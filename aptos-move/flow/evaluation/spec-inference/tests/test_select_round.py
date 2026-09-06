@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = importlib.util.spec_from_file_location(
-    "select_round", ROOT / "corpus-v3.1" / "select_round.py"
+    "select_round", ROOT / "corpus-v3.2" / "select_round.py"
 )
 select_round = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(select_round)
@@ -25,10 +25,10 @@ class RoundSelectionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.manifest = json.loads(
-            (ROOT / "corpus-v3.1" / "manifest.json").read_text(encoding="utf-8")
+            (ROOT / "corpus-v3.2" / "manifest.json").read_text(encoding="utf-8")
         )
         cls.recorded = json.loads(
-            (ROOT / "corpus-v3.1" / "metadata" / "selection.json").read_text(
+            (ROOT / "corpus-v3.2" / "metadata" / "selection.json").read_text(
                 encoding="utf-8"
             )
         )
@@ -37,7 +37,7 @@ class RoundSelectionTest(unittest.TestCase):
         if not select_round.SOURCES.is_dir():
             self.skipTest(
                 "private Etna-derived sources are not materialized; "
-                "run corpus-v3.1/build.py"
+                "run corpus-v3.2/build.py"
             )
         derived = select_round.select(
             self.manifest["records"],
@@ -46,6 +46,11 @@ class RoundSelectionTest(unittest.TestCase):
         )
         self.assertEqual(self.recorded["selected"], derived["selected"])
         self.assertEqual(self.recorded["held_back"], derived["held_back"])
+
+    def test_the_round_contains_twenty_distinct_tasks(self) -> None:
+        selected = self.recorded["selected"]
+        self.assertEqual(20, len(selected))
+        self.assertEqual(len(selected), len(set(selected)))
 
     def test_no_feature_stratum_is_lost(self) -> None:
         # Dropping the only carrier of a stratum removes a capability from the

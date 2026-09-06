@@ -1,0 +1,60 @@
+{
+ "BK-bucket-016": [
+  {
+   "mutant_id": "BK-bucket-016-skips-first-cutoff",
+   "file": "sources/etna/extracted_bucket_index.move",
+   "anchor": "for (i in 0..n) {",
+   "replace": "0..n",
+   "with": "1..n",
+   "obligation_category": "normal-result",
+   "rationale": "The first cutoff is never considered, so an immediately admissible leverage can be assigned to a later bucket."
+  },
+  {
+   "mutant_id": "BK-bucket-016-no-match-decrements",
+   "file": "sources/etna/extracted_bucket_index.move",
+   "anchor": "// If leverage exceeds all cutoffs, put into the last bucket\n        n",
+   "replace": "\n        n",
+   "with": "\n        n - 1",
+   "obligation_category": "abort",
+   "rationale": "The no-match case returns the preceding index and underflows when the cutoff vector is empty."
+  },
+  {
+   "mutant_id": "BK-bucket-016-match-returns-zero",
+   "file": "sources/etna/extracted_bucket_index.move",
+   "anchor": "if (leverage <= (buckets.cutoffs)[i]) { return i };",
+   "replace": "return i",
+   "with": "return 0",
+   "obligation_category": "normal-result",
+   "rationale": "Every admitting cutoff is reported as the first bucket, losing the least matching index when it is positive."
+  }
+ ],
+ "MD-median-015": [
+  {
+   "mutant_id": "MD-median-015-outer-comparison-reversed",
+   "file": "sources/etna/extracted_median.move",
+   "anchor": "if (a >= b) {",
+   "replace": ">=",
+   "with": "<=",
+   "obligation_category": "normal-result",
+   "rationale": "The top-level ordering split is reversed, sending most inputs through the wrong decision tree."
+  },
+  {
+   "mutant_id": "MD-median-015-upper-nested-comparison-reversed",
+   "file": "sources/etna/extracted_median.move",
+   "anchor": "if (a >= b) {\n            if (b >= c) { b }",
+   "replace": "b >= c",
+   "with": "b <= c",
+   "obligation_category": "normal-result",
+   "rationale": "When a is at least b, the test deciding whether b is the median is reversed."
+  },
+  {
+   "mutant_id": "MD-median-015-final-branch-returns-a",
+   "file": "sources/etna/extracted_median.move",
+   "anchor": "else if (b >= c) { c }\n            else { b }",
+   "replace": "else { b }",
+   "with": "else { a }",
+   "obligation_category": "normal-result",
+   "rationale": "For strictly increasing inputs the function returns the minimum instead of the middle value."
+  }
+ ]
+}

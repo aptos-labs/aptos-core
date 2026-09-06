@@ -1,0 +1,31 @@
+{
+ "PM-curve-027": [
+  {
+   "mutant_id": "PM-curve-027-below-low-returns-protected",
+   "file": "sources/etna/extracted_payout_math.move",
+   "anchor": "if (lock_amount < low_lock) { return 0 };",
+   "replace": "return 0",
+   "with": "return low_prot",
+   "obligation_category": "normal-result",
+   "rationale": "The lower clamped region returns the low protected anchor instead of zero."
+  },
+  {
+   "mutant_id": "PM-curve-027-above-high-returns-low",
+   "file": "sources/etna/extracted_payout_math.move",
+   "anchor": "if (lock_amount >= high_lock) {\n            return high_prot\n        };",
+   "replace": "return high_prot",
+   "with": "return low_prot",
+   "obligation_category": "normal-result",
+   "rationale": "The upper clamped region returns the wrong protected anchor."
+  },
+  {
+   "mutant_id": "PM-curve-027-delta-added",
+   "file": "sources/etna/extracted_payout_math.move",
+   "anchor": "let delta = ((lock_amount - low_lock) as u128);",
+   "replace": " - ",
+   "with": " + ",
+   "obligation_category": "normal-result",
+   "rationale": "The interpolation measures from the sum of the lock values rather than the distance above the low anchor."
+  }
+ ]
+}

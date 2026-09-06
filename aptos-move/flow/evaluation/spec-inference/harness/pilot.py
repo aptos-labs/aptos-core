@@ -311,7 +311,7 @@ def _require_committed_corpus(package: Path, recorded: dict[str, str] | None) ->
     """Refuse to schedule a package that is not the committed corpus.
 
     The manifest records a digest per generated source file, but only
-    `corpus-v3.1/build.py --verify` read it. A round snapshots whatever is on
+    `corpus-v3.2/build.py --verify` read it. A round snapshots whatever is on
     disk and hashes the copy, so a locally altered package would have been
     scheduled with a self-consistent snapshot hash and measured as if it were
     the corpus. The comparison is the one `build.py --verify` makes.
@@ -442,7 +442,7 @@ def _corpus_tasks(
 class CorpusRecipe:
     """How one sample's starting tree is built from the corpus.
 
-    A corpus-v3.1 record names a target in the corpus package and starts from it
+    A corpus-v3.2 record names a target in the corpus package and starts from it
     unchanged. A corpus-v1.1 record is a shared-package recipe: the package plus
     a preparation patch that removes the target's reference contract, with the
     prepared tree's digest recorded so a round cannot start from a tree the

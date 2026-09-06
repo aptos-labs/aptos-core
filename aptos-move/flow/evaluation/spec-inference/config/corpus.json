@@ -24,6 +24,6 @@
     "deep-calls": 5
   },
   "maximum_functions_per_module": 2,
-  "compatibility_threshold_seconds": 40,
+  "compatibility_threshold_seconds": 20,
   "selection_seed_suffix": "move-inference-corpus-v1"
 }
