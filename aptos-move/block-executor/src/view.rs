@@ -486,7 +486,7 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
 // txn_idx is estimated to have a r/w dependency on dep_idx.
 // Returns after the dependency has been resolved, the returned indicator is true if
 // it is safe to continue, and false if the execution has been halted.
-fn wait_for_dependency(
+pub(crate) fn wait_for_dependency(
     wait_for: &dyn TWaitForDependency,
     txn_idx: TxnIndex,
     dep_idx: TxnIndex,
