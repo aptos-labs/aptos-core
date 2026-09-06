@@ -15,7 +15,7 @@
       "target": "decibel_dex::extracted_base_math::compute_base_needed",
       "task_id": "BA-base-012",
       "threshold_seconds": 20,
-      "wall_seconds": 5.3,
+      "wall_seconds": 4.8,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -31,7 +31,7 @@
       "target": "decibel_dex::extracted_bucket_index::get_bucket_index",
       "task_id": "BK-bucket-016",
       "threshold_seconds": 20,
-      "wall_seconds": 4.7,
+      "wall_seconds": 4.5,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -47,7 +47,7 @@
       "target": "decibel_dex::extracted_liquidation_price::get_liquidation_price",
       "task_id": "LP-price-021",
       "threshold_seconds": 20,
-      "wall_seconds": 5.2,
+      "wall_seconds": 4.9,
       "well_formed": true,
       "wp_failure_kind": "untrusted_inferred_contract",
       "wp_hard": true
@@ -63,7 +63,7 @@
       "target": "decibel_dex::extracted_median::get_median_price",
       "task_id": "MD-median-015",
       "threshold_seconds": 20,
-      "wall_seconds": 5.3,
+      "wall_seconds": 5.2,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -79,7 +79,7 @@
       "target": "decibel_dex::extracted_minmax::find_min_value",
       "task_id": "MM-min-013",
       "threshold_seconds": 20,
-      "wall_seconds": 5.2,
+      "wall_seconds": 5.3,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -95,7 +95,7 @@
       "target": "decibel_dex::extracted_order_validation::validate_order_input",
       "task_id": "OV-order-006",
       "threshold_seconds": 20,
-      "wall_seconds": 5.5,
+      "wall_seconds": 5.4,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -111,7 +111,7 @@
       "target": "decibel_campaign::extracted_payout_math::compute",
       "task_id": "PM-curve-027",
       "threshold_seconds": 20,
-      "wall_seconds": 5.4,
+      "wall_seconds": 5.7,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -127,7 +127,7 @@
       "target": "decibel_dex::lomuto_partition::partition",
       "task_id": "QP-part-025",
       "threshold_seconds": 20,
-      "wall_seconds": 5.3,
+      "wall_seconds": 5.4,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -159,7 +159,7 @@
       "target": "decibel_campaign::extracted_tier_leverage::checked_max_tier_leverage",
       "task_id": "TL-lev-020",
       "threshold_seconds": 20,
-      "wall_seconds": 6.3,
+      "wall_seconds": 6.7,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -239,7 +239,7 @@
       "target": "decibel_campaign::extracted_tier_lookup::credits_for_duration_days",
       "task_id": "UC-credits-008",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 4.5,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -255,7 +255,7 @@
       "target": "decibel_vault::vault_share_math::convert_new_assets_to_share_count",
       "task_id": "VS-contrib-003",
       "threshold_seconds": 20,
-      "wall_seconds": 5.3,
+      "wall_seconds": 5.5,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -271,7 +271,7 @@
       "target": "decibel_vault::vault_share_math::calculate_unrealized_fees",
       "task_id": "VS-fees-001",
       "threshold_seconds": 20,
-      "wall_seconds": 5.6,
+      "wall_seconds": 5.7,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -287,7 +287,7 @@
       "target": "decibel_vault::vault_share_math::calculate_redemption_funds_and_fee",
       "task_id": "VS-redeem-004",
       "threshold_seconds": 20,
-      "wall_seconds": 5.1,
+      "wall_seconds": 5.0,
       "well_formed": true,
       "wp_failure_kind": "untrusted_inferred_contract",
       "wp_hard": true
@@ -303,7 +303,7 @@
       "target": "decibel_vault::vault_share_math::convert_existing_shares_to_asset_amount",
       "task_id": "VS-shares-002",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 4.9,
       "well_formed": true,
       "wp_failure_kind": "untrusted_inferred_contract",
       "wp_hard": true
@@ -327,10 +327,10 @@
   ],
   "schema_version": 1,
   "screened": 20,
-  "source_commit": "70b971adc4a62ee3cef58d722ba93926434ad6ed",
+  "source_commit": "3f5106c27af8dda5b9fb5df4289ebed3cdddeb19",
   "threshold_seconds": 20,
   "tools": {
-    "experiment_config_sha256": "ec47225c91eda5909a6e60c29e8587556ca7d24275daa5f192202f620408b91f",
+    "experiment_config_sha256": "1b5e3e8cf03964b77b5cbae4cb2a7963d23a09b914db46adb65fa28bb325e653",
     "model_independent": true,
     "move_flow": [
       "move-flow"
