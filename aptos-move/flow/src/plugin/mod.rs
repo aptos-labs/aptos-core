@@ -632,6 +632,7 @@ mod tests {
         assert!(!skill.contains("## Verification workflow"));
         assert!(skill.contains("available as an inference pass"));
         assert!(skill.contains("whether and when to use it"));
+        assert!(!skill.contains("every function it did not name is finished"));
         // WP runs on any scope; the loop diagnostics are what guide the
         // invariant, so no arm is told to withhold the call.
         assert!(skill.contains("It runs on any scope, loops included"));

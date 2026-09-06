@@ -30,8 +30,9 @@ code, and its output is dominated by text that was already correct.
 4. **Simplify arithmetic and boolean structure.** Remove only clauses implied by
    retained clauses or language guarantees. Flatten repeated updates and factor
    repeated subexpressions without changing overflow or abort behavior.
-5. **Verify the replacement.** Keep `[inferred]` on inferred replacements and
-   rerun the prover after each meaningful simplification.
+5. **Check the replacement.** Keep `[inferred]` on inferred replacements and
+   rerun the candidate check after each meaningful simplification. If it reports
+   a verification failure, use a focused prover call to localize it.
 
 Every simplification must preserve result, abort, precondition, and frame
 semantics.
