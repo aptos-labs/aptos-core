@@ -74,5 +74,5 @@
   ],
   "provider_base_url": "https://api.z.ai/api/anthropic",
   "schema_version": 1,
-  "source_commit": "3f5106c27af8dda5b9fb5df4289ebed3cdddeb19"
+  "source_commit": "e3e44eee90802fc83a003360fe9913b8507a563d"
 }
