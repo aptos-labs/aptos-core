@@ -437,15 +437,17 @@ pub struct Violation {
     pub path: String,
     pub line: usize,
     pub message: String,
-    /// Qualified function and its source line, used internally to distinguish
-    /// otherwise identical weakening sites. These are deliberately omitted
-    /// from the JSON report; `path` and `line` remain its public location.
+    /// Function and source context used internally to distinguish otherwise
+    /// identical weakening sites. These are deliberately omitted from the JSON
+    /// report; `path` and `line` remain its public location.
     #[serde(skip)]
     pub function: Option<String>,
     #[serde(skip)]
     pub function_line: Option<usize>,
     #[serde(skip)]
     pub function_context: Option<String>,
+    #[serde(skip)]
+    pub source_span: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -789,6 +791,7 @@ pub fn check_specification(
             function: None,
             function_line: None,
             function_context: None,
+            source_span: None,
         })
         .collect::<Vec<_>>();
 
@@ -1227,18 +1230,20 @@ fn is_inline_marker(exp: &Exp) -> bool {
 /// had as newly introduced. The function identity prevents a candidate from
 /// moving an inherited construct into the checked target. The preceding
 /// specification-free function text binds an inline construct to its runtime
-/// program point, while the relative line and source text keep otherwise
-/// unrelated constructs apart.
+/// program point, while the relative line and full construct text keep
+/// otherwise unrelated constructs apart.
 fn weakening_site(package: &Path, violation: &Violation) -> String {
-    let text = std::fs::read_to_string(package.join(&violation.path))
-        .ok()
-        .and_then(|source| {
-            source
-                .lines()
-                .nth(violation.line.saturating_sub(1))
-                .map(|line| line.trim().to_string())
-        })
-        .unwrap_or_default();
+    let text = violation.source_span.clone().unwrap_or_else(|| {
+        std::fs::read_to_string(package.join(&violation.path))
+            .ok()
+            .and_then(|source| {
+                source
+                    .lines()
+                    .nth(violation.line.saturating_sub(1))
+                    .map(|line| line.trim().to_string())
+            })
+            .unwrap_or_default()
+    });
     let function = violation.function.as_deref().unwrap_or_default();
     let relative_line = violation
         .function_line
@@ -1304,6 +1309,16 @@ fn location_of(env: &GlobalEnv, package: &Path, loc: &Loc) -> Violation {
         ),
         None => ("<target-specification>".to_string(), 1),
     };
+    let source_span = {
+        let source = env.get_file_source(loc.file_id());
+        let start = loc.span().start().0 as usize;
+        let end = loc.span().end().0 as usize;
+        source
+            .get(start..end)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_string)
+    };
     Violation {
         code: String::new(),
         path,
@@ -1312,6 +1327,7 @@ fn location_of(env: &GlobalEnv, package: &Path, loc: &Loc) -> Violation {
         function: None,
         function_line: None,
         function_context: None,
+        source_span,
     }
 }
 
@@ -1404,6 +1420,7 @@ pub fn check_edit_scope(
             function: None,
             function_line: None,
             function_context: None,
+            source_span: None,
         })
         .collect();
     Ok((changed, violations))
@@ -1735,6 +1752,47 @@ mod tests {
     }
 
     #[test]
+    fn changing_a_multiline_companion_weakening_is_rejected() {
+        let source = "module 0xCAFE::m { fun target(x: u64): u64 { x } }";
+        let package = |name, condition| {
+            crate::tests::common::make_package(name, &[
+                ("m", source),
+                (
+                    "m.spec.move",
+                    &format!(
+                        "spec 0xCAFE::m {{\n    spec target(x: u64): u64 {{\n        ensures [abstract]\n            {condition};\n    }}\n}}"
+                    ),
+                ),
+            ])
+        };
+        let baseline = package("baseline", "result == x");
+        let candidate = package("candidate", "false");
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(
+                !env.has_errors(),
+                "probe package does not compile:\n{}",
+                crate::mcp::package_data::render_diagnostics(&env).join("\n")
+            );
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("abstract_condition", added[0].code);
+    }
+
+    #[test]
     fn suppressing_pragmas_are_rejected() {
         let report = check_module(
             "module 0xCAFE::m {
@@ -1940,6 +1998,7 @@ mod tests {
                     function: None,
                     function_line: None,
                     function_context: None,
+                    source_span: None,
                 }],
                 assumed_contracts: Vec::new(),
                 contract_coverage: ContractCoverage {
