@@ -71,6 +71,13 @@ where
         self.inner.remove(key)
     }
 
+    fn replace(&self, map: DashMap<K, V>) {
+        self.inner.clear();
+        for (key, value) in map {
+            self.inner.insert(key, value);
+        }
+    }
+
     fn len(&self) -> usize {
         self.inner.len()
     }
@@ -147,10 +154,13 @@ impl HotStateView for LayeredHotStateView {
 
 enum CommitMsg {
     Commit(State),
-    /// Sent by `hack_reset` to synchronously reset the Committer's `merged_state` and `old_views`.
+    /// Sent by `hack_reset` to synchronously reset the Committer's `merged_state` and `old_views`
+    /// and republish `committed`. `base_shards`, when given, replaces the base DashMaps' contents
+    /// in the same step, so a restore's KVs and their LRU metadata are installed together.
     /// The caller blocks on `ack` until the Committer has finished processing the reset.
     HackReset {
         state: State,
+        base_shards: Option<[DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
         ack: Sender<()>,
     },
 }
@@ -162,6 +172,8 @@ struct CommittedSnapshot {
 }
 
 pub struct HotState {
+    /// The Committer owns the live reference and is the only writer. Only read by test helpers.
+    #[cfg(test)]
     base: Arc<HotStateBase>,
     committed: Arc<Mutex<CommittedSnapshot>>,
     commit_tx: SyncSender<CommitMsg>,
@@ -200,6 +212,7 @@ impl HotState {
         );
 
         Self {
+            #[cfg(test)]
             base,
             committed,
             commit_tx,
@@ -208,22 +221,22 @@ impl HotState {
         }
     }
 
-    pub(crate) fn hack_reset(&self, state: State) {
-        {
-            let mut committed = self.committed.lock();
-            committed.state = state.clone();
-            // Reset view to base-only (no delta). hack_reset is only called when no commits are in
-            // flight, so DashMaps and committed state are in sync from the readers' perspective.
-            committed.view = Arc::new(LayeredHotStateView {
-                delta: None,
-                base: Arc::clone(&self.base),
-            });
-        }
-        // Synchronously reset the Committer's merged_state and old_views. Block until processed,
-        // so the caller has a hard guarantee that no stale Committer state remains.
+    /// Resets the committed state to `state`, optionally replacing the base DashMaps' contents
+    /// with `base_shards` (e.g. what a restore wrote) in the same step. Everything happens on the
+    /// Committer thread; this blocks until it's done, so the caller has a hard guarantee that no
+    /// stale Committer state remains.
+    pub(crate) fn hack_reset(
+        &self,
+        state: State,
+        base_shards: Option<[DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
+    ) {
         let (ack_tx, ack_rx) = std::sync::mpsc::channel();
         self.commit_tx
-            .send(CommitMsg::HackReset { state, ack: ack_tx })
+            .send(CommitMsg::HackReset {
+                state,
+                base_shards,
+                ack: ack_tx,
+            })
             .expect("Failed to send reset to hot state committer.");
         ack_rx
             .recv()
@@ -407,19 +420,31 @@ impl Committer {
         info!("HotState committer quitting.");
     }
 
-    /// Process a `HackReset` message: synchronize `merged_state` / `old_views` with the caller and
-    /// ack.
+    /// Process a `HackReset` message: install `base_shards` if given, synchronize `merged_state` /
+    /// `old_views` with the caller, republish `committed`, and ack.
     ///
     /// `HackReset` is a hack used by `hack_reset` and is only sent when no commits are in flight,
     /// so it must be the sole message in the channel. `next_to_commit` asserts this before
     /// calling.
     ///
-    // TODO(HotState): The DashMaps and the LRU metadata in `State` are loaded together (from
-    // `load_hot_state_kvs`) but arrive here through separate paths — the DashMaps via
-    // `new_from_loaded` at `PersistedState` construction, the `State` via `hack_reset`. The
-    // assertions below guard against the two getting out of sync. Consider passing them
-    // together through a single path to make consistency structural.
-    fn handle_reset(&mut self, state: State, ack: Sender<()>) {
+    /// The assertions below check `state`'s LRU metadata against the DashMaps. With `base_shards`
+    /// the two come from the same `load_hot_state_kvs` call and are installed together here. With
+    /// `None` they validate `state` against whatever the base already holds — at startup, the
+    /// shards `new_from_loaded` moved in (moved rather than copied, since they can hold millions
+    /// of entries).
+    fn handle_reset(
+        &mut self,
+        state: State,
+        base_shards: Option<[DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
+        ack: Sender<()>,
+    ) {
+        let base_replaced = base_shards.is_some();
+        if let Some(base_shards) = base_shards {
+            for (shard, loaded) in self.base.shards.iter().zip(base_shards) {
+                shard.replace(loaded);
+            }
+        }
+
         for i in 0..NUM_STATE_SHARDS {
             let head = state.latest_hot_key(i);
             let tail = state.oldest_hot_key(i);
@@ -460,6 +485,25 @@ impl Committer {
         self.merged_version
             .store(self.merged_state.next_version(), Ordering::Release);
         self.old_views.clear();
+
+        {
+            let mut committed = self.committed.lock();
+            committed.state = self.merged_state.clone();
+            // Publish a base-only view (no delta): the DashMaps now reflect `merged_state`.
+            committed.view = Arc::new(LayeredHotStateView {
+                delta: None,
+                base: Arc::clone(&self.base),
+            });
+        }
+
+        self.report_size_metrics();
+        self.report_age_metrics();
+        info!(
+            next_version = self.merged_state.next_version(),
+            num_items = self.base.len(),
+            base_replaced = base_replaced,
+            "HotState reset.",
+        );
         let _ = ack.send(());
     }
 
@@ -470,13 +514,17 @@ impl Committer {
         let first = loop {
             match self.rx.recv_timeout(DEFERRED_MERGE_RETRY_INTERVAL) {
                 Ok(CommitMsg::Commit(state)) => break state,
-                Ok(CommitMsg::HackReset { state, ack }) => {
+                Ok(CommitMsg::HackReset {
+                    state,
+                    base_shards,
+                    ack,
+                }) => {
                     assert!(
                         self.rx.try_recv().is_err(),
                         "HackReset must be the only message in the channel — \
                          hack_reset is only valid when no commits are in flight."
                     );
-                    self.handle_reset(state, ack);
+                    self.handle_reset(state, base_shards, ack);
                 },
                 Err(RecvTimeoutError::Timeout) => {
                     self.try_merge();
@@ -601,10 +649,17 @@ impl Committer {
             debug_assert!(self.validate_lru(shard_id).is_ok());
         }
 
-        let total_items = self.base.len();
         COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
         COUNTER.inc_with_by(&["hot_state_update"], n_update);
         COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
+
+        self.report_size_metrics();
+        self.report_age_metrics();
+    }
+
+    /// Reports item count and byte size of the base DashMaps.
+    fn report_size_metrics(&self) {
+        let total_items = self.base.len();
         GAUGE.set_with(&["hot_state_items"], total_items as i64);
         GAUGE.set_with(
             &["hot_state_key_bytes"],
@@ -614,8 +669,6 @@ impl Committer {
             &["hot_state_value_bytes"],
             self.total_value_bytes.iter().sum::<usize>() as i64,
         );
-
-        self.report_age_metrics();
     }
 
     /// Reports per-shard MRU/LRU `hot_since_version` gauges and aggregate max/min LRU across shards.
