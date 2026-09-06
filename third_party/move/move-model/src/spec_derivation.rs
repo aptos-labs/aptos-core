@@ -1291,7 +1291,13 @@ pub fn try_as_pure_spec_call(
     // `map_spec_new`.  Do not derive and call its `$` companion, whose body
     // packs the source representation and is illegal for a backend intrinsic
     // map type.
-    if callee.is_intrinsic() && callee.get_parameters().is_empty() {
+    // An unbound map constructor is intentionally not registered as a Move
+    // intrinsic: its result type's `map_spec_new` binding is its prover
+    // implementation. Preserve this fallback even though other unregistered
+    // executable intrinsics are now verified as ordinary functions.
+    if (callee.is_intrinsic() || callee.is_unimplemented_intrinsic())
+        && callee.get_parameters().is_empty()
+    {
         let instantiated_result = callee.get_result_type().instantiate(type_inst);
         if let Type::Struct(result_mid, result_sid, result_inst) = &instantiated_result {
             let intrinsics = env.get_intrinsics();
