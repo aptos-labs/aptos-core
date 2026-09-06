@@ -1316,7 +1316,13 @@ fn location_in_function(
 ) -> Violation {
     let mut violation = location_of(env, package, loc);
     violation.function = Some(function.get_full_name_str());
-    violation.function_line = Some(location_of(env, package, &function.get_loc()).line);
+    let function_location = location_of(env, package, &function.get_loc());
+    // A companion `.spec.move` condition and its executable function have
+    // locations in different files. Their line numbers share no origin, so a
+    // subtraction would make harmless edits above the companion spec change
+    // the weakening identity.
+    violation.function_line =
+        (function_location.path == violation.path).then_some(function_location.line);
     violation
 }
 
@@ -1626,6 +1632,48 @@ mod tests {
         assert_eq!(1, added.len());
         assert!(inherited.is_empty());
         assert_eq!("unjustified_assumption", added[0].code);
+    }
+
+    #[test]
+    fn a_line_shift_in_a_companion_spec_keeps_an_inherited_weakening() {
+        let source = "module 0xCAFE::m { fun target(x: u64): u64 { x } }";
+        let baseline = crate::tests::common::make_package("baseline", &[
+            ("m", source),
+            (
+                "m.spec.move",
+                    "spec 0xCAFE::m {\n    spec target(x: u64): u64 { ensures [abstract] result == x; }\n}",
+            ),
+        ]);
+        let candidate = crate::tests::common::make_package("candidate", &[
+            ("m", source),
+            (
+                "m.spec.move",
+                    "spec 0xCAFE::m {\n\n    spec target(x: u64): u64 { ensures [abstract] result == x; }\n}",
+            ),
+        ]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(
+                !env.has_errors(),
+                "probe package does not compile:\n{}",
+                crate::mcp::package_data::render_diagnostics(&env).join("\n")
+            );
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert!(added.is_empty());
+        assert_eq!(1, inherited.len());
+        assert_eq!("abstract_condition", inherited[0].code);
     }
 
     #[test]
