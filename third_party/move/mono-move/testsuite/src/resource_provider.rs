@@ -71,7 +71,7 @@ impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
             .get(key)
             .map(|&ptr| StorageRead::ExternalHeap {
                 ptr,
-                version: 0,
+                version: None,
                 pin: materialized.arena.clone(),
             })
     }
@@ -89,7 +89,7 @@ impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
         materialized.cache.insert(key.clone(), ptr);
         Ok(StorageRead::ExternalHeap {
             ptr,
-            version: 0,
+            version: None,
             pin: arena,
         })
     }
@@ -114,13 +114,18 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
                     .map_err(|err| ResourceProviderError::InvariantViolation(err.to_string()))?;
                 match blob {
                     Some(blob) => self.materialize(key, *ty, &blob),
-                    None => Ok(StorageRead::DoesNotExist),
+                    None => Ok(StorageRead::DoesNotExist { version: None }),
                 }
             },
             // TODO(testing): serve table items from the storage's tables once the
             // session commits table writes, so transactional sources can keep tables
             // across tasks.
-            InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist),
+            InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist { version: None }),
+            // Resource groups are a storage-layer concern; this provider serves
+            // members directly by their own key.
+            InMemoryStorageKey::ResourceGroup { .. } => {
+                Ok(StorageRead::DoesNotExist { version: None })
+            },
         }
     }
 }
