@@ -13,6 +13,7 @@ use crate::{
         StateDb,
     },
 };
+use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
@@ -20,7 +21,8 @@ use aptos_storage_interface::state_store::{
     state_with_summary::{LedgerStateWithSummary, StateWithSummary},
     HotStateShardUpdates, HotStateUpdates,
 };
-use aptos_types::state_store::NUM_STATE_SHARDS;
+use aptos_types::state_store::{state_slot::StateSlot, NUM_STATE_SHARDS};
+use dashmap::DashMap;
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -103,11 +105,12 @@ impl BufferedState {
         target_items: usize,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
+        hot_state_base_shards: Option<[DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
     ) -> Self {
         let arc_state_db = Arc::clone(state_db);
         *out_current_state.lock() =
             LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
-        out_persisted_state.hack_reset(last_snapshot.clone());
+        out_persisted_state.hack_reset(last_snapshot.clone(), hot_state_base_shards);
 
         let merklize_state_db = Arc::clone(&arc_state_db);
         let persisted_state_clone = out_persisted_state.clone();

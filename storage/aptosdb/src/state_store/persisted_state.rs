@@ -74,10 +74,18 @@ impl PersistedState {
         self.hot_state.enqueue_commit(state);
     }
 
-    // n.b. Can only be used when no on the fly commit is in the queue.
-    pub fn hack_reset(&self, state_with_summary: StateWithSummary) {
+    /// Resets the persisted state to `state_with_summary`. `base_shards`, when given, replaces
+    /// the base hot state shards (e.g. with what a restore wrote), in which case
+    /// `state_with_summary` must carry the LRU metadata describing them.
+    ///
+    /// n.b. Can only be used when no on the fly commit is in the queue.
+    pub fn hack_reset(
+        &self,
+        state_with_summary: StateWithSummary,
+        base_shards: Option<[DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
+    ) {
         let (state, summary) = state_with_summary.into_inner();
         *self.summary.lock() = summary;
-        self.hot_state.hack_reset(state);
+        self.hot_state.hack_reset(state, base_shards);
     }
 }

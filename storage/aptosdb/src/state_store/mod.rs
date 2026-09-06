@@ -82,6 +82,7 @@ use aptos_types::{
     transaction::Version,
 };
 use claims::{assert_ge, assert_le};
+use dashmap::DashMap;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
@@ -497,6 +498,7 @@ impl StateStore {
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
+                /*hot_state_base_shards=*/ None,
             )
         } else {
             Self::create_buffered_state_from_latest_snapshot(
@@ -507,6 +509,8 @@ impl StateStore {
                 current_state.clone(),
                 persisted_state.clone(),
                 hot_state_metadata,
+                // Already installed as the base hot state by `new_from_loaded` above.
+                None,
                 hot_state_config,
             )
             .expect("buffered state creation failed.")
@@ -737,6 +741,7 @@ impl StateStore {
             current_state.clone(),
             PersistedState::new_empty(HotStateConfig::default()),
             Default::default(),
+            /*hot_state_base_shards=*/ None,
             HotStateConfig::default(),
         )?;
         let base_version = current_state.lock().version();
@@ -753,6 +758,9 @@ impl StateStore {
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
+        // Hot state KVs described by `hot_state_metadata`, installed as the base hot state.
+        // `None` leaves the base as-is, in which case `hot_state_metadata` must describe it.
+        hot_state_base_shards: Option<[DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
         hot_state_config: HotStateConfig,
     ) -> Result<BufferedState> {
         let num_transactions = state_db
@@ -825,6 +833,7 @@ impl StateStore {
             buffered_state_target_items,
             out_current_state.clone(),
             out_persisted_state.clone(),
+            hot_state_base_shards,
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
@@ -990,24 +999,46 @@ impl StateStore {
         state_db: &Arc<StateDb>,
         hot_state_config: HotStateConfig,
     ) -> (PersistedState, [HotStateMetadata; NUM_STATE_SHARDS]) {
-        let empty = || {
-            (
+        match Self::try_load_hot_state_kvs(state_db, hot_state_config) {
+            None => (
                 PersistedState::new_empty(hot_state_config),
                 Default::default(),
-            )
-        };
-
-        if hot_state_config.delete_on_restart {
-            return empty();
+            ),
+            Some((snapshot_version, shards, metadata)) => {
+                let usage = state_db
+                    .get_state_storage_usage(Some(snapshot_version))
+                    .expect("Failed to query state storage usage on initialization.");
+                let state = State::new_at_version_with_hot_state_metadata(
+                    Some(snapshot_version),
+                    usage,
+                    hot_state_config,
+                    metadata.clone(),
+                );
+                (
+                    PersistedState::new_from_loaded(state, hot_state_config, shards),
+                    metadata,
+                )
+            },
         }
-        let snapshot_version = match state_db
+    }
+
+    /// Loads the hot state KV shards and per-shard LRU metadata at the latest snapshot
+    /// version. `None` when loading is not applicable (disabled, no snapshot).
+    fn try_load_hot_state_kvs(
+        state_db: &Arc<StateDb>,
+        hot_state_config: HotStateConfig,
+    ) -> Option<(
+        Version,
+        [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+        [HotStateMetadata; NUM_STATE_SHARDS],
+    )> {
+        if hot_state_config.delete_on_restart {
+            return None;
+        }
+        let snapshot_version = state_db
             .state_merkle_db
             .get_state_snapshot_version_before(Version::MAX)
-            .expect("Failed to query latest snapshot on initialization.")
-        {
-            Some(v) => v,
-            None => return empty(),
-        };
+            .expect("Failed to query latest snapshot on initialization.")?;
 
         let loaded = state_db
             .hot_state_kv_db
@@ -1021,21 +1052,7 @@ impl StateStore {
                 loaded[i].total_value_bytes,
             )
         });
-        let dashmaps = loaded.map(|s| s.map);
-        let usage = state_db
-            .get_state_storage_usage(Some(snapshot_version))
-            .expect("Failed to query state storage usage on initialization.");
-        let state = State::new_at_version_with_hot_state_metadata(
-            Some(snapshot_version),
-            usage,
-            hot_state_config,
-            metadata.clone(),
-        );
-
-        (
-            PersistedState::new_from_loaded(state, hot_state_config, dashmaps),
-            metadata,
-        )
+        Some((snapshot_version, loaded.map(|s| s.map), metadata))
     }
 
     pub fn reset(&self) {
@@ -1046,9 +1063,30 @@ impl StateStore {
         // drop-time `sync_commit` read the new family and panic on
         // `is_descendant_of`.
         self.buffered_state.lock().quit();
-        // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
-        // metadata here. This is safe because callers (restore / state-sync) open the DB with
-        // `empty_buffered_state_for_restore`, so the DashMaps are always empty.
+        // A restore may have written a hot state snapshot since the DB was opened, so reload it
+        // and hand it over with its LRU metadata, replacing whatever the base held.
+        //
+        // TODO(HotState): load it under `delete_on_restart` too. Today that flag makes
+        // `create_buffered_state_from_latest_snapshot` fall back to the placeholder hot root and
+        // then write a null node over the hot JMT root the restore just wrote.
+        let (shards, hot_state_metadata) =
+            match Self::try_load_hot_state_kvs(&self.state_db, self.hot_state_config) {
+                Some((snapshot_version, shards, metadata)) => {
+                    info!(
+                        snapshot_version = snapshot_version,
+                        num_items = shards.iter().map(|s| s.len()).sum::<usize>(),
+                        "Reloading hot state from DB on reset."
+                    );
+                    (shards, metadata)
+                },
+                None => {
+                    info!(
+                        delete_on_restart = self.hot_state_config.delete_on_restart,
+                        "No hot state to reload on reset; clearing the in-memory hot state."
+                    );
+                    (std::array::from_fn(|_| DashMap::new()), Default::default())
+                },
+            };
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
@@ -1056,7 +1094,8 @@ impl StateStore {
             true,
             self.current_state.clone(),
             self.persisted_state.clone(),
-            Default::default(),
+            hot_state_metadata,
+            Some(shards),
             self.hot_state_config,
         )
         .expect("buffered state creation failed.");
@@ -1627,7 +1666,8 @@ impl StateStore {
             last_checkpoint.clone(),
         );
 
-        self.persisted_state.hack_reset(last_checkpoint.clone());
+        self.persisted_state
+            .hack_reset(last_checkpoint.clone(), /*base_shards=*/ None);
         *self.current_state_locked() = current;
         self.buffered_state
             .lock()

@@ -897,7 +897,7 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
     let persisted_state = PersistedState::new_empty(TEST_CONFIG);
-    persisted_state.hack_reset(empty.deref().clone());
+    persisted_state.hack_reset(empty.deref().clone(), /*base_shards=*/ None);
 
     let (to_summary_update, from_state_update) = channel();
     let (to_db_commit, from_summary_update) = channel();
