@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::state_store::persisted_state::PersistedState;
+use crate::state_store::{hot_state::LoadedHotState, persisted_state::PersistedState};
 use aptos_block_executor::hot_state_op_accumulator::BlockHotStateOpAccumulator;
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -897,7 +897,10 @@ fn replay_chunks_pipelined(chunks: Vec<Chunk>, state_by_version: Arc<StateByVers
     let current_state = Arc::new(Mutex::new(empty.clone()));
 
     let persisted_state = PersistedState::new_empty(TEST_CONFIG);
-    persisted_state.hack_reset(empty.deref().clone());
+    persisted_state.install_snapshot(
+        LoadedHotState::empty(empty.state().clone()),
+        empty.summary().clone(),
+    );
 
     let (to_summary_update, from_state_update) = channel();
     let (to_db_commit, from_summary_update) = channel();
