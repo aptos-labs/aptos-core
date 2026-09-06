@@ -121,6 +121,7 @@ pub fn build_loop_info(func_target: &FunctionTarget) -> anyhow::Result<FatLoopFu
         for_spec: false,
         targets: None,
         forced_unroll: None,
+        forced_unroll_only: None,
     }
     .build_loop_info(func_target)
     .map(|(info, _)| info)
@@ -138,6 +139,7 @@ pub fn build_loop_info_for_spec(
         for_spec: true,
         targets: Some(targets),
         forced_unroll: None,
+        forced_unroll_only: None,
     }
     .build_loop_info(func_target)
 }
@@ -151,10 +153,25 @@ pub fn build_loop_info_for_spec_with_forced_unroll(
     targets: &FunctionTargetsHolder,
     forced_unroll: usize,
 ) -> anyhow::Result<(FatLoopFunctionInfo, LoopUnrollingFunctionInfo)> {
+    build_loop_info_for_spec_with_forced_unroll_of(func_target, targets, forced_unroll, None)
+}
+
+/// As above, but unroll only `only` and summarize every other loop.
+///
+/// Bounded diagnostics want facts about one loop. Unrolling the others as well
+/// multiplies the paths through the bounded DAG without adding anything about
+/// the loop in question.
+pub fn build_loop_info_for_spec_with_forced_unroll_of(
+    func_target: &FunctionTarget,
+    targets: &FunctionTargetsHolder,
+    forced_unroll: usize,
+    only: Option<Label>,
+) -> anyhow::Result<(FatLoopFunctionInfo, LoopUnrollingFunctionInfo)> {
     FatLoopBuilder {
         for_spec: true,
         targets: Some(targets),
         forced_unroll: Some(forced_unroll),
+        forced_unroll_only: only,
     }
     .build_loop_info(func_target)
 }
@@ -163,6 +180,13 @@ struct FatLoopBuilder<'a> {
     for_spec: bool,
     targets: Option<&'a FunctionTargetsHolder>,
     forced_unroll: Option<usize>,
+    /// Restrict forced unrolling to a single loop header.
+    ///
+    /// Unrolling every invariant-free loop to observe one of them makes the
+    /// bounded DAG carry on the order of `(unroll + 1)^loops` paths. A caller
+    /// that wants facts about one loop names it here; the rest stay summarized,
+    /// which is what the fat-loop machinery does with them anyway.
+    forced_unroll_only: Option<Label>,
 }
 
 impl FatLoopBuilder<'_> {
@@ -218,7 +242,8 @@ impl FatLoopBuilder<'_> {
                     .probe_loop_unrolling_mark(&cfg, func_target, fat_root)
                     .map(|(marker, count)| (Some(marker), count))
                     .or_else(|| unroll_pragma.map(|count| (None, count)));
-                let diagnostic_unrolling = if invariants.is_empty() {
+                let selected_for_unroll = self.forced_unroll_only.is_none_or(|only| only == label);
+                let diagnostic_unrolling = if invariants.is_empty() && selected_for_unroll {
                     self.forced_unroll.map(|count| (None, count))
                 } else {
                     None

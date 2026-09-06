@@ -337,6 +337,7 @@ impl CandidateVerdict {
             passed: false,
             changed_paths: Vec::new(),
             violations: Vec::new(),
+            inherited_weakenings: Vec::new(),
             scope_violations: Vec::new(),
             assumed_contracts: Vec::new(),
             contract_coverage: ContractCoverage {
@@ -436,6 +437,17 @@ pub struct Violation {
     pub path: String,
     pub line: usize,
     pub message: String,
+    /// Enclosing scope and source context used internally to distinguish otherwise
+    /// identical weakening sites. These are deliberately omitted from the JSON
+    /// report; `path` and `line` remain its public location.
+    #[serde(skip)]
+    pub function: Option<String>,
+    #[serde(skip)]
+    pub function_line: Option<usize>,
+    #[serde(skip)]
+    pub function_context: Option<String>,
+    #[serde(skip)]
+    pub source_span: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -449,6 +461,14 @@ pub struct PolicyReport {
     pub passed: bool,
     pub changed_paths: Vec<String>,
     pub violations: Vec<Violation>,
+    /// Weakening constructs the baseline package already carried.
+    ///
+    /// Reported, never rejected: they constrain the candidate's proof and the
+    /// reference's alike, so they are a property of the corpus rather than of
+    /// the change. Empty without a baseline, where the two cannot be told
+    /// apart and every construct is reported as the candidate's.
+    #[serde(default)]
+    pub inherited_weakenings: Vec<Violation>,
     /// Files edited outside the declared scope.
     ///
     /// Held apart from `violations` because it is reported rather than
@@ -492,8 +512,12 @@ impl PolicyReport {
 /// a spec function's body is a line the target contains but no obligation it
 /// carries.
 ///
-/// Needs no baseline: a weakening construct is rejected wherever it appears,
-/// and a required category has to be covered by the specification as it stands.
+/// Reports a weakening construct wherever it appears, and a required category
+/// has to be covered by the specification as it stands. Whether a construct is
+/// the candidate's own is a separate question, answered by `added_weakenings`
+/// against a baseline scan: on a corpus whose package is a whole framework,
+/// the upstream sources carry assumptions of their own, and the reference
+/// contract is proved under exactly those.
 /// `filter` of `None` means every function in the package's target modules;
 /// an empty filter string would match no module and is not a way to say "all".
 pub fn check_specification(
@@ -501,6 +525,7 @@ pub fn check_specification(
     package: &Path,
     filter: Option<&str>,
     required_contract_categories: &[String],
+    inherited_partial_aborts: &BTreeSet<String>,
 ) -> Result<PolicyReport> {
     for category in required_contract_categories {
         anyhow::ensure!(
@@ -524,7 +549,7 @@ pub fn check_specification(
                 violations.push(Violation {
                     code: "axiom".to_string(),
                     message: "`axiom` is forbidden: it is assumed, never proved".to_string(),
-                    ..location_of(env, package, &condition.loc)
+                    ..location_in_module(env, package, &module, &condition.loc)
                 });
             }
         }
@@ -534,6 +559,7 @@ pub fn check_specification(
                 module.get_name().display_full(env),
                 function.get_name().display(env.symbol_pool())
             );
+            let at = |loc: &Loc| location_in_function(env, package, &function, loc);
             // A lemma is proved unless its verification is disabled, in which
             // case every `apply` of it assumes it. That holds whatever the
             // filter selects, so it is checked for the whole target module.
@@ -542,7 +568,7 @@ pub fn check_specification(
                     code: "unproved_lemma".to_string(),
                     message: "a lemma with verification disabled is assumed, not proved"
                         .to_string(),
-                    ..location_of(env, package, &function.get_loc())
+                    ..at(&function.get_loc())
                 });
             }
             // An assumption constrains whatever proof reaches it. The prover
@@ -555,7 +581,7 @@ pub fn check_specification(
                     code: "unjustified_assumption".to_string(),
                     message: "`assume` in a proof block is forbidden: it is trusted, not proved"
                         .to_string(),
-                    ..location_of(env, package, &loc)
+                    ..at(&loc)
                 });
             }
             for condition in &conditions {
@@ -565,12 +591,12 @@ pub fn check_specification(
                         message: "`assume` is forbidden: it narrows what is verified without \
                                   declaring a precondition"
                             .to_string(),
-                        ..location_of(env, package, &condition.loc)
+                        ..at(&condition.loc)
                     }),
                     ConditionKind::Axiom(_) => violations.push(Violation {
                         code: "axiom".to_string(),
                         message: "`axiom` is forbidden: it is assumed, never proved".to_string(),
-                        ..location_of(env, package, &condition.loc)
+                        ..at(&condition.loc)
                     }),
                     _ => {},
                 }
@@ -584,7 +610,7 @@ pub fn check_specification(
                         "`pragma unroll = {depth}` is forbidden: a loop without an invariant is \
                          unrolled to that depth, so the proof covers only {depth} iterations"
                     ),
-                    ..location_of(env, package, &function.get_loc())
+                    ..at(&function.get_loc())
                 });
             }
             for (pragma, reason) in OBLIGATION_SUPPRESSING_PRAGMAS {
@@ -592,7 +618,7 @@ pub fn check_specification(
                     violations.push(Violation {
                         code: "suppressed_obligation".to_string(),
                         message: format!("`pragma {pragma}` is forbidden: {reason}"),
-                        ..location_of(env, package, &function.get_loc())
+                        ..at(&function.get_loc())
                     });
                 }
             }
@@ -610,8 +636,6 @@ pub fn check_specification(
             }
             any_target = true;
             let spec = function.get_spec();
-            let at = |loc: &Loc| location_of(env, package, loc);
-
             // Pragmas that suppress or qualify the proof obligation.
             if function.is_pragma_false(VERIFY_PRAGMA) {
                 violations.push(Violation {
@@ -620,14 +644,25 @@ pub fn check_specification(
                     ..at(&function.get_loc())
                 });
             }
-            if function.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false) {
+            // Partiality the candidate wrote for itself does not license a
+            // partial caller; partiality it found does -- reported by inference
+            // for the callee, or already in the tree the run started from.
+            let justified = |callee: &FunctionEnv<'_>| {
+                contract_is_inferred(callee)
+                    || inherited_partial_aborts.contains(&callee.get_full_name_str())
+            };
+            if function.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+                && partial_abort_boundary(&function, justified).is_none()
+            {
                 violations.push(Violation {
                     code: "partial_aborts".to_string(),
                     message: "the abort characterization is incomplete: \
                               `aborts_if_is_partial` makes the emitted `aborts_if` clauses a \
                               lower bound. Complete the abort behavior and then remove the \
                               pragma; removing it on its own turns an incomplete contract \
-                              into a false claim of exactness"
+                              into a false claim of exactness. It is admissible only when a \
+                              callee's own contract is partial, since a caller cannot be more \
+                              exact about aborts than the contracts it is verified against"
                         .to_string(),
                     ..at(&function.get_loc())
                 });
@@ -753,6 +788,10 @@ pub fn check_specification(
             message: format!(
                 "required contract category `{category}` is absent from the specification"
             ),
+            function: None,
+            function_line: None,
+            function_context: None,
+            source_span: None,
         })
         .collect::<Vec<_>>();
 
@@ -760,6 +799,7 @@ pub fn check_specification(
         passed: violations.is_empty(),
         changed_paths: Vec::new(),
         violations,
+        inherited_weakenings: Vec::new(),
         scope_violations: Vec::new(),
         assumed_contracts: Vec::new(),
         contract_coverage: ContractCoverage {
@@ -827,6 +867,13 @@ pub struct BaselineContracts {
     pub intrinsic: BTreeSet<String>,
     /// Spec functions, by qualified name, with their definition.
     pub spec_functions: BTreeMap<String, String>,
+    /// Functions whose contract already declared `aborts_if_is_partial`, by
+    /// qualified name. A caller may inherit that partiality; it is a property
+    /// of the tree the run started from, not something the candidate wrote.
+    pub partial_aborts: BTreeSet<String>,
+    /// Weakening constructs the baseline itself contains, by site, with how
+    /// many times each occurs.
+    pub weakenings: BTreeMap<String, usize>,
 }
 
 /// A stable rendering of a spec function's definition: arity and displayed
@@ -961,6 +1008,69 @@ pub fn contract_fingerprint(env: &GlobalEnv, function: &FunctionEnv<'_>) -> Stri
 /// Without a baseline the check cannot tell which the candidate added, so it
 /// names them rather than either rejecting a package for its own dependencies
 /// or staying silent.
+/// Whether this function's contract was produced by inference rather than
+/// written by hand, judged by the `[inferred]` marker the engine attaches to
+/// every condition it derives.
+fn contract_is_inferred(function: &FunctionEnv<'_>) -> bool {
+    let env = function.module_env.env;
+    let inferred = env.symbol_pool().make(CONDITION_INFERRED_PROP);
+    conditions_of(function)
+        .iter()
+        .any(|condition| condition.properties.contains_key(&inferred))
+}
+
+/// A callee whose partial abort contract the caller inherits, if there is one.
+///
+/// `aborts_if_is_partial` says the emitted `aborts_if` clauses are a lower
+/// bound rather than the exact abort condition. Writing that about a function
+/// whose callees are all exact hides an abort the contract could have stated,
+/// so the check rejects it. But a caller is verified against its opaque
+/// callees' contracts, not their bodies, and cannot be more exact about aborts
+/// than those contracts are: when one of them is itself partial, the caller has
+/// no exact condition to state and the pragma is the honest form.
+///
+/// `justified` decides which callee's partiality counts. Partiality the
+/// candidate wrote itself does not: marking a helper partial and then citing it
+/// would excuse any contract at all. What counts is partiality the candidate
+/// found -- reported by inference, or already in the tree it started from.
+///
+/// The walk stops at each opaque callee, which is where the caller's proof
+/// stops as well; a transparent callee is proved through, so its own callees
+/// are part of the same question. Names the callee, so a report can say which
+/// contract the partiality came from.
+pub fn partial_abort_boundary(
+    function: &FunctionEnv<'_>,
+    justified: impl Fn(&FunctionEnv<'_>) -> bool,
+) -> Option<String> {
+    let env = function.module_env.env;
+    let mut seen = BTreeSet::new();
+    let mut pending = vec![function.get_qualified_id()];
+    while let Some(qid) = pending.pop() {
+        let Some(callees) = env.get_function(qid).get_called_functions().cloned() else {
+            continue;
+        };
+        for callee_qid in callees {
+            if !seen.insert(callee_qid) {
+                continue;
+            }
+            let callee = env.get_function(callee_qid);
+            let is_contract_boundary = callee.is_opaque() || callee.is_native_or_intrinsic();
+            if is_contract_boundary
+                && callee.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+                && justified(&callee)
+            {
+                return Some(callee.get_full_name_str());
+            }
+            // Opaque is where the caller's proof stops: past it only the
+            // contract is visible, and the body no longer bears on the caller.
+            if !is_contract_boundary {
+                pending.push(callee_qid);
+            }
+        }
+    }
+    None
+}
+
 pub fn opaque_outside_scope(env: &GlobalEnv, filter: Option<&str>) -> Vec<String> {
     let mut names = Vec::new();
     for module in env.get_modules() {
@@ -1112,6 +1222,85 @@ fn is_inline_marker(exp: &Exp) -> bool {
 }
 
 /// A `Violation` carrying only the position, for struct-update syntax.
+/// A weakening's site, stable under line shifts before its function while
+/// binding the construct to its original function and relative source site.
+///
+/// Line numbers move when a candidate rewrites the specification above them,
+/// so an identity built from one would report a construct the baseline already
+/// had as newly introduced. The function identity prevents a candidate from
+/// moving an inherited construct into the checked target. A canonical digest
+/// of the complete containing function (or companion source) binds it to its
+/// runtime and proof context, while the relative line and full construct text
+/// keep otherwise unrelated constructs apart.
+fn weakening_site(package: &Path, violation: &Violation) -> String {
+    let text = violation.source_span.clone().unwrap_or_else(|| {
+        std::fs::read_to_string(package.join(&violation.path))
+            .ok()
+            .and_then(|source| {
+                source
+                    .lines()
+                    .nth(violation.line.saturating_sub(1))
+                    .map(|line| line.trim().to_string())
+            })
+            .unwrap_or_default()
+    });
+    let function = violation.function.as_deref().unwrap_or_default();
+    let relative_line = violation
+        .function_line
+        .map(|start| violation.line.saturating_sub(start).to_string())
+        .unwrap_or_default();
+    let function_context = violation.function_context.as_deref().unwrap_or_default();
+    // NUL joins the parts: no component contains one, so no two distinct sites
+    // can render to the same key.
+    [
+        violation.code.as_str(),
+        violation.path.as_str(),
+        violation.message.as_str(),
+        function,
+        relative_line.as_str(),
+        function_context,
+        text.as_str(),
+    ]
+    .join("\0")
+}
+
+/// Index a package's weakenings by site, for `added_weakenings` to subtract.
+pub fn weakening_sites(package: &Path, violations: &[Violation]) -> BTreeMap<String, usize> {
+    let mut sites = BTreeMap::new();
+    for violation in violations {
+        *sites.entry(weakening_site(package, violation)).or_insert(0) += 1;
+    }
+    sites
+}
+
+/// Split the candidate's weakenings into the ones it introduced and the ones
+/// the baseline already carried.
+///
+/// A construct the baseline contains is not a weakening the candidate made:
+/// the reference contract is proved in that same package and inherits it too,
+/// so rejecting the candidate for it would measure the corpus. Counted rather
+/// than matched by presence, so adding a second `assume` beside an inherited
+/// one is still the candidate's.
+pub fn added_weakenings(
+    package: &Path,
+    violations: Vec<Violation>,
+    baseline: &BTreeMap<String, usize>,
+) -> (Vec<Violation>, Vec<Violation>) {
+    let mut remaining = baseline.clone();
+    let mut added = Vec::new();
+    let mut inherited = Vec::new();
+    for violation in violations {
+        match remaining.get_mut(&weakening_site(package, &violation)) {
+            Some(count) if *count > 0 => {
+                *count -= 1;
+                inherited.push(violation);
+            },
+            _ => added.push(violation),
+        }
+    }
+    (added, inherited)
+}
+
 fn location_of(env: &GlobalEnv, package: &Path, loc: &Loc) -> Violation {
     let (path, line) = match env.get_file_and_location(loc) {
         Some((file, location)) => (
@@ -1120,12 +1309,70 @@ fn location_of(env: &GlobalEnv, package: &Path, loc: &Loc) -> Violation {
         ),
         None => ("<target-specification>".to_string(), 1),
     };
+    let source_span = {
+        let source = env.get_file_source(loc.file_id());
+        let start = loc.span().start().0 as usize;
+        let end = loc.span().end().0 as usize;
+        source
+            .get(start..end)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_string)
+    };
     Violation {
         code: String::new(),
         path,
         line,
         message: String::new(),
+        function: None,
+        function_line: None,
+        function_context: None,
+        source_span,
     }
+}
+
+fn location_in_module(
+    env: &GlobalEnv,
+    package: &Path,
+    module: &ModuleEnv<'_>,
+    loc: &Loc,
+) -> Violation {
+    let mut violation = location_of(env, package, loc);
+    violation.function = Some(format!("module {}", module.get_name().display_full(env)));
+    violation
+}
+
+fn location_in_function(
+    env: &GlobalEnv,
+    package: &Path,
+    function: &FunctionEnv<'_>,
+    loc: &Loc,
+) -> Violation {
+    let mut violation = location_of(env, package, loc);
+    violation.function = Some(function.get_full_name_str());
+    let function_location = location_of(env, package, &function.get_loc());
+    // A companion `.spec.move` condition and its executable function have
+    // locations in different files. Their line numbers share no origin, so a
+    // subtraction would make harmless edits above the companion spec change
+    // the weakening identity.
+    violation.function_line =
+        (function_location.path == violation.path).then_some(function_location.line);
+    let source = env.get_file_source(loc.file_id());
+    let (start, end) = if function.get_loc().file_id() == loc.file_id() {
+        (
+            function.get_loc().span().start().0 as usize,
+            function.get_loc().span().end().0 as usize,
+        )
+    } else {
+        // A companion specification has no source span shared with the
+        // executable function. Bind its weakening to the canonical companion
+        // source so proof-statement reordering there is visible as well.
+        (0, source.len())
+    };
+    violation.function_context = source
+        .get(start..end)
+        .map(|context| sha256_hex(crate::experiment::canonicalize_move_source(context).as_bytes()));
+    violation
 }
 
 fn has_property(env: &GlobalEnv, spec: &Spec, name: &str) -> bool {
@@ -1187,6 +1434,10 @@ pub fn check_edit_scope(
             path: relative.clone(),
             line: 1,
             message: "file is outside the task's declared editable paths".to_string(),
+            function: None,
+            function_line: None,
+            function_context: None,
+            source_span: None,
         })
         .collect();
     Ok((changed, violations))
@@ -1298,7 +1549,8 @@ mod tests {
         let env = crate::experiment::build_model(package.path()).expect("model");
         assert!(!env.has_errors(), "probe module does not compile");
         let required: Vec<String> = required.iter().map(|name| name.to_string()).collect();
-        check_specification(&env, package.path(), Some("m"), &required).expect("check")
+        check_specification(&env, package.path(), Some("m"), &required, &BTreeSet::new())
+            .expect("check")
     }
 
     fn codes(report: &PolicyReport) -> Vec<String> {
@@ -1332,6 +1584,317 @@ mod tests {
     }
 
     #[test]
+    fn a_weakening_the_baseline_already_carried_is_not_the_candidate_s() {
+        // corpus-v1's package is a whole framework, and its upstream sources
+        // carry `assume`s, `axiom`s and suppressing pragmas of their own. The
+        // reference contract is proved under exactly those, so charging them
+        // to a candidate rejects every run whatever it writes.
+        let inherited = "module 0xCAFE::m {
+    fun f(x: u64): u64 {
+        spec { assume x > 0; };
+        x
+    }
+}";
+        // The candidate's own `assume`, under an edit that also moves the
+        // inherited one down the file.
+        let candidate_source = "module 0xCAFE::m {
+    /// A comment the candidate wrote, which shifts every line below it.
+    fun f(x: u64): u64 {
+        spec { assume x > 0; };
+        x
+    }
+    fun g(x: u64): u64 {
+        spec { assume x > 1; };
+        x
+    }
+}";
+        let baseline = crate::tests::common::make_package("baseline", &[("m", inherited)]);
+        let candidate = crate::tests::common::make_package("candidate", &[("m", candidate_source)]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(
+                !env.has_errors(),
+                "probe module does not compile: {}",
+                package.display()
+            );
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+        assert_eq!(1, baseline_violations.len());
+        assert_eq!(2, candidate_violations.len());
+
+        let (added, inherited_back) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(
+            vec!["unjustified_assumption"],
+            added
+                .iter()
+                .map(|violation| violation.code.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(8, added[0].line, "the candidate\'s own `assume`");
+        // Line 3 in the baseline, line 4 here: the site is matched by its text.
+        assert_eq!(1, inherited_back.len());
+        assert_eq!(4, inherited_back[0].line);
+    }
+
+    #[test]
+    fn moving_an_inherited_weakening_to_another_function_is_rejected() {
+        let baseline_source = "module 0xCAFE::m {
+    fun helper(x: u64): u64 {
+        spec { assume x > 0; };
+        x
+    }
+    fun target(x: u64): u64 { x }
+}";
+        let candidate_source = "module 0xCAFE::m {
+    fun helper(x: u64): u64 { x }
+    fun target(x: u64): u64 {
+        spec { assume x > 0; };
+        x
+    }
+}";
+        let baseline = crate::tests::common::make_package("baseline", &[("m", baseline_source)]);
+        let candidate = crate::tests::common::make_package("candidate", &[("m", candidate_source)]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(!env.has_errors(), "probe module does not compile");
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("unjustified_assumption", added[0].code);
+    }
+
+    #[test]
+    fn a_line_shift_in_a_companion_spec_keeps_an_inherited_weakening() {
+        let source = "module 0xCAFE::m { fun target(x: u64): u64 { x } }";
+        let baseline = crate::tests::common::make_package("baseline", &[
+            ("m", source),
+            (
+                "m.spec.move",
+                    "spec 0xCAFE::m {\n    spec target(x: u64): u64 { ensures [abstract] result == x; }\n}",
+            ),
+        ]);
+        let candidate = crate::tests::common::make_package("candidate", &[
+            ("m", source),
+            (
+                "m.spec.move",
+                    "spec 0xCAFE::m {\n\n    spec target(x: u64): u64 { ensures [abstract] result == x; }\n}",
+            ),
+        ]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(
+                !env.has_errors(),
+                "probe package does not compile:\n{}",
+                crate::mcp::package_data::render_diagnostics(&env).join("\n")
+            );
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert!(added.is_empty());
+        assert_eq!(1, inherited.len());
+        assert_eq!("abstract_condition", inherited[0].code);
+    }
+
+    #[test]
+    fn moving_an_inline_assume_past_runtime_code_is_rejected() {
+        let baseline_source = "module 0xCAFE::m {
+    fun target(): u64 {
+        let y = 0;
+        spec { assume y == 0; };
+        y = 1;
+        y
+    }
+}";
+        let candidate_source = "module 0xCAFE::m {
+    fun target(): u64 {
+        let y = 0; y = 1;
+        spec { assume y == 0; };
+
+        y
+    }
+}";
+        let baseline = crate::tests::common::make_package("baseline", &[("m", baseline_source)]);
+        let candidate = crate::tests::common::make_package("candidate", &[("m", candidate_source)]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(!env.has_errors(), "probe module does not compile");
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("unjustified_assumption", added[0].code);
+    }
+
+    #[test]
+    fn moving_an_inline_assume_ahead_of_an_assert_is_rejected() {
+        let baseline_source = "module 0xCAFE::m {
+    fun target(): u64 {
+        spec { assert false; };
+        spec { assume false; };
+        0
+    }
+}";
+        let candidate_source = "module 0xCAFE::m {
+    fun target(): u64 {
+
+        spec { assume false; };
+        spec { assert false; };
+        0
+    }
+}";
+        let baseline = crate::tests::common::make_package("baseline", &[("m", baseline_source)]);
+        let candidate = crate::tests::common::make_package("candidate", &[("m", candidate_source)]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(!env.has_errors(), "probe module does not compile");
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("unjustified_assumption", added[0].code);
+    }
+
+    #[test]
+    fn changing_a_multiline_companion_weakening_is_rejected() {
+        let source = "module 0xCAFE::m { fun target(x: u64): u64 { x } }";
+        let package = |name, condition| {
+            crate::tests::common::make_package(name, &[
+                ("m", source),
+                (
+                    "m.spec.move",
+                    &format!(
+                        "spec 0xCAFE::m {{\n    spec target(x: u64): u64 {{\n        ensures [abstract]\n            {condition};\n    }}\n}}"
+                    ),
+                ),
+            ])
+        };
+        let baseline = package("baseline", "result == x");
+        let candidate = package("candidate", "false");
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(
+                !env.has_errors(),
+                "probe package does not compile:\n{}",
+                crate::mcp::package_data::render_diagnostics(&env).join("\n")
+            );
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("abstract_condition", added[0].code);
+    }
+
+    #[test]
+    fn moving_a_module_axiom_between_modules_is_rejected() {
+        let source = "module 0xCAFE::a { fun target(): u64 { 0 } }
+module 0xCAFE::b { fun helper(): u64 { 0 } }";
+        let baseline = crate::tests::common::make_package("baseline", &[
+            ("modules", source),
+            (
+                "modules.spec.move",
+                "spec 0xCAFE::a { spec module { axiom true; } }
+spec 0xCAFE::b { spec module {} }",
+            ),
+        ]);
+        let candidate = crate::tests::common::make_package("candidate", &[
+            ("modules", source),
+            (
+                "modules.spec.move",
+                "spec 0xCAFE::a { spec module {} }
+spec 0xCAFE::b { spec module { axiom true; } }",
+            ),
+        ]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(
+                !env.has_errors(),
+                "probe package does not compile:\n{}",
+                crate::mcp::package_data::render_diagnostics(&env).join("\n")
+            );
+            check_specification(&env, package, Some("a::target"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("axiom", added[0].code);
+    }
+
+    #[test]
     fn suppressing_pragmas_are_rejected() {
         let report = check_module(
             "module 0xCAFE::m {
@@ -1346,6 +1909,70 @@ mod tests {
         );
 
         assert_eq!(vec!["partial_aborts", "verify_false"], codes(&report));
+    }
+
+    #[test]
+    fn partial_aborts_are_admissible_only_from_a_callee_the_candidate_did_not_write() {
+        // A caller is verified against its opaque callees' contracts, so it
+        // cannot be more exact about aborts than they are. Partiality the
+        // candidate wrote for itself is not that situation: marking a helper
+        // partial and citing it would excuse any contract at all.
+        //
+        // The helper's own partial contract is a violation either way -- a leaf
+        // claiming partiality has nothing to inherit it from -- so the question
+        // is whether the *caller* is flagged.
+        let source = |helper_spec: &str| {
+            format!(
+                "module 0xCAFE::m {{
+    fun helper(x: u64): u64 {{ x + 1 }}
+    spec helper {{
+        pragma opaque;
+        {helper_spec}
+        ensures result >= x;
+    }}
+    fun caller(x: u64): u64 {{ helper(x) }}
+    spec caller {{
+        pragma aborts_if_is_partial;
+        ensures result >= x;
+    }}
+}}"
+            )
+        };
+        let caller_is_flagged = |helper_spec: &str| {
+            let text = source(helper_spec);
+            let caller_line = text
+                .lines()
+                .position(|line| line.contains("fun caller"))
+                .expect("caller present")
+                + 1;
+            check_module(&text, &[]).violations.iter().any(|violation| {
+                violation.code == "partial_aborts" && violation.line == caller_line
+            })
+        };
+
+        // Written by hand for the callee: the caller may not lean on it.
+        assert!(caller_is_flagged("pragma aborts_if_is_partial;"));
+        // No partial callee at all: nothing to inherit.
+        assert!(caller_is_flagged(""));
+        // Found by inference for the callee: the caller inherits it.
+        assert!(!caller_is_flagged(
+            "pragma aborts_if_is_partial;\n        aborts_if [inferred] x == 0;"
+        ));
+
+        // An inferred marker on a transparent helper cannot justify a partial
+        // caller: the prover sees through that helper to its body.
+        let transparent =
+            source("pragma aborts_if_is_partial;\n        aborts_if [inferred] x == 0;")
+                .replace("        pragma opaque;\n", "");
+        let caller_line = transparent
+            .lines()
+            .position(|line| line.contains("fun caller"))
+            .expect("caller present")
+            + 1;
+        let report = check_module(&transparent, &[]);
+        assert!(report.violations.iter().any(|violation| {
+            violation.code == "partial_aborts" && violation.line == caller_line
+        }));
     }
 
     #[test]
@@ -1464,11 +2091,16 @@ mod tests {
                 passed: true,
                 changed_paths: vec!["sources/m.move".to_string()],
                 violations: Vec::new(),
+                inherited_weakenings: Vec::new(),
                 scope_violations: vec![Violation {
                     code: "out_of_scope_path".to_string(),
                     path: "sources/m.move".to_string(),
                     line: 1,
                     message: "file is outside the task's declared editable paths".to_string(),
+                    function: None,
+                    function_line: None,
+                    function_context: None,
+                    source_span: None,
                 }],
                 assumed_contracts: Vec::new(),
                 contract_coverage: ContractCoverage {
@@ -1500,6 +2132,7 @@ mod tests {
                 passed: true,
                 changed_paths: Vec::new(),
                 violations: Vec::new(),
+                inherited_weakenings: Vec::new(),
                 scope_violations: Vec::new(),
                 assumed_contracts: Vec::new(),
                 contract_coverage: ContractCoverage {

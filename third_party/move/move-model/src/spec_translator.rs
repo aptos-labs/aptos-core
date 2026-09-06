@@ -938,6 +938,42 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         let lemma = module_env.get_lemma(qid.id);
         let params = lemma.params.clone();
         let conditions = lemma.conditions.clone();
+        let applied_measure = lemma.measure(env);
+        let applied_group = lemma.recursion_group;
+
+        // An application within the lemma's own recursion group must decrease
+        // the measure; see doc/dev/lemma_well_foundedness.md.
+        if let Some(enclosing) = self.enclosing_lemma() {
+            let (enclosing_group, enclosing_measure) = {
+                let env = self.builder.global_env();
+                let module_env = env.get_module(enclosing.module_id);
+                let decl = module_env.get_lemma(enclosing.id);
+                (decl.recursion_group, decl.measure(env))
+            };
+            let same_group = applied_group.is_some()
+                && enclosing.module_id == qid.module_id
+                && enclosing_group == applied_group;
+            if same_group {
+                let current: Vec<Exp> = enclosing_measure
+                    .iter()
+                    .map(|e| self.translate_exp(e, false))
+                    .collect();
+                let env = self.builder.global_env();
+                let next: Vec<Exp> = applied_measure
+                    .iter()
+                    .map(|e| Self::substitute_lemma_params(env, &params, args, e))
+                    .collect();
+                let decreases = self.mk_lexicographic_decrease(loc, &next, &current);
+                let guarded = self.guard_proof_exp(decreases, path_cond);
+                self.push_proof_action(
+                    loc.clone(),
+                    ProofAction::Assert(
+                        guarded,
+                        "recursive lemma application does not decrease the measure".to_string(),
+                    ),
+                );
+            }
+        }
 
         // Process requires first (assert), then ensures (assume), to avoid
         // assuming conclusions before checking premises when conditions are
@@ -962,6 +998,51 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let subst_exp = Self::substitute_lemma_params(env, &params, args, &cond.exp);
             let guarded = self.guard_proof_exp(subst_exp, path_cond);
             self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
+        }
+    }
+
+    /// The lemma whose proof is being translated, if the current function is
+    /// a lemma's synthetic function.
+    fn enclosing_lemma(&self) -> Option<QualifiedId<crate::ast::LemmaId>> {
+        if !self.fun_env.is_lemma() {
+            return None;
+        }
+        let module_env = &self.fun_env.module_env;
+        module_env
+            .find_lemma_by_name(self.fun_env.get_name())
+            .map(|(id, _)| module_env.get_id().qualified(id))
+    }
+
+    /// `next <_lex current`, well-founded by bounding the component that
+    /// strictly decreases: `(n0 < c0 && 0 <= c0) || (n0 == c0 && (n1 < c1 && 0 <= c1)) || ...`
+    fn mk_lexicographic_decrease(&self, loc: &Loc, next: &[Exp], current: &[Exp]) -> Exp {
+        let env = self.builder.global_env();
+        let zero = || {
+            ExpData::Value(
+                env.new_node(loc.clone(), crate::ty::NUM_TYPE),
+                crate::ast::Value::Number(0.into()),
+            )
+            .into_exp()
+        };
+        let mut disjuncts = vec![];
+        for k in 0..next.len().min(current.len()) {
+            let mut conjuncts: Vec<Exp> = (0..k)
+                .map(|j| self.builder.mk_eq(next[j].clone(), current[j].clone()))
+                .collect();
+            conjuncts.push(
+                self.builder
+                    .mk_bool_call(Operation::Lt, vec![next[k].clone(), current[k].clone()]),
+            );
+            conjuncts.push(
+                self.builder
+                    .mk_bool_call(Operation::Le, vec![zero(), current[k].clone()]),
+            );
+            disjuncts.push(self.builder.mk_and_n(conjuncts));
+        }
+        if disjuncts.is_empty() {
+            self.builder.mk_bool_const(false)
+        } else {
+            self.builder.mk_or_n(disjuncts)
         }
     }
 

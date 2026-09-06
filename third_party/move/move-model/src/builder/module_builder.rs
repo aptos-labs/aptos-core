@@ -488,6 +488,15 @@ impl ModuleBuilder<'_, '_> {
 /// # Declaration Analysis
 
 impl ModuleBuilder<'_, '_> {
+    /// Pre-declare this module's structs so a lemma signature pre-registered
+    /// before the module is analyzed can name them. `decl_ana` declares them
+    /// again on the real builder and tolerates the repeat.
+    pub(crate) fn pre_declare_structs(&mut self, module_def: &EA::ModuleDefinition) {
+        for (name, struct_def) in module_def.structs.key_cloned_iter() {
+            self.decl_ana_struct(&name, struct_def);
+        }
+    }
+
     /// Pre-register lemma declarations from spec blocks so cross-module references
     /// resolve regardless of module processing order.
     pub(crate) fn pre_register_lemma_decls(&mut self, module_def: &EA::ModuleDefinition) {
@@ -572,7 +581,15 @@ impl ModuleBuilder<'_, '_> {
 
     fn decl_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
-        if self.parent.struct_table.contains_key(&qsym) {
+        let def_loc = self.parent.to_loc(&def.loc);
+        // The same definition, pre-declared for lemma signatures, is not a
+        // duplicate; a different definition under the same name is.
+        if self
+            .parent
+            .struct_table
+            .get(&qsym)
+            .is_some_and(|entry| entry.loc != def_loc)
+        {
             self.parent.env.error(
                 &self.parent.to_loc(&name.loc()),
                 &format!("duplicate declaration of `{}`", &name.value()),
@@ -974,6 +991,8 @@ impl ModuleBuilder<'_, '_> {
             conditions: vec![],
             properties: Default::default(),
             proof: None,
+            decreases: None,
+            recursion_group: None,
         });
     }
 
@@ -2589,7 +2608,21 @@ impl ModuleBuilder<'_, '_> {
             .map(|spec| (spec.conditions.clone(), spec.properties.clone()))
             .unwrap_or_default();
 
-        // Store conditions into the existing skeleton.
+        // A `decreases` clause is the lemma's termination measure, not a
+        // condition of its synthetic function.
+        let (decreases, conditions): (Vec<_>, Vec<_>) = conditions
+            .into_iter()
+            .partition(|c| c.kind == ConditionKind::Decreases);
+        if decreases.len() > 1 {
+            self.parent.error(
+                &decreases[1].loc,
+                "at most one `decreases` clause per lemma",
+            );
+        }
+        self.lemmas[idx].decreases = decreases
+            .into_iter()
+            .next()
+            .map(|c| std::iter::once(c.exp).chain(c.additional_exps).collect());
         self.lemmas[idx].conditions = conditions;
         self.lemmas[idx].properties = properties;
 
@@ -2600,6 +2633,129 @@ impl ModuleBuilder<'_, '_> {
             let model_proof = self.def_ana_proof(&lemma_context, p, &mut proof_locals, false, true);
             self.lemmas[idx].proof = model_proof;
         }
+    }
+}
+
+/// ## Lemma Recursion Analysis
+
+impl ModuleBuilder<'_, '_> {
+    /// Whether the context is the condition block of a lemma.
+    fn is_lemma_context(&self, context: &SpecBlockContext) -> bool {
+        match context {
+            SpecBlockContext::Function(qsym) => self
+                .parent
+                .fun_table
+                .get(qsym)
+                .is_some_and(|entry| entry.kind == FunctionKind::Lemma),
+            _ => false,
+        }
+    }
+
+    /// Computes the recursion groups of this module's lemmas (strongly connected
+    /// components of the lemma application graph) and checks that every recursive
+    /// lemma has a measure of the group's arity. `forall ... apply` of a lemma from
+    /// the same group is rejected: it has no decreasing instance to check.
+    fn analyze_lemma_recursion(&mut self) {
+        use petgraph::{algo::tarjan_scc, graph::DiGraph};
+        let module_id = self.module_id;
+        let mut graph = DiGraph::<(), ()>::new();
+        let nodes: Vec<_> = self.lemmas.iter().map(|_| graph.add_node(())).collect();
+        let applies: Vec<Vec<(Loc, usize, bool)>> = self
+            .lemmas
+            .iter()
+            .map(|lemma| {
+                let mut applies = vec![];
+                if let Some(proof) = &lemma.proof {
+                    collect_lemma_applies(proof, &mut applies);
+                }
+                applies
+                    .into_iter()
+                    .filter(|(_, qid, _)| qid.module_id == module_id)
+                    .map(|(loc, qid, forall)| (loc, qid.id.as_usize(), forall))
+                    .collect()
+            })
+            .collect();
+        for (from, applies) in applies.iter().enumerate() {
+            for (_, to, _) in applies {
+                graph.add_edge(nodes[from], nodes[*to], ());
+            }
+        }
+        for (group, members) in tarjan_scc(&graph).into_iter().enumerate() {
+            let members: Vec<usize> = members.into_iter().map(|n| n.index()).collect();
+            let recursive = members.len() > 1
+                || applies[members[0]]
+                    .iter()
+                    .any(|(_, to, _)| *to == members[0]);
+            if !recursive {
+                continue;
+            }
+            // The first declared member fixes the group's arity.
+            let reference = *members.iter().min().expect("non-empty component");
+            let arity = self.lemmas[reference].measure_arity();
+            for &idx in &members {
+                self.lemmas[idx].recursion_group = Some(group);
+                let lemma = &self.lemmas[idx];
+                let name = lemma.name.display(self.symbol_pool()).to_string();
+                if lemma.measure_arity() == 0 {
+                    self.parent.error(
+                        &lemma.loc,
+                        &format!(
+                            "recursive lemma `{}` needs a `decreases` clause: it has no integer \
+                             parameter to use as the default measure",
+                            name
+                        ),
+                    );
+                } else if lemma.measure_arity() != arity {
+                    self.parent.error(
+                        &lemma.loc,
+                        &format!(
+                            "lemma `{}` has a measure of {} component(s), but its recursion \
+                             group uses {}",
+                            name,
+                            lemma.measure_arity(),
+                            arity
+                        ),
+                    );
+                }
+                for (loc, to, forall) in &applies[idx] {
+                    if *forall && members.contains(to) {
+                        self.parent.error(
+                            loc,
+                            "`forall ... apply` cannot apply a lemma from the same recursion \
+                             group; use `apply` at a decreasing instance",
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Collects the lemma applications in a proof: (location, lemma, is forall-apply).
+fn collect_lemma_applies(
+    proof: &Proof,
+    out: &mut Vec<(Loc, crate::model::QualifiedId<LemmaId>, bool)>,
+) {
+    match proof {
+        Proof::Apply(loc, qid, _) => out.push((loc.clone(), *qid, false)),
+        Proof::ForallApply(loc, _, _, qid, _, _) => out.push((loc.clone(), *qid, true)),
+        Proof::IfElse(_, _, then_p, else_p) => {
+            collect_lemma_applies(then_p, out);
+            if let Some(else_p) = else_p {
+                collect_lemma_applies(else_p, out);
+            }
+        },
+        Proof::Block(_, proofs) => {
+            for p in proofs {
+                collect_lemma_applies(p, out);
+            }
+        },
+        Proof::Post(_, inner) => collect_lemma_applies(inner, out),
+        Proof::Let(..)
+        | Proof::Assert(..)
+        | Proof::Assume(..)
+        | Proof::Calc(..)
+        | Proof::Split(..) => {},
     }
 }
 
@@ -3079,6 +3235,7 @@ impl ModuleBuilder<'_, '_> {
             Function(name) => {
                 let entry = self.parent.fun_table.get(name).expect("function defined");
                 cond.kind.allowed_on_fun_decl(entry.visibility)
+                    || (entry.kind == FunctionKind::Lemma && cond.kind == ConditionKind::Decreases)
             },
             FunctionCodeV2(.., from_lambda) => {
                 if from_lambda.is_some() {
@@ -3362,13 +3519,41 @@ impl ModuleBuilder<'_, '_> {
         exp: &EA::Exp,
         additional_exps: &[EA::Exp],
     ) {
-        if matches!(kind, ConditionKind::Decreases | ConditionKind::SucceedsIf) {
+        if matches!(kind, ConditionKind::SucceedsIf)
+            || (kind == ConditionKind::Decreases && !self.is_lemma_context(context))
+        {
             self.parent.error(loc, "condition kind is not supported");
             return;
         }
         let expected_type = self.expected_type_for_condition(&kind);
         let mut et = self.exp_translator_for_context(loc, context, &kind);
         let (translated, translated_additional) = match kind {
+            ConditionKind::Decreases => {
+                // `decreases e` or `decreases (e1, ..., en)`: integer components.
+                if !additional_exps.is_empty() {
+                    et.error(loc, "additional expressions not allowed with `decreases`");
+                }
+                let (_, translated) = et.translate_exp_free(exp);
+                let mut components = match translated {
+                    ExpData::Call(_, Operation::Tuple, items) => items,
+                    other => vec![other.into_exp()],
+                };
+                if components.is_empty() {
+                    et.error(loc, "`decreases` requires at least one component");
+                    return;
+                }
+                for component in &components {
+                    let ty = et.get_node_type(component.node_id());
+                    if !ty.is_number() {
+                        et.error(
+                            &et.env().get_node_loc(component.node_id()),
+                            "`decreases` components must be integers",
+                        );
+                    }
+                }
+                let first = components.remove(0);
+                (first, components)
+            },
             ConditionKind::AbortsIf => (
                 et.translate_exp(exp, &expected_type).into_exp(),
                 additional_exps
@@ -5643,6 +5828,8 @@ impl ModuleBuilder<'_, '_> {
             };
             function_data.insert(fun_id, data);
         }
+
+        self.analyze_lemma_recursion();
 
         // Create synthetic FunctionData entries for lemma declarations so they are visible
         // to the prover pipeline via `get_functions()`. They have `def: None` and

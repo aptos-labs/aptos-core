@@ -49,39 +49,39 @@ module std::cmp {
     }
 
     spec is_eq {
-        pragma intrinsic;
         pragma opaque;
-        pragma verify = false;
+        aborts_if false;
+        ensures result == (self is Ordering::Equal);
     }
 
     spec is_ne {
-        pragma intrinsic;
         pragma opaque;
-        pragma verify = false;
+        aborts_if false;
+        ensures result == (!(self is Ordering::Equal));
     }
 
     spec is_lt {
-        pragma intrinsic;
         pragma opaque;
-        pragma verify = false;
+        aborts_if false;
+        ensures result == (self is Ordering::Less);
     }
 
     spec is_le {
-        pragma intrinsic;
         pragma opaque;
-        pragma verify = false;
+        aborts_if false;
+        ensures result == (!(self is Ordering::Greater));
     }
 
     spec is_gt {
-        pragma intrinsic;
         pragma opaque;
-        pragma verify = false;
+        aborts_if false;
+        ensures result == (self is Ordering::Greater);
     }
 
     spec is_ge {
-        pragma intrinsic;
         pragma opaque;
-        pragma verify = false;
+        aborts_if false;
+        ensures result == (!(self is Ordering::Less));
     }
 
     #[test_only]

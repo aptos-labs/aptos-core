@@ -1457,6 +1457,17 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a spec block for a function, including the repeated signature.
     pub fn print_fun_spec(&self, fun_env: &FunctionEnv) {
+        self.print_fun_spec_with_signature_type_display_ctx(fun_env, fun_env.get_type_display_ctx())
+    }
+
+    /// Prints a spec block with an explicitly selected type-display context for
+    /// its repeated signature. The specification body keeps its normal source
+    /// context so callers can make just the signature unambiguous.
+    pub fn print_fun_spec_with_signature_type_display_ctx(
+        &self,
+        fun_env: &FunctionEnv,
+        signature_tctx: TypeDisplayContext<'_>,
+    ) {
         let spec = fun_env.get_spec();
         let has_frame = spec
             .frame_spec
@@ -1472,7 +1483,7 @@ impl<'a> Sourcifier<'a> {
 
         emitln!(self.writer);
         emit!(self.writer, "spec ");
-        self.print_fun_signature(fun_env);
+        self.print_fun_signature(fun_env, &signature_tctx);
         emitln!(self.writer, " {");
 
         self.writer.indent();
@@ -1518,7 +1529,7 @@ impl<'a> Sourcifier<'a> {
     }
 
     /// Prints just the function signature (name, type params, params, return type).
-    fn print_fun_signature(&self, fun_env: &FunctionEnv) {
+    fn print_fun_signature(&self, fun_env: &FunctionEnv, tctx: &TypeDisplayContext<'_>) {
         let name = Sourcifier::amend_fun_name(self.env(), self.sym(fun_env.get_name()), self.amend);
         emit!(
             self.writer,
@@ -1526,19 +1537,14 @@ impl<'a> Sourcifier<'a> {
             name,
             self.type_params(fun_env.get_type_parameters_ref())
         );
-        let tctx = fun_env.get_type_display_ctx();
         let params = fun_env
             .get_parameters()
             .into_iter()
-            .map(|Parameter(sym, ty, _)| format!("{}: {}", self.sym(sym), ty.display(&tctx)))
+            .map(|Parameter(sym, ty, _)| format!("{}: {}", self.sym(sym), ty.display(tctx)))
             .join(", ");
         emit!(self.writer, "({})", params);
         if fun_env.get_return_count() > 0 {
-            emit!(
-                self.writer,
-                ": {}",
-                fun_env.get_result_type().display(&tctx)
-            )
+            emit!(self.writer, ": {}", fun_env.get_result_type().display(tctx))
         }
     }
 

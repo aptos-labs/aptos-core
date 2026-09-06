@@ -5290,21 +5290,21 @@ fn parse_lemma(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>
     ))
 }
 
-/// Parses a spec member inside a lemma spec block (only requires, ensures, pragma).
+/// Parses a spec member inside a lemma spec block (requires, ensures, decreases, pragma).
 fn parse_lemma_spec_member(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
     context.tokens.match_doc_comments();
     match context.tokens.peek() {
         Tok::Identifier => match context.tokens.content() {
-            "requires" | "ensures" => parse_condition(context),
+            "requires" | "ensures" | "decreases" => parse_condition(context),
             "pragma" => parse_spec_pragma(context),
             _ => Err(unexpected_token_error(
                 context.tokens,
-                "one of `requires`, `ensures`, or `pragma`",
+                "one of `requires`, `ensures`, `decreases`, or `pragma`",
             )),
         },
         _ => Err(unexpected_token_error(
             context.tokens,
-            "one of `requires`, `ensures`, or `pragma`",
+            "one of `requires`, `ensures`, `decreases`, or `pragma`",
         )),
     }
 }

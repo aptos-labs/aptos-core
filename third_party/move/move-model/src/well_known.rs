@@ -59,6 +59,8 @@ pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
 
 pub const CMP_MODULE: &str = "cmp";
 
+pub const EVENT_MODULE: &str = "event";
+
 pub const STRING_MODULE: &str = "string";
 pub const STRING_UTILS_MODULE: &str = "string_utils";
 
@@ -229,6 +231,28 @@ pub fn is_boogie_prelude_spec_native(fun_env: &FunctionEnv) -> bool {
     module_functions.iter().any(|(module, functions)| {
         fun_env.module_env.is_module_in_std(module) && functions.contains(&fun_name.as_str())
     })
+}
+
+/// Whether the Boogie prelude implements this `pragma intrinsic` function.
+///
+/// `pragma intrinsic` says the prover implements the function itself, so the
+/// backend emits no body for it and a call site translates to a procedure the
+/// prelude is expected to declare. The built-in prelude mocks out `vector` and
+/// `event`, while Aptos's custom-native prelude implements `aggregator` and
+/// `aggregator_v2`.
+/// A native intrinsic is prelude-backed by construction. A function carrying
+/// the pragma outside those modules has no implementation anywhere, and a call
+/// to it would name a procedure that is never declared.
+///
+/// The modules mirror the `$1_<module>_<name>` procedure templates in
+/// `src/prelude/native.bpl`, `src/prelude/prelude.bpl`, and the configured
+/// Aptos `aptos-natives.bpl` template.
+pub fn is_boogie_prelude_intrinsic(fun_env: &FunctionEnv) -> bool {
+    const PRELUDE_INTRINSIC_MODULES: &[&str] =
+        &[VECTOR_MODULE, EVENT_MODULE, "aggregator", "aggregator_v2"];
+    PRELUDE_INTRINSIC_MODULES
+        .iter()
+        .any(|module| fun_env.module_env.is_module_in_std(module))
 }
 
 /// True when `fun_name` is the bare name of a `std::vector` function whose

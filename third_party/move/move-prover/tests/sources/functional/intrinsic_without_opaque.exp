@@ -1,0 +1,46 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_without_opaque.move:12:9
+   │
+12 │         ensures result == x; // error: false when x > 10
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_without_opaque.move:6: bounded
+   =         x = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:7: bounded
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:12: bounded (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_without_opaque.move:20:9
+   │
+20 │         ensures result == x;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_without_opaque.move:15: caller
+   =         x = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:16: caller
+   =     at tests/sources/functional/intrinsic_without_opaque.move:6: bounded
+   =         x = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:7: bounded
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:8: bounded
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:20: caller (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_without_opaque.move:28:9
+   │
+28 │         ensures result == x;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_without_opaque.move:23: caller_expecting_the_body
+   =         x = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:24: caller_expecting_the_body
+   =     at tests/sources/functional/intrinsic_without_opaque.move:6: bounded
+   =         x = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:7: bounded
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:8: bounded
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:28: caller_expecting_the_body (spec)

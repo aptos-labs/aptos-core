@@ -29,7 +29,7 @@ use clap::{Parser, Subcommand};
 use codespan_reporting::term::termcolor::NoColor;
 use move_model::{
     ast::{ConditionKind, Exp, ExpData, Operation, Value},
-    metadata::{LanguageVersion, COMPILATION_METADATA_KEY},
+    metadata::LanguageVersion,
     model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedId, SpecFunId, VerificationScope},
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
@@ -363,7 +363,7 @@ struct Candidate {
     decision_reason: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct ImplementationComparison {
     schema_version: u32,
     equal: bool,
@@ -704,6 +704,11 @@ fn function_candidate(
     if stats.global_state {
         feature_strata.push("global-state".to_string());
     }
+    // Reading global state and changing it are different obligations: a frame
+    // condition can only be stated by a target that writes.
+    if stats.global_resource_mutation {
+        feature_strata.push("global-write".to_string());
+    }
     if stats.calls > 1 {
         feature_strata.push("multiple-calls".to_string());
     }
@@ -901,6 +906,12 @@ fn eligibility(
         || function.is_test_or_verify_only()
     {
         Some("test_or_verify_only")
+    } else if move_compiler_v2::env_pipeline::lambda_lifter::is_lambda_lifted_fun(function) {
+        // A lifted lambda is not a verification target. It is how the compiler
+        // lowers a lambda expression, and the contract for higher-order code is
+        // stated on the enclosing function -- through behavioral predicates over
+        // the function value, not on the lifted body, which no caller can name.
+        Some("lifted_lambda")
     } else if !frame.include_paths.is_empty()
         && !frame
             .include_paths
@@ -1239,7 +1250,10 @@ fn compare_implementation(args: &CompareImplementationArgs) -> Result<()> {
 ///
 /// Built once more rather than threaded out of the implementation comparison:
 /// the compile is seconds, and the check is dominated by the prover.
-fn baseline_contracts(package: &Path) -> Result<crate::candidate::BaselineContracts> {
+fn baseline_contracts(
+    package: &Path,
+    filter: Option<&str>,
+) -> Result<crate::candidate::BaselineContracts> {
     let env = build_model_for_implementation_comparison(package)
         .with_context(|| format!("failed to build `{}`", package.display()))?;
     let mut contracts = crate::candidate::BaselineContracts::default();
@@ -1256,12 +1270,29 @@ fn baseline_contracts(package: &Path) -> Result<crate::candidate::BaselineContra
                     crate::candidate::contract_fingerprint(&env, &function),
                 );
             }
+            if function.is_pragma_true(move_model::pragmas::ABORTS_IF_IS_PARTIAL_PRAGMA, || false) {
+                contracts.partial_aborts.insert(qualified.clone());
+            }
             if function.is_intrinsic() {
                 contracts.intrinsic.insert(qualified);
             }
         }
     }
     contracts.spec_functions = crate::candidate::spec_function_definitions(&env);
+    // The same scan the candidate gets, so the two are subtractable. Required
+    // categories are the candidate's obligation and say nothing about the
+    // baseline, so none are asked for here.
+    contracts.weakenings = crate::candidate::weakening_sites(
+        package,
+        &crate::candidate::check_specification(
+            &env,
+            package,
+            filter,
+            &[],
+            &contracts.partial_aborts,
+        )?
+        .violations,
+    );
     Ok(contracts)
 }
 
@@ -1269,25 +1300,8 @@ fn implementation_comparison(
     baseline_package: &Path,
     candidate_package: &Path,
 ) -> Result<ImplementationComparison> {
-    let baseline = build_model_for_implementation_comparison(baseline_package)
-        .with_context(|| format!("failed to build baseline `{}`", baseline_package.display()))?;
-    let candidate =
-        build_model_for_implementation_comparison(candidate_package).with_context(|| {
-            format!(
-                "failed to build candidate `{}`",
-                candidate_package.display()
-            )
-        })?;
-    anyhow::ensure!(
-        !baseline.has_errors(),
-        "baseline package has compiler errors"
-    );
-    anyhow::ensure!(
-        !candidate.has_errors(),
-        "candidate package has compiler errors"
-    );
-    let (baseline_modules, candidate_modules) =
-        implementation_module_hashes(&baseline, &candidate)?;
+    let baseline_modules = implementation_texts(baseline_package)?;
+    let candidate_modules = implementation_texts(candidate_package)?;
     let baseline_names: BTreeSet<_> = baseline_modules.keys().cloned().collect();
     let candidate_names: BTreeSet<_> = candidate_modules.keys().cloned().collect();
     let added_modules: Vec<_> = candidate_names
@@ -1306,7 +1320,7 @@ fn implementation_comparison(
     let equal =
         added_modules.is_empty() && removed_modules.is_empty() && changed_modules.is_empty();
     Ok(ImplementationComparison {
-        schema_version: 1,
+        schema_version: 2,
         equal,
         baseline_modules,
         candidate_modules,
@@ -1577,6 +1591,25 @@ fn prove_package(args: &PackageProveArgs) -> Result<()> {
         // the target before it left behind.
         env.clear_diag();
         let mut diagnostics = compile_diagnostics.clone();
+        // The prover never verifies a function whose spec carrier says
+        // `pragma verify = false`, whatever the scope. For a function target
+        // that leaves nothing proved, so it is a failure rather than a pass;
+        // for a module target the verdict merely does not cover those
+        // functions, which the report names.
+        if let Some(name) = verification_disabled_target(&env, filter) {
+            diagnostics.push(format!(
+                "error: verification of `{name}` is disabled by `pragma verify = false`; \
+                 the target was not proved"
+            ));
+            outcomes.push((target.clone(), false, diagnostics));
+            continue;
+        }
+        for name in verification_disabled_in_module(&env, filter) {
+            diagnostics.push(format!(
+                "warning: verification of `{name}` is disabled by `pragma verify = false`; \
+                 the module verdict does not cover it"
+            ));
+        }
         let result = run_prover_on_model(
             &mut env,
             &args.package,
@@ -2200,7 +2233,7 @@ pub fn evaluate_candidate(config: &CandidateCheckConfig) -> Result<CandidateVerd
                 },
                 changed,
                 violations,
-                Some(baseline_contracts(baseline)?),
+                Some(baseline_contracts(baseline, scope.as_deref())?),
             )
         },
         None => (
@@ -2217,9 +2250,28 @@ pub fn evaluate_candidate(config: &CandidateCheckConfig) -> Result<CandidateVerd
         &config.package,
         scope.as_deref(),
         &config.required_contract_categories,
+        // A contract that was already partial when the run started is a
+        // boundary the candidate inherited, not one it wrote.
+        baseline_opaque
+            .as_ref()
+            .map(|baseline| &baseline.partial_aborts)
+            .unwrap_or(&BTreeSet::new()),
     )?;
     policy.changed_paths = changed;
     policy.scope_violations = scope_violations;
+    // A construct the baseline already carried is not one the candidate
+    // introduced. Without a baseline the two cannot be told apart, and every
+    // construct stays the candidate's.
+    if let Some(baseline) = &baseline_opaque {
+        let (added, inherited) = crate::candidate::added_weakenings(
+            &config.package,
+            std::mem::take(&mut policy.violations),
+            &baseline.weakenings,
+        );
+        policy.passed = added.is_empty();
+        policy.violations = added;
+        policy.inherited_weakenings = inherited;
+    }
     // With a baseline the candidate's own additions are rejected below;
     // without one the check says what the acceptance leans on instead.
     if baseline_opaque.is_none() {
@@ -2468,6 +2520,46 @@ fn prover_filter(target: &str) -> Result<String> {
     Ok(parts[1..].join("::"))
 }
 
+/// Whether the function's spec carrier disables verification, at the function
+/// or at the module level -- the prover's own rule for skipping it.
+fn verification_disabled(function: &FunctionEnv<'_>) -> bool {
+    !function.is_pragma_true(VERIFY_PRAGMA, || true)
+}
+
+/// The function a function-level filter names, if its verification is
+/// disabled. `None` for a module-level filter.
+fn verification_disabled_target(env: &GlobalEnv, filter: &str) -> Option<String> {
+    if !filter.contains("::") {
+        return None;
+    }
+    env.get_modules()
+        .filter(|module| module.is_target())
+        .find_map(|module| {
+            module
+                .get_functions()
+                .find(|function| function.matches_name(filter) && verification_disabled(function))
+                .map(|function| function.get_full_name_str())
+        })
+}
+
+/// Functions a module-level filter leaves unproved: those whose verification
+/// the module declares disabled. Empty for a function-level filter.
+fn verification_disabled_in_module(env: &GlobalEnv, filter: &str) -> Vec<String> {
+    if filter.contains("::") {
+        return Vec::new();
+    }
+    env.get_modules()
+        .filter(|module| module.is_target() && module.matches_name(filter))
+        .flat_map(|module| {
+            module
+                .get_functions()
+                .filter(verification_disabled)
+                .map(|function| function.get_full_name_str())
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
 /// `None` verifies every function the package declares as a target.
 fn verification_scope(filter: Option<&str>) -> VerificationScope {
     let Some(filter) = filter else {
@@ -2480,346 +2572,309 @@ fn verification_scope(filter: Option<&str>) -> VerificationScope {
     }
 }
 
-/// Compare executable ASTs while treating inline specification blocks as
-/// transparent. Specs can force different local allocation and move/copy
-/// choices in generated bytecode even when the Move program is unchanged.
-fn executable_exp_equivalent(
-    left_env: &GlobalEnv,
-    left: &Exp,
-    right_env: &GlobalEnv,
-    right: &Exp,
-) -> bool {
-    use ExpData::*;
-
-    // A trailing semicolon after a unit-valued statement is represented as an
-    // empty tuple in the source model. It has no runtime effect, just like an
-    // inline specification block. In particular, agents commonly write
-    // `while (...) { ... } spec { ... };` in a unit-returning function.
-    let is_transparent = |exp: &Exp| {
-        matches!(exp.as_ref(), SpecBlock(..))
-            || matches!(exp.as_ref(), Value(_, move_model::ast::Value::Tuple(values)) if values.is_empty())
-            || matches!(exp.as_ref(), Call(_, Operation::Tuple, arguments) if arguments.is_empty())
-    };
-    let equivalent_list = |left: &[Exp], right: &[Exp]| {
-        let left = left
-            .iter()
-            .filter(|exp| !is_transparent(exp))
-            .collect::<Vec<_>>();
-        let right = right
-            .iter()
-            .filter(|exp| !is_transparent(exp))
-            .collect::<Vec<_>>();
-        left.len() == right.len()
-            && left
-                .iter()
-                .zip(right)
-                .all(|(left, right)| executable_exp_equivalent(left_env, left, right_env, right))
-    };
-
-    match (left.as_ref(), right.as_ref()) {
-        (Sequence(_, left), Sequence(_, right)) => equivalent_list(left, right),
-        (Sequence(_, items), _) => {
-            let items = items
-                .iter()
-                .filter(|exp| !is_transparent(exp))
-                .collect::<Vec<_>>();
-            items.len() == 1 && executable_exp_equivalent(left_env, items[0], right_env, right)
-        },
-        (_, Sequence(_, items)) => {
-            let items = items
-                .iter()
-                .filter(|exp| !is_transparent(exp))
-                .collect::<Vec<_>>();
-            items.len() == 1 && executable_exp_equivalent(left_env, left, right_env, items[0])
-        },
-        (Invalid(_), Invalid(_)) | (SpecBlock(..), SpecBlock(..)) => true,
-        (Value(_, left), Value(_, right)) => left == right,
-        (LocalVar(_, left), LocalVar(_, right)) => {
-            left.display(left_env.symbol_pool()).to_string()
-                == right.display(right_env.symbol_pool()).to_string()
-        },
-        (Temporary(_, left), Temporary(_, right)) => left == right,
-        (Call(left_id, left_op, left), Call(right_id, right_op, right)) => {
-            left_op.display(left_env, *left_id).to_string()
-                == right_op.display(right_env, *right_id).to_string()
-                && equivalent_list(left, right)
-        },
-        (Invoke(_, left_fun, left), Invoke(_, right_fun, right)) => {
-            executable_exp_equivalent(left_env, left_fun, right_env, right_fun)
-                && equivalent_list(left, right)
-        },
-        (
-            Lambda(_, left_pat, left_body, left_capture, _),
-            Lambda(_, right_pat, right_body, right_capture, _),
-        ) => {
-            left_pat.display(left_env).to_string() == right_pat.display(right_env).to_string()
-                && left_capture == right_capture
-                && executable_exp_equivalent(left_env, left_body, right_env, right_body)
-        },
-        (
-            Quant(_, left_kind, left_ranges, left_triggers, left_where, left_body),
-            Quant(_, right_kind, right_ranges, right_triggers, right_where, right_body),
-        ) => {
-            left_kind == right_kind
-                && left_ranges.len() == right_ranges.len()
-                && left_ranges.iter().zip(right_ranges).all(
-                    |((left_pat, left), (right_pat, right))| {
-                        left_pat.display(left_env).to_string()
-                            == right_pat.display(right_env).to_string()
-                            && executable_exp_equivalent(left_env, left, right_env, right)
-                    },
-                )
-                && left_triggers.len() == right_triggers.len()
-                && left_triggers
-                    .iter()
-                    .zip(right_triggers)
-                    .all(|(left, right)| equivalent_list(left, right))
-                && match (left_where, right_where) {
-                    (Some(left), Some(right)) => {
-                        executable_exp_equivalent(left_env, left, right_env, right)
-                    },
-                    (None, None) => true,
-                    _ => false,
-                }
-                && executable_exp_equivalent(left_env, left_body, right_env, right_body)
-        },
-        (
-            Block(_, left_pat, left_binding, left_body),
-            Block(_, right_pat, right_binding, right_body),
-        ) => {
-            left_pat.display(left_env).to_string() == right_pat.display(right_env).to_string()
-                && match (left_binding, right_binding) {
-                    (Some(left), Some(right)) => {
-                        executable_exp_equivalent(left_env, left, right_env, right)
-                    },
-                    (None, None) => true,
-                    _ => false,
-                }
-                && executable_exp_equivalent(left_env, left_body, right_env, right_body)
-        },
-        (
-            IfElse(_, left_cond, left_then, left_else),
-            IfElse(_, right_cond, right_then, right_else),
-        ) => {
-            executable_exp_equivalent(left_env, left_cond, right_env, right_cond)
-                && executable_exp_equivalent(left_env, left_then, right_env, right_then)
-                && executable_exp_equivalent(left_env, left_else, right_env, right_else)
-        },
-        (Match(_, left_discr, left_arms), Match(_, right_discr, right_arms)) => {
-            executable_exp_equivalent(left_env, left_discr, right_env, right_discr)
-                && left_arms.len() == right_arms.len()
-                && left_arms.iter().zip(right_arms).all(|(left, right)| {
-                    left.pattern.display(left_env).to_string()
-                        == right.pattern.display(right_env).to_string()
-                        && match (&left.condition, &right.condition) {
-                            (Some(left), Some(right)) => {
-                                executable_exp_equivalent(left_env, left, right_env, right)
-                            },
-                            (None, None) => true,
-                            _ => false,
-                        }
-                        && executable_exp_equivalent(left_env, &left.body, right_env, &right.body)
-                })
-        },
-        (Loop(_, left), Loop(_, right)) | (Return(_, left), Return(_, right)) => {
-            executable_exp_equivalent(left_env, left, right_env, right)
-        },
-        (LoopCont(_, left_nest, left_continue), LoopCont(_, right_nest, right_continue)) => {
-            left_nest == right_nest && left_continue == right_continue
-        },
-        (Assign(_, left_pat, left), Assign(_, right_pat, right)) => {
-            left_pat.display(left_env).to_string() == right_pat.display(right_env).to_string()
-                && executable_exp_equivalent(left_env, left, right_env, right)
-        },
-        (Mutate(_, left_lhs, left_rhs), Mutate(_, right_lhs, right_rhs)) => {
-            executable_exp_equivalent(left_env, left_lhs, right_env, right_lhs)
-                && executable_exp_equivalent(left_env, left_rhs, right_env, right_rhs)
-        },
-        _ => false,
+/// Compare the implementation text of a pristine and an edited package.
+///
+/// Specification text is not implementation: `.spec.move` files are left out,
+/// and every `spec` construct -- function, struct, module and schema blocks,
+/// `spec fun` definitions, inline `spec { ... }` blocks -- is stripped from
+/// the `.move` files before their text is compared, with comments removed and
+/// whitespace collapsed. `use` declarations remain because aliases and method
+/// bindings participate in runtime name resolution. Compiled bytecode is not a
+/// usable witness: an inline function's specification is compiled into its
+/// callers, so a contract alone changed the module image.
+///
+/// Digests of the manifest and the specification-free text of every `.move`
+/// file under `sources/`, keyed by package-relative path. The manifest is part
+/// of the runtime implementation because named addresses and dependencies
+/// affect what the same source text compiles to.
+fn implementation_texts(package: &Path) -> Result<BTreeMap<String, String>> {
+    let mut files = Vec::new();
+    collect_move_sources(&package.join("sources"), &mut files)?;
+    let mut digests = BTreeMap::new();
+    for path in files {
+        let relative = path
+            .strip_prefix(package)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let text = fs::read_to_string(&path)
+            .with_context(|| format!("cannot read `{}`", path.display()))?;
+        digests.insert(relative, sha256_hex(strip_specifications(&text).as_bytes()));
     }
+    let manifest = package.join("Move.toml");
+    let manifest_text = fs::read_to_string(&manifest)
+        .with_context(|| format!("cannot read `{}`", manifest.display()))?;
+    digests.insert(
+        "Move.toml".to_string(),
+        sha256_hex(manifest_text.as_bytes()),
+    );
+    Ok(digests)
 }
 
-fn implementation_module_hashes(
-    baseline: &GlobalEnv,
-    candidate: &GlobalEnv,
-) -> Result<(BTreeMap<String, String>, BTreeMap<String, String>)> {
-    let baseline_modules = baseline
-        .get_primary_target_modules()
-        .into_iter()
-        .map(|module| (module.get_full_name_str(), module))
-        .collect::<BTreeMap<_, _>>();
-    let candidate_modules = candidate
-        .get_primary_target_modules()
-        .into_iter()
-        .map(|module| (module.get_full_name_str(), module))
-        .collect::<BTreeMap<_, _>>();
-    let mut baseline_hashes = BTreeMap::new();
-    let mut candidate_hashes = BTreeMap::new();
-
-    for (name, module) in &baseline_modules {
-        let Some(compiled) = module.get_verified_module() else {
-            continue;
-        };
-        let mut compiled = compiled.clone();
-        compiled
-            .metadata
-            .retain(|metadata| metadata.key != COMPILATION_METADATA_KEY);
-        let mut bytes = Vec::new();
-        compiled
-            .serialize(&mut bytes)
-            .with_context(|| format!("cannot serialize `{name}`"))?;
-        baseline_hashes.insert(name.clone(), sha256_hex(&bytes));
+fn collect_move_sources(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    if !dir.is_dir() {
+        return Ok(());
     }
-    for (name, module) in &candidate_modules {
-        let Some(compiled) = module.get_verified_module() else {
-            continue;
-        };
-        let mut compiled = compiled.clone();
-        compiled
-            .metadata
-            .retain(|metadata| metadata.key != COMPILATION_METADATA_KEY);
+    let mut entries = fs::read_dir(dir)
+        .with_context(|| format!("cannot list `{}`", dir.display()))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    entries.sort_by_key(|entry| entry.path());
+    for entry in entries {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_move_sources(&path, out)?;
+        } else if path
+            .extension()
+            .is_some_and(|extension| extension == "move")
+            && !path.to_string_lossy().ends_with(".spec.move")
+        {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
 
-        if let Some(baseline_module) = baseline_modules.get(name) {
-            // The compiler retains some specification-only material in tables
-            // outside `metadata`. If the executable module model is unchanged,
-            // use the baseline's normalized executable image rather than
-            // comparing those model-only tables byte-for-byte.
-            if executable_module_equivalent(baseline, baseline_module, candidate, module) {
-                candidate_hashes.insert(
-                    name.clone(),
-                    baseline_hashes
-                        .get(name)
-                        .expect("baseline hash exists for matching module")
-                        .clone(),
-                );
+/// The implementation text of a Move source: specification constructs,
+/// comments and whitespace differences removed. Imports remain because
+/// retargeting an alias or `use fun` binding changes runtime resolution without
+/// changing the call-site text.
+pub(crate) fn strip_specifications(source: &str) -> String {
+    let (code, masked) = strip_comments(source);
+    let code = code.as_bytes();
+    let masked = masked.as_bytes();
+    let mut out = Vec::with_capacity(code.len());
+    let mut out_masked = Vec::with_capacity(code.len());
+    let mut i = 0;
+    while i < code.len() {
+        if keyword_at(masked, i, b"spec") {
+            i = skip_spec_construct(masked, i + 4);
+            continue;
+        }
+        out.push(code[i]);
+        out_masked.push(masked[i]);
+        i += 1;
+    }
+    let (out, out_masked) = canonical_spacing(&out, &out_masked);
+    collapse_block_parentheses(&out, &out_masked)
+}
+
+/// Source text with comments and insignificant whitespace removed.
+///
+/// String literals are copied exactly. This gives policy checks a stable
+/// source identity without confusing spaces or comment text inside strings
+/// with trivia.
+pub(crate) fn canonicalize_move_source(source: &str) -> String {
+    let (code, masked) = strip_comments(source);
+    let (code, _) = canonical_spacing(code.as_bytes(), masked.as_bytes());
+    String::from_utf8(code).expect("canonical Move source remains UTF-8")
+}
+
+/// Whitespace reduced to what separates two identifier characters, and the
+/// statement terminator before a closing brace dropped: `while (c) { .. }`
+/// and `while (c) { .. } spec { .. };` end the same unit-valued statement.
+/// String literals are implementation and are copied as written.
+fn canonical_spacing(code: &[u8], masked: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    let is_ident = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    let mut out: Vec<u8> = Vec::with_capacity(code.len());
+    let mut out_masked: Vec<u8> = Vec::with_capacity(code.len());
+    let mut pending_space = false;
+    for (byte, mask) in code.iter().zip(masked) {
+        if *mask == b'_' {
+            out.push(*byte);
+            out_masked.push(*mask);
+            continue;
+        }
+        if byte.is_ascii_whitespace() {
+            pending_space = true;
+            continue;
+        }
+        if pending_space && out.last().is_some_and(|last| is_ident(*last)) && is_ident(*byte) {
+            out.push(b' ');
+            out_masked.push(b' ');
+        }
+        pending_space = false;
+        out.push(*byte);
+        out_masked.push(*mask);
+    }
+    // An empty statement at either end of a block is void: the terminator
+    // before a closing brace, and the one a stripped leading block leaves. Use
+    // the masked copy so the same byte sequences inside literals remain part
+    // of the implementation digest.
+    loop {
+        let mut changed = false;
+        let mut next = Vec::with_capacity(out.len());
+        let mut next_masked = Vec::with_capacity(out_masked.len());
+        for i in 0..out.len() {
+            let empty_terminator = out_masked[i] == b';'
+                && (i > 0 && out_masked[i - 1] == b'{' || out_masked.get(i + 1) == Some(&b'}'));
+            if empty_terminator {
+                changed = true;
                 continue;
             }
-            let baseline_functions = baseline_module
-                .get_functions()
-                .map(|function| (function.get_name_str(), function))
-                .collect::<BTreeMap<_, _>>();
-            let candidate_functions = module
-                .get_functions()
-                .map(|function| (function.get_name_str(), function))
-                .collect::<BTreeMap<_, _>>();
-            let baseline_compiled = baseline_module
-                .get_verified_module()
-                .expect("verified baseline module");
-            // Preserve bytecode for every executable body which is unchanged
-            // modulo specs. A module-level or function-level specification can
-            // add model-only declarations without changing other bodies.
-            for (function_name, baseline_function) in baseline_functions {
-                let Some(candidate_function) = candidate_functions.get(&function_name) else {
-                    continue;
-                };
-                let bodies_equal = match (baseline_function.get_def(), candidate_function.get_def())
-                {
-                    (Some(left), Some(right)) => {
-                        executable_exp_equivalent(baseline, left, candidate, right)
+            next.push(out[i]);
+            next_masked.push(out_masked[i]);
+        }
+        out = next;
+        out_masked = next_masked;
+        if !changed {
+            break;
+        }
+    }
+    (out, out_masked)
+}
+
+/// `({ e })` is `(e)`: the block a `while ({ spec { ... }; c })` header wraps
+/// its condition in is left behind once the specification is stripped.
+fn collapse_block_parentheses(code: &[u8], masked: &[u8]) -> String {
+    let mut out = Vec::with_capacity(code.len());
+    let mut i = 0;
+    while i < code.len() {
+        if masked[i..].starts_with(b"({") {
+            let open = i + 1;
+            let mut depth = 0usize;
+            let mut close = None;
+            for (offset, byte) in masked[open..].iter().enumerate() {
+                match byte {
+                    b'{' => depth += 1,
+                    b'}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            close = Some(open + offset);
+                            break;
+                        }
                     },
-                    (None, None) => true,
-                    _ => false,
-                };
-                if bodies_equal {
-                    if let (Some(baseline_index), Some(candidate_index)) = (
-                        baseline_function.get_def_idx(),
-                        candidate_function.get_def_idx(),
-                    ) {
-                        compiled.function_defs[candidate_index.0 as usize].code = baseline_compiled
-                            .function_defs[baseline_index.0 as usize]
-                            .code
-                            .clone();
-                    }
+                    _ => {},
+                }
+            }
+            if let Some(close) = close {
+                let inner = &masked[open + 1..close];
+                let after = masked[close + 1..]
+                    .iter()
+                    .position(|byte| !byte.is_ascii_whitespace());
+                let closes_paren = after.is_some_and(|offset| masked[close + 1 + offset] == b')');
+                if closes_paren && !inner.contains(&b';') && !inner.contains(&b'{') {
+                    out.push(b'(');
+                    let inner_start = open + 1;
+                    out.extend_from_slice(
+                        collapse_block_parentheses(&code[inner_start..close], inner)
+                            .trim()
+                            .as_bytes(),
+                    );
+                    i = close + 1 + after.expect("a closing parenthesis follows");
+                    continue;
                 }
             }
         }
-        let mut bytes = Vec::new();
-        compiled
-            .serialize(&mut bytes)
-            .with_context(|| format!("cannot serialize `{name}`"))?;
-        candidate_hashes.insert(name.clone(), sha256_hex(&bytes));
+        out.push(code[i]);
+        i += 1;
     }
-    Ok((baseline_hashes, candidate_hashes))
+    String::from_utf8_lossy(&out).into_owned()
 }
 
-/// Whether the runtime-relevant part of two same-named modules is unchanged.
-///
-/// Move compiler metadata does not contain all specification artifacts. In
-/// particular, a trailing loop `spec` block can allocate model-only entries in
-/// a compiled module's tables. Compare source-model runtime definitions first,
-/// so those entries cannot be mistaken for an executable change.
-fn executable_module_equivalent(
-    baseline_env: &GlobalEnv,
-    baseline: &ModuleEnv<'_>,
-    candidate_env: &GlobalEnv,
-    candidate: &ModuleEnv<'_>,
-) -> bool {
-    // A public constant is executable behaviour too: a cross-module read goes
-    // through a synthetic accessor, so a changed value changes what runs.
-    let constants = |env: &GlobalEnv, module: &ModuleEnv<'_>| {
-        module
-            .get_named_constants()
-            .map(|constant| {
-                (
-                    constant.get_name().display(env.symbol_pool()).to_string(),
-                    (constant.get_type(), constant.get_value()),
-                )
-            })
-            .collect::<BTreeMap<_, _>>()
-    };
-    if constants(baseline_env, baseline) != constants(candidate_env, candidate) {
-        return false;
-    }
-    let baseline_functions = baseline
-        .get_functions()
-        .filter(|function| !function.is_lemma())
-        .map(|function| (function.get_name_str(), function))
-        .collect::<BTreeMap<_, _>>();
-    let candidate_functions = candidate
-        .get_functions()
-        .filter(|function| !function.is_lemma())
-        .map(|function| (function.get_name_str(), function))
-        .collect::<BTreeMap<_, _>>();
-    if baseline_functions.len() != candidate_functions.len() {
-        return false;
-    }
-    for (name, baseline_function) in baseline_functions {
-        let Some(candidate_function) = candidate_functions.get(&name) else {
-            return false;
-        };
-        if baseline_function.visibility() != candidate_function.visibility()
-            || baseline_function.is_native() != candidate_function.is_native()
-            || baseline_function.is_entry() != candidate_function.is_entry()
-            || baseline_function.is_inline() != candidate_function.is_inline()
-            || baseline_function.get_parameter_types() != candidate_function.get_parameter_types()
-            || baseline_function.get_result_type() != candidate_function.get_result_type()
-            || baseline_function.get_type_parameter_count()
-                != candidate_function.get_type_parameter_count()
-        {
-            return false;
+/// The end of the `spec` construct whose keyword ends at `from`: past the
+/// `;` of a bodiless declaration, or past the matching `}` of its block. A
+/// statement terminator after an inline block belongs to the statement.
+fn skip_spec_construct(masked: &[u8], from: usize) -> usize {
+    let mut i = from;
+    let mut nested = 0usize;
+    while i < masked.len() {
+        match masked[i] {
+            b'(' | b'<' => nested += 1,
+            b')' | b'>' => nested = nested.saturating_sub(1),
+            b';' if nested == 0 => return i + 1,
+            b'{' if nested == 0 => break,
+            _ => {},
         }
-        let bodies_equal = match (baseline_function.get_def(), candidate_function.get_def()) {
-            (Some(left), Some(right)) => {
-                executable_exp_equivalent(baseline_env, left, candidate_env, right)
+        i += 1;
+    }
+    let mut depth = 0usize;
+    while i < masked.len() {
+        match masked[i] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    i += 1;
+                    break;
+                }
             },
-            (None, None) => true,
-            _ => false,
-        };
-        if !bodies_equal {
-            return false;
+            _ => {},
         }
+        i += 1;
     }
+    i
+}
 
-    let Some(baseline_compiled) = baseline.get_verified_module() else {
-        return false;
-    };
-    let Some(candidate_compiled) = candidate.get_verified_module() else {
-        return false;
-    };
-    // Struct layout and friendship are executable/module-interface state.
-    // Specification-only ghost fields do not occur in `struct_defs`.
-    baseline_compiled.struct_defs == candidate_compiled.struct_defs
-        && baseline_compiled.friend_decls == candidate_compiled.friend_decls
+fn keyword_at(masked: &[u8], i: usize, word: &[u8]) -> bool {
+    let is_ident = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    masked[i..].starts_with(word)
+        && (i == 0 || !is_ident(masked[i - 1]))
+        && masked
+            .get(i + word.len())
+            .is_none_or(|byte| !is_ident(*byte))
+}
+
+/// The source without comments, and a same-length copy whose string
+/// literals are blanked so that keywords inside them are not seen.
+fn strip_comments(source: &str) -> (String, String) {
+    let bytes = source.as_bytes();
+    let mut code = Vec::with_capacity(bytes.len());
+    let mut masked = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i..].starts_with(b"//") {
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        if bytes[i..].starts_with(b"/*") {
+            let mut depth = 0usize;
+            while i < bytes.len() {
+                if bytes[i..].starts_with(b"/*") {
+                    depth += 1;
+                    i += 2;
+                } else if bytes[i..].starts_with(b"*/") {
+                    depth -= 1;
+                    i += 2;
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+            continue;
+        }
+        if bytes[i] == b'"' {
+            code.push(b'"');
+            masked.push(b'"');
+            i += 1;
+            while i < bytes.len() && bytes[i] != b'"' {
+                if bytes[i] == b'\\' && i + 1 < bytes.len() {
+                    code.push(bytes[i]);
+                    masked.push(b'_');
+                    i += 1;
+                }
+                code.push(bytes[i]);
+                masked.push(b'_');
+                i += 1;
+            }
+            if i < bytes.len() {
+                code.push(b'"');
+                masked.push(b'"');
+                i += 1;
+            }
+            continue;
+        }
+        code.push(bytes[i]);
+        masked.push(bytes[i]);
+        i += 1;
+    }
+    (
+        String::from_utf8_lossy(&code).into_owned(),
+        String::from_utf8_lossy(&masked).into_owned(),
+    )
 }
 
 pub(crate) fn build_model(path: &Path) -> Result<GlobalEnv> {
@@ -2896,6 +2951,16 @@ mod tests {
         policy.source_frames[0].path.clone()
     }
 
+    fn write_package(root: &Path, source: &str) {
+        fs::create_dir_all(root.join("sources")).expect("create sources");
+        fs::write(
+            root.join("Move.toml"),
+            "[package]\nname = \"runtime_guard\"\nversion = \"0.0.0\"\n",
+        )
+        .expect("write manifest");
+        fs::write(root.join("sources/guard.move"), source).expect("write source");
+    }
+
     #[test]
     fn inventory_excludes_verify_only_functions() {
         let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2965,128 +3030,112 @@ mod tests {
     }
 
     #[test]
-    fn runtime_hash_ignores_specs_but_rejects_executable_changes() {
-        fn write_package(root: &Path, source: &str) {
-            fs::create_dir_all(root.join("sources")).expect("create sources");
-            fs::write(
-                root.join("Move.toml"),
-                "[package]\nname = \"runtime_guard\"\nversion = \"0.0.0\"\n",
-            )
-            .expect("write manifest");
-            fs::write(root.join("sources/guard.move"), source).expect("write source");
+    fn implementation_comparison_ignores_specification_text() {
+        let baseline = concat!(
+            "module 0x42::guard { public fun f(x: u64): u64 { ",
+            "let acc = 0; let i = 0; let n = x; ",
+            "while (i < n) { acc = acc + i; i = i + 1; }; acc } }",
+        );
+        let spec_only = concat!(
+            "module 0x42::guard { public fun f(x: u64): u64 { ",
+            "let acc = 0; let i = 0; let n = x; ",
+            "while ({ spec { invariant i <= n; invariant n == x; }; i < n }) { ",
+            "acc = acc + i; i = i + 1; }; acc } ",
+            "spec f { pragma opaque = true; ensures result >= 0; } ",
+            "spec module { fun summary(x: u64): u64 { x } } ",
+            "spec fun uninterpreted(x: u64): u64; ",
+            "spec lemma reflexive(x: u64) { ensures x == x; } }",
+        );
+        let trailing_loop_spec = concat!(
+            "module 0x42::guard { public fun f(x: u64): u64 { ",
+            "let acc = 0; let i = 0; let n = x; // a comment mentioning spec\n",
+            "while (i < n) { acc = acc + i; i = i + 1; } ",
+            "spec { invariant i <= n; invariant n == x; }; acc } ",
+            "spec f<T>(x: u64): u64 { pragma opaque = true; } }",
+        );
+        let runtime_change = concat!(
+            "module 0x42::guard { public fun f(x: u64): u64 { ",
+            "let acc = 0; let i = 0; let n = x; ",
+            "while (i < n) { acc = acc + i + 1; i = i + 1; }; acc } }",
+        );
+        assert_eq!(
+            strip_specifications(baseline),
+            strip_specifications(spec_only)
+        );
+        assert_eq!(
+            strip_specifications(baseline),
+            strip_specifications(trailing_loop_spec)
+        );
+        assert_ne!(
+            strip_specifications(baseline),
+            strip_specifications(runtime_change)
+        );
+        let imported_a = "module 0x42::guard { use 0x42::a as M; fun f() { M::run() } }";
+        let imported_b = "module 0x42::guard { use 0x42::b as M; fun f() { M::run() } }";
+        assert_ne!(
+            strip_specifications(imported_a),
+            strip_specifications(imported_b),
+            "retargeting a runtime alias must change the implementation digest"
+        );
+        // A string literal is implementation, even one that spells `spec {`.
+        let literal = "module 0x42::guard { public fun f(): vector<u8> { b\"spec { }\" } }";
+        assert!(strip_specifications(literal).contains("spec { }"));
+        for (left, right) in [("b\";}\"", "b\"}\""), ("b\"({x})\"", "b\"(x)\"")] {
+            assert_ne!(
+                strip_specifications(&format!(
+                    "module 0x42::guard {{ fun f(): vector<u8> {{ {left} }} }}"
+                )),
+                strip_specifications(&format!(
+                    "module 0x42::guard {{ fun f(): vector<u8> {{ {right} }} }}"
+                )),
+                "string contents must remain part of the implementation digest"
+            );
         }
+    }
 
-        let temporary = tempfile::tempdir().expect("create temporary package root");
+    #[test]
+    fn implementation_comparison_reads_sources_and_skips_spec_files() {
+        let temporary = tempfile::tempdir().expect("temporary root");
         let baseline = temporary.path().join("baseline");
-        let spec_only = temporary.path().join("spec-only");
-        let trailing_loop_spec = temporary.path().join("trailing-loop-spec");
-        let trailing_loop_spec_with_semicolon =
-            temporary.path().join("trailing-loop-spec-with-semicolon");
-        let unit_baseline = temporary.path().join("unit-baseline");
-        let unit_trailing_semicolon = temporary.path().join("unit-trailing-semicolon");
-        let runtime_change = temporary.path().join("runtime-change");
+        let candidate = temporary.path().join("candidate");
+        let changed = temporary.path().join("changed");
         write_package(
             &baseline,
-            concat!(
-                "module 0x42::guard { public fun f(x: u64): u64 { ",
-                "let acc = 0; let i = 0; let n = x; ",
-                "while (i < n) { acc = acc + i; i = i + 1; }; acc } }",
-            ),
+            "module 0x42::guard { public fun f(x: u64): u64 { x + 1 } }",
         );
         write_package(
-            &spec_only,
+            &candidate,
             concat!(
-                "module 0x42::guard { public fun f(x: u64): u64 { ",
-                "let acc = 0; let i = 0; let n = x; ",
-                "while ({ spec { invariant i <= n; invariant n == x; }; i < n }) { ",
-                "acc = acc + i; i = i + 1; }; acc } ",
-                "spec f { pragma opaque = true; ensures result >= 0; } ",
-                "spec module { fun summary(x: u64): u64 { x } } }",
+                "module 0x42::guard { public fun f(x: u64): u64 { x + 1 } ",
+                "spec f { ensures result == x + 1; } }",
             ),
         );
+        fs::write(
+            candidate.join("sources/guard.spec.move"),
+            "spec 0x42::guard { spec module { pragma verify = true; } }",
+        )
+        .expect("write spec file");
         write_package(
-            &runtime_change,
-            concat!(
-                "module 0x42::guard { public fun f(x: u64): u64 { ",
-                "let acc = 0; let i = 0; let n = x; ",
-                "while (i < n) { acc = acc + i + 1; i = i + 1; }; acc } }",
-            ),
+            &changed,
+            "module 0x42::guard { public fun f(x: u64): u64 { x + 2 } }",
         );
-        write_package(
-            &trailing_loop_spec,
-            concat!(
-                "module 0x42::guard { public fun f(x: u64): u64 { ",
-                "let acc = 0; let i = 0; let n = x; ",
-                "while (i < n) { acc = acc + i; i = i + 1; } ",
-                "spec { invariant i <= n; invariant n == x; }; acc } ",
-                "spec f { pragma opaque = true; ensures result >= 0; } ",
-                "spec module { fun summary(x: u64): u64 { x } } ",
-                "spec lemma reflexive(x: u64) { ensures x == x; } }",
-            ),
-        );
-        write_package(
-            &trailing_loop_spec_with_semicolon,
-            concat!(
-                "module 0x42::guard { public fun f(x: u64): u64 { ",
-                "let acc = 0; let i = 0; let n = x; ",
-                "while (i < n) { acc = acc + i; i = i + 1; } ",
-                "spec { invariant i <= n; invariant n == x; }; acc } ",
-                "spec f { pragma opaque = true; ensures result >= 0; } ",
-                "spec module { fun summary(x: u64): u64 { x } } ",
-                "spec lemma reflexive(x: u64) { ensures x == x; } }",
-            ),
-        );
-        write_package(
-            &unit_trailing_semicolon,
-            concat!(
-                "module 0x42::guard { public fun f(x: u64) { ",
-                "let i = 0; while (i < x) { i = i + 1; } ",
-                "spec { invariant i <= x; }; } ",
-                "spec f { pragma opaque = true; } }",
-            ),
-        );
-        write_package(
-            &unit_baseline,
-            concat!(
-                "module 0x42::guard { public fun f(x: u64) { ",
-                "let i = 0; while (i < x) { i = i + 1; } } }",
-            ),
-        );
+        let same = implementation_comparison(&baseline, &candidate).expect("compare");
+        assert!(same.equal, "{same:?}");
+        let differs = implementation_comparison(&baseline, &changed).expect("compare");
+        assert_eq!(differs.changed_modules, vec![
+            "sources/guard.move".to_string()
+        ]);
 
-        let baseline_env = build_model_for_implementation_comparison(&baseline).expect("baseline");
-        let spec_only_env =
-            build_model_for_implementation_comparison(&spec_only).expect("spec-only candidate");
-        let runtime_change_env =
-            build_model_for_implementation_comparison(&runtime_change).expect("runtime change");
-        let trailing_loop_spec_env = build_model_for_implementation_comparison(&trailing_loop_spec)
-            .expect("trailing-loop-spec candidate");
-        let trailing_loop_spec_with_semicolon_env =
-            build_model_for_implementation_comparison(&trailing_loop_spec_with_semicolon)
-                .expect("trailing-loop-spec-with-semicolon candidate");
-        let unit_baseline_env =
-            build_model_for_implementation_comparison(&unit_baseline).expect("unit baseline");
-        let unit_trailing_semicolon_env =
-            build_model_for_implementation_comparison(&unit_trailing_semicolon)
-                .expect("unit-trailing-semicolon candidate");
-        let (baseline_hashes, spec_only_hashes) =
-            implementation_module_hashes(&baseline_env, &spec_only_env).expect("compare spec-only");
-        let (_, runtime_change_hashes) =
-            implementation_module_hashes(&baseline_env, &runtime_change_env)
-                .expect("compare runtime change");
-        let (_, trailing_loop_spec_hashes) =
-            implementation_module_hashes(&baseline_env, &trailing_loop_spec_env)
-                .expect("compare trailing loop spec");
-        let (_, trailing_loop_spec_with_semicolon_hashes) =
-            implementation_module_hashes(&baseline_env, &trailing_loop_spec_with_semicolon_env)
-                .expect("compare trailing loop spec with semicolon");
-        let (unit_baseline_hashes, unit_trailing_semicolon_hashes) =
-            implementation_module_hashes(&unit_baseline_env, &unit_trailing_semicolon_env)
-                .expect("compare unit trailing loop spec with semicolon");
-        assert_eq!(baseline_hashes, spec_only_hashes);
-        assert_eq!(baseline_hashes, trailing_loop_spec_hashes);
-        assert_eq!(baseline_hashes, trailing_loop_spec_with_semicolon_hashes);
-        assert_eq!(unit_baseline_hashes, unit_trailing_semicolon_hashes);
-        assert_ne!(baseline_hashes, runtime_change_hashes);
+        fs::write(
+            candidate.join("Move.toml"),
+            "[package]\nname = \"runtime_guard\"\nversion = \"0.0.0\"\n\n[addresses]\napp = \"0x43\"\n",
+        )
+        .expect("change candidate manifest");
+        let manifest_differs =
+            implementation_comparison(&baseline, &candidate).expect("compare manifest");
+        assert_eq!(manifest_differs.changed_modules, vec![
+            "Move.toml".to_string()
+        ]);
     }
 
     #[test]

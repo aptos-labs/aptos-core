@@ -379,14 +379,14 @@ async fn an_abstract_condition_is_rejected() {
 
 #[tokio::test]
 async fn an_added_intrinsic_pragma_is_rejected() {
-    // An intrinsic function is never verified. The corpus has legitimate
-    // intrinsics, so only opacity or intrinsicness the candidate adds counts.
+    // A registered or explicitly opaque intrinsic is not body-verified. The
+    // corpus has legitimate intrinsics, so only trust the baseline's set.
     let baseline = common::make_package("pure", &[("pure.move", BASELINE)]);
     let package = common::make_package("pure", &[("pure.move", BASELINE)]);
     fs::write(
         package.path().join("sources").join("pure.move"),
         "module 0xCAFE::pure {\n    fun answer(): u64 { 42 }\n    \
-         spec answer {\n        pragma intrinsic = true;\n        aborts_if false;\n        \
+         spec answer {\n        pragma intrinsic = true;\n        pragma opaque = true;\n        aborts_if false;\n        \
          ensures result == 7;\n    }\n}\n",
     )
     .unwrap();
@@ -897,18 +897,18 @@ async fn a_numeric_unroll_pragma_is_rejected() {
 
 #[tokio::test]
 async fn a_changed_intrinsic_contract_is_rejected() {
-    // An intrinsic function is modelled by the prover rather than proved, so
-    // its contract is assumed at call sites just as an opaque one's is.
+    // An explicitly opaque intrinsic is modelled rather than body-proved, so
+    // its contract is assumed at call sites.
     // Rewriting an existing one must not slip through as unchanged.
     let source = "module 0xCAFE::pure {\n    fun helper(x: u64): u64 { x }\n    \
-                  spec helper {\n        pragma intrinsic;\n        aborts_if false;\n        \
+                  spec helper {\n        pragma intrinsic;\n        pragma opaque;\n        aborts_if false;\n        \
                   ensures result == x;\n    }\n    fun answer(): u64 { helper(42) }\n}\n";
     let baseline = common::make_package("pure", &[("pure.move", source)]);
     let package = common::make_package("pure", &[("pure.move", source)]);
     fs::write(
         package.path().join("sources").join("pure.move"),
         "module 0xCAFE::pure {\n    fun helper(x: u64): u64 { x }\n    \
-         spec helper {\n        pragma intrinsic;\n        aborts_if false;\n        \
+         spec helper {\n        pragma intrinsic;\n        pragma opaque;\n        aborts_if false;\n        \
          ensures result == 7;\n    }\n    fun answer(): u64 { helper(42) }\n    \
          spec answer {\n        aborts_if false;\n        ensures result == 7;\n    }\n}\n",
     )

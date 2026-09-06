@@ -32,7 +32,6 @@ use crate::{
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA, INTRINSIC_PRAGMA, OPAQUE_PRAGMA,
         VERIFY_PRAGMA,
     },
-    spec_derivation,
     symbol::{Symbol, SymbolPool},
     ty::{
         AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext, Variance,
@@ -2074,7 +2073,11 @@ impl GlobalEnv {
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
 
-        // If use decls decls are empty, let's propagage them from the CompiledModule with aliases assigned
+        // If use decls are empty, let's propagate them from the CompiledModule with aliases
+        // assigned. Otherwise the module was built from source and already carries its own
+        // imports; keep them. They are the only record of which module names source actually
+        // bound, and bytecode cannot reconstruct that -- it lists what is referenced, not what
+        // was imported.
         let use_decls = if self.module_data[module_id.0 as usize].use_decls.is_empty() {
             // Map to keep track of aliases for used modules
             // key: module name (without address)
@@ -2115,7 +2118,7 @@ impl GlobalEnv {
                 })
                 .collect()
         } else {
-            vec![]
+            std::mem::take(&mut self.module_data[module_id.0 as usize].use_decls)
         };
         // If friend decls are empty, let's propagage them from the CompiledModule
         // Different from use decls, we allow friend modules that have not been added to the GlobalEnv
@@ -5762,13 +5765,19 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns true if this function has the pragma intrinsic set to true.
     pub fn is_intrinsic(&self) -> bool {
-        self.is_pragma_true(INTRINSIC_PRAGMA, || {
+        let declared_or_registered = self.is_pragma_true(INTRINSIC_PRAGMA, || {
             self.module_env
                 .env
                 .intrinsics
                 .get_decl_for_move_fun(&self.get_qualified_id())
                 .is_some()
-        })
+        });
+        // An executable function whose intrinsic has no prover implementation
+        // must not silently lose its body. It is safe to omit that body only
+        // when the author explicitly made the function opaque, in which case
+        // callers deliberately rely on its contract.
+        declared_or_registered
+            && (!self.is_unimplemented_intrinsic() || self.is_pragma_true(OPAQUE_PRAGMA, || false))
     }
 
     /// Returns true if function is either native or intrinsic.
@@ -5800,6 +5809,24 @@ impl<'env> FunctionEnv<'env> {
     /// Returns true if this function is opaque.
     pub fn is_opaque(&self) -> bool {
         self.is_pragma_true(OPAQUE_PRAGMA, || false)
+    }
+
+    /// Whether this function declares `pragma intrinsic` without the prover
+    /// providing an implementation for it.
+    pub fn is_unimplemented_intrinsic(&self) -> bool {
+        self.is_pragma_true(INTRINSIC_PRAGMA, || false)
+            // A native intrinsic is implemented by the prelude by construction,
+            // a registered one by its intrinsic declaration, and `std::vector`'s
+            // by the prelude's templates. Each translates to a procedure that is
+            // declared somewhere; nothing else with the pragma does.
+            && !self.is_native()
+            && !crate::well_known::is_boogie_prelude_intrinsic(self)
+            && self
+                .module_env
+                .env
+                .intrinsics
+                .get_decl_for_move_fun(&self.get_qualified_id())
+                .is_none()
     }
 
     /// Return the visibility of this function
@@ -6241,33 +6268,13 @@ impl<'env> FunctionEnv<'env> {
                         },
                         // Behavioral predicate over a concrete closure target:
                         // its evaluator is defined over the target's memory.
-                        ExpData::Call(_, Operation::Behavior(..), args) => {
-                            if let Some(ExpData::Call(cid, Operation::Closure(mid, fid, _), _)) =
-                                args.first().map(|a| a.as_ref())
+                        ExpData::Call(_, Operation::Behavior(kind, _), args) => {
+                            if let Some(target) = ExpData::behavior_target_memory(env, *kind, args)
                             {
-                                let target_qid = mid.qualified(*fid);
-                                let target = env.get_function(target_qid);
-                                let inst = env.get_node_instantiation(*cid);
-                                used.extend(spec_derivation::behavioral_target_memory(
-                                    env, target_qid, &inst,
-                                ));
-                                old.extend(target.get_spec_old_memory_instantiated(&inst));
-                                // A target slot the instantiation leaves as a
-                                // type parameter has no struct head to resolve
-                                // against, so it stays generic in this caller
-                                // rather than being dropped.
-                                for (target_generic, out) in [
-                                    (target.get_spec_generic_used_memory(), &mut generic_used),
-                                    (target.get_spec_generic_old_memory(), &mut generic_old),
-                                ] {
-                                    for slot in target_generic.iter() {
-                                        if let Some(Type::TypeParameter(tp)) =
-                                            inst.get(*slot as usize).map(Type::skip_reference)
-                                        {
-                                            out.insert(*tp);
-                                        }
-                                    }
-                                }
+                                used.extend(target.used);
+                                generic_used.extend(target.generic_used);
+                                old.extend(target.old);
+                                generic_old.extend(target.generic_old);
                             }
                         },
                         _ => {},

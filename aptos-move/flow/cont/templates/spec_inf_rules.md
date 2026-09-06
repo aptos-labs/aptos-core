@@ -66,6 +66,16 @@ behavioral condition, invent a restrictive `requires`, enable partial abort
 coverage, omit a frame, or skip verification. Replace a condition only with a
 semantically equivalent, complete form.
 
+Partial abort coverage has one narrow exception. A caller is verified against
+its opaque callees' contracts rather than their bodies, so when one of those
+contracts is itself partial there is no exact abort condition left for the
+caller to state, and `pragma aborts_if_is_partial` is the honest form rather
+than a weakening. It counts only for partiality you *found*: reported by
+inference for the callee, or already present in the tree you started from.
+Partiality you wrote yourself does not — marking a helper partial and then
+citing it would excuse any contract at all, and the check rejects that. When
+the exception applies, say in the contract which callee it comes from.
+
 ### Loop abstractions
 
 Derive an invariant from the implementation and the fact needed at loop exit.

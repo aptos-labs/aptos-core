@@ -76,7 +76,9 @@ pub struct McpArgs {
     #[arg(long)]
     pub experiments: Vec<String>,
 
-    /// Global timeout (seconds) for any single MCP tool call. Default: 120.
+    /// Timeout (seconds) for tool calls that run unbounded in-process work
+    /// (tests, WP inference). Default: 120. Prover-backed tools are bounded by
+    /// the prover's own watchdog instead and ignore this value.
     #[arg(long, default_value_t = 120)]
     pub tool_timeout: u64,
 

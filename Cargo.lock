@@ -13502,6 +13502,7 @@ dependencies = [
  "num 0.4.1",
  "num-traits",
  "once_cell",
+ "petgraph 0.6.5",
  "regex",
  "serde",
 ]
@@ -13652,6 +13653,7 @@ dependencies = [
  "move-model",
  "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
+ "nix 0.29.0",
  "num 0.4.1",
  "once_cell",
  "pretty",

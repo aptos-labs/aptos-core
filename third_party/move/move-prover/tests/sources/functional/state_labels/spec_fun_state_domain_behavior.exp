@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/spec_fun_state_domain_behavior.move:24:9
+   │
+24 │         ensures readable_in_every_state(_addr); // error: Counter need not exist in every state
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/spec_fun_state_domain_behavior.move:21: expose_false_claim
+   =     at tests/sources/functional/state_labels/spec_fun_state_domain_behavior.move:23: expose_false_claim (spec)
+   =     at tests/sources/functional/state_labels/spec_fun_state_domain_behavior.move:21: expose_false_claim
+   =         _addr = <redacted>
+   =     at tests/sources/functional/state_labels/spec_fun_state_domain_behavior.move:24: expose_false_claim (spec)
