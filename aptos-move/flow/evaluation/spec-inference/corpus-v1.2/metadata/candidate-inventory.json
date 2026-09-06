@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
+  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
   "source_roots": [
     "aptos-move/framework/aptos-framework",
     "aptos-move/framework/aptos-experimental"

@@ -12,9 +12,9 @@ giving the independent workspace to an agent.
 - Original source: `aptos-move/framework/aptos-framework/sources/transaction_fee.move`
 - Source inside the shared package: `sources/AptosFramework/transaction_fee.move`
 - Source root: `aptos-move/framework/aptos-framework`
-- Aptos Core commit: `1ffaa408ec8899d19e0933b1680dce339051cd9f`
+- Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
 - Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `63667276f5a0f36b901268f29f2fd18dd62b8072426eb374b76e5fc873e01700`
+- Prepared tree SHA-256: `53eecc2e1b0b5911a3a8797ec7ec829159644e4d58cc47b21b83e2b3c6ef9314`
 - Required contract categories: `normal-result`, `state-transition`, `frame`
 
 Target functions:

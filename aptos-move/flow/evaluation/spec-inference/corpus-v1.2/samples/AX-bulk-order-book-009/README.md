@@ -12,9 +12,9 @@ giving the independent workspace to an agent.
 - Original source: `aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_book.move`
 - Source inside the shared package: `sources/AptosExperimental/trading/order_book/bulk_order_book.move`
 - Source root: `aptos-move/framework/aptos-experimental`
-- Aptos Core commit: `1ffaa408ec8899d19e0933b1680dce339051cd9f`
+- Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
 - Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `6e82570572e4877c55fa4896a73db2bf6a41e09989fb13b34ff2a33f5cc67573`
+- Prepared tree SHA-256: `b3c2936c698ed0f77e9b0aeeb0bc28bbe98591dd4713797a4b264b0af68d88fd`
 - Required contract categories: `normal-result`, `abort`
 
 Target functions:
