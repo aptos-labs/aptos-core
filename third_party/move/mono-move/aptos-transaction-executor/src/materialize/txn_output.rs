@@ -100,7 +100,8 @@ fn drain_write_set(
     // Unordered on purpose: nothing below may depend on the order groups are
     // visited in (see the SAFETY note above). The inner map is ordered because
     // its keys are user-chosen struct tags and it merges into `GroupMembers`.
-    let mut group_ops: UnorderedMap<StateKey, BTreeMap<StructTag, MemberOp>> = UnorderedMap::new();
+    let mut group_ops: UnorderedMap<InMemoryStorageKey, BTreeMap<StructTag, MemberOp>> =
+        UnorderedMap::new();
     let mut materialized_groups = MaterializedGroups::new();
     let mut failures: Vec<String> = vec![];
 
@@ -135,10 +136,7 @@ fn drain_write_set(
                 writes.push((state_key, op));
             },
             Some(group_ty) => {
-                let group_key = StateKey::resource_group(
-                    &key.address(),
-                    &nominal_tag(group_ty).map_err(|e| format!("{e:#}"))?,
-                );
+                let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_op = match class {
                     WriteClass::Creation(ptr) | WriteClass::Modification(ptr) => {
                         Some(written_bytes(ptr, key.value_ty())?)
@@ -178,10 +176,14 @@ fn drain_write_set(
     // `WriteSet::new` sorts the writes and `MaterializationError::new` sorts
     // the failures, so the order does not reach the result.
     for (group_key, member_ops) in group_ops.into_iter_unordered() {
-        match merge_group(provider, &group_key, member_ops) {
-            Ok((op, members)) => {
-                materialized_groups.insert(group_key.clone(), members);
-                writes.push((group_key, op));
+        let merged = merge_group(provider, &group_key, member_ops).and_then(|(op, members)| {
+            let state_key = group_key.as_state_key().map_err(|e| format!("{e:#}"))?;
+            Ok((state_key, op, members))
+        });
+        match merged {
+            Ok((state_key, op, members)) => {
+                materialized_groups.insert(group_key, members);
+                writes.push((state_key, op));
             },
             Err(e) => failures.push(e),
         }
@@ -209,7 +211,7 @@ fn drain_write_set(
 // assembling the group.
 fn merge_group(
     provider: &dyn AptosDataProvider,
-    group_key: &StateKey,
+    group_key: &InMemoryStorageKey,
     member_ops: BTreeMap<StructTag, MemberOp>,
 ) -> Result<(WriteOp, Option<GroupMembers>), String> {
     let old = provider
