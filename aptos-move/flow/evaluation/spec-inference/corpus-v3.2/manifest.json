@@ -44,7 +44,7 @@
  },
  "provenance": {
   "aptos_core": {
-   "commit": "5e1e5be7c5665676afc1a20f53f484bb1258598d",
+   "commit": "e9f1b7545253e665790a60d4ca820468f89136ae",
    "reconstructible": true,
    "tracked_modifications": false
   },
