@@ -3644,46 +3644,6 @@ impl<'env> ModuleEnv<'env> {
         &self.data.use_decls
     }
 
-    /// Returns the modules whose name is bound as a qualifier by a `use`
-    /// declaration of this module.
-    ///
-    /// This is deliberately not `get_used_modules`. That set is the dependency
-    /// closure: once a compiled module is attached it is recomputed from
-    /// bytecode and holds every module referenced, whether or not source ever
-    /// imported it. Printing a type short because it is *referenced* produces a
-    /// qualifier that does not resolve; only an import can license the short
-    /// form.
-    pub fn get_use_bound_modules(&self) -> BTreeSet<ModuleId> {
-        let pool = self.env.symbol_pool();
-        self.data
-            .use_decls
-            .iter()
-            .filter(|ud| ud.binds_module_qualifier(pool))
-            .filter_map(|ud| self.resolve_use_decl_module(ud))
-            .collect()
-    }
-
-    /// Resolves the module a `use` declaration names.
-    ///
-    /// `UseDecl::module_id` is filled in during declaration analysis and stays
-    /// `None` whenever the target module had not been entered into the module
-    /// table yet, so it cannot be relied on on its own. The declaration also
-    /// keeps the address as written, which may be a named alias, so resolving by
-    /// name needs the alias map.
-    fn resolve_use_decl_module(&self, use_decl: &UseDecl) -> Option<ModuleId> {
-        if let Some(id) = use_decl.module_id {
-            return Some(id);
-        }
-        let name = &use_decl.module_name;
-        let addr = match name.addr() {
-            Address::Symbolic(alias) => Address::Numerical(self.env.resolve_address_alias(*alias)?),
-            addr @ Address::Numerical(_) => addr.clone(),
-        };
-        self.env
-            .find_module(&ModuleName::new(addr, name.name()))
-            .map(|m| m.get_id())
-    }
-
     /// Returns the friend declarations of this module.
     pub fn get_friend_decls(&self) -> &[FriendDecl] {
         &self.data.friend_decls
@@ -3890,7 +3850,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.get_name().clone()),
-            used_modules: self.get_use_bound_modules(),
+            used_modules: self.get_used_modules(false),
             ..TypeDisplayContext::new(self.env)
         }
     }
@@ -5064,7 +5024,7 @@ impl NamedConstantEnv<'_> {
     pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.module_env.get_name().clone()),
-            used_modules: self.module_env.get_use_bound_modules(),
+            used_modules: self.module_env.get_used_modules(false),
             ..TypeDisplayContext::new(self.module_env.env)
         }
     }

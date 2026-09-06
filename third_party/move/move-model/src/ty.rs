@@ -3858,19 +3858,16 @@ impl<'a> TypeDisplayContext<'a> {
         self.module_name.as_ref() == Some(module_name)
     }
 
-    /// Whether the given module is bound as a qualifier in the current module,
-    /// so a type belonging to it can be printed in its short form.
+    /// Check if the given module is used by the current module
     pub fn is_imported_module(&self, module_id: &ModuleId) -> bool {
         self.used_modules.contains(module_id) || {
             // `used_modules` may not have been propagated yet, so let's check `use_decls` as a backup.
             let imported_module_env = self.env.get_module(*module_id);
-            let pool = self.env.symbol_pool();
             self.module_name.as_ref().is_some_and(|ctx_module| {
                 self.env.find_module(ctx_module).is_some_and(|m| {
-                    m.get_use_decls().iter().any(|use_| {
-                        use_.module_name == *imported_module_env.get_name()
-                            && use_.binds_module_qualifier(pool)
-                    })
+                    m.get_use_decls()
+                        .iter()
+                        .any(|use_| use_.module_name == *imported_module_env.get_name())
                 })
             })
         }
@@ -4075,16 +4072,21 @@ impl TypeDisplay<'_> {
             || (!self.context.is_current_module(&struct_module_name)
                 && !self.context.is_imported_module(&mid))
         {
-            // Reaching here means the module is neither the current one nor bound
-            // by an import, so a bare `m::T` has nothing to resolve against. That
-            // holds even when it sits at the current address: sharing an address
-            // does not bind a qualifier, only a `use` does. Print the address.
-            return format!(
-                "0x{}::{}::{}",
-                struct_module_addr.short_str_lossless(),
-                struct_module_idstr,
-                struct_name
-            );
+            let mut result = String::new();
+            let show_addr = !self.context.is_current_addr(struct_module_name.addr());
+            let show_mod = show_addr
+                || !self.context.is_current_name(&struct_module_idstr)
+                || self.context.clash_with_ty_params(struct_symbol)
+                || self.context.use_module_qualification;
+
+            if show_addr {
+                result.push_str(&format!("0x{}::", struct_module_addr.short_str_lossless()));
+            }
+            if show_mod {
+                result.push_str(&format!("{}::", struct_module_idstr));
+            }
+            result.push_str(&struct_name);
+            return result;
         }
 
         // If there's a module alias, use it
