@@ -67,7 +67,7 @@ where
             .get(key)
             .map(|&ptr| StorageRead::ExternalHeap {
                 ptr,
-                version: 0,
+                version: None,
                 pin: materialized.arena.clone(),
             })
     }
@@ -85,7 +85,7 @@ where
         materialized.cache.insert(key.clone(), ptr);
         Ok(StorageRead::ExternalHeap {
             ptr,
-            version: 0,
+            version: None,
             pin: arena,
         })
     }
@@ -109,13 +109,18 @@ where
                     .map_err(|err| ResourceProviderError::InvariantViolation(format!("{err:#}")))?;
                 match (self.lookup)(*address, tag)? {
                     Some(blob) => self.materialize(key, *ty, &blob),
-                    None => Ok(StorageRead::DoesNotExist),
+                    None => Ok(StorageRead::DoesNotExist { version: None }),
                 }
             },
             // TODO(testing): serve table items through the lookup, so the
             // transactional session can keep tables across tasks once it
             // commits table writes.
-            InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist),
+            InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist { version: None }),
+            // Resource groups are a storage-layer concern; this provider serves
+            // members directly by their own key.
+            InMemoryStorageKey::ResourceGroup { .. } => {
+                Ok(StorageRead::DoesNotExist { version: None })
+            },
         }
     }
 }

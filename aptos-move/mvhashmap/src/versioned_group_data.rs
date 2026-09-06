@@ -522,31 +522,8 @@ where
         group_key: &K,
         txn_idx: TxnIndex,
     ) -> Result<(Vec<(T, V)>, ResourceGroupSize), PanicError> {
-        let superset_tags = self
-            .group_tags
-            .get(group_key)
-            .expect("Group tags must be set")
-            .clone();
-
-        let committed_group = superset_tags
-            .into_iter()
-            .map(
-                |tag| match self.fetch_tagged_data_no_record(group_key, &tag, txn_idx + 1) {
-                    Ok((_, value)) => Ok((value.write_op_kind() != WriteOpKind::Deletion)
-                        .then(|| (tag, value.clone()))),
-                    Err(MVGroupError::TagNotFound) => Ok(None),
-                    Err(e) => Err(code_invariant_error(format!(
-                        "Unexpected error in finalize group fetching value {:?}",
-                        e
-                    ))),
-                },
-            )
-            .collect::<Result<Vec<_>, PanicError>>()?
-            .into_iter()
-            .flatten()
-            .collect();
         Ok((
-            committed_group,
+            self.group_members_at(group_key, txn_idx + 1)?,
             self.get_group_size_no_record(group_key, txn_idx + 1)
                 .map_err(|e| {
                     code_invariant_error(format!(
@@ -555,6 +532,42 @@ where
                     ))
                 })?,
         ))
+    }
+
+    /// The contents of a group as a transaction at `read_idx` observes it: every
+    /// tag ever written to the group, resolved to the latest entry below
+    /// `read_idx`, with deletions left out.
+    ///
+    /// The caller must know that no entry below `read_idx` is still speculative,
+    /// which holds when all transactions below it are committed.
+    pub fn group_members_at(
+        &self,
+        group_key: &K,
+        read_idx: TxnIndex,
+    ) -> Result<Vec<(T, V)>, PanicError> {
+        let superset_tags = self
+            .group_tags
+            .get(group_key)
+            .ok_or_else(|| code_invariant_error("Group tags must be set"))?
+            .clone();
+
+        Ok(superset_tags
+            .into_iter()
+            .map(
+                |tag| match self.fetch_tagged_data_no_record(group_key, &tag, read_idx) {
+                    Ok((_, value)) => Ok((value.write_op_kind() != WriteOpKind::Deletion)
+                        .then(|| (tag, value.clone()))),
+                    Err(MVGroupError::TagNotFound) => Ok(None),
+                    Err(e) => Err(code_invariant_error(format!(
+                        "Unexpected error fetching a group member: {:?}",
+                        e
+                    ))),
+                },
+            )
+            .collect::<Result<Vec<_>, PanicError>>()?
+            .into_iter()
+            .flatten()
+            .collect())
     }
 }
 
@@ -1020,7 +1033,6 @@ mod test {
     #[should_panic]
     #[test_case(0)]
     #[test_case(1)]
-    #[test_case(2)]
     fn group_no_path_exists(test_idx: usize) {
         let ap = KeyType(b"/foo/b".to_vec());
         let map = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::empty();
@@ -1032,11 +1044,16 @@ mod test {
             1 => {
                 map.remove(&ap, 2, HashSet::new());
             },
-            2 => {
-                let _ = map.finalize_group(&ap, 0);
-            },
             _ => unreachable!("Wrong test index"),
         }
+    }
+
+    #[test]
+    fn group_no_path_finalize() {
+        let ap = KeyType(b"/foo/b".to_vec());
+        let map = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::empty();
+        assert_err!(map.finalize_group(&ap, 0));
+        assert_err!(map.group_members_at(&ap, 0));
     }
 
     #[test]

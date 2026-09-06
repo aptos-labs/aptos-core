@@ -9,7 +9,7 @@
 mod module_provider;
 mod resource_provider;
 
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_types::{chain_id::ChainId, contract_event::ContractEvent};
 use bytes::Bytes;
 use legacy_move_compiler::unit_test::{NamedOrBytecodeModule, TestCase, TestPlan};
@@ -444,6 +444,9 @@ fn test_effects(guard: &ExecutionGuard<'_>, effects: &SessionEffects) -> Result<
                     .entry(handle.address())
                     .or_default()
                     .insert(key.to_vec(), op);
+            },
+            InMemoryStorageKey::ResourceGroup { .. } => {
+                bail!("Session wrote a resource group slot directly")
             },
         }
     }

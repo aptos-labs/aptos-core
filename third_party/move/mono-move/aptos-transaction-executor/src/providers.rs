@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
+use aptos_types::on_chain_config::OnChainConfig;
 use bytes::Bytes;
 use mono_move_core::{
-    storage::resource_provider::{ResourceProvider, ResourceProviderError},
+    storage::resource_provider::{InMemoryStorageKey, ResourceProvider, ResourceProviderError},
     types::InternedType,
 };
 use mono_move_global_context::ExecutionGuard;
@@ -20,10 +20,11 @@ use std::collections::BTreeMap;
 /// handle resource groups.
 pub trait AptosDataProvider: ResourceProvider {
     /// The stored members of the group behind `group_key`, as execution read
-    /// them, or `None` if no group is stored there.
+    /// them, or `None` if no group is stored there. `group_key` must be an
+    /// [`InMemoryStorageKey::ResourceGroup`].
     fn group_members(
         &self,
-        group_key: &StateKey,
+        group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError>;
 }
 
@@ -90,9 +91,8 @@ pub type GroupMembers = BTreeMap<StructTag, Bytes>;
 /// group slot. `None` marks a group the transaction deleted.
 ///
 /// Unordered: a caller merges it into its own cache, which does not depend on
-/// order. The default hasher is fine because `StateKey` hashes its
-/// cryptographic digest.
-pub type MaterializedGroups = UnorderedMap<StateKey, Option<GroupMembers>>;
+/// order.
+pub type MaterializedGroups = UnorderedMap<InMemoryStorageKey, Option<GroupMembers>>;
 
 /// Decodes a group's stored blob.
 pub fn decode_group_members(blob: &[u8]) -> Result<GroupMembers, ResourceProviderError> {
