@@ -9,12 +9,40 @@ from harness.prepare import (
     _blank_spec_blocks,
     _copy_standalone_package,
     _remove_target_references,
+    _require_disjoint_output_roots,
+    _shared_source_roots,
     _write_git_patch,
     _write_sample_catalog,
 )
 
 
 class PrepareTests(unittest.TestCase):
+    def test_shared_source_identity_covers_every_indexed_package(self) -> None:
+        self.assertEqual(
+            {
+                "aptos-move/framework/move-stdlib",
+                "aptos-move/framework/aptos-stdlib",
+                "aptos-move/framework/aptos-framework",
+                "aptos-move/framework/aptos-trading",
+                "aptos-move/framework/aptos-experimental",
+            },
+            set(_shared_source_roots()),
+        )
+
+    def test_output_exclusions_cannot_cover_a_source_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            source_root = "aptos-move/framework/aptos-framework"
+            source = repo / source_root
+            source.mkdir(parents=True)
+
+            with self.assertRaisesRegex(ValueError, "overlaps a corpus source root"):
+                _require_disjoint_output_roots(
+                    repo,
+                    [source_root],
+                    repo,
+                    repo / "safe-patches",
+                )
     def test_remove_target_finds_generated_experimental_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary)

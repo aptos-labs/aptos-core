@@ -35,8 +35,9 @@ def build_catalog(corpus_path: Path, output_path: Path) -> dict[str, Any]:
         for record in corpus["records"]
         if record["selection_status"] == "selected"
     ]
-    if len(selected) != 30:
-        raise ValueError(f"expected 30 selected records, got {len(selected)}")
+    expected = _expected_selected_count(corpus)
+    if expected and len(selected) != expected:
+        raise ValueError(f"expected {expected} selected records, got {len(selected)}")
 
     package_sources: dict[str, tuple[str, Path]] = {}
     dependency_closures: dict[str, dict[str, Any]] = {}
@@ -95,6 +96,14 @@ def build_catalog(corpus_path: Path, output_path: Path) -> dict[str, Any]:
     corpus["corpus_status"] = "screened"
     write_json(output_path, corpus)
     return corpus
+
+
+def _expected_selected_count(corpus: dict[str, Any]) -> int:
+    return sum(
+        count
+        for quotas in (corpus.get("quotas") or {}).values()
+        for count in quotas.values()
+    )
 
 
 def main() -> None:

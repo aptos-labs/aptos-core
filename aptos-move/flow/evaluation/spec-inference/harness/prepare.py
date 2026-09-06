@@ -17,7 +17,7 @@ from typing import Any
 from .identifiers import require_plain_name
 from .artifacts import copy_snapshot, load_object, sha256_file, tree_hash, write_json
 from .move_source import mask_comments_and_strings
-from .shared_package import build_shared_package
+from .shared_package import SOURCE_PACKAGES, build_shared_package
 
 
 FRAMEWORK = "aptos-move/framework/aptos-framework"
@@ -42,13 +42,12 @@ def prepare_corpus(
     provenance = load_object(provenance_path)
     commit = _source_commit(repo_root)
     recorded = provenance.get("source_commit")
-    source_roots = sorted(
-        {
-            record["source_root"]
-            for record in provenance["records"]
-            if record.get("source_root")
-        }
-    )
+    # The shared package indexes every framework package and may copy a
+    # selected target's transitive modules from any of them. All indexed roots
+    # therefore belong to the source identity, even if no selected record names
+    # one directly. Fixed roots also cannot be interpreted as Git pathspecs
+    # supplied by a manifest.
+    source_roots = _shared_source_roots()
     # What has to match is the source the corpus copies, not the commit the
     # checkout happens to sit on. A later commit that leaves those roots
     # untouched -- a harness fix, a note, another corpus -- describes the same
@@ -68,6 +67,7 @@ def prepare_corpus(
     # The corpus this run is writing is not one of those sources: its manifest,
     # inventory and patches are outputs of this pipeline, and counting them
     # makes a second preparation impossible once the first has been committed.
+    _require_disjoint_output_roots(repo_root, source_roots, artifacts_root, patches_dir)
     modified = [
         path
         for path in _tracked_modifications(repo_root, [artifacts_root, patches_dir])
@@ -826,6 +826,32 @@ def _tracked_modifications(
             continue
         modified.append(relative)
     return modified
+
+
+def _shared_source_roots() -> list[str]:
+    """Every source root the shared-package index can copy from."""
+    return sorted(SOURCE_PACKAGES)
+
+
+def _require_disjoint_output_roots(
+    repo_root: Path,
+    source_roots: Sequence[str],
+    artifacts_root: Path,
+    patches_dir: Path,
+) -> None:
+    """Do not let caller-selected output exclusions hide corpus sources."""
+    sources = [(repo_root / root).resolve() for root in source_roots]
+    for label, output_root in (
+        ("artifacts root", artifacts_root.resolve()),
+        ("patches directory", patches_dir.resolve()),
+    ):
+        if any(
+            output_root == source
+            or output_root.is_relative_to(source)
+            or source.is_relative_to(output_root)
+            for source in sources
+        ):
+            raise ValueError(f"{label} overlaps a corpus source root: {output_root}")
 
 
 def _source_commit(repo_root: Path) -> str:
