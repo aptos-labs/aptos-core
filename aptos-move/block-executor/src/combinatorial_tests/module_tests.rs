@@ -10,6 +10,7 @@ use crate::{
             key_to_mock_module_id, KeyType, MockTransaction, TransactionGen, TransactionGenParams,
         },
     },
+    single_transaction_executor::LegacyTransactionExecutor,
     task::ExecutorTask,
     txn_provider::default::DefaultTxnProvider,
 };
@@ -115,6 +116,7 @@ fn execute_module_tests(
 
                 let output = execute_block_parallel::<
                     MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                    LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
                     MockStateView<KeyType<[u8; 32]>>,
                     DefaultTxnProvider<
                         MockTransaction<KeyType<[u8; 32]>, MockEvent>,

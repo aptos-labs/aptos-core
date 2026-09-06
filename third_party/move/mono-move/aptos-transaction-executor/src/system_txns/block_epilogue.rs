@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::{call_block_function, system_txn_outcome, SystemTxnMetadata};
+use super::common::{
+    call_block_function, finish_system_session, system_txn_outcome, SystemTxnMetadata,
+};
 use crate::{errors::NoEffectsReason, executor::AptosTransactionExecutor, outcome::TxnOutcome};
 use aptos_types::transaction::{BlockEpiloguePayload, FeeDistribution};
 use move_core_types::{ident_str, identifier::IdentStr};
@@ -14,7 +16,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
     ///
     /// Unlike the other system transactions, a failure never aborts the block:
     /// the outcome falls back to an empty success carrying the failure, and the
-    /// failed session's effects are dropped.
+    /// failed session's writes are dropped.
     //
     // TODO(completeness): the legacy VM currently ignores the payload's
     // `to_make_hot` keys and emits no hot-state output, and so do we; revisit
@@ -26,7 +28,10 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let fee_distribution = match block_epilogue {
             // V0 carries no fee distribution: nothing runs on-chain.
             BlockEpiloguePayload::V0 { .. } => {
-                return TxnOutcome::ExecutedNoEffects(NoEffectsReason::NothingToExecute)
+                return TxnOutcome::ExecutedNoEffects {
+                    reason: NoEffectsReason::NothingToExecute,
+                    effects: None,
+                }
             },
             BlockEpiloguePayload::V1 {
                 fee_distribution, ..
@@ -43,9 +48,15 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             call.arg(&IterAsMoveVector(amount.values().copied()))
         });
         match result {
-            Ok(()) => system_txn_outcome(interp),
-            Err(failure) => {
-                TxnOutcome::ExecutedNoEffects(NoEffectsReason::BlockEpilogueFailed(failure))
+            Ok(()) => system_txn_outcome(interp, BLOCK_EPILOGUE.as_str()),
+            // The writes are dropped, but the failed session's reads still have
+            // to be validated before this empty success can commit.
+            Err(failure) => match finish_system_session(interp, BLOCK_EPILOGUE.as_str()) {
+                Ok(effects) => TxnOutcome::ExecutedNoEffects {
+                    reason: NoEffectsReason::BlockEpilogueFailed(failure),
+                    effects: Some(effects),
+                },
+                Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(failure),
             },
         }
     }

@@ -11,7 +11,7 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
+        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc, evacuate_session_roots,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         FrozenHeap, Heap, TopFrame,
     },
@@ -601,17 +601,36 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. The session heap is frozen into the effects, so every heap
-    /// pointer they hold stays valid for as long as they live. Their interned
-    /// types are not: the effects do not borrow the guard, so the caller must
-    /// keep the global arena alive until the effects are dropped.
-    pub fn finish(self) -> SessionEffects {
-        SessionEffects {
-            read_write_set: self.read_write_set,
-            extensions: self.extensions,
+    /// publication. The live data is compacted out of the session heap and
+    /// frozen into the effects, so every heap pointer they hold stays valid for
+    /// as long as they live. Their interned types are not: the effects do not
+    /// borrow the guard, so the caller must keep the global arena alive until
+    /// the effects are dropped.
+    ///
+    /// Fails if compacting hits an invariant violation, which leaves the value
+    /// graph half-forwarded and so unusable. The transaction must not commit.
+    pub fn finish(self) -> VMResult<SessionEffects> {
+        let Self {
+            loader,
+            mut read_write_set,
+            extensions,
+            heap,
+            ..
+        } = self;
+
+        // What survives a transaction is usually a few hundred bytes, but it
+        // sits in a megabyte-scale session heap that the block then pins until
+        // it ends. Copying it out keeps the pinned memory proportional to the
+        // writes rather than to the number of transactions in the block.
+        let frozen =
+            evacuate_session_roots(&heap, loader.guard(), &mut read_write_set, &extensions)?;
+
+        Ok(SessionEffects {
+            read_write_set,
+            extensions,
             #[allow(clippy::arc_with_non_send_sync)]
-            heap: std::sync::Arc::new(FrozenHeap::new(self.heap)),
-        }
+            heap: std::sync::Arc::new(FrozenHeap::new(frozen)),
+        })
     }
 
     /// Runs `f` with gas metering suspended: the meter is swapped for an
