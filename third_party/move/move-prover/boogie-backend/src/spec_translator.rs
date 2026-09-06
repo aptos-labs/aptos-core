@@ -2690,12 +2690,12 @@ impl SpecTranslator<'_> {
                 }
                 first = false;
                 let pre_name = self
-                    .spec_fun_body_memory_arg(memory, kind, true)
+                    .spec_fun_body_memory_arg(memory, kind, true, *pre)
                     .unwrap_or_else(|| self.resolve_memory_name(memory, *pre));
                 emit!(self.writer, &pre_name);
                 emit!(self.writer, ", ");
                 let current_name = self
-                    .spec_fun_body_memory_arg(memory, kind, false)
+                    .spec_fun_body_memory_arg(memory, kind, false, *current)
                     .unwrap_or_else(|| self.resolve_memory_name(memory, *current));
                 emit!(self.writer, &current_name);
             } else {
@@ -2704,7 +2704,7 @@ impl SpecTranslator<'_> {
                 }
                 first = false;
                 let mem_name = self
-                    .spec_fun_body_memory_arg(memory, kind, false)
+                    .spec_fun_body_memory_arg(memory, kind, false, *current)
                     .unwrap_or_else(|| self.resolve_memory_name(memory, *current));
                 emit!(self.writer, &mem_name);
             }
@@ -2974,7 +2974,7 @@ impl SpecTranslator<'_> {
                 // exit state in ensures. A labeled one resolves through the
                 // label chain for non-modified types.
                 let pre_name = self
-                    .spec_fun_body_memory_arg(memory, kind, true)
+                    .spec_fun_body_memory_arg(memory, kind, true, pre)
                     .unwrap_or_else(|| match (&pre, &self.fun_old_memory) {
                         // An old-aware function body (an evaluator, or a spec
                         // fun using `old`) carries the entry state as its
@@ -2991,7 +2991,7 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, &pre_name);
                 emit!(self.writer, ", ");
                 let current_name = self
-                    .spec_fun_body_memory_arg(memory, kind, false)
+                    .spec_fun_body_memory_arg(memory, kind, false, current)
                     .unwrap_or_else(|| self.resolve_memory_name(memory, current));
                 emit!(self.writer, &current_name);
             } else {
@@ -3000,7 +3000,7 @@ impl SpecTranslator<'_> {
                 }
                 first = false;
                 let mem_name = self
-                    .spec_fun_body_memory_arg(memory, kind, false)
+                    .spec_fun_body_memory_arg(memory, kind, false, current)
                     .unwrap_or_else(|| self.resolve_memory_name(memory, current));
                 emit!(self.writer, &mem_name);
             }
@@ -3939,18 +3939,19 @@ impl SpecTranslator<'_> {
 
     /// The Boogie name of `memory` in a behavioral predicate's argument list
     /// when a spec fun body is being translated, or `None` in a procedure
-    /// context. Memory is a function parameter there, so a label names no
-    /// saved state. The pre-state slot is the `old_` parameter only for a
-    /// two-state predicate in a two-state spec fun that carries the memory;
-    /// a pre-state predicate is evaluated in the state the spec fun is, which
-    /// is its ordinary parameter, and so is every current-state slot.
+    /// context. For an unlabeled range, memory is a function parameter there:
+    /// the pre-state slot is the `old_` parameter only for a two-state
+    /// predicate in a two-state spec fun that carries the memory. An explicit
+    /// label instead names a quantified or saved state and must be resolved by
+    /// the caller rather than replaced with the function parameter.
     fn spec_fun_body_memory_arg(
         &self,
         memory: &QualifiedInstId<StructId>,
         kind: BehaviorKind,
         pre_slot: bool,
+        label: Option<MemoryLabel>,
     ) -> Option<String> {
-        if !self.in_spec_fun_body {
+        if !self.in_spec_fun_body || label.is_some() {
             return None;
         }
         let old_param = pre_slot
