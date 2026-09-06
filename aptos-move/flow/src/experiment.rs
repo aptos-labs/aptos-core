@@ -2649,6 +2649,17 @@ pub(crate) fn strip_specifications(source: &str) -> String {
     collapse_block_parentheses(&out, &out_masked)
 }
 
+/// Source text with comments and insignificant whitespace removed.
+///
+/// String literals are copied exactly. This gives policy checks a stable
+/// source identity without confusing spaces or comment text inside strings
+/// with trivia.
+pub(crate) fn canonicalize_move_source(source: &str) -> String {
+    let (code, masked) = strip_comments(source);
+    let (code, _) = canonical_spacing(code.as_bytes(), masked.as_bytes());
+    String::from_utf8(code).expect("canonical Move source remains UTF-8")
+}
+
 /// Whitespace reduced to what separates two identifier characters, and the
 /// statement terminator before a closing brace dropped: `while (c) { .. }`
 /// and `while (c) { .. } spec { .. };` end the same unit-valued statement.

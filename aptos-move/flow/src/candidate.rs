@@ -1228,10 +1228,10 @@ fn is_inline_marker(exp: &Exp) -> bool {
 /// Line numbers move when a candidate rewrites the specification above them,
 /// so an identity built from one would report a construct the baseline already
 /// had as newly introduced. The function identity prevents a candidate from
-/// moving an inherited construct into the checked target. The preceding
-/// specification-free function text binds an inline construct to its runtime
-/// program point, while the relative line and full construct text keep
-/// otherwise unrelated constructs apart.
+/// moving an inherited construct into the checked target. A canonical digest
+/// of the complete containing function (or companion source) binds it to its
+/// runtime and proof context, while the relative line and full construct text
+/// keep otherwise unrelated constructs apart.
 fn weakening_site(package: &Path, violation: &Violation) -> String {
     let text = violation.source_span.clone().unwrap_or_else(|| {
         std::fs::read_to_string(package.join(&violation.path))
@@ -1346,15 +1346,21 @@ fn location_in_function(
     // the weakening identity.
     violation.function_line =
         (function_location.path == violation.path).then_some(function_location.line);
-    violation.function_context = (function.get_loc().file_id() == loc.file_id())
-        .then(|| {
-            let source = env.get_file_source(loc.file_id());
-            let start = function.get_loc().span().start().0 as usize;
-            let end = loc.span().start().0 as usize;
-            (start <= end && end <= source.len())
-                .then(|| crate::experiment::strip_specifications(&source[start..end]))
-        })
-        .flatten();
+    let source = env.get_file_source(loc.file_id());
+    let (start, end) = if function.get_loc().file_id() == loc.file_id() {
+        (
+            function.get_loc().span().start().0 as usize,
+            function.get_loc().span().end().0 as usize,
+        )
+    } else {
+        // A companion specification has no source span shared with the
+        // executable function. Bind its weakening to the canonical companion
+        // source so proof-statement reordering there is visible as well.
+        (0, source.len())
+    };
+    violation.function_context = source
+        .get(start..end)
+        .map(|context| sha256_hex(crate::experiment::canonicalize_move_source(context).as_bytes()));
     violation
 }
 
@@ -1740,6 +1746,46 @@ mod tests {
         let baseline_violations = scan(baseline.path());
         let candidate_violations = scan(candidate.path());
 
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("unjustified_assumption", added[0].code);
+    }
+
+    #[test]
+    fn moving_an_inline_assume_ahead_of_an_assert_is_rejected() {
+        let baseline_source = "module 0xCAFE::m {
+    fun target(): u64 {
+        spec { assert false; };
+        spec { assume false; };
+        0
+    }
+}";
+        let candidate_source = "module 0xCAFE::m {
+    fun target(): u64 {
+
+        spec { assume false; };
+        spec { assert false; };
+        0
+    }
+}";
+        let baseline = crate::tests::common::make_package("baseline", &[("m", baseline_source)]);
+        let candidate = crate::tests::common::make_package("candidate", &[("m", candidate_source)]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(!env.has_errors(), "probe module does not compile");
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
         let (added, inherited) = added_weakenings(
             candidate.path(),
             candidate_violations,
