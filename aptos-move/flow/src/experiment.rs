@@ -2583,8 +2583,10 @@ fn verification_scope(filter: Option<&str>) -> VerificationScope {
 /// usable witness: an inline function's specification is compiled into its
 /// callers, so a contract alone changed the module image.
 ///
-/// Digests of the specification-free text of every `.move` file under
-/// `sources/`, keyed by package-relative path.
+/// Digests of the manifest and the specification-free text of every `.move`
+/// file under `sources/`, keyed by package-relative path. The manifest is part
+/// of the runtime implementation because named addresses and dependencies
+/// affect what the same source text compiles to.
 fn implementation_texts(package: &Path) -> Result<BTreeMap<String, String>> {
     let mut files = Vec::new();
     collect_move_sources(&package.join("sources"), &mut files)?;
@@ -2599,6 +2601,13 @@ fn implementation_texts(package: &Path) -> Result<BTreeMap<String, String>> {
             .with_context(|| format!("cannot read `{}`", path.display()))?;
         digests.insert(relative, sha256_hex(strip_specifications(&text).as_bytes()));
     }
+    let manifest = package.join("Move.toml");
+    let manifest_text = fs::read_to_string(&manifest)
+        .with_context(|| format!("cannot read `{}`", manifest.display()))?;
+    digests.insert(
+        "Move.toml".to_string(),
+        sha256_hex(manifest_text.as_bytes()),
+    );
     Ok(digests)
 }
 
@@ -3115,6 +3124,17 @@ mod tests {
         let differs = implementation_comparison(&baseline, &changed).expect("compare");
         assert_eq!(differs.changed_modules, vec![
             "sources/guard.move".to_string()
+        ]);
+
+        fs::write(
+            candidate.join("Move.toml"),
+            "[package]\nname = \"runtime_guard\"\nversion = \"0.0.0\"\n\n[addresses]\napp = \"0x43\"\n",
+        )
+        .expect("change candidate manifest");
+        let manifest_differs =
+            implementation_comparison(&baseline, &candidate).expect("compare manifest");
+        assert_eq!(manifest_differs.changed_modules, vec![
+            "Move.toml".to_string()
         ]);
     }
 

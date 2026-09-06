@@ -683,7 +683,13 @@ fn generate_fresh_spec_file(
         // uninformative `aborts_if true` from a function which can also return.
         // The run-local target marker is therefore authoritative here.
         if has_inferred_output(&fun, inferred_sym) {
-            sourcifier.print_fun_spec(&fun);
+            // A companion module is merged with the implementation module and
+            // therefore inherits all of its aliases. Fully qualify external
+            // signature types so a same-named alias cannot retarget a type or
+            // suppress the import that would otherwise disambiguate it.
+            let mut signature_tctx = fun.get_type_display_ctx();
+            signature_tctx.display_module_addr = true;
+            sourcifier.print_fun_spec_with_signature_type_display_ctx(&fun, signature_tctx);
         }
         fun.get_mut_spec().conditions = original_conditions;
     }

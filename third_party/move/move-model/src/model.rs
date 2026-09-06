@@ -5765,13 +5765,19 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns true if this function has the pragma intrinsic set to true.
     pub fn is_intrinsic(&self) -> bool {
-        self.is_pragma_true(INTRINSIC_PRAGMA, || {
+        let declared_or_registered = self.is_pragma_true(INTRINSIC_PRAGMA, || {
             self.module_env
                 .env
                 .intrinsics
                 .get_decl_for_move_fun(&self.get_qualified_id())
                 .is_some()
-        })
+        });
+        // An executable function whose intrinsic has no prover implementation
+        // must not silently lose its body. It is safe to omit that body only
+        // when the author explicitly made the function opaque, in which case
+        // callers deliberately rely on its contract.
+        declared_or_registered
+            && (!self.is_unimplemented_intrinsic() || self.is_pragma_true(OPAQUE_PRAGMA, || false))
     }
 
     /// Returns true if function is either native or intrinsic.
@@ -5801,17 +5807,8 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns true if this function is opaque.
-    ///
-    /// `pragma intrinsic` on a function the prover does not actually implement
-    /// is opaque as well. The backend emits no body for an intrinsic, and an
-    /// unregistered one has no prelude procedure either, so a call site that
-    /// translated to a direct call named a procedure that was never declared
-    /// and Boogie failed to resolve it -- an internal error carrying no source
-    /// location, rather than a verdict. Having no body the prover can use is
-    /// what opaque means, so such a call goes through the specification. A
-    /// registered intrinsic is implemented and keeps its direct translation.
     pub fn is_opaque(&self) -> bool {
-        self.is_pragma_true(OPAQUE_PRAGMA, || self.is_unimplemented_intrinsic())
+        self.is_pragma_true(OPAQUE_PRAGMA, || false)
     }
 
     /// Whether this function declares `pragma intrinsic` without the prover
