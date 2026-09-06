@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from collections.abc import Mapping, Sequence
@@ -36,6 +37,7 @@ def build_pilot(
     round_id: str = "pilot-001",
     task_names: Sequence[str] | None = None,
     mutants_root: Path | None = None,
+    disqualification_root: Path | None = None,
 ) -> dict[str, Any]:
     """Schedule one round over tasks, arms, and feedback levels.
 
@@ -56,6 +58,10 @@ def build_pilot(
     `mutants_root` turns on strict scoring. It must hold `TASK_ID/mutants.json`
     for every scheduled task; a round that names it and cannot supply one for
     each task fails here rather than degrading to core scoring in silence.
+
+    `disqualification_root` binds a withheld gate before any cell runs. Its
+    contents are not exposed to the session; only each manifest digest enters
+    the run record so scoring cannot select or substitute a gate afterwards.
     """
     if task_names is not None and not task_names:
         raise ValueError("a pilot round needs at least one task")
@@ -154,6 +160,20 @@ def build_pilot(
     )
 
     mutant_digests, mutant_fingerprints = _resolve_mutant_manifests(tasks, mutants_root)
+    gate_digests, gate_fingerprints = _resolve_mutant_manifests(
+        tasks, disqualification_root
+    )
+    if disqualification_root is not None:
+        for task in tasks:
+            task_id = task["task_id"]
+            overlap = sorted(
+                set(mutant_fingerprints.get(task_id, ()))
+                & set(gate_fingerprints[task_id])
+            )
+            if overlap:
+                raise ValueError(
+                    f"scored and disqualification sets overlap for {task_id}"
+                )
 
     seed = hashlib.sha256(
         (source_commit + "\0unscored-pilot\0" + require_plain_name(round_id, "round_id")).encode()
@@ -199,6 +219,11 @@ def build_pilot(
                 "plugin_tree_sha256": plugin_records[level][arm]["tree_sha256"],
                 "initial_tree_sha256": task["initial_tree_sha256"],
                 "mutant_manifest_sha256": mutant_digests[task["task_id"]],
+                "disqualification_mutant_manifest_sha256": (
+                    gate_digests[task["task_id"]]
+                    if disqualification_root is not None
+                    else None
+                ),
                 # Opaque identities of the scored mutations, so a run can
                 # refuse a refutation set that overlaps them without the
                 # scored mutations being present where the session can read.
@@ -254,6 +279,9 @@ def build_pilot(
             for level, arm_records in plugin_records.items()
         },
         "scoring_mode": "core" if mutants_root is None else "reference_mutants",
+        "disqualification_mode": (
+            "none" if disqualification_root is None else "withheld_mutants"
+        ),
         "arms": list(scheduled_arms),
     }
     manifest["schedule_sha256"] = hashlib.sha256(canonical_json(runs)).hexdigest()
@@ -436,12 +464,20 @@ def _record_target(record: Mapping[str, Any]) -> str:
 
 
 def _record_recipe(manifest_path: Path, record: Mapping[str, Any]) -> CorpusRecipe:
-    corpus = manifest_path.parent
+    corpus = manifest_path.parent.resolve()
     package = (corpus / record.get("shared_package_path", "package")).resolve()
+    if not package.is_relative_to(corpus):
+        raise ValueError(
+            f"shared package for {record['task_id']} escapes the corpus: {package}"
+        )
     target = _record_target(record)
     patch = None
     if record.get("preparation_patch"):
         patch = (corpus / record["preparation_patch"]).resolve()
+        if not patch.is_relative_to(corpus):
+            raise ValueError(
+                f"preparation patch for {record['task_id']} escapes the corpus: {patch}"
+            )
         if not patch.is_file():
             raise FileNotFoundError(patch)
         recorded = record.get("preparation_patch_sha256")
@@ -813,6 +849,15 @@ def _resolve_mutant_manifests(
             continue
         digests[task["task_id"]] = sha256_file(manifest)
         cases = json.loads(manifest.read_text(encoding="utf-8"))["mutants"]
+        ids = Counter(str(case.get("id")) for case in cases)
+        duplicates = sorted(
+            mutant_id for mutant_id, count in ids.items() if count > 1
+        )
+        if duplicates:
+            raise ValueError(
+                f"mutant manifest for {task['task_id']} repeats id(s): "
+                + ", ".join(duplicates)
+            )
         # Against the snapshot the round will actually run, so the identity is
         # computed from the same text at schedule time and at run time.
         fingerprints[task["task_id"]] = sorted(
@@ -866,6 +911,11 @@ def main() -> None:
         help="directory of TASK_ID/mutants.json enabling strict scoring; every "
         "scheduled task must have one",
     )
+    parser.add_argument(
+        "--disqualification-mutants-root",
+        type=Path,
+        help="withheld TASK_ID/mutants.json gate to bind before the round",
+    )
     args = parser.parse_args()
     result = build_pilot(
         args.corpus_manifest.resolve(),
@@ -877,6 +927,11 @@ def main() -> None:
         round_id=args.round_id,
         task_names=args.tasks,
         mutants_root=args.mutants_root.resolve() if args.mutants_root else None,
+        disqualification_root=(
+            args.disqualification_mutants_root.resolve()
+            if args.disqualification_mutants_root
+            else None
+        ),
     )
     provenance = result["source_commit_provenance"]
     print(

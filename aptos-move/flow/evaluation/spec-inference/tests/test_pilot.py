@@ -17,6 +17,7 @@ from harness.pilot import (
     _move_flow_sha256,
     _balanced_arm_orders,
     _require_committed_corpus,
+    _record_recipe,
     _resolve_mutant_manifests,
     build_pilot,
     load_round_shape,
@@ -426,6 +427,20 @@ class ControlLevelTest(unittest.TestCase):
 
 
 class CorpusRoundTest(unittest.TestCase):
+    def test_a_shared_recipe_cannot_escape_the_corpus(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            corpus = Path(temporary) / "corpus"
+            corpus.mkdir()
+            manifest = corpus / "manifest.json"
+            record = {
+                "task_id": "T-001",
+                "package_module_target": "0x1::m::f",
+                "shared_package_path": "../private-package",
+            }
+
+            with self.assertRaisesRegex(ValueError, "escapes the corpus"):
+                _record_recipe(manifest, record)
+
     """A round may be scheduled from a corpus manifest of shared-package targets."""
 
     @staticmethod
@@ -916,6 +931,16 @@ class MutantManifestResolution(unittest.TestCase):
             )
             self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
             self.assertNotEqual(digests["a"], digests["b"])
+
+    def test_a_manifest_cannot_repeat_a_mutant_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_mutants(root / "a", ["same", "same"])
+            with self.assertRaisesRegex(ValueError, "repeats id"):
+                _resolve_mutant_manifests(
+                    [{"task_id": "a", "snapshot": str(_mutant_package(root))}],
+                    root,
+                )
 
 
 MUTANT_SOURCE = "module m { fun f(): u64 { 1 } }\n"

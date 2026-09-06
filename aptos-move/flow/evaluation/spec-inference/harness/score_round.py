@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+from collections import Counter
 from dataclasses import asdict, dataclass
 from collections.abc import Sequence
 from pathlib import Path
@@ -109,6 +110,13 @@ class PendingScore:
     disqualification_manifest: Path | None = None
 
 
+def _require_unique_mutant_ids(cases: Sequence[dict[str, Any]], label: str) -> None:
+    counts = Counter(str(case.get("id")) for case in cases)
+    duplicates = sorted(mutant_id for mutant_id, count in counts.items() if count > 1)
+    if duplicates:
+        raise ValueError(f"{label} repeats mutant id(s): {', '.join(duplicates)}")
+
+
 def _disqualification_manifest(
     root: Path,
     task_id: str,
@@ -116,6 +124,7 @@ def _disqualification_manifest(
     scored_manifest: Path,
     baseline: Path,
     shown: Sequence[str] | None,
+    expected_sha256: str | None,
 ) -> Path:
     """The gate set for one run, once it is disjoint from what may measure it.
 
@@ -130,8 +139,21 @@ def _disqualification_manifest(
         raise FileNotFoundError(
             f"run {run_id} is gated on a disqualification set but {manifest} is missing"
         )
+    if expected_sha256 is None:
+        raise ValueError(
+            f"run {run_id} was not scheduled with a disqualification set; "
+            "reschedule it before applying a withheld gate"
+        )
+    actual_sha256 = sha256_file(manifest)
+    if actual_sha256 != expected_sha256:
+        raise ValueError(
+            f"the disqualification set for {task_id} disagrees with the digest "
+            f"recorded when run {run_id} was scheduled"
+        )
     cases = load_object(manifest)["mutants"]
     scored_cases = load_object(scored_manifest)["mutants"]
+    _require_unique_mutant_ids(cases, f"disqualification set for {task_id}")
+    _require_unique_mutant_ids(scored_cases, f"scored set for {task_id}")
     repeated = overlapping_mutations(
         cases,
         {mutation_fingerprint(case, baseline) for case in scored_cases},
@@ -277,6 +299,7 @@ async def score_round(
                         manifest,
                         baseline,
                         record.get("refutation_mutant_identities"),
+                        record.get("disqualification_mutant_manifest_sha256"),
                     )
                     if disqualification_root is not None
                     else None,
@@ -359,6 +382,14 @@ async def _score_pending(
                         # reading a disqualified run as a partial result.
                         entry["outcome"] = "disqualified"
                         entry["disqualified_by"] = survived
+                        entry["strict_success"] = False
+                        return
+                    if gate["inconclusive"]:
+                        entry["outcome"] = "not_scorable"
+                        entry["detail"] = (
+                            "disqualification gate reached no verdict for: "
+                            + ", ".join(gate["inconclusive"])
+                        )
                         entry["strict_success"] = False
                         return
                 score = await measure(item, item.manifest)

@@ -1,14 +1,42 @@
+import asyncio
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from harness.artifacts import tree_hash
 from harness.compatibility import COMPATIBILITY_SCHEMA_VERSION, admission
-from harness.screen import _load_ledger, _resume_result, reference_targets
+from harness.screen import (
+    _load_ledger,
+    _resume_result,
+    _screen_from_ledger,
+    reference_targets,
+)
 
 
 class ScreeningLedgerTests(unittest.TestCase):
+    def test_reused_compatibility_evidence_still_proves_the_reference(self) -> None:
+        record = {
+            "package_module_target": "0x1::m::f",
+            "granularity": "function",
+        }
+        ledger = {"passed": True, "reason": None}
+        proof = {"proved": False, "vacuity_checked": True}
+        with mock.patch(
+            "harness.screen.prove_reference", mock.AsyncMock(return_value=proof)
+        ) as prove:
+            result, apparatus_ok = asyncio.run(
+                _screen_from_ledger(
+                    mock.MagicMock(), Path("/shared"), record, 40, ledger
+                )
+            )
+
+        prove.assert_awaited_once()
+        self.assertFalse(result["passed"])
+        self.assertEqual("reference_unproved", result["reason"])
+        self.assertTrue(apparatus_ok)
+
     def test_ignores_entries_from_a_different_tool_build(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "ledger.json"
@@ -164,7 +192,7 @@ class AdmissionTests(unittest.TestCase):
 
 
 class ReferenceTargetTests(unittest.TestCase):
-    def test_a_module_task_proves_its_named_functions(self) -> None:
+    def test_a_module_task_proves_the_same_module_the_round_runs(self) -> None:
         record = {
             "package_module_target": "0x1::aptos_coin",
             "granularity": "module",
@@ -172,7 +200,7 @@ class ReferenceTargetTests(unittest.TestCase):
         }
         self.assertEqual(
             reference_targets(record),
-            ["0x1::aptos_coin::initialize", "0x1::aptos_coin::find_delegation"],
+            ["0x1::aptos_coin"],
         )
 
     def test_a_function_task_proves_itself(self) -> None:

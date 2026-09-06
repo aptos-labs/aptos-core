@@ -7,7 +7,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from harness.score_round import PendingScore, _score_pending
+from harness.artifacts import sha256_file
+from harness.score_round import (
+    PendingScore,
+    _disqualification_manifest,
+    _score_pending,
+)
 
 
 class UnscorableRunTest(unittest.TestCase):
@@ -106,15 +111,53 @@ class DisqualificationGateTest(unittest.TestCase):
         self.assertTrue(entry["strict_success"])
         self.assertEqual("g" * 64, entry["disqualification_manifest_sha256"])
 
-    def test_a_mutation_that_reached_no_verdict_does_not_refute(self) -> None:
+    def test_an_inconclusive_gate_blocks_ordinary_scoring(self) -> None:
         # It is not a counterexample; it is a measurement that did not happen,
         # and recording it keeps a gate that measured nothing from reading as
         # one the contract passed.
         entry = self._run(
             {"results": self._results(True, False, True), "inconclusive": ["m1"]}
         )
-        self.assertEqual("scored", entry["outcome"])
+        self.assertEqual("not_scorable", entry["outcome"])
+        self.assertFalse(entry["strict_success"])
         self.assertEqual(["m1"], entry["disqualification_inconclusive"])
+
+    def test_a_gate_must_be_bound_when_the_round_is_scheduled(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            gate = root / "gate/T/mutants.json"
+            scored = root / "scored.json"
+            gate.parent.mkdir(parents=True)
+            gate.write_text(json.dumps({"mutants": []}), encoding="utf-8")
+            scored.write_text(json.dumps({"mutants": []}), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "not scheduled"):
+                _disqualification_manifest(
+                    root / "gate", "T", "run-1", scored, root, [], None
+                )
+
+    def test_a_gate_cannot_repeat_mutant_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            gate = root / "gate/T/mutants.json"
+            scored = root / "scored.json"
+            gate.parent.mkdir(parents=True)
+            gate.write_text(
+                json.dumps({"mutants": [{"id": "same"}, {"id": "same"}]}),
+                encoding="utf-8",
+            )
+            scored.write_text(json.dumps({"mutants": []}), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "repeats mutant id"):
+                _disqualification_manifest(
+                    root / "gate",
+                    "T",
+                    "run-1",
+                    scored,
+                    root,
+                    [],
+                    sha256_file(gate),
+                )
 
 
 if __name__ == "__main__":

@@ -83,13 +83,11 @@ async def screen_corpus(
                     raise ValueError(
                         f"selected task was previously excluded: {record['task_id']}"
                     )
-                record["compatibility_screen"] = {
-                    **ledger_entry,
-                    "origin": "cumulative_screening_ledger",
-                }
-                # A ledger entry is admitted only when it passed, and a pass
-                # is a verdict.
-                apparatus_ok = True
+                record["compatibility_screen"], apparatus_ok = (
+                    await _screen_from_ledger(
+                        config, shared, record, threshold, ledger_entry
+                    )
+                )
             else:
                 result = (
                     _resume_result(
@@ -238,14 +236,38 @@ def main() -> None:
 def reference_targets(record: dict[str, Any]) -> list[str]:
     """The task's functions as prover targets.
 
-    A module task names its functions in `target_functions`; proving them one
-    by one is what the task asks, and keeps a `pragma verify = false` on a
-    function the task does not name from refusing the whole module.
+    A module task is screened under the same module target the scheduler runs.
+    Deriving a narrower set from manifest-provided function names would let the
+    screen prove a sibling while the round executes the whole module.
     """
     target = record["package_module_target"]
     if record.get("granularity") == "module":
-        return [f"{target}::{function}" for function in record["target_functions"]]
+        return [target]
     return [target]
+
+
+async def _screen_from_ledger(
+    config: ExperimentConfig,
+    shared: Path,
+    record: dict[str, Any],
+    threshold: int,
+    ledger_entry: dict[str, Any],
+) -> tuple[dict[str, Any], bool]:
+    """Reuse compatibility evidence while re-proving the current reference."""
+    reference_proof = await prove_reference(
+        config, shared, reference_targets(record), threshold
+    )
+    reference_proved = bool(reference_proof["proved"])
+    return (
+        {
+            **ledger_entry,
+            "passed": reference_proved,
+            "reason": None if reference_proved else "reference_unproved",
+            "reference_proved": reference_proved,
+            "origin": "cumulative_screening_ledger",
+        },
+        bool(reference_proof["vacuity_checked"]),
+    )
 
 
 def screening_evidence(

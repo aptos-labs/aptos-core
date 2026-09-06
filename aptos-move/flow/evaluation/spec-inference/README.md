@@ -132,7 +132,8 @@ root to run without the mechanism; omit `--mutants-root` and the round cannot
 report strict success at all.
 
 A corpus may withhold that set instead of refuting with it. corpus-v1 does:
-the round runs with no `--refutation-mutants-root`, so a contract gets no
+schedule it with `--disqualification-mutants-root corpus-v1/mutants` and run
+with no `--refutation-mutants-root`, so a contract gets no
 second attempt at the counterexamples, and the set is applied after the round
 as a gate -- a mutation that survives refutes the contract, and the run is
 disqualified rather than measured:
