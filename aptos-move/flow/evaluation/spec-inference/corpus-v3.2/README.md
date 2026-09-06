@@ -283,6 +283,10 @@ so everything generated from it â€” `package/sources/` and `references/build/` â
 is gitignored, and only recipes, specifications, digests and anchors are
 tracked.
 
+Committed screening records retain verdicts, timings, reference hashes, and
+tool identities, but omit raw compiler and prover diagnostics because their
+source frames can quote the generated Etna files.
+
 | | |
 |---|---|
 | repository | `https://github.com/aptos-labs/etna.git` (private; access required) |

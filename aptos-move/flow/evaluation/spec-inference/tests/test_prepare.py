@@ -25,6 +25,8 @@ class PrepareTests(unittest.TestCase):
             sources = repo / "package/sources"
             sources.mkdir(parents=True)
             (repo / "package/Move.toml").write_text("[package]\nname = 'P'\n")
+            prover = repo / "package/Prover.toml"
+            prover.write_text("[prover]\nverbosity_level = 'warn'\n")
             (sources / "tracked.move").write_text("module 0x1::tracked {}\n")
             subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
             subprocess.run(["git", "add", "."], cwd=repo, check=True)
@@ -43,11 +45,13 @@ class PrepareTests(unittest.TestCase):
                 check=True,
             )
             (sources / "untracked.move").write_text("module 0x1::untracked {}\n")
+            prover.write_text("[prover]\nverbosity_level = 'debug'\n")
             (repo / ".git/info/exclude").write_text("package/sources/ignored.move\n")
             (sources / "ignored.move").write_text("module 0x1::ignored {}\n")
 
             self.assertEqual(
                 {
+                    "package/Prover.toml",
                     "package/sources/ignored.move",
                     "package/sources/untracked.move",
                 },

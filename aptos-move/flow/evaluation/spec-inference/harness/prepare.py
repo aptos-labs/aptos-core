@@ -804,7 +804,7 @@ def _source_modifications(repo_root: Path, source_roots: Sequence[str]) -> list[
     inputs = [
         path
         for root in source_roots
-        for path in (f"{root}/Move.toml", f"{root}/sources")
+        for path in (f"{root}/Move.toml", f"{root}/Prover.toml", f"{root}/sources")
     ]
     result = subprocess.run(
         [

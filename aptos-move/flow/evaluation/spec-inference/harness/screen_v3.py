@@ -115,7 +115,12 @@ async def screen_corpus_v3(
             "wall_seconds": round(time.monotonic() - started, 1),
             "threshold_seconds": threshold,
         }
-        write_json(results_dir / f"{task_id}.json", {**summary, "detail": result})
+        # Compiler and prover diagnostics include source frames. This corpus is
+        # generated partly from private Etna source, so committing the raw
+        # command result would publish those excerpts. The durable screening
+        # record keeps the verdict, timing, failure class, reference digest,
+        # and tool identity without the diagnostic payload.
+        write_json(results_dir / f"{task_id}.json", summary)
         summaries.append(summary)
         if summary["passed"]:
             state = "pass" + (" (wp-hard)" if wp_hard else "")
