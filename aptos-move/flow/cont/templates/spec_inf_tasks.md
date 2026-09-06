@@ -22,8 +22,8 @@ effect and no other.
 ### Direct tactic
 
 Derive the contract and any loop invariants directly from the implementation
-and relevant dependency contracts. Check the candidate as you go, and use its
-diagnostics to refine your work.
+and relevant dependency contracts. Check one coherent candidate, then use its
+diagnostics to refine the rejected parts.
 {% endif %}
 {% if inference_tactic == "hybrid_flexible" or tactic_selectable %}
 
