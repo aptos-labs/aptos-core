@@ -243,7 +243,11 @@ impl FlowSession {
         let telemetry = self.telemetry().clone();
         let telemetry_package = self.resolve_package_path(&params.package_path);
         let telemetry_filter = filter.clone();
-        let package_timeout_secs = self.tool_timeout().as_secs().max(1);
+        let tool_timeout = self.tool_timeout();
+        // Let the backend's package deadline fire first so it can kill the
+        // active Boogie process group and return its diagnostic before the
+        // outer deadline releases the MCP caller.
+        let package_timeout_secs = tool_timeout.as_secs().saturating_sub(1).max(1);
 
         if vc_timeout == 0 || vc_timeout > MAX_VC_TIMEOUT {
             return Ok(CallToolResult::error(vec![Content::text(
@@ -258,9 +262,7 @@ impl FlowSession {
             ))]));
         }
 
-        // No tool-level deadline: the prover's own watchdog bounds every Boogie
-        // process and kills its solver process group.
-        let result = tokio::task::spawn_blocking(move || {
+        let verify_task = tokio::task::spawn_blocking(move || {
             let (verification_filter, attribute_timeouts, evidence_depth) =
                 (verification_filter, attribute_timeouts, evidence_depth);
             let mut data = pkg.lock().unwrap();
@@ -608,11 +610,22 @@ impl FlowSession {
                     Ok(CallToolResult::error(vec![Content::text(msg)]))
                 },
             }
-        })
-        .await
-        .map_err(|e| {
-            rmcp::ErrorData::internal_error(format!("verify task panicked: {}", e), None)
-        })??;
+        });
+        let result = tokio::time::timeout(tool_timeout, verify_task)
+            .await
+            .map_err(|_| {
+                // A pre-solver compiler phase cannot be interrupted from another
+                // Rust thread. Detach its locked PackageData from the cache so a
+                // later request rebuilds instead of waiting on that stale task.
+                self.invalidate_package(&params.package_path);
+                rmcp::ErrorData::internal_error(
+                    format!("tool timeout ({}s exceeded)", tool_timeout.as_secs()),
+                    None,
+                )
+            })?
+            .map_err(|e| {
+                rmcp::ErrorData::internal_error(format!("verify task panicked: {}", e), None)
+            })??;
 
         Ok(result)
     }

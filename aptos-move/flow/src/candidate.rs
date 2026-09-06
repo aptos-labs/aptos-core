@@ -444,6 +444,8 @@ pub struct Violation {
     pub function: Option<String>,
     #[serde(skip)]
     pub function_line: Option<usize>,
+    #[serde(skip)]
+    pub function_context: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -786,6 +788,7 @@ pub fn check_specification(
             ),
             function: None,
             function_line: None,
+            function_context: None,
         })
         .collect::<Vec<_>>();
 
@@ -1222,9 +1225,10 @@ fn is_inline_marker(exp: &Exp) -> bool {
 /// Line numbers move when a candidate rewrites the specification above them,
 /// so an identity built from one would report a construct the baseline already
 /// had as newly introduced. The function identity prevents a candidate from
-/// moving an inherited construct into the checked target, and the line relative
-/// to that function prevents relocation within the same body. The text keeps
-/// otherwise unrelated constructs apart.
+/// moving an inherited construct into the checked target. The preceding
+/// specification-free function text binds an inline construct to its runtime
+/// program point, while the relative line and source text keep otherwise
+/// unrelated constructs apart.
 fn weakening_site(package: &Path, violation: &Violation) -> String {
     let text = std::fs::read_to_string(package.join(&violation.path))
         .ok()
@@ -1240,6 +1244,7 @@ fn weakening_site(package: &Path, violation: &Violation) -> String {
         .function_line
         .map(|start| violation.line.saturating_sub(start).to_string())
         .unwrap_or_default();
+    let function_context = violation.function_context.as_deref().unwrap_or_default();
     // NUL joins the parts: no component contains one, so no two distinct sites
     // can render to the same key.
     [
@@ -1248,6 +1253,7 @@ fn weakening_site(package: &Path, violation: &Violation) -> String {
         violation.message.as_str(),
         function,
         relative_line.as_str(),
+        function_context,
         text.as_str(),
     ]
     .join("\0")
@@ -1305,6 +1311,7 @@ fn location_of(env: &GlobalEnv, package: &Path, loc: &Loc) -> Violation {
         message: String::new(),
         function: None,
         function_line: None,
+        function_context: None,
     }
 }
 
@@ -1323,6 +1330,15 @@ fn location_in_function(
     // the weakening identity.
     violation.function_line =
         (function_location.path == violation.path).then_some(function_location.line);
+    violation.function_context = (function.get_loc().file_id() == loc.file_id())
+        .then(|| {
+            let source = env.get_file_source(loc.file_id());
+            let start = function.get_loc().span().start().0 as usize;
+            let end = loc.span().start().0 as usize;
+            (start <= end && end <= source.len())
+                .then(|| crate::experiment::strip_specifications(&source[start..end]))
+        })
+        .flatten();
     violation
 }
 
@@ -1387,6 +1403,7 @@ pub fn check_edit_scope(
             message: "file is outside the task's declared editable paths".to_string(),
             function: None,
             function_line: None,
+            function_context: None,
         })
         .collect();
     Ok((changed, violations))
@@ -1677,6 +1694,47 @@ mod tests {
     }
 
     #[test]
+    fn moving_an_inline_assume_past_runtime_code_is_rejected() {
+        let baseline_source = "module 0xCAFE::m {
+    fun target(): u64 {
+        let y = 0;
+        spec { assume y == 0; };
+        y = 1;
+        y
+    }
+}";
+        let candidate_source = "module 0xCAFE::m {
+    fun target(): u64 {
+        let y = 0; y = 1;
+        spec { assume y == 0; };
+
+        y
+    }
+}";
+        let baseline = crate::tests::common::make_package("baseline", &[("m", baseline_source)]);
+        let candidate = crate::tests::common::make_package("candidate", &[("m", candidate_source)]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(!env.has_errors(), "probe module does not compile");
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("unjustified_assumption", added[0].code);
+    }
+
+    #[test]
     fn suppressing_pragmas_are_rejected() {
         let report = check_module(
             "module 0xCAFE::m {
@@ -1881,6 +1939,7 @@ mod tests {
                     message: "file is outside the task's declared editable paths".to_string(),
                     function: None,
                     function_line: None,
+                    function_context: None,
                 }],
                 assumed_contracts: Vec::new(),
                 contract_coverage: ContractCoverage {
