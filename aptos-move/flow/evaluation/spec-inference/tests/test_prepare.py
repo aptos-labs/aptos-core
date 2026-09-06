@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,7 @@ from harness.prepare import (
     _copy_standalone_package,
     _remove_target_references,
     _require_disjoint_output_roots,
+    _source_modifications,
     _shared_source_roots,
     _write_git_patch,
     _write_sample_catalog,
@@ -17,6 +19,41 @@ from harness.prepare import (
 
 
 class PrepareTests(unittest.TestCase):
+    def test_source_modifications_include_untracked_and_ignored_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            sources = repo / "package/sources"
+            sources.mkdir(parents=True)
+            (repo / "package/Move.toml").write_text("[package]\nname = 'P'\n")
+            (sources / "tracked.move").write_text("module 0x1::tracked {}\n")
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-qm",
+                    "initial",
+                ],
+                cwd=repo,
+                check=True,
+            )
+            (sources / "untracked.move").write_text("module 0x1::untracked {}\n")
+            (repo / ".git/info/exclude").write_text("package/sources/ignored.move\n")
+            (sources / "ignored.move").write_text("module 0x1::ignored {}\n")
+
+            self.assertEqual(
+                {
+                    "package/sources/ignored.move",
+                    "package/sources/untracked.move",
+                },
+                set(_source_modifications(repo, ["package"])),
+            )
+
     def test_shared_source_identity_covers_every_indexed_package(self) -> None:
         self.assertEqual(
             {

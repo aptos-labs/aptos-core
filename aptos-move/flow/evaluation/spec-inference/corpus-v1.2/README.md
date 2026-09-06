@@ -6,7 +6,7 @@ hash for a sample; treatment-specific skills and tools are stored separately.
 
 ## Metadata
 
-- [`manifest.json`](manifest.json): the 30 prepared sample records and hashes;
+- [`manifest.json`](manifest.json): the 20 selected sample records and hashes;
   its `corpus_status` is authoritative for round readiness.
 - [`metadata/candidate-inventory.json`](metadata/candidate-inventory.json): the
   complete compiler-AST source frame.

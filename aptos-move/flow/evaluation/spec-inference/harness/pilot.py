@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from collections.abc import Mapping, Sequence
@@ -23,7 +22,7 @@ from .artifacts import canonical_json, sha256_file, tree_hash, write_json
 from .compatibility import tool_executables
 from .config import ExperimentConfig, FEEDBACK_LEVELS, RunSpec
 from .materialize import materialize_task
-from .mutants import NO_MUTANTS, mutation_fingerprint
+from .mutants import NO_MUTANTS, mutation_fingerprint, require_unique_mutant_ids
 from .schedule import ARMS
 
 
@@ -849,15 +848,7 @@ def _resolve_mutant_manifests(
             continue
         digests[task["task_id"]] = sha256_file(manifest)
         cases = json.loads(manifest.read_text(encoding="utf-8"))["mutants"]
-        ids = Counter(str(case.get("id")) for case in cases)
-        duplicates = sorted(
-            mutant_id for mutant_id, count in ids.items() if count > 1
-        )
-        if duplicates:
-            raise ValueError(
-                f"mutant manifest for {task['task_id']} repeats id(s): "
-                + ", ".join(duplicates)
-            )
+        require_unique_mutant_ids(cases, f"mutant manifest for {task['task_id']}")
         # Against the snapshot the round will actually run, so the identity is
         # computed from the same text at schedule time and at run time.
         fingerprints[task["task_id"]] = sorted(

@@ -26,7 +26,6 @@ import argparse
 import asyncio
 import hashlib
 import json
-from collections import Counter
 from dataclasses import asdict, dataclass
 from collections.abc import Sequence
 from pathlib import Path
@@ -39,6 +38,7 @@ from .mutants import (
     NO_MUTANTS,
     mutation_fingerprint,
     overlapping_mutations,
+    require_unique_mutant_ids,
     score_mutants,
 )
 
@@ -110,13 +110,6 @@ class PendingScore:
     disqualification_manifest: Path | None = None
 
 
-def _require_unique_mutant_ids(cases: Sequence[dict[str, Any]], label: str) -> None:
-    counts = Counter(str(case.get("id")) for case in cases)
-    duplicates = sorted(mutant_id for mutant_id, count in counts.items() if count > 1)
-    if duplicates:
-        raise ValueError(f"{label} repeats mutant id(s): {', '.join(duplicates)}")
-
-
 def _disqualification_manifest(
     root: Path,
     task_id: str,
@@ -152,8 +145,8 @@ def _disqualification_manifest(
         )
     cases = load_object(manifest)["mutants"]
     scored_cases = load_object(scored_manifest)["mutants"]
-    _require_unique_mutant_ids(cases, f"disqualification set for {task_id}")
-    _require_unique_mutant_ids(scored_cases, f"scored set for {task_id}")
+    require_unique_mutant_ids(cases, f"disqualification set for {task_id}")
+    require_unique_mutant_ids(scored_cases, f"scored set for {task_id}")
     repeated = overlapping_mutations(
         cases,
         {mutation_fingerprint(case, baseline) for case in scored_cases},

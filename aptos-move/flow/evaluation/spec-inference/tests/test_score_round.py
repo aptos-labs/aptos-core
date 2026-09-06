@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from harness.artifacts import sha256_file
+from harness.mutants import require_unique_mutant_ids
 from harness.score_round import (
     PendingScore,
     _disqualification_manifest,
@@ -143,7 +144,9 @@ class DisqualificationGateTest(unittest.TestCase):
             scored = root / "scored.json"
             gate.parent.mkdir(parents=True)
             gate.write_text(
-                json.dumps({"mutants": [{"id": "same"}, {"id": "same"}]}),
+                json.dumps(
+                    {"mutants": [{"mutant_id": "same"}, {"mutant_id": "same"}]}
+                ),
                 encoding="utf-8",
             )
             scored.write_text(json.dumps({"mutants": []}), encoding="utf-8")
@@ -158,6 +161,11 @@ class DisqualificationGateTest(unittest.TestCase):
                     [],
                     sha256_file(gate),
                 )
+
+    def test_distinct_schema_mutant_ids_are_accepted(self) -> None:
+        require_unique_mutant_ids(
+            [{"mutant_id": "first"}, {"mutant_id": "second"}], "set"
+        )
 
 
 if __name__ == "__main__":

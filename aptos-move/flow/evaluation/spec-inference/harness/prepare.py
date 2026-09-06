@@ -60,22 +60,17 @@ def prepare_corpus(
             f"{recorded} in {', '.join(source_roots)}"
         )
     # The commit alone does not describe what gets copied: `build_shared_package`
-    # reads the working tree, so a tracked modification would enter the corpus
-    # under a commit that does not contain it, and every hash below would then
-    # describe a source nobody can reconstruct. Untracked files elsewhere cannot
-    # change what is copied, so only tracked modifications count.
+    # reads the working tree, so a tracked, untracked, or ignored source input
+    # would enter the corpus under a commit that does not contain it, and every
+    # hash below would then describe a source nobody can reconstruct.
     # The corpus this run is writing is not one of those sources: its manifest,
     # inventory and patches are outputs of this pipeline, and counting them
     # makes a second preparation impossible once the first has been committed.
     _require_disjoint_output_roots(repo_root, source_roots, artifacts_root, patches_dir)
-    modified = [
-        path
-        for path in _tracked_modifications(repo_root, [artifacts_root, patches_dir])
-        if any(path.startswith(root) for root in source_roots)
-    ]
+    modified = _source_modifications(repo_root, source_roots)
     if modified:
         raise ValueError(
-            f"source checkout {commit} has {len(modified)} tracked modification(s), "
+            f"source checkout {commit} has {len(modified)} source modification(s), "
             "so the corpus would not match its recorded commit: "
             + ", ".join(modified[:5])
             + ("..." if len(modified) > 5 else "")
@@ -804,26 +799,33 @@ def _sources_unchanged(repo_root: Path, recorded: str | None, roots: list[str]) 
     return result.returncode == 0
 
 
-def _tracked_modifications(
-    repo_root: Path, ignored: Sequence[Path] = ()
-) -> list[str]:
-    """Paths with tracked modifications in `repo_root`, outside `ignored`."""
+def _source_modifications(repo_root: Path, source_roots: Sequence[str]) -> list[str]:
+    """Changed, untracked, or ignored inputs consumed by the source index."""
+    inputs = [
+        path
+        for root in source_roots
+        for path in (f"{root}/Move.toml", f"{root}/sources")
+    ]
     result = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=no"],
+        [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignored=matching",
+            "--",
+            *inputs,
+        ],
         cwd=repo_root,
         capture_output=True,
         text=True,
         check=True,
     )
-    excluded = [path.resolve() for path in ignored]
     modified = []
     for line in result.stdout.splitlines():
         if not line.strip():
             continue
         relative = line[3:]
-        absolute = (repo_root / relative).resolve()
-        if any(absolute.is_relative_to(root) for root in excluded):
-            continue
         modified.append(relative)
     return modified
 

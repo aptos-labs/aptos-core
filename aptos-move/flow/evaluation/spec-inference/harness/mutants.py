@@ -8,6 +8,7 @@ import hashlib
 import json
 import shutil
 import tempfile
+from collections import Counter
 from dataclasses import asdict
 from difflib import SequenceMatcher
 from pathlib import Path, PurePosixPath
@@ -23,6 +24,23 @@ from .judge import render_command, run_command
 #: Digest recorded by a run that has no mutant set and is scored on core
 #: criteria only.
 NO_MUTANTS = "0" * 64
+
+
+def require_unique_mutant_ids(
+    cases: Sequence[Mapping[str, Any]], label: str
+) -> None:
+    """Require the schema's non-empty `mutant_id` field to be unique."""
+    ids = []
+    for case in cases:
+        mutant_id = case.get("mutant_id")
+        if not isinstance(mutant_id, str) or not mutant_id:
+            raise ValueError(f"{label} has a mutant without a non-empty mutant_id")
+        ids.append(mutant_id)
+    duplicates = sorted(
+        mutant_id for mutant_id, count in Counter(ids).items() if count > 1
+    )
+    if duplicates:
+        raise ValueError(f"{label} repeats mutant id(s): {', '.join(duplicates)}")
 
 
 async def score_mutants(

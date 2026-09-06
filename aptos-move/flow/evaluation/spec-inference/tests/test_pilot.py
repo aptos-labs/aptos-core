@@ -932,11 +932,21 @@ class MutantManifestResolution(unittest.TestCase):
             self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
             self.assertNotEqual(digests["a"], digests["b"])
 
+    def test_a_manifest_accepts_distinct_schema_mutant_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_mutants(root / "a", ["first", "second"])
+            digests, _ = _resolve_mutant_manifests(
+                [{"task_id": "a", "snapshot": str(_mutant_package(root))}],
+                root,
+            )
+            self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
+
     def test_a_manifest_cannot_repeat_a_mutant_id(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _write_mutants(root / "a", ["same", "same"])
-            with self.assertRaisesRegex(ValueError, "repeats id"):
+            with self.assertRaisesRegex(ValueError, "repeats mutant id"):
                 _resolve_mutant_manifests(
                     [{"task_id": "a", "snapshot": str(_mutant_package(root))}],
                     root,
