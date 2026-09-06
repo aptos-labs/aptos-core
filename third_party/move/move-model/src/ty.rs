@@ -3374,7 +3374,7 @@ impl TypeUnificationError {
             | TypeUnificationError::MissingAbilities(loc, ..) => Some(loc.clone()),
             _ => None,
         }
-        .and_then(|loc| if loc.is_default() { None } else { Some(loc) })
+        .filter(|loc| !loc.is_default())
     }
 
     /// Return the message for this error.

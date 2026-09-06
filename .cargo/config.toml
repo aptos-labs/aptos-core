@@ -24,7 +24,6 @@ xclippy = [
   "-Aclippy::chunks_exact_to_as_chunks",
   "-Aclippy::explicit_counter_loop",
   "-Aclippy::manual_checked_ops",
-  "-Aclippy::manual_filter",
   "-Aclippy::map_or_identity",
   "-Aclippy::missing_spin_loop",
   "-Aclippy::needless_return_with_question_mark",
