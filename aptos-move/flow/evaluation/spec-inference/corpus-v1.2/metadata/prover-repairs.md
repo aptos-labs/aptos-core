@@ -55,7 +55,20 @@ created by the patch. Selection policy marks these
 
 `harness.prepare` blanks the inline `spec { ... }` blocks (loop invariants,
 inline assertions) of a target's body in the task package, so a loop invariant
-the reference carries is part of the reference rather than a hint. The one
-exception is an `inline fun` target (`AX-pending-order-book-index-006`): its
-body is expanded into callers, so the checker's bytecode comparison would count
-the blanking as an implementation change; its invariants stay in the task.
+the reference carries is part of the reference rather than a hint.
+
+`AX-pending-order-book-index-006` now uses an ordinary function with the same
+explicit `while` loop, rather than an `inline fun`. This preserves the loop's
+executable behavior while allowing agents to attach invariants to the target
+without changing callers through inlining. Preparation removes its reference
+invariants just as it does for the other loop tasks. This preparation change
+applies only to future rounds; archived run snapshots remain unchanged.
+
+`code::publish_package` now uses explicit indexed loops for deploy-owner
+recording, package scanning, and initialization reset. `check_upgradability`
+likewise checks old module names in an explicit loop. Each traversal preserves
+the iterator's forward order and original operations, but exposes an invariant
+attachment point. Apply `explicit-loop-repairs.patch` after `source-repairs.patch`
+to reproduce these source changes and the pending-order target conversion.
+Task recipes and package inventory have been refreshed; previous screening
+results are stale, and the manifest requires re-screening before another round.

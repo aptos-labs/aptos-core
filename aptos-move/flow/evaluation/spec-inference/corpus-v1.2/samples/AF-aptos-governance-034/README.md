@@ -13,8 +13,8 @@ giving the independent workspace to an agent.
 - Source inside the shared package: `sources/AptosFramework/aptos_governance.move`
 - Source root: `aptos-move/framework/aptos-framework`
 - Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
-- Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `50df3152ff26ba0697c66704620fcf141362544acb3f45d743f6191a82e2c057`
+- Shared package SHA-256: `1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116`
+- Prepared tree SHA-256: `81b74a60e2db85ae955d8dd92e75d26641aa193d073c593c42b24cceba4d08d4`
 - Required contract categories: `normal-result`, `state-transition`, `frame`
 
 Target functions:

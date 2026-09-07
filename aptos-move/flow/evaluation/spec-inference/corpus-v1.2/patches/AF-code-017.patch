@@ -355,10 +355,10 @@ index 0000000000..cfdd364c61
 +  ]
 +}
 diff --git a/sources/AptosFramework/code.move b/sources/AptosFramework/code.move
-index 5ad02aff39..63db7be25b 100644
+index c1e02bea32..58dad857f8 100644
 --- a/sources/AptosFramework/code.move
 +++ b/sources/AptosFramework/code.move
-@@ -252,12 +252,12 @@ module aptos_framework::code {
+@@ -259,12 +259,12 @@ module aptos_framework::code {
              package.upgrade_policy = upgrade_policy_immutable();
              frozen.push_back(package);
              i += 1;
@@ -377,7 +377,7 @@ index 5ad02aff39..63db7be25b 100644
          registry.packages = frozen;
  
          // We unfortunately have to make a copy of each package to avoid borrow checker issues as check_dependencies
-@@ -271,9 +271,9 @@ module aptos_framework::code {
+@@ -278,9 +278,9 @@ module aptos_framework::code {
          while (i < n) {
              check_dependencies(code_object_addr, packages.borrow(i));
              i += 1;
@@ -390,7 +390,7 @@ index 5ad02aff39..63db7be25b 100644
      }
  
      /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
-@@ -402,11 +402,11 @@ module aptos_framework::code {
+@@ -412,11 +412,11 @@ module aptos_framework::code {
          while (i < n) {
              vector::push_back(&mut module_names, pack.modules.borrow(i).name);
              i += 1;

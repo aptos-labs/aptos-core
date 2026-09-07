@@ -119,7 +119,7 @@ module aptos_experimental::pending_order_book_index {
         };
     }
 
-    inline fun take_ready_price_move_up_orders(
+    fun take_ready_price_move_up_orders(
         self: &mut PendingOrderBookIndex,
         current_price: u64,
         orders: &mut vector<OrderId>,
