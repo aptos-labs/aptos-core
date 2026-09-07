@@ -49,7 +49,10 @@ use crate::{
         state_with_summary::LedgerWithSummary,
     },
 };
-pub use aptos_types::{block_info::BlockHeight, state_store::StateKind};
+pub use aptos_types::{
+    block_info::BlockHeight,
+    state_store::{SnapshotKind, StateKind},
+};
 pub use errors::AptosDbError;
 pub use ledger_summary::LedgerSummary;
 

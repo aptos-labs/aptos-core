@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
-use aptos_storage_interface::StateKind;
+use aptos_storage_interface::{SnapshotKind, StateKind};
 use aptos_time_service::TimeService;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -40,12 +40,46 @@ async fn test_notifications_state_values() {
 
     // Request a state value stream and get a data stream listener
     let mut stream_listener = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await
         .unwrap();
 
     // Verify that the stream listener receives all state value notifications
     verify_continuous_state_value_notifications(&mut stream_listener).await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_hot_state_values() {
+    let streaming_client = create_streaming_client_and_service();
+    let mut stream_listener = streaming_client
+        .get_all_state_values(MAX_ADVERTISED_STATES, None, SnapshotKind::HotState)
+        .await
+        .unwrap();
+
+    let mut next_expected_index = 0;
+    loop {
+        let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
+        match data_notification.data_payload {
+            DataPayload::HotStateValuesWithProof(hot_state_values_with_proof) => {
+                assert_eq!(hot_state_values_with_proof.first_index, next_expected_index);
+                let num_hot_values = hot_state_values_with_proof.raw_values.len() as u64;
+                assert_eq!(
+                    hot_state_values_with_proof.last_index,
+                    next_expected_index + num_hot_values - 1
+                );
+                next_expected_index += num_hot_values;
+            },
+            DataPayload::EndOfStream => {
+                assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES);
+                return;
+            },
+            data_payload => unexpected_payload_type!(data_payload),
+        }
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -55,7 +89,11 @@ async fn test_notifications_state_values_limited_chunks() {
 
     // Request a new state value stream starting at the next expected index
     let mut stream_listener = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES, Some(0), StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES,
+            Some(0),
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await
         .unwrap();
 
@@ -74,7 +112,7 @@ async fn test_notifications_state_values_multiple_streams() {
         .get_all_state_values(
             MAX_ADVERTISED_STATES,
             Some(next_expected_index),
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .await
         .unwrap();
@@ -109,7 +147,7 @@ async fn test_notifications_state_values_multiple_streams() {
                         .get_all_state_values(
                             MAX_ADVERTISED_STATES,
                             Some(next_expected_index),
-                            StateKind::MainState,
+                            SnapshotKind::State(StateKind::MainState),
                         )
                         .await
                         .unwrap();
@@ -1255,19 +1293,31 @@ async fn test_stream_states() {
 
     // Request a state value stream and verify we get a data stream listener
     let result = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES - 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES - 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await;
     assert_ok!(result);
 
     // Request a stream where states are missing (we are lower than advertised)
     let result = streaming_client
-        .get_all_state_values(MIN_ADVERTISED_STATES - 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MIN_ADVERTISED_STATES - 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 
     // Request a stream where states are missing (we are higher than advertised)
     let result = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_EPOCH_END + 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_EPOCH_END + 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 }
@@ -1566,7 +1616,11 @@ async fn test_terminate_stream() {
 
     // Request a state value stream
     let mut stream_listener = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES - 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES - 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await
         .unwrap();
 

@@ -14,7 +14,7 @@ use crate::{
     },
     tests::utils::{create_ledger_info, initialize_logger},
 };
-use aptos_storage_interface::StateKind;
+use aptos_storage_interface::{SnapshotKind, StateKind};
 use claims::assert_ok;
 use futures::{channel::mpsc, executor::block_on, FutureExt, StreamExt};
 use std::thread::JoinHandle;
@@ -46,7 +46,7 @@ fn test_get_all_states() {
     let expected_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version: request_version,
         start_index: 0,
-        state_kind: StateKind::MainState,
+        snapshot_kind: SnapshotKind::State(StateKind::MainState),
     });
 
     // Spawn a new server thread to handle any stream requests
@@ -56,7 +56,7 @@ fn test_get_all_states() {
     let response = block_on(streaming_service_client.get_all_state_values(
         request_version,
         None,
-        StateKind::MainState,
+        SnapshotKind::State(StateKind::MainState),
     ));
     assert_ok!(response);
 }
