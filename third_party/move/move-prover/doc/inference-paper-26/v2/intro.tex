@@ -21,7 +21,7 @@ The intended workflow is that the agent requests specs for a program, the tool c
 The most interesting question with such a setup is whether the capability to run \WP actually improves specification inference, and whether the overhead introduced by model/tool interaction is worth it.
 We investigate this question empirically by comparing pure agent and combined agent/\WP on a corpus of examples drawn out of a private codebase (\Anon{the one for the perpetual trading system Decibel~\cite{Decibel}}{that of a production perpetual trading system}).
 The fact that we choose a private codebase is methodologically important, as discussed later. The currency of comparison is US dollars under the stated token prices; we use GLM-5.3~\cite{GLM53} as the model and the Claude Code SDK as the harness.
-The results show that \WP-based inference, at least with today's models, beats the agent-only approach on average by 28\% lower cost.
+The results show that \WP-based inference, at least with today's models, beats the agent-only approach on average by 31\% lower cost.
 
 The combination of agentic and mechanical inference as discussed here has been implemented in the Move Prover (\MVP).
 \MVP has been developed as part of the Libra/Diem project at Meta, targeting the Move smart contract language, \Anon{and transitioned into Aptos Labs in 2022}{and later transitioned to the blockchain company that maintains it}.

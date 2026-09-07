@@ -5,17 +5,17 @@
 \SubSection{Interpreting the Results}
 
 The headline of Sec.~\ref{sec:evaluation} is that both \WP-backed tactics cost
-about 28\% less than agent-only while producing mutation-complete specifications
-in 67/67 hybrid-guided and 66/67 hybrid-flexible cells, compared with 64/68
+about 31\% less than agent-only while producing mutation-complete specifications
+in 63/63 hybrid-guided and 62/63 hybrid-flexible cells, compared with 60/64
 agent-only cells; the two cells lost to infrastructure are excluded from these
 fractions. The more informative result is how narrow the margin is.
 
 \Paragraph{Agent-only does surprisingly well}
 Given no \WP tool at all, the direct tactic produced a verifying, mutation-complete
-specification in 64 of its 68 sessions. It found the same recursive spec helpers and
+specification in 60 of its 64 sessions. It found the same recursive spec helpers and
 loop invariants as the hybrids, at nearly the same rates, and it got there by a
 recognizable method: it wrote its own mutation probes and let counterexamples drive
-the repair. The \WP tool reduces dollar cost by about 28\% and avoids four failures ---
+the repair. The \WP tool reduces dollar cost by about 31\% and avoids four failures ---
 real, but not the difference between working and not working.
 
 Two things temper that. The targets are individual functions of a few dozen lines, and
@@ -86,7 +86,7 @@ To our knowledge, no prior LLM-based inference system for verification languages
 
 We have presented a specification inference tool for the Move Prover that combines a sound, mechanical \WP analysis over Move bytecode with an agentic coding CLI; the prover serves as the oracle for both signals.
 The two inference streams compose in a single instrumentation pipeline, and the workflow is delivered as a Claude Code plugin --- skills, hooks, and an MCP server --- so inference runs inside the same conversational loop the user already writes Move in.
-A controlled comparison on 17 targets drawn from a private perpetual-trading codebase --- three tactics, four replicates each --- found the \WP-backed tactics about 28\% cheaper at the stated GLM-5.3 prices and less prone to leaving a contract incomplete, while the unaided agent still produced a complete specification in 64 of its 68 sessions.
+A controlled comparison on 16 retained targets drawn from a private perpetual-trading codebase --- three tactics, four replicates each --- found the \WP-backed tactics about 31\% cheaper at the stated GLM-5.3 prices and less prone to leaving a contract incomplete, while the unaided agent still produced a complete specification in 60 of its 64 sessions.
 Whether that margin widens with the size of the target, and whether it survives a stronger model, are the questions we take up next.
 Neither the \WP construction nor the agentic workflow is specific to Move: both rest on reference elimination and on a verifier that consumes contracts, so we expect the approach to transfer to Rust-like languages and their verifiers.
 

@@ -36,8 +36,8 @@
 	A Model Context Protocol (MCP) service exposes the \WP analysis and the verifier to the coding agent.
 	The \WP analysis provides a sound, mechanical baseline for inference; the AI is used precisely where \WP is weakest --- for loop invariants and high-level idiomatic specifications such as monotonicity, conservation, and structural invariants.
 	The verifier serves as the oracle that decides whether the generated specs are valid, and the agent is equipped to generate proof hints and to refine the inferred specification until verification succeeds.
-	We evaluate the approach on 17 targets drawn from a private perpetual-trading codebase, comparing three inference tactics --- one without \WP and two with --- over four replicates each.
-	At the stated GLM-5.3 prices, the \WP-backed tactics cost about 28\% less and leave fewer contracts incomplete, though the unaided agent still produces a complete specification in 64 of its 68 sessions.
+	We evaluate the approach on 16 retained targets drawn from a private perpetual-trading codebase, comparing three inference tactics --- one without \WP and two with --- over four replicates each.
+	At the stated GLM-5.3 prices, the \WP-backed tactics cost about 31\% less and leave fewer contracts incomplete, though the unaided agent still produces a complete specification in 60 of its 64 sessions.
 \end{abstract}
 
 \input{intro}
