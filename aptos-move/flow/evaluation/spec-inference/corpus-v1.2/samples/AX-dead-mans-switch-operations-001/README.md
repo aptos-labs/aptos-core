@@ -13,8 +13,8 @@ giving the independent workspace to an agent.
 - Source inside the shared package: `sources/AptosExperimental/trading/market/dead_mans_switch_operations.move`
 - Source root: `aptos-move/framework/aptos-experimental`
 - Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
-- Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `97cd97bb3893bc2a06c68a2e997a6c060b412c04af2f8d12f8ab526917b9d0d1`
+- Shared package SHA-256: `1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116`
+- Prepared tree SHA-256: `bcd3e189105ba583ed49815c2732b3b84b3a8c88cd9d8194d7425b6dbfa6fe29`
 - Required contract categories: `normal-result`, `abort`, `state-transition`
 
 Target functions:

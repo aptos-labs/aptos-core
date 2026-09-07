@@ -13,8 +13,8 @@ giving the independent workspace to an agent.
 - Source inside the shared package: `sources/AptosFramework/coin.move`
 - Source root: `aptos-move/framework/aptos-framework`
 - Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
-- Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `e0914a75723095be1a349c2d4d4f689ae2a1743e6ce8bf33e6063d3e3cd0b598`
+- Shared package SHA-256: `1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116`
+- Prepared tree SHA-256: `7db7bf0f892aac9b5f1b408aeeff48456521221a36312ce2d7bbeddd40bd561a`
 - Required contract categories: `normal-result`, `abort`, `state-transition`
 
 Target functions:

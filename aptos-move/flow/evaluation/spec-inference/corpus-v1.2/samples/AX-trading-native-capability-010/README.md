@@ -13,8 +13,8 @@ giving the independent workspace to an agent.
 - Source inside the shared package: `sources/AptosExperimental/trading/position/trading_native_capability.move`
 - Source root: `aptos-move/framework/aptos-experimental`
 - Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
-- Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `27f4fa17bb4da5533c1edfa9761e4fa6e6e7cca1099beb7e2e7c82437c54beb4`
+- Shared package SHA-256: `1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116`
+- Prepared tree SHA-256: `ccb2a50785e3284c2c94494d59180901c5b2a9ff30aa3d1c6ea8477f54cd72ef`
 - Required contract categories: `normal-result`, `abort`, `state-transition`, `frame`
 
 Target functions:

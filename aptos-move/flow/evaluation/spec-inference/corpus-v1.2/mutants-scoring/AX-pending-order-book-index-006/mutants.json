@@ -3,7 +3,7 @@
     {
       "anchor": {
         "length": 99,
-        "offset": 4952,
+        "offset": 4945,
         "sha256": "f8bf71727f99837c2bd731e9011e4f8c6c04d99ea224659cc45af5e905fcc78f"
       },
       "edit": {
@@ -35,7 +35,7 @@
     {
       "anchor": {
         "length": 81,
-        "offset": 4749,
+        "offset": 4742,
         "sha256": "c467cbbe3619e4ab4563ac3d73e6a66a6023b9a362bea202e7ce019a92204541"
       },
       "edit": {
@@ -67,7 +67,7 @@
     {
       "anchor": {
         "length": 78,
-        "offset": 4600,
+        "offset": 4593,
         "sha256": "af9671a6a782a2125893e912effe681dec7b73f69b104433c18e79281b65bac9"
       },
       "edit": {

@@ -6,13 +6,13 @@ hash for a sample; treatment-specific skills and tools are stored separately.
 
 ## Metadata
 
-- [`manifest.json`](manifest.json): the 20 selected sample records and hashes;
+- [`manifest.json`](manifest.json): the 30 prepared sample records and hashes;
   its `corpus_status` is authoritative for round readiness.
 - [`metadata/candidate-inventory.json`](metadata/candidate-inventory.json): the
   complete compiler-AST source frame.
 - [`metadata/selection.json`](metadata/selection.json): inclusion, exclusion,
   reserve, and replacement decisions.
-- [`metadata/screening-ledger.json`](metadata/screening-ledger.json) and
+- [`screening/ledger.json`](screening/ledger.json) and
   [`screening/results/`](screening/results/): compatibility evidence, valid for
   the current corpus only when its identity is recorded by `manifest.json`.
 

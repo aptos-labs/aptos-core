@@ -13,8 +13,8 @@ giving the independent workspace to an agent.
 - Source inside the shared package: `sources/AptosExperimental/trading/order_book/pending_order_book_index.move`
 - Source root: `aptos-move/framework/aptos-experimental`
 - Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
-- Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `43e882f95e1e6e5e36c2b8739e7e06ce29ff922f541ebe29ca1f7e662d9f41fe`
+- Shared package SHA-256: `1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116`
+- Prepared tree SHA-256: `8a7f98958f4815cec43dfa09a6648869f089bb4752482d2d09d52f1682ba21dc`
 - Required contract categories: `normal-result`, `state-transition`, `loop-invariant`
 
 Target functions:

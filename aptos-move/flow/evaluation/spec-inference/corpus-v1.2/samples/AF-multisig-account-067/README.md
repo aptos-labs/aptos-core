@@ -13,8 +13,8 @@ giving the independent workspace to an agent.
 - Source inside the shared package: `sources/AptosFramework/multisig_account.move`
 - Source root: `aptos-move/framework/aptos-framework`
 - Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
-- Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `2ae1000504ceccc511be98704eb6ef8a6f14500031422474e5401ec343239fa3`
+- Shared package SHA-256: `1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116`
+- Prepared tree SHA-256: `7e7255e0f923a9f5618c09e4a5db56e40f107f94348b519665dcf0fc2cbca9ff`
 - Required contract categories: `normal-result`, `abort`, `loop-invariant`
 
 Target functions:
