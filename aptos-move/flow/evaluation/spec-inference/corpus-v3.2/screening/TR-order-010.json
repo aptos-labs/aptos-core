@@ -9,7 +9,7 @@
   "target": "aptos_experimental::extracted_bulk_order_utils::validate_price_ordering",
   "task_id": "TR-order-010",
   "threshold_seconds": 20,
-  "wall_seconds": 5.1,
+  "wall_seconds": 2.7,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true

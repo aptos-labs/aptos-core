@@ -9,7 +9,7 @@
   "target": "decibel_campaign::extracted_tier_lookup::credits_for_duration_days",
   "task_id": "UC-credits-008",
   "threshold_seconds": 20,
-  "wall_seconds": 4.8,
+  "wall_seconds": 2.4,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true

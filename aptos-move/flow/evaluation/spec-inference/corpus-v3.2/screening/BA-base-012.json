@@ -9,7 +9,7 @@
   "target": "decibel_dex::extracted_base_math::compute_base_needed",
   "task_id": "BA-base-012",
   "threshold_seconds": 20,
-  "wall_seconds": 4.9,
+  "wall_seconds": 3.6,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true

@@ -9,7 +9,7 @@
   "target": "decibel_campaign::extracted_tier_leverage::checked_max_tier_leverage",
   "task_id": "TL-lev-020",
   "threshold_seconds": 20,
-  "wall_seconds": 6.7,
+  "wall_seconds": 4.2,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true

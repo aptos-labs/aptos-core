@@ -9,7 +9,7 @@
   "target": "decibel_vault::vault_share_math::convert_existing_shares_to_asset_amount",
   "task_id": "VS-shares-002",
   "threshold_seconds": 20,
-  "wall_seconds": 5.1,
+  "wall_seconds": 3.0,
   "well_formed": true,
   "wp_failure_kind": "untrusted_inferred_contract",
   "wp_hard": true
