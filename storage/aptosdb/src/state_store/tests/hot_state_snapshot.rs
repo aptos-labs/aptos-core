@@ -3,7 +3,7 @@
 
 //! Tests for the hot state snapshot APIs used by fast sync to serve and restore hot state.
 
-use crate::{db::test_helper::arb_blocks_to_commit_with_params, AptosDB};
+use crate::{db::test_helper::arb_blocks_to_commit_with_params, pruner::PrunerManager, AptosDB};
 use aptos_config::config::{
     HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
@@ -12,14 +12,17 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore, restore::JellyfishMerkleRestore, JellyfishMerkleTree,
 };
-use aptos_storage_interface::{DbReader, DbWriter, Result as DbResult};
+use aptos_storage_interface::{DbReader, DbWriter, Result as DbResult, StateKind};
 use aptos_temppath::TempPath;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures,
+    aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     state_store::{
         hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::StateValue,
+        NUM_STATE_SHARDS,
     },
     transaction::{
         BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
@@ -28,7 +31,11 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use proptest::prelude::*;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 fn key(seed: &str) -> StateKey {
     StateKey::raw(seed.as_bytes())
@@ -469,6 +476,26 @@ fn open_persistent_hot_state_db(path: &TempPath) -> AptosDB {
     .unwrap()
 }
 
+/// Restores cold state so reset can discover the snapshot version.
+fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
+    let root_hash = src.state_store.get_root_hash(version).unwrap();
+    let num_items = src
+        .get_state_item_count(version, StateKind::MainState)
+        .unwrap();
+    let mut receiver = dst
+        .get_state_snapshot_receiver(version, root_hash, StateKind::MainState)
+        .unwrap();
+    let mut first_index = 0;
+    while first_index < num_items {
+        let chunk = src
+            .get_state_value_chunk_with_proof(version, first_index, 2, StateKind::MainState)
+            .unwrap();
+        first_index += chunk.raw_values.len();
+        receiver.add_chunk(chunk.raw_values, chunk.proof).unwrap();
+    }
+    receiver.finish_box().unwrap();
+}
+
 #[test]
 fn test_hot_state_restore() {
     let tmp_src = TempPath::new();
@@ -487,6 +514,8 @@ fn test_hot_state_restore() {
 
     let tmp_dst = TempPath::new();
     let dst = open_persistent_hot_state_db(&tmp_dst);
+    let (empty_view, empty_state) = dst.get_persisted_state().unwrap();
+    restore_cold_state(&src, &dst, version);
     let mut receiver = dst
         .get_hot_state_snapshot_receiver(version, root_hash)
         .unwrap();
@@ -496,6 +525,45 @@ fn test_hot_state_restore() {
             .unwrap();
     }
     receiver.finish_box().unwrap();
+    let ledger_info = LedgerInfoWithSignatures::new(
+        LedgerInfo::new(
+            BlockInfo::new(
+                0,
+                0,
+                HashValue::zero(),
+                src.get_accumulator_root_hash(version).unwrap(),
+                version,
+                0,
+                None,
+            ),
+            HashValue::zero(),
+        ),
+        AggregateSignature::empty(),
+    );
+    dst.finalize_state_snapshot(
+        version,
+        src.get_transaction_outputs(version, 1, version).unwrap(),
+        &[ledger_info],
+    )
+    .unwrap();
+
+    let pruners = &dst.state_store.state_pruner;
+    assert_eq!(
+        pruners.hot_state_merkle_pruner.get_min_readable_version(),
+        version
+    );
+    assert_eq!(
+        pruners.hot_epoch_snapshot_pruner.get_min_readable_version(),
+        version
+    );
+    assert_eq!(
+        pruners.hot_state_kv_pruner.get_min_readable_version(),
+        version
+    );
+    assert_eq!(empty_state.version(), None);
+    for (key, _) in &expected {
+        assert!(empty_view.get_state_slot(key.crypto_hash_ref()).is_none());
+    }
 
     // The restored DB serves the same snapshot.
     assert_eq!(
@@ -507,6 +575,131 @@ fn test_hot_state_restore() {
         dst.state_store
             .hot_state_merkle_db
             .get_root_hash(version)
+            .unwrap(),
+        root_hash
+    );
+
+    // Finalization must activate the restored hot state before returning.
+    assert_hot_state_activated(&dst, &expected, root_hash);
+
+    // Retain a base view across a reset and subsequent writes.
+    let (restored_view, restored_state) = dst.get_persisted_state().unwrap();
+    dst.state_store.reset();
+    assert_hot_state_activated(&dst, &expected, root_hash);
+
+    // Retain this view to keep the next commit's delta from merging into its base.
+    let (before_write_view, _) = dst.get_persisted_state().unwrap();
+    let txn = block_epilogue_txn(vec![
+        (key("a"), None),
+        (key("b"), Some(val(b"b-new"))),
+        (key("f"), Some(val(b"f-new"))),
+    ]);
+    src.save_transactions_for_test(std::slice::from_ref(&txn), version + 1, None, true)
+        .unwrap();
+    dst.save_transactions_for_test(&[txn], version + 1, None, true)
+        .unwrap();
+    // The snapshot commit can finish before the hot-state committer publishes its view.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let (delta_view, delta_state) = loop {
+        let persisted = dst.get_persisted_state().unwrap();
+        if persisted.1.version() == Some(version + 1) {
+            break persisted;
+        }
+        assert!(Instant::now() < deadline, "hot state commit did not finish");
+        std::thread::sleep(Duration::from_millis(1));
+    };
+    let expected_after_write = collect_paged(&src, version + 1, usize::MAX);
+    dst.state_store.reset();
+
+    // Updating a key outside the retained delta must preserve its fall-through reads.
+    let txn = block_epilogue_txn(vec![(key("c"), Some(val(b"c-new")))]);
+    src.save_transactions_for_test(std::slice::from_ref(&txn), version + 2, None, true)
+        .unwrap();
+    dst.save_transactions_for_test(&[txn], version + 2, None, true)
+        .unwrap();
+    let hot_state = dst.state_store.persisted_state.get_hot_state();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let entries = hot_state.get_all_entries(key("c").get_shard_id());
+        if entries
+            .get(key("c").crypto_hash_ref())
+            .and_then(|slot| slot.as_state_value_opt())
+            == Some(&val(b"c-new"))
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "old views blocked the new base's merge"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+
+    assert_eq!(restored_state.version(), Some(version));
+    for (key, hot_value) in &expected {
+        for view in [&restored_view, &before_write_view] {
+            assert_eq!(
+                view.get_state_slot(key.crypto_hash_ref())
+                    .unwrap()
+                    .as_state_value_opt(),
+                hot_value.value_opt()
+            );
+        }
+    }
+    assert_eq!(delta_state.version(), Some(version + 1));
+    for (key, hot_value) in &expected_after_write {
+        assert_eq!(
+            delta_view
+                .get_state_slot(key.crypto_hash_ref())
+                .unwrap()
+                .as_state_value_opt(),
+            hot_value.value_opt()
+        );
+    }
+
+    let expected_root = src
+        .state_store
+        .hot_state_merkle_db
+        .get_root_hash(version + 2)
+        .unwrap();
+    let expected_final = collect_paged(&src, version + 2, usize::MAX);
+    assert_eq!(
+        dst.state_store.get_root_hash(version + 2).unwrap(),
+        src.state_store.get_root_hash(version + 2).unwrap()
+    );
+    assert_hot_state_activated(&dst, &expected_final, expected_root);
+    drop(hot_state);
+    drop(dst);
+    let reopened = open_persistent_hot_state_db(&tmp_dst);
+    assert_hot_state_activated(&reopened, &expected_final, expected_root);
+}
+
+/// Checks hot entries and the current summary root.
+fn assert_hot_state_activated(
+    db: &AptosDB,
+    expected: &[(StateKey, HotStateValue)],
+    root_hash: HashValue,
+) {
+    let (hot_view, state) = db.get_persisted_state().unwrap();
+    let num_hot_items: usize = (0..NUM_STATE_SHARDS)
+        .map(|shard_id| state.num_hot_items(shard_id))
+        .sum();
+    assert_eq!(num_hot_items, expected.len());
+    for (key, hot_value) in expected {
+        let slot = hot_view
+            .get_state_slot(key.crypto_hash_ref())
+            .expect("restored key must be hot");
+        assert_eq!(slot.as_state_value_opt(), hot_value.value_opt());
+        assert_eq!(
+            slot.expect_hot_since_version(),
+            hot_value.hot_since_version()
+        );
+    }
+    assert_eq!(
+        db.state_store
+            .current_state_locked()
+            .summary()
+            .hot_root_hash()
             .unwrap(),
         root_hash
     );

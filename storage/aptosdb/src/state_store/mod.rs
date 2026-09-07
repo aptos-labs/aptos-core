@@ -20,7 +20,9 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
-    state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
+    state_store::{
+        buffered_state::BufferedState, hot_state::LoadedHotState, persisted_state::PersistedState,
+    },
     state_value_chunk::{
         build_hot_value_chunk_proof, build_value_chunk_proof, jmt_leaves_with_values,
         value_chunk_with_proof,
@@ -56,7 +58,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
-        state::{HotStateMetadata, LedgerState, State},
+        state::{LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -482,18 +484,12 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             hot_state_config,
         )));
-        let (persisted_state, hot_state_metadata) = if empty_buffered_state_for_restore {
-            (
-                PersistedState::new_empty(hot_state_config),
-                Default::default(),
-            )
-        } else {
-            Self::load_hot_state_or_empty(&state_db, hot_state_config)
-        };
+        let persisted_state = PersistedState::new_empty(hot_state_config);
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new_at_snapshot(
                 &state_db,
-                StateWithSummary::new_empty(hot_state_config),
+                LoadedHotState::empty(State::new_empty(hot_state_config)),
+                StateSummary::new_empty(hot_state_config),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
@@ -506,7 +502,6 @@ impl StateStore {
                 /*check_max_versions_after_snapshot=*/ true,
                 current_state.clone(),
                 persisted_state.clone(),
-                hot_state_metadata,
                 hot_state_config,
             )
             .expect("buffered state creation failed.")
@@ -725,10 +720,6 @@ impl StateStore {
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
             HotStateConfig::default(),
         )));
-        // TODO(HotState): When hot state persistence is needed for this path, load hot state
-        // KV from DB via `load_hot_state_or_empty` and pass the real persisted state and
-        // metadata, instead of empty defaults. This will let both `hot_state_merkle_db` and
-        // `state_merkle_db` catch up correctly during replay.
         let _ = Self::create_buffered_state_from_latest_snapshot(
             &state_db,
             0,
@@ -736,15 +727,14 @@ impl StateStore {
             /*check_max_versions_after_snapshot=*/ false,
             current_state.clone(),
             PersistedState::new_empty(HotStateConfig::default()),
-            Default::default(),
             HotStateConfig::default(),
         )?;
         let base_version = current_state.lock().version();
         Ok(base_version)
     }
 
-    /// Creates a `BufferedState` from the latest state snapshot, replaying write sets
-    /// between the snapshot and the committed version.
+    /// Loads the latest snapshot as the persisted base, then replays later committed writes.
+    /// Startup and restore share this path so rows, LRU metadata, and roots use the same version.
     fn create_buffered_state_from_latest_snapshot(
         state_db: &Arc<StateDb>,
         buffered_state_target_items: usize,
@@ -752,7 +742,6 @@ impl StateStore {
         check_max_versions_after_snapshot: bool,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
-        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         hot_state_config: HotStateConfig,
     ) -> Result<BufferedState> {
         let num_transactions = state_db
@@ -779,10 +768,12 @@ impl StateStore {
         } else {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
-        let hot_state_root_hash = if !hot_state_config.delete_on_restart
+        let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
+        // TODO(HotState): honor restored snapshots even when delete_on_restart is enabled.
+        let (hot_state, hot_state_root_hash) = if !hot_state_config.delete_on_restart
             && let Some(version) = latest_snapshot_version
         {
-            match state_db
+            let hot_state_root_hash = match state_db
                 .hot_state_merkle_db
                 .get_root_hash_option(version)
                 .expect("Failed to query hot state root hash on initialization.")
@@ -805,23 +796,32 @@ impl StateStore {
                     );
                     *SPARSE_MERKLE_PLACEHOLDER_HASH
                 },
-            }
+            };
+            let hot_state = LoadedHotState::new(
+                version,
+                usage,
+                hot_state_config,
+                state_db.hot_state_kv_db.load_hot_state_kvs(version)?,
+            );
+            (hot_state, hot_state_root_hash)
         } else {
-            *SPARSE_MERKLE_PLACEHOLDER_HASH
+            let hot_state = LoadedHotState::empty(State::new_at_version(
+                latest_snapshot_version,
+                usage,
+                hot_state_config,
+            ));
+            (hot_state, *SPARSE_MERKLE_PLACEHOLDER_HASH)
         };
-        let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
-
-        let state = StateWithSummary::new_at_version_with_hot_state_metadata(
+        let summary = StateSummary::new_at_version(
             latest_snapshot_version,
-            hot_state_root_hash,
-            latest_snapshot_root_hash,
-            usage,
+            SparseMerkleTree::new(hot_state_root_hash),
+            SparseMerkleTree::new(latest_snapshot_root_hash),
             hot_state_config,
-            hot_state_metadata,
         );
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
-            state.clone(),
+            hot_state,
+            summary,
             buffered_state_target_items,
             out_current_state.clone(),
             out_persisted_state.clone(),
@@ -978,77 +978,10 @@ impl StateStore {
         Ok(())
     }
 
-    /// Tries to load the hot state from DB at the latest snapshot version. Returns an empty
-    /// persisted state when loading is not applicable (disabled, no DB, no snapshot).
-    ///
-    /// Returns:
-    ///   - `PersistedState` — fed into `BufferedState` as the base hot state.
-    ///   - `[HotStateMetadata; NUM_STATE_SHARDS]` — per-shard LRU metadata for seeding
-    ///     the speculative `State` (which diverges from the `PersistedState`'s `State`
-    ///     during replay).
-    fn load_hot_state_or_empty(
-        state_db: &Arc<StateDb>,
-        hot_state_config: HotStateConfig,
-    ) -> (PersistedState, [HotStateMetadata; NUM_STATE_SHARDS]) {
-        let empty = || {
-            (
-                PersistedState::new_empty(hot_state_config),
-                Default::default(),
-            )
-        };
-
-        if hot_state_config.delete_on_restart {
-            return empty();
-        }
-        let snapshot_version = match state_db
-            .state_merkle_db
-            .get_state_snapshot_version_before(Version::MAX)
-            .expect("Failed to query latest snapshot on initialization.")
-        {
-            Some(v) => v,
-            None => return empty(),
-        };
-
-        let loaded = state_db
-            .hot_state_kv_db
-            .load_hot_state_kvs(snapshot_version)
-            .expect("Failed to load hot state KVs from DB.");
-        let metadata = std::array::from_fn(|i| {
-            HotStateMetadata::new(
-                loaded[i].head,
-                loaded[i].tail,
-                loaded[i].num_items,
-                loaded[i].total_value_bytes,
-            )
-        });
-        let dashmaps = loaded.map(|s| s.map);
-        let usage = state_db
-            .get_state_storage_usage(Some(snapshot_version))
-            .expect("Failed to query state storage usage on initialization.");
-        let state = State::new_at_version_with_hot_state_metadata(
-            Some(snapshot_version),
-            usage,
-            hot_state_config,
-            metadata.clone(),
-        );
-
-        (
-            PersistedState::new_from_loaded(state, hot_state_config, dashmaps),
-            metadata,
-        )
-    }
-
     pub fn reset(&self) {
-        // Drain + shut down the old pipeline against the *current*
-        // chain family before `create_buffered_state_from_latest_snapshot`
-        // repoints `current_state` at a new MapLayer family. Doing
-        // the shutdown lazily via `Drop` would let the old thread's
-        // drop-time `sync_commit` read the new family and panic on
-        // `is_descendant_of`.
+        // Flush and stop the snapshot pipeline before replacing current_state's layer family.
+        // Its final sync_commit must use the old family to compute valid deltas.
         self.buffered_state.lock().quit();
-        // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
-        // metadata here. This is safe because callers (restore / state-sync) open the DB with
-        // `empty_buffered_state_for_restore`, so the DashMaps are always empty.
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
@@ -1056,7 +989,6 @@ impl StateStore {
             true,
             self.current_state.clone(),
             self.persisted_state.clone(),
-            Default::default(),
             self.hot_state_config,
         )
         .expect("buffered state creation failed.");
@@ -1627,7 +1559,10 @@ impl StateStore {
             last_checkpoint.clone(),
         );
 
-        self.persisted_state.hack_reset(last_checkpoint.clone());
+        self.persisted_state.install_snapshot(
+            LoadedHotState::empty(last_checkpoint.state().clone()),
+            last_checkpoint_summary,
+        );
         *self.current_state_locked() = current;
         self.buffered_state
             .lock()

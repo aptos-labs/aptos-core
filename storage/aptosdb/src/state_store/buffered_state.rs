@@ -5,6 +5,7 @@ use crate::{
     common::{spawn_commit_pipeline, BufferedStateCore, BufferedStateExtras},
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
+        hot_state::LoadedHotState,
         persisted_state::PersistedState,
         state_merkle_batch_committer::StateMerkleBatchCommitter,
         state_snapshot_committer::{
@@ -17,6 +18,7 @@ use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
     empty_hot_state_updates,
+    state_summary::StateSummary,
     state_with_summary::{LedgerStateWithSummary, StateWithSummary},
     HotStateShardUpdates, HotStateUpdates,
 };
@@ -99,15 +101,17 @@ impl BufferedStateExtras<SnapshotToCommit, StateWithSummary> for HotStateAccumul
 impl BufferedState {
     pub(crate) fn new_at_snapshot(
         state_db: &Arc<StateDb>,
-        last_snapshot: StateWithSummary,
+        hot_state: LoadedHotState,
+        summary: StateSummary,
         target_items: usize,
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
     ) -> Self {
         let arc_state_db = Arc::clone(state_db);
+        // Install before starting the snapshot pipeline so its commits use the loaded base.
+        let last_snapshot = out_persisted_state.install_snapshot(hot_state, summary);
         *out_current_state.lock() =
             LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
-        out_persisted_state.hack_reset(last_snapshot.clone());
 
         let merklize_state_db = Arc::clone(&arc_state_db);
         let persisted_state_clone = out_persisted_state.clone();
