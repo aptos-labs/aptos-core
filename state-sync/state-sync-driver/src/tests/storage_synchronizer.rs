@@ -16,10 +16,11 @@ use crate::{
         mocks::{
             create_mock_db_writer, create_mock_executor, create_mock_reader_writer,
             create_mock_reader_writer_with_version, create_mock_receiver, MockChunkExecutor,
+            MockHotSnapshotReceiver,
         },
         utils::{
-            create_epoch_ending_ledger_info, create_event, create_output_list_with_proof,
-            create_state_value_chunk_with_proof, create_transaction,
+            create_epoch_ending_ledger_info, create_event, create_hot_state_value_chunk_with_proof,
+            create_output_list_with_proof, create_state_value_chunk_with_proof, create_transaction,
             create_transaction_list_with_proof, verify_commit_notification,
         },
     },
@@ -32,7 +33,7 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor_types::ChunkCommitNotification;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_storage_interface::{AptosDbError, DbReaderWriter, StateKind};
+use aptos_storage_interface::{AptosDbError, DbReaderWriter, SnapshotKind, StateKind};
 use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -650,7 +651,7 @@ async fn test_save_states_receiver_error() {
         .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .unwrap();
 
@@ -730,7 +731,7 @@ async fn test_save_states_completion() {
         .initialize_snapshot_synchronizer(
             target_ledger_info.clone(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .unwrap();
 
@@ -777,6 +778,54 @@ async fn test_save_states_completion() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_save_hot_states_completion() {
+    // Setup the mock hot snapshot receiver
+    let mut snapshot_receiver = MockHotSnapshotReceiver::new();
+    snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(|_, _| Ok(()));
+    snapshot_receiver.expect_finish_box().returning(|| Ok(()));
+
+    // Setup the mock db writer
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_hot_state_snapshot_receiver()
+        .with(always(), always())
+        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+
+    // Create the storage synchronizer
+    let target_ledger_info = create_epoch_ending_ledger_info();
+    let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    // Initialize the hot state snapshot synchronizer
+    let state_synchronizer_handle = storage_synchronizer
+        .initialize_snapshot_synchronizer(
+            target_ledger_info,
+            HashValue::random(),
+            SnapshotKind::HotState,
+        )
+        .unwrap();
+
+    // Save multiple hot state chunks (including the last chunk)
+    storage_synchronizer
+        .save_hot_state_values(0, create_hot_state_value_chunk_with_proof(false))
+        .await
+        .unwrap();
+    storage_synchronizer
+        .save_hot_state_values(1, create_hot_state_value_chunk_with_proof(true))
+        .await
+        .unwrap();
+
+    // The receiver should return once it has written the entire snapshot
+    state_synchronizer_handle.await.unwrap();
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_finalize_fast_sync_dropped_commit_listener() {
     // `finalize_fast_sync` sends the commit notification (it used to be sent by
     // the snapshot receiver). With the commit listener dropped, it should surface
@@ -816,7 +865,7 @@ async fn test_finalize_fast_sync_dropped_commit_listener() {
         .initialize_snapshot_synchronizer(
             target_ledger_info.clone(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .unwrap();
     storage_synchronizer
@@ -863,7 +912,7 @@ async fn test_save_states_invalid_chunk() {
         .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .unwrap();
 

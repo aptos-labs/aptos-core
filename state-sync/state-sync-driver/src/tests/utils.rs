@@ -29,7 +29,7 @@ use aptos_types::{
     proof::{
         SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoListWithProof,
     },
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{
         use_case::UseCaseAwareTransaction, ExecutionStatus, RawTransaction, ReplayProtector,
         Script, SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionInfo,
@@ -153,6 +153,34 @@ pub fn create_output_list_with_proof() -> TransactionOutputListWithProofV2 {
     ))
 }
 
+/// Creates an output proof with V1 transaction-info snapshot roots.
+pub fn create_output_list_with_proof_v1(
+    hot_state_root: Option<HashValue>,
+    position_state_root: Option<HashValue>,
+) -> TransactionOutputListWithProofV2 {
+    let transaction_info = TransactionInfo::builder_v1()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .maybe_state_checkpoint_hash(Some(HashValue::random()))
+        .maybe_hot_state_checkpoint_hash(hot_state_root)
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .maybe_auxiliary_info_hash(Some(HashValue::random()))
+        .maybe_position_state_checkpoint_hash(position_state_root)
+        .build();
+    let transaction_info_list_with_proof =
+        TransactionInfoListWithProof::new(TransactionAccumulatorRangeProof::new_empty(), vec![
+            transaction_info,
+        ]);
+    let transaction_and_output = (create_transaction(), create_transaction_output());
+    TransactionOutputListWithProofV2::new_from_v1(TransactionOutputListWithProof::new(
+        vec![transaction_and_output],
+        Some(0),
+        transaction_info_list_with_proof,
+    ))
+}
+
 /// Creates a random epoch ending ledger info with the specified values
 pub fn create_random_epoch_ending_ledger_info(
     version: Version,
@@ -198,6 +226,24 @@ pub fn create_state_value_chunk_with_proof(last_chunk: bool) -> StateValueChunkW
         vec![HashValue::random()]
     };
     StateValueChunkWithProof {
+        first_index: 0,
+        last_index: 100,
+        first_key: HashValue::random(),
+        last_key: HashValue::random(),
+        raw_values: vec![],
+        proof: SparseMerkleRangeProof::new(right_siblings),
+        root_hash: HashValue::random(),
+    }
+}
+
+/// Creates a simple hot state value chunk with proof for testing
+pub fn create_hot_state_value_chunk_with_proof(last_chunk: bool) -> HotStateValueChunkWithProof {
+    let right_siblings = if last_chunk {
+        vec![]
+    } else {
+        vec![HashValue::random()]
+    };
+    HotStateValueChunkWithProof {
         first_index: 0,
         last_index: 100,
         first_key: HashValue::random(),

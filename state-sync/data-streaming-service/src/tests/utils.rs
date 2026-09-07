@@ -16,9 +16,10 @@ use aptos_logger::Level;
 use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
+        DataRequest, EpochEndingLedgerInfoRequest, HotStateValuesWithProofRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, StateValuesWithProofRequest,
+        SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
@@ -35,6 +36,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::SparseMerkleRangeProof,
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -328,6 +330,54 @@ impl AptosDataClientInterface for MockAptosDataClient {
         Ok(create_data_client_response(state_value_chunk_with_proof))
     }
 
+    async fn get_hot_state_values_with_proof(
+        &self,
+        version: Version,
+        start_index: u64,
+        end_index: u64,
+        request_timeout_ms: u64,
+    ) -> Result<Response<HotStateValueChunkWithProof>, aptos_data_client::error::Error> {
+        // Verify the request timeout
+        let data_request =
+            DataRequest::GetHotStateValuesWithProof(HotStateValuesWithProofRequest {
+                version,
+                start_index,
+                end_index,
+            });
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Calculate the last index based on if we should limit the chunk size
+        let end_index = self.calculate_last_index(start_index, end_index);
+
+        // Create hot state keys and values according to the given indices
+        let mut hot_state_keys_and_values = vec![];
+        for _ in start_index..=end_index {
+            hot_state_keys_and_values.push((
+                StateKey::raw(HashValue::random().as_ref()),
+                HotStateValue::new(Some(StateValue::from(vec![])), version),
+            ));
+        }
+
+        // Create a hot state value chunk with proof
+        let hot_state_value_chunk_with_proof = HotStateValueChunkWithProof {
+            first_index: start_index,
+            last_index: end_index,
+            first_key: HashValue::random(),
+            last_key: HashValue::random(),
+            raw_values: hot_state_keys_and_values,
+            proof: SparseMerkleRangeProof::new(vec![]),
+            root_hash: HashValue::zero(),
+        };
+
+        // Create and send a data client response
+        Ok(create_data_client_response(
+            hot_state_value_chunk_with_proof,
+        ))
+    }
+
     async fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: Epoch,
@@ -535,6 +585,22 @@ impl AptosDataClientInterface for MockAptosDataClient {
     ) -> Result<Response<u64>, aptos_data_client::error::Error> {
         // Verify the request timeout
         let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
+        self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
+
+        // Emulate network latencies
+        self.emulate_network_latencies().await;
+
+        // Create and send a data client response
+        Ok(create_data_client_response(TOTAL_NUM_STATE_VALUES))
+    }
+
+    async fn get_number_of_hot_states(
+        &self,
+        version: Version,
+        request_timeout_ms: u64,
+    ) -> Result<Response<u64>, aptos_data_client::error::Error> {
+        // Verify the request timeout
+        let data_request = DataRequest::GetNumberOfHotStatesAtVersion(version);
         self.verify_request_timeout_value(request_timeout_ms, false, false, data_request);
 
         // Emulate network latencies
