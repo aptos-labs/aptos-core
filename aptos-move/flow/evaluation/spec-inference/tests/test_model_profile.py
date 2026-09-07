@@ -1,4 +1,5 @@
-from dataclasses import replace
+from dataclasses import asdict, replace
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -18,6 +19,7 @@ class ModelProfileTest(unittest.TestCase):
         self.config = replace(
             ExperimentConfig.load(ROOT / "config/default.json"),
             model=PROFILES["opus"][0], provider_base_url=PROFILES["opus"][1],
+            effort="xhigh",
         )
 
     def test_select_preserves_limits_and_cannot_overwrite(self) -> None:
@@ -40,11 +42,30 @@ class ModelProfileTest(unittest.TestCase):
         }
         env = subscription_environment(self.config, original)
         self.assertEqual(env["ANTHROPIC_MODEL"], "claude-opus-5")
+        self.assertEqual(env["CLAUDE_CODE_EFFORT_LEVEL"], "xhigh")
         self.assertEqual(env["ANTHROPIC_BASE_URL"], PROFILES["opus"][1])
         for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_DEFAULT_OPUS_MODEL", "CLAUDE_CODE_USE_FOUNDRY", "ZAI_API_KEY"):
             self.assertNotIn(name, env)
         with patch.dict(os.environ, env, clear=True):
             require_provider_auth(self.config.model, self.config.provider_base_url)
+
+    def test_select_glm_restores_max_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            opus = Path(directory) / "opus.json"
+            glm = Path(directory) / "glm.json"
+            select_model(ROOT / "config/default.json", opus, "opus")
+            select_model(opus, glm, "glm")
+            self.assertEqual(ExperimentConfig.load(glm).effort, "max")
+
+    def test_effort_validation_preserves_history_and_rejects_glm_xhigh(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            path.write_text(json.dumps(asdict(replace(self.config, effort="max"))))
+            self.assertEqual(ExperimentConfig.load(path).effort, "max")
+            for model, effort in (("glm-5.3[1m]", "xhigh"), ("claude-opus-5", "typo")):
+                path.write_text(json.dumps(asdict(replace(self.config, model=model, effort=effort))))
+                with self.assertRaisesRegex(ValueError, "effort must"):
+                    ExperimentConfig.load(path)
 
     def test_missing_subscription_never_falls_back_to_key(self) -> None:
         with self.assertRaisesRegex(ValueError, "subscription token missing"):

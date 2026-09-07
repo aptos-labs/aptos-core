@@ -25,6 +25,7 @@ def select_model(base: Path, output: Path, model: str) -> None:
         ExperimentConfig.load(base),
         model=PROFILES[model][0],
         provider_base_url=PROFILES[model][1],
+        effort="xhigh" if model == "opus" else "max",
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     # A scheduled configuration is immutable; never overwrite an existing one.
