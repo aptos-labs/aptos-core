@@ -2,151 +2,151 @@
   "compatibility_screen": {
     "corpus_config_sha256": "212eea69462215dc1f5608697a8bf98f3c65828695b983ebc358b8594fd27001",
     "excluded_for_timeout": 0,
-    "experiment_config_sha256": "365dbbbc80296cdcfaf62a23364503229ec817cb3812892d27ee33792f80c88c",
+    "experiment_config_sha256": "e5530880b7595de00626c192288964de71fb064b3124af3a48761569ae29b1c3",
     "failed": 0,
     "failures": [],
-    "input_manifest_sha256": "14269cf21c3478391b742c3f5a7844e193040ffe6b3f373cf954f2dc648c41d4",
-    "package_tree_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+    "input_manifest_sha256": "71801ddf0d4f2156d321389dfc070e97924b68724a7e8d378911af3e9baeb2b6",
+    "package_tree_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
     "passed": 20,
     "requires_fix_or_rerun": 0,
     "results": [
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "e4454388ba805bbcc619baa0d16b6f5055b87b5092170dbf51f9d6bab1101f34",
+        "reference_sha256": "dc22fda6257f239bd445546956ab17ae573e75c186cc544cff387ad8e1bf74e5",
         "target": "0x1::account::increment_sequence_number",
         "task_id": "AF-account-025"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "aed2361944663c80702388760ab651228562606639adb5313f167229ada24a16",
+        "reference_sha256": "1857df4f95bceaac4adc76c6be9b369604a0ee01abca0d01d149a868cd72d659",
         "target": "0x1::account::revoke_any_signer_capability",
         "task_id": "AF-account-036"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "2a8e051d3c6f81fbd035d5e588317bd60d899d5ac7c49a6647131302ae1db4ca",
+        "reference_sha256": "f042541e1e8c5364ea4cd62ae64486fbe81e9442d950ce0dbb375679fcdc328e",
         "target": "0x1::aptos_coin",
         "task_id": "AF-aptos-coin-010"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "50df3152ff26ba0697c66704620fcf141362544acb3f45d743f6191a82e2c057",
+        "reference_sha256": "81b74a60e2db85ae955d8dd92e75d26641aa193d073c593c42b24cceba4d08d4",
         "target": "0x1::aptos_governance::update_governance_config",
         "task_id": "AF-aptos-governance-034"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "a9705d27ef13a2c0b35ac7934c29b4bf4082051577e78a55fe9289f27207abc2",
+        "reference_sha256": "5946660be09d8bbeb6861d9fb7748934abad37cb9910a26b578c2d610d595e7e",
         "target": "0x1::code",
         "task_id": "AF-code-017"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "e0914a75723095be1a349c2d4d4f689ae2a1743e6ce8bf33e6063d3e3cd0b598",
+        "reference_sha256": "7db7bf0f892aac9b5f1b408aeeff48456521221a36312ce2d7bbeddd40bd561a",
         "target": "0x1::coin::balance",
         "task_id": "AF-coin-003"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "b38691eb679e7ff4bc29438f15bc03776a7a017a29e2135ce081f42d8b77ebc6",
+        "reference_sha256": "0e5461ca8e84b25b6cc2ff3b5e3e3fed4a0da5302436d9368e489ba73734898e",
         "target": "0x1::epoch_timeout_config",
         "task_id": "AF-epoch-timeout-config-007"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "669ab55dc9975f02ed5c61ef7c2f2ae9e94de7d585c760d3188ee09c18622a54",
+        "reference_sha256": "f9a54c02d66e44c21f97d1b348530ac07ece20ba39f4058818e3e19a4489d028",
         "target": "0x1::gas_schedule::on_new_epoch",
         "task_id": "AF-gas-schedule-002"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "3ee38b05879e44a1434acefbd665b45d7317a0c524a7edba0a9efb448de76c33",
+        "reference_sha256": "f33e40952b099bc9f65229514aaff4e48c3a70c504bf5eaf6656a2b56dc64b64",
         "target": "0x1::multisig_account::can_execute",
         "task_id": "AF-multisig-account-015"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "2ae1000504ceccc511be98704eb6ef8a6f14500031422474e5401ec343239fa3",
+        "reference_sha256": "7e7255e0f923a9f5618c09e4a5db56e40f107f94348b519665dcf0fc2cbca9ff",
         "target": "0x1::multisig_account::validate_owners",
         "task_id": "AF-multisig-account-067"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "e2a0de58bae20cae38104d975e1775ecc0fa6dcaf2386d40d9f0ef921d380258",
+        "reference_sha256": "dd28976aaa09659835bbd66a1aa2f54ad69908a5c5468670e34bb2674d47583a",
         "target": "0x1::stake::append",
         "task_id": "AF-stake-004"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "53eecc2e1b0b5911a3a8797ec7ec829159644e4d58cc47b21b83e2b3c6ef9314",
+        "reference_sha256": "dd5f4ed7ce4e71087a007b7f4dd1a37181a49a287b13188b3d23b1a43bae4adb",
         "target": "0x1::transaction_fee::store_aptos_coin_mint_cap",
         "task_id": "AF-transaction-fee-010"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "28d8ab8b0c04495e3568f0576450e5eb9f4e8681304d9d18b8e88b116a380f2f",
+        "reference_sha256": "dc946135091e88a7d7ff89d800628da482a35172435954d5a6148f392e39b34b",
         "target": "0x1::vesting::vesting_schedule",
         "task_id": "AF-vesting-042"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "b3c2936c698ed0f77e9b0aeeb0bc28bbe98591dd4713797a4b264b0af68d88fd",
+        "reference_sha256": "ebb466877b18beda1e8d1d19c2cc3fbaa2107762792d7683d563fb750ff31360",
         "target": "0x7::bulk_order_book::get_remaining_size",
         "task_id": "AX-bulk-order-book-009"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "97cd97bb3893bc2a06c68a2e997a6c060b412c04af2f8d12f8ab526917b9d0d1",
+        "reference_sha256": "bcd3e189105ba583ed49815c2732b3b84b3a8c88cd9d8194d7425b6dbfa6fe29",
         "target": "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
         "task_id": "AX-dead-mans-switch-operations-001"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "46bb5176e4f126be080cf3a273ef9ca90c3bed12dcc4f36e25fca090222a0166",
+        "reference_sha256": "0cf49fe0eb3cfd0874bc553fcd586c35fdcbbdca7604fda2aa4f6e189f245d23",
         "target": "0x7::native_position_types",
         "task_id": "AX-native-position-types-005"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "3acbba9a703baf837729b6da7e9ed9c35e7f996ff24c0b136e6c0eaa64585836",
+        "reference_sha256": "faded1e03674f0ed6b2d7af051ff322601250f6d143dbc9d59d3f30fc4115306",
         "target": "0x7::order_book::client_order_id_exists",
         "task_id": "AX-order-book-006"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "43e882f95e1e6e5e36c2b8739e7e06ce29ff922f541ebe29ca1f7e662d9f41fe",
+        "reference_sha256": "8a7f98958f4815cec43dfa09a6648869f089bb4752482d2d09d52f1682ba21dc",
         "target": "0x7::pending_order_book_index::take_ready_price_move_up_orders",
         "task_id": "AX-pending-order-book-index-006"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "3ee4c9c9102c66d03fa610d4ca718b7376f71b472dbfaade08d8e2bf8f706041",
+        "reference_sha256": "2529ac8271e6733e8ec7877bd01d9961eeaab8cec8b9682744a241390b294580",
         "target": "0x7::price_time_index::new_price_time_idx",
         "task_id": "AX-price-time-index-014"
       },
       {
         "apparatus_ok": true,
         "passed": true,
-        "reference_sha256": "27f4fa17bb4da5533c1edfa9761e4fa6e6e7cca1099beb7e2e7c82437c54beb4",
+        "reference_sha256": "ccb2a50785e3284c2c94494d59180901c5b2a9ff30aa3d1c6ea8477f54cd72ef",
         "target": "0x7::trading_native_capability",
         "task_id": "AX-trading-native-capability-010"
       }
@@ -154,36 +154,36 @@
     "schema_version": 1,
     "threshold_seconds_per_stage": 20,
     "tools": {
-      "experiment_config_sha256": "33727696338f2f2ad8c9e199d2daa6f7da4e498cfdfe79e4b7107f7a4338d253",
+      "experiment_config_sha256": "1abea717a6d0e3ae8dd661f5b938067008c52700fc28846114ca3927be0d2c55",
       "model_independent": true,
       "move_flow": [
         "move-flow"
       ],
-      "move_flow_sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3",
+      "move_flow_sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8",
       "stage_executables": {
         "boogie": {
           "path": "/home/wrw/shared/bin/boogie",
           "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
         },
         "check_candidate": {
-          "path": "/usr/local/cargo/bin/move-flow",
-          "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+          "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+          "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
         },
         "compile": {
-          "path": "/usr/local/cargo/bin/move-flow",
-          "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+          "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+          "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
         },
         "enriched_compile": {
-          "path": "/usr/local/cargo/bin/move-flow",
-          "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+          "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+          "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
         },
         "prover": {
-          "path": "/usr/local/cargo/bin/move-flow",
-          "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+          "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+          "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
         },
         "wp_inference": {
-          "path": "/usr/local/cargo/bin/move-flow",
-          "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+          "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+          "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
         },
         "z3": {
           "path": "/home/wrw/shared/bin/z3",
@@ -192,15 +192,19 @@
       }
     },
     "wp_hard": [
-      "AF-account-025",
       "AF-aptos-coin-010",
       "AF-aptos-governance-034",
       "AF-code-017",
+      "AF-coin-003",
+      "AF-epoch-timeout-config-007",
+      "AF-gas-schedule-002",
       "AF-multisig-account-067",
       "AF-stake-004",
       "AF-transaction-fee-010",
+      "AF-vesting-042",
       "AX-bulk-order-book-009",
       "AX-order-book-006",
+      "AX-pending-order-book-index-006",
       "AX-price-time-index-014",
       "AX-trading-native-capability-010"
     ]
@@ -208,7 +212,7 @@
   "corpus_status": "screened",
   "dependency_refresh": {
     "package_inventory": "metadata/package-inventory.json",
-    "package_inventory_sha256": "0735f53c3b30cf3546e5907f72d604f9b2e6ab941c73666979b756e2cef96276"
+    "package_inventory_sha256": "0e5aedf9e770442728efeb9459d624f01fdbc6d5a82b5562129262e12b26e350"
   },
   "inventory_sha256": "bfa85d8a4549550242a7afa1002888fba0036efdef1f96e177d8265ce1ced55b",
   "minimum_feature_counts": {
@@ -233,7 +237,7 @@
     "records": [
       {
         "preparation_patch_sha256": "203a7e5752c831404994a75e70822c867a95b027a3f868432d0c5a09cb3374c6",
-        "prepared_sha256": "e4454388ba805bbcc619baa0d16b6f5055b87b5092170dbf51f9d6bab1101f34",
+        "prepared_sha256": "dc22fda6257f239bd445546956ab17ae573e75c186cc544cff387ad8e1bf74e5",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -247,12 +251,12 @@
           "state-transition",
           "frame"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-account-025"
       },
       {
         "preparation_patch_sha256": "7d46adcd9aed67889e2ba9868dd89a4634e3fe2cbb9b3be5e5cb6b4d27d43510",
-        "prepared_sha256": "aed2361944663c80702388760ab651228562606639adb5313f167229ada24a16",
+        "prepared_sha256": "1857df4f95bceaac4adc76c6be9b369604a0ee01abca0d01d149a868cd72d659",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -266,12 +270,12 @@
           "state-transition",
           "frame"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-account-036"
       },
       {
         "preparation_patch_sha256": "55b868cf38040a2590b0731644719c3fcb9004692612a86d1f6559304581d46a",
-        "prepared_sha256": "2a8e051d3c6f81fbd035d5e588317bd60d899d5ac7c49a6647131302ae1db4ca",
+        "prepared_sha256": "f042541e1e8c5364ea4cd62ae64486fbe81e9442d950ce0dbb375679fcdc328e",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -302,12 +306,12 @@
           "frame",
           "loop-invariant"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-aptos-coin-010"
       },
       {
         "preparation_patch_sha256": "1d75503b2f8208070896692c655957fae540d23ac23fb3210b0a4138223c8a84",
-        "prepared_sha256": "50df3152ff26ba0697c66704620fcf141362544acb3f45d743f6191a82e2c057",
+        "prepared_sha256": "81b74a60e2db85ae955d8dd92e75d26641aa193d073c593c42b24cceba4d08d4",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -320,12 +324,12 @@
           "state-transition",
           "frame"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-aptos-governance-034"
       },
       {
-        "preparation_patch_sha256": "ab2f539b36b83f0fc8f127e406522cb6a71929fb53eb5dec90373cf6e905c4d5",
-        "prepared_sha256": "a9705d27ef13a2c0b35ac7934c29b4bf4082051577e78a55fe9289f27207abc2",
+        "preparation_patch_sha256": "73b07c7d8998bfa3482bd283f0a95894616f7dc0dd909cd64386bbf04557f7a8",
+        "prepared_sha256": "5946660be09d8bbeb6861d9fb7748934abad37cb9910a26b578c2d610d595e7e",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -372,12 +376,12 @@
           "frame",
           "loop-invariant"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-code-017"
       },
       {
         "preparation_patch_sha256": "37d466a181a0ed914133d38bef4f3e323f027cf6384e53015e16cdcdee369314",
-        "prepared_sha256": "e0914a75723095be1a349c2d4d4f689ae2a1743e6ce8bf33e6063d3e3cd0b598",
+        "prepared_sha256": "7db7bf0f892aac9b5f1b408aeeff48456521221a36312ce2d7bbeddd40bd561a",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -390,12 +394,12 @@
           "abort",
           "state-transition"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-coin-003"
       },
       {
         "preparation_patch_sha256": "4e7530a70eb2a39eb8079b6e9925cbc6d8d91ea4b1e6843691a1b93d51bb9666",
-        "prepared_sha256": "b38691eb679e7ff4bc29438f15bc03776a7a017a29e2135ce081f42d8b77ebc6",
+        "prepared_sha256": "0e5461ca8e84b25b6cc2ff3b5e3e3fed4a0da5302436d9368e489ba73734898e",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -439,12 +443,12 @@
           "state-transition",
           "frame"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-epoch-timeout-config-007"
       },
       {
         "preparation_patch_sha256": "0d381eb8d39f544f5e7a4ec5e51b6b520640c17097a65e55bcce2f6296487362",
-        "prepared_sha256": "669ab55dc9975f02ed5c61ef7c2f2ae9e94de7d585c760d3188ee09c18622a54",
+        "prepared_sha256": "f9a54c02d66e44c21f97d1b348530ac07ece20ba39f4058818e3e19a4489d028",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -457,12 +461,12 @@
           "state-transition",
           "frame"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-gas-schedule-002"
       },
       {
         "preparation_patch_sha256": "035768c7a818d02dac66d28a7cf49e549f7d820a39a3e978eadee193f8e03893",
-        "prepared_sha256": "3ee38b05879e44a1434acefbd665b45d7317a0c524a7edba0a9efb448de76c33",
+        "prepared_sha256": "f33e40952b099bc9f65229514aaff4e48c3a70c504bf5eaf6656a2b56dc64b64",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -476,12 +480,12 @@
           "state-transition",
           "loop-invariant"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-multisig-account-015"
       },
       {
         "preparation_patch_sha256": "c408986f22b4371edcba6cc5c97ca117fe035f900c83d17726da39503bdcb8f1",
-        "prepared_sha256": "2ae1000504ceccc511be98704eb6ef8a6f14500031422474e5401ec343239fa3",
+        "prepared_sha256": "7e7255e0f923a9f5618c09e4a5db56e40f107f94348b519665dcf0fc2cbca9ff",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -500,12 +504,12 @@
           "abort",
           "loop-invariant"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-multisig-account-067"
       },
       {
         "preparation_patch_sha256": "76aaf2697e4be33122c2da9d5e0ba978ae38ea2293b6c30894affcf865f2599e",
-        "prepared_sha256": "e2a0de58bae20cae38104d975e1775ecc0fa6dcaf2386d40d9f0ef921d380258",
+        "prepared_sha256": "dd28976aaa09659835bbd66a1aa2f54ad69908a5c5468670e34bb2674d47583a",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -524,12 +528,12 @@
           "state-transition",
           "loop-invariant"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-stake-004"
       },
       {
         "preparation_patch_sha256": "19b2fd7208fcbfd7f71fced7a72d6a9e15a15ae361384f900712e81f9e6a77c1",
-        "prepared_sha256": "53eecc2e1b0b5911a3a8797ec7ec829159644e4d58cc47b21b83e2b3c6ef9314",
+        "prepared_sha256": "dd5f4ed7ce4e71087a007b7f4dd1a37181a49a287b13188b3d23b1a43bae4adb",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -542,12 +546,12 @@
           "state-transition",
           "frame"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-transaction-fee-010"
       },
       {
         "preparation_patch_sha256": "a850bbbe033f8d68d17b5d3272ff89dd411af79719ebf47fc9e30181f4dbc419",
-        "prepared_sha256": "28d8ab8b0c04495e3568f0576450e5eb9f4e8681304d9d18b8e88b116a380f2f",
+        "prepared_sha256": "dc946135091e88a7d7ff89d800628da482a35172435954d5a6148f392e39b34b",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -559,12 +563,12 @@
           "normal-result",
           "state-transition"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AF-vesting-042"
       },
       {
         "preparation_patch_sha256": "118c4b0c2bf66dfae8eb1d619923a2a005d6058dd0ab1f2162591fc3cc8f74c0",
-        "prepared_sha256": "b3c2936c698ed0f77e9b0aeeb0bc28bbe98591dd4713797a4b264b0af68d88fd",
+        "prepared_sha256": "ebb466877b18beda1e8d1d19c2cc3fbaa2107762792d7683d563fb750ff31360",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -576,12 +580,12 @@
           "normal-result",
           "abort"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AX-bulk-order-book-009"
       },
       {
         "preparation_patch_sha256": "f77ff8af633e65c9b14f78201e38c005b2933483b1719ea083357f53e86e10ef",
-        "prepared_sha256": "97cd97bb3893bc2a06c68a2e997a6c060b412c04af2f8d12f8ab526917b9d0d1",
+        "prepared_sha256": "bcd3e189105ba583ed49815c2732b3b84b3a8c88cd9d8194d7425b6dbfa6fe29",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -594,12 +598,12 @@
           "abort",
           "state-transition"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AX-dead-mans-switch-operations-001"
       },
       {
         "preparation_patch_sha256": "8a37e7a7585c7949a3bad0df7911d902f231dfbeef2583b74d95d66ce62d4bb1",
-        "prepared_sha256": "46bb5176e4f126be080cf3a273ef9ca90c3bed12dcc4f36e25fca090222a0166",
+        "prepared_sha256": "0cf49fe0eb3cfd0874bc553fcd586c35fdcbbdca7604fda2aa4f6e189f245d23",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -620,12 +624,12 @@
         "required_contract_categories": [
           "normal-result"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AX-native-position-types-005"
       },
       {
         "preparation_patch_sha256": "0922ee0a9045d9b6e19159fd7a85a5ae99b52d11676a9af613a147f0ef9b83a1",
-        "prepared_sha256": "3acbba9a703baf837729b6da7e9ed9c35e7f996ff24c0b136e6c0eaa64585836",
+        "prepared_sha256": "faded1e03674f0ed6b2d7af051ff322601250f6d143dbc9d59d3f30fc4115306",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -636,12 +640,12 @@
         "required_contract_categories": [
           "normal-result"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AX-order-book-006"
       },
       {
-        "preparation_patch_sha256": "4817e17f07fe43dc14939459d8555da8e9b6a3feacabb9cb310829a1a8680499",
-        "prepared_sha256": "43e882f95e1e6e5e36c2b8739e7e06ce29ff922f541ebe29ca1f7e662d9f41fe",
+        "preparation_patch_sha256": "e3cb5968582716c1a39b44d09ee874997292048cc8780bf9614f4219782bba97",
+        "prepared_sha256": "8a7f98958f4815cec43dfa09a6648869f089bb4752482d2d09d52f1682ba21dc",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -660,12 +664,12 @@
           "state-transition",
           "loop-invariant"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AX-pending-order-book-index-006"
       },
       {
         "preparation_patch_sha256": "41f9fe9392b566535584431a02213bc55a0a67a60037be6a5f890af5c4b7be00",
-        "prepared_sha256": "3ee4c9c9102c66d03fa610d4ca718b7376f71b472dbfaade08d8e2bf8f706041",
+        "prepared_sha256": "2529ac8271e6733e8ec7877bd01d9961eeaab8cec8b9682744a241390b294580",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -676,12 +680,12 @@
         "required_contract_categories": [
           "normal-result"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AX-price-time-index-014"
       },
       {
         "preparation_patch_sha256": "a3bb3e635052e2c9def23cda10163beb8bd7d41a134ae8702991d88989b3fc0f",
-        "prepared_sha256": "27f4fa17bb4da5533c1edfa9761e4fa6e6e7cca1099beb7e2e7c82437c54beb4",
+        "prepared_sha256": "ccb2a50785e3284c2c94494d59180901c5b2a9ff30aa3d1c6ea8477f54cd72ef",
         "removed_reference_blocks": [
           {
             "blocks": 1,
@@ -730,7 +734,7 @@
           "state-transition",
           "frame"
         ],
-        "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+        "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
         "task_id": "AX-trading-native-capability-010"
       }
     ],
@@ -739,7 +743,7 @@
     "shared_module_count": 154,
     "shared_move_file_count": 265,
     "shared_package": "framework",
-    "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+    "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
     "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
     "tasks_prepared": 20
   },
@@ -6090,13 +6094,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-account-025.json",
-        "result_sha256": "3c52f6ebbb3196dc6a1a5d002f4f70f2d2997b257bfc6810459436a57851226b",
+        "result_path": "state-label-repair-005/results/AF-account-025.json",
+        "result_sha256": "f7367ddc9549e34e17e378a9a221e9eacc1e002189455660142f2132f7062fd0",
         "stage_duration_ms": {
-          "compile": 2456,
-          "enriched_compile": 2255,
-          "prover": 3256,
-          "wp_inference": 3216
+          "compile": 2641,
+          "enriched_compile": 2270,
+          "prover": 3606,
+          "wp_inference": 3381
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -6106,34 +6110,34 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11183,
+        "total_duration_ms": 11898,
         "well_formed": true,
-        "wp_failure_kind": "untrusted_inferred_contract",
-        "wp_hard": true
+        "wp_failure_kind": null,
+        "wp_hard": false
       },
       "corpus_reference_paths": [
         "sources/AptosFramework/account/account.spec.move"
@@ -6173,7 +6177,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-account-025.patch",
       "preparation_patch_sha256": "203a7e5752c831404994a75e70822c867a95b027a3f868432d0c5a09cb3374c6",
-      "prepared_sha256": "e4454388ba805bbcc619baa0d16b6f5055b87b5092170dbf51f9d6bab1101f34",
+      "prepared_sha256": "dc22fda6257f239bd445546956ab17ae573e75c186cc544cff387ad8e1bf74e5",
       "reference_condition_count": 8,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -6204,7 +6208,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 9,
@@ -8820,13 +8824,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-account-036.json",
-        "result_sha256": "c7446e502a606e55402087cfdac27c20be8ce28bff89e79ed311f9cc6c1ee270",
+        "result_path": "state-label-repair-005/results/AF-account-036.json",
+        "result_sha256": "3451fde03f7b8f679c0741159f37c2068655720636f8bc44e11d43de50a92445",
         "stage_duration_ms": {
-          "compile": 2643,
-          "enriched_compile": 2308,
-          "prover": 3777,
-          "wp_inference": 3230
+          "compile": 2466,
+          "enriched_compile": 2635,
+          "prover": 3801,
+          "wp_inference": 3762
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -8836,31 +8840,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11958,
+        "total_duration_ms": 12664,
         "well_formed": true,
         "wp_failure_kind": null,
         "wp_hard": false
@@ -8902,7 +8906,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-account-036.patch",
       "preparation_patch_sha256": "7d46adcd9aed67889e2ba9868dd89a4634e3fe2cbb9b3be5e5cb6b4d27d43510",
-      "prepared_sha256": "aed2361944663c80702388760ab651228562606639adb5313f167229ada24a16",
+      "prepared_sha256": "1857df4f95bceaac4adc76c6be9b369604a0ee01abca0d01d149a868cd72d659",
       "reference_condition_count": 3,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -8933,7 +8937,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 6,
@@ -32067,13 +32071,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-aptos-coin-010.json",
-        "result_sha256": "0baf0c352915f63079005783ca7817e28d5da004580fe59fcc60f5809d74de04",
+        "result_path": "state-label-repair-005/results/AF-aptos-coin-010.json",
+        "result_sha256": "ab6810a9c7d03a8e5b9c7206caaa74200d91ad207f3e59903ea422c21c61fd0d",
         "stage_duration_ms": {
-          "compile": 2484,
+          "compile": 2510,
           "enriched_compile": null,
           "prover": null,
-          "wp_inference": 2976
+          "wp_inference": 3096
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -32083,31 +32087,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 5460,
+        "total_duration_ms": 5606,
         "well_formed": true,
         "wp_failure_kind": "implementation_failure",
         "wp_hard": true
@@ -32150,7 +32154,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-aptos-coin-010.patch",
       "preparation_patch_sha256": "55b868cf38040a2590b0731644719c3fcb9004692612a86d1f6559304581d46a",
-      "prepared_sha256": "2a8e051d3c6f81fbd035d5e588317bd60d899d5ac7c49a6647131302ae1db4ca",
+      "prepared_sha256": "f042541e1e8c5364ea4cd62ae64486fbe81e9442d950ce0dbb375679fcdc328e",
       "reference_condition_count": 15,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -32198,7 +32202,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 181,
@@ -43607,13 +43611,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-aptos-governance-034.json",
-        "result_sha256": "5f7ba99342ef0b9ca36ed98ed2fcbd73ae7979a101375fbf30fd77065533e924",
+        "result_path": "state-label-repair-005/results/AF-aptos-governance-034.json",
+        "result_sha256": "db5948845f81c1b33c2e79388e70d010c6ff4936347c364201f5b4d47fbf8f6a",
         "stage_duration_ms": {
-          "compile": 2332,
-          "enriched_compile": 2361,
-          "prover": 2328,
-          "wp_inference": 2936
+          "compile": 2370,
+          "enriched_compile": 2303,
+          "prover": 2299,
+          "wp_inference": 3410
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -43623,31 +43627,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 9957,
+        "total_duration_ms": 10382,
         "well_formed": true,
         "wp_failure_kind": "implementation_failure",
         "wp_hard": true
@@ -43689,7 +43693,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-aptos-governance-034.patch",
       "preparation_patch_sha256": "1d75503b2f8208070896692c655957fae540d23ac23fb3210b0a4138223c8a84",
-      "prepared_sha256": "50df3152ff26ba0697c66704620fcf141362544acb3f45d743f6191a82e2c057",
+      "prepared_sha256": "81b74a60e2db85ae955d8dd92e75d26641aa193d073c593c42b24cceba4d08d4",
       "reference_condition_count": 9,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -43719,7 +43723,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 19,
@@ -87341,13 +87345,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-code-017.json",
-        "result_sha256": "d74b6175063af5273032177fae8143d4f08012fbf98ca852027505dc9c8948b3",
+        "result_path": "state-label-repair-005/results/AF-code-017.json",
+        "result_sha256": "394ed16b50612e6f6a6bb62e77686526c6384bd1aaf65f80e0071fc58f3809af",
         "stage_duration_ms": {
-          "compile": 2434,
+          "compile": 2409,
           "enriched_compile": null,
           "prover": null,
-          "wp_inference": 3501
+          "wp_inference": 3549
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -87357,31 +87361,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 5935,
+        "total_duration_ms": 5958,
         "well_formed": true,
         "wp_failure_kind": "implementation_failure",
         "wp_hard": true
@@ -87425,8 +87429,8 @@
       "package_module_target": "0x1::code",
       "package_relpath": ".",
       "preparation_patch": "patches/AF-code-017.patch",
-      "preparation_patch_sha256": "ab2f539b36b83f0fc8f127e406522cb6a71929fb53eb5dec90373cf6e905c4d5",
-      "prepared_sha256": "a9705d27ef13a2c0b35ac7934c29b4bf4082051577e78a55fe9289f27207abc2",
+      "preparation_patch_sha256": "73b07c7d8998bfa3482bd283f0a95894616f7dc0dd909cd64386bbf04557f7a8",
+      "prepared_sha256": "5946660be09d8bbeb6861d9fb7748934abad37cb9910a26b578c2d610d595e7e",
       "reference_condition_count": 15,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -87490,7 +87494,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 351,
@@ -88269,13 +88273,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-coin-003.json",
-        "result_sha256": "a914c64cd91cbf47bb44fd042047d42fc5c8c327d009fd7813bc00b177377905",
+        "result_path": "state-label-repair-005/results/AF-coin-003.json",
+        "result_sha256": "66033ab890c636784438bd2a141ad8cffee30f0554a6a27fe6b11b88530c417f",
         "stage_duration_ms": {
-          "compile": 2281,
-          "enriched_compile": 2270,
-          "prover": 3397,
-          "wp_inference": 3016
+          "compile": 2579,
+          "enriched_compile": 2340,
+          "prover": 3811,
+          "wp_inference": 3339
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -88285,34 +88289,34 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 10964,
+        "total_duration_ms": 12069,
         "well_formed": true,
-        "wp_failure_kind": null,
-        "wp_hard": false
+        "wp_failure_kind": "untrusted_inferred_contract",
+        "wp_hard": true
       },
       "corpus_reference_paths": [
         "sources/AptosFramework/coin.spec.move"
@@ -88348,7 +88352,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-coin-003.patch",
       "preparation_patch_sha256": "37d466a181a0ed914133d38bef4f3e323f027cf6384e53015e16cdcdee369314",
-      "prepared_sha256": "e0914a75723095be1a349c2d4d4f689ae2a1743e6ce8bf33e6063d3e3cd0b598",
+      "prepared_sha256": "7db7bf0f892aac9b5f1b408aeeff48456521221a36312ce2d7bbeddd40bd561a",
       "reference_condition_count": 3,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -88378,7 +88382,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 9,
@@ -182502,13 +182506,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-epoch-timeout-config-007.json",
-        "result_sha256": "5eb76deb60449a03887daedd9f42e640c923c02d912b8900b9578c81d314c688",
+        "result_path": "state-label-repair-005/results/AF-epoch-timeout-config-007.json",
+        "result_sha256": "de3ad76a39839f34a31c5d1a387229641f8f7b11e33a45f62cdfceaf61491b07",
         "stage_duration_ms": {
-          "compile": 2267,
-          "enriched_compile": 2271,
-          "prover": 4001,
-          "wp_inference": 2811
+          "compile": 2381,
+          "enriched_compile": 2359,
+          "prover": 4374,
+          "wp_inference": 3366
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -182518,34 +182522,34 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11350,
+        "total_duration_ms": 12480,
         "well_formed": true,
-        "wp_failure_kind": null,
-        "wp_hard": false
+        "wp_failure_kind": "untrusted_inferred_contract",
+        "wp_hard": true
       },
       "corpus_reference_paths": [
         "sources/AptosFramework/configs/config_buffer.spec.move",
@@ -182586,7 +182590,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-epoch-timeout-config-007.patch",
       "preparation_patch_sha256": "4e7530a70eb2a39eb8079b6e9925cbc6d8d91ea4b1e6843691a1b93d51bb9666",
-      "prepared_sha256": "b38691eb679e7ff4bc29438f15bc03776a7a017a29e2135ce081f42d8b77ebc6",
+      "prepared_sha256": "0e5461ca8e84b25b6cc2ff3b5e3e3fed4a0da5302436d9368e489ba73734898e",
       "reference_condition_count": 24,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -182649,7 +182653,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 136,
@@ -210755,13 +210759,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-gas-schedule-002.json",
-        "result_sha256": "0171f658ab351b8e12414b10752f35615b93f6fffc9a084a714193bfb1a8efef",
+        "result_path": "state-label-repair-005/results/AF-gas-schedule-002.json",
+        "result_sha256": "a417b9766b4fc9e45e918db86c6fc4973021d8ad4d3e9b14af438b2bc057f20e",
         "stage_duration_ms": {
-          "compile": 2349,
-          "enriched_compile": 2282,
-          "prover": 3369,
-          "wp_inference": 2925
+          "compile": 2373,
+          "enriched_compile": 2508,
+          "prover": 4493,
+          "wp_inference": 2888
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -210771,34 +210775,34 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 10925,
+        "total_duration_ms": 12262,
         "well_formed": true,
-        "wp_failure_kind": null,
-        "wp_hard": false
+        "wp_failure_kind": "untrusted_inferred_contract",
+        "wp_hard": true
       },
       "corpus_reference_paths": [
         "sources/AptosFramework/configs/config_buffer.spec.move"
@@ -210837,7 +210841,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-gas-schedule-002.patch",
       "preparation_patch_sha256": "0d381eb8d39f544f5e7a4ec5e51b6b520640c17097a65e55bcce2f6296487362",
-      "prepared_sha256": "669ab55dc9975f02ed5c61ef7c2f2ae9e94de7d585c760d3188ee09c18622a54",
+      "prepared_sha256": "f9a54c02d66e44c21f97d1b348530ac07ece20ba39f4058818e3e19a4489d028",
       "reference_condition_count": 12,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -210868,7 +210872,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 11,
@@ -247156,13 +247160,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-multisig-account-015.json",
-        "result_sha256": "4aad013eab15027acecf67bfd95afbb9eae626ced499205e1c40c841e2828226",
+        "result_path": "state-label-repair-005/results/AF-multisig-account-015.json",
+        "result_sha256": "a7321b313c281b5a9e75a6dfc5e942b56e3b619631877837a022456670480269",
         "stage_duration_ms": {
-          "compile": 2294,
-          "enriched_compile": 2362,
-          "prover": 3760,
-          "wp_inference": 2943
+          "compile": 2420,
+          "enriched_compile": 2273,
+          "prover": 3605,
+          "wp_inference": 3096
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -247172,31 +247176,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11359,
+        "total_duration_ms": 11394,
         "well_formed": true,
         "wp_failure_kind": null,
         "wp_hard": false
@@ -247235,7 +247239,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-multisig-account-015.patch",
       "preparation_patch_sha256": "035768c7a818d02dac66d28a7cf49e549f7d820a39a3e978eadee193f8e03893",
-      "prepared_sha256": "3ee38b05879e44a1434acefbd665b45d7317a0c524a7edba0a9efb448de76c33",
+      "prepared_sha256": "f33e40952b099bc9f65229514aaff4e48c3a70c504bf5eaf6656a2b56dc64b64",
       "reference_condition_count": 4,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -247266,7 +247270,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 10,
@@ -260996,13 +261000,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-multisig-account-067.json",
-        "result_sha256": "b42e49813dfaf3076ab9da4c498a9e2f816d896a25d93144ce205d69f85c09c3",
+        "result_path": "state-label-repair-005/results/AF-multisig-account-067.json",
+        "result_sha256": "9b5da34f2180b9da322cc7041b4234ac13513331b6fa3f02c2e5824945718018",
         "stage_duration_ms": {
-          "compile": 2570,
+          "compile": 2395,
           "enriched_compile": null,
           "prover": null,
-          "wp_inference": 3000
+          "wp_inference": 3053
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -261012,31 +261016,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 5570,
+        "total_duration_ms": 5448,
         "well_formed": true,
         "wp_failure_kind": "implementation_failure",
         "wp_hard": true
@@ -261075,7 +261079,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-multisig-account-067.patch",
       "preparation_patch_sha256": "c408986f22b4371edcba6cc5c97ca117fe035f900c83d17726da39503bdcb8f1",
-      "prepared_sha256": "2ae1000504ceccc511be98704eb6ef8a6f14500031422474e5401ec343239fa3",
+      "prepared_sha256": "7e7255e0f923a9f5618c09e4a5db56e40f107f94348b519665dcf0fc2cbca9ff",
       "reference_condition_count": 2,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -261111,7 +261115,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 9,
@@ -344633,13 +344637,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-stake-004.json",
-        "result_sha256": "e67c6ff2b447af1b9fa8f2e2048529775eb62145ebe67e1f733f30dc10ad8e78",
+        "result_path": "state-label-repair-005/results/AF-stake-004.json",
+        "result_sha256": "ae6340ddf25a499778d21d6c5232ce186405eb3f40a1c3c82e705e959718f467",
         "stage_duration_ms": {
-          "compile": 2457,
+          "compile": 2403,
           "enriched_compile": null,
           "prover": null,
-          "wp_inference": 3011
+          "wp_inference": 3036
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -344649,31 +344653,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 5468,
+        "total_duration_ms": 5439,
         "well_formed": true,
         "wp_failure_kind": "implementation_failure",
         "wp_hard": true
@@ -344711,7 +344715,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-stake-004.patch",
       "preparation_patch_sha256": "76aaf2697e4be33122c2da9d5e0ba978ae38ea2293b6c30894affcf865f2599e",
-      "prepared_sha256": "e2a0de58bae20cae38104d975e1775ecc0fa6dcaf2386d40d9f0ef921d380258",
+      "prepared_sha256": "dd28976aaa09659835bbd66a1aa2f54ad69908a5c5468670e34bb2674d47583a",
       "reference_condition_count": 5,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -344747,7 +344751,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 5,
@@ -407415,13 +407419,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-transaction-fee-010.json",
-        "result_sha256": "894172415320370fe1ac86ee5c1b9779edaad7cd6db18589b72c445a4af576fe",
+        "result_path": "state-label-repair-005/results/AF-transaction-fee-010.json",
+        "result_sha256": "1ee19bef23b41cf153a5bd50e26044fe1c63d31bedb2ea26e7a5e829c3926376",
         "stage_duration_ms": {
-          "compile": 2426,
-          "enriched_compile": 2318,
-          "prover": 2335,
-          "wp_inference": 2994
+          "compile": 2442,
+          "enriched_compile": 2414,
+          "prover": 2325,
+          "wp_inference": 3365
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -407431,31 +407435,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 10073,
+        "total_duration_ms": 10546,
         "well_formed": true,
         "wp_failure_kind": "implementation_failure",
         "wp_hard": true
@@ -407497,7 +407501,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-transaction-fee-010.patch",
       "preparation_patch_sha256": "19b2fd7208fcbfd7f71fced7a72d6a9e15a15ae361384f900712e81f9e6a77c1",
-      "prepared_sha256": "53eecc2e1b0b5911a3a8797ec7ec829159644e4d58cc47b21b83e2b3c6ef9314",
+      "prepared_sha256": "dd5f4ed7ce4e71087a007b7f4dd1a37181a49a287b13188b3d23b1a43bae4adb",
       "reference_condition_count": 6,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -407527,7 +407531,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 10,
@@ -443733,13 +443737,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AF-vesting-042.json",
-        "result_sha256": "a5afc508526cc012226cd90769697a0046226f4d14c5443ec20972a93104bc5d",
+        "result_path": "state-label-repair-005/results/AF-vesting-042.json",
+        "result_sha256": "289bec1fa1bfb3bc9844bf59b82fd038e2e47c489ce1b86e06b45ee3a2ec59f0",
         "stage_duration_ms": {
-          "compile": 2319,
-          "enriched_compile": 2309,
-          "prover": 3697,
-          "wp_inference": 2884
+          "compile": 2305,
+          "enriched_compile": 2262,
+          "prover": 3423,
+          "wp_inference": 3231
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -443749,34 +443753,34 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11209,
+        "total_duration_ms": 11221,
         "well_formed": true,
-        "wp_failure_kind": null,
-        "wp_hard": false
+        "wp_failure_kind": "untrusted_inferred_contract",
+        "wp_hard": true
       },
       "corpus_reference_paths": [
         "sources/AptosFramework/vesting.spec.move"
@@ -443810,7 +443814,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AF-vesting-042.patch",
       "preparation_patch_sha256": "a850bbbe033f8d68d17b5d3272ff89dd411af79719ebf47fc9e30181f4dbc419",
-      "prepared_sha256": "28d8ab8b0c04495e3568f0576450e5eb9f4e8681304d9d18b8e88b116a380f2f",
+      "prepared_sha256": "dc946135091e88a7d7ff89d800628da482a35172435954d5a6148f392e39b34b",
       "reference_condition_count": 1,
       "reference_origin": "upstream",
       "reference_paths": [
@@ -443839,7 +443843,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 4,
@@ -456231,13 +456235,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AX-bulk-order-book-009.json",
-        "result_sha256": "7eaf209a5389c8ea4f779bca1b5ba651eb62dd4cb17494c3f3fb1023203dd032",
+        "result_path": "state-label-repair-005/results/AX-bulk-order-book-009.json",
+        "result_sha256": "ad7bbdc123789672cf8f01f3390f3dae4216bbd863a9dd8b6c178bc96b85d468",
         "stage_duration_ms": {
-          "compile": 2488,
-          "enriched_compile": 2341,
-          "prover": 2989,
-          "wp_inference": 3059
+          "compile": 2607,
+          "enriched_compile": 2383,
+          "prover": 3625,
+          "wp_inference": 3074
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -456247,31 +456251,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 10877,
+        "total_duration_ms": 11689,
         "well_formed": true,
         "wp_failure_kind": "implementation_failure",
         "wp_hard": true
@@ -456307,7 +456311,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AX-bulk-order-book-009.patch",
       "preparation_patch_sha256": "118c4b0c2bf66dfae8eb1d619923a2a005d6058dd0ab1f2162591fc3cc8f74c0",
-      "prepared_sha256": "b3c2936c698ed0f77e9b0aeeb0bc28bbe98591dd4713797a4b264b0af68d88fd",
+      "prepared_sha256": "ebb466877b18beda1e8d1d19c2cc3fbaa2107762792d7683d563fb750ff31360",
       "reference_condition_count": 0,
       "reference_origin": "study-authored",
       "reference_paths": [],
@@ -456334,7 +456338,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 11,
@@ -461789,13 +461793,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AX-dead-mans-switch-operations-001.json",
-        "result_sha256": "343b52ee9bef08185d61afa8bbf70b7261ba9ded8f2aea49da4e169f17aac227",
+        "result_path": "state-label-repair-005/results/AX-dead-mans-switch-operations-001.json",
+        "result_sha256": "908ebf5e396dc95d90099f1a51c406b52b95d043ba14de2b646971dfeaf475f2",
         "stage_duration_ms": {
-          "compile": 2295,
-          "enriched_compile": 2308,
-          "prover": 4426,
-          "wp_inference": 2854
+          "compile": 2544,
+          "enriched_compile": 2261,
+          "prover": 4095,
+          "wp_inference": 2950
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -461805,31 +461809,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11883,
+        "total_duration_ms": 11850,
         "well_formed": true,
         "wp_failure_kind": null,
         "wp_hard": false
@@ -461866,7 +461870,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AX-dead-mans-switch-operations-001.patch",
       "preparation_patch_sha256": "f77ff8af633e65c9b14f78201e38c005b2933483b1719ea083357f53e86e10ef",
-      "prepared_sha256": "97cd97bb3893bc2a06c68a2e997a6c060b412c04af2f8d12f8ab526917b9d0d1",
+      "prepared_sha256": "bcd3e189105ba583ed49815c2732b3b84b3a8c88cd9d8194d7425b6dbfa6fe29",
       "reference_condition_count": 0,
       "reference_origin": "study-authored",
       "reference_paths": [],
@@ -461894,7 +461898,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 27,
@@ -493534,13 +493538,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AX-native-position-types-005.json",
-        "result_sha256": "9bae6487b50070b61122d9d91cf9f9fd2f9f5ad4096872847b40cc9dc7abafc3",
+        "result_path": "state-label-repair-005/results/AX-native-position-types-005.json",
+        "result_sha256": "4e93f86b527c899000342e250b2bc1dd8ccf767711c4a3e7999dadb45a86e1f4",
         "stage_duration_ms": {
-          "compile": 2404,
-          "enriched_compile": 2308,
-          "prover": 3819,
-          "wp_inference": 2986
+          "compile": 2242,
+          "enriched_compile": 2356,
+          "prover": 4544,
+          "wp_inference": 3090
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -493550,31 +493554,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11517,
+        "total_duration_ms": 12232,
         "well_formed": true,
         "wp_failure_kind": null,
         "wp_hard": false
@@ -493608,7 +493612,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AX-native-position-types-005.patch",
       "preparation_patch_sha256": "8a37e7a7585c7949a3bad0df7911d902f231dfbeef2583b74d95d66ce62d4bb1",
-      "prepared_sha256": "46bb5176e4f126be080cf3a273ef9ca90c3bed12dcc4f36e25fca090222a0166",
+      "prepared_sha256": "0cf49fe0eb3cfd0874bc553fcd586c35fdcbbdca7604fda2aa4f6e189f245d23",
       "reference_condition_count": 0,
       "reference_origin": "study-authored",
       "reference_paths": [],
@@ -493644,7 +493648,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 81,
@@ -495630,13 +495634,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AX-order-book-006.json",
-        "result_sha256": "dad304f3d72bc0227d661dbba21668766a6f64669dd054cb762fd1aedb227f0f",
+        "result_path": "state-label-repair-005/results/AX-order-book-006.json",
+        "result_sha256": "9e812d2f379d3a5ab79f15e699b0323065ffa6e913f3e0e6ba049716b3fd76f8",
         "stage_duration_ms": {
-          "compile": 2288,
-          "enriched_compile": 2448,
-          "prover": 3229,
-          "wp_inference": 2900
+          "compile": 2359,
+          "enriched_compile": 2585,
+          "prover": 3549,
+          "wp_inference": 3183
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -495646,31 +495650,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 10865,
+        "total_duration_ms": 11676,
         "well_formed": true,
         "wp_failure_kind": "untrusted_inferred_contract",
         "wp_hard": true
@@ -495704,7 +495708,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AX-order-book-006.patch",
       "preparation_patch_sha256": "0922ee0a9045d9b6e19159fd7a85a5ae99b52d11676a9af613a147f0ef9b83a1",
-      "prepared_sha256": "3acbba9a703baf837729b6da7e9ed9c35e7f996ff24c0b136e6c0eaa64585836",
+      "prepared_sha256": "faded1e03674f0ed6b2d7af051ff322601250f6d143dbc9d59d3f30fc4115306",
       "reference_condition_count": 0,
       "reference_origin": "study-authored",
       "reference_paths": [],
@@ -495730,7 +495734,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 5,
@@ -518692,13 +518696,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AX-pending-order-book-index-006.json",
-        "result_sha256": "533bac5f738c2191b38f407d1227151279eeb8af425408e15a2a4698da3d13c6",
+        "result_path": "state-label-repair-005/results/AX-pending-order-book-index-006.json",
+        "result_sha256": "443b6c84e6e885c471487a6acee7a248173162bbda29b353bb3b480c96f76011",
         "stage_duration_ms": {
-          "compile": 2445,
-          "enriched_compile": 2327,
-          "prover": 3402,
-          "wp_inference": 3023
+          "compile": 2386,
+          "enriched_compile": null,
+          "prover": null,
+          "wp_inference": 3207
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -518708,34 +518712,34 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 11197,
+        "total_duration_ms": 5593,
         "well_formed": true,
-        "wp_failure_kind": null,
-        "wp_hard": false
+        "wp_failure_kind": "implementation_failure",
+        "wp_hard": true
       },
       "corpus_reference_paths": [],
       "corpus_source_path": "sources/AptosExperimental/trading/order_book/pending_order_book_index.move",
@@ -518767,8 +518771,8 @@
       "package_module_target": "0x7::pending_order_book_index::take_ready_price_move_up_orders",
       "package_relpath": ".",
       "preparation_patch": "patches/AX-pending-order-book-index-006.patch",
-      "preparation_patch_sha256": "4817e17f07fe43dc14939459d8555da8e9b6a3feacabb9cb310829a1a8680499",
-      "prepared_sha256": "43e882f95e1e6e5e36c2b8739e7e06ce29ff922f541ebe29ca1f7e662d9f41fe",
+      "preparation_patch_sha256": "e3cb5968582716c1a39b44d09ee874997292048cc8780bf9614f4219782bba97",
+      "prepared_sha256": "8a7f98958f4815cec43dfa09a6648869f089bb4752482d2d09d52f1682ba21dc",
       "reference_condition_count": 0,
       "reference_origin": "study-authored",
       "reference_paths": [],
@@ -518802,7 +518806,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 16,
@@ -526311,13 +526315,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AX-price-time-index-014.json",
-        "result_sha256": "bdf4cf5c4368924a06489f12e2be644c6284260a58492a0617ced1c2f075f3ab",
+        "result_path": "state-label-repair-005/results/AX-price-time-index-014.json",
+        "result_sha256": "f5cfb3501878a4bd4c8bc659101ceadff9d8dac5de32629f1b993fdddbbca8e3",
         "stage_duration_ms": {
-          "compile": 2337,
-          "enriched_compile": 2423,
-          "prover": 3152,
-          "wp_inference": 2892
+          "compile": 2325,
+          "enriched_compile": 2356,
+          "prover": 3394,
+          "wp_inference": 3101
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -526327,31 +526331,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 10804,
+        "total_duration_ms": 11176,
         "well_formed": true,
         "wp_failure_kind": "untrusted_inferred_contract",
         "wp_hard": true
@@ -526386,7 +526390,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AX-price-time-index-014.patch",
       "preparation_patch_sha256": "41f9fe9392b566535584431a02213bc55a0a67a60037be6a5f890af5c4b7be00",
-      "prepared_sha256": "3ee4c9c9102c66d03fa610d4ca718b7376f71b472dbfaade08d8e2bf8f706041",
+      "prepared_sha256": "2529ac8271e6733e8ec7877bd01d9961eeaab8cec8b9682744a241390b294580",
       "reference_condition_count": 0,
       "reference_origin": "study-authored",
       "reference_paths": [],
@@ -526412,7 +526416,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 8,
@@ -538697,13 +538701,13 @@
         "passed": true,
         "reason": null,
         "reference_proved": true,
-        "result_path": "results/AX-trading-native-capability-010.json",
-        "result_sha256": "179002c74d5f3b5ff4d5ef2c5c36bbccb32a93bcc74d1e51dcdcc671da4b3828",
+        "result_path": "state-label-repair-005/results/AX-trading-native-capability-010.json",
+        "result_sha256": "6df20b75e409faf0c7f913062713328035555a321f5d53577fc448db68b27a25",
         "stage_duration_ms": {
-          "compile": 2409,
-          "enriched_compile": 2304,
-          "prover": 3064,
-          "wp_inference": 2990
+          "compile": 2433,
+          "enriched_compile": 2303,
+          "prover": 3086,
+          "wp_inference": 3031
         },
         "threshold_exceeded_stage": null,
         "threshold_seconds": 20,
@@ -538713,31 +538717,31 @@
             "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
           },
           "check_candidate": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "enriched_compile": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "prover": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "wp_inference": {
-            "path": "/usr/local/cargo/bin/move-flow",
-            "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+            "path": "/home/wrw/aptos-core/.worktrees/dev2/target/ci/move-flow",
+            "sha256": "5ffa0e4be5673096fcc04a35b79e2f7e1cd17c2dc9dcdc05b4ce9da3d9db8bb8"
           },
           "z3": {
             "path": "/home/wrw/shared/bin/z3",
             "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
           }
         },
-        "total_duration_ms": 10767,
+        "total_duration_ms": 10853,
         "well_formed": true,
         "wp_failure_kind": "untrusted_inferred_contract",
         "wp_hard": true
@@ -538777,7 +538781,7 @@
       "package_relpath": ".",
       "preparation_patch": "patches/AX-trading-native-capability-010.patch",
       "preparation_patch_sha256": "a3bb3e635052e2c9def23cda10163beb8bd7d41a134ae8702991d88989b3fc0f",
-      "prepared_sha256": "27f4fa17bb4da5533c1edfa9761e4fa6e6e7cca1099beb7e2e7c82437c54beb4",
+      "prepared_sha256": "ccb2a50785e3284c2c94494d59180901c5b2a9ff30aa3d1c6ea8477f54cd72ef",
       "reference_condition_count": 0,
       "reference_origin": "study-authored",
       "reference_paths": [],
@@ -538841,7 +538845,7 @@
       "selection_or_exclusion_reason": "deterministic_constrained_sample",
       "selection_status": "selected",
       "shared_package_path": "framework",
-      "shared_package_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+      "shared_package_sha256": "1c41a4a754554758e1632217bb867a0dc8c622072f937edf1e1ef44adaf1f116",
       "snapshot_status": "shared_package_recipe",
       "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
       "source_loc": 240,

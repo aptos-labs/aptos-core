@@ -6,21 +6,21 @@ hash for a sample; treatment-specific skills and tools are stored separately.
 
 ## Metadata
 
-- [`manifest.json`](manifest.json): the 30 prepared sample records and hashes;
+- [`manifest.json`](manifest.json): the 20 selected sample records and hashes;
   its `corpus_status` is authoritative for round readiness.
 - [`metadata/candidate-inventory.json`](metadata/candidate-inventory.json): the
   complete compiler-AST source frame.
 - [`metadata/selection.json`](metadata/selection.json): inclusion, exclusion,
   reserve, and replacement decisions.
-- [`screening/ledger.json`](screening/ledger.json) and
-  [`screening/results/`](screening/results/): compatibility evidence, valid for
-  the current corpus only when its identity is recorded by `manifest.json`.
+- [`screening/summary.json`](screening/summary.json) and
+  [`screening/state-label-repair-005/`](screening/state-label-repair-005/): current
+  compatibility evidence; historical results remain under `screening/results/`.
 
 ## Shared editable framework
 
 [`framework/`](framework/) is the only Move package stored by the corpus. It
 contains 154 modules and
-265 Move source/specification files: the union
+257 Move source/specification files: the union
 of all targets and their source-level transitive dependencies. Named addresses,
 original paths, and the exact module-to-file mapping are in
 [`framework/corpus-modules.json`](framework/corpus-modules.json).
