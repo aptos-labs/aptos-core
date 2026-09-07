@@ -23,7 +23,7 @@ use aptos_config::config::DataStreamingServiceConfig;
 use aptos_crypto::HashValue;
 use aptos_data_client::{global_summary::GlobalDataSummary, interface::ResponsePayload};
 use aptos_id_generator::U64IdGenerator;
-use aptos_storage_interface::StateKind;
+use aptos_storage_interface::{SnapshotKind, StateKind};
 use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::{
     proof::{SparseMerkleRangeProof, TransactionInfoListWithProof},
@@ -517,7 +517,7 @@ fn transform_state_values_stream_notifications() {
     let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
         start_index,
-        state_kind: StateKind::MainState,
+        snapshot_kind: SnapshotKind::State(StateKind::MainState),
     });
 
     // Create a global data summary with a single state range

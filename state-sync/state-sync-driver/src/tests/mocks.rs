@@ -17,7 +17,7 @@ use aptos_data_streaming_service::{
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, LedgerSummary, Result,
-    StateKind, StateSnapshotReceiver,
+    SnapshotKind, StateKind, StateSnapshotReceiver,
 };
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -363,7 +363,7 @@ mock! {
             &self,
             version: Version,
             start_index: Option<u64>,
-            state_kind: StateKind,
+            snapshot_kind: SnapshotKind,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(

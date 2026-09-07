@@ -74,6 +74,17 @@ impl PersistedState {
         self.hot_state.enqueue_commit(state);
     }
 
+    /// Replaces the base hot state shards, e.g. with what a restore wrote. Must be followed by
+    /// `hack_reset` with the matching LRU metadata.
+    ///
+    /// n.b. Can only be used when no on the fly commit is in the queue.
+    pub fn reset_hot_state_shards(
+        &self,
+        shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    ) {
+        self.hot_state.reset_base_shards(shards);
+    }
+
     // n.b. Can only be used when no on the fly commit is in the queue.
     pub fn hack_reset(&self, state_with_summary: StateWithSummary) {
         let (state, summary) = state_with_summary.into_inner();

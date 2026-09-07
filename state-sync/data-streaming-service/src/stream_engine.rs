@@ -5,15 +5,16 @@ use crate::{
     data_notification::{
         DataClientRequest,
         DataClientRequest::{
-            EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
-            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfStates,
-            StateValuesWithProof, SubscribeTransactionOutputsWithProof,
+            EpochEndingLedgerInfos, HotStateValuesWithProof, NewTransactionOutputsWithProof,
+            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfHotStates,
+            NumberOfStates, StateValuesWithProof, SubscribeTransactionOutputsWithProof,
             SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
             TransactionOutputsWithProof, TransactionsOrOutputsWithProof, TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
+        HotStateValuesWithProofRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        NumberOfStatesRequest, StateValuesWithProofRequest,
         SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
@@ -33,7 +34,7 @@ use aptos_data_client::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
-use aptos_storage_interface::StateKind;
+use aptos_storage_interface::{SnapshotKind, StateKind};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
 use std::{cmp, cmp::min, sync::Arc};
@@ -170,7 +171,7 @@ pub struct StateStreamEngine {
     pub request: GetAllStatesRequest,
 
     // Which snapshot store this engine streams
-    pub kind: StateKind,
+    pub kind: SnapshotKind,
 
     // True iff a request has been created to fetch the number of states
     pub state_num_requested: bool,
@@ -194,7 +195,7 @@ impl StateStreamEngine {
     fn new(request: &GetAllStatesRequest) -> Result<Self, Error> {
         Ok(StateStreamEngine {
             request: request.clone(),
-            kind: request.state_kind,
+            kind: request.snapshot_kind,
             state_num_requested: false,
             number_of_states: None,
             next_stream_index: request.start_index,
@@ -215,6 +216,12 @@ impl StateStreamEngine {
                             Error::IntegerOverflow("Next request index has overflown!".into())
                         })?;
                 },
+                HotStateValuesWithProof(request) => {
+                    self.next_request_index =
+                        request.end_index.checked_add(1).ok_or_else(|| {
+                            Error::IntegerOverflow("Next request index has overflown!".into())
+                        })?;
+                },
                 request => invalid_client_request!(request, self),
             }
         }
@@ -225,6 +232,87 @@ impl StateStreamEngine {
         self.number_of_states.ok_or_else(|| {
             Error::UnexpectedErrorEncountered("Number of states is not initialized!".into())
         })
+    }
+
+    /// Shared chunk-response handling for the `StateValuesWithProof` and
+    /// `HotStateValuesWithProof` responses.
+    fn process_state_chunk(
+        &mut self,
+        start_index: u64,
+        end_index: u64,
+        last_received_index: u64,
+        client_response_payload: ResponsePayload,
+        notification_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<Option<DataNotification>, Error> {
+        let last_received_index = bound_by_range(last_received_index, start_index, end_index);
+
+        // Update the next stream index
+        self.next_stream_index = last_received_index
+            .checked_add(1)
+            .ok_or_else(|| Error::IntegerOverflow("Next stream index has overflown!".into()))?;
+
+        // Check if the stream is complete
+        let last_stream_index = self
+            .get_number_of_states()?
+            .checked_sub(1)
+            .ok_or_else(|| Error::IntegerOverflow("End index has overflown!".into()))?;
+        if last_received_index >= last_stream_index {
+            self.stream_is_complete = true;
+        }
+
+        // Create a new data notification
+        let data_notification = create_data_notification(
+            notification_id_generator,
+            client_response_payload,
+            None,
+            self.clone().into(),
+        )?;
+        Ok(Some(data_notification))
+    }
+
+    /// Shared handling for the `NumberOfStates` and `NumberOfHotStates` responses.
+    fn handle_number_of_states(
+        &mut self,
+        request_version: Version,
+        client_response_payload: ResponsePayload,
+    ) -> Result<(), Error> {
+        if let ResponsePayload::NumberOfStates(number_of_states) = client_response_payload {
+            info!(
+                (LogSchema::new(LogEntry::ReceivedDataResponse)
+                    .event(LogEvent::Success)
+                    .message(&format!(
+                        "Received number of states at version: {:?}. Total states: {:?}",
+                        request_version, number_of_states
+                    )))
+            );
+            self.state_num_requested = false;
+
+            // Sanity check the response before saving it.
+            if number_of_states < self.next_request_index {
+                return Err(Error::NoDataToFetch(format!(
+                    "The next state index to fetch is higher than the \
+                    total number of states. Next index: {:?}, total states: {:?}",
+                    self.next_request_index, number_of_states
+                )));
+            }
+            // The number of states is an internal planning value, not
+            // consumer data. An empty tree (count 0) has no chunks: just
+            // end the stream (no notification). The bootstrapper detects
+            // the zero-chunk end and verifies emptiness against the
+            // committed snapshot root. Main state at a real snapshot is
+            // never empty, so a 0 there is an invalid response.
+            if number_of_states == 0 {
+                if self.kind == SnapshotKind::State(StateKind::MainState) {
+                    return Err(Error::AptosDataClientResponseIsInvalid(
+                        "Received a state count of 0 for the main state snapshot!".into(),
+                    ));
+                }
+                self.stream_is_complete = true;
+                return Ok(());
+            }
+            self.number_of_states = Some(number_of_states);
+        }
+        Ok(())
     }
 }
 
@@ -282,10 +370,15 @@ impl DataStreamEngine for StateStreamEngine {
 
         // Return the request
         self.state_num_requested = true;
-        let number_request = DataClientRequest::NumberOfStates(NumberOfStatesRequest {
-            version: self.request.version,
-            state_kind: self.kind,
-        });
+        let number_request = match self.kind {
+            SnapshotKind::State(state_kind) => {
+                DataClientRequest::NumberOfStates(NumberOfStatesRequest {
+                    version: self.request.version,
+                    state_kind,
+                })
+            },
+            SnapshotKind::HotState => DataClientRequest::NumberOfHotStates(self.request.version),
+        };
         Ok(vec![number_request])
     }
 
@@ -320,7 +413,7 @@ impl DataStreamEngine for StateStreamEngine {
                     request.end_index,
                 )?;
 
-                // Identify the last received state index and bound it appropriately
+                // Identify the last received state index
                 let last_received_index = match &client_response_payload {
                     ResponsePayload::StateValuesWithProof(state_values_with_proof) => {
                         // Verify that we received at least one state value
@@ -336,69 +429,51 @@ impl DataStreamEngine for StateStreamEngine {
                     },
                     _ => invalid_response_type!(client_response_payload),
                 };
-                let last_received_index =
-                    bound_by_range(last_received_index, request.start_index, request.end_index);
-
-                // Update the next stream index
-                self.next_stream_index = last_received_index.checked_add(1).ok_or_else(|| {
-                    Error::IntegerOverflow("Next stream index has overflown!".into())
-                })?;
-
-                // Check if the stream is complete
-                let last_stream_index = self
-                    .get_number_of_states()?
-                    .checked_sub(1)
-                    .ok_or_else(|| Error::IntegerOverflow("End index has overflown!".into()))?;
-                if last_received_index >= last_stream_index {
-                    self.stream_is_complete = true;
-                }
-
-                // Create a new data notification
-                let data_notification = create_data_notification(
-                    notification_id_generator,
+                return self.process_state_chunk(
+                    request.start_index,
+                    request.end_index,
+                    last_received_index,
                     client_response_payload,
-                    None,
-                    self.clone().into(),
+                    notification_id_generator,
+                );
+            },
+            HotStateValuesWithProof(request) => {
+                // Verify the client request indices
+                verify_client_request_indices(
+                    self.next_stream_index,
+                    request.start_index,
+                    request.end_index,
                 )?;
-                return Ok(Some(data_notification));
+
+                // Identify the last received state index
+                let last_received_index = match &client_response_payload {
+                    ResponsePayload::HotStateValuesWithProof(hot_state_values_with_proof) => {
+                        // Verify that we received at least one hot state value
+                        if hot_state_values_with_proof.raw_values.is_empty() {
+                            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                                "Received an empty hot state values response! Request: {:?}",
+                                client_request
+                            )));
+                        }
+
+                        // Get the last received state index
+                        hot_state_values_with_proof.last_index
+                    },
+                    _ => invalid_response_type!(client_response_payload),
+                };
+                return self.process_state_chunk(
+                    request.start_index,
+                    request.end_index,
+                    last_received_index,
+                    client_response_payload,
+                    notification_id_generator,
+                );
             },
             NumberOfStates(request) => {
-                if let ResponsePayload::NumberOfStates(number_of_states) = client_response_payload {
-                    info!(
-                        (LogSchema::new(LogEntry::ReceivedDataResponse)
-                            .event(LogEvent::Success)
-                            .message(&format!(
-                                "Received number of states at version: {:?}. Total states: {:?}",
-                                request.version, number_of_states
-                            )))
-                    );
-                    self.state_num_requested = false;
-
-                    // Sanity check the response before saving it.
-                    if number_of_states < self.next_request_index {
-                        return Err(Error::NoDataToFetch(format!(
-                            "The next state index to fetch is higher than the \
-                            total number of states. Next index: {:?}, total states: {:?}",
-                            self.next_request_index, number_of_states
-                        )));
-                    }
-                    // The number of states is an internal planning value, not
-                    // consumer data. An empty tree (count 0) has no chunks: just
-                    // end the stream (no notification). The bootstrapper detects
-                    // the zero-chunk end and verifies emptiness against the
-                    // committed snapshot root. Main state at a real snapshot is
-                    // never empty, so a 0 there is an invalid response.
-                    if number_of_states == 0 {
-                        if self.kind == StateKind::MainState {
-                            return Err(Error::AptosDataClientResponseIsInvalid(
-                                "Received a state count of 0 for the main state snapshot!".into(),
-                            ));
-                        }
-                        self.stream_is_complete = true;
-                        return Ok(None);
-                    }
-                    self.number_of_states = Some(number_of_states);
-                }
+                self.handle_number_of_states(request.version, client_response_payload)?;
+            },
+            NumberOfHotStates(version) => {
+                self.handle_number_of_states(*version, client_response_payload)?;
             },
             request => invalid_client_request!(request, self),
         }
@@ -2125,13 +2200,18 @@ fn create_data_client_request(
     stream_engine: &StreamEngine,
 ) -> Result<DataClientRequest, Error> {
     let data_client_request = match stream_engine {
-        StreamEngine::StateStreamEngine(stream_engine) => {
-            StateValuesWithProof(StateValuesWithProofRequest {
+        StreamEngine::StateStreamEngine(stream_engine) => match stream_engine.kind {
+            SnapshotKind::State(state_kind) => StateValuesWithProof(StateValuesWithProofRequest {
                 version: stream_engine.request.version,
                 start_index,
                 end_index,
-                state_kind: stream_engine.kind,
-            })
+                state_kind,
+            }),
+            SnapshotKind::HotState => HotStateValuesWithProof(HotStateValuesWithProofRequest {
+                version: stream_engine.request.version,
+                start_index,
+                end_index,
+            }),
         },
         StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
             let target_ledger_info_version = stream_engine
@@ -2215,14 +2295,23 @@ fn create_data_notification(
     let client_response_type = client_response.get_label();
     let data_payload = match client_response {
         ResponsePayload::StateValuesWithProof(states_chunk) => match &stream_engine {
-            StreamEngine::StateStreamEngine(engine) => {
-                DataPayload::StateValuesWithProof(engine.kind, states_chunk)
+            StreamEngine::StateStreamEngine(engine) => match engine.kind {
+                SnapshotKind::State(state_kind) => {
+                    DataPayload::StateValuesWithProof(state_kind, states_chunk)
+                },
+                SnapshotKind::HotState => invalid_response_type!(client_response_type),
             },
             _ => invalid_response_type!(client_response_type),
         },
         // The number of states is consumed internally by the engine for chunk
         // planning; it is never surfaced to the consumer as a notification.
         ResponsePayload::NumberOfStates(_) => invalid_response_type!(client_response_type),
+        ResponsePayload::HotStateValuesWithProof(hot_states_chunk) => match &stream_engine {
+            StreamEngine::StateStreamEngine(engine) if engine.kind == SnapshotKind::HotState => {
+                DataPayload::HotStateValuesWithProof(hot_states_chunk)
+            },
+            _ => invalid_response_type!(client_response_type),
+        },
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
         },

@@ -27,7 +27,7 @@ use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
-use aptos_storage_interface::StateKind;
+use aptos_storage_interface::{SnapshotKind, StateKind};
 use aptos_time_service::TimeService;
 use aptos_types::{
     transaction::{TransactionOutputListWithProofV2, Version},
@@ -1070,7 +1070,7 @@ async fn test_snapshot_sync_epoch_change() {
         .with(
             eq(target_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
@@ -1134,7 +1134,11 @@ async fn test_snapshot_sync_epoch_change_genesis() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(target_version), eq(Some(0)), eq(StateKind::MainState))
+        .with(
+            eq(target_version),
+            eq(Some(0)),
+            eq(SnapshotKind::State(StateKind::MainState)),
+        )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
@@ -1197,7 +1201,11 @@ async fn test_snapshot_sync_state_values_invalid_chunk_retries() {
         mock_streaming_client
             .expect_get_all_state_values()
             .times(1)
-            .with(always(), eq(Some(0)), eq(StateKind::MainState))
+            .with(
+                always(),
+                eq(Some(0)),
+                eq(SnapshotKind::State(StateKind::MainState)),
+            )
             .return_once(move |_, _, _| Ok(data_stream_listener))
             .in_sequence(&mut expectation_sequence);
     }
@@ -1292,7 +1300,7 @@ async fn test_snapshot_sync_epoch_change_genesis_restart() {
         .with(
             eq(target_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
@@ -1364,7 +1372,7 @@ async fn test_snapshot_sync_existing_state() {
         .with(
             eq(highest_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1))
         .in_sequence(&mut expectation_sequence);
@@ -1387,7 +1395,7 @@ async fn test_snapshot_sync_existing_state() {
         .with(
             eq(highest_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_2))
         .in_sequence(&mut expectation_sequence);
@@ -1469,7 +1477,11 @@ async fn test_snapshot_sync_fresh_state() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(highest_version), eq(Some(0)), eq(StateKind::MainState))
+        .with(
+            eq(highest_version),
+            eq(Some(0)),
+            eq(SnapshotKind::State(StateKind::MainState)),
+        )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
