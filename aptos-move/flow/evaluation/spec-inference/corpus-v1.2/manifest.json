@@ -1,5 +1,5 @@
 {
-  "corpus_status": "prepared_requires_screening",
+  "corpus_status": "screened",
   "dependency_refresh": {
     "package_inventory": "metadata/package-inventory.json",
     "package_inventory_sha256": "0e5aedf9e770442728efeb9459d624f01fdbc6d5a82b5562129262e12b26e350"
