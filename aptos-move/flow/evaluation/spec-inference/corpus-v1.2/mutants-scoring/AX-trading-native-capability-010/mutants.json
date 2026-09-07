@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 52,
+        "offset": 5230,
+        "sha256": "bc7ef6fb2a1c28844d6d8b4ced8f0f68de0ec1f10c37629116ed3db2685adea3"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 40,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "mutant_id": "AX-trading-native-capability-010-deny-does-nothing",
+      "obligation_category": "normal-result",
+      "rationale": "Denying records the exchange. Pins `ensures spec_contains_key(denied, exchange)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 46,
+        "offset": 5680,
+        "sha256": "e048baff84ccf43005f2c91c5c71d9afd75718fd99165113009209a05ed61f0d"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 34,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "mutant_id": "AX-trading-native-capability-010-reenable-does-nothing",
+      "obligation_category": "normal-result",
+      "rationale": "Re-enabling clears the exchange. Pins `ensures !spec_contains_key(denied, exchange)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 50,
+        "offset": 4339,
+        "sha256": "532345286570ddabb41c5b91f396ced2089e86a3ad074e92abed30c6b4265b70"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 42,
+        "to": "TradingNativeCapability { exchange: @aptos_framework }"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "mutant_id": "AX-trading-native-capability-010-capability-for-framework",
+      "obligation_category": "normal-result",
+      "rationale": "The capability names the caller. Pins `ensures result == TradingNativeCapability { exchange: addr }`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_work_units",
+  "reference_proved": true,
+  "reference_sha256": "01ab3f47ae36f1b1936c25fa838c83bcc922e8fde9528c46ee4b019299fb652d",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_work_units::get_max_order_placement_limit",
+  "task_id": "WU-limit-024",
+  "threshold_seconds": 40,
+  "wall_seconds": 7.2,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false
+}

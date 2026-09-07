@@ -1,0 +1,118 @@
+{
+ "QP-part-025": [
+  {
+   "mutant_id": "QP-part-025-store-starts-at-one",
+   "file": "sources/etna/lomuto_partition.move",
+   "anchor": "let store = 0;",
+   "replace": "0",
+   "with": "1",
+   "obligation_category": "normal-result",
+   "rationale": "The store cursor starts past the front, so the returned index and layout are both wrong."
+  },
+  {
+   "mutant_id": "QP-part-025-last-index-off-by-one",
+   "file": "sources/etna/lomuto_partition.move",
+   "anchor": "let last = values.length() - 1;",
+   "replace": " - 1",
+   "with": "",
+   "obligation_category": "abort",
+   "rationale": "Treating the length as the last index indexes out of bounds."
+  },
+  {
+   "mutant_id": "QP-part-025-final-swap-uses-pivot",
+   "file": "sources/etna/lomuto_partition.move",
+   "anchor": "values.swap(store, last);",
+   "replace": "last",
+   "with": "pivot",
+   "obligation_category": "normal-result",
+   "rationale": "The closing swap targets the original pivot slot instead of the parked one."
+  }
+ ],
+ "SM-select-022": [
+  {
+   "mutant_id": "SM-select-022-returns-start-value",
+   "file": "sources/etna/selection_machine.move",
+   "anchor": "Outcome::Accepted { value, draws: i }",
+   "replace": "value,",
+   "with": "value: start,",
+   "obligation_category": "normal-result",
+   "rationale": "Reports the seed rather than the admissible value that was found."
+  },
+  {
+   "mutant_id": "SM-select-022-skips-seed-candidate",
+   "file": "sources/etna/selection_machine.move",
+   "anchor": "let value = start;",
+   "replace": "start",
+   "with": "next(start)",
+   "obligation_category": "normal-result",
+   "rationale": "The seed is never tested for admissibility."
+  },
+  {
+   "mutant_id": "SM-select-022-one-round-short",
+   "file": "sources/etna/selection_machine.move",
+   "anchor": "while (i < rounds) {",
+   "replace": "rounds",
+   "with": "rounds - 1",
+   "obligation_category": "abort",
+   "rationale": "Loses the final round, and a zero round count now underflows."
+  }
+ ],
+ "TR-discard-011": [
+  {
+   "mutant_id": "TR-discard-011-bid-guard-inverted",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "is_bid && prices[i] < best_price",
+   "replace": "is_bid &&",
+   "with": "!is_bid &&",
+   "obligation_category": "normal-result",
+   "rationale": "The bid test applies to asks, so crossing levels are counted on the wrong side."
+  },
+  {
+   "mutant_id": "TR-discard-011-treats-none-as-some",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (best_price.is_some()) {",
+   "replace": "is_some",
+   "with": "is_none",
+   "obligation_category": "abort",
+   "rationale": "An absent best price is unwrapped, so the no-reference case aborts instead of returning zero."
+  },
+  {
+   "mutant_id": "TR-discard-011-starts-past-first-level",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "let i = 0;\n        if (best_price.is_some()) {",
+   "replace": "let i = 0;",
+   "with": "let i = 1;",
+   "obligation_category": "normal-result",
+   "rationale": "The first level is skipped, so a crossing level at index zero is not discarded."
+  }
+ ],
+ "TR-order-010": [
+  {
+   "mutant_id": "TR-order-010-reads-past-last-pair",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "while (i < prices.length() - 1)",
+   "replace": " - 1",
+   "with": "",
+   "obligation_category": "abort",
+   "rationale": "The final iteration indexes one past the end."
+  },
+  {
+   "mutant_id": "TR-order-010-direction-inverted",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (is_descending) {",
+   "replace": "is_descending",
+   "with": "!is_descending",
+   "obligation_category": "normal-result",
+   "rationale": "Ascending and descending checks are exchanged."
+  },
+  {
+   "mutant_id": "TR-order-010-descending-requires-ascending",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (prices[i] <= prices[i + 1]) {",
+   "replace": "<=",
+   "with": ">=",
+   "obligation_category": "normal-result",
+   "rationale": "The descending branch accepts only ascending sequences."
+  }
+ ]
+}

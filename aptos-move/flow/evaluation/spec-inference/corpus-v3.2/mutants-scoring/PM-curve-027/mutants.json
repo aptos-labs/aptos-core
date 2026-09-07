@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 41,
+        "offset": 1153,
+        "sha256": "bda9bf8844343863285270a76ae18f321b4d3b64199d0a4132b560f6e56296d8"
+      },
+      "edit": {
+        "at": 30,
+        "kind": "substitute",
+        "length": 8,
+        "to": "return low_prot"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_payout_math.move",
+      "mutant_id": "PM-curve-027-below-low-returns-protected",
+      "obligation_category": "normal-result",
+      "rationale": "The lower clamped region returns the low protected anchor instead of zero.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 71,
+        "offset": 1203,
+        "sha256": "263dee69ea3867ebac9db4569df4a436d6d6c7b1392f9a7a51cbaef1ac7283e0"
+      },
+      "edit": {
+        "at": 44,
+        "kind": "substitute",
+        "length": 16,
+        "to": "return low_prot"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_payout_math.move",
+      "mutant_id": "PM-curve-027-above-high-returns-low",
+      "obligation_category": "normal-result",
+      "rationale": "The upper clamped region returns the wrong protected anchor.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 47,
+        "offset": 1390,
+        "sha256": "3aa2d0dc6ffcaae2c7427d0106a892b0118fed9be88541adfdf8996448c055cf"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 3,
+        "to": " + "
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_payout_math.move",
+      "mutant_id": "PM-curve-027-delta-added",
+      "obligation_category": "normal-result",
+      "rationale": "The interpolation measures from the sum of the lock values rather than the distance above the low anchor.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "50c0735a483ecee4e97ec4d588307db2b4b2aa9bfdd705ef8b8ba53b43c341cb",
+  "task_id": "PM-curve-027"
+}

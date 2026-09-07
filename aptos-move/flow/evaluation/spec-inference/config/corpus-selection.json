@@ -15,7 +15,7 @@
         "/sources/trading/position/"
       ],
       "require_upstream_reference": false,
-      "eligible_reason": "pending_expert_reference_and_mutant_review"
+      "eligible_reason": "study_authored_reference"
     }
   ],
   "safety_exclusion_terms": [
@@ -41,5 +41,8 @@
     "jwk",
     "key_"
   ],
-  "module_function_count": { "min": 3, "max": 10 }
+  "module_function_count": {
+    "min": 3,
+    "max": 10
+  }
 }

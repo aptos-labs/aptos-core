@@ -11,6 +11,7 @@ import random
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from collections.abc import Mapping, Sequence
@@ -18,9 +19,10 @@ from typing import Any
 
 from .identifiers import require_plain_name
 from .artifacts import canonical_json, sha256_file, tree_hash, write_json
-from .compatibility import tool_executables
+from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig, FEEDBACK_LEVELS, RunSpec
-from .mutants import NO_MUTANTS, mutation_fingerprint
+from .materialize import materialize_task
+from .mutants import NO_MUTANTS, mutation_fingerprint, require_unique_mutant_ids
 from .schedule import ARMS
 
 
@@ -34,6 +36,7 @@ def build_pilot(
     round_id: str = "pilot-001",
     task_names: Sequence[str] | None = None,
     mutants_root: Path | None = None,
+    disqualification_root: Path | None = None,
 ) -> dict[str, Any]:
     """Schedule one round over tasks, arms, and feedback levels.
 
@@ -54,6 +57,10 @@ def build_pilot(
     `mutants_root` turns on strict scoring. It must hold `TASK_ID/mutants.json`
     for every scheduled task; a round that names it and cannot supply one for
     each task fails here rather than degrading to core scoring in silence.
+
+    `disqualification_root` binds a withheld gate before any cell runs. Its
+    contents are not exposed to the session; only each manifest digest enters
+    the run record so scoring cannot select or substitute a gate afterwards.
     """
     if task_names is not None and not task_names:
         raise ValueError("a pilot round needs at least one task")
@@ -152,6 +159,20 @@ def build_pilot(
     )
 
     mutant_digests, mutant_fingerprints = _resolve_mutant_manifests(tasks, mutants_root)
+    gate_digests, gate_fingerprints = _resolve_mutant_manifests(
+        tasks, disqualification_root
+    )
+    if disqualification_root is not None:
+        for task in tasks:
+            task_id = task["task_id"]
+            overlap = sorted(
+                set(mutant_fingerprints.get(task_id, ()))
+                & set(gate_fingerprints[task_id])
+            )
+            if overlap:
+                raise ValueError(
+                    f"scored and disqualification sets overlap for {task_id}"
+                )
 
     seed = hashlib.sha256(
         (source_commit + "\0unscored-pilot\0" + require_plain_name(round_id, "round_id")).encode()
@@ -197,6 +218,11 @@ def build_pilot(
                 "plugin_tree_sha256": plugin_records[level][arm]["tree_sha256"],
                 "initial_tree_sha256": task["initial_tree_sha256"],
                 "mutant_manifest_sha256": mutant_digests[task["task_id"]],
+                "disqualification_mutant_manifest_sha256": (
+                    gate_digests[task["task_id"]]
+                    if disqualification_root is not None
+                    else None
+                ),
                 # Opaque identities of the scored mutations, so a run can
                 # refuse a refutation set that overlaps them without the
                 # scored mutations being present where the session can read.
@@ -252,6 +278,9 @@ def build_pilot(
             for level, arm_records in plugin_records.items()
         },
         "scoring_mode": "core" if mutants_root is None else "reference_mutants",
+        "disqualification_mode": (
+            "none" if disqualification_root is None else "withheld_mutants"
+        ),
         "arms": list(scheduled_arms),
     }
     manifest["schedule_sha256"] = hashlib.sha256(canonical_json(runs)).hexdigest()
@@ -281,13 +310,13 @@ def _require_committed_corpus(package: Path, recorded: dict[str, str] | None) ->
     """Refuse to schedule a package that is not the committed corpus.
 
     The manifest records a digest per generated source file, but only
-    `corpus-v3/build.py --verify` read it. A round snapshots whatever is on
+    `corpus-v3.2/build.py --verify` read it. A round snapshots whatever is on
     disk and hashes the copy, so a locally altered package would have been
     scheduled with a self-consistent snapshot hash and measured as if it were
     the corpus. The comparison is the one `build.py --verify` makes.
 
     A manifest that records no digests makes no reproducibility claim to
-    enforce (corpus-v1 pins its sources by commit instead), and the audit's
+    enforce (corpus-v1.1 pins its sources by commit instead), and the audit's
     `initial_tree_sha256` still fixes what a round actually ran.
     """
     # A symlink is never part of the committed corpus, and one pointing at a
@@ -328,7 +357,13 @@ def _corpus_tasks(
     verified, and keeps a round's packages identical across its tasks.
     """
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    records = manifest["records"]
+    # A manifest that keeps its whole candidate pool marks the members with
+    # `selection_status`; the rest are not tasks, whatever their screen field.
+    records = [
+        record
+        for record in manifest["records"]
+        if record.get("selection_status", "selected") == "selected"
+    ]
     # A sample the screen did not clear is not a task. Scheduling it would spend
     # a cell on a known defect and report the failure as a specification result,
     # so the manifest's own status is the gate rather than the operator's memory.
@@ -354,29 +389,40 @@ def _corpus_tasks(
     if not records:
         raise ValueError("a corpus round needs at least one sample")
 
-    package = (manifest_path.parent / "package").resolve()
+    recipes = {record["task_id"]: _record_recipe(manifest_path, record) for record in records}
+    package = _shared_package(records, recipes)
     if not (package / "Move.toml").is_file():
         raise FileNotFoundError(package / "Move.toml")
     _require_committed_corpus(package, manifest.get("generated_file_sha256"))
     # After the corpus-integrity check: both notice a package that moved, and
     # that one names the files, which is the more useful answer.
+    _require_screened_tree(manifest_path, package)
     _require_screening_agrees(manifest_path, records, apparatus)
     snapshot = snapshots_dir / "corpus"
     if snapshot.exists():
         shutil.rmtree(snapshot)
     shutil.copytree(package, snapshot, ignore=shutil.ignore_patterns("build"))
-    digest = tree_hash(snapshot)
 
     tasks: list[dict[str, Any]] = []
     for record in records:
         require_plain_name(record["task_id"], "task_id")
+        recipe = recipes[record["task_id"]]
         patch = patches_dir / f"{record['task_id']}.patch"
-        patch.write_text("", encoding="utf-8")
+        if recipe.patch is None:
+            patch.write_text("", encoding="utf-8")
+        else:
+            shutil.copyfile(recipe.patch, patch)
+        # The tree a run starts from is the snapshot with the task's patch
+        # applied; the controller re-derives it and checks this digest.
+        with tempfile.TemporaryDirectory(prefix="move-inference-pilot-") as temporary:
+            digest = materialize_task(
+                snapshot, patch, Path(temporary) / "package", recipe.prepared_sha256
+            )
         tasks.append(
             {
                 "name": record["task_id"],
                 "task_id": record["task_id"],
-                "target": record["target"],
+                "target": recipe.target,
                 "categories": tuple(record["required_contract_categories"]),
                 "snapshot": snapshot,
                 "patch": patch,
@@ -389,6 +435,71 @@ def _corpus_tasks(
             }
         )
     return tasks
+
+
+@dataclass(frozen=True)
+class CorpusRecipe:
+    """How one sample's starting tree is built from the corpus.
+
+    A corpus-v3.2 record names a target in the corpus package and starts from it
+    unchanged. A corpus-v1.1 record is a shared-package recipe: the package plus
+    a preparation patch that removes the target's reference contract, with the
+    prepared tree's digest recorded so a round cannot start from a tree the
+    corpus did not describe.
+    """
+
+    package: Path
+    patch: Path | None
+    prepared_sha256: str | None
+    target: str
+
+
+def _record_target(record: Mapping[str, Any]) -> str:
+    """The function a sample asks for, however its corpus spells the field."""
+    target = record.get("target") or record.get("package_module_target")
+    if not target:
+        raise ValueError(f"corpus record names no target: {record['task_id']}")
+    return target
+
+
+def _record_recipe(manifest_path: Path, record: Mapping[str, Any]) -> CorpusRecipe:
+    corpus = manifest_path.parent.resolve()
+    package = (corpus / record.get("shared_package_path", "package")).resolve()
+    if not package.is_relative_to(corpus):
+        raise ValueError(
+            f"shared package for {record['task_id']} escapes the corpus: {package}"
+        )
+    target = _record_target(record)
+    patch = None
+    if record.get("preparation_patch"):
+        patch = (corpus / record["preparation_patch"]).resolve()
+        if not patch.is_relative_to(corpus):
+            raise ValueError(
+                f"preparation patch for {record['task_id']} escapes the corpus: {patch}"
+            )
+        if not patch.is_file():
+            raise FileNotFoundError(patch)
+        recorded = record.get("preparation_patch_sha256")
+        if recorded and sha256_file(patch) != recorded:
+            raise ValueError(f"shared package recipe mismatch for {record['task_id']}")
+    return CorpusRecipe(package, patch, record.get("prepared_sha256"), target)
+
+
+def _shared_package(
+    records: Sequence[Mapping[str, Any]], recipes: Mapping[str, CorpusRecipe]
+) -> Path:
+    """The one package every scheduled sample starts from."""
+    packages = {recipe.package for recipe in recipes.values()}
+    if len(packages) != 1:
+        raise ValueError(
+            "every sample must share one package; the manifest names "
+            + ", ".join(sorted(str(package) for package in packages))
+        )
+    (package,) = packages
+    recorded = {record.get("shared_package_sha256") for record in records} - {None}
+    if recorded and recorded != {tree_hash(package)}:
+        raise ValueError("shared package recipe mismatch: the package is not the recorded tree")
+    return package
 
 
 def _move_flow_sha256() -> str | None:
@@ -570,9 +681,32 @@ def _source_commit_durability(commit: str) -> dict[str, Any]:
     }
 
 
+def _screening_evidence(manifest_path: Path) -> tuple[Path, Mapping[str, Any]]:
+    """The screen's own record: `screen_v3` writes it at the top level, and
+    `screen` nests it beside the manifest it screened."""
+    summary_path = manifest_path.parent / "screening" / "summary.json"
+    if not summary_path.is_file():
+        raise ValueError(
+            f"no screening report at {summary_path}; a round cannot be scheduled "
+            "from a manifest whose readiness has no evidence behind it"
+        )
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    return summary_path, summary.get("compatibility_screen") or summary
+
+
+def _require_screened_tree(manifest_path: Path, package: Path) -> None:
+    """Refuse evidence about a package tree other than the one scheduled."""
+    summary_path, summary = _screening_evidence(manifest_path)
+    if summary.get("package_tree_sha256") != tree_hash(package):
+        raise ValueError(
+            f"{summary_path} screened a different corpus tree than the one being "
+            "scheduled; re-run screening before scheduling a round"
+        )
+
+
 def _require_screening_agrees(
     manifest_path: Path,
-    records: list[dict[str, Any]],
+    records: Sequence[Mapping[str, Any]],
     apparatus: dict[str, str | None] | None = None,
 ) -> None:
     """Refuse to schedule a task the screening report does not clear.
@@ -595,19 +729,7 @@ def _require_screening_agrees(
     would ever re-screen it -- and would leave `round_selection` contradicting
     the manifest.
     """
-    summary_path = manifest_path.parent / "screening" / "summary.json"
-    if not summary_path.is_file():
-        raise ValueError(
-            f"no screening report at {summary_path}; a round cannot be scheduled "
-            "from a manifest whose readiness has no evidence behind it"
-        )
-    summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    package = manifest_path.parent / "package"
-    if package.is_dir() and summary.get("package_tree_sha256") != tree_hash(package):
-        raise ValueError(
-            f"{summary_path} screened a different corpus tree than the one being "
-            "scheduled; re-run screening before scheduling a round"
-        )
+    summary_path, summary = _screening_evidence(manifest_path)
     # Keyed by task *and* target: a record can be repointed at a different
     # target without changing the package tree, and evidence for the target
     # that was screened says nothing about the one that would now run.
@@ -658,9 +780,10 @@ def _require_screening_agrees(
         if result.get("passed") and result.get("apparatus_ok")
     }
     claimed = {
-        (record["task_id"], record.get("target"))
+        (record["task_id"], _record_target(record))
         for record in records
-        if record.get("screening_status", "ready") == "ready"
+        if record.get("selection_status", "selected") == "selected"
+        and record.get("screening_status", "ready") == "ready"
     }
     # A reference proof is about a generated, gitignored tree, so evidence that
     # records only a boolean and a path cannot be tied to the content it
@@ -678,10 +801,11 @@ def _require_screening_agrees(
                 f"{summary_path} records no stage executables, so the toolchain "
                 "that screened these targets is unknown; re-run screening"
             )
-        if recorded_stages != apparatus["stage_executables"]:
+        changed = changed_stages(recorded_stages, apparatus["stage_executables"])
+        if changed:
             raise ValueError(
                 f"{summary_path} screened with a different toolchain than the "
-                "round is scheduled with; re-run screening"
+                f"round is scheduled with ({', '.join(changed)}); re-run screening"
             )
     for result in summary.get("results") or ():
         if result.get("passed") and not result.get("reference_sha256"):
@@ -725,6 +849,7 @@ def _resolve_mutant_manifests(
             continue
         digests[task["task_id"]] = sha256_file(manifest)
         cases = json.loads(manifest.read_text(encoding="utf-8"))["mutants"]
+        require_unique_mutant_ids(cases, f"mutant manifest for {task['task_id']}")
         # Against the snapshot the round will actually run, so the identity is
         # computed from the same text at schedule time and at run time.
         fingerprints[task["task_id"]] = sorted(
@@ -778,6 +903,11 @@ def main() -> None:
         help="directory of TASK_ID/mutants.json enabling strict scoring; every "
         "scheduled task must have one",
     )
+    parser.add_argument(
+        "--disqualification-mutants-root",
+        type=Path,
+        help="withheld TASK_ID/mutants.json gate to bind before the round",
+    )
     args = parser.parse_args()
     result = build_pilot(
         args.corpus_manifest.resolve(),
@@ -789,6 +919,11 @@ def main() -> None:
         round_id=args.round_id,
         task_names=args.tasks,
         mutants_root=args.mutants_root.resolve() if args.mutants_root else None,
+        disqualification_root=(
+            args.disqualification_mutants_root.resolve()
+            if args.disqualification_mutants_root
+            else None
+        ),
     )
     provenance = result["source_commit_provenance"]
     print(

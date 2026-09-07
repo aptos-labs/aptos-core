@@ -247,7 +247,7 @@ class ControllerRunTest(unittest.TestCase):
     def test_a_rejected_candidate_draws_a_follow_up_and_recovers(self) -> None:
         """The controller's follow-up path, which no real round has reached.
 
-        Every session of `corpus-v3-pilot-002` finished in one turn, so the
+        Every session of `corpus-v3.2-pilot-002` finished in one turn, so the
         rejection-to-follow-up cycle has never run outside a unit test. Here the
         first turn writes a specification the judge rejects and the second
         repairs it, which is the only way to exercise the prompt the policy

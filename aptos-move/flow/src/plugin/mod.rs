@@ -567,7 +567,8 @@ mod tests {
         assert!(!skill.contains("move_package_wp"));
         assert!(!skill.contains("### Guided hybrid tactic"));
         assert!(!skill.contains("### Flexible hybrid tactic"));
-        assert!(skill.contains("Never disable or skip verification"));
+        assert!(skill.contains("### The candidate check"));
+        assert!(!skill.contains("## Verification workflow"));
         assert!(skill.contains("### Loop abstractions"));
         assert!(skill.contains("## Final report"));
         // Shared WP concepts remain available as reasoning background, but
@@ -628,8 +629,10 @@ mod tests {
             std::fs::read_to_string(output_dir.path().join("skills/move-inf/SKILL.md")).unwrap();
         assert!(skill.contains("### Flexible hybrid tactic"));
         assert!(skill.contains("move_package_wp"));
+        assert!(!skill.contains("## Verification workflow"));
         assert!(skill.contains("available as an inference pass"));
         assert!(skill.contains("whether and when to use it"));
+        assert!(!skill.contains("every function it did not name is finished"));
         // WP runs on any scope; the loop diagnostics are what guide the
         // invariant, so no arm is told to withhold the call.
         assert!(skill.contains("It runs on any scope, loops included"));
@@ -659,6 +662,7 @@ mod tests {
         let guided_skill =
             std::fs::read_to_string(guided_output_dir.path().join("skills/move-inf/SKILL.md"))
                 .unwrap();
+        assert!(!guided_skill.contains("## Verification workflow"));
         let shared_marker = "## Specification inference reference";
         let flexible_reference = skill
             .split_once(shared_marker)

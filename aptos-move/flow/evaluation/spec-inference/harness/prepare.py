@@ -11,12 +11,13 @@ import subprocess
 import tempfile
 import tomllib
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any
 
 from .identifiers import require_plain_name
 from .artifacts import copy_snapshot, load_object, sha256_file, tree_hash, write_json
 from .move_source import mask_comments_and_strings
-from .shared_package import build_shared_package
+from .shared_package import SOURCE_PACKAGES, build_shared_package
 
 
 FRAMEWORK = "aptos-move/framework/aptos-framework"
@@ -40,19 +41,36 @@ def prepare_corpus(
 ) -> dict[str, Any]:
     provenance = load_object(provenance_path)
     commit = _source_commit(repo_root)
-    if commit != provenance.get("source_commit"):
+    recorded = provenance.get("source_commit")
+    # The shared package indexes every framework package and may copy a
+    # selected target's transitive modules from any of them. All indexed roots
+    # therefore belong to the source identity, even if no selected record names
+    # one directly. Fixed roots also cannot be interpreted as Git pathspecs
+    # supplied by a manifest.
+    source_roots = _shared_source_roots()
+    # What has to match is the source the corpus copies, not the commit the
+    # checkout happens to sit on. A later commit that leaves those roots
+    # untouched -- a harness fix, a note, another corpus -- describes the same
+    # sources, and the recorded commit still reconstructs them. Requiring HEAD
+    # to equal it meant no harness change could be committed between selecting
+    # a corpus and preparing it.
+    if commit != recorded and not _sources_unchanged(repo_root, recorded, source_roots):
         raise ValueError(
-            f"source checkout is {commit}, expected {provenance.get('source_commit')}"
+            f"source checkout is {commit}, and it differs from the recorded "
+            f"{recorded} in {', '.join(source_roots)}"
         )
     # The commit alone does not describe what gets copied: `build_shared_package`
-    # reads the working tree, so a tracked modification would enter the corpus
-    # under a commit that does not contain it, and every hash below would then
-    # describe a source nobody can reconstruct. Untracked files elsewhere cannot
-    # change what is copied, so only tracked modifications count.
-    modified = _tracked_modifications(repo_root)
+    # reads the working tree, so a tracked, untracked, or ignored source input
+    # would enter the corpus under a commit that does not contain it, and every
+    # hash below would then describe a source nobody can reconstruct.
+    # The corpus this run is writing is not one of those sources: its manifest,
+    # inventory and patches are outputs of this pipeline, and counting them
+    # makes a second preparation impossible once the first has been committed.
+    _require_disjoint_output_roots(repo_root, source_roots, artifacts_root, patches_dir)
+    modified = _source_modifications(repo_root, source_roots)
     if modified:
         raise ValueError(
-            f"source checkout {commit} has {len(modified)} tracked modification(s), "
+            f"source checkout {commit} has {len(modified)} source modification(s), "
             "so the corpus would not match its recorded commit: "
             + ", ".join(modified[:5])
             + ("..." if len(modified) > 5 else "")
@@ -62,8 +80,16 @@ def prepare_corpus(
         for record in provenance["records"]
         if record["selection_status"] == "selected"
     ]
-    if len(selected) != 30:
-        raise ValueError(f"expected 30 selected tasks, got {len(selected)}")
+    expected = sum(
+        count
+        for quotas in (provenance.get("quotas") or {}).values()
+        for count in quotas.values()
+    )
+    # The corpus size is the sum of the selection quotas, not a constant: a
+    # corpus that de-duplicates shapes is smaller than one that does not, and a
+    # hard-coded thirty silently outlaws every size but the first one chosen.
+    if expected and len(selected) != expected:
+        raise ValueError(f"expected {expected} selected tasks, got {len(selected)}")
 
     shared = artifacts_root / "framework"
     shared_metadata = build_shared_package(repo_root, selected, shared)
@@ -355,7 +381,8 @@ def _write_sample_catalog(
     removed = record.get("removed_reference_blocks", [])
     removed_text = (
         "\n".join(
-            f"- `{item['path']}`: `{item['function']}` ({item['blocks']} block(s))"
+            f"- `{item['path']}`: `{item['function']}` ({item['blocks']} "
+            f"{'inline ' if item.get('kind') == 'inline' else ''}block(s))"
             for item in removed
         )
         if removed
@@ -580,12 +607,78 @@ def _remove_target_references(package: Path, record: dict[str, Any]) -> list[dic
             if count:
                 _atomic_text(path, updated)
                 matches.append({"path": relative.as_posix(), "function": function, "blocks": count})
+        # Loop invariants and other inline `spec { ... }` blocks in the
+        # target's body are part of its reference as much as the contract
+        # block is: a loop the reference already annotates would hand the
+        # candidate the invariant the task asks it to find.
+        source_path = package / implementation
+        if source_path.is_file():
+            text = source_path.read_text(encoding="utf-8")
+            updated, count = _blank_inline_spec_blocks(text, function)
+            if count:
+                _atomic_text(source_path, updated)
+                matches.append(
+                    {
+                        "path": implementation.as_posix(),
+                        "function": function,
+                        "blocks": count,
+                        "kind": "inline",
+                    }
+                )
         if not matches and record.get("reference_condition_count", 0) > 0:
             raise ValueError(
                 f"could not locate explicit reference block for {record['task_id']}::{function}"
             )
         removed.extend(matches)
     return removed
+
+
+def _blank_inline_spec_blocks(text: str, function: str) -> tuple[str, int]:
+    """Blank every `spec { ... }` block inside the body of `function`.
+
+    Offsets and line count are preserved, as `_blank_spec_blocks` preserves
+    them, so mutant anchors computed on the reference still land.
+    """
+    masked = mask_comments_and_strings(text)
+    header = re.compile(
+        rf"(?m)^[ \t]*(?:(?:public|friend|entry|inline|native)\b[^\n{{;]*?)?"
+        rf"fun[ \t]+{re.escape(function)}\b"
+    )
+    inline = re.compile(r"\bspec[ \t]*\{")
+    updated = text
+    count = 0
+    for match in header.finditer(masked):
+        body_start = masked.find("{", match.end())
+        if body_start < 0:
+            continue
+        body_end = _matching_brace(masked, body_start)
+        if body_end is None:
+            continue
+        for block in inline.finditer(masked, body_start + 1, body_end):
+            open_brace = block.end() - 1
+            close_brace = _matching_brace(masked, open_brace)
+            if close_brace is None:
+                continue
+            start, end = block.start(), close_brace + 1
+            blank = "".join(
+                character if character == "\n" else " " for character in text[start:end]
+            )
+            updated = updated[:start] + blank + updated[end:]
+            count += 1
+    return updated, count
+
+
+def _matching_brace(masked: str, open_brace: int) -> int | None:
+    depth = 0
+    for index in range(open_brace, len(masked)):
+        character = masked[index]
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
 
 
 def _spec_declares_module(text: str, module_name: str) -> bool:
@@ -671,7 +764,12 @@ def _required_categories(record: dict[str, Any]) -> list[str]:
         result.append("abort")
     if "global-state" in features or "mutable-reference" in features:
         result.append("state-transition")
-    if "global-state" in features:
+    # A frame condition says what the call changes, and only a `modifies` clause
+    # states one. A target that reads global state but writes none has nothing
+    # to put in such a clause, so requiring the category of it asks for a
+    # contract that cannot be written -- and the task is unwinnable however good
+    # the specification is.
+    if "global-write" in features:
         result.append("frame")
     if "loop" in features:
         result.append("loop-invariant")
@@ -688,16 +786,74 @@ def _package_relative_source(record: dict[str, Any]) -> str:
     return Path(record["source_path"]).relative_to(record["source_root"]).as_posix()
 
 
-def _tracked_modifications(repo_root: Path) -> list[str]:
-    """Paths with tracked modifications in `repo_root`, if any."""
+def _sources_unchanged(repo_root: Path, recorded: str | None, roots: list[str]) -> bool:
+    """Whether `roots` hold the same content at HEAD as at the recorded commit."""
+    if not recorded or not roots:
+        return False
     result = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=no"],
+        ["git", "diff", "--quiet", recorded, "HEAD", "--", *roots],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def _source_modifications(repo_root: Path, source_roots: Sequence[str]) -> list[str]:
+    """Changed, untracked, or ignored inputs consumed by the source index."""
+    inputs = [
+        path
+        for root in source_roots
+        for path in (f"{root}/Move.toml", f"{root}/Prover.toml", f"{root}/sources")
+    ]
+    result = subprocess.run(
+        [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignored=matching",
+            "--",
+            *inputs,
+        ],
         cwd=repo_root,
         capture_output=True,
         text=True,
         check=True,
     )
-    return [line[3:] for line in result.stdout.splitlines() if line.strip()]
+    modified = []
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+        relative = line[3:]
+        modified.append(relative)
+    return modified
+
+
+def _shared_source_roots() -> list[str]:
+    """Every source root the shared-package index can copy from."""
+    return sorted(SOURCE_PACKAGES)
+
+
+def _require_disjoint_output_roots(
+    repo_root: Path,
+    source_roots: Sequence[str],
+    artifacts_root: Path,
+    patches_dir: Path,
+) -> None:
+    """Do not let caller-selected output exclusions hide corpus sources."""
+    sources = [(repo_root / root).resolve() for root in source_roots]
+    for label, output_root in (
+        ("artifacts root", artifacts_root.resolve()),
+        ("patches directory", patches_dir.resolve()),
+    ):
+        if any(
+            output_root == source
+            or output_root.is_relative_to(source)
+            or source.is_relative_to(output_root)
+            for source in sources
+        ):
+            raise ValueError(f"{label} overlaps a corpus source root: {output_root}")
 
 
 def _source_commit(repo_root: Path) -> str:

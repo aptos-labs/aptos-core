@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_order_validation",
+  "reference_proved": true,
+  "reference_sha256": "0f3a7ba081b232c31b2ad51f59d9ac8056bf1f0beb9d5bddc10e755b25ded9d1",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_order_validation::validate_order_input",
+  "task_id": "OV-order-006",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.5,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false
+}

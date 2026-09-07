@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 143,
+        "offset": 29418,
+        "sha256": "f3125d6afb7ed695fba1922fc76b63b43606bb38bc32b6dadd908eb78a66e6f0"
+      },
+      "edit": {
+        "at": 67,
+        "kind": "substitute",
+        "length": 29,
+        "to": "coin_balance<CoinType>(owner) / 2"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/coin.move",
+      "mutant_id": "AF-coin-003-halves-coin-part",
+      "obligation_category": "normal-result",
+      "rationale": "The legacy store balance counts in full. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 101,
+        "offset": 29611,
+        "sha256": "a2ee1000034c4e36b09e6bdc63fd58e8f9dd7c0e5b68cc9e6dc557ebcc45478e"
+      },
+      "edit": {
+        "at": 20,
+        "kind": "substitute",
+        "length": 32,
+        "to": "@0x1, paired_metadata.extract()"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/coin.move",
+      "mutant_id": "AF-coin-003-wrong-owner-store",
+      "obligation_category": "normal-result",
+      "rationale": "The paired balance is the owner's own store. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 143,
+        "offset": 29418,
+        "sha256": "f3125d6afb7ed695fba1922fc76b63b43606bb38bc32b6dadd908eb78a66e6f0"
+      },
+      "edit": {
+        "at": 67,
+        "kind": "substitute",
+        "length": 29,
+        "to": "(coin_balance<CoinType>(owner) + 1)"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/coin.move",
+      "mutant_id": "AF-coin-003-coin-part-plus-one",
+      "obligation_category": "normal-result",
+      "rationale": "The answer is exactly the sum of both balances. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

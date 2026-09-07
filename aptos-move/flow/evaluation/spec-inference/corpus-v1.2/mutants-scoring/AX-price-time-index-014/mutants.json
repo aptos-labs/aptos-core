@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 95,
+        "offset": 2999,
+        "sha256": "65bc779b098b40d426c147e6dcb7785bcd412d2f8e4b695f1adb33473351ca5b"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 20,
+        "to": "assert!(1 + 1 == 3, 2);\n        PriceTimeIndex::V1 {"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/order_book/price_time_index.move",
+      "mutant_id": "AX-price-time-index-014-aborts-differently",
+      "obligation_category": "abort",
+      "rationale": "Construction never aborts. Pins `aborts_if false`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 66,
+        "offset": 3028,
+        "sha256": "661faffbe9cb79ec4998d8d6e9ea9a76fae76755d590a507c2c937ca16c058ba"
+      },
+      "edit": {
+        "at": 18,
+        "kind": "substitute",
+        "length": 47,
+        "to": "abort 3"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/order_book/price_time_index.move",
+      "mutant_id": "AX-price-time-index-014-buy-map-aborts",
+      "obligation_category": "abort",
+      "rationale": "Constructing the buy map must not abort. Pins `aborts_if false` at the first field initialization.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 66,
+        "offset": 3095,
+        "sha256": "1031a13a7170a91e85922b9b29bf5fd315737f6b979cf0b217c0e49125e89be0"
+      },
+      "edit": {
+        "at": 19,
+        "kind": "substitute",
+        "length": 47,
+        "to": "abort 4"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/order_book/price_time_index.move",
+      "mutant_id": "AX-price-time-index-014-sell-map-aborts",
+      "obligation_category": "abort",
+      "rationale": "Constructing the sell map must not abort. Pins `aborts_if false` at the second field initialization.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+  "task_id": "AX-price-time-index-014"
+}

@@ -1,19 +1,89 @@
 from __future__ import annotations
 
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 from harness.prepare import (
+    _blank_inline_spec_blocks,
     _blank_spec_blocks,
     _copy_standalone_package,
     _remove_target_references,
+    _require_disjoint_output_roots,
+    _source_modifications,
+    _shared_source_roots,
     _write_git_patch,
     _write_sample_catalog,
 )
 
 
 class PrepareTests(unittest.TestCase):
+    def test_source_modifications_include_untracked_and_ignored_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            sources = repo / "package/sources"
+            sources.mkdir(parents=True)
+            (repo / "package/Move.toml").write_text("[package]\nname = 'P'\n")
+            prover = repo / "package/Prover.toml"
+            prover.write_text("[prover]\nverbosity_level = 'warn'\n")
+            (sources / "tracked.move").write_text("module 0x1::tracked {}\n")
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-qm",
+                    "initial",
+                ],
+                cwd=repo,
+                check=True,
+            )
+            (sources / "untracked.move").write_text("module 0x1::untracked {}\n")
+            prover.write_text("[prover]\nverbosity_level = 'debug'\n")
+            (repo / ".git/info/exclude").write_text("package/sources/ignored.move\n")
+            (sources / "ignored.move").write_text("module 0x1::ignored {}\n")
+
+            self.assertEqual(
+                {
+                    "package/Prover.toml",
+                    "package/sources/ignored.move",
+                    "package/sources/untracked.move",
+                },
+                set(_source_modifications(repo, ["package"])),
+            )
+
+    def test_shared_source_identity_covers_every_indexed_package(self) -> None:
+        self.assertEqual(
+            {
+                "aptos-move/framework/move-stdlib",
+                "aptos-move/framework/aptos-stdlib",
+                "aptos-move/framework/aptos-framework",
+                "aptos-move/framework/aptos-trading",
+                "aptos-move/framework/aptos-experimental",
+            },
+            set(_shared_source_roots()),
+        )
+
+    def test_output_exclusions_cannot_cover_a_source_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            source_root = "aptos-move/framework/aptos-framework"
+            source = repo / source_root
+            source.mkdir(parents=True)
+
+            with self.assertRaisesRegex(ValueError, "overlaps a corpus source root"):
+                _require_disjoint_output_roots(
+                    repo,
+                    [source_root],
+                    repo,
+                    repo / "safe-patches",
+                )
     def test_remove_target_finds_generated_experimental_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary)
@@ -62,6 +132,33 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(source.count("\n"), prepared.count("\n"))
         self.assertNotIn("ensures result == x", prepared)
         self.assertIn("spec other()", prepared)
+
+    def test_blank_inline_spec_blocks_strips_only_the_target_body(self) -> None:
+        source = """module a::m {
+    fun target(v: &mut vector<u64>) {
+        let i = 0;
+        while (i < 3) {
+            i = i + 1;
+        } spec {
+            invariant i <= 3;
+        };
+        spec { assert i == 3; };
+    }
+
+    fun other() {
+        while (true) {} spec { invariant true; };
+    }
+}
+"""
+        prepared, count = _blank_inline_spec_blocks(source, "target")
+        self.assertEqual(count, 2)
+        self.assertEqual(len(source), len(prepared))
+        self.assertEqual(source.count("\n"), prepared.count("\n"))
+        self.assertNotIn("invariant i <= 3", prepared)
+        self.assertNotIn("assert i == 3", prepared)
+        self.assertIn("invariant true", prepared)
+        # The statement terminator after the loop survives, so the body still parses.
+        self.assertRegex(prepared, r"\}\s+;")
 
     def test_copy_resolves_transitive_local_dependencies_and_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -148,7 +245,7 @@ Dependency = {{ local = "../dependency" }}
                     encoding="utf-8",
                 )
 
-            package_store = Path(temporary) / "corpus-v1/packages"
+            package_store = Path(temporary) / "corpus-v1.1/packages"
             shared_packages: dict[str, Path] = {}
             destinations = []
             for index, root in enumerate(roots):

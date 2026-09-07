@@ -1,22 +1,29 @@
 {
   "schema_version": 1,
   "quotas": {
-    "aptos-move/framework/aptos-framework": {"function": 16, "module": 4},
-    "aptos-move/framework/aptos-experimental": {"function": 8, "module": 2}
+    "aptos-move/framework/aptos-framework": {
+      "function": 10,
+      "module": 3
+    },
+    "aptos-move/framework/aptos-experimental": {
+      "function": 5,
+      "module": 2
+    }
   },
   "minimum_feature_counts": {
-    "loop": 6,
-    "higher-order": 3,
-    "mutable-reference": 6,
-    "global-state": 8,
-    "multiple-calls": 8,
-    "arithmetic-abort": 6,
-    "small": 6,
-    "medium": 10,
-    "large": 6,
-    "deep-calls": 6
+    "loop": 5,
+    "higher-order": 2,
+    "mutable-reference": 5,
+    "global-state": 6,
+    "global-write": 6,
+    "multiple-calls": 6,
+    "arithmetic-abort": 5,
+    "small": 4,
+    "medium": 6,
+    "large": 4,
+    "deep-calls": 5
   },
   "maximum_functions_per_module": 2,
-  "compatibility_threshold_seconds": 40,
+  "compatibility_threshold_seconds": 20,
   "selection_seed_suffix": "move-inference-corpus-v1"
 }

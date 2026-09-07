@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/vault_share_math",
+  "reference_proved": true,
+  "reference_sha256": "0b2d1a809f5d8840f9304d232c7f180b0d9ef4f2fda364ee02656561e9e8a561",
+  "schema_version": 2,
+  "target": "decibel_vault::vault_share_math::calculate_redemption_funds_and_fee",
+  "task_id": "VS-redeem-004",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.4,
+  "well_formed": true,
+  "wp_failure_kind": "untrusted_inferred_contract",
+  "wp_hard": true
+}

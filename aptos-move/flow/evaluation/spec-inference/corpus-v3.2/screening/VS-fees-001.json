@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/vault_share_math",
+  "reference_proved": true,
+  "reference_sha256": "0b2d1a809f5d8840f9304d232c7f180b0d9ef4f2fda364ee02656561e9e8a561",
+  "schema_version": 2,
+  "target": "decibel_vault::vault_share_math::calculate_unrealized_fees",
+  "task_id": "VS-fees-001",
+  "threshold_seconds": 20,
+  "wall_seconds": 6.0,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false
+}

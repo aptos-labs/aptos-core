@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 103,
+        "offset": 16241,
+        "sha256": "046bdd5ae3534fb26ce193ede48c90608940f9deb5698672f7460c251d68f5d4"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 58,
+        "to": "if (!self.orders.contains(&account)) { return 0 };"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+      "mutant_id": "AX-bulk-order-book-009-missing-order-returns-zero",
+      "obligation_category": "abort",
+      "rationale": "A missing order must abort. Pins `aborts_if !spec_contains_key(orders, account)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 95,
+        "offset": 16308,
+        "sha256": "14c76d876c0e9c13bd39de179bcca1def5bd856bf5536a0c8414d2a901faadbe"
+      },
+      "edit": {
+        "at": 57,
+        "kind": "substitute",
+        "length": 32,
+        "to": "get_total_remaining_size(!is_bid)"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+      "mutant_id": "AX-bulk-order-book-009-wrong-side",
+      "obligation_category": "normal-result",
+      "rationale": "The requested side is summed. Pins `ensures result == spec_sum_from(sizes, 0)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 95,
+        "offset": 16308,
+        "sha256": "14c76d876c0e9c13bd39de179bcca1def5bd856bf5536a0c8414d2a901faadbe"
+      },
+      "edit": {
+        "at": 57,
+        "kind": "substitute",
+        "length": 32,
+        "to": "get_total_remaining_size(is_bid) / 2"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+      "mutant_id": "AX-bulk-order-book-009-halves-result",
+      "obligation_category": "normal-result",
+      "rationale": "The result is the full remaining size. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

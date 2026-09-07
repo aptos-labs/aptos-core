@@ -1,4 +1,4 @@
-{# Verification workflow, shared by proving and guided inference #}
+{# Verification workflow for proving and specification repair. #}
 {% if once(name="verification_tasks") %}
 
 ## Verification workflow
@@ -24,17 +24,18 @@
    remaining obligation and evidence. Do not introduce a trusted boundary
    unless the user or project policy explicitly authorizes it.
 {% endif %}
-5. **Run a final full-scope proof.** Use timeout
-   {{ args.max_verification_timeout }} with no temporary exclusions.
+5. **Close over the full scope.** With no temporary exclusions, use timeout
+   {{ args.max_verification_timeout }}.
 {% if evaluation_mode %}
    Every requested obligation must be present and verified for success.
 {% else %}
    Report verified, unresolved, and explicitly trusted functions separately.
 {% endif %}
-6. **Check the candidate.** When specifications were written or changed, close
-   with `{{ tool(name="move_spec_check") }}` over the same scope:
-   it proves once more and, unlike the prover, also rejects a contract that
-   weakened itself or left an obligation uncovered.
+   When specifications were written or changed, close with
+   `{{ tool(name="move_spec_check") }}`; it performs the full-scope proof and
+   also rejects a contract that weakened itself or left an obligation
+   uncovered. For a diagnostic run that changed no specification, close with
+   `{{ tool(name="move_package_verify") }}`.
 
 {% include "templates/candidate_check.md" %}
 

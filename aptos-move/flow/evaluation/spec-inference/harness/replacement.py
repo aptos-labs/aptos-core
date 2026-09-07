@@ -15,6 +15,7 @@ ALLOWED_REASONS = {
     "compatibility_timeout",
     "snapshot_isolation_failure",
     "mutant_validation_failure",
+    "screening_failure",
 }
 
 

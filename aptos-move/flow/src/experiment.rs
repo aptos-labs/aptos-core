@@ -2802,7 +2802,45 @@ fn skip_spec_construct(masked: &[u8], from: usize) -> usize {
         }
         i += 1;
     }
-    i
+    // A specification function or lemma may carry a proof block after its
+    // declaration. The proof is specification text too; leaving it behind
+    // makes a reference that adds only a proved helper look like an executable
+    // implementation change.
+    let mut proof = i;
+    while masked
+        .get(proof)
+        .is_some_and(|byte| byte.is_ascii_whitespace())
+    {
+        proof += 1;
+    }
+    if !keyword_at(masked, proof, b"proof") {
+        return i;
+    }
+    proof += b"proof".len();
+    while masked
+        .get(proof)
+        .is_some_and(|byte| byte.is_ascii_whitespace())
+    {
+        proof += 1;
+    }
+    if masked.get(proof) != Some(&b'{') {
+        return i;
+    }
+    let mut depth = 0usize;
+    while proof < masked.len() {
+        match masked[proof] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return proof + 1;
+                }
+            },
+            _ => {},
+        }
+        proof += 1;
+    }
+    proof
 }
 
 fn keyword_at(masked: &[u8], i: usize, word: &[u8]) -> bool {
@@ -3044,7 +3082,8 @@ mod tests {
             "spec f { pragma opaque = true; ensures result >= 0; } ",
             "spec module { fun summary(x: u64): u64 { x } } ",
             "spec fun uninterpreted(x: u64): u64; ",
-            "spec lemma reflexive(x: u64) { ensures x == x; } }",
+            "spec lemma reflexive(x: u64) { ensures x == x; } ",
+            "proof { assert x == x; } }",
         );
         let trailing_loop_spec = concat!(
             "module 0x42::guard { public fun f(x: u64): u64 { ",

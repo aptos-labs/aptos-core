@@ -9,20 +9,23 @@ verifies the target, rejects a contract that weakens itself -- verification
 disabled or skipped, a vacuous condition, a partial-abort pragma no callee
 justifies -- and
 reports an obligation category the contract leaves uncovered. Give it
-`package_path` and optionally `filter` to work on one module or function.
+`package_path` and optionally `filter` to work on one module or function. If a
+candidate needs a larger per-condition solver budget, set `timeout` no higher
+than {{ args.max_verification_timeout }} seconds.
 
 It verifies as part of accepting, so it replaces a closing call to
-`{{ tool(name="move_package_verify") }}`: beforehand that repeats work the check
-is about to do, and afterwards it re-proves what the check already proved. Call
-the prover only to localize a failure the check has reported, over a narrower
-`filter` than the check ran.
+`{{ tool(name="move_package_verify") }}`: immediately beforehand that repeats
+work the check is about to do, and afterwards it re-proves what the check
+already proved. Use the prover for initial diagnosis or to localize a reported
+failure over a narrower `filter`.
 
 - Accepted: the requested scope is done. Stop and report.
 - Rejected: the headline names which check failed, and the diagnostic lines that
-  follow are `path:line: code: message`. A verification failure is worked with
-  the verification workflow; a weakening code points at the clause that
-  introduced it. A weakening you did not introduce -- a trusted boundary the
-  project already had -- is reported, not removed.
+  follow are `path:line: code: message`. Localize a verification failure with a
+  focused `{{ tool(name="move_package_verify") }}` call, repair it, and rerun the
+  candidate check. A weakening code points at the clause that introduced it. A
+  weakening you did not introduce -- a trusted boundary the project already
+  had -- is reported, not removed.
 - Unavailable: the prover could not run. That is not a verdict on the
   specification; report it as such.
 

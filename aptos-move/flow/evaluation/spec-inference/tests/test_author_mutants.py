@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = importlib.util.spec_from_file_location(
-    "author_mutants", ROOT / "corpus-v3" / "author_mutants.py"
+    "author_mutants", ROOT / "corpus-v3.2" / "author_mutants.py"
 )
 author_mutants = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(author_mutants)
@@ -103,12 +103,17 @@ class ScoringSetTest(unittest.TestCase):
     """
 
     def test_committed_sets_are_disjoint(self) -> None:
-        refutation = ROOT / "corpus-v3" / "mutants"
-        scoring = ROOT / "corpus-v3" / "mutants-scoring"
+        refutation = ROOT / "corpus-v3.2" / "mutants"
+        scoring = ROOT / "corpus-v3.2" / "mutants-scoring"
         if not scoring.is_dir():
             self.skipTest("no scoring set is committed yet")
 
-        package = ROOT / "corpus-v3" / "package"
+        package = ROOT / "corpus-v3.2" / "package"
+        if not (package / "sources").is_dir():
+            self.skipTest(
+                "private Etna-derived sources are not materialized; "
+                "run corpus-v3.2/build.py"
+            )
 
         def identities(root: Path, task: str) -> set[str]:
             # The relation the controller actually enforces with, so a
@@ -129,7 +134,7 @@ class ScoringSetTest(unittest.TestCase):
             )
 
     def test_every_scoring_mutant_ids_are_unique_across_tasks(self) -> None:
-        scoring = ROOT / "corpus-v3" / "mutants-scoring"
+        scoring = ROOT / "corpus-v3.2" / "mutants-scoring"
         if not scoring.is_dir():
             self.skipTest("no scoring set is committed yet")
         seen: dict[str, str] = {}

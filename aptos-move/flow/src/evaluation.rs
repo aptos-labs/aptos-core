@@ -22,7 +22,7 @@ pub const EXPECTED_FEEDBACK_LEVEL_ENV_VAR: &str = "MOVE_FLOW_EXPECTED_FEEDBACK_L
 pub enum InferenceTactic {
     /// Infer specifications directly, without access to the WP tool.
     AgentOnly,
-    /// Follow the prescribed invariants -> WP -> simplify -> verify workflow.
+    /// Follow the prescribed WP -> invariants -> WP -> simplify -> candidate-check workflow.
     HybridGuided,
     /// Make WP available while leaving orchestration to the agent.
     HybridFlexible,

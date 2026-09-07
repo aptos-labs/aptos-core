@@ -26,7 +26,8 @@ Run it on any scope, loops included. The call succeeds and writes what it could
 derive; a loop whose invariant does not constrain its modified state is reported
 as a warning against that function, and the condition it could not constrain is
 not emitted. So a warning means that function's contract is incomplete, while
-every function it did not name is finished.
+every function it did not name has a complete WP draft, ready for simplification
+and the candidate check.
 
 A warning names the loop and its source location, lists the loop-carried state,
 and gives bounded loop-head facts for the first few iterations. Those facts are

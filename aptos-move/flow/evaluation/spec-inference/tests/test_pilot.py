@@ -17,6 +17,7 @@ from harness.pilot import (
     _move_flow_sha256,
     _balanced_arm_orders,
     _require_committed_corpus,
+    _record_recipe,
     _resolve_mutant_manifests,
     build_pilot,
     load_round_shape,
@@ -75,7 +76,10 @@ def _config_sha256(config_path: Path | None) -> str | None:
 
 
 def _write_screening_report(
-    corpus_root: Path, records: list[dict], config_path: Path | None = None
+    corpus_root: Path,
+    records: list[dict],
+    config_path: Path | None = None,
+    package: str = "package",
 ) -> None:
     """Evidence for the fixture, matching what `screen_v3` writes.
 
@@ -88,7 +92,7 @@ def _write_screening_report(
     screening.mkdir(parents=True, exist_ok=True)
     (screening / "summary.json").write_text(
         json.dumps({
-            "package_tree_sha256": tree_hash(corpus_root / "package"),
+            "package_tree_sha256": tree_hash(corpus_root / package),
             # The scheduler compares these against what the round will run.
             "tools": {
                 "move_flow_sha256": _move_flow_sha256(),
@@ -96,7 +100,9 @@ def _write_screening_report(
                 "experiment_config_sha256": _config_sha256(config_path),
             },
             "results": [
-                {"task_id": r["task_id"], "target": r.get("target"), "passed": True,
+                {"task_id": r["task_id"],
+                 "target": r.get("target") or r.get("package_module_target"),
+                 "passed": True,
                  "apparatus_ok": True,
                  "reference_sha256": "d" * 64}
                 for r in records
@@ -421,6 +427,20 @@ class ControlLevelTest(unittest.TestCase):
 
 
 class CorpusRoundTest(unittest.TestCase):
+    def test_a_shared_recipe_cannot_escape_the_corpus(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            corpus = Path(temporary) / "corpus"
+            corpus.mkdir()
+            manifest = corpus / "manifest.json"
+            record = {
+                "task_id": "T-001",
+                "package_module_target": "0x1::m::f",
+                "shared_package_path": "../private-package",
+            }
+
+            with self.assertRaisesRegex(ValueError, "escapes the corpus"):
+                _record_recipe(manifest, record)
+
     """A round may be scheduled from a corpus manifest of shared-package targets."""
 
     @staticmethod
@@ -485,6 +505,85 @@ class CorpusRoundTest(unittest.TestCase):
             self.assertEqual(
                 {"0x42::m::f", "0x42::m::g"}, {s.target for s in specs}
             )
+
+    def test_a_shared_package_recipe_starts_each_task_from_its_prepared_tree(self) -> None:
+        # A corpus-v1.1 record names the shared package and a preparation patch
+        # that removes the target's reference contract; a run must start from
+        # the patched tree, not from the package the corpus keeps for proving.
+        from harness.artifacts import tree_hash
+        from harness.materialize import materialize_task
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _, plugins, config_path, commit = PilotScheduleTest._inputs(root)
+            corpus = root / "corpus"
+            package = corpus / "framework"
+            (package / "sources").mkdir(parents=True)
+            (package / "Move.toml").write_text(
+                '[package]\nname = "C"\nversion = "1.0.0"\n', encoding="utf-8"
+            )
+            (package / "sources" / "m.move").write_text(
+                "module 0x42::m { public fun f(): u64 { 1 } }\n"
+                "spec 0x42::m { spec f { ensures result == 1; } }\n",
+                encoding="utf-8",
+            )
+            (corpus / "patches").mkdir()
+            patch = corpus / "patches" / "V-001.patch"
+            patch.write_text(
+                "--- a/sources/m.move\n+++ b/sources/m.move\n@@ -1,2 +1 @@\n"
+                " module 0x42::m { public fun f(): u64 { 1 } }\n"
+                "-spec 0x42::m { spec f { ensures result == 1; } }\n",
+                encoding="utf-8",
+            )
+            prepared = materialize_task(package, patch, root / "prepared")
+            self.assertNotEqual(prepared, tree_hash(package))
+            manifest = corpus / "manifest.json"
+            records = [
+                {
+                    "task_id": "V-001",
+                    "package_module_target": "0x42::m::f",
+                    "shared_package_path": "framework",
+                    "shared_package_sha256": tree_hash(package),
+                    "preparation_patch": "patches/V-001.patch",
+                    "preparation_patch_sha256": hashlib.sha256(patch.read_bytes()).hexdigest(),
+                    "prepared_sha256": prepared,
+                    "required_contract_categories": ["normal-result"],
+                    "feature_strata": ["total"],
+                }
+            ]
+            manifest.write_text(
+                json.dumps({"schema_version": 2, "corpus": "v1", "records": records}),
+                encoding="utf-8",
+            )
+            _write_screening_report(corpus, records, config_path, package="framework")
+
+            built = build_pilot(
+                manifest, plugins, root / "round", commit, config_path,
+                replicates=1, round_id="recipe-001",
+            )
+
+            self.assertEqual(1, built["task_count"])
+            spec = RunSpec.load(next((root / "round" / "runs").glob("*.json")))
+            self.assertEqual("0x42::m::f", spec.target)
+            self.assertEqual(prepared, spec.initial_tree_sha256)
+            run_dir = root / "round" / "runs"
+            self.assertEqual(
+                patch.read_text(encoding="utf-8"),
+                (run_dir / spec.task_patch).read_text(encoding="utf-8"),
+            )
+
+            # The patch and package digests are the recipe's identity.
+            records[0]["preparation_patch_sha256"] = "0" * 64
+            manifest.write_text(
+                json.dumps({"schema_version": 2, "corpus": "v1", "records": records}),
+                encoding="utf-8",
+            )
+            with self.assertRaises(ValueError) as raised:
+                build_pilot(
+                    manifest, plugins, root / "round-2", commit, config_path,
+                    replicates=1, round_id="recipe-002",
+                )
+            self.assertIn("recipe mismatch", str(raised.exception))
 
     def test_a_symlink_in_the_package_is_not_scheduled(self) -> None:
         # The digest walk does not descend a symlinked directory, and the
@@ -832,6 +931,26 @@ class MutantManifestResolution(unittest.TestCase):
             )
             self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
             self.assertNotEqual(digests["a"], digests["b"])
+
+    def test_a_manifest_accepts_distinct_schema_mutant_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_mutants(root / "a", ["first", "second"])
+            digests, _ = _resolve_mutant_manifests(
+                [{"task_id": "a", "snapshot": str(_mutant_package(root))}],
+                root,
+            )
+            self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
+
+    def test_a_manifest_cannot_repeat_a_mutant_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_mutants(root / "a", ["same", "same"])
+            with self.assertRaisesRegex(ValueError, "repeats mutant id"):
+                _resolve_mutant_manifests(
+                    [{"task_id": "a", "snapshot": str(_mutant_package(root))}],
+                    root,
+                )
 
 
 MUTANT_SOURCE = "module m { fun f(): u64 { 1 } }\n"

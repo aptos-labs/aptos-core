@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 36,
+        "offset": 21027,
+        "sha256": "63634fad02347ccb51c2c7dade5128a1ae86f603455447646679917d1de7964f"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 22,
+        "to": "*sequence_number += 2;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/account/account.move",
+      "mutant_id": "AF-account-025-increment-by-two",
+      "obligation_category": "normal-result",
+      "rationale": "The sequence number advances by exactly one. Pins `ensures sequence_number == old + 1`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 135,
+        "offset": 20890,
+        "sha256": "8d009d85878fe6a7d66bc3b1508f3a8a3490f3ed1d9722ad50f2aa66933f0522"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 135,
+        "to": "if ((*sequence_number as u128) >= MAX_U64) { return };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/account/account.move",
+      "mutant_id": "AF-account-025-no-abort-at-max",
+      "obligation_category": "abort",
+      "rationale": "At `MAX_U64` the function must abort, not return silently. Pins `aborts_if sequence_number_pre == MAX_U64`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 65,
+        "offset": 20823,
+        "sha256": "52e9f5afa5446d26ac8513ca91a5f9b9974b70988325627502494142b973bbc6"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 57,
+        "to": "let sequence_number = &mut Account[addr].sequence_number;\n        if (*sequence_number == 0) { return };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/account/account.move",
+      "mutant_id": "AF-account-025-skip-when-zero",
+      "obligation_category": "normal-result",
+      "rationale": "A fresh account must still be advanced. Pins the unconditional increment.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

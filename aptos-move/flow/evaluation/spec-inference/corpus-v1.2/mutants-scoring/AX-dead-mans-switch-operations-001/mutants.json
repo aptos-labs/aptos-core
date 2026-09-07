@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 137,
+        "offset": 4947,
+        "sha256": "159bf2a4529d16f5bdd64c3495fa1331efc033af7b810002cfe982099ff59374"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 36,
+        "to": "true"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "mutant_id": "AX-dead-mans-switch-operations-001-enabled-check-always-passes",
+      "obligation_category": "abort",
+      "rationale": "A disabled switch must abort. Pins `aborts_if !enable_dead_mans_switch`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 137,
+        "offset": 4947,
+        "sha256": "159bf2a4529d16f5bdd64c3495fa1331efc033af7b810002cfe982099ff59374"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 36,
+        "to": "market.is_dead_mans_switch_enabled() || account == @0x1"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "mutant_id": "AX-dead-mans-switch-operations-001-disabled-address-one-proceeds",
+      "obligation_category": "abort",
+      "rationale": "A disabled switch must abort for every account. Pins `aborts_if !enable_dead_mans_switch` independently of the account value.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 147,
+        "offset": 5085,
+        "sha256": "a059bd08a0985120428937ffdab5896a57b5ddaf7b057ef25ee856e54c83d54f"
+      },
+      "edit": {
+        "at": 49,
+        "kind": "substitute",
+        "length": 23,
+        "to": "get_bulk_order(@0x1)"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "mutant_id": "AX-dead-mans-switch-operations-001-looks-up-address-one",
+      "obligation_category": "abort",
+      "rationale": "The requested account must be looked up. Pins the missing-order abort for the input account.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204",
+  "task_id": "AX-dead-mans-switch-operations-001"
+}

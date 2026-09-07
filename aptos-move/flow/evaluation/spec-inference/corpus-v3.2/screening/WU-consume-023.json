@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_work_units",
+  "reference_proved": true,
+  "reference_sha256": "402e40515f83dd0d924325bbbc04917a555e9884083abfe3fd36dd622e122db0",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_work_units::consume_order_match_work_units",
+  "task_id": "WU-consume-023",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.5,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false
+}

@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_minmax",
+  "reference_proved": true,
+  "reference_sha256": "e7ab5d6bd023aafd27ea81e0a567fc4cc4499b7e9cf2b4861e12ba87b9b36f74",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_minmax::find_min_value",
+  "task_id": "MM-min-013",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.3,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

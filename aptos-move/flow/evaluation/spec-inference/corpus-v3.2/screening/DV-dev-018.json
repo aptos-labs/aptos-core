@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_deviation",
+  "reference_proved": true,
+  "reference_sha256": "0aa5839df9b942a1495aa28910745330af4669134f8aa1d51c4f9d45cee815f4",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_deviation::calculate_deviation_bps",
+  "task_id": "DV-dev-018",
+  "threshold_seconds": 40,
+  "wall_seconds": 7.4,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false
+}

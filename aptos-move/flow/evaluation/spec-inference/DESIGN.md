@@ -57,7 +57,7 @@ package that is otherwise complete and provable.
 
 - `corpus-vN/package/` is a single editable Move package, vendored so it
   declares no external dependencies and relocates cleanly.
-- `corpus-v1/samples/<task-id>/README.md` is the human-facing recipe: target,
+- `corpus-v1.1/samples/<task-id>/README.md` is the human-facing recipe: target,
   source file, dependency closure, aliases, allowed edits, hashes, preparation
   patch. Samples are **overlays**, never independent package copies.
 - `materialize_task` copies the shared package, applies the preparation patch,
@@ -79,8 +79,8 @@ into a parameter.
 
 | corpus | source | status |
 |---|---|---|
-| [`corpus-v1/`](corpus-v1/README.md) | Aptos framework + experimental, pinned revision | superseded as a benchmark; retained as infrastructure |
-| [`corpus-v3/`](corpus-v3/README.md) | Etna | **the benchmark.** The full run is planned on this corpus |
+| [`corpus-v1.1/`](corpus-v1.1/README.md) | Aptos framework + experimental, pinned revision | superseded as a benchmark; retained as infrastructure |
+| [`corpus-v3.2/`](corpus-v3.2/README.md) | Etna | **the benchmark.** The full run is planned on this corpus |
 
 **V3 is the final benchmark target.** Rounds are planned and reported against
 it; V1 is kept for the reasons below, not as a run target.
@@ -93,7 +93,7 @@ may be recall rather than inference. It is kept because it is the only
 is the only source of higher-order/iterator and global-state coverage, which the
 V3 pool structurally lacks. Its 8,000-plus lines of authored opaque dependency
 contracts are the proof infrastructure behind
-[`corpus-v1/metadata/prover-repairs.md`](corpus-v1/metadata/prover-repairs.md).
+[`corpus-v1.1/metadata/prover-repairs.md`](corpus-v1.1/metadata/prover-repairs.md).
 
 *V2* was an earlier cut of the same Etna source and has been removed; it lives
 in git history. It saturated — nearly every cell succeeded for every arm, so
@@ -119,9 +119,9 @@ tasks.
 **No Etna source is in this repository.** `aptos-core` is public and Etna is
 not, so everything derived from it is generated from a pinned commit of a
 private repository — `aptos-labs/etna` at
-`dd23678f980266360e050037fb78317b13753068` — into gitignored trees: the corpus
-package (`corpus-v3/package/sources/`) and the reference packages
-(`corpus-v3/references/build/`). What is committed is recipes, specifications,
+`1a71823845dc092c825996d433adaf9843ea78aa` — into gitignored trees: the corpus
+package (`corpus-v3.2/package/sources/`) and the reference packages
+(`corpus-v3.2/references/build/`). What is committed is recipes, specifications,
 digests, and anchors — our own text plus hashes. A mutant stores an offset and
 a SHA-256 into the generated file rather than the code it rewrites, and a
 reference is committed as a patch that only *adds* specification lines.
@@ -572,8 +572,8 @@ counts are the stable resource result; dollar costs are derived from them.
 - [ ] Analysis uses task-level blocking and includes failed runs at the cap.
 
 **The Etna sources are not committed.** `aptos-core` is public and Etna is not,
-so `corpus-v3/package/sources/` is gitignored and only the recipe lives here;
-`corpus-v3/build.py --verify` regenerates in place and fails, naming files, if
+so `corpus-v3.2/package/sources/` is gitignored and only the recipe lives here;
+`corpus-v3.2/build.py --verify` regenerates in place and fails, naming files, if
 any digest differs from the manifest. Any published artifact built from this
 corpus needs its own disclosure decision — contract shapes can be described
 without reproducing proprietary source, but the package itself cannot be

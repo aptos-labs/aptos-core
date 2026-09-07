@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_tier_leverage",
+  "reference_proved": true,
+  "reference_sha256": "62071dda6921e574ef4717060422205e852a0a4beca191cdd5aad9af34552d06",
+  "schema_version": 2,
+  "target": "decibel_campaign::extracted_tier_leverage::checked_max_tier_leverage",
+  "task_id": "TL-lev-020",
+  "threshold_seconds": 20,
+  "wall_seconds": 6.7,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

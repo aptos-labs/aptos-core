@@ -2,7 +2,7 @@
 
 This is V1 tooling and is not used by V3, which does not need it: a V3
 reference is a committed specification patch assembled by
-`corpus-v3/build_references.py`, and its mutants are authored directly as
+`corpus-v3.2/build_references.py`, and its mutants are authored directly as
 anchored manifests. Both are then validated by `harness.validate_mutants`.
 The V1 flow is different because that corpus restores pinned-commit
 framework specifications rather than authoring them, which is what this

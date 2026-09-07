@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/selection_machine",
+  "reference_proved": true,
+  "reference_sha256": "efe076ba227b80a65b8a33a7ddafec1c2799189f38972f19c2b1c18a270a2bf8",
+  "schema_version": 2,
+  "target": "decibel_dex::selection_machine::select",
+  "task_id": "SM-select-022",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.9,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

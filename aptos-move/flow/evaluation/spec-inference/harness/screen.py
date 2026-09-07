@@ -4,15 +4,25 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import tempfile
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from .identifiers import require_plain_name
-from .artifacts import load_object, sha256_file, tree_hash, write_json
-from .compatibility import check_compatibility, tool_executables
+from .artifacts import canonical_json, load_object, sha256_file, tree_hash, write_json
+from .compatibility import (
+    COMPATIBILITY_SCHEMA_VERSION,
+    apparatus_reached_a_verdict,
+    binary_sha256,
+    admission,
+    check_compatibility,
+    prove_reference,
+    tool_executables,
+)
 from .config import ExperimentConfig
 from .materialize import materialize_task
 
@@ -41,13 +51,24 @@ async def screen_corpus(
         for record in manifest["records"]
         if record["selection_status"] == "selected"
     ]
-    if len(selected) != 30:
-        raise ValueError(f"expected 30 selected tasks, got {len(selected)}")
+    expected = sum(
+        count
+        for quotas in (manifest.get("quotas") or {}).values()
+        for count in quotas.values()
+    )
+    # The corpus size is the sum of the selection quotas, not a constant: a
+    # corpus that de-duplicates shapes is smaller than one that does not, and a
+    # hard-coded thirty silently outlaws every size but the first one chosen.
+    if expected and len(selected) != expected:
+        raise ValueError(f"expected {expected} selected tasks, got {len(selected)}")
     results_dir.mkdir(parents=True, exist_ok=resume)
     summaries = []
+    evidence = []
+    shared_packages = set()
     for index, record in enumerate(selected, 1):
         require_plain_name(record["task_id"], "task_id")
         shared = (manifest_path.parent / record["shared_package_path"]).resolve()
+        shared_packages.add(shared)
         patch = (manifest_path.parent / record["preparation_patch"]).resolve()
         with tempfile.TemporaryDirectory(
             prefix=f"move-inference-screen-{record['task_id']}-"
@@ -62,13 +83,16 @@ async def screen_corpus(
                     raise ValueError(
                         f"selected task was previously excluded: {record['task_id']}"
                     )
-                record["compatibility_screen"] = {
-                    **ledger_entry,
-                    "origin": "cumulative_screening_ledger",
-                }
+                record["compatibility_screen"], apparatus_ok = (
+                    await _screen_from_ledger(
+                        config, shared, record, threshold, ledger_entry
+                    )
+                )
             else:
                 result = (
-                    _resume_result(result_path, package, record, threshold)
+                    _resume_result(
+                        result_path, package, record, threshold, tool_executables(config)
+                    )
                     if resume
                     else None
                 )
@@ -79,11 +103,22 @@ async def screen_corpus(
                         record["package_module_target"],
                         threshold,
                     )
+                    # The shared package carries every target's reference;
+                    # the preparation patch only removes this target's. So
+                    # the reference to prove is the target in the shared tree.
+                    result["reference_proof"] = await prove_reference(
+                        config, shared, reference_targets(record), threshold
+                    )
                     write_json(result_path, result)
-                reason = result.get("failure_kind") if not result["passed"] else None
+                verdict = admission(result)
+                apparatus_ok = apparatus_reached_a_verdict(result)
                 record["compatibility_screen"] = {
-                    "passed": result["passed"],
-                    "reason": reason,
+                    "passed": verdict["passed"],
+                    "reason": verdict["reason"],
+                    "well_formed": verdict["well_formed"],
+                    "reference_proved": verdict["reference_proved"],
+                    "wp_hard": verdict["wp_hard"],
+                    "wp_failure_kind": verdict["wp_failure_kind"],
                     "threshold_seconds": threshold,
                     "threshold_exceeded_stage": result["threshold_exceeded_stage"],
                     "total_duration_ms": result["total_duration_ms"],
@@ -98,7 +133,10 @@ async def screen_corpus(
                     },
                     "result_path": os.path.relpath(result_path, output_path.parent),
                     "result_sha256": sha256_file(result_path),
-                    "tool_executables": result.get("tool_executables", {}),
+                    # The identity `_load_ledger` compares against, so a
+                    # ledger built from these verdicts is reusable by the
+                    # same apparatus.
+                    "tool_executables": tool_executables(config),
                     "origin": "executed",
                 }
         summary = {
@@ -107,6 +145,16 @@ async def screen_corpus(
             **record["compatibility_screen"],
         }
         summaries.append(summary)
+        evidence.append(
+            {
+                "task_id": record["task_id"],
+                "target": record["package_module_target"],
+                "passed": summary["passed"],
+                "apparatus_ok": apparatus_ok,
+                # The prepared tree this verdict is about.
+                "reference_sha256": record["prepared_sha256"],
+            }
+        )
         print(
             json.dumps(
                 {
@@ -114,6 +162,7 @@ async def screen_corpus(
                     "task_id": record["task_id"],
                     "passed": summary["passed"],
                     "reason": summary["reason"],
+                    "wp_hard": summary.get("wp_hard"),
                     "threshold_exceeded_stage": summary["threshold_exceeded_stage"],
                     "total_duration_ms": summary["total_duration_ms"],
                 },
@@ -123,6 +172,9 @@ async def screen_corpus(
         )
 
     failures = [summary for summary in summaries if not summary["passed"]]
+    if len(shared_packages) != 1:
+        raise ValueError("every selected task must share one package")
+    (shared,) = shared_packages
     result_manifest = {
         **manifest,
         "corpus_status": "screened" if not failures else "screen_failed",
@@ -141,6 +193,10 @@ async def screen_corpus(
                 failure["reason"] != "compatibility_timeout" for failure in failures
             ),
             "failures": failures,
+            "wp_hard": [
+                summary["task_id"] for summary in summaries if summary.get("wp_hard")
+            ],
+            **screening_evidence(config, shared, evidence),
         },
         "records": manifest["records"],
     }
@@ -177,25 +233,101 @@ def main() -> None:
         )
 
 
+def reference_targets(record: dict[str, Any]) -> list[str]:
+    """The task's functions as prover targets.
+
+    A module task is screened under the same module target the scheduler runs.
+    Deriving a narrower set from manifest-provided function names would let the
+    screen prove a sibling while the round executes the whole module.
+    """
+    target = record["package_module_target"]
+    if record.get("granularity") == "module":
+        return [target]
+    return [target]
+
+
+async def _screen_from_ledger(
+    config: ExperimentConfig,
+    shared: Path,
+    record: dict[str, Any],
+    threshold: int,
+    ledger_entry: dict[str, Any],
+) -> tuple[dict[str, Any], bool]:
+    """Reuse compatibility evidence while re-proving the current reference."""
+    reference_proof = await prove_reference(
+        config, shared, reference_targets(record), threshold
+    )
+    reference_proved = bool(reference_proof["proved"])
+    return (
+        {
+            **ledger_entry,
+            "passed": reference_proved,
+            "reason": None if reference_proved else "reference_unproved",
+            "reference_proved": reference_proved,
+            "origin": "cumulative_screening_ledger",
+        },
+        bool(reference_proof["vacuity_checked"]),
+    )
+
+
+def screening_evidence(
+    config: ExperimentConfig, package: Path, results: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Identify what a screen measured and with what, for a round to check.
+
+    The scheduler admits a task only against evidence that names the same
+    package tree and the same apparatus the round will run: a verdict depends
+    on the binary and the configuration, and recording only a command name
+    would let evidence produced by one build clear a round executed by another.
+    `screen_v3` records the same block.
+    """
+    return {
+        "package_tree_sha256": tree_hash(package),
+        "tools": {
+            "move_flow": config.check_candidate_command[:1],
+            "move_flow_sha256": binary_sha256(config.check_candidate_command[0]),
+            "stage_executables": tool_executables(config),
+            "experiment_config_sha256": hashlib.sha256(
+                canonical_json(asdict(config))
+            ).hexdigest(),
+            "model_independent": True,
+        },
+        "results": results,
+    }
+
+
 def _resume_result(
     path: Path,
     package: Path,
     record: dict[str, Any],
     threshold: int,
+    tools: dict[str, Any],
 ) -> dict[str, Any] | None:
+    """A result from an interrupted screen, if it is still this screen's.
+
+    The toolchain is part of the identity for the reason the round's own
+    apparatus check exists: a verdict from another build says nothing about
+    this one, and resuming across a rebuild would publish the new binary's
+    name over the old binary's measurements.
+    """
     if tree_hash(package) != record["prepared_sha256"]:
         raise ValueError(f"prepared package hash mismatch during resume: {package}")
     if not path.is_file():
         return None
     result = load_object(path)
     expected = {
-        "schema_version": 4,
+        "schema_version": COMPATIBILITY_SCHEMA_VERSION,
         "package_sha256": record["prepared_sha256"],
         "target": record["package_module_target"],
         "threshold_seconds": threshold,
     }
     if any(result.get(key) != value for key, value in expected.items()):
         raise ValueError(f"resume result identity mismatch: {path}")
+    if result.get("tool_executables") != tools:
+        raise ValueError(
+            f"{path} was screened by a different toolchain than this screen runs; "
+            "re-screen rather than resume"
+        )
     return result
 
 

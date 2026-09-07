@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import asyncio
 import json
 import re
@@ -18,6 +19,10 @@ from .move_source import mask_comments_and_strings
 from .clean_unused_aliases import clean_unused_aliases
 from .config import ExperimentConfig
 from .judge import render_command, run_command
+
+# Version of the result `check_compatibility` writes; a resumed screen accepts
+# only results of this shape.
+COMPATIBILITY_SCHEMA_VERSION = 5
 
 
 async def check_compatibility(
@@ -69,8 +74,15 @@ async def check_compatibility(
             )
             inference_report = _read_stage_report(values["output"])
             if inference_result.succeeded:
-                untrusted_inferred_conditions = _find_untrusted_inferred_conditions(
-                    enriched_package
+                # Only what this run inferred. The scan reads every
+                # `.spec.move` in the package, and a prepared corpus ships
+                # reviewed dependency contracts that already carry flagged
+                # clauses -- they are the corpus's trusted boundary, not
+                # something the target introduced. Subtracting the conditions
+                # already present before enrichment leaves exactly the ones WP
+                # emitted for this target, which is what the check is for.
+                untrusted_inferred_conditions = _conditions_introduced_by(
+                    package, enriched_package
                 )
                 values["output"].unlink(missing_ok=True)
                 # Recompile and prove exactly the inferred source. In
@@ -121,7 +133,7 @@ async def check_compatibility(
         else (_failure_kind(stages) if not passed else None)
     )
     report = {
-        "schema_version": 5,
+        "schema_version": COMPATIBILITY_SCHEMA_VERSION,
         "package_sha256": tree_hash(package),
         "target": target,
         "threshold_seconds": threshold,
@@ -181,7 +193,17 @@ def stage_identity(entry: dict[str, Any] | None) -> dict[str, Any]:
     means a field added to the record later is compared by default, which is
     the safe direction.
     """
-    return {key: value for key, value in (entry or {}).items() if key != "path"}
+    identity = {
+        key: value for key, value in (entry or {}).items() if key != "path"
+    }
+    arguments = identity.get("arguments")
+    if isinstance(arguments, dict):
+        # Argument paths are useful while diagnosing a local run, but the
+        # ordered content digests are the portable identity.  Keeping the map
+        # keys would make a relocated wrapper look different and would expose
+        # the checkout layout when this identity is published as evidence.
+        identity["arguments"] = list(arguments.values())
+    return identity
 
 
 def changed_stages(
@@ -288,6 +310,39 @@ _FLAGGED_CONDITION = re.compile(
     r"(?m)^[ \t]*(?:requires|ensures|aborts_if|aborts_with|modifies|emits|"
     r"invariant|decreases)\s*\[\s*inferred\s*=\s*(?:vacuous|sathard)\s*\]"
 )
+def _conditions_introduced_by(
+    baseline: Path, enriched: Path
+) -> list[dict[str, object]]:
+    """Flagged clauses present after inference and absent before it.
+
+    A prepared corpus carries dependency contracts that were authored and
+    reviewed against an earlier prover, and a later prover may flag some of
+    them. Those are inputs to the screen, not findings of it: re-reporting them
+    fails every target in the package for the same reason and says nothing
+    about any of them. What the screen asks is whether WP produced an untrusted
+    clause *here*.
+
+    Compared by file and kind rather than by line, so a clause that merely
+    shifted position when the inferred specification was written in is still
+    recognized as pre-existing.
+    """
+    def digest(package: Path) -> collections.Counter:
+        counted: collections.Counter = collections.Counter()
+        for finding in _find_untrusted_inferred_conditions(package):
+            counted[(finding["path"], finding["kind"])] += 1
+        return counted
+
+    before = digest(baseline)
+    introduced: list[dict[str, object]] = []
+    seen: collections.Counter = collections.Counter()
+    for finding in _find_untrusted_inferred_conditions(enriched):
+        key = (finding["path"], finding["kind"])
+        seen[key] += 1
+        if seen[key] > before[key]:
+            introduced.append(finding)
+    return introduced
+
+
 def _find_untrusted_inferred_conditions(package: Path) -> list[dict[str, object]]:
     """Return, but never alter, WP clauses it marked unfit for a contract."""
     findings: list[dict[str, object]] = []
@@ -329,3 +384,179 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def apparatus_reached_a_verdict(result: dict[str, Any]) -> bool:
+    """Whether the screen actually measured the target.
+
+    `check_compatibility` reports `infrastructure_failure` for tooling that was
+    unavailable and `compatibility_timeout` for a stage that ran out of time.
+    Neither is evidence about the target, so neither can be read as one.
+    """
+    if result.get("failure_kind") in ("infrastructure_failure", "compatibility_timeout"):
+        return False
+    # Every stage the screen ran, not only WP. A prover that dies on the
+    # inferred source says as little about the target as a WP that dies on the
+    # original, and `_failure_kind` lands both on `implementation_failure`;
+    # reading only the inference stage admitted a target whose enriched proof
+    # had crashed as a screened, WP-hard corpus member.
+    return all(
+        _stage_reached_a_verdict(result.get(stage))
+        for stage in ("compile", "wp_inference", "enriched_compile", "prover")
+    )
+
+
+def _stage_reached_a_verdict(stage: dict[str, Any] | None) -> bool:
+    """Whether one stage's exit says anything about the target.
+
+    Success is a verdict, and so is a non-zero exit carrying a stage report: a
+    tool that declines with a diagnosis has diagnosed something. A crash
+    arrives with neither, and `_failure_kind` cannot tell the two apart. A
+    negative return code is a signal, which is never a refusal.
+
+    A stage that did not run has no return code and is not held against the
+    target: when WP declines there is nothing to recompile or prove.
+    """
+    stage = stage or {}
+    returncode = stage.get("returncode")
+    if returncode in (0, None):
+        return True
+    return returncode > 0 and bool(stage.get("stage_report"))
+
+
+def is_well_formed(result: dict[str, Any]) -> bool:
+    """Whether the target itself is admissible, given a working apparatus.
+
+    Inference failing is a property of the task, not a defect in it: an
+    uninvariant loop makes WP drop what the havoc left unconstrained, and in an
+    evaluation that is an error rather than an empty `aborts_if_is_partial`
+    contract -- so the loop targets, which are the interesting ones, report a
+    failed inference stage. When WP declines there is nothing to recompile, so
+    requiring the enriched compile would eject exactly the tasks worth asking.
+
+    But a failed inference stage covers two different things, and only one of
+    them is about the target. WP that could not run at all says nothing, and
+    admitting it records an unscreened task as a corpus member.
+    """
+    compiles = (result.get("compile") or {}).get("returncode") == 0
+    inferred = (result.get("wp_inference") or {}).get("returncode") == 0
+    enriched_ok = (
+        (result.get("enriched_compile") or {}).get("returncode") == 0
+        if inferred
+        else True
+    )
+    return compiles and enriched_ok and apparatus_reached_a_verdict(result)
+
+
+async def prove_reference(
+    config: ExperimentConfig, package: Path, targets: list[str], threshold: int
+) -> dict[str, Any]:
+    """Prove a task's reference contracts, the evidence that it is solvable.
+
+    `targets` are the task's functions as `address::module::function`: a
+    function-level prover scope verifies each one even under
+    `pragma verify = false`, whereas a module-level scope would refuse the
+    module for functions the task does not ask about.
+    """
+    outcomes = [
+        await _prove_reference_target(config, package, target, threshold)
+        for target in targets
+    ]
+    return {
+        "proved": all(outcome["proved"] for outcome in outcomes),
+        "vacuity_checked": all(outcome["vacuity_checked"] for outcome in outcomes),
+        "vacuous": any(outcome["vacuous"] for outcome in outcomes),
+        "targets": {target: outcome for target, outcome in zip(targets, outcomes)},
+        "package": str(package),
+        "reference_sha256": tree_hash(package),
+    }
+
+
+async def _prove_reference_target(
+    config: ExperimentConfig, package: Path, target: str, threshold: int
+) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="move-inference-reference-") as temporary:
+        outcome = await run_command(
+            render_command(
+                config.prove_command,
+                package=package,
+                baseline=package,
+                target=target,
+                timeout=threshold,
+                output=Path(temporary) / "reference.json",
+            ),
+            timeout_seconds=max(120, threshold * 4),
+        )
+        # A reference with contradictory assumptions proves every
+        # postcondition, so a successful prove says nothing about solvability
+        # on its own. `validate_mutants` refuses such a reference before
+        # certifying essentiality; the screen has to refuse it before
+        # certifying that the task is solvable at all.
+        inconsistency = await run_command(
+            render_command(
+                [*config.prove_command, "--check-inconsistency"],
+                package=package,
+                baseline=package,
+                target=target,
+                timeout=threshold,
+                output=Path(temporary) / "inconsistency.json",
+            ),
+            timeout_seconds=max(120, threshold * 4),
+        )
+        vacuous = "inconsistent assumption" in inconsistency.diagnostics
+        # Silence only means something if the check reached a verdict: a
+        # timeout or a missing solver produces the same absence of the
+        # diagnostic as a sound reference does.
+        vacuity_checked = inconsistency.succeeded and not vacuous
+    # `returncode == 0` is not success: a process can exit zero while the
+    # watchdog is tearing it down, and `succeeded` also covers an
+    # infrastructure error. A reference that did not finish proving has not
+    # proved anything.
+    return {
+        "proved": outcome.succeeded and vacuity_checked,
+        "vacuity_checked": vacuity_checked,
+        "vacuous": vacuous,
+    }
+
+
+def admission(result: dict[str, Any]) -> dict[str, Any]:
+    """Whether a screened target is a corpus member, and why not otherwise.
+
+    `check_compatibility` also asks that WP's unaided output verify. That was
+    the bar for the first prepared corpus, where the dependency contracts had to
+    be complete before a target was asked of anyone. Here the target *is* the
+    task, and a target WP cannot do unaided is the interesting kind -- admitting
+    only what WP already solves would keep the easy member of every family. So
+    admission asks whether the task is well-formed and provable, and
+    WP-hardness is recorded as a property of the task, with the stage WP fell
+    short at as its kind.
+    """
+    well_formed = is_well_formed(result)
+    reference = result.get("reference_proof") or {}
+    wp_hard = not result["passed"]
+    passed = bool(well_formed and reference.get("proved"))
+    if passed:
+        reason = None
+    elif not well_formed:
+        reason = result.get("failure_kind") or _failure_kind(
+            {
+                name: result.get(name)
+                for name in ("compile", "wp_inference", "enriched_compile", "prover")
+            }
+        )
+    else:
+        reason = "reference_unproved"
+    return {
+        "passed": passed,
+        "reason": reason,
+        "well_formed": well_formed,
+        "reference_proved": bool(reference.get("proved")),
+        "wp_hard": wp_hard,
+        "wp_failure_kind": result.get("failure_kind") if wp_hard else None,
+    }
+
+
+def binary_sha256(name: str) -> str | None:
+    """The digest of the tool the screen actually invoked, if it is on PATH."""
+    resolved = shutil.which(name)
+    return sha256_file(Path(resolved)) if resolved else None

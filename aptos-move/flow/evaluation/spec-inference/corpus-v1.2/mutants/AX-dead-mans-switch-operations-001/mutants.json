@@ -1,0 +1,69 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 137,
+        "offset": 4947,
+        "sha256": "159bf2a4529d16f5bdd64c3495fa1331efc033af7b810002cfe982099ff59374"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 78,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "mutant_id": "AX-dead-mans-switch-operations-001-no-enabled-check",
+      "obligation_category": "abort",
+      "rationale": "A disabled switch must abort. Pins `aborts_if !enable_dead_mans_switch`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 137,
+        "offset": 4947,
+        "sha256": "159bf2a4529d16f5bdd64c3495fa1331efc033af7b810002cfe982099ff59374"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 78,
+        "to": "if (!market.is_dead_mans_switch_enabled()) { return };"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "mutant_id": "AX-dead-mans-switch-operations-001-returns-when-disabled",
+      "obligation_category": "abort",
+      "rationale": "A disabled switch must abort, not return. Pins `aborts_if !enable_dead_mans_switch`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

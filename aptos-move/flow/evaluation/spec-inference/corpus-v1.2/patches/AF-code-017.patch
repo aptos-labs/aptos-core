@@ -1,0 +1,500 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..6e240697a0
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,350 @@
++{
++  "called_function_dependencies": [
++    "0x1::code::check_dependencies",
++    "0x1::code::get_module_names",
++    "0x1::code::request_publish",
++    "0x1::code::request_publish_with_allowed_deps",
++    "0x1::create_signer::create_signer",
++    "0x1::error::canonical",
++    "0x1::event::emit",
++    "0x1::features::is_enabled",
++    "0x1::from_bcs::from_bytes",
++    "0x1::hash::sha3_256",
++    "0x1::object::exists_at",
++    "0x1::object::is_owner",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::borrow_mut",
++    "0x1::ordered_map::contains",
++    "0x1::ordered_map::new",
++    "0x1::signer::borrow_address",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::contains",
++    "0x1::vector::empty",
++    "0x1::vector::length",
++    "0x1::vector::push_back",
++    "0x1::vector::trim"
++  ],
++  "granularity": "module",
++  "package_module_target": "0x1::code",
++  "schema_version": 3,
++  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_path": "sources/AptosFramework/code.move",
++  "spec_function_dependencies": [
++    "0x1::code::spec_allowed_deps",
++    "0x1::code::spec_dep_allowed",
++    "0x1::code::spec_dep_step_aborts",
++    "0x1::code::spec_deps_abort_from",
++    "0x1::code::spec_first_package_named",
++    "0x1::code::spec_is_policy_exempted_address",
++    "0x1::code::spec_module_deps",
++    "0x1::create_signer::spec_create_signer",
++    "0x1::features::spec_is_enabled",
++    "0x1::from_bcs::deserializable",
++    "0x1::from_bcs::deserialize",
++    "0x1::object::spec_exists_at",
++    "0x1::option::spec_none",
++    "0x1::option::spec_some",
++    "0x1::signer::$address_of",
++    "0x1::signer::$borrow_address",
++    "0x1::string::spec_utf8"
++  ],
++  "target_functions": [
++    "initialize",
++    "check_upgradability",
++    "freeze_code_object",
++    "get_module_names",
++    "publish_package"
++  ],
++  "task_id": "AF-code-017",
++  "transitive_called_function_dependencies": [
++    "0x1::cmp::compare",
++    "0x1::cmp::is_lt",
++    "0x1::code::can_change_upgrade_policy_to",
++    "0x1::code::check_coexistence",
++    "0x1::code::check_dependencies",
++    "0x1::code::check_upgradability",
++    "0x1::code::get_module_names",
++    "0x1::code::is_policy_exempted_address",
++    "0x1::code::request_publish",
++    "0x1::code::request_publish_with_allowed_deps",
++    "0x1::code::upgrade_policy_arbitrary",
++    "0x1::code::upgrade_policy_immutable",
++    "0x1::create_signer::create_signer",
++    "0x1::error::already_exists",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::not_found",
++    "0x1::error::permission_denied",
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::features::code_dependency_check_enabled",
++    "0x1::features::contains",
++    "0x1::features::is_enabled",
++    "0x1::features::is_lazy_module_initialization_enabled",
++    "0x1::from_bcs::from_bytes",
++    "0x1::from_bcs::to_u128",
++    "0x1::hash::sha3_256",
++    "0x1::init::ensure_module_state",
++    "0x1::init::module_id_from_name",
++    "0x1::init::record_deploy_owner",
++    "0x1::init::reset_initialized",
++    "0x1::object::address_to_object",
++    "0x1::object::exists_at",
++    "0x1::object::is_object",
++    "0x1::object::is_owner",
++    "0x1::object::object_address",
++    "0x1::object::owner",
++    "0x1::object::root_owner",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::borrow_mut",
++    "0x1::ordered_map::contains",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_borrow_mut",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::new",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::string::bytes",
++    "0x1::string::internal_check_utf8",
++    "0x1::string::utf8",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::system_addresses::is_aptos_framework_address",
++    "0x1::vector::append",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::contains",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_append",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::cmp::compare",
++    "0x1::cmp::is_lt",
++    "0x1::code::can_change_upgrade_policy_to",
++    "0x1::code::check_coexistence",
++    "0x1::code::check_dependencies",
++    "0x1::code::check_upgradability",
++    "0x1::code::get_module_names",
++    "0x1::code::is_policy_exempted_address",
++    "0x1::code::request_publish",
++    "0x1::code::request_publish_with_allowed_deps",
++    "0x1::code::upgrade_policy_arbitrary",
++    "0x1::code::upgrade_policy_immutable",
++    "0x1::create_signer::create_signer",
++    "0x1::error::already_exists",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::not_found",
++    "0x1::error::permission_denied",
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::features::code_dependency_check_enabled",
++    "0x1::features::contains",
++    "0x1::features::is_enabled",
++    "0x1::features::is_lazy_module_initialization_enabled",
++    "0x1::from_bcs::from_bytes",
++    "0x1::from_bcs::to_u128",
++    "0x1::hash::sha3_256",
++    "0x1::init::ensure_module_state",
++    "0x1::init::module_id_from_name",
++    "0x1::init::record_deploy_owner",
++    "0x1::init::reset_initialized",
++    "0x1::object::address_to_object",
++    "0x1::object::exists_at",
++    "0x1::object::is_object",
++    "0x1::object::is_owner",
++    "0x1::object::object_address",
++    "0x1::object::owner",
++    "0x1::object::root_owner",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::borrow_mut",
++    "0x1::ordered_map::contains",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_borrow_mut",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::new",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::string::bytes",
++    "0x1::string::internal_check_utf8",
++    "0x1::string::utf8",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::system_addresses::is_aptos_framework_address",
++    "0x1::vector::append",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::contains",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_append",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::account",
++    "0x1::account_abstraction",
++    "0x1::aggregator",
++    "0x1::aggregator_factory",
++    "0x1::aggregator_v2",
++    "0x1::any",
++    "0x1::aptos_account",
++    "0x1::aptos_coin",
++    "0x1::aptos_governance",
++    "0x1::aptos_hash",
++    "0x1::auth_data",
++    "0x1::bcs",
++    "0x1::bcs_stream",
++    "0x1::big_ordered_map",
++    "0x1::block",
++    "0x1::bls12381",
++    "0x1::bn254_algebra",
++    "0x1::chain_id",
++    "0x1::chain_status",
++    "0x1::chunky_dkg",
++    "0x1::chunky_dkg_config",
++    "0x1::chunky_dkg_config_seqnum",
++    "0x1::cmp",
++    "0x1::coin",
++    "0x1::comparator",
++    "0x1::confidential_amount",
++    "0x1::confidential_asset",
++    "0x1::confidential_balance",
++    "0x1::confidential_range_proofs",
++    "0x1::config_buffer",
++    "0x1::consensus_config",
++    "0x1::copyable_any",
++    "0x1::create_signer",
++    "0x1::crypto_algebra",
++    "0x1::decryption",
++    "0x1::delegation_pool",
++    "0x1::dispatchable_fungible_asset",
++    "0x1::dkg",
++    "0x1::ed25519",
++    "0x1::epoch_timeout_config",
++    "0x1::error",
++    "0x1::event",
++    "0x1::execution_config",
++    "0x1::features",
++    "0x1::federated_keyless",
++    "0x1::fixed_point32",
++    "0x1::fixed_point64",
++    "0x1::from_bcs",
++    "0x1::function_info",
++    "0x1::fungible_asset",
++    "0x1::gas_schedule",
++    "0x1::genesis",
++    "0x1::governance_proposal",
++    "0x1::guid",
++    "0x1::hash",
++    "0x1::init",
++    "0x1::jwk_consensus_config",
++    "0x1::jwks",
++    "0x1::keyless",
++    "0x1::keyless_account",
++    "0x1::math128",
++    "0x1::math64",
++    "0x1::math_fixed64",
++    "0x1::mem",
++    "0x1::multi_ed25519",
++    "0x1::multi_key",
++    "0x1::multisig_account",
++    "0x1::nonce_validation",
++    "0x1::object",
++    "0x1::option",
++    "0x1::optional_aggregator",
++    "0x1::ordered_map",
++    "0x1::pool_u64",
++    "0x1::pool_u64_unbound",
++    "0x1::primary_fungible_store",
++    "0x1::randomness",
++    "0x1::randomness_api_v0_config",
++    "0x1::randomness_config",
++    "0x1::randomness_config_seqnum",
++    "0x1::reconfiguration",
++    "0x1::reconfiguration_state",
++    "0x1::reconfiguration_with_dkg",
++    "0x1::reflect",
++    "0x1::resource_account",
++    "0x1::result",
++    "0x1::ristretto255",
++    "0x1::ristretto255_bulletproofs",
++    "0x1::ristretto255_pedersen",
++    "0x1::secp256k1",
++    "0x1::secp256r1",
++    "0x1::sigma_protocol",
++    "0x1::sigma_protocol_fiat_shamir",
++    "0x1::sigma_protocol_homomorphism",
++    "0x1::sigma_protocol_key_rotation",
++    "0x1::sigma_protocol_proof",
++    "0x1::sigma_protocol_registration",
++    "0x1::sigma_protocol_representation",
++    "0x1::sigma_protocol_representation_vec",
++    "0x1::sigma_protocol_statement",
++    "0x1::sigma_protocol_statement_builder",
++    "0x1::sigma_protocol_transfer",
++    "0x1::sigma_protocol_utils",
++    "0x1::sigma_protocol_withdraw",
++    "0x1::sigma_protocol_witness",
++    "0x1::signer",
++    "0x1::simple_map",
++    "0x1::single_key",
++    "0x1::smart_table",
++    "0x1::stake",
++    "0x1::staking_config",
++    "0x1::staking_contract",
++    "0x1::state_storage",
++    "0x1::storage_gas",
++    "0x1::storage_slots_allocator",
++    "0x1::string",
++    "0x1::string_utils",
++    "0x1::system_addresses",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::timestamp",
++    "0x1::transaction_context",
++    "0x1::transaction_fee",
++    "0x1::transaction_limits",
++    "0x1::transaction_validation",
++    "0x1::type_info",
++    "0x1::util",
++    "0x1::validator_consensus_info",
++    "0x1::vector",
++    "0x1::version",
++    "0x1::vesting",
++    "0x1::voting"
++  ]
++}
+diff --git a/sources/AptosFramework/code.move b/sources/AptosFramework/code.move
+index 5ad02aff39..63db7be25b 100644
+--- a/sources/AptosFramework/code.move
++++ b/sources/AptosFramework/code.move
+@@ -252,12 +252,12 @@ module aptos_framework::code {
+             package.upgrade_policy = upgrade_policy_immutable();
+             frozen.push_back(package);
+             i += 1;
+-        } spec {
+-            invariant i <= len(packages_before);
+-            invariant len(frozen) == i;
+-            invariant forall k in 0..i: frozen[k]
+-                == update_field(packages_before[k], upgrade_policy, UpgradePolicy { policy: 2 });
+-        };
++        }       
++                                                
++                                       
++                                                 
++                                                                                                 
++         ;
+         registry.packages = frozen;
+ 
+         // We unfortunately have to make a copy of each package to avoid borrow checker issues as check_dependencies
+@@ -271,9 +271,9 @@ module aptos_framework::code {
+         while (i < n) {
+             check_dependencies(code_object_addr, packages.borrow(i));
+             i += 1;
+-        } spec {
+-            invariant i <= len(packages);
+-        };
++        }       
++                                         
++         ;
+     }
+ 
+     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
+@@ -402,11 +402,11 @@ module aptos_framework::code {
+         while (i < n) {
+             vector::push_back(&mut module_names, pack.modules.borrow(i).name);
+             i += 1;
+-        } spec {
+-            invariant i <= len(pack.modules);
+-            invariant len(module_names) == i;
+-            invariant forall x in 0..i: module_names[x] == pack.modules[x].name;
+-        };
++        }       
++                                             
++                                             
++                                                                                
++         ;
+         module_names
+     }
+ 
+diff --git a/sources/AptosFramework/code.spec.move b/sources/AptosFramework/code.spec.move
+index a5c7eab254..9977476f11 100644
+--- a/sources/AptosFramework/code.spec.move
++++ b/sources/AptosFramework/code.spec.move
+@@ -72,37 +72,37 @@ spec aptos_framework::code {
+         pragma opaque;
+     }
+ 
+-    spec initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata) {
+-        pragma opaque;
+-        let aptos_addr = signer::address_of(aptos_framework);
+-        let owner_addr = signer::address_of(package_owner);
+-        modifies global<PackageRegistry>(owner_addr);
+-        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+-        ensures exists<PackageRegistry>(owner_addr);
+-    }
+-
+-    spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
+-        pragma aborts_if_is_partial;
+-        let addr = signer::address_of(owner);
+-        modifies global<PackageRegistry>(addr);
+-        aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
+-    }
++                                                                                                  
++                      
++                                                             
++                                                           
++                                                     
++                                                                            
++                                                    
++     
++
++                                                                                           
++                                    
++                                             
++                                               
++                                                                                  
++     
+ 
+     spec publish_package_txn {
+     }
+ 
+-    spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
+-        pragma aborts_if_is_partial;
+-        aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
+-        aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
+-    }
++                                                                                                                    
++                                    
++                                                                                      
++                                                                                                  
++     
+ 
+-    spec get_module_names(pack: &PackageMetadata): vector<String> {
+-        pragma opaque;
+-        aborts_if false;
+-        ensures len(result) == len(pack.modules);
+-        ensures forall i in 0..len(result): result[i] == pack.modules[i].name;
+-    }
++                                                                   
++                      
++                        
++                                                 
++                                                                              
++     
+ 
+     spec fun spec_is_policy_exempted_address(addr: address): bool {
+         addr == @1 || addr == @2 || addr == @3 || addr == @4 || addr == @5
+@@ -172,14 +172,14 @@ spec aptos_framework::code {
+         ensures result == spec_allowed_deps(pack, len(pack.deps));
+     }
+ 
+-    spec freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
+-        pragma aborts_if_is_partial;
++                                                                                       
++                                    
+ 
+-        let code_object_addr = code_object.inner;
+-        aborts_if !exists<object::ObjectCore>(code_object_addr);
+-        aborts_if !exists<PackageRegistry>(code_object_addr);
+-        aborts_if !object::is_owner(code_object, signer::address_of(publisher));
++                                                 
++                                                                
++                                                             
++                                                                                
+ 
+-        modifies global<PackageRegistry>(code_object_addr);
+-    }
++                                                           
++     
+ }

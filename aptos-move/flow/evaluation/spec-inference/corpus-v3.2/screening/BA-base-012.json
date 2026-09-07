@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_base_math",
+  "reference_proved": true,
+  "reference_sha256": "9713773a75b5c6ffcab659f83e31682d40891baa4e821e2087ae09bec395277b",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_base_math::compute_base_needed",
+  "task_id": "BA-base-012",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.9,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

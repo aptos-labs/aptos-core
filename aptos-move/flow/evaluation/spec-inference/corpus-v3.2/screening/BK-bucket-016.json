@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_bucket_index",
+  "reference_proved": true,
+  "reference_sha256": "502fcb7c882c1c2eb296d3291e10debb786d096bc3658dd629faac9dad9fe206",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_bucket_index::get_bucket_index",
+  "task_id": "BK-bucket-016",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.8,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

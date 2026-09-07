@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 163,
+        "offset": 1602,
+        "sha256": "e64856f3661ff2abab90f65749ba93b7de948ab40d30fef3600b36ca741bb239"
+      },
+      "edit": {
+        "at": 57,
+        "kind": "substitute",
+        "length": 8,
+        "to": "is_long: !is_long,"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "mutant_id": "AX-native-position-types-005-flips-side",
+      "obligation_category": "normal-result",
+      "rationale": "Every field is stored as given. Pins `ensures result == PerpV1 { ... }`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 35,
+        "offset": 508,
+        "sha256": "bca52d7724bec51c425a2e4df340ad2dfc4fca1d9ac06beef88e4d9e0fe910c0"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 27,
+        "to": "AccumulativeIndex { index: index + 1 }"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "mutant_id": "AX-native-position-types-005-index-off-by-one",
+      "obligation_category": "normal-result",
+      "rationale": "The index is stored as given. Pins `ensures result == AccumulativeIndex { index }`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 85,
+        "offset": 2389,
+        "sha256": "6487ea898f47419df383dbcb4f555f51028e1ffd83b2af381bc2418c33e77142"
+      },
+      "edit": {
+        "at": 28,
+        "kind": "substitute",
+        "length": 20,
+        "to": "            !is_long,"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "mutant_id": "AX-native-position-types-005-unpack-flips-side",
+      "obligation_category": "normal-result",
+      "rationale": "Unpacking returns the stored fields. Pins `ensures result_2 == pos.is_long`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

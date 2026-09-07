@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_bulk_order_utils",
+  "reference_proved": true,
+  "reference_sha256": "89ba7a12375e6066cbfcf88cb3cc8f232c99af449f4e14688978241cfc96611a",
+  "schema_version": 2,
+  "target": "aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels",
+  "task_id": "TR-discard-011",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.7,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

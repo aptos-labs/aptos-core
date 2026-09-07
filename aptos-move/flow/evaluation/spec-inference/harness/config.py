@@ -81,6 +81,9 @@ class RunSpec:
     initial_tree_sha256: str
     mutant_manifest_sha256: str
     required_contract_categories: tuple[str, ...]
+    # Optional withheld gate selected before the run. Scoring refuses to add a
+    # gate after outcomes are known or to substitute a different manifest.
+    disqualification_mutant_manifest_sha256: str | None = None
     order: int = 1
     block: int = 1
     package_relpath: str = "."
@@ -162,6 +165,15 @@ class RunSpec:
         ):
             if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
                 raise ValueError(f"{label} must be lowercase SHA-256 hex")
+        if spec.disqualification_mutant_manifest_sha256 is not None:
+            value = spec.disqualification_mutant_manifest_sha256
+            if len(value) != 64 or any(
+                char not in "0123456789abcdef" for char in value
+            ):
+                raise ValueError(
+                    "disqualification_mutant_manifest_sha256 must be lowercase "
+                    "SHA-256 hex"
+                )
         if spec.experiment_config_sha256 is not None and (
             len(spec.experiment_config_sha256) != 64
             or any(

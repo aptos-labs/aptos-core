@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_trial_size",
+  "reference_proved": true,
+  "reference_sha256": "5f278076fd061d1c750b66ffc3b1edeadf5d2ec38a2bf1201cc47a2745668d95",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_trial_size::trial_size_for",
+  "task_id": "TS-trial-019",
+  "threshold_seconds": 20,
+  "wall_seconds": 7.1,
+  "well_formed": true,
+  "wp_failure_kind": "untrusted_inferred_contract",
+  "wp_hard": true
+}

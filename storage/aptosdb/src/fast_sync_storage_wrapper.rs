@@ -71,7 +71,7 @@ impl FastSyncStorageWrapper {
                 .ledger_db
                 .metadata_db()
                 .get_synced_version()?
-                .map_or(0, |v| v)
+                .unwrap_or(0)
                 == 0)
         {
             db_dir.push(SECONDARY_DB_DIR);

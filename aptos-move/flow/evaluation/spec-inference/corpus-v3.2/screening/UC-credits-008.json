@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_tier_lookup",
+  "reference_proved": true,
+  "reference_sha256": "1ee74c09f1e7d8f248c9061369ed478cdf5eeee41cd64480a8797eaba7ce703a",
+  "schema_version": 2,
+  "target": "decibel_campaign::extracted_tier_lookup::credits_for_duration_days",
+  "task_id": "UC-credits-008",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.8,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

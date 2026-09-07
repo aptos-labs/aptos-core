@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_liquidation_price",
+  "reference_proved": true,
+  "reference_sha256": "7f4efff19156cc6372a53aed62ca957b88cb422a3118a062fff7cc7296b41dd8",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_liquidation_price::get_liquidation_price",
+  "task_id": "LP-price-021",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.2,
+  "well_formed": true,
+  "wp_failure_kind": "untrusted_inferred_contract",
+  "wp_hard": true
+}

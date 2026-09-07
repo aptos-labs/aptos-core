@@ -290,19 +290,22 @@ class ScreeningEnforcementTest(unittest.TestCase):
         return ""
 
     def _ready(self, *task_ids: str) -> list[dict]:
-        return [{"task_id": t, "screening_status": "ready"} for t in task_ids]
+        return [
+            {"task_id": t, "target": f"0x42::m::{t}", "screening_status": "ready"}
+            for t in task_ids
+        ]
 
     def test_a_cleared_task_schedules(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             message = self._check(
-                Path(temporary), [{"task_id": "T", "passed": True, "apparatus_ok": True, "reference_sha256": "d" * 64}], self._ready("T")
+                Path(temporary), [{"task_id": "T", "target": "0x42::m::T", "passed": True, "apparatus_ok": True, "reference_sha256": "d" * 64}], self._ready("T")
             )
         self.assertEqual("", message)
 
     def test_a_task_the_screen_failed_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             message = self._check(
-                Path(temporary), [{"task_id": "T", "passed": False, "apparatus_ok": True}], self._ready("T")
+                Path(temporary), [{"task_id": "T", "target": "0x42::m::T", "passed": False, "apparatus_ok": True}], self._ready("T")
             )
         self.assertIn("not cleared", message)
 
@@ -311,7 +314,7 @@ class ScreeningEnforcementTest(unittest.TestCase):
         # alone would not notice it.
         with tempfile.TemporaryDirectory() as temporary:
             message = self._check(
-                Path(temporary), [{"task_id": "T", "passed": True, "apparatus_ok": True, "reference_sha256": "d" * 64}], self._ready("T", "NEW")
+                Path(temporary), [{"task_id": "T", "target": "0x42::m::T", "passed": True, "apparatus_ok": True, "reference_sha256": "d" * 64}], self._ready("T", "NEW")
             )
         self.assertIn("NEW", message)
 
@@ -323,14 +326,36 @@ class ScreeningEnforcementTest(unittest.TestCase):
         self.assertIn("no screening report", message)
 
     def test_a_report_for_another_tree_is_refused(self) -> None:
+        from harness.pilot import _require_screened_tree
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            (root / "package").mkdir()
-            (root / "package" / "Move.toml").write_text("x", encoding="utf-8")
-            message = self._check(
-                root, [{"task_id": "T", "passed": True, "apparatus_ok": True, "reference_sha256": "d" * 64}], self._ready("T"), "0" * 64
+            # The package a corpus keeps its sources in is named by the
+            # samples, so the check is asked about the resolved package rather
+            # than about a fixed directory beside the manifest.
+            package = root / "framework"
+            package.mkdir()
+            (package / "Move.toml").write_text("x", encoding="utf-8")
+            self._check(
+                root, [{"task_id": "T", "target": "0x42::m::T", "passed": True, "apparatus_ok": True, "reference_sha256": "d" * 64}], self._ready("T"), "0" * 64
             )
-        self.assertIn("different corpus tree", message)
+            with self.assertRaises(ValueError) as raised:
+                _require_screened_tree(root / "manifest.json", package)
+        self.assertIn("different corpus tree", str(raised.exception))
+
+    def test_the_scheduler_checks_the_tree_of_the_package_it_resolved(self) -> None:
+        # The check used to read a fixed `package` directory beside the
+        # manifest and skip itself when that directory was absent, so a corpus
+        # whose samples name their own package could be scheduled against
+        # evidence for any tree at all.
+        import inspect
+        from harness.pilot import _corpus_tasks, _require_screened_tree
+
+        self.assertIn(
+            "_require_screened_tree(manifest_path, package)",
+            inspect.getsource(_corpus_tasks),
+        )
+        self.assertNotIn("is_dir()", inspect.getsource(_require_screened_tree))
 
     def test_a_not_ready_record_needs_no_evidence(self) -> None:
         # It is already out; the screen has nothing to say about it.
@@ -679,7 +704,7 @@ class ReferencePatchTest(unittest.TestCase):
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "build_references", ROOT / "corpus-v3" / "build_references.py"
+            "build_references", ROOT / "corpus-v3.2" / "build_references.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -1128,6 +1153,7 @@ class VacuousReferenceTest(unittest.TestCase):
     def _prove(self, prove_ok: bool, incons_ok: bool, diagnostics: str) -> dict:
         import asyncio
         from unittest import mock
+        import harness.compatibility as compatibility
         import harness.screen_v3 as screen
 
         calls = {"n": 0}
@@ -1145,7 +1171,7 @@ class VacuousReferenceTest(unittest.TestCase):
             package = root / "references" / "build" / "m"
             package.mkdir(parents=True)
             (package / "Move.toml").write_text("x", encoding="utf-8")
-            with mock.patch.object(screen, "run_command", new=fake_run_command):
+            with mock.patch.object(compatibility, "run_command", new=fake_run_command):
                 return asyncio.run(
                     screen._prove_reference(
                         mock.Mock(prove_command=["p"]),
@@ -1212,8 +1238,20 @@ class ToolchainIdentityTest(unittest.TestCase):
         return ""
 
     def test_a_matching_toolchain_clears(self) -> None:
-        stages = {"prover": {"path": "/p", "sha256": "e" * 64}}
-        self.assertEqual("", self._check(stages, stages))
+        recorded = {
+            "prover": {
+                "sha256": "e" * 64,
+                "arguments": ["f" * 64],
+            }
+        }
+        scheduled = {
+            "prover": {
+                "path": "/another/checkout/prover",
+                "sha256": "e" * 64,
+                "arguments": {"/another/checkout/wrapper.py": "f" * 64},
+            }
+        }
+        self.assertEqual("", self._check(recorded, scheduled))
 
     def test_a_changed_prover_does_not_clear(self) -> None:
         message = self._check(
@@ -1307,15 +1345,15 @@ class MountReadabilityTest(unittest.TestCase):
     def test_a_root_under_the_plugin_is_refused(self) -> None:
         from harness.pilot_sandbox import _require_confined_mount
 
-        root = (ROOT / "corpus-v3" / "mutants").resolve()
+        root = (ROOT / "corpus-v3.2" / "mutants").resolve()
         with self.assertRaises(SystemExit) as raised:
-            _require_confined_mount(root, ((ROOT / "corpus-v3").resolve(),))
+            _require_confined_mount(root, ((ROOT / "corpus-v3.2").resolve(),))
         self.assertIn("can read", str(raised.exception))
 
     def test_a_root_outside_the_readable_trees_is_accepted(self) -> None:
         from harness.pilot_sandbox import _require_confined_mount
 
-        root = (ROOT / "corpus-v3" / "mutants").resolve()
+        root = (ROOT / "corpus-v3.2" / "mutants").resolve()
         _require_confined_mount(root, ((ROOT / "harness").resolve(),))
 
 
@@ -1406,7 +1444,7 @@ class MountConfinementTest(unittest.TestCase):
     """
 
     def test_the_corpus_root_is_accepted(self) -> None:
-        _require_confined_mount((ROOT / "corpus-v3" / "mutants").resolve())
+        _require_confined_mount((ROOT / "corpus-v3.2" / "mutants").resolve())
 
     def test_tmp_is_refused(self) -> None:
         with self.assertRaises(SystemExit) as raised:
@@ -1488,7 +1526,7 @@ class AuthoringPathTest(unittest.TestCase):
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "author_mutants", ROOT / "corpus-v3" / "author_mutants.py"
+            "author_mutants", ROOT / "corpus-v3.2" / "author_mutants.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

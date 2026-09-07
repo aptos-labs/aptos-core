@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_taker_fee",
+  "reference_proved": true,
+  "reference_sha256": "bad2e7e95e052ec0d7f340bc8073e7dffb7099e6f80bccf3a94e07f773c95fe1",
+  "schema_version": 2,
+  "target": "decibel_dex::extracted_taker_fee::calculate_min_net_taker_fee",
+  "task_id": "TF-taker-017",
+  "threshold_seconds": 40,
+  "wall_seconds": 8.4,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false
+}
