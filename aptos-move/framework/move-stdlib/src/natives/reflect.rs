@@ -28,7 +28,8 @@ const INVALID_IDENTIFIER: u16 = 0;
 /// Functions that reflection refuses to resolve, identified by `(module_name, function_name)` at the
 /// framework address `0x1`. A function is forbidden when its call-site rules are enforced by the
 /// bytecode verifier and therefore cannot be upheld for a dynamically-resolved function value.
-const FORBIDDEN_FRAMEWORK_FUNCTIONS: &[(&str, &str)] = &[("event", "emit")];
+const FORBIDDEN_FRAMEWORK_FUNCTIONS: &[(&str, &str)] =
+    &[("event", "emit"), ("init", "internal_maybe_initialize")];
 
 fn native_resolve(
     context: &mut SafeNativeContext,
