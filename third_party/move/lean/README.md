@@ -1,123 +1,75 @@
-# *WIP* Leaner Move
+# *WIP* Leaner
 
-This experimental project is a source language for writing Move contracts in
-Lean 4, together with a verifier that proves contracts directly against the
-authored source and a compiler that lowers the same source to production Move
-bytecode.
+This experimental project is a language-neutral intermediate representation
+(LIR) in Lean 4 with semantic profiles for Move and Rust, a Lean-authored
+source language over it (LeanerLang), a verifier that proves contracts
+against the source semantics, and frontends from Move and Rust.
 
-A module is ordinary Lean syntax.  `spec` attaches a contract declaratively and
-`verify` turns it into a theorem checked by the Lean kernel:
+A module is ordinary Lean syntax. `spec` attaches a contract and `verify`
+turns it into a theorem checked by the Lean kernel:
 
 ```lean
-import Move
-
-open scoped Move Move.Spec
-
-module Account where
-
+leaner module 0x42::account where
   struct Balance has Key where
-    value : U64
+    value : u64
 
-  entry fun deposit (addr : Address) (amount : U64) : Action Unit := do
-    let value ← &mut Balance[addr].value
-    value := *value + amount
+  public entry fun deposit(addr : Address, amount : u64) -> Unit := do
+    let balance := &mut Balance[addr]
+    *balance := new Balance { value := (*balance).value + amount }
 
-  spec deposit (addr : Address) (amount : U64) where
-    requires existsAt<Balance>(addr);
-    modifies Balance[addr];
-    ensures Balance[addr].value = old(Balance[addr].value) + amount;
-    aborts_if ¬old(Balance[addr].value).toNat + amount.toNat < U64.size
-      with Semantics.Checked.arithmeticAbortCode
+  spec deposit where
+    requires exists<Balance>(addr)
+    ensures global<Balance>(addr).value == old(global<Balance>(addr).value) + amount
+    aborts_if global<Balance>(addr).value + amount > 18446744073709551615
+    modifies global<Balance>(addr)
 
   verify deposit
 ```
 
-The same source has two distinct uses:
+Three claims stay separate:
 
-1. **Source verification.**  `verify f` produces `f.verified : f.contract`,
-   proved over the generated relational semantics of the authored function.
-2. **Executable compilation.**  Selected declarations are lowered through typed
-   base LCNF, `Move.Compiler.LIR`, and `MoveModel.IR` into versioned XIR, then
-   compiled by the complete compiler-v2 pipeline and checked by the production
-   Move bytecode verifier.
+1. **Source verification.** `verify f` proves a theorem about the big-step
+   semantics of the validated LIR of `f`
+   ([`designs/denotation.md`](designs/denotation.md)).
+2. **Compilation.** Supported declarations lower to XIR and production Move
+   bytecode.
+3. A compiler-correctness theorem connecting the two is future work.
 
-A compiler-correctness theorem connecting `f.verified` to the emitted bytecode
-remains future work; the prototype does not conflate those claims.  XIR is a
-compiler exchange format, not a proof artifact.
+## Packages
 
-## Components
+| Package | Purpose |
+|---|---|
+| [`leaner-ir`](leaner-ir/) | The shared typed LIR: RawUnit JSON import, validation, semantics, interpreter, proofs, the denotation-based verifier, and LeanerLang. |
+| [`leaner-move`](leaner-move/) | The Move semantic profile and intrinsic registry, plus the Move exchange frontend (`LeanerMove/Frontend`). |
+| [`leaner-rust`](leaner-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](leaner-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. |
+| [`leaner-e2e-tests`](leaner-e2e-tests/) | Move-to-LeanerLang and Rust-to-LeanerLang baselines and the verification check ledger ([`designs/test-organization.md`](designs/test-organization.md)). |
 
-| Package | Library | Purpose |
-|---|---|---|
-| `move` | [`Move`](move/Move/README.md) | The Leaner Move source language: surface, source contracts, the `verify` proof engine, and lowering to XIR, with its regressions under `Move/Tests`.  **Start here.** |
-| `move-model` | [`MoveModel`](move-model/MoveModel/README.md) | A logical model of Move bytecode: stackless IR, execution semantics, prover stages, and masm/Move source embedding, with its regressions under `MoveModel/Tests`.  What `Move` compiles into, and usable on its own. |
-| `transpiler` | [`Transpiler`](transpiler/transpile-design.md) | The Move-to-Leaner transpiler: runs `aptos move exchange --format ast` on Move sources and prints Leaner Move (`lake exe transpile`), with baselines (`Tests/Programs/<name>.move` beside its generated `<Name>.lean`) and an elaboration gate.  Requires `move` for its tests. |
-| `leaner-rust` | [`LeanerRust`](designs/rust-mir-design.md) | The initial Rust semantic profile plus the project-owned Rustc Public exporter spike. It imports into the shared `leaner-ir` boundary and stops rustc before code generation. |
-| `leaner-e2e-tests` | [end-to-end baselines](leaner-e2e-tests/README.md) | Discoverable Move→LeanerLang and Rust→LeanerLang source/result baselines. It temporarily depends on `transpiler` while the compatibility adapters are migrated. |
-
-Each production Lake package holds the library of the same name;
-`leaner-e2e-tests` is deliberately test-only and may depend on all layers it
-exercises. `move` depends on `move-model`, while `leaner-rust` depends on
-`leaner-ir`. A downstream project requires whichever it needs:
-
-```toml
-[[require]]
-name = "move"
-path = "<checkout>/third_party/move/lean/move"
-```
-
-The current cross-package design documents live in [`designs/`](designs/);
-executed or superseded ones are kept under
-[`designs/historical/`](designs/historical/). The
-profile-general Leaner source language is being designed in
-[`designs/leaner-lang.md`](designs/leaner-lang.md). Its implemented Move profile is
-defined in [`leaner-move.md`](move/Move/leaner-move.md), the verification
-architecture in [`verification-design.md`](move/Move/verification-design.md),
-and current surface coverage and gaps in
-[`project-plan.md`](move/Move/project-plan.md).  Each library README owns its
-architecture, module index, and roadmap.
-
-The `leaner-rust` package uses a project-owned Rustc Public exporter to
-import borrow-checked MIR into validated Leaner IR, then reproduce readable
-Rust source from that IR. Charon remains a differential-testing aid, and
-raw-pointer support is staged. The full decision is described in
-[`designs/rust-mir-design.md`](designs/rust-mir-design.md).
+`move`, `move-model`, and `transpiler` are deprecated reference packages;
+nothing current links them. Designs live in [`designs/`](designs/), with
+executed or superseded ones under [`designs/historical/`](designs/historical/);
+[`designs/roadmap.md`](designs/roadmap.md) orders the work.
 
 ## Build and test
 
-Install the repository-pinned Lean toolchain with the standard development
-setup script. The script verifies the downloaded release archive and adds its
-tools to the shell profile.
+Install the pinned Lean toolchain from the repository root:
 
 ```bash
-scripts/dev_setup.sh -p -l
+./scripts/dev_setup.sh -p -l
 source "$HOME/.profile"
 ```
 
-```bash
-cd move-model && lake build     # the logical model
-cd move       && lake build     # Leaner Move (builds move-model first)
-cd transpiler && lake build     # the Move-to-Leaner transpiler and `transpile`
-```
-
-The core libraries do not require the Aptos CLI. The regression suites do
-require the exchange frontend. Build the standalone Move CLI and set
-`APTOS_MOVE_CLI` in your shell profile; this is **highly recommended** for
-normal Leaner development because it avoids the full Aptos CLI and greatly
-improves edit/test turnaround. Then run each package's suite:
+Every package is an independent Lake package; build and test it from its
+own directory:
 
 ```bash
-cargo build -p aptos-move-cli --features binary --bin move
-export APTOS_MOVE_CLI="$PWD/../../../target/debug/move"
-cd move-model && lake test
-cd move       && lake test
-cd transpiler && lake test
+(cd leaner-ir        && lake build && lake test)
+(cd leaner-move      && lake build && lake test)
+(cd leaner-rust      && lake build && lake test)
+(cd leaner-e2e-tests && lake build && lake test)
 ```
 
-`APTOS_CLI=<path-to-aptos>` remains supported for the full `aptos move
-exchange` command. The standalone Move CLI receives `exchange` directly, so
-its equivalent command is `move exchange`.
-
-Proof cost is tracked with `scripts/bench-proofs.sh`; the encoding's cost
-analysis is in
-[`performance-analysis.md`](move/Move/performance-analysis.md).
+The core libraries need no Aptos CLI. The end-to-end driver builds the
+standalone Move exchange CLI itself (`cargo build --locked --profile ci -p
+aptos-move-cli --features binary --bin move`); see [`CLAUDE.md`](CLAUDE.md)
+for the `APTOS_MOVE_CLI` and `APTOS_CLI` contracts and the rest of the
+working rules.

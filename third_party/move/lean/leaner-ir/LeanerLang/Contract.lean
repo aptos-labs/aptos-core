@@ -1491,7 +1491,7 @@ private def pendingEquation? (initial final : Lean.Expr)
 
 /-- Find source-normalized `spec invariant; loop` pairs.  The expression id
 identifies the generated predicate over the loop's typed header product. -/
-private partial def loopSpecifications (ns : ValidatedNamespace)
+partial def loopSpecifications (ns : ValidatedNamespace)
     (root : ExprId) (seen : Array Nat := #[]) :
     Array (ExprId × LeanerIR.SpecBlock) := Id.run do
   if seen.contains root.index then return #[]
@@ -1529,9 +1529,22 @@ private partial def loopSpecifications (ns : ValidatedNamespace)
     if acc.any (fun previous => previous.1 == item.1) then acc else acc.push item) #[]
   return found
 
+/-- The conjunction of a loop annotation's `invariant` clauses over the
+given local binders: the clause translation the contracts use, with no
+runtime row, frame, or route-specific representation. -/
+def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (ns : ValidatedNamespace) (block : LeanerIR.SpecBlock)
+    (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) : MetaM Lean.Expr := do
+  let context : Context := {
+    unit, namespaceId, ns, locals, oldLocals := locals, localTypes, results := #[] }
+  let clauses ← block.conditions.filterMapM fun condition => do
+    if condition.kind == .loopInvariant then some <$> translate context condition.expression
+    else pure none
+  conjunction clauses
+
 /-- Locals lexically available at a loop header. Body-local slots exist in
 the runtime row but are not initialized on the first visit. -/
-private partial def loopHeaderLocals (ns : ValidatedNamespace) (root target : ExprId)
+partial def loopHeaderLocals (ns : ValidatedNamespace) (root target : ExprId)
     (available : Array LocalId) : Option (Array LocalId) := do
   if root == target then return available
   let expression ← ns.expressions[root.index]?
@@ -3339,67 +3352,6 @@ def prepareVerification (reference : Syntax) (namespaceSegments : Array String)
     namespaceIndex, functionIndex, unitDefinition, semanticsEq, widthEq,
     preparedUnit, preparedNs, preparedDeclaration, generated, artifacts, twins }
 
-/-- Shared no-fallback audit for one generated source function. -/
-def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
-  let function := base.getString!
-  let theoremName := base ++ `typedVerified
-  let env ← getEnv
-  unless (env.find? theoremName |>.bind (·.value? (allowOpaque := true))).any
-      hasNativeTransport do
-    throwError m!"`{function}` has no native computation transport; \
-      a frame/row typed theorem does not qualify"
-  unless env.contains (base ++ `computationRepresents) do
-    throwError m!"missing native execution agreement for `{function}`"
-  for suffix in [`computation, `computationVerified] do
-    let mut pending := #[base ++ suffix]
-    let mut visited : NameSet := {}
-    while let some name := pending.back? do
-      pending := pending.pop
-      if visited.contains name then continue
-      visited := visited.insert name
-      let some declaration := env.find? name
-        | throwError m!"missing native artifact `{name}`"
-      let constants := declaration.type.getUsedConstants ++
-        ((declaration.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[]
-      for dependency in constants do
-        if dependency == ``LeanerIR.RuntimeFrame ||
-            dependency == ``LeanerIR.Proofs.typedFunction ||
-            dependency == ``LeanerIR.Proofs.decodeSpec ||
-            (`LeanerIR.Proofs.Denotation).isPrefixOf dependency ||
-            (`LeanerIR.Proofs.ComputationAgreement).isPrefixOf dependency ||
-            (`LeanerIR.Proofs.NativeBoundary).isPrefixOf dependency ||
-            dependency.getString! == "computationRepresents" ||
-            dependency.getString! == "computationBoundary" ||
-            dependency.getString! == "computationState" || dependency == ``sorryAx ||
-            (suffix == `computation && dependency == ``LeanerIR.RuntimeValue) then
-          throwError m!"native artifact `{name}` retains forbidden dependency `{dependency}`"
-        if base.isPrefixOf dependency then pending := pending.push dependency
-
-/-- Verify and transport a function natively. Reject retired route selections
-before preparation or reuse of any previously published proof. -/
-def verifyFunction (reference : Syntax) (namespaceSegments : Array String)
-    (function : String)
-    (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none) :
-    CommandElabM Unit := do
-  let route := leaner.route.get (← getOptions)
-  unless route == "native" do
-    throwErrorAt reference m!"legacy verification route `{route}` is disabled; \
-      use `native` and migrate unsupported computations"
-  if script?.isSome then
-    throwErrorAt reference "native verification consumes computation certificates, not row scripts"
-  let input ← prepareVerification reference namespaceSegments function
-  let saved ← get
-  try
-    discard <| ensureTypedVerificationTheorem reference namespaceSegments function
-      input.namespaceIndex input.functionIndex input.unitDefinition input.semanticsEq
-      input.preparedUnit input.preparedNs input.preparedDeclaration
-      input.generated input.artifacts input.twins script?
-    let base := (← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function
-    withRef reference <| requireNativeArtifacts base
-  catch failure =>
-    modify fun state => { saved with messages := state.messages }
-    throw failure
-
 /-- Expose generated contracts, representations and execution agreement for
 an explicitly supplied native computation. This does not verify a contract. -/
 syntax (name := leanerPrepareCommand) "#leaner_prepare" leanerPath : command
@@ -3440,85 +3392,5 @@ elab "#leaner_perf " path:str : command => do
   let (text, ok) := Perf.report samples baseline 10
   if ok then logInfo m!"verification cost:\n{text}"
   else throwError m!"verification cost regressed:\n{text}"
-
-/-- The optional authored script of a `verify` form. -/
-def scriptOfOptional (optional : Syntax) :
-    Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) :=
-  match optional.getArgs with
-  | #[_, script] => some ⟨script⟩
-  | _ => none
-
-/-- Elaborate one in-module `verify` item once its module is registered. -/
-def elabVerifyItem (namespaceSegments : Array String) (item : Syntax) :
-    CommandElabM Unit := do
-  let some identifier := item[1]? | throwErrorAt item "expected a function name"
-  let function := identifier.getId.toString (escape := false)
-  verifyFunction identifier namespaceSegments function
-    (scriptOfOptional (item[2]?.getD .missing))
-
-/-- Verify one function of a registered unit from outside its module, with
-an optional authored proof script; the in-module `verify` item is the
-normal spelling. -/
-syntax (name := leanerVerifyCommand)
-  "#leaner_verify" leanerPath ("by" Lean.Parser.Tactic.tacticSeq)? : command
-
-@[command_elab leanerVerifyCommand]
-def elabLeanerVerify : CommandElab := fun stx => do
-  let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
-  let segments := pathSegments pathSyntax
-  unless segments.size ≥ 2 do
-    throwErrorAt pathSyntax "a verification path must name a namespace and a function"
-  let function := segments[segments.size - 1]!
-  verifyFunction pathSyntax segments.pop function
-    (scriptOfOptional (stx[2]?.getD .missing))
-
-/-- Check native computation/VC artifacts, not merely the existence of the
-typed wrapper theorem (which the retiring routes also generate). -/
-syntax (name := leanerRequireNativeCommand) "#leaner_require_native" leanerPath : command
-
-
-@[command_elab leanerRequireNativeCommand]
-def elabLeanerRequireNative : CommandElab := fun stx => do
-  let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
-  let (namespaceSegments, function, _, _, _, _, _) ← resolvePath pathSyntax
-  let base := (← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function
-  withRef pathSyntax <| requireNativeArtifacts base
-
-/-- Audit every successfully verified source function declared in this file.
-Imported declarations are excluded by the environment's current-module stage;
-an omitted per-target assertion cannot hide a legacy-backed proof. -/
-syntax (name := leanerRequireNativeAllCommand) "#leaner_require_native_all" : command
-
-@[command_elab leanerRequireNativeAllCommand]
-def elabLeanerRequireNativeAll : CommandElab := fun _ => do
-  let env ← getEnv
-  let bases : Array Name := env.constants.foldStage2 (fun bases name _ =>
-    if name.getString! == "typedVerified" then bases.push name.getPrefix else bases) #[]
-  unless !bases.isEmpty do throwError "native audit found no verified source functions in this file"
-  for base in bases.qsort Name.quickLt do requireNativeArtifacts base
-
-/-- The in-module `verify` items of a namespace command, in source order. -/
-private partial def verifyItems (stx : Syntax) : Array Syntax :=
-  if stx.isOfKind ``leanerVerifyItem then #[stx]
-  else stx.getArgs.flatMap verifyItems
-
-/-- Elaborate a Leaner namespace command and then its in-module `verify`
-items: the namespace registers first, and each item proves its function
-against the generated contract exactly as `#leaner_verify` does.  This
-registration shadows the plain namespace elaborator, which stays the
-entry point for every consumer that does not verify. -/
-@[command_elab leanerNamespaceCommand, command_elab leanerMoveModuleCommand,
-  command_elab leanerRustNamespaceCommand]
-def elaborateNamespaceWithVerification : CommandElab := fun stx => do
-  LeanerLang.elaborateNamespace stx
-  let items := verifyItems stx
-  if items.isEmpty then return
-  let some pathSyntax := stx.getArgs.find? (·.isOfKind ``leanerPathSyntax)
-    | throwErrorAt stx "a Leaner namespace requires a path"
-  /- Every item reports on its own: a function that fails to verify does
-  not hide the verdicts of the functions after it. -/
-  for item in items do
-    try elabVerifyItem (pathSegments pathSyntax) item
-    catch error => logException error
 
 end LeanerLang.Contract

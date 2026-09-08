@@ -97,9 +97,6 @@ older source-specific work those packages own.
 - [`designs/test-organization.md`](designs/test-organization.md): verification
   checks as baselines under `leaner-e2e-tests/LeanerE2ETests/Check/` and
   the ledger of v0 tests ported so far.
-- [`designs/verification-perf-audit.md`](designs/verification-perf-audit.md):
-  what verification costs, how the benchmark gates it, and the ranked
-  findings behind the optimizations.
 - [`designs/leaner-lang.md`](designs/leaner-lang.md): the profile-aware Leaner
   source language over the shared IR, generalizing the Move-profile surface.
 - [`designs/prophetic-references.md`](designs/prophetic-references.md):
@@ -117,8 +114,9 @@ older source-specific work those packages own.
   exact exporter scope, supported MIR fixtures, commands, and known boundaries.
 
 Executed or superseded designs move to
-[`designs/historical/`](designs/historical/) (`verification-v2.md`, `certifying-execution.md`, and `generic-route.md`,
-all replaced by `denotation.md`); they are
+[`designs/historical/`](designs/historical/) (`verification-v2.md`,
+`certifying-execution.md`, `generic-route.md`, and
+`verification-perf-audit.md`, all replaced by `denotation.md`); they are
 reference only and are not updated.
 
 ### Leaner Move source and verification (deprecated packages)
@@ -216,11 +214,12 @@ or CI (their libraries still compile as e2e dependencies):
 ```
 
 `leaner-ir`'s suite includes a verification-cost benchmark
-(`LeanerLang/Tests/Performance.lean`) that gates every `verify` target
-against `Performance.exp` on elaborator heartbeats and proof-term size.
-A deliberate cost change is recorded with
-`lake build && UB=1 lake env lean LeanerLang/Tests/Performance.lean`; review
-the diff, which should name only the targets the change was meant to move.
+(`LeanerLang/Tests/DenotePerformance.lean`) that gates every `verify`
+target against `DenotePerformance.exp` on elaborator heartbeats and
+proof-term size. A deliberate cost change is recorded with
+`lake build && UB=1 lake env lean LeanerLang/Tests/DenotePerformance.lean`;
+review the diff, which should name only the targets the change was meant
+to move.
 The build belongs to the command: `lake env lean` only sets the module path,
 so regenerating without it records the cost of whatever imports happen to be
 built and commits a baseline that its own source does not reproduce.

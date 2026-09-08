@@ -1,6 +1,6 @@
 # Cross-design roadmap
 
-Status: priority ordering agreed 2026-08-27, progress noted 2026-09-08.
+Status: priority ordering agreed 2026-08-27, progress noted at the 2026-09-08 checkpoint.
 This document orders the work across the current designs; each linked design stays authoritative for its
 own scope, gates, and deferred-work register. Update the ordering here when a
 design's status section changes.
@@ -54,21 +54,16 @@ compiler-correctness claims) they re-emerge inside the designs below.
    Remaining spine work continues under M2's owed metatheory and M5's
    state/loop/modular items.
 
-   The verification half is designed in
-   [`denotation.md`](denotation.md) (decided 2026-09-08): one `denote` of
-   validated LIR into `Spec` and one agreement theorem against `BigStep`,
-   executing V5 of [`historical/verification-v2.md`](historical/verification-v2.md).
-   It is measured by the check ledger of
-   [`test-organization.md`](test-organization.md). The two routes before it
-   are historical: the frame-free row route of
-   [`historical/certifying-execution.md`](historical/certifying-execution.md)
-   (per-shape scripts that did not compose, frozen 2026-09-03) and the
-   normalization-then-native route of
-   [`historical/generic-route.md`](historical/generic-route.md), whose
-   native-only cutover left 42 of 61 Check files failing because every
-   construct needed a generated combinator, an agreement law, and closer
-   support. Ports are frozen until D1 of `denotation.md`; T2 (the produced
-   LeanerLang verifies) is not started.
+   The verification half is [`denotation.md`](denotation.md) (decided
+   2026-09-08): one `denote` of validated LIR into `Spec` and one agreement
+   theorem against `BigStep`, executing V5 of
+   [`historical/verification-v2.md`](historical/verification-v2.md).
+   Checkpoint 2026-09-08: D0 and D1 done (agreement assumed as a named
+   axiom by the user's decision), D2 references and storage carried, 35 of
+   61 Check files exact per [`test-organization.md`](test-organization.md);
+   next are resource invariants, vectors, recursion, returned references,
+   generics (D3), and the retirement of the previous routes (D4). T2 (the
+   produced LeanerLang verifies) is not started.
 
 3. **MonoVM differential harness** —
    [`monovm-link-design.md`](monovm-link-design.md).
@@ -129,9 +124,10 @@ compiler-correctness claims) they re-emerge inside the designs below.
 superseded. They keep their rationale and measurements, are linked from
 the design that replaced them, and are not updated:
 [`verification-v2.md`](historical/verification-v2.md) (moved 2026-09-03),
-[`certifying-execution.md`](historical/certifying-execution.md) and
-[`generic-route.md`](historical/generic-route.md) (moved 2026-09-08), all
-replaced by [`denotation.md`](denotation.md).
+[`certifying-execution.md`](historical/certifying-execution.md),
+[`generic-route.md`](historical/generic-route.md), and
+[`verification-perf-audit.md`](historical/verification-perf-audit.md)
+(moved 2026-09-08), all replaced by [`denotation.md`](denotation.md).
 
 ## Deliberately not scheduled
 

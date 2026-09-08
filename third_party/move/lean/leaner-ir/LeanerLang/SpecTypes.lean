@@ -5,6 +5,7 @@ import LeanerLang.Registry
 import LeanerIR.Proofs.Typed
 import LeanerIR.Proofs.Denotation
 import LeanerIR.Proofs.SimpAttrs
+import LeanerIR.Proofs.Denote.Attr
 import LeanerIR.Proofs.Plain
 
 /- Nested vector fields expose their element codecs only after the outer
@@ -668,6 +669,8 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
       (contents : Option $twin) :
       Option.bind (Option.map $eraseName contents) $decodeName = contents :=
     LeanerIR.map_erase_bind_decode $roundtripName contents))
+  elabCommand (← `(attribute [lir_denote_norm] $mapName:ident $roundtripName:ident
+    $literalRoundtripName:ident))
   /- Field selections through the erasure: a proof that reads a field of
   a stored value keeps the twin folded, so the roundtrips still apply to
   the whole once the closing meets it. -/
@@ -1044,6 +1047,9 @@ private def emitFamily (family : FamilyInfo) : CommandElabM Unit := do
   -- A clause's read and the program's read of one key meet in the closing
   -- normalization only if both unfold to the same keyed lookup.
   elabCommand (← `(attribute [lir_data_norm]
+    $keyAtName:ident $keyName:ident $readAtName:ident $readName:ident
+    $getAtName:ident $getName:ident $containsAtName:ident $containsName:ident))
+  elabCommand (← `(attribute [lir_denote_norm]
     $keyAtName:ident $keyName:ident $readAtName:ident $readName:ident
     $getAtName:ident $getName:ident $containsAtName:ident $containsName:ident))
 

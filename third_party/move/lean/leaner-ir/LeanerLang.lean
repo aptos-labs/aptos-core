@@ -12,3 +12,4 @@ import LeanerLang.Registry
 import LeanerLang.Elab
 import LeanerLang.Quote
 import LeanerLang.Contract
+import LeanerLang.Verify

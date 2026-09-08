@@ -28,12 +28,12 @@ private def checkDir : System.FilePath :=
   "LeanerE2ETests/Check"
 
 /-- The heartbeat cap, in the units of `maxHeartbeats`: five times the
-largest generated route of the cost benchmark.  It bounds every command
+largest target of the cost benchmark (`total`, the three-variant match of
+`LeanerLang/Tests/DenotePerformance`, at 35M).  It bounds every command
 of a check and, through `leaner.verifyHeartbeats`, every generated
 verification theorem, which otherwise carries its own budget.  Cost
-itself is gated by `LeanerLang/Tests/Performance`; the cap catches
-collapses. -/
-private def heartbeatCap : Nat := 50000
+itself is gated by the benchmark; the cap catches collapses. -/
+private def heartbeatCap : Nat := 180000
 
 /-- Elaborate one check in its own process, invoked on the package-relative
 path so the paths in its messages are stable across machines. -/

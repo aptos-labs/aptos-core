@@ -1,4 +1,10 @@
-# Verification performance audit
+# Verification performance audit (historical)
+
+Status: historical since 2026-09-08. This audit measured the retired
+routes (`leaner_denotation_*` tactics, `Performance.exp`); its findings
+became the principles of [`../denotation.md`](../denotation.md), whose
+gate is `DenotePerformance.exp`. It is kept for its measurements and is
+not updated.
 
 The bar is v0: seconds per `verify` target.
 

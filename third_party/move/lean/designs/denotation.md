@@ -9,6 +9,99 @@ then the native route), and executes milestone V5 of
 is measured by the check ledger of
 [`test-organization.md`](test-organization.md).
 
+## Status (checkpoint 2026-09-08)
+
+Implemented in `leaner-ir`, suspended at this checkpoint with the tree
+consistent: builds, the `DenotePerformance` gate, and the check ledger of
+[`test-organization.md`](test-organization.md) (33 of 61 files exact) are
+as recorded there. The agreement theorem is **assumed**, by the user's
+decision, until its induction is done.
+
+### Modules
+
+- `LeanerIR/Proofs/Denote/`: `Types` (native carriers, rows, codecs, the
+  state operations and their wp rules), `Term` (typed terms and
+  `Term.denote`), `Compile` (`compileFunction`, structural on fuel),
+  `Agreement` (the named axiom `compileFunction_agrees` and the transport
+  to `SatisfiesFunction`), `Close` (the closer, the `lir_denote` and
+  `lir_denote_norm` simp sets, the state-fact and leaf tactics).
+- `LeanerLang/Verify.lean` owns `verify`, `#leaner_verify`, and
+  `#leaner_require_native[_all]`. Per target it publishes the quoted term,
+  the kernel `rfl` certificate of its compilation, `typedVerified` over the
+  denotation, and `verified` over the big-step meaning; per struct twin it
+  generates the two bridge theorems (`erase_eq_encode`, `decode?_fields`).
+  `Contract.lean` keeps the clause translator and preparation.
+- Gate: `LeanerLang/Tests/DenotePerformance.{lean,exp}` records heartbeats
+  and proof objects per target (straight-line 1.7–6M, loops about 20M,
+  the three-variant `match` with a matching contract 35M). The e2e check
+  driver caps a target at 180k verification heartbeats.
+
+### Carried
+
+Scalars and checked arithmetic, comparisons, Boolean operations, unsigned
+`&`, checked shifts and casts, constants, `if`, `let`, blocks, `abort`,
+`assert`, early `return`, assignment, `break`/`continue` (labeled too),
+loops with `invariant` clauses (an automatic frame ties every immutable
+local available at the header to its entry value), direct monomorphic
+calls through the callee's published theorem, tuples, structs, enums with
+variant tests and payload selection (a `match` arrives as those), shared
+borrows of locals, mutable references (`NTy.ref`: a loan with the native
+current value; parameters, in-place mutation, typed projection paths,
+local lenders, reborrowed call arguments settled from the callee's
+exports), and storage over the runtime's keyed global map (`globalRead`,
+`globalContains`, `globalBorrow`, `globalPublish`, `globalTake`, with a
+mutable global borrow leaving the runtime's hole and its death marker
+writing back by key). A rejection names the construct.
+
+### Not carried
+
+`|`, `^`, signed bitwise, vectors (every "type of a local is not carried"
+row of the ledger), generic calls, constructors, and fields, recursion
+(a callee is verified before its callers; `drain`, `recursive_choose`),
+unspecified pure callees used as summaries (`plus_one`), a mutable borrow
+outside a binding or a call argument (`reborrow`), returned references,
+loops over a live global borrow (`Language/Loops` `drain`), resource
+invariants (`GlobalInv`, `CrossInv`), the Rust profile's primitives, and
+nested destructuring patterns. `Verification/Typed` and `EnumRefs` still
+assert names of the retired route.
+
+### Rules the implementation settled
+
+- The closer is a worklist: a `wp` over a marked loop takes the loop rule,
+  over a callee the callee's theorem, over the recursive iteration the loop
+  hypothesis; a syntactic binder, conjunction, or conditional splits; only
+  a goal whose head is `wp` is renormalized; a call's post hypotheses are
+  consumed before renormalizing (specialize decided implications, split
+  existentials, substitute witnesses, rewrite with state equations).
+- A leaf clears every computation hypothesis first (`contradiction` had
+  reduced the whole unit through the preparation hypothesis), adds the
+  bounds of every range certificate in context as separate facts (never
+  rewrites the certificate a term depends on: the cast it leaves is not
+  typed at the transparency simp matches at), saturates with the context,
+  splits the range-check conditionals, and decides by `omega`/`decide`.
+  Signed quotients and remainders use width-specific range facts, not
+  magnitudes.
+- Inventories are simp sets, never explicit lists (0.8M heartbeats per
+  call otherwise). `HList` and `variantCarrier` are not reducible, so
+  every lemma whose right-hand side builds a row value is stated at the
+  row type, never at the product it unfolds to.
+- Rows are a mutual family `NTy`/`NRow`/`NRows` (a nested inductive cannot
+  derive decidable equality); an enum carries the distinctness of its
+  variant names. Aggregate arguments are introduced destructured, one goal
+  per variant. `do`-notation never appears in a denotation definition.
+
+Assumption ledger: `LeanerIR.Proofs.Denote.compileFunction_agrees` is an
+axiom; every `verified` theorem names it under `#print axioms`. Nothing
+else is admitted.
+
+### Next
+
+In order: resource invariants and loops over live global borrows (D2),
+vectors, recursion and unspecified callee summaries, returned references,
+generics (D3), then the retirement of the previous routes' generators,
+tests, and `Performance.exp` (D4). Discharging the axiom blocks nothing
+else and is scheduled with D4.
+
 ## What does not change
 
 - **`BigStep` is the authority.** A `verify f` theorem is a theorem about
@@ -39,7 +132,7 @@ established.
 
 v0 verified 225 functions automatically at sub-second cost each. Every
 route since was slower, and the perf audit
-([`verification-perf-audit.md`](verification-perf-audit.md)) and v0's own
+([`historical/verification-perf-audit.md`](historical/verification-perf-audit.md)) and v0's own
 analysis ([`../move/Move/performance-analysis.md`](../move/Move/performance-analysis.md))
 attribute the difference to the same handful of causes. The principles
 below are the inverse of those causes. Each names its evidence and how it
@@ -62,7 +155,7 @@ measured number.
    obligation never contains `denote`, an evaluator, or an arena lookup.
    *Evidence:* the deep-embedding tax of v2, paid per obligation, and every
    `whnf`/seal trap in the audit. *Check:* the unfolded term contains no
-   `denote` or interpreter constant; `Performance.exp` reports unfold cost
+   `denote` or interpreter constant; `DenotePerformance.exp` reports unfold cost
    separately from closing cost.
 
 3. **Weakest preconditions, never unfolded relations.** One `wp` rule per
@@ -80,7 +173,7 @@ measured number.
    over the leaf's own context. *Evidence:* `bump_twice` was search-bound
    at 25k heartbeats per proof object because closing passes reprocessed
    the whole context per residual goal (audit F1, F1c). *Check:* heartbeats
-   per proof object in `Performance.exp`, gated per target.
+   per proof object in `DenotePerformance.exp`, gated per target.
 
 5. **Modularity by contract.** A call contributes its callee's contract as
    a native equation at the boundary, never the callee's body, and a
@@ -104,15 +197,26 @@ measured number.
    *Check:* no `String` and no `Array.mk`/`List.toArray` mix in the
    unfolded term.
 
-8. **Measured against v0, per target.** `Performance.exp` records
+8. **Precomputed inventories, stable keys.** Every simp inventory a proof
+   uses is a registered simp set (`lir_denote`, `lir_denote_norm`),
+   never a long explicit list: `simp only [list]` re-elaborates every
+   entry per call, and that cost was a constant 0.8M heartbeats per
+   target when the normal-form list grew. The types that key rewrite
+   lemmas (`HList`, `variantCarrier`) are not reducible: a reducible key
+   is reduced in goals but stuck in lemmas, and the rewrite silently
+   stops matching. *Check:* the normalizers name only per-target
+   constants and simprocs beyond the sets, and a lemma over a row or
+   variant value is exercised by an aggregate target of the gate.
+
+9. **Measured against v0, per target.** `DenotePerformance.exp` records
    heartbeats, proof objects, and unfold cost per target; the gate is v0's
    per-function time for the same contract, and a regeneration names only
    the targets a change was meant to move.
 
 Principles 1, 2, 3, and 6 are architectural: they hold or fail by
 construction of `denote` and the closer, and are what the previous routes
-violated. Principles 4, 5, 7, and 8 are engineering discipline the routes
-had partly recovered and must not lose again.
+violated. Principles 4, 5, 7, 8, and 9 are engineering discipline the
+routes had partly recovered and must not lose again.
 
 ## What went wrong
 
@@ -207,13 +311,13 @@ obligation exists; the gate below measures it.
 
 ## Milestones
 
-| | Milestone | Gate |
-|---|---|---|
-| D0 | `denote` and `denote_agrees` for the straight-line subset `Denotation.lean` already covers (values, locals, checked arithmetic, assignment, return, monomorphic calls). | Theorem closed without `sorry`; `Language/Arithmetic` and `Language/Integers` verify through definitional unfolding; per-target unfold and closing cost recorded in `Performance.exp` and compared against v0's per-function times, with the unfold reported separately. |
-| D1 | Control: branches, enum matches with payloads, structured loops with invariants, recursion. | `Verification/Loops`, `LoopInvariants`, `Calls`, `Callees`, the recursive `Corpus` targets, `Language/Loops`, `Enums`, `EnumPatterns`, `ControlForms` pass. |
-| D2 | Storage and references: typed global family, scoped borrows, prophecies, returned references. | `Account`, `GlobalBorrows`, `GlobalInv`, `References`, `Loans`, `Prophecies`, `Storage` pass. |
-| D3 | Generics (V4, carried) and the Rust profile denotations. | `Language/Generics`, `Verification/Generics`, `GenericScalarCalls`, Rust-profile fixtures pass. |
-| D4 | Retirement: delete per-target `computationRepresents` generation, the `LeanerLang/Native*` generators, the `Proofs/*Agreement.lean` modules not consumed by `denote_agrees`, and `Certify.lean`'s shape routing. | Full Check audit at the unchanged caps; `Performance.exp` at or below the v0-parity targets; Move and Rust suites green. |
+| | Status | Milestone | Gate |
+|---|---|---|---|
+| D0 | **DONE 2026-09-08**, agreement assumed (named axiom, user decision) | `denote` and `denote_agrees` for the straight-line subset `Denotation.lean` already covers (values, locals, checked arithmetic, assignment, return, monomorphic calls). | Theorem closed without `sorry`; `Language/Arithmetic` and `Language/Integers` verify through definitional unfolding; per-target unfold and closing cost recorded in `Performance.exp` and compared against v0's per-function times, with the unfold reported separately. |
+| D1 | **DONE 2026-09-08** except recursion (`drain`, `recursive_choose`) | Control: branches, enum matches with payloads, structured loops with invariants, recursion. | `Verification/Loops`, `LoopInvariants`, `Calls`, `Callees`, the recursive `Corpus` targets, `Language/Loops`, `Enums`, `EnumPatterns`, `ControlForms` pass. |
+| D2 | **IN PROGRESS** (checkpoint 2026-09-08): references and storage carried (`Account`, `Storage`, `Read`, `Prophecies`, `Corpus`, `Normalized` pass); open: resource invariants, loops over a live global borrow, returned references, vector loans | Storage and references: typed global family, scoped borrows, prophecies, returned references. | `Account`, `GlobalBorrows`, `GlobalInv`, `References`, `Loans`, `Prophecies`, `Storage` pass. |
+| D3 | open | Generics (V4, carried) and the Rust profile denotations. | `Language/Generics`, `Verification/Generics`, `GenericScalarCalls`, Rust-profile fixtures pass. |
+| D4 | open | Retirement: delete per-target `computationRepresents` generation, the `LeanerLang/Native*` generators, the `Proofs/*Agreement.lean` modules not consumed by `denote_agrees`, and `Certify.lean`'s shape routing. | Full Check audit at the unchanged caps; `Performance.exp` at or below the v0-parity targets; Move and Rust suites green. |
 
 D0 is a feasibility gate as much as a milestone: if the induction for the
 straight-line subset cannot be closed, or definitional unfolding costs
@@ -224,11 +328,12 @@ more than the agreement proofs it replaces, stop and report before D1.
 - No new `Proofs/*Agreement.lean` module, no new `LeanerLang/Native*`
   generator, and no new `Certify.lean` shape case. A construct `denote`
   does not carry is a negative check naming it, as today.
-- No further v0 ports onto the current native route; the 19/61 result is
-  frozen until D1.
-- No `sorry` or axiom in `denote_agrees`. A case that cannot be closed is
-  a construct `denote` does not carry.
-- Cost is gated per target by `Performance.exp`; do not raise the caps.
+- No further ports onto the retired routes; a fixture is promoted only by
+  the check ledger at the unchanged caps.
+- No `sorry` in `denote_agrees`; the one named axiom stating it is the
+  user-decided interim of 2026-09-08 and is removed by proving it. A case
+  that cannot be closed is a construct `denote` does not carry.
+- Cost is gated per target by `DenotePerformance.exp`; do not raise the caps.
 
 ## Open questions
 
