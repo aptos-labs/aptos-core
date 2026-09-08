@@ -10,9 +10,6 @@ on:
         description: "Whether only docs/packer/dashboard files changed (skip unit tests if true)"
         required: true
         type: string
-    secrets:
-      GIT_CREDENTIALS:
-        required: false
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -33,15 +30,6 @@ jobs:
 
       - name: Run dev_setup.sh
         run: scripts/dev_setup.sh -b -p -r -y -P -t
-
-      - name: Setup git credentials
-        if: secrets.GIT_CREDENTIALS != ''
-        env:
-          UNIT_TEST_GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-        run: |
-          git config --global credential.helper store
-          printf '%s\n' "$UNIT_TEST_GIT_CREDENTIALS" > ~/.git-credentials
-        shell: bash
 
       - name: Output the changed files
         run: cargo x changed-files -vvv

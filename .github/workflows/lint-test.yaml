@@ -181,7 +181,6 @@ jobs:
       )
     needs: file_change_determinator
     uses: ./.github/workflows/unit-tests.yaml
-    secrets: inherit
     with:
       only_docs_changed: ${{ needs.file_change_determinator.outputs.only_docs_changed }}
 
