@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerIR.Proofs.Denotation
+import LeanerIR.Proofs.Plain
 import LeanerIR.Proofs.Typed
 import LeanerIR.Proofs.WP
 
@@ -102,12 +103,14 @@ theorem wpFunction_functionRelation
     exact h frame frame_eq finalFrame evaluatedState control body_step
       outcome outcome_eq
 
-theorem wpFunction_nativeFunctionRelation
+theorem wpFunction_nativeFunctionRelationAt
     {unit : ExecutableUnit} {shape : FunctionShape}
+    {typeInstantiation : Array (TypeId × TypeId)}
     {body : ExprDenotation} {arguments : Array RuntimeValue}
     {initial : RuntimeState} {post : RuntimeState → Outcome → Prop} :
-    wpFunction (nativeFunctionRelation unit shape body) initial arguments post ↔
-      ∀ frame, nativeInitialFrame? shape arguments = some frame →
+    wpFunction (nativeFunctionRelationAt unit shape typeInstantiation body)
+        initial arguments post ↔
+      ∀ frame, nativeInitialFrame? shape arguments typeInstantiation = some frame →
         wpExpr body frame initial fun finalFrame evaluatedState control =>
           ∀ outcome,
             finishControl? shape.resultCount control = some outcome →
@@ -127,6 +130,22 @@ theorem wpFunction_nativeFunctionRelation
     subst final
     exact h frame frame_eq finalFrame evaluatedState control body_step
       outcome outcome_eq
+
+theorem wpFunction_nativeFunctionRelation
+    {unit : ExecutableUnit} {shape : FunctionShape}
+    {body : ExprDenotation} {arguments : Array RuntimeValue}
+    {initial : RuntimeState} {post : RuntimeState → Outcome → Prop} :
+    wpFunction (nativeFunctionRelation unit shape body) initial arguments post ↔
+      ∀ frame, nativeInitialFrame? shape arguments = some frame →
+        wpExpr body frame initial fun finalFrame evaluatedState control =>
+          ∀ outcome,
+            finishControl? shape.resultCount control = some outcome →
+              post
+                (finalizeFunctionState unit shape.profile initial
+                  evaluatedState finalFrame outcome)
+                outcome := by
+  simpa only [nativeFunctionRelation] using
+    (wpFunction_nativeFunctionRelationAt (typeInstantiation := #[]))
 
 theorem wp_function {unit : ExecutableUnit}
     {declaration : FunctionDecl FunctionBody} {body : ExprDenotation}
@@ -175,13 +194,14 @@ theorem wp_function {unit : ExecutableUnit}
       exact calculated frame frame_eq finalFrame evaluatedState control
         body_step (.threw kind thrown) outcome_eq
 
-theorem wp_nativeFunction {unit : ExecutableUnit}
+theorem wp_nativeFunctionAt {unit : ExecutableUnit}
     {shape : FunctionShape} {body : ExprDenotation}
+    {typeInstantiation : Array (TypeId × TypeId)}
     {arguments : Array RuntimeValue} {initial : RuntimeState}
     {ensures : Array RuntimeValue → RuntimeState → Prop}
     {aborts : Failure → Prop} :
-    wp (nativeFunction unit shape body arguments) ensures aborts initial ↔
-      ∀ frame, nativeInitialFrame? shape arguments = some frame →
+    wp (nativeFunctionAt unit shape typeInstantiation body arguments) ensures aborts initial ↔
+      ∀ frame, nativeInitialFrame? shape arguments typeInstantiation = some frame →
         wpExpr body frame initial fun finalFrame evaluatedState control =>
           ∀ outcome,
             finishControl? shape.resultCount control = some outcome →
@@ -220,6 +240,25 @@ theorem wp_nativeFunction {unit : ExecutableUnit}
           body_step, outcome_eq, finalize_eq⟩
       exact calculated frame frame_eq finalFrame evaluatedState control
         body_step (.threw kind thrown) outcome_eq
+
+theorem wp_nativeFunction {unit : ExecutableUnit}
+    {shape : FunctionShape} {body : ExprDenotation}
+    {arguments : Array RuntimeValue} {initial : RuntimeState}
+    {ensures : Array RuntimeValue → RuntimeState → Prop}
+    {aborts : Failure → Prop} :
+    wp (nativeFunction unit shape body arguments) ensures aborts initial ↔
+      ∀ frame, nativeInitialFrame? shape arguments = some frame →
+        wpExpr body frame initial fun finalFrame evaluatedState control =>
+          ∀ outcome,
+            finishControl? shape.resultCount control = some outcome →
+              match outcome with
+              | .returned results =>
+                  ensures results
+                    (finalizeFunctionState unit shape.profile initial
+                      evaluatedState finalFrame outcome)
+              | .threw kind thrown => aborts (kind, thrown) := by
+  simpa only [nativeFunction] using
+    (wp_nativeFunctionAt (typeInstantiation := #[]))
 
 /-! ## Leaves and sequencing -/
 
@@ -483,7 +522,7 @@ in the proof term. -/
 def storageOptionPost (entry : Option RuntimeValue) (onMissing : Prop)
     (onPresent : RuntimeValue → Prop) : Prop :=
   (entry = none → onMissing) ∧
-    (∀ value, entry = some value → onPresent value)
+    (entry ≠ none → onPresent (entry.getD .unit))
 
 /-- Postcondition for a resolved global location.  Resource identity,
 reference kind, and lexical loan identity are lowering-time data.  Only the
@@ -501,7 +540,8 @@ def globalOperationPost (operation : GlobalLocationOperation)
           | some _ =>
               storageOptionPost
                 (state.globals.lookup
-                  (globalKey resource.namespaceId resource.typeId key))
+                  (globalKey resource.namespaceId
+                    (instantiatedTypeId frame.typeInstantiation resource.typeId) key))
                 (post frame state (.value (.bool false)))
                 (fun _ => post frame state (.value (.bool true)))
       | _ => True
@@ -513,7 +553,8 @@ def globalOperationPost (operation : GlobalLocationOperation)
           | some _ =>
               storageOptionPost
                 (state.globals.lookup
-                  (globalKey site.resource.namespaceId site.resource.typeId key))
+                  (globalKey site.resource.namespaceId
+                    (instantiatedTypeId frame.typeInstantiation site.resource.typeId) key))
                 (post frame state (.throw_ .abort #[]))
                 fun current =>
                   match site.kind with
@@ -525,7 +566,8 @@ def globalOperationPost (operation : GlobalLocationOperation)
                       else
                         let loan := state.nextLoan
                         let global := globalKey site.resource.namespaceId
-                          site.resource.typeId key
+                          (instantiatedTypeId frame.typeInstantiation
+                            site.resource.typeId) key
                         post
                           { frame with
                             activeLoans :=
@@ -548,7 +590,8 @@ def globalOperationPost (operation : GlobalLocationOperation)
           match key.storageKey? with
           | none => True
           | some _ =>
-              let global := globalKey resource.namespaceId resource.typeId key
+              let global := globalKey resource.namespaceId
+                (instantiatedTypeId frame.typeInstantiation resource.typeId) key
               storageOptionPost
                 (state.globals.lookup global)
                 (post frame state (.throw_ .abort #[]))
@@ -562,7 +605,8 @@ def globalOperationPost (operation : GlobalLocationOperation)
           match key.storageKey? with
           | none => True
           | some _ =>
-              let global := globalKey resource.namespaceId resource.typeId key
+              let global := globalKey resource.namespaceId
+                (instantiatedTypeId frame.typeInstantiation resource.typeId) key
               storageOptionPost
                 (state.globals.lookup global)
                 (post frame
@@ -579,7 +623,7 @@ private theorem storageOptionPost_iff_match (entry : Option RuntimeValue)
       storageOptionPost entry onMissing onPresent := by
   cases entry <;> simp [storageOptionPost]
 
-private theorem globalOperation_post_iff
+theorem globalOperation_post_iff
     (operation : GlobalLocationOperation) (arguments : Array RuntimeValue)
     (frame : RuntimeFrame) (state : RuntimeState)
     (post : RuntimeFrame → RuntimeState → Control → Prop) :
@@ -607,7 +651,8 @@ private theorem globalOperation_post_iff
                     containsGlobalAt?, args_eq, shape_eq]
               | some storageKey =>
                   generalize lookup_eq : state.globals.lookup
-                    (globalKey resource.namespaceId resource.typeId key) = entry
+                    (globalKey resource.namespaceId
+                      (instantiatedTypeId frame.typeInstantiation resource.typeId) key) = entry
                   cases entry <;>
                     simp [globalOperationPost, storageOptionPost, globalValue?,
                       GlobalLocationOperation.evaluate?, containsGlobalAt?,
@@ -633,7 +678,8 @@ private theorem globalOperation_post_iff
               | some storageKey =>
                   generalize lookup_eq : state.globals.lookup
                     (globalKey site.resource.namespaceId
-                      site.resource.typeId key) = entry
+                      (instantiatedTypeId frame.typeInstantiation
+                        site.resource.typeId) key) = entry
                   cases entry with
                   | none =>
                       simp [globalOperationPost, storageOptionPost, globalValue?,
@@ -642,7 +688,8 @@ private theorem globalOperation_post_iff
                   | some current =>
                       have raw_lookup_eq : state.globals.lookup
                           (globalKey site.resource.namespaceId
-                            site.resource.typeId key) = some current := by
+                            (instantiatedTypeId frame.typeInstantiation
+                              site.resource.typeId) key) = some current := by
                         exact lookup_eq
                       cases kind_eq : site.kind with
                       | immutable =>
@@ -655,7 +702,8 @@ private theorem globalOperation_post_iff
                                 borrowRuntimePlaceAt?_global_immutable_of_lookup
                                   site.lexicalLoan site.referenceType frame state
                                   (globalKey site.resource.namespaceId
-                                    site.resource.typeId key) current
+                                    (instantiatedTypeId frame.typeInstantiation
+                                      site.resource.typeId) key) current
                                   reference_eq raw_lookup_eq
                               simp [globalOperationPost, storageOptionPost, globalValue?,
                                 GlobalLocationOperation.evaluate?, borrowGlobalAt?,
@@ -690,7 +738,8 @@ private theorem globalOperation_post_iff
                                 borrowRuntimePlaceAt?_global_mutable_of_lookup
                                   site.lexicalLoan site.referenceType frame state
                                   (globalKey site.resource.namespaceId
-                                    site.resource.typeId key) current
+                                    (instantiatedTypeId frame.typeInstantiation
+                                      site.resource.typeId) key) current
                                   reference_eq raw_lookup_eq
                               simp [globalOperationPost, storageOptionPost, globalValue?,
                                 GlobalLocationOperation.evaluate?, borrowGlobalAt?,
@@ -721,7 +770,8 @@ private theorem globalOperation_post_iff
                     takeGlobalAt?, args_eq, shape_eq]
               | some storageKey =>
                   generalize lookup_eq : state.globals.lookup
-                    (globalKey resource.namespaceId resource.typeId key) = entry
+                    (globalKey resource.namespaceId
+                      (instantiatedTypeId frame.typeInstantiation resource.typeId) key) = entry
                   cases entry <;>
                     simp [globalOperationPost, storageOptionPost, globalValue?,
                       GlobalLocationOperation.evaluate?, takeGlobalAt?, args_eq,
@@ -751,7 +801,8 @@ private theorem globalOperation_post_iff
                         args_eq, shape_eq]
                   | some storageKey =>
                       generalize lookup_eq : state.globals.lookup
-                        (globalKey resource.namespaceId resource.typeId key) = entry
+                        (globalKey resource.namespaceId
+                          (instantiatedTypeId frame.typeInstantiation resource.typeId) key) = entry
                       cases entry <;>
                         simp [globalOperationPost, storageOptionPost, globalValue?,
                           GlobalLocationOperation.evaluate?, publishGlobalAt?,
@@ -795,6 +846,20 @@ def checkedIntegerPost (failure : ThrowKind) (resultType : Ty) (value : Int)
       (¬(lower ≤ value ∧ value ≤ upper) →
         post frame state (.throw_ failure #[.integer value]))
 
+/-- Direct postcondition for checked vector indexing. Bounds remain ordinary
+propositions, so a symbolic index never leaves an option/evaluator match for
+the closing procedure to reconstruct. -/
+def vectorIndexPost (arguments : Array RuntimeValue) (frame : RuntimeFrame)
+    (state : RuntimeState)
+    (post : RuntimeFrame → RuntimeState → Control → Prop) : Prop :=
+  match arguments.toList with
+  | [.vector elements, .integer index] =>
+      ((index < 0 ∨ elements.size ≤ index.toNat) →
+          post frame state (.throw_ .abort #[.integer index])) ∧
+        ((0 ≤ index ∧ index.toNat < elements.size) →
+          post frame state (.value (elements[index.toNat]?.getD .unit)))
+  | _ => True
+
 /-- Primitive postcondition after lowering has selected the operation and
 result type.  Checked arithmetic exposes only its range split; the remaining
 primitive subset is total for validated, constructor-shaped operands and can
@@ -804,6 +869,7 @@ def primitiveOperationPost (operation : PrimitiveLocationOperation)
     (state : RuntimeState)
     (post : RuntimeFrame → RuntimeState → Control → Prop) : Prop :=
   match operation with
+  | .index _ => vectorIndexPost arguments frame state post
   | .checkedAdd failure resultType =>
       match arguments.toList with
       | [.integer left, .integer right] =>
@@ -898,6 +964,86 @@ private theorem checkedBinaryEvaluator_post_iff (failure : ThrowKind)
                 try apply liftedCheckedInteger_post_iff
           | cons third tail => simp [checkedBinaryInteger, args_eq]
 
+theorem vectorIndexEvaluator_post_iff (resultType : Ty)
+    (arguments : Array RuntimeValue) (frame : RuntimeFrame)
+    (state : RuntimeState)
+    (post : RuntimeFrame → RuntimeState → Control → Prop) :
+    (match (PrimitiveLocationOperation.index resultType).evaluate?
+        arguments frame state with
+      | none => True
+      | some (.value finalFrame finalState runtimeValue) =>
+          post finalFrame finalState (.value runtimeValue)
+      | some (.throw_ finalFrame finalState kind thrown) =>
+          post finalFrame finalState (.throw_ kind thrown)) ↔
+      vectorIndexPost arguments frame state post := by
+  generalize args_eq : arguments.toList = args
+  cases args with
+  | nil => simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+      vectorIndexPost, args_eq]
+  | cons first tail =>
+      cases tail with
+      | nil => simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+          vectorIndexPost, args_eq]
+      | cons second tail =>
+          cases tail with
+          | cons third tail =>
+              simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+                vectorIndexPost, args_eq]
+          | nil =>
+              cases first <;> cases second <;>
+                simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+                  vectorIndexPost, args_eq]
+              case vector.integer elements index =>
+                by_cases negative : index < 0
+                · have not_nonnegative : ¬0 ≤ index := by omega
+                  simp [negative, not_nonnegative]
+                · by_cases in_bounds : index.toNat < elements.size
+                  · rw [Array.getElem?_eq_getElem in_bounds]
+                    have nonnegative : 0 ≤ index := by omega
+                    have not_out_of_bounds : ¬elements.size ≤ index.toNat :=
+                      Nat.not_le_of_gt in_bounds
+                    simp [negative, nonnegative, in_bounds, not_out_of_bounds]
+                  · have out_of_bounds : elements.size ≤ index.toNat :=
+                      Nat.le_of_not_gt in_bounds
+                    have nonnegative : 0 ≤ index := by omega
+                    rw [Array.getElem?_eq_none out_of_bounds]
+                    simp [negative, nonnegative, in_bounds, out_of_bounds]
+
+/-- The same vector-index rule in the branch order produced by the row
+evaluator's weakest-precondition theorem. -/
+theorem vectorIndexEvaluator_post_iff_row (resultType : Ty)
+    (arguments : Array RuntimeValue) (frame : RuntimeFrame)
+    (state : RuntimeState)
+    (post : RuntimeFrame → RuntimeState → Control → Prop) :
+    (match (PrimitiveLocationOperation.index resultType).evaluate?
+        arguments frame state with
+      | some (.value finalFrame finalState runtimeValue) =>
+          post finalFrame finalState (.value runtimeValue)
+      | some (.throw_ finalFrame finalState kind thrown) =>
+          post finalFrame finalState (.throw_ kind thrown)
+      | none => True) ↔
+      vectorIndexPost arguments frame state post := by
+  let evaluated := (PrimitiveLocationOperation.index resultType).evaluate?
+    arguments frame state
+  have reorder :
+      (match evaluated with
+        | some (.value finalFrame finalState runtimeValue) =>
+            post finalFrame finalState (.value runtimeValue)
+        | some (.throw_ finalFrame finalState kind thrown) =>
+            post finalFrame finalState (.throw_ kind thrown)
+        | none => True) =
+      (match evaluated with
+        | none => True
+        | some (.value finalFrame finalState runtimeValue) =>
+            post finalFrame finalState (.value runtimeValue)
+        | some (.throw_ finalFrame finalState kind thrown) =>
+            post finalFrame finalState (.throw_ kind thrown)) := by
+    cases evaluated with
+    | none => rfl
+    | some result => cases result <;> rfl
+  rw [reorder]
+  exact vectorIndexEvaluator_post_iff resultType arguments frame state post
+
 /-- Direct WP for a descriptor-preserving primitive.  Checked arithmetic is
 lowered to a bounds proposition and an exact success/throw continuation;
 there is no existential evaluator equation for the proof driver to solve. -/
@@ -921,6 +1067,23 @@ theorem wpExpr_nativePrimitiveOperation
       simp only [valuesPost]
       cases operation with
       | tuple => rfl
+      | vector => rfl
+      | pushVector => rfl
+      | concatVector => rfl
+      | slice => rfl
+      | insertVector => rfl
+      | removeVector => rfl
+      | swapVector => rfl
+      | reverseSliceVector => rfl
+      | destroyEmptyVector => rfl
+      | containsVector => rfl
+      | indexOfVector _ => rfl
+      | checkVectorIndex _ => rfl
+      | length resultType => rfl
+      | logicalNot => rfl
+      | index resultType =>
+          exact vectorIndexEvaluator_post_iff resultType values.toArray
+            operandFrame operandState post
       | copyValue resultType => rfl
       | moveValue resultType => rfl
       | add resultType => rfl
@@ -936,6 +1099,18 @@ theorem wpExpr_nativePrimitiveOperation
       | checkedDivide failure resultType => rfl
       | modulo resultType => rfl
       | checkedModulo failure resultType => rfl
+      | bitwiseOr resultType => rfl
+      | bitwiseAnd resultType => rfl
+      | bitwiseXor resultType => rfl
+      | bitwiseNot resultType => rfl
+      | shiftLeft resultType => rfl
+      | checkedShiftLeft failure resultType => rfl
+      | shiftRight resultType => rfl
+      | checkedShiftRight failure resultType => rfl
+      | cast resultType => rfl
+      | checkedCast failure resultType => rfl
+      | logicalAnd => rfl
+      | logicalOr => rfl
       | checkedAdd failure resultType =>
           change
             (match (do
@@ -1565,6 +1740,7 @@ def referenceOperationPost (operation : ReferenceLocationOperation)
   | .dereference =>
       match arguments.toList with
       | [.borrow _ current] => post frame state (.value current)
+      | [value] => post frame state (.value value)
       | _ => True
   | .mutate =>
       match arguments.toList with
@@ -2556,6 +2732,7 @@ macro_rules
         first
         | assumption
         | omega
+        | leaner_plain
         | apply SemanticOperations.FreshGlobalLoanIds.lookup_next <;>
             assumption
         | apply SemanticOperations.FreshGlobalLoanIds.lookup_add <;>
@@ -2576,6 +2753,7 @@ attribute [lir_reconcile]
   SemanticOperations.exportFrameLoans_plainBool_state
   SemanticOperations.exportFrameLoans_plainAddress_state
   SemanticOperations.exportFrameLoans_plainTwoIntegers_state
+  SemanticOperations.exportFrameLoans_plainValue_state
   SemanticOperations.exportFrameLoans_addressNominalInteger_state
   SemanticOperations.exportFrameLoans_globalNominalThirdLocal
   SemanticOperations.exportFrameLoans_globalNominalSingletonLocation

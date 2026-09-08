@@ -18,6 +18,8 @@ namespace LeanerLang.Quote
 
 open Lean
 open LeanerIR
+
+deriving instance ToExpr for LeanerIR.Validation.IndexedArena
 open LeanerIR.Validation
 
 deriving instance ToExpr for LoanId

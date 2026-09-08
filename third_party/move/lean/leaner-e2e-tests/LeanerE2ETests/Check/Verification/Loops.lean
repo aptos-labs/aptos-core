@@ -34,5 +34,7 @@ leaner module 0x44::verification_loops where
 
   verify count_to_with_continue
 
+#leaner_require_native 0x44::verification_loops::count_to
+#leaner_require_native 0x44::verification_loops::count_to_with_continue
 
 end LeanerLang.Tests.VerificationLoops

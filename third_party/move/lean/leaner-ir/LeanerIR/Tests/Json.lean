@@ -589,6 +589,14 @@ private def classifyPrimitiveOperation : PrimitiveOperation → Nat
   | .repeatVector => 2
   | .pushVector => 60
   | .swapVector => 61
+  | .insertVector => 62
+  | .removeVector => 63
+  | .concatVector => 64
+  | .reverseSliceVector => 65
+  | .destroyEmptyVector => 66
+  | .containsVector => 67
+  | .indexOfVector => 68
+  | .checkVectorIndex _ => 69
   | .length => 3
   | .index => 4
   | .slice => 5
@@ -797,7 +805,8 @@ private def allPrimitiveOperations : Array PrimitiveOperation := #[
   .logicalAnd, .logicalOr, .equal, .notEqual, .less, .greater, .lessEqual,
   .greaterEqual, .logicalNot, .negate, .checkedNegate .panic,
   .copyValue, .moveValue, .cast, .checkedCast .panic, .range, .implies,
-  .equivalent, .identical]
+  .equivalent, .identical, .insertVector, .removeVector, .concatVector, .reverseSliceVector,
+  .destroyEmptyVector, .containsVector, .indexOfVector, .checkVectorIndex .abort]
 
 private def allReferenceOperations : Array ReferenceOperation := #[
   .borrow (.profile extensionValue), .dereference, .freeze true, .mutate]
@@ -912,7 +921,7 @@ private def operationConstructorUnit : RawUnit :=
   classifySurfaceSyntax == Array.range 3
 #guard #[GlobalKind.contains, .borrow .immutable, .take, .publish].map
   classifyGlobalKind == Array.range 4
-#guard allPrimitiveOperations.map classifyPrimitiveOperation == Array.range 46
+#guard allPrimitiveOperations.map classifyPrimitiveOperation == Array.range 46 ++ #[62, 63, 64, 65, 66, 67, 68, 69]
 #guard allReferenceOperations.map classifyReferenceOperation == Array.range 4
 #guard allDataOperations.map classifyDataOperation == Array.range 5
 #guard #[TraceKind.user, .automatic, .subAutomatic].map classifyTraceKind == Array.range 3

@@ -251,7 +251,8 @@ private def referenceType? (ns : ValidatedNamespace) (typeId : TypeId) : Option 
 
 private def addBorrow (ns : ValidatedNamespace) (exprId : ExprId) (loc : LocId)
     (resultType : TypeId) (kind : BorrowKind) (placeId : PlaceId)
-    (state : BorrowState) : BorrowState × Array LoanFact × Array Diagnostic :=
+    (state : BorrowState) (discarded : Bool := false) :
+    BorrowState × Array LoanFact × Array Diagnostic :=
   match kind, loanPlace? ns placeId, referenceType? ns resultType with
   | .immutable, some place, some reference =>
       let kind := ReferenceKind.shared
@@ -264,7 +265,14 @@ private def addBorrow (ns : ValidatedNamespace) (exprId : ExprId) (loc : LocId)
       let kind := ReferenceKind.mutable
       let loan : LoanFact := { expression := exprId, kind, place, lifetime := reference.lifetime, loc }
       let prior := { state with active := state.active.filter (·.expression != exprId) }
-      let diagnostics := accessDiagnostics prior loc place true "borrow"
+      -- Move's local-handle creation does not itself read or write the
+      -- referent. An unobserved direct-local result can therefore take an
+      -- empty live range even when another handle exists. The let analysis
+      -- below proves non-use and retires this loan before entering its body.
+      -- Projected/global resolution and Rust keep their existing checks.
+      let diagnostics := if discarded && ns.profile == some .move &&
+          place.projections.isEmpty then #[]
+        else accessDiagnostics prior loc place true "borrow"
       let active := if state.active.any (·.expression == exprId) then state.active else state.active.push loan
       ({ active }, #[loan], diagnostics)
   | .profile _, _, _ =>
@@ -396,7 +404,9 @@ private partial def expressionUsesLocal (ns : ValidatedNamespace) (exprId : Expr
         expressionUsesLocal ns value localId fuel
   | fuel + 1, some { kind := .assignPattern _ value, .. } =>
       expressionUsesLocal ns value localId fuel
-  | _, some { kind := .quantifier .., .. } | _, some { kind := .spec _, .. } => true
+  | fuel + 1, some { kind := .spec block, .. } =>
+      (expressionChildren (.spec block)).any (expressionUsesLocal ns · localId fuel)
+  | _, some { kind := .quantifier .., .. } => true
   | _, some { kind := .value .., .. } | _, some { kind := .constant _, .. } |
       _, some { kind := .continue_ _, .. } => false
 
@@ -445,7 +455,9 @@ private partial def expressionUsesCarrier (ns : ValidatedNamespace) (exprId : Ex
       placeUsesCarrier ns place carrier || expressionUsesCarrier ns value carrier fuel
   | fuel + 1, some { kind := .assignPattern _ value, .. } =>
       expressionUsesCarrier ns value carrier fuel
-  | _, some { kind := .quantifier .., .. } | _, some { kind := .spec _, .. } => true
+  | fuel + 1, some { kind := .spec block, .. } =>
+      (expressionChildren (.spec block)).any (expressionUsesCarrier ns · carrier fuel)
+  | _, some { kind := .quantifier .., .. } => true
   | _, some { kind := .value .., .. } | _, some { kind := .constant _, .. } |
       _, some { kind := .continue_ _, .. } => false
 
@@ -1153,8 +1165,9 @@ mutual
   descendant already recorded a more precise point. -/
   private partial def analyzeExpr (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (exprId : ExprId)
-      (state : BorrowState) (preserved : Array ExprId := #[]) : BorrowFlow :=
-    let flow := analyzeExprCore unit ns exprId state preserved
+      (state : BorrowState) (preserved : Array ExprId := #[])
+      (discarded : Bool := false) : BorrowFlow :=
+    let flow := analyzeExprCore unit ns exprId state preserved discarded
     match flow.normal with
     | none => flow
     | some exit =>
@@ -1168,7 +1181,8 @@ mutual
 
   private partial def analyzeExprCore (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (exprId : ExprId)
-      (state : BorrowState) (preserved : Array ExprId := #[]) : BorrowFlow :=
+      (state : BorrowState) (preserved : Array ExprId := #[])
+      (discarded : Bool := false) : BorrowFlow :=
     match ns.expressions[exprId.index]? with
     | none => { normal := some state }
     | some expression => match expression.kind with
@@ -1201,9 +1215,21 @@ mutual
                       let (state, loans, diagnostics) := addGlobalBorrow ns exprId
                         expression.loc expression.typeId kind instantiations afterArguments
                       (some state, loans, loans, diagnostics)
+                  | .global .take | .global .publish =>
+                      /- Removing or replacing the owner conflicts with any
+                      live reference into the family, just like a local
+                      consume/write. Use the same family identity as global
+                      borrowing; contains does not invalidate an owner. -/
+                      let diagnostics := match (instantiations[0]? : Option GenericArgument) with
+                        | some (.typeArg resource) =>
+                            accessDiagnostics afterArguments expression.loc
+                              { root := .global resource.typeId } true "global owner write"
+                        | _ => #[]
+                      (some afterArguments, #[], #[], diagnostics)
                   | .borrow kind place =>
                       let (state, loans, diagnostics) :=
                         addBorrow ns exprId expression.loc expression.typeId kind place afterArguments
+                          discarded
                       let parentLoans := loansHeldAtPlace ns afterArguments place
                       let valueLoans := appendUniqueLoans parentLoans loans
                       (some state, valueLoans, valueLoans, diagnostics)
@@ -1272,7 +1298,20 @@ mutual
             let bodyProtected := loansUsedBy ns [body] state preserved
             let initializerFlow : BorrowFlow := match initializer with
               | none => { normal := some state }
-              | some value => analyzeExpr unit ns value state bodyProtected
+              | some value =>
+                  -- Only a direct Move borrow can use this rule. In
+                  -- particular, do not propagate non-use through an
+                  -- initializer that might observe a reference internally.
+                  -- Avoid the extra liveness walk for all other lets and
+                  -- when there is no existing loan to conflict with.
+                  let discarded := !state.active.isEmpty && ns.profile == some .move &&
+                    (match ns.expressions[value.index]? with
+                      | some { kind := .operation (.borrow .mutable place) _ _ _, .. } =>
+                          (directLocalPlace? ns place).isSome
+                      | _ => false) &&
+                    !(patternVariables ns pattern (ns.patterns.size + 1)).any
+                      (fun localId => expressionUsesLocal ns body localId (ns.expressions.size + 1))
+                  analyzeExpr unit ns value state bodyProtected discarded
             match initializerFlow.normal with
             | none => initializerFlow
             | some afterInitializer =>
@@ -1853,9 +1892,16 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
               deaths := pushDeaths flow.deaths died { anchor := root } }
       -- A loan taken through a dereference of a reference parameter reborrows
       -- caller-owned storage and escapes with the parameter's lifetime; only
-      -- loans of frame-owned storage must not outlive the frame. Reborrows
-      -- through local reference variables stay conservatively frame-owned.
+      -- loans of frame-owned storage must not outlive the frame. Move's VM
+      -- also roots global resources in the invocation frame: references to
+      -- those resources may not escape, even through another local holder.
+      -- Reborrows through local reference variables stay conservative.
       let parameters := referenceParameters ns function
+      let escapingRoot (root : LoanRoot) : Bool :=
+        match root with
+        | .external => true
+        | .global _ => ns.profile != some .move
+        | _ => false
       let frameOwned (state : BorrowState) (loan : LoanFact) : Bool :=
         let rootedInEscapingReference :=
           loan.place.projections[0]? == some .dereference &&
@@ -1864,9 +1910,9 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
                 state.active.any fun parent =>
                   parent.expression != loan.expression &&
                     parent.holders.contains rootLocal &&
-                    (parent.place.root matches .global _ | .external)
+                    escapingRoot parent.place.root
         !(rootedInEscapingReference ||
-          (loan.place.root matches .global _ | .external))
+          escapingRoot loan.place.root)
       let normalEscapes := match flow.normal with
         | some state => state.active.any (frameOwned state)
         | none => false
@@ -1877,7 +1923,7 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
             typeMayContainReference ns result.typeId) then flow
       else
         let diagnostic := Diagnostic.at "LIR-SEMANTIC-BORROW-ESCAPE"
-          "a local loan may escape through a reference-bearing function result" function.loc
+          "a local or Move global loan may escape through a reference-bearing function result" function.loc
         { flow with diagnostics := flow.diagnostics.push diagnostic }
 
 /-- Run the borrow analysis once for one function: conservative conflicts and

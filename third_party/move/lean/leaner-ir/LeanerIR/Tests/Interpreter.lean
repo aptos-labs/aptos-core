@@ -241,7 +241,7 @@ private theorem successfulFixtureRunHasDerivation (executable : ExecutableUnit)
     (fuel : Nat) (function : FunctionHandle) (arguments : Array RuntimeValue)
     (success : (Interpreter.run executable fuel function arguments).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction executable function {} arguments
+      BigStep.EvalFunction executable function #[] {} arguments
       finalState outcome.value := by
   generalize result_eq : Interpreter.run executable fuel function arguments = result
   cases result with
@@ -254,37 +254,37 @@ private theorem successfulFixtureRunHasDerivation (executable : ExecutableUnit)
 private def preparedExecutable : ExecutableUnit := executable?.get (by native_decide)
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedExecutable (handle 0) {} #[]
+    BigStep.EvalFunction preparedExecutable (handle 0) #[] {} #[]
       finalState outcome.value := by
   apply successfulFixtureRunHasDerivation preparedExecutable 32 (handle 0) #[]
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedExecutable (handle 1) {} #[]
+    BigStep.EvalFunction preparedExecutable (handle 1) #[] {} #[]
       finalState outcome.value := by
   apply successfulFixtureRunHasDerivation preparedExecutable 32 (handle 1) #[]
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedExecutable (handle 3) {} #[]
+    BigStep.EvalFunction preparedExecutable (handle 3) #[] {} #[]
       finalState outcome.value := by
   apply successfulFixtureRunHasDerivation preparedExecutable 32 (handle 3) #[]
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedExecutable (handle 5) {} #[]
+    BigStep.EvalFunction preparedExecutable (handle 5) #[] {} #[]
       finalState outcome.value := by
   apply successfulFixtureRunHasDerivation preparedExecutable 32 (handle 5) #[]
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedExecutable (handle 6) {} #[]
+    BigStep.EvalFunction preparedExecutable (handle 6) #[] {} #[]
       finalState outcome.value := by
   apply successfulFixtureRunHasDerivation preparedExecutable 32 (handle 6) #[]
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedExecutable (handle 7) {} #[]
+    BigStep.EvalFunction preparedExecutable (handle 7) #[] {} #[]
       finalState outcome.value := by
   apply successfulFixtureRunHasDerivation preparedExecutable 32 (handle 7) #[]
   native_decide

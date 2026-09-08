@@ -106,6 +106,116 @@ private def ensureUnitType (tables : Tables) : Tables × TypeId :=
   | some index => (tables, ⟨index⟩)
   | none => ({ tables with types := tables.types.push .unit }, ⟨tables.types.size⟩)
 
+private def mergeByIndex {α : Type} :
+    Nat → List (Nat × α) → List (Nat × α) → List (Nat × α)
+  | 0, left, right => left ++ right
+  | _ + 1, [], right => right
+  | _ + 1, left, [] => left
+  | fuel + 1, (i, a) :: left, (j, b) :: right =>
+      if i ≤ j then (i, a) :: mergeByIndex fuel left ((j, b) :: right)
+      else (j, b) :: mergeByIndex fuel ((i, a) :: left) right
+
+private def sortByIndexFuel {α : Type} : Nat → List (Nat × α) → List (Nat × α)
+  | 0, entries => entries
+  | _ + 1, [] => []
+  | _ + 1, [entry] => [entry]
+  | fuel + 1, entries =>
+      let size := entries.length
+      let middle := size / 2
+      mergeByIndex size
+        (sortByIndexFuel fuel (entries.take middle))
+        (sortByIndexFuel fuel (entries.drop middle))
+
+/-- Stable O(n log n) index sorting with structural recursion throughout.
+Unlike the library's well-founded merge sort, this reduces directly in
+kernel-checked preparation certificates without an accessibility proof. -/
+def sortByIndex {α : Type} (entries : List (Nat × α)) : List (Nat × α) :=
+  sortByIndexFuel entries.length entries
+
+private def replacePlaceCopies : Nat → List Place → List (Nat × Place) → List Place
+  | _, [], _ => []
+  | index, node :: rest, patches =>
+      match patches with
+      | (anchor, replacement) :: tail =>
+          if index == anchor then
+            replacement :: replacePlaceCopies (index + 1) rest
+              (tail.dropWhile fun entry => entry.1 == anchor)
+          else node :: replacePlaceCopies (index + 1) rest patches
+      | [] => node :: rest
+
+/-- Apply ordered copies between place slots, reading each source from the
+state established by preceding copies. Keep a sparse overlay until the final
+arena merge, so kernel reduction never replays a chain of full-array updates.
+The changed-slot bits avoid searching the overlay for untouched source slots.
+Stable sorting retains the newest replacement at a repeatedly written slot. -/
+def applyPlaceCopies (original : Array Place) (copies : List (Nat × PlaceId)) : Array Place :=
+  let (_, patches) := copies.foldl (init := (0, ([] : List (Nat × Place))))
+    fun (changed, patches) (index, base) =>
+      if index < original.size then
+        let value := if base.index < original.size && changed / 2 ^ base.index % 2 != 0 then
+            ((patches.find? fun entry => entry.1 == base.index).map (·.2)).getD
+              original[base.index]!
+          else original[base.index]!
+        let changed := if changed / 2 ^ index % 2 == 0 then changed + 2 ^ index else changed
+        (changed, (index, value) :: patches)
+      else (changed, patches)
+  (replacePlaceCopies 0 original.toList (sortByIndex patches)).toArray
+
+/-- Merge unique, sorted replacement slots in one traversal of the original
+arena. Repeated `Array.set!` on the growing arena duplicates the computation
+of previous updates during kernel reduction. -/
+private def replaceAnchors : Nat → List Expr → List (Nat × Expr) → List Expr
+  | _, [], _ => []
+  | index, node :: rest, patches =>
+      match patches with
+      | (anchor, replacement) :: tail =>
+          if index == anchor then replacement :: replaceAnchors (index + 1) rest tail
+          else node :: replaceAnchors (index + 1) rest patches
+      | [] => node :: rest
+
+private def anchorNodeNative (original : Array Expr) (index : Nat) : Expr :=
+  original[index]!
+
+@[implemented_by anchorNodeNative]
+private def anchorNode (original : Array Expr) (index : Nat) : Expr :=
+  original.toList[index]!
+
+private theorem anchorNode_eq (original : Array Expr) (index : Nat) :
+    anchorNode original index = anchorNodeNative original index := by
+  exact Array.getElem!_toList
+
+/-- Batch valid, grouped anchors while preserving the original append order
+and therefore every synthesized expression id. Only the final merge touches
+the full original arena; each marker inspects its original slot once. -/
+private def markAnchorsBatched (original : Array Expr) (unitType : TypeId)
+    (reserved : Array ExprId) (marks : Array AnchorMarks)
+    (diagnostics : Array Diagnostic) : Array Expr × Array Diagnostic :=
+  let (_, appended, patches, diagnostics) := marks.foldl
+    (init := (original.size, ([] : List Expr), ([] : List (Nat × Expr)), diagnostics))
+    fun (next, appended, patches, diagnostics) mark =>
+      if reserved.contains mark.anchor then
+        (next, appended, patches, diagnostics.push (.error "LIR-SEMANTIC-LOAN-MARKER"
+          s!"internal: loan-death anchor {mark.anchor.index} is a place index" none))
+      else
+        let node := anchorNode original mark.anchor.index
+        let (next, appended, current) := if mark.after.isEmpty then
+            (next, appended, node)
+          else
+            (next + 1, node :: appended, { node with
+              kind := .operation (.reference (.endLoan mark.after)) #[] #[⟨next⟩] })
+        let (next, appended, current) := if mark.before.isEmpty then
+            (next, appended, current)
+          else
+            let marker : Expr := {
+              loc := node.loc
+              typeId := unitType
+              kind := .operation (.reference (.endLoan mark.before)) #[] #[] }
+            (next + 2, marker :: current :: appended,
+              { node with kind := .block #[⟨next + 1⟩] (some ⟨next⟩) })
+        (next, appended, (mark.anchor.index, current) :: patches, diagnostics)
+  let sorted := sortByIndex patches
+  ((replaceAnchors 0 original.toList sorted ++ appended.reverse).toArray, diagnostics)
+
 /-- Materialize the death records of every certificate as `endLoan` markers.
 The result is the semantic view of the unit; the input stays the marker-free
 surface authority. -/
@@ -121,6 +231,11 @@ def markLoanDeaths (unit : ValidatedUnit) : ValidatedUnit × Array Diagnostic :=
               addMark marks death.anchor death.before ⟨loanIndex⟩
       let reserved := placeIndexIds ns
       let (expressions, diagnostics) :=
+        if marks.all (fun mark => mark.anchor.index < ns.expressions.size) then
+          markAnchorsBatched ns.expressions unitType reserved marks diagnostics
+        else
+        -- Retain the established malformed-certificate diagnostics, including
+        -- their ordering, on the uncommon out-of-range path.
         marks.foldl (init := (ns.expressions, diagnostics)) fun (expressions, diagnostics) mark =>
           if reserved.contains mark.anchor then
             (expressions, diagnostics.push (.error "LIR-SEMANTIC-LOAN-MARKER"

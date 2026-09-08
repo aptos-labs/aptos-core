@@ -53,6 +53,93 @@ theorem Plain.ofFields (source : StructHandle) (variant : Option String)
     Plain (.nominal source variant fields.toArray) :=
   .nominal source variant fields.toArray (by simpa using plain)
 
+/-- Collecting outer borrows from a list known to contain only plain values
+is empty.  Keeping this structural fact separate avoids unfolding the
+collector for every generated nominal shape. -/
+private theorem collectPrunedList_borrowEntry?_eq_empty
+    {values : List RuntimeValue}
+    (plain : ∀ value ∈ values, Plain value)
+    (empty : ∀ value ∈ values, collectPruned borrowEntry? value = #[]) :
+    collectPrunedList borrowEntry? values = #[] := by
+  induction values with
+  | nil => simp [collectPrunedList]
+  | cons head tail ih =>
+      rw [collectPrunedList, empty head (by simp)]
+      simp only [Array.empty_append]
+      exact ih (fun value mem => plain value (by simp [mem]))
+        (fun value mem => empty value (by simp [mem]))
+
+/-- A plain value contains no outer mutable borrow. -/
+theorem Plain.collectPruned_borrowEntry?_eq_empty {value : RuntimeValue}
+    (plain : Plain value) : collectPruned borrowEntry? value = #[] := by
+  induction plain with
+  | unit | bool | character | integer | address | signer | string | bytes =>
+      simp [collectPruned, borrowEntry?]
+  | vector elements fields ih
+  | tuple elements fields ih
+  | nominal _ _ elements fields ih
+  | closure _ elements fields ih =>
+      simp only [collectPruned, borrowEntry?]
+      apply collectPrunedList_borrowEntry?_eq_empty
+      · simpa using fields
+      · intro value mem
+        exact ih value (by simpa using mem)
+
+theorem Plain.outermostBorrows_eq_empty {value : RuntimeValue} (plain : Plain value) :
+    outermostBorrows value = #[] := by
+  simp [outermostBorrows, plain.collectPruned_borrowEntry?_eq_empty]
+
+private theorem maskReturnedBorrowList_eq_self (loans : Array Nat)
+    (values : List RuntimeValue)
+    (unchanged : ∀ value ∈ values, maskReturnedBorrows loans value = value) :
+    maskReturnedBorrowList loans values = values := by
+  induction values with
+  | nil => simp [maskReturnedBorrowList]
+  | cons head tail ih =>
+      rw [maskReturnedBorrowList, unchanged head (by simp),
+        ih (fun value mem => unchanged value (by simp [mem]))]
+
+/-- Returning a handle never requires inspecting a typed loan-free payload. -/
+theorem Plain.maskReturnedBorrows_eq_self {value : RuntimeValue}
+    (plain : Plain value) (loans : Array Nat) : maskReturnedBorrows loans value = value := by
+  induction plain with
+  | unit | bool | character | integer | address | signer | string | bytes =>
+      simp [maskReturnedBorrows]
+  | vector elements fields ih
+  | tuple elements fields ih
+  | nominal _ _ elements fields ih
+  | closure _ elements fields ih =>
+      simp only [maskReturnedBorrows]
+      rw [maskReturnedBorrowList_eq_self loans elements.toList
+        (fun value mem => ih value (by simpa using mem))]
+
+/-- The common plain-result boundary has no dynamic handle-set computation. -/
+theorem exportReturnedFrameLoans_singlePlain {value : RuntimeValue}
+    (plain : Plain value) (frame : RuntimeFrame) (state : RuntimeState) :
+    exportReturnedFrameLoans #[value] frame state = exportFrameLoans frame state := by
+  apply exportReturnedFrameLoans_noReturnedBorrows
+  simp [returnedBorrowIds, plain.outermostBorrows_eq_empty]
+
+theorem exportReturnedFrameLoans_empty (frame : RuntimeFrame) (state : RuntimeState) :
+    exportReturnedFrameLoans #[] frame state = exportFrameLoans frame state := by
+  simp [exportReturnedFrameLoans]
+
+/-- A frame containing one plain value exports no write-back.  This is the
+shape-independent exit rule used by typed struct and enum arguments. -/
+theorem exportFrameLoans_plainValue_state
+    (state : RuntimeState) (value : RuntimeValue) (plain : Plain value)
+    (activeLoans : Array (ExprId × Nat))
+    (loanLocations : Array (Nat × RuntimePlace))
+    (typeInstantiation : Array (TypeId × TypeId) := #[]) :
+    exportFrameLoans
+        { locals := #[some value]
+          activeLoans
+          loanLocations
+          typeInstantiation }
+        state = state := by
+  simp [exportFrameLoans, exportSettledLoans, frameBorrows,
+    plain.outermostBorrows_eq_empty]
+
 /-- A matcher that answers only at a borrow or at a hole. -/
 def LoanMatcher {α : Type} (f : RuntimeValue → Option α) : Prop :=
   ∀ value, (∀ loan current, value ≠ .borrow loan current) →
@@ -96,6 +183,11 @@ theorem LoanMatcher.plain {α : Type} {f : RuntimeValue → Option α}
 theorem LoanMatcher.nominal {α : Type} {f : RuntimeValue → Option α}
     (matcher : LoanMatcher f) (source : StructHandle) (variant : Option String)
     (fields : Array RuntimeValue) : f (.nominal source variant fields) = none :=
+  matcher _ (by intro _ _ h; cases h) (by intro _ h; cases h)
+
+theorem LoanMatcher.vector {α : Type} {f : RuntimeValue → Option α}
+    (matcher : LoanMatcher f) (elements : Array RuntimeValue) :
+    f (.vector elements) = none :=
   matcher _ (by intro _ _ h; cases h) (by intro _ h; cases h)
 
 theorem findFirstList_eq_none {α : Type} {f : RuntimeValue → Option α}
@@ -331,12 +423,13 @@ end NodeAlgebra
 
 /-! ## Focus steps -/
 
-/-- One step of a focused path: the struct descended into, and the focused
-field's siblings on either side. -/
+/-- One step of a focused path: the nominal value descended into, its
+variant tag (if any), and the focused field's siblings on either side. -/
 structure FocusStep where
   source : StructHandle
   before : Array RuntimeValue
   after : Array RuntimeValue
+  variant : Option String := none
 
 namespace FocusStep
 
@@ -344,11 +437,11 @@ namespace FocusStep
 def index (step : FocusStep) : Nat := step.before.size
 
 /-- The nominal field step a reborrow along this step carries. -/
-def fieldStep (step : FocusStep) : NominalFieldStep := ⟨step.source, none, step.index⟩
+def fieldStep (step : FocusStep) : NominalFieldStep := ⟨step.source, step.variant, step.index⟩
 
 /-- The struct with `focus` at the focused field. -/
 def fill (step : FocusStep) (focus : RuntimeValue) : RuntimeValue :=
-  .nominal step.source none (step.before.push focus ++ step.after)
+  .nominal step.source step.variant (step.before.push focus ++ step.after)
 
 /-- The siblings are loan-free. -/
 def Plain (step : FocusStep) : Prop :=
@@ -376,6 +469,154 @@ theorem toList_fill (step : FocusStep) (focus : RuntimeValue) :
   simp
 
 end FocusStep
+
+/-- One focused vector element, represented by its siblings.  This is the
+indexed analogue of `FocusStep`, kept separate because no nominal shape
+check is involved. -/
+structure VectorFocus where
+  before : Array RuntimeValue
+  after : Array RuntimeValue
+
+namespace VectorFocus
+
+def index (focus : VectorFocus) : Nat := focus.before.size
+
+def fill (focus : VectorFocus) (value : RuntimeValue) : RuntimeValue :=
+  .vector (focus.before.push value ++ focus.after)
+
+def Plain (focus : VectorFocus) : Prop :=
+  (∀ sibling ∈ focus.before, SemanticOperations.Plain sibling) ∧
+    (∀ sibling ∈ focus.after, SemanticOperations.Plain sibling)
+
+theorem Plain.fill {focus : VectorFocus} (plain : focus.Plain)
+    {value : RuntimeValue} (valuePlain : SemanticOperations.Plain value) :
+    SemanticOperations.Plain (focus.fill value) := by
+  apply SemanticOperations.Plain.vector
+  intro element member
+  simp only [fill, Array.mem_append, Array.mem_push] at member
+  rcases member with (member | rfl) | member
+  · exact plain.1 element member
+  · exact valuePlain
+  · exact plain.2 element member
+
+@[simp] theorem getElem?_fill (focus : VectorFocus) (value : RuntimeValue) :
+    (focus.before.push value ++ focus.after)[focus.index]? = some value := by
+  simp [index, Array.getElem?_append]
+
+@[simp] theorem runtimeField_fill (focus : VectorFocus) (value : RuntimeValue) :
+    RuntimeValue.field (focus.fill value) focus.index = value := by
+  simp [RuntimeValue.field, fill, getElem?_fill]
+
+@[simp] theorem runtimeAsIntField_fill (focus : VectorFocus)
+    (value : RuntimeValue) :
+    RuntimeValue.asInt (RuntimeValue.field (focus.fill value) focus.index) =
+      RuntimeValue.asInt value := by
+  rw [runtimeField_fill]
+
+@[simp] theorem runtimeField_fill_zero (after : Array RuntimeValue)
+    (value : RuntimeValue) :
+    RuntimeValue.field
+      (({ before := #[], after } : VectorFocus).fill value) 0 = value := by
+  simpa [index] using
+    runtimeField_fill ({ before := #[], after } : VectorFocus) value
+
+@[simp] theorem runtimeAsIntField_fill_zero (after : Array RuntimeValue)
+    (value : RuntimeValue) :
+    RuntimeValue.asInt
+      (RuntimeValue.field
+        (({ before := #[], after } : VectorFocus).fill value) 0) =
+      RuntimeValue.asInt value := by
+  rw [runtimeField_fill_zero]
+
+/-- The expanded spelling produced after a contract unfolds a focus at
+index zero. -/
+@[simp] theorem runtimeField_vector_zero (value : RuntimeValue)
+    (after : Array RuntimeValue) :
+    RuntimeValue.field (.vector (#[].push value ++ after)) 0 = value := by
+  simp [RuntimeValue.field, Array.getElem?_append]
+
+@[simp] theorem runtimeAsIntField_vector_zero (value : RuntimeValue)
+    (after : Array RuntimeValue) :
+    RuntimeValue.asInt
+      (RuntimeValue.field (.vector (#[].push value ++ after)) 0) =
+        RuntimeValue.asInt value := by
+  rw [runtimeField_vector_zero]
+
+theorem set!_fill (focus : VectorFocus) (value replacement : RuntimeValue) :
+    (focus.before.push value ++ focus.after).set! focus.index replacement =
+      focus.before.push replacement ++ focus.after := by
+  apply Array.ext'
+  simp [index, Array.set!]
+
+@[simp] theorem setIfInBounds_push (before : Array RuntimeValue)
+    (value replacement : RuntimeValue) :
+    (before.push value).setIfInBounds before.size replacement =
+      before.push replacement := by
+  apply Array.ext'
+  simp
+
+theorem toList_fill (focus : VectorFocus) (value : RuntimeValue) :
+    (focus.before.push value ++ focus.after).toList =
+      focus.before.toList ++ value :: focus.after.toList := by
+  simp
+
+theorem findFirst_fill {α : Type} {f : RuntimeValue → Option α}
+    (matcher : LoanMatcher f) {focus : VectorFocus} (plain : focus.Plain)
+    (value : RuntimeValue) :
+    findFirst f (focus.fill value) = findFirst f value := by
+  obtain ⟨before, after⟩ := plain
+  rw [fill, findFirst.eq_def, matcher.vector]
+  dsimp only
+  rw [toList_fill,
+    findFirstList_append_of_none fun x mem =>
+      findFirst_eq_none_of_plain matcher (before x (by simpa using mem)),
+    findFirstList.eq_def]
+  dsimp only
+  rw [findFirstList_eq_none fun x mem =>
+    findFirst_eq_none_of_plain matcher (after x (by simpa using mem))]
+  cases findFirst f value <;> rfl
+
+theorem rewriteFirst_fill {f : RuntimeValue → Option RuntimeValue}
+    (matcher : LoanMatcher f) {focus : VectorFocus} (plain : focus.Plain)
+    (value : RuntimeValue) :
+    rewriteFirst f (focus.fill value) =
+      (rewriteFirst f value).map focus.fill := by
+  obtain ⟨before, after⟩ := plain
+  rw [fill, rewriteFirst.eq_def, matcher.vector]
+  dsimp only
+  rw [toList_fill,
+    rewriteFirstList_append_of_none fun x mem =>
+      rewriteFirst_eq_none_of_plain matcher (before x (by simpa using mem)),
+    rewriteFirstList.eq_def]
+  dsimp only
+  rw [rewriteFirstList_eq_none fun x mem =>
+    rewriteFirst_eq_none_of_plain matcher (after x (by simpa using mem))]
+  cases rewriteFirst f value <;> simp [fill]
+
+theorem walks {focus : VectorFocus} (plain : focus.Plain) :
+    (∀ loan leaf, findFirst (holeMark? loan) (focus.fill leaf) =
+        findFirst (holeMark? loan) leaf) ∧
+      (∀ leaf, findFirst anyHole? (focus.fill leaf) = findFirst anyHole? leaf) ∧
+      (∀ loan leaf, findFirst (borrowCurrent? loan) (focus.fill leaf) =
+        findFirst (borrowCurrent? loan) leaf) ∧
+      (∀ loan replacement leaf,
+        rewriteFirst (holeFill? loan replacement) (focus.fill leaf) =
+          (rewriteFirst (holeFill? loan replacement) leaf).map focus.fill) ∧
+      (∀ loan replacement leaf,
+        rewriteFirst (borrowRewrite? loan replacement) (focus.fill leaf) =
+          (rewriteFirst (borrowRewrite? loan replacement) leaf).map focus.fill) ∧
+      (∀ loan leaf, rewriteFirst (borrowClear? loan) (focus.fill leaf) =
+        (rewriteFirst (borrowClear? loan) leaf).map focus.fill) :=
+  ⟨fun loan leaf => findFirst_fill (LoanMatcher.holeMark? loan) plain leaf,
+    fun leaf => findFirst_fill LoanMatcher.anyHole? plain leaf,
+    fun loan leaf => findFirst_fill (LoanMatcher.borrowCurrent? loan) plain leaf,
+    fun loan replacement leaf =>
+      rewriteFirst_fill (LoanMatcher.holeFill? loan replacement) plain leaf,
+    fun loan replacement leaf =>
+      rewriteFirst_fill (LoanMatcher.borrowRewrite? loan replacement) plain leaf,
+    fun loan leaf => rewriteFirst_fill (LoanMatcher.borrowClear? loan) plain leaf⟩
+
+end VectorFocus
 
 /-- The resource with `leaf` at the focus of `steps`. -/
 def focusValue : List FocusStep → RuntimeValue → RuntimeValue

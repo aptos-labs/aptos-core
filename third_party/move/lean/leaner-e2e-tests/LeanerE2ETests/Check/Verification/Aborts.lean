@@ -95,6 +95,13 @@ leaner module 0x99::abort_directions where
     aborts_if value < 1 with E_ZERO
   verify assert_floor
 
+#leaner_require_native 0x99::abort_directions::halve
+#leaner_require_native 0x99::abort_directions::bump_checked
+#leaner_require_native 0x99::abort_directions::identity
+#leaner_require_native 0x99::abort_directions::successor
+#leaner_require_native 0x99::abort_directions::explicit_abort
+#leaner_require_native 0x99::abort_directions::assert_floor
+
 /-! ## A deliberately wrong body fails at the specification range
 
 The body adds two where the unchanged contract promises one; the failure is

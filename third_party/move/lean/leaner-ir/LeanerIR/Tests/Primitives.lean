@@ -28,6 +28,34 @@ private def pointerTestNamespace : ValidatedNamespace := {
   tables := { types := #[.integer .pointer false, .integer .pointer true, .bool,
     .tuple #[⟨0⟩, ⟨2⟩]] } }
 
+-- Insertion permits the end index; removal returns the removed value and
+-- rejects the end index. Both reject negative indexes and preserve siblings.
+example : insertVector? #[.vector #[], .integer 0, .integer 7] =
+  some (.ok (.vector #[.integer 7])) := by simp [insertVector?, Array.insertIdxIfInBounds]
+example : insertVector? #[.vector #[.integer 10, .integer 30], .integer 1, .integer 20] =
+  some (.ok (.vector #[.integer 10, .integer 20, .integer 30])) := by
+    simp [insertVector?, Array.insertIdxIfInBounds]
+example : insertVector? #[.vector #[.integer 10], .integer 1, .integer 20] =
+  some (.ok (.vector #[.integer 10, .integer 20])) := by
+    simp [insertVector?, Array.insertIdxIfInBounds]
+example : insertVector? #[.vector #[.integer 10], .integer 2, .integer 20] =
+  some (.error (.abort, #[.integer 2])) := by rfl
+example : insertVector? #[.vector #[.integer 10], .integer (-1), .integer 20] =
+  some (.error (.abort, #[.integer (-1)])) := by rfl
+example : removeVector? #[.vector #[.integer 10, .integer 20, .integer 30], .integer 1] =
+  some (.ok (.tuple #[.integer 20, .vector #[.integer 10, .integer 30]])) := by
+    simp [removeVector?, Array.eraseIdxIfInBounds]
+example : removeVector? #[.vector #[.integer 7], .integer 0] =
+  some (.ok (.tuple #[.integer 7, .vector #[]])) := by
+    simp [removeVector?, Array.eraseIdxIfInBounds]
+example : removeVector? #[.vector #[], .integer 0] = some (.error (.abort, #[.integer 0])) := by rfl
+example : removeVector? #[.vector #[.integer 7], .integer 1] =
+  some (.error (.abort, #[.integer 1])) := by rfl
+example : removeVector? #[.vector #[.integer 7], .integer (-1)] =
+  some (.error (.abort, #[.integer (-1)])) := by rfl
+#guard (insertVector? #[.bool true, .integer 0, .integer 7]).isNone
+#guard (removeVector? #[.vector #[], .bool true]).isNone
+
 #guard (evaluatePrimitiveOperation? pointerTestNamespace ⟨0⟩ .add
   #[.integer 65535, .integer 1]).isNone
 
@@ -376,6 +404,39 @@ private def validationHasDiagnosticAt (raw : RawUnit) (code : String) (loc : Loc
       diagnostic.code == code && diagnostic.primary == some loc
   | .ok _ => false
 
+private def vectorEditFixture (operation : PrimitiveOperation)
+    (resultType : Nat) (badIndex := false) (badElement := false) : RawUnit :=
+  let ns := fixture.namespaces[0]!
+  { fixture with
+    tables := { fixture.tables with types := #[.integer (.bits 8) false, .bool,
+      .vector ⟨0⟩ none, .tuple #[⟨0⟩, ⟨2⟩], .tuple #[⟨1⟩, ⟨2⟩]] }
+    namespaces := #[{ ns with
+      expressions := #[
+        { loc := ⟨0⟩, typeId := ⟨2⟩, kind := .operation (.primitive .vector) #[] #[] },
+        { loc := ⟨1⟩, typeId := ⟨if badIndex then 1 else 0⟩,
+          kind := .value (if badIndex then .bool true else .integer 0) },
+        { loc := ⟨2⟩, typeId := ⟨if badElement then 1 else 0⟩,
+          kind := .value (if badElement then .bool true else .integer 7) },
+        { loc := ⟨3⟩, typeId := ⟨resultType⟩,
+          kind := .operation (.primitive operation) #[]
+            (if operation == .insertVector then #[⟨0⟩, ⟨1⟩, ⟨2⟩] else #[⟨0⟩, ⟨1⟩]) }]
+      functions := #[{ ns.functions[0]! with
+        signature := { results := #[typeUse resultType 7] }
+        body := .structured ⟨3⟩ }] }] }
+
+#guard (validate #[schema] (vectorEditFixture .insertVector 2)).isOk
+#guard (validate #[schema] (vectorEditFixture .removeVector 3)).isOk
+#guard validationHasDiagnosticAt (vectorEditFixture .insertVector 2 true)
+  "LIR-SEMANTIC-TYPE" ⟨3⟩
+#guard validationHasDiagnosticAt (vectorEditFixture .insertVector 2 false true)
+  "LIR-SEMANTIC-TYPE" ⟨3⟩
+#guard validationHasDiagnosticAt (vectorEditFixture .removeVector 3 true)
+  "LIR-SEMANTIC-TYPE" ⟨3⟩
+#guard validationHasDiagnosticAt (vectorEditFixture .removeVector 2)
+  "LIR-SEMANTIC-TYPE" ⟨3⟩
+#guard validationHasDiagnosticAt (vectorEditFixture .removeVector 4)
+  "LIR-SEMANTIC-TYPE" ⟨3⟩
+
 private def pointerWidthFixture (width : Option String) : RawUnit :=
   let options := width.map (fun value => #[
     ("target_pointer_width", value)]) |>.getD #[]
@@ -662,7 +723,7 @@ example : ¬ ValueHasType default integerTypingTables (.integer 256) ⟨0⟩ := 
       simp [integerTypingTables] at type_eq
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction castPrepared handle {} #[] finalState outcome.value := by
+    BigStep.EvalFunction castPrepared handle #[] {} #[] finalState outcome.value := by
   have success : (Interpreter.run castPrepared 16 handle #[]).isOk := by native_decide
   generalize result_eq : Interpreter.run castPrepared 16 handle #[] = result
   cases result with
@@ -673,7 +734,7 @@ example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
           result.1 result.2 result_eq⟩
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction shiftPrepared handle {} #[] finalState outcome.value := by
+    BigStep.EvalFunction shiftPrepared handle #[] {} #[] finalState outcome.value := by
   have success : (Interpreter.run shiftPrepared 16 handle #[]).isOk := by native_decide
   generalize result_eq : Interpreter.run shiftPrepared 16 handle #[] = result
   cases result with
@@ -684,7 +745,7 @@ example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
           result.1 result.2 result_eq⟩
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared handle {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared handle #[] {} #[] finalState outcome.value := by
   have success : (Interpreter.run prepared 16 handle #[]).isOk := by native_decide
   generalize result_eq : Interpreter.run prepared 16 handle #[] = result
   cases result with

@@ -143,6 +143,10 @@ private theorem beq_eq_decide {α : Type} [BEq α] [LawfulBEq α] [DecidableEq �
   unfold RuntimeValue.beq
   exact beq_eq_decide _ _
 
+@[simp] theorem RuntimeValue.bne_integer (left right : Int) :
+    (RuntimeValue.integer left != RuntimeValue.integer right) = decide (left ≠ right) := by
+  simp [bne_eq, RuntimeValue.beq_integer]
+
 @[simp] theorem RuntimeValue.beq_bool (left right : Bool) :
     (RuntimeValue.bool left == RuntimeValue.bool right) = decide (left = right) := by
   show RuntimeValue.beq _ _ = _
@@ -411,6 +415,10 @@ structure RuntimeFrame where
   locals : Array (Option RuntimeValue) := #[]
   activeLoans : Array (ExprId × Nat) := #[]
   loanLocations : Array (Nat × RuntimePlace) := #[]
+  /-- Declaration-local type ids mapped to the concrete members selected by
+  this invocation.  The map is computed once at a generic call boundary;
+  ordinary functions carry the empty identity map. -/
+  typeInstantiation : Array (TypeId × TypeId) := #[]
   deriving Repr, BEq, Inhabited
 
 /-- Whole runtime state threaded through expressions and calls.  `nextLoan`

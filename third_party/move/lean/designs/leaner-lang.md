@@ -703,6 +703,21 @@ native execution.
 Function contracts are described below. Declaration pragmas, attributes,
 profile data, origin, and alignment do not alter the structured body.
 
+Declaration attributes accept nested calls and assigned literal/name values:
+`@[resource_group (scope («global»)), randomness = 7]`. Quoted identifiers
+retain dotted names such as `«lint.skip»`. Structs, enums, functions, and
+specification functions preserve this metadata through lowering and canonical
+print/reparse. Specification-function annotations use LIR's existing contract
+pragma slot, restored to declaration attributes by the source printer.
+`@[move_public]` is a compatibility spelling for a public function and does
+not leave a user annotation. Other function modifiers keep their ordinary
+keyword spellings.
+
+Intrinsic owners (`intrinsic_<model>`) and model-prefixed roles (including
+`map_*`) are reserved annotations. They lower to the intrinsic role graph,
+not user metadata. Ordinary annotations may accompany them; malformed owner
+or role annotations and roles attached to nominal declarations are rejected.
+
 ## Locals and lexical scope
 
 Parameters occupy the leading local slots. Every local binding has a stable
@@ -815,9 +830,9 @@ where
   invariant condition
 for iterator in lower..upper do
   body
-loop ['label] ...
-break ['label] [value]
-continue ['label]
+loop[@label] ...
+break[@label] [value]
+continue[@label]
 return value
 abort arguments...
 panic arguments...
@@ -826,6 +841,8 @@ throw profile[p, "tag", "payload"] arguments...
 
 LIR stores `break` and `continue` targets as lexical nesting depths. Source
 uses labels where needed; frontend resolution computes the depth. Loops are
+written `loop@outer do ...`, with `break@outer` and `continue@outer` selecting
+the nearest enclosing loop of that name. Unknown labels are rejected. Loops are
 expressions and may produce a value through `break`. A body which can fall
 through must match its declared result type. A loop body, an `if` without
 `else`, and a pattern assignment which can fall through must have `Unit` type.
@@ -1267,10 +1284,20 @@ A frame distinguishes omission from an explicitly empty frame:
 
 ```lean
 modifies place_or_resource
+modifies global<Resource>(addr), *
 modifies *
 reads Type
 reads *
 ```
+
+The mixed wildcard is a per-family frame: every listed resource family is
+closed at its listed keys, while unlisted families may change. It does not
+permit changes at other keys in a listed family. By contrast, `modifies *`
+opens every family. The mixed spelling lowers to the existing modifies keys
+plus the boolean contract attribute `leaner_loose_frame`; the canonical
+printer restores the surface marker instead of printing that internal
+attribute. Invariant checking conservatively treats unlisted families as
+potentially modified.
 
 In-body specification blocks use the same conditions, pragmas, and frame at a
 structured program point:

@@ -979,7 +979,8 @@ mutual
     | .repeatVector => match values.toList, context.ns.tables.types[resultType.index]? with
         | [value], some (.vector _ (some (.integer length))) => pure s!"[{value}; {length}]"
         | _, _ => throw "validated repeated vector has no fixed integer length"
-    | .swapVector =>
+    | .swapVector | .insertVector | .removeVector | .concatVector |
+        .reverseSliceVector | .destroyEmptyVector =>
         -- Rust reshapes a `Vec` by statement, not by expression, and the Rust
         -- frontend never produces these; a Move unit reaching this backend is
         -- the real error.
@@ -1030,7 +1031,8 @@ mutual
         | _ => throw "validated shift has wrong source arity"
     | .checkedAdd _ | .checkedSubtract _ | .checkedMultiply _ | .checkedModulo _ |
         .checkedDivide _ | .checkedShiftLeft _ | .checkedShiftRight _ | .checkedNegate _ |
-        .checkedCast _ | .slice | .range | .implies | .equivalent =>
+        .checkedCast _ | .slice | .range | .implies | .equivalent |
+        .containsVector | .indexOfVector | .checkVectorIndex _ =>
         throw s!"primitive {repr kind} requires source-level control reconstruction"
 
   private partial def callText (context : Context) (loops : List String)

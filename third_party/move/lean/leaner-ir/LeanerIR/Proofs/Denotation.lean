@@ -77,10 +77,24 @@ def StatementsDenotation.AgreesWith (unit : ExecutableUnit) (callee : CalleeRela
 /-- Exact agreement of a native whole-function relation with what the
 oracle answers for one handle. -/
 def FunctionDenotation.AgreesWith (callee : CalleeRelation) (handle : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId))
     (denotation : FunctionDenotation) : Prop :=
   ∀ initial arguments final outcome,
     denotation initial arguments final outcome ↔
-      callee handle initial arguments final outcome
+      callee handle typeInstantiation initial arguments final outcome
+
+/-- Transport a function agreement across a computed invocation
+instantiation.  Call agreement uses this to discharge non-generic calls
+without changing the callee relation. -/
+theorem FunctionDenotation.AgreesWith.of_typeInstantiation_eq
+    {callee : CalleeRelation} {handle : FunctionHandle}
+    {actual expected : Array (TypeId × TypeId)}
+    {denotation : FunctionDenotation}
+    (eq : actual = expected)
+    (agree : FunctionDenotation.AgreesWith callee handle expected denotation) :
+    FunctionDenotation.AgreesWith callee handle actual denotation := by
+  subst actual
+  exact agree
 
 /-- Exact agreement of a native expression relation with one deep node. -/
 abbrev ExprDenotation.Agrees (unit : ExecutableUnit) (namespaceId : NamespaceId)
@@ -105,7 +119,13 @@ abbrev StatementsDenotation.Agrees (unit : ExecutableUnit)
 function handle. -/
 abbrev FunctionDenotation.Agrees (unit : ExecutableUnit)
     (handle : FunctionHandle) (denotation : FunctionDenotation) : Prop :=
-  FunctionDenotation.AgreesWith (EvalFunction unit) handle denotation
+  FunctionDenotation.AgreesWith (EvalFunction unit) handle #[] denotation
+
+/-- Exact agreement at an explicitly specialized invocation. -/
+abbrev FunctionDenotation.AgreesAt (unit : ExecutableUnit)
+    (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId))
+    (denotation : FunctionDenotation) : Prop :=
+  FunctionDenotation.AgreesWith (EvalFunction unit) handle typeInstantiation denotation
 
 /-! ## Leaf and sequencing combinators -/
 
@@ -213,6 +233,30 @@ structure DerefLocalBorrowOperation where
   lexicalLoan : Nat
   deriving Repr, BEq, Inhabited
 
+/-- A borrow of a literal-indexed vector or tuple element rooted at a known
+local.  `dereference` distinguishes an owned local aggregate from one held
+through a mutable-reference parameter. -/
+structure IndexedLocalBorrowOperation where
+  location : LocalLocation
+  dereference : Bool
+  index : Nat
+  referenceType : ReferenceType
+  kind : BorrowKind
+  lexicalLoan : Nat
+  indexLocal : Option LocalId := none
+  deriving Repr, BEq, Inhabited
+
+/-- A borrow of one statically selected nominal field below a literal
+index into an owned local vector or tuple. -/
+structure IndexedLocalFieldBorrowOperation where
+  location : LocalLocation
+  index : Nat
+  field : NominalFieldStep
+  referenceType : ReferenceType
+  kind : BorrowKind
+  lexicalLoan : Nat
+  deriving Repr, BEq, Inhabited
+
 /-- Read-like operations on an already selected local slot.  The variants
 remain distinct so the lowering certificate records the exact source
 operation even though their runtime action is identical. -/
@@ -220,6 +264,8 @@ inductive LocalLocationOperation where
   | read (location : LocalLocation)
   | copy (location : LocalLocation)
   | move (location : LocalLocation)
+  | borrow (location : LocalLocation) (referenceType : ReferenceType)
+      (kind : BorrowKind) (lexicalLoan : Nat)
   deriving Repr, BEq, Inhabited
 
 /-- Recover only the source operation tag for an agreement statement.  The
@@ -231,6 +277,7 @@ def LocalLocationOperation.sourceOperation
   | .read _ => .read place
   | .copy _ => .copy place
   | .move _ => .move place
+  | .borrow _ _ kind _ => .borrow kind place
 
 /-- A nominal constructor after declaration and arity resolution. -/
 structure NominalConstructor where
@@ -248,9 +295,36 @@ structure NominalFieldLocation where
   index : Nat
   deriving Repr, BEq, Inhabited
 
+/-- A variant payload selection after its per-variant offsets are resolved. -/
+structure NominalVariantFieldLocation where
+  source : StructHandle
+  choices : Array (String × Nat)
+  deriving Repr, BEq, Inhabited
+
+/-- A nominal variant predicate after owner resolution. -/
+structure NominalVariantTest where
+  source : StructHandle
+  variants : Array String
+  deriving Repr, BEq, Inhabited
+
 /-- The primitive subset whose result type has already been resolved. -/
 inductive PrimitiveLocationOperation where
   | tuple
+  | vector
+  | pushVector
+  | concatVector
+  | slice
+  | insertVector
+  | removeVector
+  | swapVector
+  | reverseSliceVector
+  | destroyEmptyVector
+  | containsVector
+  | indexOfVector (indexType : Ty)
+  | checkVectorIndex (failure : ThrowKind)
+  | length (resultType : Ty)
+  | logicalNot
+  | index (resultType : Ty)
   | copyValue (resultType : Ty)
   | moveValue (resultType : Ty)
   | add (resultType : Ty)
@@ -269,6 +343,18 @@ inductive PrimitiveLocationOperation where
   | checkedDivide (failure : ThrowKind) (resultType : Ty)
   | modulo (resultType : Ty)
   | checkedModulo (failure : ThrowKind) (resultType : Ty)
+  | bitwiseOr (resultType : Ty)
+  | bitwiseAnd (resultType : Ty)
+  | bitwiseXor (resultType : Ty)
+  | bitwiseNot (resultType : Ty)
+  | shiftLeft (resultType : Ty)
+  | checkedShiftLeft (failure : ThrowKind) (resultType : Ty)
+  | shiftRight (resultType : Ty)
+  | checkedShiftRight (failure : ThrowKind) (resultType : Ty)
+  | cast (resultType : Ty)
+  | checkedCast (failure : ThrowKind) (resultType : Ty)
+  | logicalAnd
+  | logicalOr
   deriving Repr, BEq, Inhabited
 
 /-- Reference operations after result-type resolution. -/
@@ -310,13 +396,23 @@ def liftConstructorEvaluator
 /-- Evaluate a global operation at its already selected resource location. -/
 def GlobalLocationOperation.evaluate? :
     GlobalLocationOperation → NativeEvaluator
-  | .contains resource =>
-      containsGlobalAt? resource.namespaceId resource.typeId
+  | .contains resource => fun arguments frame state =>
+      containsGlobalAt? resource.namespaceId
+        (instantiatedTypeId frame.typeInstantiation resource.typeId)
+        arguments frame state
   | .borrow site =>
-      borrowGlobalAt? site.resource.namespaceId site.resource.typeId
-        site.referenceType site.lexicalLoan site.kind
-  | .take resource => takeGlobalAt? resource.namespaceId resource.typeId
-  | .publish resource => publishGlobalAt? resource.namespaceId resource.typeId
+      fun arguments frame state =>
+        borrowGlobalAt? site.resource.namespaceId
+          (instantiatedTypeId frame.typeInstantiation site.resource.typeId)
+          site.referenceType site.lexicalLoan site.kind arguments frame state
+  | .take resource => fun arguments frame state =>
+      takeGlobalAt? resource.namespaceId
+        (instantiatedTypeId frame.typeInstantiation resource.typeId)
+        arguments frame state
+  | .publish resource => fun arguments frame state =>
+      publishGlobalAt? resource.namespaceId
+        (instantiatedTypeId frame.typeInstantiation resource.typeId)
+        arguments frame state
 
 /-- Read an already selected local slot.  This performs only the dynamic
 initialization check; it contains no namespace or place-arena lookup. -/
@@ -340,6 +436,13 @@ def LocalLocationOperation.evaluate? :
       let frame := { frame with
         locals := frame.locals.set! location.localId.index none }
       some (.value frame state value)
+  | .borrow location referenceType kind lexicalLoan =>
+      liftPlaceEvaluator fun arguments frame state => do
+        if !arguments.isEmpty then none else
+        if location.localId.index < frame.locals.size then
+          borrowRuntimePlaceAt? lexicalLoan referenceType kind frame state
+            { root := .local location.localId }
+        else none
 
 /-- Resolve the native runtime place of a local reborrow. Only slot bounds,
 the dynamic borrow tag, and nominal shape checks remain. -/
@@ -358,11 +461,98 @@ def DerefLocalBorrowOperation.evaluate? (operation : DerefLocalBorrowOperation) 
     borrowRuntimePlaceAt? operation.lexicalLoan operation.referenceType
       operation.kind frame state resolved
 
+/-- Resolve and borrow a statically indexed local aggregate. -/
+def IndexedLocalBorrowOperation.resolve?
+    (operation : IndexedLocalBorrowOperation)
+    (frame : RuntimeFrame) (state : RuntimeState) : Option RuntimePlace :=
+  match operation.indexLocal with
+  | none => resolveLocalLiteralIndex? operation.location.localId operation.dereference
+      operation.index frame state
+  | some index =>
+      if operation.dereference then
+        resolveLocalDynamicIndex? operation.location.localId index true frame state
+      else resolveLocalIndex? operation.location.localId index frame
+
+def IndexedLocalBorrowOperation.evaluate?
+    (operation : IndexedLocalBorrowOperation) : NativeEvaluator :=
+  liftPlaceEvaluator fun arguments frame state => do
+    if !arguments.isEmpty then none else
+    let resolved ← operation.resolve? frame state
+    borrowRuntimePlaceAt? operation.lexicalLoan operation.referenceType
+      operation.kind frame state resolved
+
+/-- Resolve and borrow a statically selected field below an owned local
+aggregate's literal-indexed element. -/
+def IndexedLocalFieldBorrowOperation.resolve?
+    (operation : IndexedLocalFieldBorrowOperation)
+    (frame : RuntimeFrame) (state : RuntimeState) : Option RuntimePlace :=
+  resolveLocalLiteralIndexField? operation.location.localId operation.index
+    operation.field frame state
+
+def IndexedLocalFieldBorrowOperation.evaluate?
+    (operation : IndexedLocalFieldBorrowOperation) : NativeEvaluator :=
+  liftPlaceEvaluator fun arguments frame state => do
+    if !arguments.isEmpty then none else
+    let resolved ← operation.resolve? frame state
+    borrowRuntimePlaceAt? operation.lexicalLoan operation.referenceType
+      operation.kind frame state resolved
+
 /-- Evaluate a fixed-width primitive without a type-table lookup. -/
 def PrimitiveLocationOperation.evaluate? :
     PrimitiveLocationOperation → NativeEvaluator
   | .tuple, arguments, frame, state =>
       some (.value frame state (.tuple arguments))
+  | .vector, arguments, frame, state =>
+      some (.value frame state (.vector arguments))
+  | .pushVector, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun arguments =>
+        match arguments.toList with
+        | [.vector elements, value] =>
+            some (.ok (.vector (elements.push value)))
+        | _ => none) arguments frame state
+  | .insertVector, arguments, frame, state =>
+      liftPrimitiveEvaluator insertVector? arguments frame state
+  | .concatVector, arguments, frame, state =>
+      liftPrimitiveEvaluator concatVector? arguments frame state
+  | .slice, arguments, frame, state =>
+      liftPrimitiveEvaluator sliceVector? arguments frame state
+  | .removeVector, arguments, frame, state =>
+      liftPrimitiveEvaluator removeVector? arguments frame state
+  | .swapVector, arguments, frame, state =>
+      liftPrimitiveEvaluator swapVector? arguments frame state
+  | .reverseSliceVector, arguments, frame, state =>
+      liftPrimitiveEvaluator reverseSliceVector? arguments frame state
+  | .destroyEmptyVector, arguments, frame, state =>
+      liftPrimitiveEvaluator destroyEmptyVector? arguments frame state
+  | .containsVector, arguments, frame, state =>
+      liftPrimitiveEvaluator containsVector? arguments frame state
+  | .indexOfVector indexType, arguments, frame, state =>
+      liftPrimitiveEvaluator (indexOfVector? indexType) arguments frame state
+  | .checkVectorIndex failure, arguments, frame, state =>
+      liftPrimitiveEvaluator (checkVectorIndex? failure) arguments frame state
+  | .length resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun arguments =>
+        let lengthValue (length : Nat) := match resultType with
+          | .integer .unbounded _ => some (.integer (Int.ofNat length))
+          | _ => modularInteger resultType length
+        match arguments.toList with
+        | [.vector elements] => .ok <$> lengthValue elements.size
+        | [.string value] => .ok <$> lengthValue value.utf8ByteSize
+        | [.bytes values] => .ok <$> lengthValue values.size
+        | _ => none) arguments frame state
+  | .logicalNot, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun arguments =>
+        match arguments.toList with
+        | [.bool operand] => some (.ok (.bool (!operand)))
+        | _ => none) arguments frame state
+  | .index _, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun values => match values.toList with
+        | [RuntimeValue.vector elements, RuntimeValue.integer position] =>
+            if position < 0 then some (.error (.abort, #[.integer position]))
+            else match elements[position.toNat]? with
+              | some element => some (.ok element)
+              | none => some (.error (.abort, #[.integer position]))
+        | _ => none) arguments frame state
   | .copyValue _, arguments, frame, state
   | .moveValue _, arguments, frame, state =>
       match arguments.toList with
@@ -429,6 +619,58 @@ def PrimitiveLocationOperation.evaluate? :
       liftPrimitiveEvaluator (moduloIntegers? resultType) arguments frame state
   | .checkedModulo failure resultType, arguments, frame, state =>
       liftPrimitiveEvaluator (checkedModuloIntegers? failure resultType) arguments frame state
+  | .bitwiseOr resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator
+        (fun arguments => bitwiseBinary resultType arguments
+          (fun left right => left ||| right) booleanOr) arguments frame state
+  | .bitwiseAnd resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator
+        (fun arguments => bitwiseBinary resultType arguments
+          (fun left right => left &&& right) booleanAnd) arguments frame state
+  | .bitwiseXor resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator
+        (fun arguments => bitwiseBinary resultType arguments
+          (fun left right => left ^^^ right) booleanXor) arguments frame state
+  | .bitwiseNot resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator (bitwiseNotInteger resultType) arguments frame state
+  | .shiftLeft resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator (shiftInteger true resultType) arguments frame state
+  | .checkedShiftLeft failure resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator
+        (checkedShiftInteger failure true resultType) arguments frame state
+  | .shiftRight resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator (shiftInteger false resultType) arguments frame state
+  | .checkedShiftRight failure resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator
+        (checkedShiftInteger failure false resultType) arguments frame state
+  | .cast resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun arguments => match arguments.toList with
+        | [.integer value] => match resultType with
+            | .character =>
+              if value < 0 || !isUnicodeScalar value.toNat then none
+              else some (.ok (.character value.toNat))
+            | _ => .ok <$> modularInteger resultType value
+        | [.character value] => .ok <$> modularInteger resultType (Int.ofNat value)
+        | _ => none) arguments frame state
+  | .checkedCast failure resultType, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun arguments => match arguments.toList with
+        | [.integer value] => match resultType with
+            | .character =>
+              if value < 0 || !isUnicodeScalar value.toNat then
+                some (.error (failure, #[.integer value]))
+              else some (.ok (.character value.toNat))
+            | _ => some <| checkedInteger failure resultType value
+        | [.character value] =>
+            some <| checkedInteger failure resultType (Int.ofNat value)
+        | _ => none) arguments frame state
+  | .logicalAnd, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun arguments => match arguments.toList with
+        | [.bool left, .bool right] => some (.ok (.bool (left && right)))
+        | _ => none) arguments frame state
+  | .logicalOr, arguments, frame, state =>
+      liftPrimitiveEvaluator (fun arguments => match arguments.toList with
+        | [.bool left, .bool right] => some (.ok (.bool (left || right)))
+        | _ => none) arguments frame state
 
 /-- Evaluate a constructor with no declaration/name/arity lookup. -/
 def NominalConstructor.evaluate? (constructor : NominalConstructor) :
@@ -441,6 +683,15 @@ def NominalConstructor.evaluate? (constructor : NominalConstructor) :
 def NominalFieldLocation.evaluateSelect? (field : NominalFieldLocation) :
     NativeEvaluator := liftConstructorEvaluator
   (selectNominalFieldAt? field.source field.variant field.index)
+
+def NominalVariantFieldLocation.evaluateSelect?
+    (field : NominalVariantFieldLocation) : NativeEvaluator :=
+  liftConstructorEvaluator
+    (selectNominalVariantFieldAt? field.source field.choices)
+
+def NominalVariantTest.evaluate? (test : NominalVariantTest) :
+    NativeEvaluator := liftConstructorEvaluator
+  (testNominalVariants? test.source test.variants)
 
 /-- Evaluate reference-value operations after lowering has removed every
 static result-type lookup. -/
@@ -493,6 +744,18 @@ def nativeLocalOperation (operation : LocalLocationOperation)
 
 /-- Execute a reborrow through a pre-resolved local-reference location. -/
 def nativeDerefLocalBorrowOperation (operation : DerefLocalBorrowOperation)
+    (operands : ValuesDenotation) : ExprDenotation :=
+  nativeOperation operation.evaluate? operands
+
+/-- Execute a borrow through a pre-resolved literal local index. -/
+def nativeIndexedLocalBorrowOperation (operation : IndexedLocalBorrowOperation)
+    (operands : ValuesDenotation) : ExprDenotation :=
+  nativeOperation operation.evaluate? operands
+
+/-- Execute a borrow through a literal local index and one resolved
+nominal field. -/
+def nativeIndexedLocalFieldBorrowOperation
+    (operation : IndexedLocalFieldBorrowOperation)
     (operands : ValuesDenotation) : ExprDenotation :=
   nativeOperation operation.evaluate? operands
 
@@ -590,6 +853,34 @@ theorem LocalLocationOperation.move_evaluator_eq
         readRuntimePlace?, readRoot?, readProjections?, in_bounds]
     all_goals
       cases local_eq : readLocal? frame location.localId <;> simp
+  · simp [LocalLocationOperation.evaluate?, liftPlaceEvaluator,
+      evaluatePlaceOperation?, arguments_eq]
+
+theorem LocalLocationOperation.borrow_evaluator_eq
+    {unit : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId} {place : PlaceId}
+    (location : LocalLocation) (referenceType : ReferenceType)
+    (kind : BorrowKind) (lexicalLoan : Nat)
+    (place_eq : ns.places[place.index]? =
+      some (.localVar location.localId))
+    (result_type_eq : ns.tables.types[resultType.index]? =
+      some (.reference referenceType))
+    (borrower_eq :
+      (fun frame state place => borrowRuntimePlaceAt? lexicalLoan
+        referenceType kind frame state place) =
+      (fun frame state place => borrowRuntimePlace? unit ns site
+        referenceType kind frame state place)) :
+    (LocalLocationOperation.borrow location referenceType kind lexicalLoan).evaluate? =
+      liftPlaceEvaluator fun arguments frame state =>
+        evaluatePlaceOperation? unit ns resultType site (.borrow kind place)
+          arguments frame state := by
+  funext arguments frame state
+  by_cases arguments_eq : arguments = #[]
+  · subst arguments
+    by_cases in_bounds : location.localId.index < frame.locals.size <;>
+      simp [LocalLocationOperation.evaluate?, liftPlaceEvaluator,
+        evaluatePlaceOperation?, result_type_eq,
+        resolvePlace?_localVar place_eq, borrower_eq, in_bounds]
   · simp [LocalLocationOperation.evaluate?, liftPlaceEvaluator,
       evaluatePlaceOperation?, arguments_eq]
 
@@ -719,6 +1010,129 @@ theorem DerefLocalBorrowOperation.evaluator_eq_path_of_unit
   · exact operation.resolve_eq_path_of_unit rfl path local_eq enough
   · exact borrower_eq
 
+/-- Agreement of the compact indexed resolver with a source index rooted
+directly at an owned local. -/
+theorem IndexedLocalBorrowOperation.resolve_eq_local_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {place basePlace : PlaceId} {indexExpr : ExprId}
+    (unit_eq : actual = prepared)
+    (operation : IndexedLocalBorrowOperation)
+    (place_eq : ns.places[place.index]? = some (.index basePlace indexExpr))
+    (base_eq : ns.places[basePlace.index]? =
+      some (.localVar operation.location.localId))
+    (dereference_eq : operation.dereference = false)
+    (index_local_eq : operation.indexLocal = none)
+    (index_eq : placeIndexForm? ns indexExpr =
+      some (.literal (operation.index : Int))) :
+    operation.resolve? =
+      fun frame state => resolvePlace? prepared ns frame state place := by
+  subst actual
+  funext frame state
+  simp only [IndexedLocalBorrowOperation.resolve?, dereference_eq, index_local_eq]
+  exact (resolvePlace?_localLiteralIndex place_eq base_eq index_eq).symm
+
+/-- Agreement of the compact indexed resolver with an index through a
+mutable-reference local. -/
+theorem IndexedLocalBorrowOperation.resolve_eq_deref_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {place basePlace localPlace : PlaceId} {indexExpr : ExprId}
+    (unit_eq : actual = prepared)
+    (operation : IndexedLocalBorrowOperation)
+    (place_eq : ns.places[place.index]? = some (.index basePlace indexExpr))
+    (base_eq : ns.places[basePlace.index]? = some (.deref localPlace))
+    (local_eq : ns.places[localPlace.index]? =
+      some (.localVar operation.location.localId))
+    (dereference_eq : operation.dereference = true)
+    (index_local_eq : operation.indexLocal = none)
+    (index_eq : placeIndexForm? ns indexExpr =
+      some (.literal (operation.index : Int))) :
+    operation.resolve? =
+      fun frame state => resolvePlace? prepared ns frame state place := by
+  subst actual
+  funext frame state
+  simp only [IndexedLocalBorrowOperation.resolve?, dereference_eq, index_local_eq]
+  exact (resolvePlace?_derefLocalLiteralIndex place_eq base_eq local_eq index_eq).symm
+
+theorem IndexedLocalBorrowOperation.resolve_eq_dynamic_local_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {place basePlace : PlaceId} {indexExpr : ExprId} {index : LocalId}
+    (unit_eq : actual = prepared) (operation : IndexedLocalBorrowOperation)
+    (place_eq : ns.places[place.index]? = some (.index basePlace indexExpr))
+    (base_eq : ns.places[basePlace.index]? = some (.localVar operation.location.localId))
+    (dereference_eq : operation.dereference = false)
+    (index_local_eq : operation.indexLocal = some index)
+    (index_eq : placeIndexForm? ns indexExpr = some (.local index) ∨
+      placeIndexForm? ns indexExpr = some (.copyLocal index)) :
+    operation.resolve? = fun frame state => resolvePlace? prepared ns frame state place := by
+  subst actual
+  funext frame state
+  simp only [IndexedLocalBorrowOperation.resolve?, dereference_eq, index_local_eq, Bool.false_eq_true, ↓reduceIte]
+  exact (resolvePlace?_localIndex place_eq base_eq index_eq).symm
+
+theorem IndexedLocalBorrowOperation.resolve_eq_dynamic_deref_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {place basePlace localPlace : PlaceId} {indexExpr : ExprId} {index : LocalId}
+    (unit_eq : actual = prepared) (operation : IndexedLocalBorrowOperation)
+    (place_eq : ns.places[place.index]? = some (.index basePlace indexExpr))
+    (base_eq : ns.places[basePlace.index]? = some (.deref localPlace))
+    (local_eq : ns.places[localPlace.index]? = some (.localVar operation.location.localId))
+    (dereference_eq : operation.dereference = true)
+    (index_local_eq : operation.indexLocal = some index)
+    (index_eq : placeIndexForm? ns indexExpr = some (.local index) ∨
+      placeIndexForm? ns indexExpr = some (.copyLocal index)) :
+    operation.resolve? = fun frame state => resolvePlace? prepared ns frame state place := by
+  subst actual
+  funext frame state
+  simp only [IndexedLocalBorrowOperation.resolve?, dereference_eq, index_local_eq, ↓reduceIte]
+  exact (resolvePlace?_derefLocalDynamicIndex place_eq base_eq local_eq index_eq).symm
+
+theorem IndexedLocalBorrowOperation.evaluator_eq_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId} {place : PlaceId}
+    (unit_eq : actual = prepared)
+    (operation : IndexedLocalBorrowOperation)
+    (result_type_eq : ns.tables.types[resultType.index]? =
+      some (.reference operation.referenceType))
+    (resolver_eq : operation.resolve? =
+      fun frame state => resolvePlace? prepared ns frame state place)
+    (borrower_eq :
+      (fun frame state place => borrowRuntimePlaceAt? operation.lexicalLoan
+        operation.referenceType operation.kind frame state place) =
+      (fun frame state place => borrowRuntimePlace? prepared ns site
+        operation.referenceType operation.kind frame state place)) :
+    operation.evaluate? = liftPlaceEvaluator fun arguments frame state =>
+      evaluatePlaceOperation? actual ns resultType site
+        (.borrow operation.kind place) arguments frame state := by
+  subst actual
+  funext arguments frame state
+  simp [IndexedLocalBorrowOperation.evaluate?, liftPlaceEvaluator,
+    evaluatePlaceOperation?, result_type_eq, resolver_eq, borrower_eq]
+
+/-- Agreement of the compact owned index/field resolver with its source
+place.  All arena and declaration lookups are closed premises emitted by
+the generator. -/
+theorem IndexedLocalFieldBorrowOperation.evaluator_eq_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId} {place : PlaceId}
+    (unit_eq : actual = prepared)
+    (operation : IndexedLocalFieldBorrowOperation)
+    (result_type_eq : ns.tables.types[resultType.index]? =
+      some (.reference operation.referenceType))
+    (resolver_eq : operation.resolve? =
+      fun frame state => resolvePlace? prepared ns frame state place)
+    (borrower_eq :
+      (fun frame state place => borrowRuntimePlaceAt? operation.lexicalLoan
+        operation.referenceType operation.kind frame state place) =
+      (fun frame state place => borrowRuntimePlace? prepared ns site
+        operation.referenceType operation.kind frame state place)) :
+    operation.evaluate? = liftPlaceEvaluator fun arguments frame state =>
+      evaluatePlaceOperation? actual ns resultType site
+        (.borrow operation.kind place) arguments frame state := by
+  subst actual
+  funext arguments frame state
+  simp [IndexedLocalFieldBorrowOperation.evaluate?, liftPlaceEvaluator,
+    evaluatePlaceOperation?, result_type_eq, resolver_eq, borrower_eq]
+
 theorem GlobalLocationOperation.borrow_evaluator_eq
     {unit : ValidatedUnit} {ns : ValidatedNamespace}
     {resultType : TypeId} {site : ExprId}
@@ -744,7 +1158,7 @@ theorem GlobalLocationOperation.borrow_evaluator_eq
   rw [identity_eq, resource_type_eq, result_type_eq]
   rw [borrower_eq]
   exact borrowGlobalUsing?_unfold borrow.resource.namespaceId
-    borrow.resource.typeId
+    (instantiatedTypeId frame.typeInstantiation borrow.resource.typeId)
     (fun frame state place => borrowRuntimePlace? unit ns site
       borrow.referenceType borrow.kind frame state place)
     arguments frame state
@@ -855,6 +1269,196 @@ theorem PrimitiveLocationOperation.tuple_evaluator_eq
   funext arguments frame state
   simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
     evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.vector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.vector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .vector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.pushVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.pushVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .pushVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+  rfl
+
+theorem PrimitiveLocationOperation.insertVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.insertVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .insertVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.removeVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.removeVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .removeVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.swapVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.swapVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .swapVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.concatVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.concatVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .concatVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.slice_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.slice.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .slice arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.reverseSliceVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.reverseSliceVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .reverseSliceVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.destroyEmptyVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.destroyEmptyVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .destroyEmptyVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.containsVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.containsVector.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .containsVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.indexOfVector_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType found index : TypeId}
+    (indexType : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some (.tuple #[found, index]))
+    (index_eq : (ns.tables.types[index.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some indexType) :
+    (PrimitiveLocationOperation.indexOfVector indexType).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .indexOfVector arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  change (ns.tables.types[index.index]?.bind
+    (resolveTargetIntegerType? unit.targetPointerWidth)) = some indexType at index_eq
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq, index_eq]
+
+theorem PrimitiveLocationOperation.checkVectorIndex_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty} (failure : ThrowKind)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.checkVectorIndex failure).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType (.checkVectorIndex failure) arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.index_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.index resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .index arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+  rfl
+
+theorem PrimitiveLocationOperation.length_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.length resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .length arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+  rfl
+
+theorem PrimitiveLocationOperation.logicalNot_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.logicalNot.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .logicalNot arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, evaluatePrimitiveOperation?, type_eq]
+  rfl
 
 theorem PrimitiveLocationOperation.moveValue_evaluator_eq
     {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
@@ -1068,6 +1672,166 @@ theorem PrimitiveLocationOperation.checkedModulo_evaluator_eq
   simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
     evaluatePrimitiveOperation?, type_eq]
 
+theorem PrimitiveLocationOperation.bitwiseOr_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.bitwiseOr resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .bitwiseOr arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.bitwiseAnd_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.bitwiseAnd resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .bitwiseAnd arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.bitwiseXor_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.bitwiseXor resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .bitwiseXor arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.bitwiseNot_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.bitwiseNot resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .bitwiseNot arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.shiftLeft_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.shiftLeft resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .shiftLeft arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.checkedShiftLeft_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (failure : ThrowKind) (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.checkedShiftLeft failure resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType (.checkedShiftLeft failure) arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.shiftRight_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.shiftRight resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .shiftRight arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.checkedShiftRight_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (failure : ThrowKind) (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.checkedShiftRight failure resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType (.checkedShiftRight failure) arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+
+theorem PrimitiveLocationOperation.cast_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.cast resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .cast arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+  rfl
+
+theorem PrimitiveLocationOperation.checkedCast_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    (failure : ThrowKind) (resolved : Ty)
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    (PrimitiveLocationOperation.checkedCast failure resolved).evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType (.checkedCast failure) arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+  rfl
+
+theorem PrimitiveLocationOperation.logicalAnd_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.logicalAnd.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .logicalAnd arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+  rfl
+
+theorem PrimitiveLocationOperation.logicalOr_evaluator_eq
+    {unit : ExecutableUnit} {ns : ValidatedNamespace} {resultType : TypeId}
+    {resolved : Ty}
+    (type_eq : (ns.tables.types[resultType.index]? >>= fun ty =>
+      resolveTargetIntegerType? unit.targetPointerWidth ty) = some resolved) :
+    PrimitiveLocationOperation.logicalOr.evaluate? =
+      liftPrimitiveEvaluator fun arguments =>
+        evaluatePrimitiveOperation? ns resultType .logicalOr arguments
+          unit.targetPointerWidth := by
+  funext arguments frame state
+  simp [PrimitiveLocationOperation.evaluate?, liftPrimitiveEvaluator,
+    evaluatePrimitiveOperation?, type_eq]
+  rfl
+
 theorem NominalConstructor.evaluator_eq
     {unit : ValidatedUnit} {namespaceId : NamespaceId}
     {reference : QualifiedRef} {variant : Option String}
@@ -1149,6 +1913,73 @@ theorem NominalFieldLocation.select_evaluator_eq_of_unit
           (.data (.select reference fieldName)) arguments frame state := by
   subst actual
   exact field.select_evaluator_eq resolved_eq index_eq
+
+theorem NominalVariantFieldLocation.select_evaluator_eq
+    {unit : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId}
+    {reference : QualifiedRef} {fieldNames : Array String}
+    (field : NominalVariantFieldLocation)
+    (resolved_eq : resolveStruct? unit ns.identity reference =
+      some field.source)
+    (choices_eq : variantFieldChoices? unit field.source fieldNames =
+      some field.choices) :
+    field.evaluateSelect? =
+      liftPlaceEvaluator fun arguments frame state =>
+        evaluatePlaceOperation? unit ns resultType site
+          (.data (.selectVariants reference fieldNames)) arguments frame state := by
+  funext arguments frame state
+  have data_eq : evaluateDataOperation? unit ns.identity
+      (.selectVariants reference fieldNames) arguments =
+      selectNominalVariantFieldAt? field.source field.choices arguments :=
+    evaluateDataOperation?_selectVariants_at resolved_eq choices_eq arguments
+  cases selected_eq : selectNominalVariantFieldAt? field.source field.choices
+      arguments <;>
+    simp [NominalVariantFieldLocation.evaluateSelect?, liftConstructorEvaluator,
+      liftPlaceEvaluator, evaluatePlaceOperation?, data_eq, selected_eq]
+
+theorem NominalVariantFieldLocation.select_evaluator_eq_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId}
+    {reference : QualifiedRef} {fieldNames : Array String}
+    (unit_eq : actual = prepared) (field : NominalVariantFieldLocation)
+    (resolved_eq : resolveStruct? prepared ns.identity reference =
+      some field.source)
+    (choices_eq : variantFieldChoices? prepared field.source fieldNames =
+      some field.choices) :
+    field.evaluateSelect? =
+      liftPlaceEvaluator fun arguments frame state =>
+        evaluatePlaceOperation? actual ns resultType site
+          (.data (.selectVariants reference fieldNames)) arguments frame state := by
+  subst actual
+  exact field.select_evaluator_eq resolved_eq choices_eq
+
+theorem NominalVariantTest.evaluator_eq
+    {unit : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId} {reference : QualifiedRef}
+    (test : NominalVariantTest)
+    (resolved_eq : resolveStruct? unit ns.identity reference = some test.source) :
+    test.evaluate? =
+      liftPlaceEvaluator fun arguments frame state =>
+        evaluatePlaceOperation? unit ns resultType site
+          (.data (.testVariants reference test.variants)) arguments frame state := by
+  funext arguments frame state
+  have data_eq := evaluateDataOperation?_testVariants_at
+    (variants := test.variants) resolved_eq arguments
+  cases tested_eq : testNominalVariants? test.source test.variants arguments <;>
+    simp [NominalVariantTest.evaluate?, liftConstructorEvaluator,
+      liftPlaceEvaluator, evaluatePlaceOperation?, data_eq, tested_eq]
+
+theorem NominalVariantTest.evaluator_eq_of_unit
+    {actual prepared : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId} {reference : QualifiedRef}
+    (unit_eq : actual = prepared) (test : NominalVariantTest)
+    (resolved_eq : resolveStruct? prepared ns.identity reference = some test.source) :
+    test.evaluate? =
+      liftPlaceEvaluator fun arguments frame state =>
+        evaluatePlaceOperation? actual ns resultType site
+          (.data (.testVariants reference test.variants)) arguments frame state := by
+  subst actual
+  exact test.evaluator_eq resolved_eq
 
 theorem ReferenceLocationOperation.dereference_evaluator_eq
     {unit : ValidatedUnit} {ns : ValidatedNamespace}
@@ -1312,6 +2143,24 @@ def call (lexical : Option Nat) (callee : FunctionDenotation)
       finalState = (applyPendingFrom operandState.pending operandFrame calleeState).2 ∧
       control = callControl outcome
 
+/-- A direct call whose callee relation is selected using the invocation
+substitution carried by the caller frame. -/
+def callAt (lexical : Option Nat)
+    (callee : Array (TypeId × TypeId) → FunctionDenotation)
+    (operands : ValuesDenotation) : ExprDenotation :=
+  fun frame state finalFrame finalState control =>
+    (∃ operandFrame operandState propagated,
+      operands frame state (.control operandState operandFrame propagated) ∧
+      finalFrame = operandFrame ∧ finalState = operandState ∧
+        control = propagated) ∨
+    ∃ operandFrame operandState values calleeState outcome,
+      operands frame state (.values operandState operandFrame values) ∧
+      callee operandFrame.typeInstantiation operandState values.toArray calleeState outcome ∧
+      finalFrame = callFrame lexical outcome
+        (applyPendingFrom operandState.pending operandFrame calleeState).1 ∧
+      finalState = (applyPendingFrom operandState.pending operandFrame calleeState).2 ∧
+      control = callControl outcome
+
 /-- A lowered direct call.  `handle` is the result of name resolution and is
 retained natively so agreement never has to rediscover it from the source
 namespace.  Runtime behavior is still entirely determined by the supplied
@@ -1320,6 +2169,12 @@ def nativeCall (_handle : FunctionHandle) (lexical : Option Nat)
     (callee : FunctionDenotation)
     (operands : ValuesDenotation) : ExprDenotation :=
   call lexical callee operands
+
+/-- Lowered invocation-aware direct call. -/
+def nativeCallAt (_handle : FunctionHandle) (lexical : Option Nat)
+    (callee : Array (TypeId × TypeId) → FunctionDenotation)
+    (operands : ValuesDenotation) : ExprDenotation :=
+  callAt lexical callee operands
 
 /-! ## Function control combinators -/
 
@@ -1374,6 +2229,20 @@ def nativeAssignLocal (localId : LocalId) (value : ExprDenotation) :
       finalFrame = { valueFrame with
         locals := valueFrame.locals.set! localId.index (some runtimeValue) } ∧
       finalState = valueState ∧ control = .value .unit
+
+/-- Assign through a checked index of a vector or tuple held in a local.
+The source place and index expression have been erased to their two local
+slots; the compact resolver performs only the dynamic shape and bounds work. -/
+def nativeAssignLocalIndex (base index : LocalId) (value : ExprDenotation) :
+    ExprDenotation :=
+  fun frame state finalFrame finalState control =>
+    (value frame state finalFrame finalState control ∧ Abrupt control) ∨
+    ∃ valueFrame valueState runtimeValue resolved,
+      value frame state valueFrame valueState (.value runtimeValue) ∧
+      resolveLocalIndex? base index valueFrame = some resolved ∧
+      writeRuntimePlace? valueFrame valueState resolved runtimeValue =
+        some (finalFrame, finalState) ∧
+      control = .value .unit
 
 /-- Least finite native loop relation.  Recursive occurrences are explicit
 Lean constructors, so verification reasons by the stated invariant and never
@@ -1541,35 +2410,49 @@ def function (unit : ExecutableUnit) (declaration : FunctionDecl FunctionBody)
 
 /-- State-retaining function boundary over the runtime projection produced by
 lowering.  The generated relation contains no declaration lookup or projection. -/
-def nativeFunctionRelation (unit : ExecutableUnit) (shape : FunctionShape)
+def nativeFunctionRelationAt (unit : ExecutableUnit) (shape : FunctionShape)
+    (typeInstantiation : Array (TypeId × TypeId))
     (body : ExprDenotation) : FunctionDenotation :=
   fun initial arguments final outcome =>
     ∃ frame finalFrame evaluatedState control,
-      nativeInitialFrame? shape arguments = some frame ∧
+      nativeInitialFrame? shape arguments typeInstantiation = some frame ∧
       body frame initial finalFrame evaluatedState control ∧
       finishControl? shape.resultCount control = some outcome ∧
       finalizeFunctionState unit shape.profile initial evaluatedState
           finalFrame outcome = final
 
-/-- Public `Spec` boundary over a lowered function shape. -/
-def nativeFunction (unit : ExecutableUnit) (shape : FunctionShape)
+/-- The ordinary invocation has the identity type substitution. -/
+def nativeFunctionRelation (unit : ExecutableUnit) (shape : FunctionShape)
+    (body : ExprDenotation) : FunctionDenotation :=
+  nativeFunctionRelationAt unit shape #[] body
+
+/-- Public `Spec` boundary over a lowered function shape and an explicit
+invocation type substitution. -/
+def nativeFunctionAt (unit : ExecutableUnit) (shape : FunctionShape)
+    (typeInstantiation : Array (TypeId × TypeId))
     (body : ExprDenotation) (arguments : Array RuntimeValue) :
     Spec RuntimeState Failure (Array RuntimeValue) where
   ok := fun initial results final =>
     ∃ frame finalFrame evaluatedState control,
-      nativeInitialFrame? shape arguments = some frame ∧
+      nativeInitialFrame? shape arguments typeInstantiation = some frame ∧
       body frame initial finalFrame evaluatedState control ∧
       finishControl? shape.resultCount control = some (.returned results) ∧
       finalizeFunctionState unit shape.profile initial evaluatedState
           finalFrame (.returned results) = final
   aborts := fun initial failure =>
     ∃ frame finalFrame evaluatedState control final,
-      nativeInitialFrame? shape arguments = some frame ∧
+      nativeInitialFrame? shape arguments typeInstantiation = some frame ∧
       body frame initial finalFrame evaluatedState control ∧
       finishControl? shape.resultCount control =
         some (.threw failure.1 failure.2) ∧
       finalizeFunctionState unit shape.profile initial evaluatedState
           finalFrame (.threw failure.1 failure.2) = final
+
+/-- Public invocation with the identity type substitution. -/
+def nativeFunction (unit : ExecutableUnit) (shape : FunctionShape)
+    (body : ExprDenotation) (arguments : Array RuntimeValue) :
+    Spec RuntimeState Failure (Array RuntimeValue) :=
+  nativeFunctionAt unit shape #[] body arguments
 
 theorem nativeFunctionRelation_ofDeclaration (unit : ExecutableUnit)
     (declaration : FunctionDecl FunctionBody) (body : ExprDenotation) :
@@ -1691,6 +2574,79 @@ theorem constant_agrees {unit : ExecutableUnit} {namespaceId : NamespaceId}
          cases initializerStep <;> simp_all [value])
       | (rename_i initializerStep abrupt
          cases initializerStep <;> simp_all [value] <;> cases abrupt)
+
+/-- Constant folding preserves a constant's initializer semantics in the
+empty frame, and retains the caller's frame. -/
+theorem constant_computed_agrees {unit : ExecutableUnit} {namespaceId : NamespaceId}
+    {exprId : ExprId} {ns : ValidatedNamespace} {expression : Expr}
+    {reference : QualifiedRef} {handle : ConstantHandle}
+    {targetNs : ValidatedNamespace} {declaration : ConstantDecl}
+    {runtimeValue : RuntimeValue}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind = .constant reference)
+    (resolve_eq : resolveConstant? unit.unit namespaceId reference = some handle)
+    (target_namespace_eq : unit.unit.namespaces[handle.namespaceId.index]? = some targetNs)
+    (declaration_eq : targetNs.constants[handle.constantId]? = some declaration)
+    (initializer_agrees : ExprDenotation.AgreesWith unit callee handle.namespaceId
+      declaration.value (value runtimeValue)) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId (value runtimeValue) := by
+  intro frame state finalFrame finalState control
+  constructor
+  · rintro ⟨frame_eq, state_eq, control_eq⟩
+    subst finalFrame
+    subst finalState
+    subst control
+    exact .constantValue namespaceId frame state exprId ns expression reference handle
+      targetNs declaration { locals := #[] } state runtimeValue
+      namespace_eq expression_eq kind_eq resolve_eq target_namespace_eq declaration_eq
+      ((initializer_agrees _ _ _ _ _).mp ⟨rfl, rfl, rfl⟩)
+  · intro step
+    cases step <;> simp_all
+    all_goals subst_vars
+    all_goals
+      have evaluated := (initializer_agrees _ _ _ _ _).mpr (by assumption)
+      simp_all [value]
+
+/-- A closed row of constant values. This occurs only in folding certificates. -/
+def literalValues (values : List RuntimeValue) : ValuesDenotation :=
+  fun frame state result => result = .values state frame values
+
+theorem literalValues_nil_agrees {unit : ExecutableUnit} {namespaceId : NamespaceId} :
+    ValuesDenotation.AgreesWith unit callee namespaceId [] (literalValues []) := by
+  intro frame state result
+  constructor
+  · rintro rfl; exact .nil namespaceId frame state
+  · intro step; cases step; rfl
+
+theorem literalValues_cons_agrees {unit : ExecutableUnit} {namespaceId : NamespaceId}
+    {head : ExprId} {tail : List ExprId} {headValue : RuntimeValue}
+    {tailValues : List RuntimeValue}
+    (head_agrees : ExprDenotation.AgreesWith unit callee namespaceId head (value headValue))
+    (tail_agrees : ValuesDenotation.AgreesWith unit callee namespaceId tail
+      (literalValues tailValues)) :
+    ValuesDenotation.AgreesWith unit callee namespaceId (head :: tail)
+      (literalValues (headValue :: tailValues)) := by
+  intro frame state result
+  constructor
+  · rintro rfl
+    exact .tailValues namespaceId frame state head tail frame state headValue frame state
+      tailValues ((head_agrees _ _ _ _ _).mp ⟨rfl, rfl, rfl⟩)
+      ((tail_agrees _ _ _).mp rfl)
+  · intro step
+    cases step with
+    | headControl _ _ _ _ _ _ _ _ ran abrupt =>
+        obtain ⟨rfl, rfl, rfl⟩ := (head_agrees _ _ _ _ _).mpr ran
+        cases abrupt
+    | tailValues _ _ _ _ _ _ _ _ _ _ _ ran tailRan =>
+        obtain ⟨rfl, rfl, equal⟩ := (head_agrees _ _ _ _ _).mpr ran
+        cases equal
+        have equal := (tail_agrees _ _ _).mpr tailRan
+        cases equal
+        rfl
+    | tailControl _ _ _ _ _ _ _ _ _ _ _ _ tailRan =>
+        have equal := (tail_agrees _ _ _).mpr tailRan
+        cases equal
 
 theorem valuesNil_agrees {unit : ExecutableUnit} {namespaceId : NamespaceId} :
     ValuesDenotation.AgreesWith unit callee namespaceId [] valuesNil := by
@@ -1835,6 +2791,28 @@ theorem primitive_agrees {unit : ExecutableUnit}
           _, by assumption, rfl, rfl, rfl⟩
       | exact Or.inr ⟨_, _, _, by assumption,
           _, _, by assumption, rfl, rfl, ⟨rfl, rfl⟩⟩
+
+/-- A pure primitive on already folded operands is a literal when its
+existing semantic evaluator returns that literal successfully. -/
+theorem primitive_computed_agrees {unit : ExecutableUnit}
+    {namespaceId : NamespaceId} {exprId : ExprId}
+    {ns : ValidatedNamespace} {expression : Expr}
+    {operation : PrimitiveOperation} {instantiations : Array GenericArgument}
+    {arguments : Array ExprId} {surface : Option SurfaceSyntax}
+    {values : List RuntimeValue} {runtimeValue : RuntimeValue}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind =
+      .operation (.primitive operation) instantiations arguments surface)
+    (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
+      arguments.toList (literalValues values))
+    (evaluated : evaluatePrimitiveOperation? ns expression.typeId operation values.toArray
+      unit.targetPointerWidth = some (.ok runtimeValue)) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId (value runtimeValue) := by
+  have agreement := primitive_agrees namespace_eq expression_eq kind_eq rfl operands_agree
+  intro frame state finalFrame finalState control
+  rw [← agreement]
+  simp [primitive, literalValues, value, evaluated, eq_comm, and_assoc]
 
 theorem global_agrees {unit : ExecutableUnit}
     {namespaceId : NamespaceId} {exprId : ExprId}
@@ -2459,6 +3437,58 @@ theorem nativeDerefLocalBorrow_agrees {unit : ExecutableUnit}
     (borrowPlace_agrees namespace_eq expression_eq kind_eq type_eq
       operands_agree frame state finalFrame finalState control)
 
+theorem nativeIndexedLocalBorrow_agrees {unit : ExecutableUnit}
+    {namespaceId : NamespaceId} {exprId : ExprId}
+    {ns : ValidatedNamespace} {expression : Expr}
+    {resultType : TypeId} {operation : IndexedLocalBorrowOperation}
+    {place : PlaceId} {instantiations : Array GenericArgument}
+    {arguments : Array ExprId} {surface : Option SurfaceSyntax}
+    {operands : ValuesDenotation}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind = .operation
+      (.borrow operation.kind place) instantiations arguments surface)
+    (type_eq : expression.typeId = resultType)
+    (evaluate_eq : operation.evaluate? = liftPlaceEvaluator fun values frame state =>
+      evaluatePlaceOperation? unit.unit ns resultType exprId
+        (.borrow operation.kind place) values frame state)
+    (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
+      arguments.toList operands) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId
+      (nativeIndexedLocalBorrowOperation operation operands) := by
+  rw [nativeIndexedLocalBorrowOperation, evaluate_eq,
+    nativeOperation_liftPlace]
+  intro frame state finalFrame finalState control
+  simpa [placeOperation] using
+    (borrowPlace_agrees namespace_eq expression_eq kind_eq type_eq
+      operands_agree frame state finalFrame finalState control)
+
+theorem nativeIndexedLocalFieldBorrow_agrees {unit : ExecutableUnit}
+    {namespaceId : NamespaceId} {exprId : ExprId}
+    {ns : ValidatedNamespace} {expression : Expr}
+    {resultType : TypeId} {operation : IndexedLocalFieldBorrowOperation}
+    {place : PlaceId} {instantiations : Array GenericArgument}
+    {arguments : Array ExprId} {surface : Option SurfaceSyntax}
+    {operands : ValuesDenotation}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind = .operation
+      (.borrow operation.kind place) instantiations arguments surface)
+    (type_eq : expression.typeId = resultType)
+    (evaluate_eq : operation.evaluate? = liftPlaceEvaluator fun values frame state =>
+      evaluatePlaceOperation? unit.unit ns resultType exprId
+        (.borrow operation.kind place) values frame state)
+    (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
+      arguments.toList operands) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId
+      (nativeIndexedLocalFieldBorrowOperation operation operands) := by
+  rw [nativeIndexedLocalFieldBorrowOperation, evaluate_eq,
+    nativeOperation_liftPlace]
+  intro frame state finalFrame finalState control
+  simpa [placeOperation] using
+    (borrowPlace_agrees namespace_eq expression_eq kind_eq type_eq
+      operands_agree frame state finalFrame finalState control)
+
 theorem nativeConstructor_agrees {unit : ExecutableUnit}
     {namespaceId : NamespaceId} {exprId : ExprId}
     {ns : ValidatedNamespace} {expression : Expr}
@@ -2497,7 +3527,8 @@ theorem call_agrees {unit : ExecutableUnit}
     (resolve_eq : resolveFunction? unit.unit namespaceId reference = some handle)
     (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
       arguments.toList operands)
-    (callee_agrees : FunctionDenotation.AgreesWith callee handle calleeDenotation)
+    (callee_agrees : ∀ typeInstantiation,
+      FunctionDenotation.AgreesWith callee handle typeInstantiation calleeDenotation)
     (loan_eq : certificateLoanId? unit.unit namespaceId exprId = lexical) :
     ExprDenotation.AgreesWith unit callee namespaceId exprId (call lexical calleeDenotation operands) := by
   intro frame state finalFrame finalState control
@@ -2524,13 +3555,13 @@ theorem call_agrees {unit : ExecutableUnit}
             reference instantiations arguments surface operandState operandFrame
             values handle calleeState results namespace_eq expression_eq kind_eq
             ((operands_agree _ _ _).mp operandsStep) resolve_eq
-            ((callee_agrees _ _ _ _).mp calleeStep)
+            ((callee_agrees _ _ _ _ _).mp calleeStep)
       | threw kind thrown =>
           exact .callThrew namespaceId frame state exprId ns expression
             reference instantiations arguments surface operandState operandFrame
             values handle calleeState kind thrown namespace_eq expression_eq kind_eq
             ((operands_agree _ _ _).mp operandsStep) resolve_eq
-            ((callee_agrees _ _ _ _).mp calleeStep)
+            ((callee_agrees _ _ _ _ _).mp calleeStep)
   · intro step
     cases step <;>
       try (exfalso; simp_all [evaluatePlaceOperation?_call]; done)
@@ -2541,9 +3572,9 @@ theorem call_agrees {unit : ExecutableUnit}
     all_goals first
       | exact Or.inl ⟨_, _, _, by assumption, rfl, rfl, rfl⟩
       | exact Or.inr ⟨_, _, _, by assumption, _, .returned _,
-          by assumption, rfl, rfl, rfl⟩
+          by exact (callee_agrees _ _ _ _ _).mpr (by assumption), rfl, rfl, rfl⟩
       | exact Or.inr ⟨_, _, _, by assumption, _, .threw _ _,
-          by assumption, rfl, rfl, rfl⟩
+          by exact (callee_agrees _ _ _ _ _).mpr (by assumption), rfl, rfl, rfl⟩
 
 theorem nativeCall_agrees {unit : ExecutableUnit}
     {namespaceId : NamespaceId} {exprId : ExprId}
@@ -2558,7 +3589,8 @@ theorem nativeCall_agrees {unit : ExecutableUnit}
       instantiations arguments surface)
     (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
       arguments.toList operands)
-    (callee_agrees : FunctionDenotation.AgreesWith callee handle calleeDenotation)
+    (callee_agrees : ∀ typeInstantiation,
+      FunctionDenotation.AgreesWith callee handle typeInstantiation calleeDenotation)
     (resolve_eq : resolveFunction? unit.unit namespaceId reference = some handle)
     (loan_eq : certificateLoanId? unit.unit namespaceId exprId = lexical) :
     ExprDenotation.AgreesWith unit callee namespaceId exprId
@@ -2566,6 +3598,124 @@ theorem nativeCall_agrees {unit : ExecutableUnit}
   simpa [nativeCall] using
     call_agrees namespace_eq expression_eq kind_eq resolve_eq
       operands_agree callee_agrees loan_eq
+
+theorem callAt_agrees {unit : ExecutableUnit}
+    {namespaceId : NamespaceId} {exprId : ExprId}
+    {ns : ValidatedNamespace} {expression : Expr}
+    {reference : QualifiedRef} {instantiations : Array GenericArgument}
+    {arguments : Array ExprId} {surface : Option SurfaceSyntax}
+    {handle : FunctionHandle} {operands : ValuesDenotation}
+    {calleeDenotation : Array (TypeId × TypeId) → FunctionDenotation}
+    {lexical : Option Nat}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind = .operation (.call (.function reference))
+      instantiations arguments surface)
+    (resolve_eq : resolveFunction? unit.unit namespaceId reference = some handle)
+    (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
+      arguments.toList operands)
+    (callee_agrees : ∀ outer,
+      FunctionDenotation.AgreesWith callee handle
+        (callTypeInstantiation unit.unit handle outer instantiations)
+        (calleeDenotation outer))
+    (loan_eq : certificateLoanId? unit.unit namespaceId exprId = lexical) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId
+      (callAt lexical calleeDenotation operands) := by
+  intro frame state finalFrame finalState control
+  constructor
+  · intro step
+    rcases step with ⟨operandFrame, operandState, propagated, operandsStep,
+        finalFrame_eq, finalState_eq, control_eq⟩ |
+      ⟨operandFrame, operandState, values, calleeState, outcome,
+        operandsStep, calleeStep, finalFrame_eq, finalState_eq, control_eq⟩
+    · subst finalFrame
+      subst finalState
+      subst control
+      exact .callArgumentsControl namespaceId frame state exprId ns expression
+        reference instantiations arguments surface operandState operandFrame
+        propagated namespace_eq expression_eq kind_eq
+        ((operands_agree _ _ _).mp operandsStep)
+    · subst finalFrame
+      subst finalState
+      subst control
+      cases outcome with
+      | returned results =>
+          rw [← loan_eq]
+          exact .callReturned namespaceId frame state exprId ns expression
+            reference instantiations arguments surface operandState operandFrame
+            values handle calleeState results namespace_eq expression_eq kind_eq
+            ((operands_agree _ _ _).mp operandsStep) resolve_eq
+            ((callee_agrees operandFrame.typeInstantiation _ _ _ _).mp calleeStep)
+      | threw kind thrown =>
+          exact .callThrew namespaceId frame state exprId ns expression
+            reference instantiations arguments surface operandState operandFrame
+            values handle calleeState kind thrown namespace_eq expression_eq kind_eq
+            ((operands_agree _ _ _).mp operandsStep) resolve_eq
+            ((callee_agrees operandFrame.typeInstantiation _ _ _ _).mp calleeStep)
+  · intro step
+    cases step <;>
+      try (exfalso; simp_all [evaluatePlaceOperation?_call]; done)
+    all_goals simp_all
+    all_goals subst_vars
+    all_goals simp_all [callAt, callFrame, callControl,
+      ValuesDenotation.AgreesWith, FunctionDenotation.AgreesWith]
+    all_goals first
+      | exact Or.inl ⟨_, _, _, by assumption, rfl, rfl, rfl⟩
+      | exact Or.inr ⟨_, _, _, by assumption, _, .returned _,
+          by assumption, rfl, rfl, rfl⟩
+      | exact Or.inr ⟨_, _, _, by assumption, _, .threw _ _,
+          by assumption, rfl, rfl, rfl⟩
+
+theorem nativeCallAt_agrees {unit : ExecutableUnit}
+    {namespaceId : NamespaceId} {exprId : ExprId}
+    {ns : ValidatedNamespace} {expression : Expr}
+    {reference : QualifiedRef} {instantiations : Array GenericArgument}
+    {arguments : Array ExprId} {surface : Option SurfaceSyntax}
+    {handle : FunctionHandle} {operands : ValuesDenotation}
+    {calleeDenotation : Array (TypeId × TypeId) → FunctionDenotation}
+    {lexical : Option Nat}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind = .operation (.call (.function reference))
+      instantiations arguments surface)
+    (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
+      arguments.toList operands)
+    (callee_agrees : ∀ outer,
+      FunctionDenotation.AgreesWith callee handle
+        (callTypeInstantiation unit.unit handle outer instantiations)
+        (calleeDenotation outer))
+    (resolve_eq : resolveFunction? unit.unit namespaceId reference = some handle)
+    (loan_eq : certificateLoanId? unit.unit namespaceId exprId = lexical) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId
+      (nativeCallAt handle lexical calleeDenotation operands) := by
+  simpa [nativeCallAt] using
+    callAt_agrees namespace_eq expression_eq kind_eq resolve_eq
+      operands_agree callee_agrees loan_eq
+
+/-- A call with no generic arguments uses the ordinary function relation.
+Its invocation substitution is empty, including inside a generic caller. -/
+theorem nativeCall_monomorphic_agrees {unit : ExecutableUnit}
+    {namespaceId : NamespaceId} {exprId : ExprId}
+    {ns : ValidatedNamespace} {expression : Expr}
+    {reference : QualifiedRef} {instantiations : Array GenericArgument}
+    {arguments : Array ExprId} {surface : Option SurfaceSyntax}
+    {handle : FunctionHandle} {operands : ValuesDenotation}
+    {calleeDenotation : FunctionDenotation} {lexical : Option Nat}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind = .operation (.call (.function reference))
+      instantiations arguments surface)
+    (instantiations_eq : instantiations = #[])
+    (operands_agree : ValuesDenotation.AgreesWith unit callee namespaceId
+      arguments.toList operands)
+    (callee_agrees : FunctionDenotation.AgreesWith callee handle #[] calleeDenotation)
+    (resolve_eq : resolveFunction? unit.unit namespaceId reference = some handle)
+    (loan_eq : certificateLoanId? unit.unit namespaceId exprId = lexical) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId
+      (nativeCall handle lexical calleeDenotation operands) := by
+  subst instantiations
+  exact nativeCallAt_agrees namespace_eq expression_eq kind_eq operands_agree
+    (fun _ => callee_agrees) resolve_eq loan_eq
 
 theorem nativeReturn_agrees {unit : ExecutableUnit}
     {namespaceId : NamespaceId} {exprId : ExprId}
@@ -2752,6 +3902,73 @@ theorem nativeAssignLocal_agrees {unit : ExecutableUnit}
           in_bounds, ?_, rfl, rfl⟩
         simp only [SemanticOperations.array_set!_eq_setIfInBounds]
       · simp_all
+
+theorem nativeAssignLocalIndex_agrees {unit : ExecutableUnit}
+    {namespaceId : NamespaceId} {exprId child indexExpr : ExprId}
+    {ns : ValidatedNamespace} {expression : Expr}
+    {place basePlace : PlaceId} {base index : LocalId}
+    {denotation : ExprDenotation}
+    (namespace_eq : unit.unit.namespaces[namespaceId.index]? = some ns)
+    (expression_eq : ns.expressions[exprId.index]? = some expression)
+    (kind_eq : expression.kind = .assign place child)
+    (place_eq : ns.places[place.index]? = some (.index basePlace indexExpr))
+    (base_eq : ns.places[basePlace.index]? = some (.localVar base))
+    (index_eq : placeIndexForm? ns indexExpr = some (.local index) ∨
+      placeIndexForm? ns indexExpr = some (.copyLocal index))
+    (child_agree : ExprDenotation.AgreesWith unit callee namespaceId child denotation) :
+    ExprDenotation.AgreesWith unit callee namespaceId exprId
+      (nativeAssignLocalIndex base index denotation) := by
+  intro frame state finalFrame finalState control
+  constructor
+  · rintro (⟨child_step, abrupt⟩ |
+      ⟨valueFrame, valueState, runtimeValue, resolved, child_step,
+        resolve_eq, write_eq, control_eq⟩)
+    · exact .assignControl namespaceId frame state exprId ns expression place child
+        finalFrame finalState control namespace_eq expression_eq kind_eq
+        ((child_agree _ _ _ _ _).mp child_step) abrupt
+    · subst control
+      exact .assignValue namespaceId frame state exprId ns expression place child
+        valueFrame valueState resolved finalFrame finalState runtimeValue
+        namespace_eq expression_eq kind_eq
+        ((child_agree _ _ _ _ _).mp child_step)
+        ((resolvePlace?_localIndex place_eq base_eq index_eq).trans resolve_eq)
+        write_eq
+  · intro step
+    cases step <;> try (exfalso; simp_all; done)
+    case assignControl =>
+      rename_i ns2 expression2 place2 child2 kind_eq2 namespace_eq2
+        expression_eq2 abrupt2 child_step2
+      have ns_same : ns2 = ns := Option.some.inj
+        (namespace_eq2.symm.trans namespace_eq)
+      subst ns2
+      have expression_same : expression2 = expression := Option.some.inj
+        (expression_eq2.symm.trans expression_eq)
+      subst expression2
+      have kind_same : ExprKind.assign place2 child2 =
+          ExprKind.assign place child := kind_eq2.symm.trans kind_eq
+      injection kind_same with place_same child_same
+      subst place2
+      subst child2
+      exact .inl ⟨(child_agree _ _ _ _ _).mpr child_step2, abrupt2⟩
+    case assignValue =>
+      rename_i ns2 expression2 place2 child2 childFrame childState resolved
+        runtimeValue kind_eq2 resolve_eq2 namespace_eq2 child_step2
+        expression_eq2 write_eq2
+      have ns_same : ns2 = ns := Option.some.inj
+        (namespace_eq2.symm.trans namespace_eq)
+      subst ns2
+      have expression_same : expression2 = expression := Option.some.inj
+        (expression_eq2.symm.trans expression_eq)
+      subst expression2
+      have kind_same : ExprKind.assign place2 child2 =
+          ExprKind.assign place child := kind_eq2.symm.trans kind_eq
+      injection kind_same with place_same child_same
+      subst place2
+      subst child2
+      refine .inr ⟨childFrame, childState, runtimeValue, resolved,
+        (child_agree _ _ _ _ _).mpr child_step2, ?_, write_eq2, rfl⟩
+      rw [resolvePlace?_localIndex place_eq base_eq index_eq] at resolve_eq2
+      exact resolve_eq2
 
 theorem nativeLoop_agrees {unit : ExecutableUnit}
     {namespaceId : NamespaceId} {exprId bodyId : ExprId}
@@ -3103,7 +4320,7 @@ theorem functionRelation_agrees {unit : ExecutableUnit}
   constructor
   · rintro ⟨frame, finalFrame, evaluatedState, control, frame_eq,
         body_step, outcome_eq, finalize_eq⟩
-    exact .body handle initial arguments ns declaration frame root finalFrame
+    exact .body handle #[] initial arguments ns declaration frame root finalFrame
       evaluatedState final control outcome namespace_eq declaration_eq frame_eq
       body_eq ((body_agrees _ _ _ _ _).mp body_step) outcome_eq finalize_eq
   · intro step
@@ -3128,6 +4345,33 @@ theorem nativeFunctionRelation_agrees {unit : ExecutableUnit}
   rw [nativeFunctionRelation_ofDeclaration]
   exact functionRelation_agrees namespace_eq declaration_eq body_eq body_agrees
 
+theorem nativeFunctionRelationAt_agrees {unit : ExecutableUnit}
+    {handle : FunctionHandle} {ns : ValidatedNamespace}
+    {declaration : FunctionDecl FunctionBody} {root : ExprId}
+    {shape : FunctionShape} {body : ExprDenotation}
+    (typeInstantiation : Array (TypeId × TypeId))
+    (namespace_eq : unit.unit.namespaces[handle.namespaceId.index]? = some ns)
+    (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
+    (body_eq : declaration.body = .structured root)
+    (shape_eq : shape = .ofDeclaration declaration)
+    (body_agrees : ExprDenotation.Agrees unit handle.namespaceId root body) :
+    FunctionDenotation.AgreesAt unit handle typeInstantiation
+      (nativeFunctionRelationAt unit shape typeInstantiation body) := by
+  subst shape
+  intro initial arguments final outcome
+  constructor
+  · rintro ⟨frame, finalFrame, evaluatedState, control, frame_eq,
+        body_step, outcome_eq, finalize_eq⟩
+    exact .body handle typeInstantiation initial arguments ns declaration frame root
+      finalFrame evaluatedState final control outcome namespace_eq declaration_eq
+      frame_eq body_eq ((body_agrees _ _ _ _ _).mp body_step) outcome_eq finalize_eq
+  · intro step
+    cases step
+    simp_all
+    subst_vars
+    exact ⟨_, _, _, _, by assumption,
+      (body_agrees _ _ _ _ _).mpr (by assumption), by assumption, rfl⟩
+
 /-- Project exact agreement of the state-retaining native call relation to
 the public function `Spec`.  Generated callers reuse the relation theorem;
 the callee body therefore has one agreement proof regardless of how many
@@ -3143,7 +4387,7 @@ theorem nativeFunction_agrees_of_relation {unit : ExecutableUnit}
   · intro initial results final
     change nativeFunctionRelation unit shape body initial arguments final
         (.returned results) ↔
-      BigStep.EvalFunction unit handle initial arguments final
+      BigStep.EvalFunction unit handle #[] initial arguments final
         (.returned results)
     exact relation_agrees initial arguments final (.returned results)
   · intro initial failure
@@ -3181,7 +4425,7 @@ theorem function_agrees {unit : ExecutableUnit} {handle : FunctionHandle}
     constructor
     · rintro ⟨frame, finalFrame, evaluatedState, control, frame_eq,
           body_step, outcome_eq, finalize_eq⟩
-      exact .body handle initial arguments ns declaration frame root finalFrame
+      exact .body handle #[] initial arguments ns declaration frame root finalFrame
         evaluatedState final control (.returned results) namespace_eq declaration_eq
         frame_eq body_eq ((body_agrees _ _ _ _ _).mp body_step) outcome_eq
         finalize_eq
@@ -3195,7 +4439,7 @@ theorem function_agrees {unit : ExecutableUnit} {handle : FunctionHandle}
     constructor
     · rintro ⟨frame, finalFrame, evaluatedState, control, final, frame_eq,
           body_step, outcome_eq, finalize_eq⟩
-      exact ⟨final, .body handle initial arguments ns declaration frame root finalFrame
+      exact ⟨final, .body handle #[] initial arguments ns declaration frame root finalFrame
         evaluatedState final control (.threw failure.1 failure.2) namespace_eq
         declaration_eq frame_eq body_eq ((body_agrees _ _ _ _ _).mp body_step)
         outcome_eq finalize_eq⟩

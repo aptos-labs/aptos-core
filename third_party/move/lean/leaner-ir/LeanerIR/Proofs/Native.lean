@@ -26,7 +26,7 @@ Scope: the registry-free subset — values, locals, operand and statement
 rows, checked primitive operations, assignment, and return.  A construct
 that mints a loan or touches global storage is not here; those are the
 prophecy and family-store milestones in
-[`certifying-execution.md`](../../designs/certifying-execution.md), and
+[`certifying-execution.md`](../../designs/historical/certifying-execution.md), and
 until they land such a construct keeps the frame-based rules.
 -/
 
@@ -52,12 +52,14 @@ prophecy work rather than bookkeeping to carry. -/
 structure Registries where
   activeLoans : Array (ExprId × Nat)
   loanLocations : Array (Nat × RuntimePlace)
+  typeInstantiation : Array (TypeId × TypeId) := #[]
 
 /-- The frame a row denotes, over registries this layer does not read. -/
 def rowFrame (row : Row) (registries : Registries) : RuntimeFrame :=
   { locals := row
     activeLoans := registries.activeLoans
-    loanLocations := registries.loanLocations }
+    loanLocations := registries.loanLocations
+    typeInstantiation := registries.typeInstantiation }
 
 @[simp] theorem rowFrame_locals (row : Row) (registries : Registries) :
     (rowFrame row registries).locals = row := rfl
@@ -68,6 +70,9 @@ def rowFrame (row : Row) (registries : Registries) : RuntimeFrame :=
 @[simp] theorem rowFrame_loanLocations (row : Row) (registries : Registries) :
     (rowFrame row registries).loanLocations = registries.loanLocations := rfl
 
+@[simp] theorem rowFrame_typeInstantiation (row : Row) (registries : Registries) :
+    (rowFrame row registries).typeInstantiation = registries.typeInstantiation := rfl
+
 theorem rowFrame_injective {row row' : Row} {registries : Registries}
     (equal : rowFrame row registries = rowFrame row' registries) :
     row = row' :=
@@ -77,6 +82,79 @@ theorem rowFrame_injective {row row' : Row} {registries : Registries}
 @[simp] theorem readLocal?_rowFrame (row : Row) (registries : Registries) (localId : LocalId) :
     readLocal? (rowFrame row registries) localId = row[localId.index]?.join := by
   rfl
+
+/-- Substitute a simplified local-read equality, peeling constructors if
+necessary. -/
+private partial def substituteReadHypothesis (goal : Lean.MVarId)
+    (fvarId : Lean.FVarId) (fuel : Nat) : Lean.MetaM (Option Lean.MVarId) := do
+  match fuel with
+  | 0 => return goal
+  | fuel + 1 =>
+    try
+      let (_, substituted) ← Lean.Meta.substCore goal fvarId (symm := true)
+      return substituted
+    catch _ =>
+    try
+      let (_, substituted) ← Lean.Meta.substCore goal fvarId
+      return substituted
+    catch _ =>
+    try
+      match ← Lean.Meta.injection goal fvarId with
+      | .solved => return none
+      | .subgoal subgoal fvarIds _ =>
+          let mut goal := subgoal
+          for fvarId in fvarIds do
+            match ← substituteReadHypothesis goal fvarId fuel with
+            | some next => goal := next
+            | none => return none
+          return goal
+    catch _ => return goal
+
+/-- Consume the local reads introduced by the drive.  Reads of a concrete
+row may reduce without leaving an equality, while symbolic reads leave at
+most the count recorded by the route.  The latter can be
+implementation-detail hypotheses, so operate on their free-variable
+identifiers directly instead of assigning source-level names that the
+tactic parser cannot resolve. -/
+elab "leaner_consume_reads" expected:num : tactic => do
+  let some expected := expected.raw.isNatLit?
+    | throwErrorAt expected "expected a literal local-read count"
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  let reads ← goal.withContext do
+    let declarations := (← Lean.getLCtx).decls.toList.filterMap id
+    let mut reads : Array Lean.FVarId := #[]
+    for declaration in declarations do
+      let type ← Lean.instantiateMVars declaration.type
+      unless type.isAppOfArity ``Eq 3 do continue
+      let lhs := type.getArg! 1
+      let rhs := type.getArg! 2
+      unless lhs.isAppOf ``Option.join || lhs.isAppOf ``readLocal? do continue
+      unless rhs.isAppOfArity ``Option.some 2 do continue
+      let .fvar _ := rhs.getArg! 1 | continue
+      reads := reads.push declaration.fvarId
+    pure reads
+  if expected < reads.size then
+    throwError "expected at most {expected} local-read equations, found {reads.size}"
+  if reads.isEmpty then return
+  let simpNames := #[``readLocal?_rowFrame,
+    ``List.getElem?_toArray, ``List.getElem?_cons_zero,
+    ``List.getElem?_cons_succ, ``Option.join_some,
+    ``Option.some.injEq].map Lean.mkIdent
+  let simpStx ← `(tactic| simp only [$[$simpNames:ident],*])
+  let simpContext ← Lean.Elab.Tactic.withMainContext do
+    Lean.Elab.Tactic.mkSimpContext simpStx.raw (eraseLocal := false)
+  let result ← simpContext.dischargeWrapper.with fun discharge? =>
+    Lean.Meta.simpGoal goal simpContext.ctx
+      (simprocs := simpContext.simprocs) (discharge? := discharge?)
+      (simplifyTarget := false) (fvarIdsToSimp := reads)
+  let some (reads, goal) := result.1
+    | Lean.Elab.Tactic.replaceMainGoal []; return
+  let mut goal := goal
+  for read in reads do
+    match ← substituteReadHypothesis goal read 4 with
+    | some next => goal := next
+    | none => Lean.Elab.Tactic.replaceMainGoal []; return
+  Lean.Elab.Tactic.replaceMainGoal [goal]
 
 /-- A relation stays inside the subset: from a row it reaches a row, and
 the state it reaches carries no new write-backs.  Every rule below needs
@@ -221,6 +299,20 @@ front and the mutable ones registered.  Over a row that is one law for
 every arity and every mix of parameters, where the frame formulation needed
 a closed constructor equation per shape. -/
 
+theorem nativeInitialFrame?_rowFrameAt (shape : FunctionShape)
+    (arguments : Array RuntimeValue)
+    (typeInstantiation : Array (TypeId × TypeId))
+    (arity : arguments.size = shape.parameterCount)
+    (declared : arguments.size ≤ shape.localCount) :
+    nativeInitialFrame? shape arguments typeInstantiation
+      = some (rowFrame (initialLocals shape.localCount arguments)
+          { activeLoans := #[]
+            loanLocations := parameterLoanLocations arguments
+            typeInstantiation }) := by
+  simp only [nativeInitialFrame?, rowFrame, arity, bne_self_eq_false,
+    Bool.false_eq_true, if_false]
+  rw [if_neg (Nat.not_lt.mpr (arity ▸ declared))]
+
 theorem nativeInitialFrame?_rowFrame (shape : FunctionShape)
     (arguments : Array RuntimeValue)
     (arity : arguments.size = shape.parameterCount)
@@ -228,10 +320,8 @@ theorem nativeInitialFrame?_rowFrame (shape : FunctionShape)
     nativeInitialFrame? shape arguments
       = some (rowFrame (initialLocals shape.localCount arguments)
           { activeLoans := #[]
-            loanLocations := parameterLoanLocations arguments }) := by
-  simp only [nativeInitialFrame?, rowFrame, arity, bne_self_eq_false,
-    Bool.false_eq_true, if_false]
-  rw [if_neg (Nat.not_lt.mpr (arity ▸ declared))]
+            loanLocations := parameterLoanLocations arguments }) :=
+  nativeInitialFrame?_rowFrameAt shape arguments #[] arity declared
 
 /-- The whole call boundary, over a row.
 
@@ -345,7 +435,7 @@ theorem exportFrameLoans_rowFrame_holeFree (row : Row) (registries : Registries)
   funext accumulated entry
   simp [holeFree entry.1]
 
-/-- What a returning call leaves the caller.
+/-- What a call returning no handles leaves the caller.
 
 Composed with the boundary rule this is the prophecy pair in full: the
 mutable argument entered as `borrow loan current`, and the value the caller
@@ -354,13 +444,15 @@ that; it is read off the row. -/
 theorem finalizeFunctionState_returned_rowFrame {unit : ExecutableUnit}
     {profile : Profile} {initial evaluated : RuntimeState}
     (row : Row) (registries : Registries) (results : Array RuntimeValue)
+    (noReturned : returnedBorrowIds results = #[])
     (holeFree : ∀ loan, holeInFrame (rowFrame row registries) loan = false) :
     finalizeFunctionState unit profile initial evaluated
         (rowFrame row registries) (.returned results)
       = (frameBorrows (rowFrame row registries)).foldl (init := evaluated)
           fun state entry =>
-            (applyWriteBack { locals := #[] } state entry.1 entry.2).2 :=
-  exportFrameLoans_rowFrame_holeFree row registries evaluated holeFree
+            (applyWriteBack { locals := #[] } state entry.1 entry.2).2 := by
+  rw [finalizeFunctionState, exportReturnedFrameLoans_noReturnedBorrows _ _ _ noReturned]
+  exact exportFrameLoans_rowFrame_holeFree row registries evaluated holeFree
 
 /-! ## Operand rows, frame-free
 
@@ -726,19 +818,20 @@ theorem writeRoot?_registries {frame : RuntimeFrame} {state : RuntimeState}
     {written : RuntimeFrame} {writtenState : RuntimeState}
     (write : writeRoot? frame state root value = some (written, writtenState)) :
     written.activeLoans = frame.activeLoans ∧
-      written.loanLocations = frame.loanLocations := by
+      written.loanLocations = frame.loanLocations ∧
+      written.typeInstantiation = frame.typeInstantiation := by
   unfold writeRoot? at write
   split at write
   · split at write
     · simp at write
     · obtain ⟨rfl, _⟩ := Prod.mk.inj (Option.some.inj write)
-      exact ⟨rfl, rfl⟩
+      exact ⟨rfl, rfl, rfl⟩
   · cases lookup : state.globals.lookup _ with
     | none => rw [lookup] at write; simp at write
     | some _ =>
         rw [lookup] at write
         obtain ⟨rfl, _⟩ := Prod.mk.inj (Option.some.inj write)
-        exact ⟨rfl, rfl⟩
+        exact ⟨rfl, rfl, rfl⟩
 
 theorem writeRuntimePlace?_registries {frame : RuntimeFrame} {state : RuntimeState}
     {place : RuntimePlace} {value : RuntimeValue}
@@ -746,7 +839,8 @@ theorem writeRuntimePlace?_registries {frame : RuntimeFrame} {state : RuntimeSta
     (write : writeRuntimePlace? frame state place value
       = some (written, writtenState)) :
     written.activeLoans = frame.activeLoans ∧
-      written.loanLocations = frame.loanLocations := by
+      written.loanLocations = frame.loanLocations ∧
+      written.typeInstantiation = frame.typeInstantiation := by
   unfold writeRuntimePlace? at write
   split at write
   · simp at write
@@ -767,18 +861,22 @@ theorem fillVisibleHole_registries (frame : RuntimeFrame) (state : RuntimeState)
     (fillVisibleHole frame state loan replacement).1.activeLoans
         = frame.activeLoans ∧
       (fillVisibleHole frame state loan replacement).1.loanLocations
-        = frame.loanLocations := by
+        = frame.loanLocations ∧
+      (fillVisibleHole frame state loan replacement).1.typeInstantiation
+        = frame.typeInstantiation := by
   unfold fillVisibleHole
   repeat' split
   all_goals first
-    | exact ⟨rfl, rfl⟩
+    | exact ⟨rfl, rfl, rfl⟩
     | simp
 
 theorem applyWriteBack_registries (frame : RuntimeFrame) (state : RuntimeState)
     (loan : Nat) (current : RuntimeValue) :
     (applyWriteBack frame state loan current).1.activeLoans = frame.activeLoans ∧
       (applyWriteBack frame state loan current).1.loanLocations
-        = frame.loanLocations := by
+        = frame.loanLocations ∧
+      (applyWriteBack frame state loan current).1.typeInstantiation
+        = frame.typeInstantiation := by
   have preserved := fillVisibleHole_registries frame state loan current
   unfold applyWriteBack
   rcases filled : fillVisibleHole frame state loan current with ⟨written, writtenState, found⟩
@@ -791,7 +889,8 @@ theorem updateLocalBorrowValue?_registries {frame : RuntimeFrame}
     (update : updateLocalBorrowValue? frame state loan replacement
       = some (updated, updatedState)) :
     updated.activeLoans = frame.activeLoans ∧
-      updated.loanLocations = frame.loanLocations := by
+      updated.loanLocations = frame.loanLocations ∧
+      updated.typeInstantiation = frame.typeInstantiation := by
   unfold updateLocalBorrowValue? at update
   have spelled : (localLoanPlace? frame loan).bind (fun place =>
       (readRuntimePlace? frame state place).bind (fun value =>
@@ -817,7 +916,8 @@ theorem updateBorrowValue?_registries {frame : RuntimeFrame} {state : RuntimeSta
     (update : updateBorrowValue? frame state loan replacement
       = some (updated, updatedState)) :
     updated.activeLoans = frame.activeLoans ∧
-      updated.loanLocations = frame.loanLocations := by
+      updated.loanLocations = frame.loanLocations ∧
+      updated.typeInstantiation = frame.typeInstantiation := by
   unfold updateBorrowValue? at update
   dsimp only at update
   cases localUpdate : updateLocalBorrowValue? frame state loan replacement with
@@ -832,7 +932,7 @@ theorem updateBorrowValue?_registries {frame : RuntimeFrame} {state : RuntimeSta
       · rw [Option.map_eq_some_iff] at update
         obtain ⟨_, _, built⟩ := update
         obtain ⟨rfl, _⟩ := Prod.mk.inj built
-        exact ⟨rfl, rfl⟩
+        exact ⟨rfl, rfl, rfl⟩
       · /- The remaining search rewrites a global entry and leaves the frame
         exactly as it was. -/
         split at update
@@ -841,7 +941,7 @@ theorem updateBorrowValue?_registries {frame : RuntimeFrame} {state : RuntimeSta
           rw [Option.map_eq_some_iff] at rest
           obtain ⟨_, _, built⟩ := rest
           obtain ⟨rfl, _⟩ := Prod.mk.inj built
-          exact ⟨rfl, rfl⟩
+          exact ⟨rfl, rfl, rfl⟩
         · exact absurd update (by simp)
 
 theorem mutateBorrow?_registries {operands : Array RuntimeValue}
@@ -850,7 +950,8 @@ theorem mutateBorrow?_registries {operands : Array RuntimeValue}
     (mutation : mutateBorrow? operands frame state
       = some (written, writtenState, result)) :
     written.activeLoans = frame.activeLoans ∧
-      written.loanLocations = frame.loanLocations := by
+      written.loanLocations = frame.loanLocations ∧
+      written.typeInstantiation = frame.typeInstantiation := by
   unfold mutateBorrow? at mutation
   split at mutation
   · split at mutation
@@ -890,6 +991,10 @@ theorem evaluatorRowStable_dereference :
       evaluated
     cases Option.some.inj reduced
     rfl
+  · have reduced : some (GlobalOperationResult.value frame state _) = some result :=
+      evaluated
+    cases Option.some.inj reduced
+    rfl
   · simp_all
 
 /-- A checked primitive computes on values, so it keeps the row. -/
@@ -915,6 +1020,14 @@ theorem evaluatorRowStable_liftPrimitive
       cases Option.some.inj built
       rfl
 
+/-- Native vector construction returns the frame it was given. -/
+theorem evaluatorRowStable_vector :
+    EvaluatorRowStable PrimitiveLocationOperation.vector.evaluate? := by
+  intro operands row registries state result evaluated
+  simp only [PrimitiveLocationOperation.evaluate?] at evaluated
+  cases Option.some.inj evaluated
+  exact ⟨row, rfl⟩
+
 /-- Writing through a reference keeps the row: it rewrites a local, or a
 global entry, and leaves the loan bookkeeping to the interpreter.  With
 this the whole of a mutation through a reference is frame-free. -/
@@ -930,10 +1043,11 @@ theorem evaluatorRowStable_mutate :
   rw [Option.bind_eq_some_iff] at spelled
   obtain ⟨triple, mutation, built⟩ := spelled
   obtain ⟨written, writtenState, produced⟩ := triple
-  obtain ⟨registriesActive, registriesLocations⟩ := mutateBorrow?_registries mutation
+  obtain ⟨registriesActive, registriesLocations, typeInstantiation⟩ :=
+    mutateBorrow?_registries mutation
   cases Option.some.inj built
   simp only [resultFrame]
-  rw [← registriesActive, ← registriesLocations]
+  rw [← registriesActive, ← registriesLocations, ← typeInstantiation]
 
 /-! ## Frame-free rules
 
@@ -1213,6 +1327,63 @@ theorem exportFrameLoans_rowFrame_borrowBool (state : RuntimeState)
   simp [rowFrame, exportFrameLoans, exportSettledLoans, frameBorrows,
     outermostBorrows, borrowEntry?, collectPruned, holeInFrame, holeWithin,
     findFirst, applyWriteBack_empty_export, globalLoanKey?, noGlobal]
+
+/-- The exit row of a mutable parameter carrying any loan-free value beside
+one loan-free local.  This is the representation-independent form used by
+typed vector parameters: the proof depends on `Plain`, not on traversing a
+symbolic `RuntimeValue`. -/
+theorem exportFrameLoans_rowFrame_borrowPlain (state : RuntimeState)
+    (loan : Nat) (value tail : RuntimeValue) (plain : Plain value)
+    (tailPlain : Plain tail) (activeLoans : Array (ExprId × Nat))
+    (loanLocations : Array (Nat × RuntimePlace))
+    (noGlobal : globalLoanKeyIn? state.globalLoans loan = none) :
+    exportFrameLoans
+        (rowFrame #[some (.borrow loan value), some tail]
+          { activeLoans, loanLocations })
+        state =
+      { state with pending := state.pending.push (loan, value) } := by
+  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
+  have noNested := plain.outermostBorrows_eq_empty
+  have noHole := findFirst_eq_none_of_plain
+    (LoanMatcher.holeMark? loan) plain
+  have noTail := tailPlain.outermostBorrows_eq_empty
+  have noTailBorrows := tailPlain.collectPruned_borrowEntry?_eq_empty
+  have noTailHole := findFirst_eq_none_of_plain
+    (LoanMatcher.holeMark? loan) tailPlain
+  simp [rowFrame, exportFrameLoans, exportSettledLoans, frameBorrows,
+    outermostBorrows, borrowEntry?, collectPruned, noNested, noTail,
+    holeInFrame, holeWithin, findFirst, applyWriteBack_empty_export,
+    globalLoanKey?, noGlobal, noHole, noTailBorrows, noTailHole]
+
+/-- The three-local exit used by an owned element loan after retirement:
+the mutable parameter exports, while the reconstructed owner and cleared
+temporary are both loan-free. -/
+theorem exportFrameLoans_rowFrame_borrowTwoPlain (state : RuntimeState)
+    (loan : Nat) (value first second : RuntimeValue)
+    (plain : Plain value) (firstPlain : Plain first)
+    (secondPlain : Plain second) (activeLoans : Array (ExprId × Nat))
+    (loanLocations : Array (Nat × RuntimePlace))
+    (noGlobal : globalLoanKeyIn? state.globalLoans loan = none) :
+    exportFrameLoans
+        (rowFrame #[some (.borrow loan value), some first, some second]
+          { activeLoans, loanLocations })
+        state =
+      { state with pending := state.pending.push (loan, value) } := by
+  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
+  have noValueBorrows := plain.collectPruned_borrowEntry?_eq_empty
+  have noFirstBorrows := firstPlain.collectPruned_borrowEntry?_eq_empty
+  have noSecondBorrows := secondPlain.collectPruned_borrowEntry?_eq_empty
+  have noValueHole := findFirst_eq_none_of_plain
+    (LoanMatcher.holeMark? loan) plain
+  have noFirstHole := findFirst_eq_none_of_plain
+    (LoanMatcher.holeMark? loan) firstPlain
+  have noSecondHole := findFirst_eq_none_of_plain
+    (LoanMatcher.holeMark? loan) secondPlain
+  simp [rowFrame, exportFrameLoans, exportSettledLoans, frameBorrows,
+    outermostBorrows, borrowEntry?, collectPruned, holeInFrame, holeWithin,
+    findFirst, applyWriteBack_empty_export, globalLoanKey?, noGlobal,
+    noValueBorrows, noFirstBorrows, noSecondBorrows,
+    noValueHole, noFirstHole, noSecondHole]
 
 /-- Result blocks, mirroring `blockUnit`. -/
 theorem rowStable_blockResult {statements : StatementsDenotation}
@@ -1592,7 +1763,7 @@ theorem evaluatorRowStable_globalBorrowShared (namespaceId : NamespaceId)
           lexicalLoan := lex }).evaluate? := by
   intro operands row registries state result evaluated
   simp only [GlobalLocationOperation.evaluate?, borrowGlobalAt?,
-    borrowGlobalUsing?] at evaluated
+    borrowGlobalUsing?, rowFrame_typeInstantiation] at evaluated
   cases operandsEq : operands.toList with
   | nil => simp [operandsEq] at evaluated
   | cons key rest =>
@@ -1604,7 +1775,8 @@ theorem evaluatorRowStable_globalBorrowShared (namespaceId : NamespaceId)
       | none => simp [keyEq] at evaluated
       | some storageKey =>
         simp only [keyEq, bind, Option.bind] at evaluated
-        cases lookupEq : globalValue? state namespaceId typeId key with
+        cases lookupEq : globalValue? state namespaceId
+            (instantiatedTypeId registries.typeInstantiation typeId) key with
         | none =>
             simp only [lookupEq] at evaluated
             cases Option.some.inj evaluated
@@ -1622,7 +1794,8 @@ theorem evaluatorRowStable_takeGlobal (namespaceId : NamespaceId)
     (typeId : TypeId) :
     EvaluatorRowStable (GlobalLocationOperation.take ⟨namespaceId, typeId⟩).evaluate? := by
   intro operands row registries state result evaluated
-  simp only [GlobalLocationOperation.evaluate?, takeGlobalAt?] at evaluated
+  simp only [GlobalLocationOperation.evaluate?, takeGlobalAt?,
+    rowFrame_typeInstantiation] at evaluated
   cases operandsEq : operands.toList with
   | nil => simp [operandsEq] at evaluated
   | cons key rest =>
@@ -1634,7 +1807,8 @@ theorem evaluatorRowStable_takeGlobal (namespaceId : NamespaceId)
       | none => simp [keyEq] at evaluated
       | some storageKey =>
         simp only [keyEq, bind, Option.bind] at evaluated
-        cases lookupEq : globalValue? state namespaceId typeId key with
+        cases lookupEq : globalValue? state namespaceId
+            (instantiatedTypeId registries.typeInstantiation typeId) key with
         | none =>
           simp only [lookupEq] at evaluated
           cases Option.some.inj evaluated
@@ -1650,7 +1824,8 @@ theorem evaluatorRowStable_containsGlobal (namespaceId : NamespaceId)
     EvaluatorRowStable
       (GlobalLocationOperation.contains ⟨namespaceId, typeId⟩).evaluate? := by
   intro operands row registries state result evaluated
-  simp only [GlobalLocationOperation.evaluate?, containsGlobalAt?] at evaluated
+  simp only [GlobalLocationOperation.evaluate?, containsGlobalAt?,
+    rowFrame_typeInstantiation] at evaluated
   cases operandsEq : operands.toList with
   | nil => simp [operandsEq] at evaluated
   | cons key rest =>
@@ -1975,7 +2150,8 @@ elab "leaner_row_stable_step" : tactic => do
           own rule. -/
           `(tactic| first
             | apply evaluatorRowStable_liftPrimitive
-            | exact evaluatorRowStable_copyValue _)
+            | exact evaluatorRowStable_copyValue _
+            | exact evaluatorRowStable_vector)
         else if shape == ``GlobalLocationOperation.evaluate? then
           /- The operation's constructor picks the law: a failed `exact`
           unfolds both evaluators before it fails. -/
@@ -2047,7 +2223,10 @@ elab "leaner_row_dispatch" : tactic => do
       `(tactic| refine (LeanerIR.Proofs.Denotation.wpStatementsRow_nil _ _ _ _).mpr ?_)
     else if head == ``nativeOperation || head == ``nativeReferenceOperation ||
         head == ``nativePrimitiveOperation || head == ``nativeLocalOperation ||
-        head == ``nativeDerefLocalBorrowOperation || head == ``nativeGlobalOperation then
+        head == ``nativeDerefLocalBorrowOperation ||
+        head == ``nativeIndexedLocalBorrowOperation ||
+        head == ``nativeIndexedLocalFieldBorrowOperation ||
+        head == ``nativeGlobalOperation then
       `(tactic| refine LeanerIR.Proofs.Denotation.wpRow_nativeOperation _ _ _ _ _ _ ?_ ?_)
     else if head == ``valuesCons then
       `(tactic| refine LeanerIR.Proofs.Denotation.wpValuesRow_cons _ _ _ _ _ _ ?_ ?_ ?_)
@@ -2145,6 +2324,47 @@ theorem wpFunction_of_satisfies {unit : ExecutableUnit}
   | returned results =>
       have ok : (nativeFunction unit shape body arguments).ok state results
           final := step
+      exact onReturn results final (normal results final ok).1
+        (normal results final ok).2.1 (normal results final ok).2.2
+  | threw kind thrown =>
+      obtain ⟨frame, finalFrame, evaluatedState, control, entry, run, finish,
+        finalize⟩ := step
+      exact onThrow kind thrown final (failing (kind, thrown)
+        ⟨frame, finalFrame, evaluatedState, control, final, entry, run, finish,
+          finalize⟩)
+
+/-- The invocation-aware counterpart of `wpFunction_of_satisfies`.
+The type substitution is fixed once at the call boundary; consuming a
+verified generic callee therefore does not unfold or re-run its body. -/
+theorem wpFunction_of_satisfiesAt {unit : ExecutableUnit}
+    {shape : SemanticOperations.FunctionShape}
+    {typeInstantiation : Array (TypeId × TypeId)} {body : ExprDenotation}
+    {contract : FunctionContract}
+    (verified : Satisfies
+      (nativeFunctionAt unit shape typeInstantiation body) contract)
+    {arguments : Array RuntimeValue} {state : RuntimeState}
+    (permitted : contract.requires arguments state)
+    {post : RuntimeState → Outcome → Prop}
+    (onReturn : ∀ results final,
+      (¬contract.mayAbort arguments state →
+        contract.ensures arguments state results final) →
+      contract.frame arguments state final →
+      ¬contract.mustAbort arguments state →
+      post final (.returned results))
+    (onThrow : ∀ kind thrown final,
+      contract.aborts arguments state (kind, thrown) →
+      post final (.threw kind thrown)) :
+    wpFunction
+      (nativeFunctionRelationAt unit shape typeInstantiation body)
+      state arguments post := by
+  unfold wpFunction
+  intro final outcome step
+  obtain ⟨normal, failing, _⟩ := verified arguments state permitted
+  cases outcome with
+  | returned results =>
+      have ok :
+          (nativeFunctionAt unit shape typeInstantiation body arguments).ok
+            state results final := step
       exact onReturn results final (normal results final ok).1
         (normal results final ok).2.1 (normal results final ok).2.2
   | threw kind thrown =>

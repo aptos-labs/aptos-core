@@ -21,6 +21,10 @@ concrete: frame reads, literal reification, and the pure operation
 evaluators. -/
 register_simp_attr lir_data_norm
 
+/-- Evaluation rules for resuming a modular call with its supplied summary.
+These do not preempt the normalizer's existing non-call operation rules. -/
+register_simp_attr lir_call_eval
+
 /-- Closed rows the native drive reconciles a program point with: frame and
 state finalization, loan registries, write-backs, and the canonical array
 spellings.  This is an attribute rather than a list written into the drive's
@@ -46,3 +50,10 @@ initialize LeanerIR.Proofs.leanerTwinAttribute : Lean.TagAttribute ←
 /-- Loan-freedom of a value, decided by simp: the constructor forms of
 `Plain`, and every generated twin's `plain_erase`. -/
 register_simp_attr leaner_plain
+
+/-- The evaluation set of the normalization route: the closed evaluations
+of the row's operations, the reads and writes over literal rows and
+nominal literals, and the laws of the identifiers they compare.  One
+`simp` over `lir_wp_norm` and this set is the whole normalization of a
+body. -/
+register_simp_attr lir_eval

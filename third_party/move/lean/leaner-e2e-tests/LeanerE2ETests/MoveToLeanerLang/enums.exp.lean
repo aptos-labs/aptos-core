@@ -10,10 +10,9 @@ leaner module 0x42::enums where
     | Split (left : u64, right : u64)
 
   fun total(action : Action) -> u64 :=
-    match action with
-      | Action::Idle {} => 0
-      | Action::Transfer { amount := amount } => amount
-      | Action::Split { left := left, right := right } => left + right
+    if action is Idle then 0
+    else
+      if action is Transfer then action.amount else action.left + action.right
 
   spec total where
     ensures result
@@ -23,10 +22,9 @@ leaner module 0x42::enums where
           | Action::Split { left := left, right := right } => left + right)
 
   fun classify(action : Action) -> u64 :=
-    match action with
-      | Action::Idle {} => 0
-      | Action::Transfer { amount := _ } => 1
-      | Action::Split { left := _, right := _ } => 2
+    if action is Idle then 0
+    else
+      if action is Transfer then 1 else 2
 
   fun is_transfer(action : Action) -> Bool := action is Transfer
 

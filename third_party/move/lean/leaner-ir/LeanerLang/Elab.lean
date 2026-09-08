@@ -24,18 +24,27 @@ private partial def identStringsOf (stx : Syntax) : Array String :=
   if stx.isIdent then #[stx.getId.getString!]
   else stx.getArgs.flatMap identStringsOf
 
-/-- Decode one `@[name (arg, ...)]` entry: the leading identifier is the
-attribute name, the parenthesized identifiers its arguments. -/
-private def attributeOf (stx : Syntax) : SourceAttribute :=
-  match identStringsOf stx with
-  | #[] => { name := "", span := spanOf stx }
-  | ids => { name := ids[0]!, arguments := ids.extract 1 ids.size, span := spanOf stx }
-
 private partial def childrenWhere (predicate : Syntax → Bool)
     (stx : Syntax) : Array Syntax :=
   stx.getArgs.foldl (fun found child =>
     if predicate child then found.push child
     else found ++ childrenWhere predicate child) #[]
+
+private def isAttributeSyntax (stx : Syntax) : Bool :=
+  stx.isOfKind ``leanerAttributeSyntax || stx.isOfKind ``leanerAttributeAssignmentSyntax
+
+private partial def attributeOf (stx : Syntax) : Except String SourceAttribute := do
+  let some name := stx.getArgs.find? (·.isIdent)
+    | throw "an attribute must have a name"
+  if stx.isOfKind ``leanerAttributeAssignmentSyntax then
+    let value := stx[2]
+    let value ← if let some number := value.isNatLit? then pure (.number number)
+      else if let some string := value.isStrLit? then pure (.string string)
+      else if value.isIdent then pure (.name value.getId.getString!)
+      else throw "an attribute value must be a number, string, or name"
+    return .assign name.getId.getString! value (spanOf stx)
+  return .call name.getId.getString!
+    (← (childrenWhere isAttributeSyntax stx).mapM attributeOf) (spanOf stx)
 
 private def isTypeSyntax (stx : Syntax) : Bool :=
   [``leanerUnitType, ``leanerNeverType, ``leanerBoolType, ``leanerCharType,
@@ -120,7 +129,7 @@ private def isExprSyntax (stx : Syntax) : Bool :=
     ``leanerSpecificationBitVectorToIntExpr,
     ``leanerSpecificationIntToBitVectorExpr,
     ``leanerSpecificationIntToBitVectorInferExpr, ``leanerRuntimeAssertExpr,
-    ``leanerRuntimeAssertMacroExpr,
+    ``leanerRuntimeAssertMacroExpr, ``leanerThrowSurfaceExpr,
     ``leanerSpecBlockExpr, ``leanerSingleSpecExpr,
     ``leanerBlockExpr, ``leanerGenericCallExpr, ``leanerDirectGenericCallExpr,
     ``leanerTypedCallExpr,
@@ -136,14 +145,16 @@ private def isExprSyntax (stx : Syntax) : Bool :=
     ``leanerFunctionValueExpr,
     ``leanerBorrowPlaceSurfaceExpr, ``leanerBorrowValueSurfaceExpr,
     ``leanerDereferenceSurfaceExpr,
-    ``leanerPlaceBorrowExpr, ``leanerDropPlaceExpr, ``leanerDropPlaceSurfaceExpr,
+    ``leanerPlaceBorrowExpr, ``leanerRawPlaceBorrowExpr, ``leanerRawPlaceAssignExpr,
+    ``leanerDropPlaceExpr, ``leanerDropPlaceSurfaceExpr,
     ``leanerMovePlaceSurfaceExpr, ``leanerCopyPlaceSurfaceExpr,
     ``leanerReadPlaceSurfaceExpr,
     ``leanerValueBorrowExpr, ``leanerFreezeReferenceExpr,
     ``leanerFreezeExplicitReferenceExpr, ``leanerDereferenceExpr,
     ``leanerMutateReferenceExpr, ``leanerAssignmentExpr,
     ``leanerPatternAssignmentExpr, ``leanerPatternAssignmentSurfaceExpr,
-    ``leanerPrimitiveExpr, ``leanerTypedCastExpr, ``leanerTypedCheckedCastExpr,
+    ``leanerPrimitiveExpr, ``leanerCheckedPrimitiveExpr,
+    ``leanerTypedCastExpr, ``leanerTypedCheckedCastExpr,
     ``leanerCastSurfaceExpr,
     ``leanerIfExpr, ``leanerLoopExpr, ``leanerWhileExpr, ``leanerForRangeExpr,
     ``leanerBreakExpr, ``leanerContinueExpr,
@@ -199,7 +210,7 @@ private def isClauseSyntax (stx : Syntax) : Bool :=
   [``leanerLetPreClause, ``leanerLetPostClause,
     ``leanerRequiresClause, ``leanerEnsuresClause,
     ``leanerAbortsIfClause, ``leanerInvariantClause,
-    ``leanerModifiesClause, ``leanerModifiesAllClause,
+    ``leanerModifiesClause, ``leanerLooseModifiesClause, ``leanerModifiesAllClause,
     ``leanerReadsClause, ``leanerReadsAllClause].contains stx.getKind
 
 private def isPragmaSyntax (stx : Syntax) : Bool :=
@@ -223,7 +234,7 @@ private partial def declarationAbilities (stx : Syntax) : Array Syntax :=
 private def isItemSyntax (stx : Syntax) : Bool :=
   [``leanerUseItem, ``leanerFriendItem, ``leanerNamespacePragmaItem, ``leanerConstantItem, ``leanerStructItem, ``leanerEnumItem,
     ``leanerFunctionItem, ``leanerSpecFunctionItem, ``leanerContractItem,
-    ``leanerContractWhereItem].contains stx.getKind
+    ``leanerContractWhereItem, ``leanerNamespaceInvariantItem].contains stx.getKind
 
 /-- Collect category nodes without crossing into a nested expression: a
 subexpression owns its own branches, arms, and binders. -/
@@ -268,7 +279,8 @@ private partial def signatureTypeChildren (stx : Syntax) : Array Syntax :=
     else found ++ signatureTypeChildren child) #[]
 private partial def throwChildren (stx : Syntax) : Array Syntax :=
   stx.getArgs.foldl (fun found child =>
-    if child.isOfKind ``leanerAbortThrow || child.isOfKind ``leanerPanicThrow then
+    if child.isOfKind ``leanerAbortThrow || child.isOfKind ``leanerPanicThrow ||
+        child.isOfKind ``leanerMoveVectorErrorThrow then
       found.push child
     else if isExprSyntax child then
       found
@@ -587,6 +599,7 @@ private partial def bindingPatternOf (stx : Syntax) : Except String BindingPatte
 private def throwOf (stx : Syntax) : Except String ThrowKind :=
   if stx.isOfKind ``leanerAbortThrow then pure .abort
   else if stx.isOfKind ``leanerPanicThrow then pure .panic
+  else if stx.isOfKind ``leanerMoveVectorErrorThrow then pure .moveVectorError
   else throw "expected `abort` or `panic`"
 
 private def primitiveOf (name : String) (failure : Option ThrowKind) : Except String Primitive :=
@@ -594,7 +607,17 @@ private def primitiveOf (name : String) (failure : Option ThrowKind) : Except St
   | "tuple", none => pure .tuple
   | "vector", none => pure .vector
   | "pushVector", none => pure .pushVector
+  | "concatVector", none => pure .concatVector
+  | "insertVector", none => pure .insertVector
+  | "removeVector", none => pure .removeVector
   | "swapVector", none => pure .swapVector
+  | "reverseSliceVector", none => pure .reverseSliceVector
+  | "destroyEmptyVector", none => pure .destroyEmptyVector
+  | "containsVector", none => pure .containsVector
+  | "indexOfVector", none => pure .indexOfVector
+  | "checkVectorIndex", some failure => pure (.checkVectorIndex failure)
+  | "checkVectorIndexAbort", none => pure (.checkVectorIndex .abort)
+  | "checkVectorIndexPanic", none => pure (.checkVectorIndex .panic)
   | "length", none => pure .length
   | "index", none => pure .index
   | "slice", none => pure .slice
@@ -634,8 +657,8 @@ private def primitiveOf (name : String) (failure : Option ThrowKind) : Except St
   | "checkedShiftRight", some failure => pure (.checkedShiftRight failure)
   | "checkedShiftRightAbort", none => pure (.checkedShiftRight .abort)
   | "checkedShiftRightPanic", none => pure (.checkedShiftRight .panic)
-  | "logicalAnd", none => pure .logicalAnd
-  | "logicalOr", none => pure .logicalOr
+  | "logicalAnd", none => pure .eagerLogicalAnd
+  | "logicalOr", none => pure .eagerLogicalOr
   | "logicalNot", none => pure .logicalNot
   | "equal", none => pure .equal
   | "notEqual", none => pure .notEqual
@@ -841,6 +864,11 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       | throw "a typed vector literal requires an element type"
     let result : Located Ty := { value := .vector (← typeOf element), span }
     pure (.typedPrimitive .vector result (← (exprChildren stx).mapM expressionOf) span)
+  else if stx.isOfKind ``leanerThrowSurfaceExpr then
+    let kind := if containsAtomOutsideExpressions "abort" stx then ThrowKind.abort
+      else if containsAtomOutsideExpressions "moveVectorError" stx then .moveVectorError
+      else .panic
+    pure (.throw_ kind (← (exprChildren stx).mapM expressionOf) span)
   else if stx.isOfKind ``leanerRuntimeAssertExpr ||
       stx.isOfKind ``leanerRuntimeAssertMacroExpr then
     let [condition, code] := (exprChildren stx).toList
@@ -1257,6 +1285,11 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       | throw "core.closure must name its target function"
     pure (.closure (← pathOf path) (← typeOf result)
       (← (exprChildren stx).mapM expressionOf) span)
+  else if stx.isOfKind ``leanerRawPlaceBorrowExpr then
+    let some place := (exprChildren stx)[0]?
+      | throw "core.borrowPlace must contain a place expression"
+    pure (.rawBorrowValue (containsAtomOutsideExpressions "mut" stx)
+      (← expressionOf place) span)
   else if stx.isOfKind ``leanerPlaceBorrowExpr then
     let some place := (placeChildren stx)[0]?
       | throw "a place borrow must contain a place"
@@ -1305,6 +1338,11 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
     unless arguments.size == 2 do throw "a reference mutation must have two operands"
     pure (.mutateReference (← expressionOf arguments[0]!)
       (← expressionOf arguments[1]!) span)
+  else if stx.isOfKind ``leanerRawPlaceAssignExpr then
+    let expressions := exprChildren stx
+    unless expressions.size == 2 do throw "core.assignPlace requires a target and value"
+    pure (.rawAssignExpression (← expressionOf expressions[0]!)
+      (← expressionOf expressions[1]!) span)
   else if stx.isOfKind ``leanerAssignmentExpr then
     let expressions := exprChildren stx
     unless expressions.size == 2 do throw "an assignment must have a target and value"
@@ -1312,9 +1350,7 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
     let value ← expressionOf expressions[1]!
     match target with
     | .dereference reference _ => pure (.mutateReference reference value span)
-    | target => match placeOfExpression target with
-        | .ok place => pure (.assign place value span)
-        | .error _ => pure (.assignExpression target value span)
+    | target => pure (.assignExpression target value span)
   else if stx.isOfKind ``leanerPatternAssignmentExpr ||
       stx.isOfKind ``leanerPatternAssignmentSurfaceExpr then
     let some type := (typeChildren stx)[0]?
@@ -1342,7 +1378,7 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       pure (.checkedCast (← throwOf failure))
     pure (.typedPrimitive operation (← typeOf resultType)
       (← (exprChildren stx).mapM expressionOf) span)
-  else if stx.isOfKind ``leanerPrimitiveExpr then
+  else if stx.isOfKind ``leanerPrimitiveExpr || stx.isOfKind ``leanerCheckedPrimitiveExpr then
     let some path := (pathChildren stx)[0]?
       | throw "an application expression must name its target"
     let path ← pathOf path
@@ -1380,7 +1416,9 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
   else if stx.isOfKind ``leanerLoopExpr then
     let some body := (exprChildren stx)[0]?
       | throw "`loop` requires a body"
-    pure (.loop (← expressionOf body) span)
+    let label := (childrenOfKind ``leanerLoopLabelSyntax stx)[0]?.map
+      (fun label => label[1].getId.getString!)
+    pure (.loop (← expressionOf body) span label)
   else if stx.isOfKind ``leanerWhileExpr then
     let some condition := (exprChildren stx)[0]?
       | throw "`while` requires a condition"
@@ -1443,9 +1481,13 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       | body => body
     pure (.forRange iterator lower upper body span)
   else if stx.isOfKind ``leanerBreakExpr then
-    pure (.break_ (← (exprChildren stx)[0]?.mapM expressionOf) span)
+    let label := (childrenOfKind ``leanerLoopLabelSyntax stx)[0]?.map
+      (fun label => label[1].getId.getString!)
+    pure (.break_ (← (exprChildren stx)[0]?.mapM expressionOf) span label)
   else if stx.isOfKind ``leanerContinueExpr then
-    pure (.continue_ span)
+    let label := (childrenOfKind ``leanerLoopLabelSyntax stx)[0]?.map
+      (fun label => label[1].getId.getString!)
+    pure (.continue_ span label)
   else if stx.isOfKind ``leanerReturnExpr then
     let some value := (exprChildren stx)[0]?
       | throw "`return` requires a value"
@@ -1509,6 +1551,7 @@ private def clauseOf (stx : Syntax) : Except String ContractClause := do
   let expression ← expressionOf expression
   let properties := (childrenOfKind ``leanerConditionPropertiesSyntax stx).flatMap identifiers
   if stx.isOfKind ``leanerModifiesClause then return .modifies expression span
+  if stx.isOfKind ``leanerLooseModifiesClause then return .modifies expression span true
   if stx.isOfKind ``leanerLetPreClause || stx.isOfKind ``leanerLetPostClause then
     let some name := stx.getArgs.find? (·.isIdent)
       | throw "a contract binding requires a name"
@@ -1619,7 +1662,7 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       fields := ← (childrenOfKind ``leanerFieldSyntax stx).mapM fieldOf
       abilities := ← (declarationAbilities stx).mapM abilityOf
-      attributes := (childrenOfKind ``LeanerLang.leanerAttributeSyntax stx).map attributeOf
+      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``leanerEnumItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1629,7 +1672,7 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       variants := ← (childrenOfKind ``leanerVariantSyntax stx).mapM variantOf
       abilities := ← (declarationAbilities stx).mapM abilityOf
-      attributes := (childrenOfKind ``LeanerLang.leanerAttributeSyntax stx).map attributeOf
+      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``leanerFunctionItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1644,7 +1687,7 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       parameters := ← (childrenOfKind ``leanerParameterSyntax stx).mapM parameterOf
       result := ← typeOf result
       body := ← expressions.back?.mapM expressionOf
-      attributes := (childrenOfKind ``LeanerLang.leanerAttributeSyntax stx).map attributeOf
+      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``leanerSpecFunctionItem then
     let some name := stx.getArgs.find? (·.isIdent)
@@ -1660,8 +1703,20 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       parameters := ← (childrenOfKind ``leanerParameterSyntax stx).mapM parameterOf
       result := ← typeOf result
       body := ← expressions.back?.mapM expressionOf
-      attributes := (childrenOfKind ``LeanerLang.leanerAttributeSyntax stx).map attributeOf
+      attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
+  else if stx.isOfKind ``leanerNamespaceInvariantItem then
+    let members := childrenWhere
+      (·.isOfKind ``LeanerLang.leanerNamespaceInvariantMemberSyntax) stx
+    if members.isEmpty then throw "a module specification must declare an invariant"
+    let declarations ← members.mapM fun member => do
+      let some expression := (exprChildren member)[0]?
+        | throw "a module invariant requires an expression"
+      pure ({
+        expression := ← expressionOf expression
+        properties := (childrenOfKind ``leanerConditionPropertiesSyntax member).flatMap identifiers
+        span := spanOf member } : NamespaceInvariantDecl)
+    pure (.item (.namespaceInvariants declarations))
   else if stx.isOfKind ``leanerContractItem || stx.isOfKind ``leanerContractWhereItem then
     let some name := stx.getArgs.find? (·.isIdent)
       | throw "a function contract must name its function"

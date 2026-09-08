@@ -111,6 +111,7 @@ structure GenericBinder where
 inductive ThrowKind where
   | abort
   | panic
+  | moveVectorError
   deriving Repr, BEq, DecidableEq, Inhabited
 
 inductive QuantifierKind where
@@ -184,7 +185,15 @@ inductive Primitive where
   | vector
   | repeatVector (length : Nat)
   | pushVector
+  | concatVector
+  | insertVector
+  | removeVector
   | swapVector
+  | reverseSliceVector
+  | destroyEmptyVector
+  | containsVector
+  | indexOfVector
+  | checkVectorIndex (failure : ThrowKind)
   | length
   | index
   | slice
@@ -212,6 +221,9 @@ inductive Primitive where
   | checkedShiftRight (failure : ThrowKind)
   | logicalAnd
   | logicalOr
+  /-- Explicit core primitives evaluate both arguments, unlike surface operators. -/
+  | eagerLogicalAnd
+  | eagerLogicalOr
   | logicalNot
   | equal
   | notEqual
@@ -338,6 +350,8 @@ inductive Expr where
   | borrowPlace (mutable : Bool) (place : Place) (span : Span := {})
   | dropPlace (place : Place) (span : Span := {})
   | borrowValue (mutable : Bool) (value : Expr) (span : Span := {})
+  /-- Canonical raw place borrow, with bounds checks represented separately. -/
+  | rawBorrowValue (mutable : Bool) (value : Expr) (span : Span := {})
   | freezeReference (explicit : Bool) (value : Expr) (span : Span := {})
   | dereference (value : Expr) (span : Span := {})
   | mutateReference (reference value : Expr) (span : Span := {})
@@ -355,12 +369,14 @@ inductive Expr where
   before the iterator is introduced. Core LIR retains the equivalent
   let/loop/assignment form; this node is canonical surface syntax. -/
   | forRange (iterator : String) (lower upper body : Expr) (span : Span := {})
-  | loop (body : Expr) (span : Span := {})
-  | break_ (value : Option Expr) (span : Span := {})
-  | continue_ (span : Span := {})
+  | loop (body : Expr) (span : Span := {}) (label : Option String := none)
+  | break_ (value : Option Expr) (span : Span := {}) (label : Option String := none)
+  | continue_ (span : Span := {}) (label : Option String := none)
   | assign (place : Place) (value : Expr) (span : Span := {})
   /-- Assignment whose target uses expression-shaped index notation. -/
   | assignExpression (target value : Expr) (span : Span := {})
+  /-- Core assignment to an already-lowered place; no implicit bounds guard. -/
+  | rawAssignExpression (target value : Expr) (span : Span := {})
   | assignPattern (pattern : BindingPattern) (type : Located Ty)
       (value : Expr) (span : Span := {})
   | return_ (value : Expr) (span : Span := {})
@@ -394,6 +410,7 @@ def Expr.span : Expr → Span
       .testVariants _ _ _ span | .discriminant _ _ _ span |
       .placeOperation _ _ span | .block _ _ span |
       .borrowPlace _ _ span | .dropPlace _ span | .borrowValue _ _ span |
+      .rawBorrowValue _ _ span |
       .freezeReference _ _ span |
       .dereference _ span |
       .mutateReference _ _ span |
@@ -402,8 +419,9 @@ def Expr.span : Expr → Span
       .specBlock _ span |
       .ifElse _ _ _ span | .match_ _ _ span |
       .forRange _ _ _ _ span |
-      .loop _ span | .break_ _ span | .continue_ span |
-      .assign _ _ span | .assignExpression _ _ span | .assignPattern _ _ _ span |
+      .loop _ span _ | .break_ _ span _ | .continue_ span _ |
+      .assign _ _ span | .assignExpression _ _ span | .rawAssignExpression _ _ span |
+      .assignPattern _ _ _ span |
       .return_ _ span | .throw_ _ _ span => span
 
 structure Parameter where
@@ -439,7 +457,7 @@ inductive ContractClause where
   | abortsIf (expression : Expr) (code : Option Expr := none)
       (properties : Array String := #[]) (span : Span := {})
   | invariant (expression : Expr) (properties : Array String := #[]) (span : Span := {})
-  | modifies (expression : Expr) (span : Span := {})
+  | modifies (expression : Expr) (span : Span := {}) (loose : Bool := false)
   | modifiesAll (span : Span := {})
   | reads (type : Located Ty) (span : Span := {})
   | readsAll (span : Span := {})
@@ -448,7 +466,7 @@ inductive ContractClause where
 def ContractClause.span : ContractClause → Span
   | .letPre _ _ _ span | .letPost _ _ _ span |
       .requires _ _ span | .ensures _ _ span | .abortsIf _ _ _ span |
-      .invariant _ _ span | .modifies _ span | .modifiesAll span |
+      .invariant _ _ span | .modifies _ span _ | .modifiesAll span |
       .reads _ span | .readsAll span => span
 
 structure Pragma where
@@ -457,14 +475,25 @@ structure Pragma where
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
-/-- One source declaration attribute: a name applied to name arguments —
-the inverted source spelling of namespace-level intrinsic role graphs
-(`@[intrinsic_map]` on the owner, `@[map_new (Owner)]` on a target). -/
-structure SourceAttribute where
-  name : String
-  arguments : Array String := #[]
-  span : Span := {}
+/-- Literal or unresolved name assigned in declaration metadata. -/
+inductive SourceAttributeValue where
+  | number (value : Nat)
+  | string (value : String)
+  | name (value : String)
   deriving Repr, BEq, Inhabited
+
+/-- Structured declaration metadata. Intrinsic owner/role annotations use
+the same call syntax, but are consumed into the intrinsic graph by lowering. -/
+inductive SourceAttribute where
+  | call (name : String) (arguments : Array SourceAttribute) (span : Span)
+  | assign (name : String) (value : SourceAttributeValue) (span : Span)
+  deriving Repr, BEq, Inhabited
+
+def SourceAttribute.name : SourceAttribute → String
+  | .call name .. | .assign name .. => name
+
+def SourceAttribute.span : SourceAttribute → Span
+  | .call _ _ span | .assign _ _ span => span
 
 structure FunctionDecl where
   name : String
@@ -534,12 +563,20 @@ structure EnumDecl where
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
+/-- One predicate declared by a namespace-level `spec module` block. -/
+structure NamespaceInvariantDecl where
+  expression : Expr
+  properties : Array String := #[]
+  span : Span := {}
+  deriving Repr, BEq, Inhabited
+
 inductive Item where
   | constant (declaration : ConstantDecl)
   | struct (declaration : StructDecl)
   | enum (declaration : EnumDecl)
   | function (declaration : FunctionDecl)
   | specFunction (declaration : SpecFunctionDecl)
+  | namespaceInvariants (declarations : Array NamespaceInvariantDecl)
   deriving Repr, BEq, Inhabited
 
 /-- Another namespace granted privileged (`friend`) access to this one. Move

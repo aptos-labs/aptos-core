@@ -53,9 +53,11 @@ initialize recorded : IO.Ref (Array Sample) ← IO.mkRef #[]
 ordinary `verify` pays nothing beyond the flag read. -/
 initialize measuring : IO.Ref Bool ← IO.mkRef false
 
-/-- Measure one verification target while it elaborates. -/
-def measure [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
-    (target : String) (theoremName : Name) (elaborate : m Unit) : m Unit := do
+/-- Measure all artifacts produced by one stage. Stages sharing a target
+are accumulated, so moving proof work into generated declarations cannot
+make it disappear from the existing verification-cost gate. -/
+def measureArtifacts [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
+    (target : String) (names : Array Name) (elaborate : m Unit) : m Unit := do
   unless ← (measuring.get : IO Bool) do
     elaborate
     return
@@ -66,16 +68,28 @@ def measure [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
   let stopTime ← (IO.monoNanosNow : BaseIO Nat)
   /- A theorem hands out its proof only to a caller that asks for opaque
   values; the proof term is exactly what this measures. -/
-  let objects ← match (← getEnv).find? theoremName with
-    | some info => match info.value? (allowOpaque := true) with
-        | some value => (value.numObjs : IO Nat)
-        | none => pure 0
-    | none => pure 0
-  (recorded.modify (·.push {
+  let mut objects := 0
+  for name in names do
+    if let some value := (← getEnv).find? name |>.bind (·.value? (allowOpaque := true)) then
+      objects := objects + (← (value.numObjs : IO Nat))
+  let sample : Sample := {
       target
       heartbeats := stopHeartbeats - startHeartbeats
       objects
-      elapsedMs := (stopTime - startTime) / 1000000 }) : IO Unit)
+      elapsedMs := (stopTime - startTime) / 1000000 }
+  (recorded.modify fun samples =>
+    match samples.findIdx? (·.target == target) with
+    | none => samples.push sample
+    | some index => samples.modify index fun previous => {
+        target
+        heartbeats := previous.heartbeats + sample.heartbeats
+        objects := previous.objects + sample.objects
+        elapsedMs := previous.elapsedMs + sample.elapsedMs } : IO Unit)
+
+/-- Measure one verification target while it elaborates. -/
+def measure [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
+    (target : String) (theoremName : Name) (elaborate : m Unit) : m Unit :=
+  measureArtifacts target #[theoremName] elaborate
 
 /-- Render the recorded samples as the baseline text: one target per line,
 sorted, carrying only the reproducible numbers. -/

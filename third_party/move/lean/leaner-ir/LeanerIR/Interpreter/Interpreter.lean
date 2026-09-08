@@ -73,14 +73,15 @@ def callResult (namespaceId : NamespaceId) (loc : LocId)
         callers := result.outcome.callers.push here } }
 
 mutual
-  def evalFunction : Nat → ExecutableUnit → FunctionHandle → RuntimeState →
-      Array RuntimeValue → Except LocatedInterpreterError FunctionEvaluation
-    | 0, executable, handle, _, _ =>
+  def evalFunction : Nat → ExecutableUnit → FunctionHandle →
+      Array (TypeId × TypeId) → RuntimeState → Array RuntimeValue →
+      Except LocatedInterpreterError FunctionEvaluation
+    | 0, executable, handle, _, _, _ =>
         let loc := executable.unit.namespaces[handle.namespaceId.index]?
           |>.map (fun ns => ns.functions[handle.functionId.index]?.map (·.loc))
           |>.join |>.getD ⟨0⟩
         failAt handle.namespaceId loc .outOfFuel
-    | fuel + 1, executable, handle, state, arguments => do
+    | fuel + 1, executable, handle, typeInstantiation, state, arguments => do
         let some ns := executable.unit.namespaces[handle.namespaceId.index]?
           | failAt handle.namespaceId ⟨0⟩ (.functionHasNoBody handle)
         let some declaration := ns.functions[handle.functionId.index]?
@@ -88,7 +89,7 @@ mutual
         if arguments.size != declaration.signature.parameters.size then
           failAt handle.namespaceId declaration.loc
             (.argumentArity declaration.signature.parameters.size arguments.size)
-        let some frame := initialFrame? declaration arguments
+        let some frame := initialFrame? declaration arguments typeInstantiation
           | failAt handle.namespaceId declaration.loc .unsupportedPreparedNode
         let .structured root := declaration.body
           | failAt handle.namespaceId declaration.loc (.functionHasNoBody handle)
@@ -164,14 +165,17 @@ mutual
             let some value := readLocal? frame localId
               | failAt namespaceId expression.loc (.uninitializedLocal localId)
             return normal state frame value
-        | .operation (.call (.function reference)) _ arguments _ =>
+        | .operation (.call (.function reference)) instantiations arguments _ =>
             let operands ← evalValues fuel executable namespaceId frame state arguments.toList
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
                 let some handle := resolveFunction? executable.unit namespaceId reference
                   | failAt namespaceId expression.loc (.unknownFunction reference)
-                let result ← match evalFunction fuel executable handle state values.toArray with
+                let typeInstantiation := callTypeInstantiation executable.unit handle
+                  frame.typeInstantiation instantiations
+                let result ← match evalFunction fuel executable handle typeInstantiation
+                    state values.toArray with
                   | .ok result => pure result
                   | .error error => throw (error.pushCaller here)
                 return callResult namespaceId expression.loc
@@ -210,7 +214,7 @@ mutual
             | .values state frame (callable :: arguments) =>
                 let .closure handle captures := callable
                   | failAt namespaceId expression.loc (.expectedClosure callable)
-                let result ← match evalFunction fuel executable handle state
+                let result ← match evalFunction fuel executable handle frame.typeInstantiation state
                     (captures ++ arguments.toArray) with
                   | .ok result => pure result
                   | .error error => throw (error.pushCaller here)
@@ -457,7 +461,7 @@ and loop iterations; exhaustion is reported at the active LIR source point. -/
 def run (executable : ExecutableUnit) (fuel : Nat) (function : FunctionHandle)
     (arguments : Array RuntimeValue) (state : RuntimeState := {}) :
     Except LocatedInterpreterError (RuntimeState × LocatedOutcome) := do
-  let result ← Internal.evalFunction fuel executable function state arguments
+  let result ← Internal.evalFunction fuel executable function #[] state arguments
   return (result.state, result.outcome)
 
 end Interpreter

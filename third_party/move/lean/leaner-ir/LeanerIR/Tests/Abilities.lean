@@ -279,7 +279,7 @@ private def copyPrepared : ExecutableUnit := copyableExecutable?.get (by native_
 private theorem successfulRunHasDerivation (executable : ExecutableUnit)
     (success : (Interpreter.run executable 16 handle #[]).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction executable handle {} #[] finalState outcome.value := by
+      BigStep.EvalFunction executable handle #[] {} #[] finalState outcome.value := by
   generalize result_eq : Interpreter.run executable 16 handle #[] = result
   cases result with
   | error error => simp [result_eq, Except.isOk, Except.toBool] at success
@@ -289,12 +289,12 @@ private theorem successfulRunHasDerivation (executable : ExecutableUnit)
           result.1 result.2 result_eq⟩
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared handle {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared handle #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation prepared
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction copyPrepared handle {} #[] finalState outcome.value := by
+    BigStep.EvalFunction copyPrepared handle #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation copyPrepared
   native_decide
 

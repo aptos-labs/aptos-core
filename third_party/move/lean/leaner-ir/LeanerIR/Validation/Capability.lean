@@ -7,6 +7,7 @@ import LeanerIR.Validation.Borrowing
 import LeanerIR.Validation.Initialization
 import LeanerIR.Validation.PlaceIndex
 import LeanerIR.Validation.Eliminate
+import LeanerIR.Validation.IndexedArena
 
 /-!
 # LIR semantic capability preparation
@@ -258,7 +259,15 @@ def corePrimitiveFeature : PrimitiveOperation → SemanticFeature
   | .vector => feature "primitive.vector" .executable
   | .repeatVector => feature "primitive.repeatVector" .executable
   | .pushVector => feature "primitive.pushVector" .executable
+  | .concatVector => feature "primitive.concatVector" .executable
+  | .insertVector => feature "primitive.insertVector" .executable
+  | .removeVector => feature "primitive.removeVector" .executable
   | .swapVector => feature "primitive.swapVector" .executable
+  | .reverseSliceVector => feature "primitive.reverseSliceVector" .executable
+  | .destroyEmptyVector => feature "primitive.destroyEmptyVector" .executable
+  | .containsVector => feature "primitive.containsVector" .executable
+  | .indexOfVector => feature "primitive.indexOfVector" .executable
+  | .checkVectorIndex _ => feature "primitive.checkVectorIndex" .executable
   | .length => feature "primitive.length" .executable
   | .index => feature "primitive.index" .executable
   | .slice => feature "primitive.slice" .executable
@@ -699,8 +708,22 @@ private structure ScanContext where
   executable declarations (one reference layer erased, integers widened). -/
   logical : Bool := false
 
+private def arenaGetNative? {α : Type} (values : Array α) (index : Nat) : Option α :=
+  values[index]?
+
+/-- Native validation keeps constant-time array access. Kernel reduction uses
+the equivalent list lookup, which does not traverse the entire arena to
+recompute its length before walking to the requested slot. -/
+@[implemented_by arenaGetNative?]
+private def arenaGet? {α : Type} (values : Array α) (index : Nat) : Option α :=
+  values.toList[index]?
+
+private theorem arenaGet?_eq {α : Type} (values : Array α) (index : Nat) :
+    arenaGet? values index = arenaGetNative? values index := by
+  simp [arenaGet?, arenaGetNative?]
+
 private def exprType? (ns : ValidatedNamespace) (id : ExprId) : Option TypeId :=
-  (ns.expressions[id.index]?).map (·.typeId)
+  (arenaGet? ns.expressions id.index).map (·.typeId)
 
 /-- Abrupt expressions are bottom-polymorphic: because they produce no normal
 value, their stored type need not equal the surrounding result type. -/
@@ -928,6 +951,22 @@ private def instantiateLifetime? (ns : ValidatedNamespace)
       | _ => none
   | .static | .inference | .local => some lifetime
 
+/-- Source locations distinguish occurrences, not instantiated nominal
+types.  Structural lookup in the shared type arena therefore compares a
+type argument by its `TypeId` while retaining ordinary equality for the
+other generic-argument kinds. -/
+private def sameGenericArgumentValue : GenericArgument → GenericArgument → Bool
+  | .typeArg left, .typeArg right => left.typeId == right.typeId
+  | .const left, .const right => left == right
+  | .lifetime left, .lifetime right => left == right
+  | .evidence left, .evidence right => left == right
+  | _, _ => false
+
+private def sameGenericArgumentValues
+    (left right : Array GenericArgument) : Bool :=
+  left.size == right.size &&
+    (left.zip right).all fun (left, right) => sameGenericArgumentValue left right
+
 /-- Resolve a declaration-local generic field type to an already interned
 concrete arena type. RawUnit remains non-monomorphized: this only locates the
 structurally instantiated node emitted for the use site. -/
@@ -968,8 +1007,11 @@ private def instantiatePlaceFieldTypeFuel? (ns : ValidatedNamespace)
             | .lifetime value => .lifetime <$> instantiateLifetime? ns instantiations value
             | .const value => some (.const value)
             | .evidence value => some (.evidence value)
-          let index ← ns.tables.types.findIdx? fun candidate =>
-            candidate == .nominal name arguments
+          let index ← ns.tables.types.findIdx? fun candidate => match candidate with
+            | .nominal candidateName candidateArguments =>
+                candidateName == name &&
+                  sameGenericArgumentValues candidateArguments arguments
+            | _ => false
           some ⟨index⟩
       | .function arguments result abilities => do
           let arguments ← arguments.mapM
@@ -1019,7 +1061,7 @@ private def staticPlaceInfoFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace
   match fuel with
   | 0 => none
   | fuel + 1 =>
-  let place ← ns.places[id.index]?
+  let place ← arenaGet? ns.places id.index
   match place with
   | .localVar localId => do
       let declaration ← context.locals[localId.index]?
@@ -1082,7 +1124,8 @@ private def staticPlaceNodeDiagnostics (mode : PreparationMode) (unit : Validate
       | none => #[]
   | .index base index =>
       let indexErrors := match exprType? ns index with
-        | some indexType => if isFixedIntegerType ns indexType then #[]
+        | some indexType => if isFixedIntegerType ns indexType ||
+              (context.logical && isAnyIntegerType ns indexType) then #[]
             else typeMismatch loc "place index is not a nonzero fixed-width integer"
         | none => #[]
       match staticPlaceInfo? unit ns context base with
@@ -1353,6 +1396,39 @@ private def swapVectorPrimitiveDiagnostics (ns : ValidatedNamespace) (logical : 
       typeMismatch loc "swapped-vector result has a fixed length"
   | _, _ => typeMismatch loc "swapped-vector result is not a vector type"
 
+private def vectorEditIndexDiagnostics (ns : ValidatedNamespace) (logical : Bool)
+    (loc : LocId) (index : ExprId) : Array Diagnostic :=
+  match exprType? ns index with
+  | some type =>
+      if isFixedIntegerType ns type || (logical && isLogicalNumType ns type) then #[]
+      else typeMismatch loc "vector edit index is not a nonzero fixed-width integer"
+  | none => #[]
+
+private def insertVectorPrimitiveDiagnostics (ns : ValidatedNamespace) (logical : Bool)
+    (loc : LocId) (resultType : TypeId) (arguments : Array ExprId) : Array Diagnostic :=
+  match arguments.toList with
+  | [vector, index, value] =>
+      pushVectorPrimitiveDiagnostics ns loc resultType #[vector, value] ++
+        vectorEditIndexDiagnostics ns logical loc index
+  | _ => #[] -- Arity checking reports malformed operand rows.
+
+private def removeVectorPrimitiveDiagnostics (ns : ValidatedNamespace) (logical : Bool)
+    (loc : LocId) (resultType : TypeId) (arguments : Array ExprId) : Array Diagnostic :=
+  match arguments.toList with
+  | [vector, index] =>
+      let resultErrors := match ns.tables.types[resultType.index]?, exprType? ns vector with
+        | some (.tuple #[elementResult, vectorResult]), some vectorType =>
+          match ns.tables.types[vectorType.index]? with
+          | some (.vector element none) =>
+              if (typesAgree ns elementResult element ||
+                  (logical && specProjectedAgree ns elementResult element)) &&
+                  typesAgree ns vectorResult vectorType then #[]
+              else typeMismatch loc "removed-vector result must contain the element and original vector types"
+          | _ => typeMismatch loc "removed-vector operand must be a variable-length vector"
+        | _, _ => typeMismatch loc "removed-vector result must be an element/vector pair"
+      resultErrors ++ vectorEditIndexDiagnostics ns logical loc index
+  | _ => #[]
+
 private def repeatVectorPrimitiveDiagnostics (ns : ValidatedNamespace) (loc : LocId)
     (resultType : TypeId) (arguments : Array ExprId) : Array Diagnostic :=
   match ns.tables.types[resultType.index]?, arguments.toList with
@@ -1497,7 +1573,52 @@ private def primitiveTypeDiagnostics (ns : ValidatedNamespace) (logical : Bool)
   | .vector => vectorPrimitiveDiagnostics ns loc resultType arguments
   | .repeatVector => repeatVectorPrimitiveDiagnostics ns loc resultType arguments
   | .pushVector => pushVectorPrimitiveDiagnostics ns loc resultType arguments
-  | .swapVector => swapVectorPrimitiveDiagnostics ns logical loc resultType arguments
+  | .concatVector =>
+      match ns.tables.types[resultType.index]? with
+      | some (.vector _ none) =>
+          arguments.foldl (init := #[]) fun errors argument =>
+            if exprTypeAgrees ns argument resultType then errors
+            else errors ++ typeMismatch loc "concatenated vector type differs from result"
+      | _ => typeMismatch loc "concatenation requires a variable-length vector result"
+  | .insertVector => insertVectorPrimitiveDiagnostics ns logical loc resultType arguments
+  | .removeVector => removeVectorPrimitiveDiagnostics ns logical loc resultType arguments
+  | .swapVector | .reverseSliceVector =>
+      swapVectorPrimitiveDiagnostics ns logical loc resultType arguments
+  | .checkVectorIndex _ =>
+      let resultErrors := if ns.tables.types[resultType.index]? == some .unit then #[]
+        else typeMismatch loc "vector index check must return unit"
+      match arguments.toList with
+      | [vector, index] =>
+          let vectorErrors := match exprType? ns vector >>= (ns.tables.types[·.index]?) with
+            | some (.vector ..) => #[]
+            | _ => typeMismatch loc "index check requires a vector"
+          resultErrors ++ vectorErrors ++ vectorEditIndexDiagnostics ns logical loc index
+      | _ => resultErrors
+  | .destroyEmptyVector =>
+      let resultErrors := if ns.tables.types[resultType.index]? == some .unit then #[]
+        else typeMismatch loc "empty-vector destruction must return unit"
+      match arguments.toList with
+      | [vector] => match exprType? ns vector >>= (ns.tables.types[·.index]?) with
+          | some (.vector ..) => resultErrors
+          | _ => resultErrors ++ typeMismatch loc "empty-vector destruction requires a vector"
+      | _ => resultErrors
+  | .containsVector | .indexOfVector =>
+      let resultErrors := if operation == .containsVector then
+          if isBoolType ns resultType then #[] else typeMismatch loc "vector membership must return Bool"
+        else match ns.tables.types[resultType.index]? with
+          | some (.tuple #[found, index]) =>
+              if isBoolType ns found &&
+                  (isFixedIntegerType ns index || (logical && isLogicalNumType ns index)) then #[]
+              else typeMismatch loc "vector search must return (Bool, integer index)"
+          | _ => typeMismatch loc "vector search must return (Bool, integer index)"
+      match arguments.toList with
+      | [vector, needle] => match exprType? ns vector >>= (ns.tables.types[·.index]?) with
+          | some (.vector element _) =>
+              if exprTypeAgrees ns needle element ||
+                  (logical && (exprType? ns needle).any (specProjectedAgree ns element)) then resultErrors
+              else resultErrors ++ typeMismatch loc "vector search element type differs"
+          | _ => resultErrors ++ typeMismatch loc "vector search requires a vector"
+      | _ => resultErrors
   | .length => lengthPrimitiveDiagnostics ns loc resultType arguments
   | .index => indexPrimitiveDiagnostics ns logical loc resultType arguments
   | .slice => slicePrimitiveDiagnostics ns logical loc resultType arguments
@@ -3303,7 +3424,8 @@ mutual
       | .global (.borrow (.profile value)) =>
           profileDiagnostics registry unit mode .borrow loc value ++
             classificationDiagnostics mode loc (coreOperationFeature operation)
-      | .primitive (.checkedAdd (.profile value)) |
+      | .primitive (.checkVectorIndex (.profile value)) |
+          .primitive (.checkedAdd (.profile value)) |
           .primitive (.checkedSubtract (.profile value)) |
           .primitive (.checkedMultiply (.profile value)) |
           .primitive (.checkedModulo (.profile value)) |
@@ -3343,7 +3465,11 @@ mutual
       | .primitive .tuple | .primitive .vector => #[]
       | .primitive .repeatVector => exactArity loc "repeated vector" 1 arguments.size
       | .primitive .pushVector => exactArity loc "vector push" 2 arguments.size
+      | .primitive .insertVector => exactArity loc "vector insert" 3 arguments.size
+      | .primitive .removeVector => exactArity loc "vector remove" 2 arguments.size
       | .primitive .swapVector => exactArity loc "vector swap" 3 arguments.size
+      | .primitive .reverseSliceVector => exactArity loc "vector range reversal" 3 arguments.size
+      | .primitive .destroyEmptyVector => exactArity loc "empty-vector destruction" 1 arguments.size
       | .primitive .length | .primitive .logicalNot | .primitive .bitwiseNot |
           .primitive .negate |
           .primitive (.checkedNegate _) | .primitive .copyValue | .primitive .moveValue |
@@ -3462,7 +3588,7 @@ mutual
               #[.at "LIR-SEMANTIC-ABILITY" "drop requires the place type to have Drop" loc]
           | none => #[]
       | .primitive .copyValue =>
-          if contextTypeHasAbility? unit ns context resultType .copy then #[] else
+          if allowNonCopyPlaceRead || contextTypeHasAbility? unit ns context resultType .copy then #[] else
             #[.at "LIR-SEMANTIC-ABILITY" "value copy requires its type to have Copy" loc]
       | .primitive .repeatVector => match ns.tables.types[resultType.index]? with
           | some (.vector element _) =>
@@ -3577,10 +3703,16 @@ mutual
               let ds := instantiations.foldl (fun ds value =>
                 ds ++ scanGenericArgument registry unit mode ns expression.loc value
                   context.generics) ds
-              let allowsDiscriminantRead := operation matches .data (.discriminant _)
+              -- Both observers inspect metadata without exporting or copying
+              -- an element of a potentially linear aggregate.
+              let allowsDiscriminantRead := operation matches
+                .data (.discriminant _) | .primitive .length | .primitive (.checkVectorIndex _)
+              let observesProjection := allowNonCopyPlaceRead && (operation matches
+                .data (.select ..) | .primitive .index | .primitive .copyValue |
+                .reference .dereference)
               let ds := arguments.zipIdx.foldl (fun ds pair =>
                 ds ++ scanExpr registry unit mode ns context pair.1
-                  (allowsDiscriminantRead && pair.2 == 0)) ds
+                  ((allowsDiscriminantRead || observesProjection) && pair.2 == 0)) ds
               match surface with
               | none => ds
               | some (.extension value) =>
@@ -3608,7 +3740,9 @@ mutual
               let ds := match value with
                 | some value =>
                     let ds := ds ++ scanExpr registry unit mode ns context value
-                    if (mode matches .execution) ||
+                    -- An abrupt initializer never reaches the binding. Like
+                    -- block and branch results, it is bottom-polymorphic.
+                    if (mode matches .execution) || !expressionCanFallThrough ns value ||
                         (match patternType? ns pattern, exprType? ns value with
                          | some patternTy, some valueTy =>
                              typesAgree ns patternTy valueTy ||
@@ -4142,27 +4276,29 @@ private def isSharedReferenceType (ns : ValidatedNamespace) (typeId : TypeId) : 
   | some (.reference reference) => reference.kind == .shared
   | _ => false
 
-private def sharedOperand (ns : ValidatedNamespace) (arguments : Array ExprId) : Bool :=
+private def sharedOperand (ns : ValidatedNamespace) (expressionAt : Nat → Option Expr)
+    (arguments : Array ExprId) : Bool :=
   match arguments[0]? with
-  | some id => match exprType? ns id with
-    | some typeId => isSharedReferenceType ns typeId
+  | some id => match expressionAt id.index with
+    | some expression => isSharedReferenceType ns expression.typeId
     | none => false
   | none => false
 
 /-- Rewrite shared dereference and freeze value operations to `copyValue`,
 namespace-wide: the decision reads only the operand's recorded type. -/
-private def eraseSharedValueOperations (ns : ValidatedNamespace) : Array Expr :=
-  ns.expressions.foldl (init := #[]) fun rewritten node => rewritten.push <|
+private def eraseSharedValueOperations (ns : ValidatedNamespace)
+    (expressionAt : Nat → Option Expr) : Array Expr :=
+  (ns.expressions.toList.map fun node =>
     match node.kind with
     | .operation (.reference .dereference) _ arguments surface =>
-        if sharedOperand ns arguments then
+        if sharedOperand ns expressionAt arguments then
           { node with kind := .operation (.primitive .copyValue) #[] arguments surface }
         else node
     | .operation (.reference (.freeze _)) _ arguments surface =>
-        if sharedOperand ns arguments then
+        if sharedOperand ns expressionAt arguments then
           { node with kind := .operation (.primitive .copyValue) #[] arguments surface }
         else node
-    | _ => node
+    | _ => node).toArray
 
 /-- The place identifiers a place-carrying operation mentions. -/
 private def mentionedPlaces : ExprKind → Array PlaceId
@@ -4174,97 +4310,256 @@ private def mentionedPlaces : ExprKind → Array PlaceId
   | .assign place _ => #[place]
   | _ => #[]
 
-/-- Fuel-structural worklist marking the place slots reachable from one
-function body, walking expression children, mentioned places, place bases,
-and index expressions. Everything here stays in the whnf-reducible
-vocabulary — folds, pushes, structural fuel — so a prepared unit is a
-computable value for symbolic execution. -/
-private def markReachable (ns : ValidatedNamespace) :
-    Nat → Array Bool → Array Bool → Array (ExprId ⊕ PlaceId) → Array Bool
-  | 0, _, placeSeen, _ => placeSeen
-  | fuel + 1, exprSeen, placeSeen, stack =>
-      match stack.back? with
-      | none => placeSeen
-      | some (.inl id) =>
-          let stack := stack.pop
-          if id.index < exprSeen.size && !(exprSeen[id.index]!) then
-            let exprSeen := exprSeen.set! id.index true
-            match ns.expressions[id.index]? with
-            | some node =>
-                let stack := (expressionChildren node.kind).foldl
-                  (fun stack child => stack.push (.inl child)) stack
-                let stack := (mentionedPlaces node.kind).foldl
-                  (fun stack place => stack.push (.inr place)) stack
-                markReachable ns fuel exprSeen placeSeen stack
-            | none => markReachable ns fuel exprSeen placeSeen stack
-          else markReachable ns fuel exprSeen placeSeen stack
-      | some (.inr id) =>
-          let stack := stack.pop
-          if id.index < placeSeen.size && !(placeSeen[id.index]!) then
-            let placeSeen := placeSeen.set! id.index true
-            match ns.places[id.index]? with
-            | some (.deref base) | some (.field base ..)
-            | some (.subslice base _ _ _) | some (.downcast base _) =>
-                markReachable ns fuel exprSeen placeSeen (stack.push (.inr base))
-            | some (.index base index) =>
-                markReachable ns fuel exprSeen placeSeen
-                  ((stack.push (.inr base)).push (.inl index))
-            | some (.localVar _) | none =>
-                markReachable ns fuel exprSeen placeSeen stack
-          else markReachable ns fuel exprSeen placeSeen stack
+private structure ReachabilityWork where
+  exprSeen : Nat := 0
+  placeSeen : Nat := 0
+  stack : List (Expr ⊕ (Nat × Place)) := []
 
-/-- Mark the place slots reachable from one function body. The budget
-covers every possible push: each first-marked expression pushes its
-children and place mentions once, each first-marked place pushes at most
-two entries. -/
-private def bodyPlaceMarks (ns : ValidatedNamespace) (root : ExprId) : Array Bool :=
-  let budget := ns.expressions.foldl (init := ns.places.size * 2 + 2) fun acc node =>
-    acc + (expressionChildren node.kind).size + (mentionedPlaces node.kind).size + 1
-  markReachable ns budget
-    (Array.replicate ns.expressions.size false)
-    (Array.replicate ns.places.size false)
-    #[.inl root]
+/-- Mark when enqueuing, so duplicate edges never consume traversal fuel. -/
+private def queueReachable (expressionAt : Nat → Option Expr)
+    (placeAt : Nat → Option Place) (work : ReachabilityWork)
+    (node : ExprId ⊕ PlaceId) : ReachabilityWork :=
+  match node with
+  | .inl id =>
+      if work.exprSeen.testBit id.index then work else
+      match expressionAt id.index with
+      | some expression =>
+          { work with
+            exprSeen := work.exprSeen + 2 ^ id.index,
+            stack := .inl expression :: work.stack }
+      | none => work
+  | .inr id =>
+      if work.placeSeen.testBit id.index then work else
+      match placeAt id.index with
+      | some place =>
+          { work with
+            placeSeen := work.placeSeen + 2 ^ id.index,
+            stack := .inr (id.index, place) :: work.stack }
+      | none => work
 
-/-- Collapse each function's shared dereference places to their bases. The
-decision types the base against the owning function's locals over the
-original arena; the collapsed content is read from the rewritten arena, so
-nested shared dereferences collapse transitively (children precede
-parents). -/
-private def erasedNamespacePlaces (unit : ValidatedUnit) (ns : ValidatedNamespace) :
-    Array Place :=
-  ns.functions.foldl (init := ns.places) fun places declaration =>
+/-- Each valid expression/place enters the worklist at most once. The sparse
+result records only dereference sites; consumers impose arena order. -/
+private def markReachable (expressionAt : Nat → Option Expr)
+    (placeAt : Nat → Option Place) (fuel : Nat) :
+    ReachabilityWork → List (Nat × PlaceId) :=
+  Nat.rec (motive := fun _ => ReachabilityWork → List (Nat × PlaceId))
+    (fun _ => [])
+    (fun _ visit work =>
+      match work.stack with
+      | [] => []
+      | .inl node :: stack =>
+          let work := { work with stack }
+          let work := (expressionChildren node.kind).foldl
+            (fun work child => queueReachable expressionAt placeAt work (.inl child)) work
+          let work := (mentionedPlaces node.kind).foldl
+            (fun work place => queueReachable expressionAt placeAt work (.inr place)) work
+          visit work
+      | .inr (index, place) :: stack =>
+          let work := { work with stack }
+          match place with
+          | .deref base =>
+              (index, base) :: visit (queueReachable expressionAt placeAt work (.inr base))
+          | .field base ..
+          | .subslice base _ _ _ | .downcast base _ =>
+              visit (queueReachable expressionAt placeAt work (.inr base))
+          | .index base index =>
+              visit (queueReachable expressionAt placeAt
+                (queueReachable expressionAt placeAt work (.inr base)) (.inl index))
+          | .localVar _ => visit work) fuel
+
+/-- Dereference sites reachable through expression and place edges. Marking
+on enqueue makes the exact traversal bound depend only on arena sizes,
+rather than repeatedly counting every namespace-wide edge for each body. -/
+private def reachableDereferencesWith (ns : ValidatedNamespace)
+    (expressionAt : Nat → Option Expr) (placeAt : Nat → Option Place)
+    (root : ExprId) : List (Nat × PlaceId) :=
+  markReachable expressionAt placeAt (ns.expressions.size + ns.places.size + 1)
+    (queueReachable expressionAt placeAt {} (.inl root))
+
+def reachableDereferences (ns : ValidatedNamespace) (root : ExprId) : List (Nat × PlaceId) :=
+  reachableDereferencesWith ns (arenaGet? ns.expressions) (arenaGet? ns.places) root
+
+/-- Find each function's shared dereference sites, typing their bases against
+the owning function's locals in the original arena. Sorting and transitive
+copy application are separate from this traversal. -/
+private def mayContainSharedReference (ns : ValidatedNamespace) : Nat → TypeId → Bool
+  | 0, _ => true
+  | fuel + 1, typeId =>
+      match arenaGet? ns.tables.types typeId.index with
+      | some (.reference reference) =>
+          reference.kind == .shared || mayContainSharedReference ns fuel reference.referent
+      | some (.vector element _) => mayContainSharedReference ns fuel element
+      | some (.tuple elements) =>
+          elements.toList.any (mayContainSharedReference ns fuel)
+      | some .unit | some .never | some .bool | some .character | some .string
+      | some .bytes | some .address | some .signer | some (.integer ..) => false
+      -- Nominal fields, generic parameters, and profile-owned types keep
+      -- the full path analysis. Unknown or cyclic types also cannot justify
+      -- skipping it. Mutable references may themselves contain shared ones.
+      | _ => true
+
+private def sharedNamespacePlaceCopyChunksWith (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (expressionAt : Nat → Option Expr) (placeAt : Nat → Option Place) :
+    Array (List (Nat × PlaceId)) :=
+  (ns.functions.toList.map fun declaration =>
     match declaration.body with
-    | .absent => places
+    | .absent => []
     | .structured root =>
+        if !declaration.locals.toList.any (fun entry =>
+            mayContainSharedReference ns (ns.tables.types.size + 1) entry.type.typeId) then
+          []
+        else
         let context : ScanContext := { locals := declaration.locals }
-        let owned := bodyPlaceMarks ns root
-        (List.range places.size).foldl (init := places) fun places index =>
-          if owned[index]! then
-            match ns.places[index]? with
-            | some (.deref base) =>
-                match staticPlaceInfo? unit ns context base with
-                | some info =>
-                    if isSharedReferenceType ns info.typeId then
-                      places.set! index places[base.index]!
-                    else places
-                | none => places
-            | _ => places
-          else places
+        -- Type only sites owned by this body, not every namespace-wide
+        -- dereference against each function's unrelated local declarations.
+        (reachableDereferencesWith ns expressionAt placeAt root).filter fun (_, base) =>
+          (staticPlaceInfo? unit ns context base).any fun info =>
+            isSharedReferenceType ns info.typeId).toArray
+
+/-- Unsorted, type-checked sites grouped by namespace and function. -/
+abbrev SharedReferenceErasureChunks := Array (Array (List (Nat × PlaceId)))
+
+def sharedReferenceErasureChunks (marked : ValidatedUnit) : SharedReferenceErasureChunks :=
+  (marked.namespaces.toList.map fun ns => sharedNamespacePlaceCopyChunksWith marked ns
+    (arenaGet? ns.expressions) (arenaGet? ns.places)).toArray
+
+/-- Proof-facing indexes are separate from the native array-based traversal. -/
+abbrev SharedReferenceErasureIndexes := List (IndexedArena Expr × IndexedArena Place)
+
+def sharedReferenceErasureIndexes (marked : ValidatedUnit) : SharedReferenceErasureIndexes :=
+  marked.namespaces.toList.map fun ns =>
+    (IndexedArena.ofArray ns.expressions, IndexedArena.ofArray ns.places)
+
+def sharedReferenceErasureChunksIndexed (marked : ValidatedUnit)
+    (indexes : SharedReferenceErasureIndexes) : SharedReferenceErasureChunks :=
+  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, places) =>
+    sharedNamespacePlaceCopyChunksWith marked ns expressions.get? places.get?).toArray
+
+theorem sharedReferenceErasureChunksIndexed_eq (marked : ValidatedUnit) :
+    sharedReferenceErasureChunksIndexed marked (sharedReferenceErasureIndexes marked) =
+      sharedReferenceErasureChunks marked := by
+  unfold sharedReferenceErasureChunksIndexed sharedReferenceErasureIndexes
+    sharedReferenceErasureChunks
+  congr 1
+  induction marked.namespaces.toList with
+  | nil => rfl
+  | cons ns rest ih =>
+      simp only [List.map_cons, List.zip_cons_cons]
+      congr 1
+      · congr 1 <;> funext index <;>
+          simp [IndexedArena.get?_ofArray, arenaGet?_eq, arenaGetNative?]
+
+theorem sharedReferenceErasureChunks_eq_of_indexes {marked : ValidatedUnit}
+    {indexes : SharedReferenceErasureIndexes} {chunks : SharedReferenceErasureChunks}
+    (indexes_eq : sharedReferenceErasureIndexes marked = indexes)
+    (chunks_eq : sharedReferenceErasureChunksIndexed marked indexes = chunks) :
+    sharedReferenceErasureChunks marked = chunks := by
+  rw [← sharedReferenceErasureChunksIndexed_eq, indexes_eq, chunks_eq]
+
+/-- Ordered place-copy instructions, one list per namespace. -/
+abbrev SharedReferenceErasurePlan := Array (List (Nat × PlaceId))
+
+def erasurePlanFromChunks (chunks : SharedReferenceErasureChunks) : SharedReferenceErasurePlan :=
+  (chunks.toList.map fun namespaceChunks =>
+    namespaceChunks.toList.flatMap sortByIndex).toArray
+
+/-- Determine erasure sites before applying their arena updates. Naming this
+plan in certificates prevents traversal/type checking from being replayed
+while the kernel reduces sorting, updates, and final record equality. -/
+def sharedReferenceErasurePlan (marked : ValidatedUnit) : SharedReferenceErasurePlan :=
+  erasurePlanFromChunks (sharedReferenceErasureChunks marked)
+
+theorem sharedReferenceErasurePlan_eq_of_chunks {marked : ValidatedUnit}
+    {chunks : SharedReferenceErasureChunks} {plan : SharedReferenceErasurePlan}
+    (chunks_eq : sharedReferenceErasureChunks marked = chunks)
+    (plan_eq : erasurePlanFromChunks chunks = plan) :
+    sharedReferenceErasurePlan marked = plan := by
+  unfold sharedReferenceErasurePlan
+  rw [chunks_eq, plan_eq]
+
+/-- Erase shared references from a unit whose loan deaths are materialized.
+Keeping the two preparation stages separate lets certificates name the
+intermediate value instead of repeatedly reducing the loan-marking pass. -/
+abbrev ErasedExpressionArenas := Array (Array Expr)
+
+def erasedExpressionArenas (marked : ValidatedUnit) : ErasedExpressionArenas :=
+  (marked.namespaces.toList.map fun ns =>
+    eraseSharedValueOperations ns (arenaGet? ns.expressions)).toArray
+
+def erasedExpressionArenasIndexed (marked : ValidatedUnit)
+    (indexes : SharedReferenceErasureIndexes) : ErasedExpressionArenas :=
+  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, _) =>
+    eraseSharedValueOperations ns expressions.get?).toArray
+
+theorem erasedExpressionArenasIndexed_eq (marked : ValidatedUnit) :
+    erasedExpressionArenasIndexed marked (sharedReferenceErasureIndexes marked) =
+      erasedExpressionArenas marked := by
+  unfold erasedExpressionArenasIndexed sharedReferenceErasureIndexes erasedExpressionArenas
+  congr 1
+  induction marked.namespaces.toList with
+  | nil => rfl
+  | cons ns rest ih =>
+      simp only [List.map_cons, List.zip_cons_cons]
+      congr 1
+      congr 1
+      funext index
+      simp [IndexedArena.get?_ofArray, arenaGet?_eq, arenaGetNative?]
+
+theorem erasedExpressionArenas_eq_of_indexes {marked : ValidatedUnit}
+    {indexes : SharedReferenceErasureIndexes} {arenas : ErasedExpressionArenas}
+    (indexes_eq : sharedReferenceErasureIndexes marked = indexes)
+    (arenas_eq : erasedExpressionArenasIndexed marked indexes = arenas) :
+    erasedExpressionArenas marked = arenas := by
+  rw [← erasedExpressionArenasIndexed_eq, indexes_eq, arenas_eq]
+
+def applySharedReferenceErasureArenas (marked : ValidatedUnit)
+    (plan : SharedReferenceErasurePlan) (arenas : ErasedExpressionArenas) : ValidatedUnit :=
+  let namespaces := (marked.namespaces.toList.zipIdx.map fun (ns, index) =>
+    { ns with
+      expressions := arenas[index]?.getD #[]
+      places := applyPlaceCopies ns.places (plan[index]?.getD []) }).toArray
+  Internal.mkValidatedUnit marked.tables marked.profiles namespaces
+    marked.dependencies marked.evidence marked.indexes marked.structurizationWitnesses
+    marked.resolution marked.initializationCertificates marked.borrowCertificates
+    marked.borrowDiagnostics
+
+def applySharedReferenceErasure (marked : ValidatedUnit)
+    (plan : SharedReferenceErasurePlan) : ValidatedUnit :=
+  applySharedReferenceErasureArenas marked plan (erasedExpressionArenas marked)
+
+theorem applySharedReferenceErasure_eq_of_arenas {marked prepared : ValidatedUnit}
+    {plan : SharedReferenceErasurePlan} {arenas : ErasedExpressionArenas}
+    (arenas_eq : erasedExpressionArenas marked = arenas)
+    (applied_eq : applySharedReferenceErasureArenas marked plan arenas = prepared) :
+    applySharedReferenceErasure marked plan = prepared := by
+  rw [applySharedReferenceErasure, arenas_eq, applied_eq]
+
+/-- Erase shared references using the plan computed from the marked unit. -/
+def eraseSharedReferences (marked : ValidatedUnit) : ValidatedUnit :=
+  applySharedReferenceErasure marked (sharedReferenceErasurePlan marked)
+
+theorem eraseSharedReferences_eq_of_plan {marked prepared : ValidatedUnit}
+    {plan : SharedReferenceErasurePlan}
+    (plan_eq : sharedReferenceErasurePlan marked = plan)
+    (apply_eq : applySharedReferenceErasure marked plan = prepared) :
+    eraseSharedReferences marked = prepared := by
+  unfold eraseSharedReferences
+  rw [plan_eq, apply_eq]
 
 /-- The semantic view of a validated unit: loan-death markers materialized
 and the shared-reference vocabulary erased. The validated unit itself stays
 the marker-free, erasure-free surface authority. -/
 def prepareSemantics (unit : ValidatedUnit) : ValidatedUnit × Array Diagnostic :=
   let (marked, diagnostics) := markLoanDeaths unit
-  let namespaces := marked.namespaces.foldl (init := #[]) fun namespaces ns =>
-    namespaces.push { ns with
-      expressions := eraseSharedValueOperations ns
-      places := erasedNamespacePlaces marked ns }
-  let erased := Internal.mkValidatedUnit marked.tables marked.profiles namespaces
-    marked.dependencies marked.evidence marked.indexes marked.structurizationWitnesses
-    marked.resolution marked.initializationCertificates marked.borrowCertificates
-    marked.borrowDiagnostics
-  (erased, diagnostics)
+  (eraseSharedReferences marked, diagnostics)
+
+/-- Compose kernel-checked certificates for the two preparation passes. -/
+theorem prepareSemantics_eq_of_stages {unit marked prepared : ValidatedUnit}
+    (mark_eq : (markLoanDeaths unit).1 = marked)
+    (erase_eq : eraseSharedReferences marked = prepared) :
+    (prepareSemantics unit).1 = prepared := by
+  change eraseSharedReferences (markLoanDeaths unit).1 = prepared
+  rw [mark_eq, erase_eq]
 
 /-- Check that every reachable runtime node has a classified, currently
 supported meaning and return the private interpreter input wrapper. -/

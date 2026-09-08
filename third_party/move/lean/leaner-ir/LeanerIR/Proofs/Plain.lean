@@ -38,6 +38,21 @@ namespace LeanerIR.SemanticOperations
 @[leaner_plain] theorem Plain.vector_iff (elements : Array RuntimeValue) :
     Plain (.vector elements) ↔ ∀ element ∈ elements, Plain element :=
   ⟨fun plain => by cases plain with | vector _ plain => exact plain, .vector elements⟩
+/-- Pointwise encoding preserves the useful source-side membership form.
+This avoids exposing an existential over the mapped runtime vector when a
+generated typed twin proves that its vector fields are loan-free. -/
+@[leaner_plain high] theorem Plain.vector_map_iff (values : Array Native)
+    (encode : Native → RuntimeValue) :
+    Plain (.vector (values.map encode)) ↔
+      ∀ value ∈ values, Plain (encode value) :=
+  (Plain.vector_iff _).trans Array.forall_mem_map
+/-- Appending one encoded element preserves a closed, two-part proof instead
+of asking the finalizer to search the resulting runtime array. -/
+@[leaner_plain high] theorem Plain.vector_push_iff (elements : Array RuntimeValue)
+    (element : RuntimeValue) :
+    Plain (.vector (elements.push element)) ↔
+      Plain element ∧ ∀ value ∈ elements, Plain value :=
+  (Plain.vector_iff _).trans Array.forall_mem_push
 @[leaner_plain] theorem Plain.tuple_iff (elements : Array RuntimeValue) :
     Plain (.tuple elements) ↔ ∀ element ∈ elements, Plain element :=
   ⟨fun plain => by cases plain with | tuple _ plain => exact plain, .tuple elements⟩

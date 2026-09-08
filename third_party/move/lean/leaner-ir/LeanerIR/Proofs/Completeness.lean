@@ -38,10 +38,11 @@ private def ExprComplete (unit : ExecutableUnit) (namespaceId : LeanerIR.Namespa
       result.control.value = control
 
 private def FunctionComplete (unit : ExecutableUnit) (handle : LeanerIR.FunctionHandle)
+    (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
     (state : LeanerIR.RuntimeState) (arguments : Array LeanerIR.RuntimeValue)
     (finalState : LeanerIR.RuntimeState) (outcome : LeanerIR.Outcome) : Prop :=
   ∃ fuel result,
-    Internal.evalFunction fuel unit handle state arguments = .ok result ∧
+    Internal.evalFunction fuel unit handle typeInstantiation state arguments = .ok result ∧
       result.state = finalState ∧ result.outcome.value = outcome
 
 private def ValuesComplete (unit : ExecutableUnit) (namespaceId : LeanerIR.NamespaceId)
@@ -74,8 +75,8 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     (h : EvalExpr unit namespaceId frame state exprId finalFrame finalState control) :
     ExprComplete unit namespaceId frame state exprId finalFrame finalState control := by
   apply BigStep.EvalFunction.rec_1
-    (motive_1 := fun handle state arguments finalState outcome _ =>
-      FunctionComplete unit handle state arguments finalState outcome)
+    (motive_1 := fun handle typeInstantiation state arguments finalState outcome _ =>
+      FunctionComplete unit handle typeInstantiation state arguments finalState outcome)
     (motive_2 := fun namespaceId frame state exprId finalFrame finalState control _ =>
       ExprComplete unit namespaceId frame state exprId finalFrame finalState control)
     (motive_3 := fun namespaceId frame state expressions expected _ =>
@@ -924,7 +925,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     simp only [namespace_eq, expression_eq, kind_eq, bind, Except.bind]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case body =>
-    intro handle initialState arguments ns declaration frame root finalFrame
+    intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
       evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq
       body_eq body_step outcome_eq finalize_eq ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
@@ -1072,14 +1073,14 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
 
 /-- Completeness up to fuel: every big-step function derivation is reproduced
 by the fuelled interpreter with sufficient fuel, up to erasing locations. -/
-theorem evalFunction_complete {unit : ExecutableUnit} {handle state arguments
+theorem evalFunction_complete {unit : ExecutableUnit} {handle typeInstantiation state arguments
     finalState outcome}
-    (h : EvalFunction unit handle state arguments finalState outcome) :
+    (h : EvalFunction unit handle typeInstantiation state arguments finalState outcome) :
     ∃ fuel result,
-      Internal.evalFunction fuel unit handle state arguments = .ok result ∧
+      Internal.evalFunction fuel unit handle typeInstantiation state arguments = .ok result ∧
         result.state = finalState ∧ result.outcome.value = outcome := by
   cases h with
-  | body handle initialState arguments ns declaration frame root finalFrame
+  | body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
       evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq
       body_eq body_step outcome_eq finalize_eq =>
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := completeExpr body_step
@@ -1118,7 +1119,7 @@ theorem evalFunction_complete {unit : ExecutableUnit} {handle state arguments
 
 /-- Completeness of `Interpreter.run` up to fuel and location erasure. -/
 theorem run_complete {unit : ExecutableUnit} {handle state arguments finalState outcome}
-    (h : EvalFunction unit handle state arguments finalState outcome) :
+    (h : EvalFunction unit handle #[] state arguments finalState outcome) :
     ∃ fuel finalOutcome,
       Interpreter.run unit fuel handle arguments state = .ok (finalState, finalOutcome) ∧
         finalOutcome.value = outcome := by
@@ -1128,10 +1129,10 @@ theorem run_complete {unit : ExecutableUnit} {handle state arguments finalState 
 
 /-- The big-step function relation is deterministic: the interpreter is a
 function, and completeness maps both derivations onto it. -/
-theorem evalFunction_deterministic {unit : ExecutableUnit} {handle state arguments
+theorem evalFunction_deterministic {unit : ExecutableUnit} {handle typeInstantiation state arguments
     finalState₁ outcome₁ finalState₂ outcome₂}
-    (h₁ : EvalFunction unit handle state arguments finalState₁ outcome₁)
-    (h₂ : EvalFunction unit handle state arguments finalState₂ outcome₂) :
+    (h₁ : EvalFunction unit handle typeInstantiation state arguments finalState₁ outcome₁)
+    (h₂ : EvalFunction unit handle typeInstantiation state arguments finalState₂ outcome₂) :
     finalState₁ = finalState₂ ∧ outcome₁ = outcome₂ := by
   obtain ⟨f₁, r₁, e₁, rs₁, ro₁⟩ := evalFunction_complete h₁
   obtain ⟨f₂, r₂, e₂, rs₂, ro₂⟩ := evalFunction_complete h₂

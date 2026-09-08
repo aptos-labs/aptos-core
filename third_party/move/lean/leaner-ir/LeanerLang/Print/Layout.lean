@@ -227,13 +227,22 @@ private def bindersDoc (binders : Array GenericBinder) : Doc :=
 private def throwText : ThrowKind → String
   | .abort => "abort"
   | .panic => "panic"
+  | .moveVectorError => "moveVectorError"
 
 private def primitiveText : Primitive → String
   | .tuple => "tuple"
   | .vector => "vector"
   | .repeatVector length => s!"repeatVector[{length}]"
   | .pushVector => "pushVector"
+  | .concatVector => "concatVector"
+  | .insertVector => "insertVector"
+  | .removeVector => "removeVector"
   | .swapVector => "swapVector"
+  | .reverseSliceVector => "reverseSliceVector"
+  | .destroyEmptyVector => "destroyEmptyVector"
+  | .containsVector => "containsVector"
+  | .indexOfVector => "indexOfVector"
+  | .checkVectorIndex failure => s!"checkVectorIndex[{throwText failure}]"
   | .length => "length"
   | .index => "index"
   | .slice => "slice"
@@ -241,21 +250,26 @@ private def primitiveText : Primitive → String
   | .add => "add"
   | .checkedAdd .abort => "checkedAddAbort"
   | .checkedAdd .panic => "checkedAddPanic"
+  | .checkedAdd .moveVectorError => "checkedAdd[moveVectorError]"
   | .subtract => "subtract"
   | .checkedSubtract .abort => "checkedSubtractAbort"
   | .checkedSubtract .panic => "checkedSubtractPanic"
+  | .checkedSubtract .moveVectorError => "checkedSubtract[moveVectorError]"
   | .multiply => "multiply"
   | .checkedMultiply .abort => "checkedMultiplyAbort"
   | .checkedMultiply .panic => "checkedMultiplyPanic"
+  | .checkedMultiply .moveVectorError => "checkedMultiply[moveVectorError]"
   | .overflowingAdd => "overflowingAdd"
   | .overflowingSubtract => "overflowingSubtract"
   | .overflowingMultiply => "overflowingMultiply"
   | .divide => "divide"
   | .checkedDivide .abort => "checkedDivideAbort"
   | .checkedDivide .panic => "checkedDividePanic"
+  | .checkedDivide .moveVectorError => "checkedDivide[moveVectorError]"
   | .modulo => "modulo"
   | .checkedModulo .abort => "checkedModuloAbort"
   | .checkedModulo .panic => "checkedModuloPanic"
+  | .checkedModulo .moveVectorError => "checkedModulo[moveVectorError]"
   | .bitwiseOr => "bitwiseOr"
   | .bitwiseAnd => "bitwiseAnd"
   | .bitwiseXor => "bitwiseXor"
@@ -263,11 +277,13 @@ private def primitiveText : Primitive → String
   | .shiftLeft => "shiftLeft"
   | .checkedShiftLeft .abort => "checkedShiftLeftAbort"
   | .checkedShiftLeft .panic => "checkedShiftLeftPanic"
+  | .checkedShiftLeft .moveVectorError => "checkedShiftLeft[moveVectorError]"
   | .shiftRight => "shiftRight"
   | .checkedShiftRight .abort => "checkedShiftRightAbort"
   | .checkedShiftRight .panic => "checkedShiftRightPanic"
-  | .logicalAnd => "logicalAnd"
-  | .logicalOr => "logicalOr"
+  | .checkedShiftRight .moveVectorError => "checkedShiftRight[moveVectorError]"
+  | .logicalAnd | .eagerLogicalAnd => "logicalAnd"
+  | .logicalOr | .eagerLogicalOr => "logicalOr"
   | .logicalNot => "logicalNot"
   | .equal => "equal"
   | .notEqual => "notEqual"
@@ -278,6 +294,7 @@ private def primitiveText : Primitive → String
   | .negate => "negate"
   | .checkedNegate .abort => "checkedNegateAbort"
   | .checkedNegate .panic => "checkedNegatePanic"
+  | .checkedNegate .moveVectorError => "checkedNegate[moveVectorError]"
   | .cast => "cast"
   | .checkedCast failure => s!"checkedCast[{throwText failure}]"
   | .implies => "implies"
@@ -368,7 +385,8 @@ private partial def rendersAsDo : Expr → Bool
   | _ => false
 
 private def isUnitEffect : Expr → Bool
-  | .assign .. | .assignExpression .. | .assignPattern .. | .mutateReference .. => true
+  | .assign .. | .assignExpression .. | .rawAssignExpression .. |
+      .assignPattern .. | .mutateReference .. => true
   | _ => false
 
 private def isAbruptExpression : Expr → Bool
@@ -377,7 +395,7 @@ private def isAbruptExpression : Expr → Bool
 
 private partial def isKnownUnitExpression : Expr → Bool
   | .unit _ | .specBlock .. | .forRange .. | .loop .. | .assign .. | .assignExpression .. |
-      .assignPattern .. |
+      .rawAssignExpression .. | .assignPattern .. |
       .mutateReference .. | .dropPlace .. => true
   | .typedCall _ result _ _ | .typedGenericCall _ result _ _ _ =>
       result.value == .unit
@@ -423,7 +441,7 @@ private def expressionPrecedence (expression : Expr) : Nat :=
         .return_ .. => 0
     | .field .. | .storageIndex .. | .index .. | .methodCall .. => 14
     | .typedPrimitive .profileCast .. => 12
-    | .placeOperation .. | .borrowPlace .. | .borrowValue .. |
+    | .placeOperation .. | .borrowPlace .. | .borrowValue .. | .rawBorrowValue .. |
         .dereference .. | .dropPlace .. => 13
     | .membership .. | .variantTest .. => 5
     | _ => 1024
@@ -623,6 +641,9 @@ mutual
     | .borrowValue mutable value _ => do
         pure <| text (if mutable then "&mut " else "&") ++
           (← expressionDocAt 13 value)
+    | .rawBorrowValue mutable value _ => do
+        pure <| call (text "core.borrowPlace")
+          #[text (if mutable then "mut" else "immutable"), ← expressionDoc value]
     | .freezeReference explicit value _ =>
         call (text <| if explicit then "core.ref.freezeExplicit" else "core.ref.freeze")
           <$> #[value].mapM expressionDoc
@@ -765,6 +786,10 @@ mutual
         pure <| call (text "assert!") #[← expressionDoc condition, ← expressionDoc code]
     | .ifElse condition (.unit _) (some elseBranch) span =>
         expressionDoc (.ifElse (negate condition) elseBranch none span)
+    | .ifElse condition thenBranch (some (.bool false _)) span =>
+        expressionDoc (.primitive .logicalAnd #[condition, thenBranch] span)
+    | .ifElse condition (.bool true _) (some elseBranch) span =>
+        expressionDoc (.primitive .logicalOr #[condition, elseBranch] span)
     | .ifElse condition thenBranch (some (.unit _)) span =>
         expressionDoc (.ifElse condition thenBranch none span)
     | .ifElse condition thenBranch elseBranch _ => do
@@ -825,7 +850,7 @@ mutual
             else pure <| head ++ Format.nest 2 (hard ++ vcat entries)
         | _ =>
             pure <| head ++ Format.nest 2 (hard ++ (← expressionDoc body))
-    | .loop (.ifElse condition body (some (.break_ none _)) _) _ => do
+    | .loop (.ifElse condition body (some (.break_ none _ none)) _) _ none => do
         let attached := do
           let .block statements (some actualCondition) _ := condition | none
           guard (!statements.isEmpty)
@@ -865,16 +890,20 @@ mutual
         | some conditions =>
             pure <| loopDoc ++ hard ++ block (text "where")
               (← specificationMemberDocs conditions)
-    | .loop body _ => do
-        pure <| text "loop " ++ (← expressionDoc body)
-    | .break_ value _ => do
+    | .loop body _ label => do
+        pure <| text ("loop" ++ (label.map ("@" ++ ·)).getD "" ++ " ") ++ (← expressionDoc body)
+    | .break_ value _ label => do
         let value ← value.mapM expressionDoc
-        pure <| text "break" ++ (value.map fun doc => text " " ++ doc).getD .nil
-    | .continue_ _ => pure <| text "continue"
+        pure <| text ("break" ++ (label.map ("@" ++ ·)).getD "") ++
+          (value.map fun doc => text " " ++ doc).getD .nil
+    | .continue_ _ label =>
+        pure <| text ("continue" ++ (label.map ("@" ++ ·)).getD "")
     | .assign place value _ => do
         pure <| placeDoc place ++ text " := " ++ (← expressionDoc value)
     | .assignExpression target value _ => do
         pure <| (← expressionDoc target) ++ text " := " ++ (← expressionDoc value)
+    | .rawAssignExpression target value _ => do
+        pure <| call (text "core.assignPlace") #[← expressionDoc target, ← expressionDoc value]
     | .assignPattern pattern type value _ => do
         let value ← expressionDoc value
         pure <| call (text s!"assign_pattern[{typeText type.value}]")
@@ -941,10 +970,15 @@ mutual
     -- what separates it from a trailing `return` supplying a block's value.
     | .expression value@(.return_ ..) => do pure ((← expressionDoc value) ++ text ";")
     | .expression value => expressionDoc value
-    | .letDecl mutable pattern _ value _ => do
+    | .letDecl mutable pattern type value _ => do
+        -- An abort produces no value from which to reconstruct the binder's
+        -- type. Keep its annotation, including for the derived spec reading.
+        let annotation := if value matches .throw_ .. then
+            type.map (fun type => text (" : " ++ typeText type.value)) |>.getD .nil
+          else .nil
         let value ← expressionDoc value
         pure <| Format.group <| text "let " ++ (if mutable then text "mut " else .nil) ++
-          patternDoc pattern ++ text " :=" ++
+          patternDoc pattern ++ annotation ++ text " :=" ++
           Format.nest 2 (soft ++ value)
 
   private partial def statementDocs (statements : Array Statement) : Except String (Array Doc) := do
@@ -1022,8 +1056,9 @@ private def clauseDoc : ContractClause → Except String Doc
       let code ← code.mapM expressionDoc
       pure <| base ++ (code.map fun value => text " with " ++ value).getD .nil
   | .invariant expression properties _ => condition "invariant" expression properties
-  | .modifies expression _ => do
-      pure <| text "modifies " ++ (← expressionDoc expression)
+  | .modifies expression _ loose => do
+      pure <| text "modifies " ++ (← expressionDoc expression) ++
+        (if loose then text ", *" else .nil)
   | .modifiesAll _ => pure <| text "modifies *"
   | .reads type _ => pure <| text s!"reads {typeText type.value}"
   | .readsAll _ => pure <| text "reads *"
@@ -1145,12 +1180,19 @@ private partial def normalizeUnitTail : Expr → Expr
   | body => body
 
 /-- A declaration's source attributes print on their own line above it. -/
+private partial def sourceAttributeText : SourceAttribute → String
+  | .call name arguments _ =>
+      identifier name ++ (if arguments.isEmpty then "" else
+        " (" ++ ", ".intercalate (arguments.map sourceAttributeText).toList ++ ")")
+  | .assign name value _ =>
+      identifier name ++ " = " ++ match value with
+        | .number value => toString value
+        | .string value => toString (repr value)
+        | .name value => identifier value
+
 private def attributesDoc (attributes : Array SourceAttribute) : Doc :=
   if attributes.isEmpty then .nil else
-    let entries := attributes.map fun sourceAttribute =>
-      let arguments := if sourceAttribute.arguments.isEmpty then "" else
-        " (" ++ ", ".intercalate (sourceAttribute.arguments.map identifier).toList ++ ")"
-      identifier sourceAttribute.name ++ arguments
+    let entries := attributes.map sourceAttributeText
     text ("@[" ++ ", ".intercalate entries.toList ++ "]") ++ hard
 
 private def itemDocs : Item → Except String (Array Doc)
@@ -1233,6 +1275,10 @@ private def itemDocs : Item → Except String (Array Doc)
             else pure <| Format.group (signature ++ text " :=" ++
               Format.nest 2 (soft ++ bodyDoc))
       pure #[attributesDoc declaration.attributes ++ declarationDoc]
+  | .namespaceInvariants declarations => do
+      let entries ← declarations.mapM fun declaration =>
+        clauseDoc (.invariant declaration.expression declaration.properties declaration.span)
+      pure #[block (text "spec module where") entries]
 
 private def itemSpan : Item → Span
   | .constant declaration => declaration.span
@@ -1240,6 +1286,7 @@ private def itemSpan : Item → Span
   | .enum declaration => declaration.span
   | .function declaration => declaration.span
   | .specFunction declaration => declaration.span
+  | .namespaceInvariants declarations => declarations[0]?.map (·.span) |>.getD {}
 
 private def normalizedDocumentationLines (documentation : String) : List String :=
   let rawLines := documentation.trimAscii.toString.splitOn "\n"

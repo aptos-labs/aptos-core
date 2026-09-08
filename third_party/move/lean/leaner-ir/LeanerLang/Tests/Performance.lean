@@ -31,6 +31,11 @@ class here only when it costs differently, and record why below.
 | `balance_of` | a field read through a shared storage borrow |
 | `is_published` | a storage existence test |
 | `carry_u64` | a generic callee at a concrete instantiation |
+| `vector_get` | checked indexing into a local vector literal |
+| `vector_set` | checked indexed assignment to a local vector literal |
+| `value_or` | a shared reference matched through an enum payload |
+| `scale` | a mutable reference matched before payload-field updates |
+| `shift` | a cross-resource module invariant over two modified families |
 -/
 
 namespace LeanerLang.Tests.Performance
@@ -76,7 +81,9 @@ leaner module 0x42::perf_calls where
   verify bump
   verify bump_twice
   verify take_and_bump
-  verify guarded
+
+set_option leaner.route "native" in
+#leaner_verify 0x42::perf_calls::guarded
 
 leaner module 0x42::perf_references where
   public fun reborrow(slot : &mut u64) -> &mut u64 := &mut *slot
@@ -173,6 +180,7 @@ leaner module 0x42::perf_storage where
   verify balance_of
   verify is_published
 
+set_option leaner.route "native" in
 leaner module 0x42::perf_generics where
   public fun carry {T : type}(value : T) -> T := value
 
@@ -189,6 +197,100 @@ leaner module 0x42::perf_generics where
 
   verify carry
   verify carry_u64
+
+leaner module 0x42::perf_vectors where
+  public fun vector_get(index : u64) -> u64 := do
+    let values : Vector<u64> := vector<u64>[10, 20, 30]
+    return values[index]
+
+  spec vector_get where
+    ensures index == 0 ==> result == 10
+    ensures index == 1 ==> result == 20
+    ensures index == 2 ==> result == 30
+    aborts_if index >= 3
+
+  public fun vector_set(index : u64) -> Vector<u64> := do
+    let mut values : Vector<u64> := vector<u64>[10, 20, 30]
+    values[index] := 7
+    return values
+
+  spec vector_set where
+    ensures index == 0 ==> result == vector<u64>[7, 20, 30]
+    ensures index == 1 ==> result == vector<u64>[10, 7, 30]
+    ensures index == 2 ==> result == vector<u64>[10, 20, 7]
+    aborts_if index >= 3
+
+  verify vector_get
+  verify vector_set
+
+leaner module 0x42::perf_enum_refs where
+  enum Slot has Copy, Drop where
+    | Empty
+    | Filled (value : u64)
+
+  enum Shape has Copy, Drop where
+    | Circle (radius : u64)
+    | Rectangle (width : u64, height : u64)
+
+  public fun value_or(slot : &Slot, default : u64) -> u64 :=
+    match slot with
+    | Slot::Filled { value := value } => *value
+    | Slot::Empty {} => default
+
+  spec value_or where
+    ensures result == (match slot with
+      | Slot::Filled { value := value } => value
+      | Slot::Empty {} => default)
+    aborts_if false
+
+  public fun scale(shape : &mut Shape, factor : u64) -> Unit :=
+    match shape with
+    | Shape::Circle { radius := radius } =>
+        *radius := *radius * factor
+    | Shape::Rectangle { width := width, height := height } => do
+        *width := *width * factor
+        *height := *height * factor
+
+  spec scale where
+    pragma aborts_if_is_partial
+    ensures shape == (match old(shape) with
+      | Shape::Circle { radius := radius } =>
+          new Shape::Circle { radius := radius * factor }
+      | Shape::Rectangle { width := width, height := height } =>
+          new Shape::Rectangle {
+            width := width * factor, height := height * factor })
+
+  verify value_or
+  verify scale
+
+leaner module 0x42::perf_invariant where
+  struct Debit has Key where
+    value : u64
+
+  struct Credit has Key where
+    value : u64
+
+  spec module where
+    invariant forall (a : Address),
+      global<Debit>(a).value <= global<Credit>(a).value
+
+  public entry fun shift(addr : Address, amount : u64) -> Unit := do
+    let Debit { value := debit } := move_from<Debit>(addr)
+    let Credit { value := credit } := move_from<Credit>(addr)
+    move_to<Debit>(addr, new Debit { value := debit - amount })
+    move_to<Credit>(addr, new Credit { value := credit + amount })
+
+  spec shift where
+    requires exists<Debit>(addr) && exists<Credit>(addr) &&
+      amount <= old(global<Debit>(addr).value) &&
+      old(global<Credit>(addr).value) + amount < 18446744073709551616
+    modifies global<Debit>(addr)
+    modifies global<Credit>(addr)
+    ensures global<Debit>(addr).value == old(global<Debit>(addr).value) - amount &&
+      global<Credit>(addr).value == old(global<Credit>(addr).value) + amount
+    aborts_if false
+
+  verify shift
 
 
 #leaner_perf "LeanerLang/Tests/Performance.exp"

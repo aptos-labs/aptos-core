@@ -176,6 +176,8 @@ private def kwCoreClosure := Lean.Parser.nonReservedSymbol "core.closure" true
 private def kwCoreAssignPattern := Lean.Parser.nonReservedSymbol "core.assignPattern" true
 private def kwAssignPattern := Lean.Parser.nonReservedSymbol "assign_pattern" true
 private def kwCoreBorrow := Lean.Parser.nonReservedSymbol "core.borrow" true
+private def kwCoreBorrowPlace := Lean.Parser.nonReservedSymbol "core.borrowPlace" true
+private def kwCoreAssignPlace := Lean.Parser.nonReservedSymbol "core.assignPlace" true
 private def kwCoreDrop := Lean.Parser.nonReservedSymbol "core.drop" true
 private def kwDropBuiltin := Lean.Parser.nonReservedSymbol "drop" true
 private def kwCopyBuiltin := Lean.Parser.nonReservedSymbol "copy" true
@@ -192,8 +194,9 @@ private def kwImmutable := Lean.Parser.nonReservedSymbol "immutable" true
 private def kwPhantom := Lean.Parser.nonReservedSymbol "phantom" true
 
 /-- Identifiers are contextual to LeanerLang: host-Lean keywords such as
-`end` and `at` remain ordinary names, while actual LeanerLang vocabulary must
-use `«...»` when it is intended as an identifier. -/
+`end` and `at`, and modifiers such as `view`, remain ordinary local names.
+Clause delimiters must use `«...»` when intended as identifiers, so an
+expression cannot consume the next contract clause. -/
 private def leanerIdentifier : Lean.Parser.Parser :=
   ["_", "move", "rust", "Unit", "Never", "Bool", "Char", "string", "Bytes",
     "Address", "Signer", "UInt", "SInt", "UPtr", "IPtr", "Nat", "Int",
@@ -208,7 +211,11 @@ private def leanerIdentifier : Lean.Parser.Parser :=
     "while", "for", "break", "continue", "forall", "exists", "in", "immutable", "if",
     "then", "else", "return", "old", "copy", "drop",
     "discriminant", "invoke", "function", "as", "match", "with"].foldr
-      (fun keyword parser => Lean.Parser.notSymbol keyword >> parser)
+      (fun keyword parser =>
+        (if ["let_pre", "let_post", "modifies", "reads", "requires", "ensures",
+            "aborts_if", "invariant"].contains keyword then
+          Lean.Parser.notFollowedBy (Lean.Parser.nonReservedSymbol keyword true) keyword
+        else Lean.Parser.notSymbol keyword) >> parser)
       Lean.Parser.rawIdent
 
 attribute [run_builtin_parser_attribute_hooks] leanerIdentifier
@@ -306,6 +313,7 @@ syntax (name := leanerEvidenceBinder)
 declare_syntax_cat leanerThrow
 syntax (name := leanerAbortThrow) kwAbort : leanerThrow
 syntax (name := leanerPanicThrow) kwPanic : leanerThrow
+syntax (name := leanerMoveVectorErrorThrow) "moveVectorError" : leanerThrow
 
 declare_syntax_cat leanerExpr
 declare_syntax_cat leanerFieldIdentifier
@@ -342,6 +350,8 @@ syntax (name := leanerRuntimeAssertExpr) (priority := high)
   kwAssert "(" leanerExpr "," leanerExpr ")" : leanerExpr
 syntax (name := leanerRuntimeAssertMacroExpr) (priority := high)
   kwAssertBang "(" leanerExpr "," leanerExpr ")" : leanerExpr
+syntax (name := leanerThrowSurfaceExpr) (priority := high)
+  (kwAbort <|> kwPanic <|> "moveVectorError") "(" leanerExpr,* ")" : leanerExpr
 declare_syntax_cat leanerBehaviorCall
 syntax (name := leanerBehaviorCallSyntax)
   (kwRequiresOf <|> kwAbortsOf <|> kwEnsuresOf <|> kwResultOf <|>
@@ -620,6 +630,10 @@ syntax (name := leanerPatternAssignmentSurfaceExpr)
     "(" leanerBindingPattern "," leanerExpr ")" : leanerExpr
 syntax (name := leanerPlaceBorrowExpr)
   kwCoreBorrow "(" leanerBorrowKind "," leanerPlace ")" : leanerExpr
+syntax (name := leanerRawPlaceBorrowExpr)
+  kwCoreBorrowPlace "(" leanerBorrowKind "," leanerExpr ")" : leanerExpr
+syntax (name := leanerRawPlaceAssignExpr)
+  kwCoreAssignPlace "(" leanerExpr "," leanerExpr ")" : leanerExpr
 syntax (name := leanerDropPlaceExpr)
   kwCoreDrop "(" leanerPlace ")" : leanerExpr
 syntax (name := leanerDropPlaceSurfaceExpr)
@@ -646,6 +660,8 @@ syntax (name := leanerTypedCheckedCastExpr) (priority := high)
   kwPrimitiveCheckedCast "[" leanerThrow "," leanerType "]" "(" leanerExpr ")" : leanerExpr
 syntax (name := leanerPrimitiveExpr)
   leanerPath colGt "(" leanerExpr,* ")" : leanerExpr
+syntax (name := leanerCheckedPrimitiveExpr) (priority := high)
+  leanerPath "[" leanerThrow "]" colGt "(" leanerExpr,* ")" : leanerExpr
 declare_syntax_cat leanerIfBranch
 syntax (name := leanerInlineIfBranch) leanerExpr : leanerIfBranch
 syntax (name := leanerIndentedIfBranch) leanerBlockEntry+ : leanerIfBranch
@@ -664,8 +680,10 @@ private def leanerIfBranchParser :=
     Lean.Parser.withPosition leanerIfBranchParser >>
     Lean.Parser.optional (kwElse >>
       Lean.Parser.withPosition leanerIfBranchParser)
+declare_syntax_cat leanerLoopLabel
+syntax (name := leanerLoopLabelSyntax) "@" leanerIdentifier : leanerLoopLabel
 syntax (name := leanerLoopExpr)
-  kwLoop leanerExpr : leanerExpr
+  kwLoop (leanerLoopLabel)? leanerExpr : leanerExpr
 declare_syntax_cat leanerLoopSpecificationMember
 syntax (name := leanerLoopSpecificationMemberSyntax)
   leanerSpecStatement : leanerLoopSpecificationMember
@@ -682,11 +700,17 @@ syntax (name := leanerLoopSpecificationMemberSyntax)
     Lean.Parser.withPosition (Lean.Parser.manyIndent
       (Lean.Parser.ppLine >> Lean.Parser.categoryParser `leanerBlockEntry 0))
 @[leanerExpr_parser] def leanerBreakExpr := leading_parser
-  Lean.Parser.withPosition <| kwBreak >> Lean.Parser.optional
+  Lean.Parser.withPosition <| kwBreak >>
+    Lean.Parser.optional (Lean.Parser.categoryParser `leanerLoopLabel 0) >> Lean.Parser.optional
     (Lean.Parser.checkLineEq "a `break` value must start on the same line as `break`" >>
       Lean.Parser.categoryParser `leanerExpr 0)
-syntax (name := leanerContinueExpr)
-  kwContinue : leanerExpr
+@[leanerExpr_parser] def leanerContinueExpr := leading_parser
+  Lean.Parser.withPosition <| kwContinue >>
+    Lean.Parser.optional (Lean.Parser.categoryParser `leanerLoopLabel 0) >>
+    Lean.Parser.notFollowedBy
+      (Lean.Parser.checkLineEq "continue has no value" >>
+        Lean.Parser.categoryParser `leanerExpr 0)
+      "`continue` takes no value or function call; use a plain or labeled `continue`"
 syntax:1 (name := leanerReturnExpr) kwReturn leanerExpr:1 : leanerExpr
 
 declare_syntax_cat leanerParameter
@@ -720,6 +744,7 @@ syntax (name := leanerAbortsIfClause)
 syntax (name := leanerInvariantClause)
   kwInvariant (leanerConditionProperties)? leanerExpr (";")? : leanerClause
 syntax (name := leanerModifiesClause) kwModifies leanerExpr (";")? : leanerClause
+syntax (name := leanerLooseModifiesClause) kwModifies leanerExpr "," "*" (";")? : leanerClause
 syntax (name := leanerModifiesAllClause) kwModifies "*" (";")? : leanerClause
 syntax (name := leanerReadsClause) kwReads leanerType (";")? : leanerClause
 syntax (name := leanerReadsAllClause) kwReads "*" (";")? : leanerClause
@@ -745,7 +770,9 @@ syntax (name := leanerConstantItem)
 declare_syntax_cat leanerAttribute
 declare_syntax_cat leanerAttributeListSyntax
 syntax (name := leanerAttributeSyntax)
-  leanerIdentifier ("(" leanerIdentifier,+ ")")? : leanerAttribute
+  leanerIdentifier ("(" leanerAttribute,+ ")")? : leanerAttribute
+syntax (name := leanerAttributeAssignmentSyntax)
+  leanerIdentifier "=" (num <|> str <|> leanerIdentifier) : leanerAttribute
 syntax (name := leanerAttributeList) "@[" leanerAttribute,+ "]" : leanerAttributeListSyntax
 
 syntax (name := leanerStructItem)
@@ -765,6 +792,12 @@ syntax (name := leanerContractItem)
   kwSpec leanerIdentifier "{" leanerClause* "}" : leanerItem
 syntax (name := leanerContractWhereItem)
   kwSpec leanerIdentifier kwWhere ppLine ppIndent(leanerClause*) : leanerItem
+declare_syntax_cat leanerNamespaceInvariantMember
+syntax (name := leanerNamespaceInvariantMemberSyntax)
+  kwInvariant (leanerConditionProperties)? leanerExpr (";")? :
+    leanerNamespaceInvariantMember
+syntax (name := leanerNamespaceInvariantItem) (priority := high)
+  kwSpec kwModule kwWhere ppLine ppIndent(leanerNamespaceInvariantMember*) : leanerItem
 syntax (name := leanerVerifyItem)
   kwVerify leanerIdentifier ("by" Lean.Parser.Tactic.tacticSeq)? : leanerItem
 

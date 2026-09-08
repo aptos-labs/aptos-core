@@ -2,6 +2,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerIR.Proofs.Interpreter
+import LeanerIR.Proofs.Certify
+import LeanerIR.Semantics.Focus
 import LeanerIR.Validation.Check
 
 namespace LeanerIR.Tests.Finalization
@@ -94,6 +96,70 @@ private def rustExecutable? := prepare? rustSchema rustSemantics rustFixture
 the current value. -/
 private def initialState : RuntimeState := { nextLoan := 1 }
 
+open LeanerIR.SemanticOperations in
+set_option maxHeartbeats 1000 in
+example (state : RuntimeState) (key : GlobalKey) (loan : Nat)
+    (fresh : FreshGlobalLoanIds state) (bound : state.nextLoan + 2 ≤ loan) :
+    globalLoanKeyIn? ((state.nextLoan, key) :: state.globalLoans) loan = none := by
+  leaner_fresh_loan
+
+open LeanerIR.SemanticOperations in
+set_option maxHeartbeats 1000 in
+example (state : RuntimeState) (key : GlobalKey) (fresh : FreshGlobalLoanIds state) :
+    ∃ carried : Nat, carried = state.nextLoan + 1 ∧
+      FreshGlobalLoanIds { state with
+        globalLoans := (state.nextLoan, key) :: state.globalLoans
+        nextLoan := state.nextLoan + 2 } := by
+  leaner_certified_close!
+
+open LeanerIR.SemanticOperations in
+set_option maxHeartbeats 1000 in
+example (value : RuntimeValue) (plain : Plain value) (loans : Array Nat) :
+    maskReturnedBorrows loans value = value :=
+  plain.maskReturnedBorrows_eq_self loans
+
+open LeanerIR.SemanticOperations in
+set_option maxHeartbeats 1000 in
+example (value : RuntimeValue) (plain : Plain value)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    exportReturnedFrameLoans #[value] frame state = exportFrameLoans frame state :=
+  exportReturnedFrameLoans_singlePlain plain frame state
+
+open LeanerIR.SemanticOperations in
+set_option maxHeartbeats 1000 in
+example (loan next : Nat) (prior : loan < next) (value : RuntimeValue) (initial : RuntimeState) :
+    exportReturnedFrameLoans #[.borrow next value]
+      { locals := #[some (.borrow loan (.loanHole next))] } initial =
+    exportFrameLoans { locals := #[some (.borrow loan (.loanHole next))] } initial := by
+  leaner_finalize
+
+open LeanerIR.SemanticOperations in
+-- A returned identity stays live even when copies remain in several local
+-- aggregate slots. Unrelated references still export their final contents.
+#guard exportReturnedFrameLoans #[.borrow 0 (.integer 7)]
+    { locals := #[some (.borrow 0 (.integer 7)),
+        some (.tuple #[.borrow 0 (.integer 7), .borrow 1 (.integer 9)]),
+        some (.vector #[.borrow 0 (.integer 7)])] }
+    { nextLoan := 2 } == { nextLoan := 2, pending := #[(1, .integer 9)] }
+
+open LeanerIR.SemanticOperations in
+-- Both handles can escape through one aggregate result without generating
+-- an early write-back into the caller's suspended owners.
+#guard exportReturnedFrameLoans #[.tuple #[.borrow 0 (.integer 7), .borrow 1 (.integer 9)]]
+    { locals := #[some (.borrow 0 (.integer 7)), some (.borrow 1 (.integer 9))] }
+    { nextLoan := 2 } == { nextLoan := 2 }
+
+open LeanerIR.SemanticOperations in
+-- Pruning stops at an outer borrow's ownership boundary.
+#guard maskReturnedBorrows #[1] (.borrow 0 (.tuple #[.borrow 1 (.integer 7)])) ==
+    .borrow 0 (.tuple #[.borrow 1 (.integer 7)])
+
+open LeanerIR.SemanticOperations in
+-- Plain results retain the old retirement behavior.
+#guard exportReturnedFrameLoans #[.integer 11]
+    { locals := #[some (.borrow 0 (.integer 7))] } initialState ==
+    { nextLoan := 1, pending := #[(0, .integer 7)] }
+
 private def reference (_profile : Profile) : RuntimeValue :=
   .borrow 0 (.integer 7)
 
@@ -124,7 +190,7 @@ private theorem successfulRunHasDerivation (executable : ExecutableUnit)
     (arguments : Array RuntimeValue) (state : RuntimeState)
     (success : (LeanerIR.Interpreter.run executable 16 handle arguments state).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction executable handle state arguments finalState outcome.value := by
+      BigStep.EvalFunction executable handle #[] state arguments finalState outcome.value := by
   generalize result_eq : LeanerIR.Interpreter.run executable 16 handle arguments state = result
   cases result with
   | error error => simp [result_eq, Except.isOk, Except.toBool] at success
@@ -137,15 +203,42 @@ private def preparedMove : ExecutableUnit := moveExecutable?.get (by native_deci
 private def preparedRust : ExecutableUnit := rustExecutable?.get (by native_decide)
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedMove handle initialState #[reference .move]
+    BigStep.EvalFunction preparedMove handle #[] initialState #[reference .move]
       finalState outcome.value := by
   apply successfulRunHasDerivation preparedMove #[reference .move] initialState
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction preparedRust handle initialState #[reference .rust]
+    BigStep.EvalFunction preparedRust handle #[] initialState #[reference .rust]
       finalState outcome.value := by
   apply successfulRunHasDerivation preparedRust #[reference .rust] initialState
   native_decide
+
+-- An unknown boundary must stay folded: proving a callee's continuation
+-- must not demand that an arbitrary final frame has no returned aliases.
+set_option maxHeartbeats 1000 in
+example (results : Array RuntimeValue) (frame : RuntimeFrame) (state : RuntimeState) :
+    SemanticOperations.exportReturnedFrameLoans results frame state =
+      SemanticOperations.exportReturnedFrameLoans results frame state := by
+  leaner_finalize
+
+-- These lookups can be exposed only when closing the final contract, after
+-- continuation normalization has finished. Keep registry tails opaque.
+set_option maxHeartbeats 1000 in
+example (initial final : RuntimeState) (retired loan : Nat)
+    (discipline : SemanticOperations.LoanDiscipline initial final)
+    (minted : initial.nextLoan ≤ retired) (older : loan < initial.nextLoan) :
+    SemanticOperations.globalLoanKeyIn?
+      (SemanticOperations.removeGlobalLoan final.globalLoans retired) loan =
+      SemanticOperations.globalLoanKeyIn? initial.globalLoans loan := by
+  leaner_certified_close!
+
+set_option maxHeartbeats 1000 in
+example (final : RuntimeState) (retired loan : Nat)
+    (fresh : SemanticOperations.FreshGlobalLoanIds final)
+    (live : retired < final.nextLoan) (unminted : final.nextLoan ≤ loan) :
+    SemanticOperations.globalLoanKeyIn?
+      (SemanticOperations.removeGlobalLoan final.globalLoans retired) loan = none := by
+  leaner_certified_close!
 
 end LeanerIR.Tests.Finalization

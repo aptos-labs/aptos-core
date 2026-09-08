@@ -43,7 +43,8 @@ is the least fixed point of the rules over this oracle, which is what makes
 a recursive function's native denotation provable by the same induction
 the rules themselves admit (`Proofs.Recursion`). -/
 abbrev CalleeRelation :=
-  FunctionHandle → RuntimeState → Array RuntimeValue → RuntimeState → Outcome → Prop
+  FunctionHandle → Array (TypeId × TypeId) → RuntimeState →
+    Array RuntimeValue → RuntimeState → Outcome → Prop
 
 mutual
   /-- Big-step evaluation of one structured expression. -/
@@ -104,7 +105,9 @@ mutual
         (operands : EvalValuesWith unit callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame values))
         (resolve_eq : resolveFunction? unit.unit namespaceId reference = some handle)
-        (calleeStep : callee handle argumentState values.toArray finalState
+        (calleeStep : callee handle
+          (callTypeInstantiation unit.unit handle argumentFrame.typeInstantiation instantiations)
+          argumentState values.toArray finalState
           (.returned results)) :
         EvalExprWith unit callee namespaceId frame state exprId
           (registerReturnedLoan
@@ -121,7 +124,9 @@ mutual
         (operands : EvalValuesWith unit callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame values))
         (resolve_eq : resolveFunction? unit.unit namespaceId reference = some handle)
-        (calleeStep : callee handle argumentState values.toArray finalState
+        (calleeStep : callee handle
+          (callTypeInstantiation unit.unit handle argumentFrame.typeInstantiation instantiations)
+          argumentState values.toArray finalState
           (.threw kind thrown)) :
         EvalExprWith unit callee namespaceId frame state exprId
           (applyPendingFrom argumentState.pending argumentFrame finalState).1
@@ -203,7 +208,8 @@ mutual
         (kind_eq : expression.kind = .operation (.call .invoke) instantiations arguments surface)
         (operands : EvalValuesWith unit callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame (.closure handle captures :: values)))
-        (calleeStep : callee handle argumentState (captures ++ values.toArray) finalState
+        (calleeStep : callee handle argumentFrame.typeInstantiation argumentState
+          (captures ++ values.toArray) finalState
           (.returned results)) :
         EvalExprWith unit callee namespaceId frame state exprId
           (applyPendingFrom argumentState.pending argumentFrame finalState).1
@@ -216,7 +222,8 @@ mutual
         (kind_eq : expression.kind = .operation (.call .invoke) instantiations arguments surface)
         (operands : EvalValuesWith unit callee namespaceId frame state arguments.toList
           (.values argumentState argumentFrame (.closure handle captures :: values)))
-        (calleeStep : callee handle argumentState (captures ++ values.toArray) finalState
+        (calleeStep : callee handle argumentFrame.typeInstantiation argumentState
+          (captures ++ values.toArray) finalState
           (.threw kind thrown)) :
         EvalExprWith unit callee namespaceId frame state exprId
           (applyPendingFrom argumentState.pending argumentFrame finalState).1
@@ -740,20 +747,22 @@ end
 /-- The closed big-step semantics of a whole function: the body rules with
 every call resolved by `EvalFunction` itself.  Nontermination is the absence
 of a finite derivation, exactly as before; the oracle only names the knot. -/
-inductive EvalFunction (unit : ExecutableUnit) : FunctionHandle → RuntimeState →
+inductive EvalFunction (unit : ExecutableUnit) : FunctionHandle →
+    Array (TypeId × TypeId) → RuntimeState →
     Array RuntimeValue → RuntimeState → Outcome → Prop where
-  | body (handle initialState arguments ns declaration frame root finalFrame evaluatedState
+  | body (handle typeInstantiation initialState arguments ns declaration frame root
+      finalFrame evaluatedState
       finalState control outcome)
       (namespace_eq : unit.unit.namespaces[handle.namespaceId.index]? = some ns)
       (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
-      (frame_eq : initialFrame? declaration arguments = some frame)
+      (frame_eq : initialFrame? declaration arguments typeInstantiation = some frame)
       (body_eq : declaration.body = .structured root)
       (body_step : EvalExprWith unit (EvalFunction unit) handle.namespaceId frame initialState root
         finalFrame evaluatedState control)
       (outcome_eq : finishControl? declaration.signature.results.size control = some outcome)
       (finalize_eq : finalizeFunctionState unit declaration.profile initialState evaluatedState
         finalFrame outcome = finalState) :
-      EvalFunction unit handle initialState arguments finalState outcome
+      EvalFunction unit handle typeInstantiation initialState arguments finalState outcome
 
 
 /-- Big-step evaluation of one structured expression, calls resolved by the
@@ -789,13 +798,14 @@ end EvalArms
 /-- The open function boundary: a body evaluated under an arbitrary callee
 oracle.  `EvalFunction` is its knot (`EvalFunction_iff`). -/
 def EvalFunctionWith (unit : ExecutableUnit) (callee : CalleeRelation)
-    (handle : FunctionHandle) (initialState : RuntimeState)
+    (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId))
+    (initialState : RuntimeState)
     (arguments : Array RuntimeValue) (finalState : RuntimeState)
     (outcome : Outcome) : Prop :=
   ∃ ns declaration frame root finalFrame evaluatedState control,
     unit.unit.namespaces[handle.namespaceId.index]? = some ns ∧
     ns.functions[handle.functionId.index]? = some declaration ∧
-    initialFrame? declaration arguments = some frame ∧
+    initialFrame? declaration arguments typeInstantiation = some frame ∧
     declaration.body = .structured root ∧
     EvalExprWith unit callee handle.namespaceId frame initialState root
       finalFrame evaluatedState control ∧
@@ -804,10 +814,11 @@ def EvalFunctionWith (unit : ExecutableUnit) (callee : CalleeRelation)
       finalFrame outcome = finalState
 
 theorem EvalFunction_iff (unit : ExecutableUnit) (handle : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId))
     (initialState : RuntimeState) (arguments : Array RuntimeValue)
     (finalState : RuntimeState) (outcome : Outcome) :
-    EvalFunction unit handle initialState arguments finalState outcome ↔
-      EvalFunctionWith unit (EvalFunction unit) handle initialState arguments
+    EvalFunction unit handle typeInstantiation initialState arguments finalState outcome ↔
+      EvalFunctionWith unit (EvalFunction unit) handle typeInstantiation initialState arguments
         finalState outcome := by
   constructor
   · intro step
@@ -816,7 +827,7 @@ theorem EvalFunction_iff (unit : ExecutableUnit) (handle : FunctionHandle)
   · rintro ⟨ns, declaration, frame, root, finalFrame, evaluatedState, control,
       namespace_eq, declaration_eq, frame_eq, body_eq, body_step, outcome_eq,
       finalize_eq⟩
-    exact .body handle initialState arguments ns declaration frame root finalFrame
+    exact .body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
       evaluatedState finalState control outcome namespace_eq declaration_eq
       frame_eq body_eq body_step outcome_eq finalize_eq
 
@@ -824,11 +835,11 @@ theorem EvalFunction_iff (unit : ExecutableUnit) (handle : FunctionHandle)
 /-- A source-independent function meaning over the declarative relation. -/
 structure FunctionMeaning (unit : ExecutableUnit) (function : FunctionHandle) where
   relates : RuntimeState → Array RuntimeValue → RuntimeState → Outcome → Prop :=
-    EvalFunction unit function
+    EvalFunction unit function #[]
 
 /-- Canonical M1 meaning of a validated function. -/
 def meaning (unit : ExecutableUnit) (function : FunctionHandle) : FunctionMeaning unit function :=
-  { relates := EvalFunction unit function }
+  { relates := EvalFunction unit function #[] }
 
 end BigStep
 end LeanerIR

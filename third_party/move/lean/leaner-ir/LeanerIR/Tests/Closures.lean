@@ -131,7 +131,7 @@ private theorem successfulRunHasDerivation (executable : ExecutableUnit)
     (fuel : Nat) (function : FunctionHandle) (arguments : Array RuntimeValue)
     (success : (LeanerIR.Interpreter.run executable fuel function arguments).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction executable function {} arguments finalState outcome.value := by
+      BigStep.EvalFunction executable function #[] {} arguments finalState outcome.value := by
   generalize result_eq : LeanerIR.Interpreter.run executable fuel function arguments = result
   cases result with
   | error error => simp [result_eq, Except.isOk, Except.toBool] at success
@@ -142,7 +142,7 @@ private theorem successfulRunHasDerivation (executable : ExecutableUnit)
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
     BigStep.EvalFunction prepared { namespaceId := ⟨0⟩, functionId := ⟨0⟩ }
-      {} #[] finalState outcome.value := by
+      #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation prepared 32
     { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } #[]
   native_decide

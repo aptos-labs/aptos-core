@@ -51,7 +51,9 @@ def moveSchema : ProfileSchema where
   version := ProfileName.move.config.version
   checkReference := fun _ => #[]
   checkType := unsupportedExtension "Move" "type"
-  checkOperation := unsupportedExtension "Move" "operation"
+  checkOperation := fun value =>
+    if value.tag == "runtime.vector_error" && value.payload.isEmpty then #[]
+    else unsupportedExtension "Move" "operation" value
   checkSurface := unsupportedExtension "Move" "surface"
   checkProperty := checkMoveProperty
 

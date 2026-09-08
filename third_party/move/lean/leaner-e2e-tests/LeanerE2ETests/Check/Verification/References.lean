@@ -1,9 +1,12 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import LeanerLang
+import LeanerE2ETests.CheckSupport
 
 namespace LeanerLang.Tests.VerificationReferences
+
+-- Calls consume the callee's proved contract through the shared normalizer.
+set_option leaner.route "native"
 
 leaner module 0x42::verification_references where
   struct Pair has Key where
@@ -93,18 +96,19 @@ leaner module 0x42::verification_references where
     ensures pair.left == 17 && pair.right == old(pair).right
     aborts_if false
 
-  public fun global_left(address : Address) -> &mut u64 :=
-    &mut Pair[address].left
+  -- The VM allows returning a parameter-derived reference, not borrowing
+  -- storage in the callee and returning that global-rooted reference.
+  public fun global_left(pair : &mut Pair) -> &mut u64 :=
+    &mut pair.left
 
   spec global_left where
-    requires exists<Pair>(address)
-    ensures result == old(global<Pair>(address).left) &&
-      global<Pair>(address).right == old(global<Pair>(address).right)
+    ensures result == old(pair).left && pair.left == result &&
+      pair.right == old(pair).right
     aborts_if false
-    modifies global<Pair>(address)
 
   public fun set_global_left(address : Address) -> Unit := do
-    let returned := core.call global_left::<>(address)
+    let resource := &mut Pair[address]
+    let returned := core.call global_left::<>(&mut *resource)
     *returned := 19
 
   spec set_global_left where
@@ -153,6 +157,15 @@ example :
 example :
     «0x42».verification_references.unit.borrowDiagnostics.isEmpty = true := by
   decide
+
+open LeanerIR LeanerE2ETests.CheckSupport in
+run_cmd do
+  let initial ← singleResourceState `«0x42».verification_references "Pair" "0x2"
+    #[.integer 7, .integer 11]
+  let final ← singleResourceState `«0x42».verification_references "Pair" "0x2"
+    #[.integer 19, .integer 11] 3
+  assertRunsState `«0x42».verification_references #[
+    ⟨"set_global_left", #[.address "0x2"], .returned #[], initial, final⟩]
 
 end LeanerLang.Tests.VerificationReferences
 

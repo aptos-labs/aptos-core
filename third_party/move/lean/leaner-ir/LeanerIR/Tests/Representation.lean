@@ -15,6 +15,24 @@ namespace LeanerIR.Tests.Representation
 
 open LeanerIR
 
+-- Shape recovery is independent of integer width and signedness; the
+-- successful decode carries the range certificate, never an extra axiom.
+example (width : IntWidth) (signed : Bool) (runtime : RuntimeValue)
+    (value : SpecInt width signed)
+    (decoded : decodeInt? width signed runtime = some value) :
+    runtime = .integer value.val :=
+  decodeInt?_shape decoded
+
+example : decodeInt? (.bits 8) false (.integer 256) = none := by decide
+example : decodeInt? (.bits 8) false (.integer (-1)) = none := by decide
+example : decodeInt? (.bits 8) true (.integer (-128)) =
+    some ⟨-128, by decide⟩ :=
+  decodeInt?_val (⟨-128, by decide⟩ : SpecInt (.bits 8) true)
+
+-- Identical payload types do not make runtime constructors interchangeable.
+example : decodeAddress? (.string "a") = none := rfl
+example : decodeString? (.address "a") = none := rfl
+
 /-- A hand-written twin of `struct Coin has Key where value : u64`. -/
 private structure Coin where
   value : SpecInt (.bits 64) false

@@ -10,6 +10,13 @@ open LeanerIR
 open LeanerIR.Import
 open LeanerIR.Validation
 
+/-- A nongeneric call has no substitution even inside a generic caller.
+This equation is independent of the namespace and its type-arena size. -/
+example (unit : ValidatedUnit) (handle : FunctionHandle)
+    (outer : Array (TypeId × TypeId)) :
+    SemanticOperations.callTypeInstantiation unit handle outer #[] = #[] := by
+  simp [SemanticOperations.callTypeInstantiation]
+
 private def config : ProfileConfig := { profile := .rust, name := "rust-test" }
 private def schema : ProfileSchema := { profile := .rust, name := "rust-test" }
 private def semantics : SemanticProfile := {
@@ -446,7 +453,7 @@ private def prepared : ExecutableUnit := executable?.get (by native_decide)
 private theorem successfulRunHasDerivation (function : FunctionHandle)
     (success : (Interpreter.run prepared 32 function #[]).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction prepared function {} #[] finalState outcome.value := by
+      BigStep.EvalFunction prepared function #[] {} #[] finalState outcome.value := by
   generalize result_eq : Interpreter.run prepared 32 function #[] = result
   cases result with
   | error error => simp [result_eq, Except.isOk, Except.toBool] at success
@@ -456,22 +463,22 @@ private theorem successfulRunHasDerivation (function : FunctionHandle)
           result.1 result.2 result_eq⟩
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared (handle 0) {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared (handle 0) #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation (handle 0)
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared (handle 2) {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared (handle 2) #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation (handle 2)
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared (handle 3) {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared (handle 3) #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation (handle 3)
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared (handle 5) {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared (handle 5) #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation (handle 5)
   native_decide
 

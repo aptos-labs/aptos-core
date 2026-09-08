@@ -1462,6 +1462,7 @@ theorem slice_eval_typed {ns : ValidatedNamespace} {resultType : TypeId}
   unfold evaluatePrimitiveOperation? at eval_eq
   simp only [result_eq, resolveTargetIntegerType?, bind, Option.bind_eq_some_iff,
     Option.some.injEq, exists_eq_left'] at eval_eq
+  unfold sliceVector? at eval_eq
   split at eval_eq
   · rename_i elements start stop shape
     split at eval_eq

@@ -4,6 +4,7 @@
 import LeanerIR.Proofs.Globals
 import LeanerIR.Proofs.Meaning
 import LeanerIR.Proofs.Representation
+import LeanerIR.Proofs.IntegerEvaluation
 
 /-!
 # Calculated weakest preconditions for structured LIR
@@ -58,13 +59,21 @@ def wpArms (unit : ExecutableUnit) (namespaceId : NamespaceId)
       finalFrame finalState control →
     post finalFrame finalState control
 
-/-- Weakest precondition of a function invocation. -/
-def wpFunction (unit : ExecutableUnit) (handle : FunctionHandle)
+/-- Weakest precondition of a function invocation at a concrete generic
+type instantiation. -/
+def wpFunctionAt (unit : ExecutableUnit) (handle : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId))
     (state : RuntimeState) (arguments : Array RuntimeValue)
     (post : RuntimeState → Outcome → Prop) : Prop :=
   ∀ finalState outcome,
-    EvalFunction unit handle state arguments finalState outcome →
+    EvalFunction unit handle typeInstantiation state arguments finalState outcome →
     post finalState outcome
+
+/-- Weakest precondition of a root (non-instantiated) invocation. -/
+def wpFunction (unit : ExecutableUnit) (handle : FunctionHandle)
+    (state : RuntimeState) (arguments : Array RuntimeValue)
+    (post : RuntimeState → Outcome → Prop) : Prop :=
+  wpFunctionAt unit handle #[] state arguments post
 
 /-! ## Monotonicity -/
 
@@ -98,19 +107,27 @@ theorem wpFunction_mono {unit handle state arguments}
     wpFunction unit handle state arguments post' :=
   fun finalState outcome step => weaken _ _ (established finalState outcome step)
 
+theorem wpFunctionAt_mono {unit handle typeInstantiation state arguments}
+    {post post' : RuntimeState → Outcome → Prop}
+    (established : wpFunctionAt unit handle typeInstantiation state arguments post)
+    (weaken : ∀ state outcome, post state outcome → post' state outcome) :
+    wpFunctionAt unit handle typeInstantiation state arguments post' :=
+  fun finalState outcome step => weaken _ _ (established finalState outcome step)
+
 /-! ## Bridges to the contract calculus -/
 
-/-- Unfold one function invocation into its body's transformer. -/
-theorem wpFunction_body {unit : ExecutableUnit} {handle : FunctionHandle}
+/-- Unfold one instantiated function invocation into its body's transformer. -/
+theorem wpFunctionAt_body {unit : ExecutableUnit} {handle : FunctionHandle}
+    {typeInstantiation : Array (TypeId × TypeId)}
     {initialState : RuntimeState} {arguments : Array RuntimeValue}
     {ns : ValidatedNamespace} {declaration : FunctionDecl FunctionBody}
     {frame : RuntimeFrame}
     {root : ExprId} {post : RuntimeState → Outcome → Prop}
     (namespace_eq : unit.unit.namespaces[handle.namespaceId.index]? = some ns)
     (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
-    (frame_eq : initialFrame? declaration arguments = some frame)
+    (frame_eq : initialFrame? declaration arguments typeInstantiation = some frame)
     (body_eq : declaration.body = .structured root) :
-    wpFunction unit handle initialState arguments post ↔
+    wpFunctionAt unit handle typeInstantiation initialState arguments post ↔
       wpExpr unit handle.namespaceId frame initialState root
         fun finalFrame evaluatedState control =>
           ∀ outcome,
@@ -123,12 +140,12 @@ theorem wpFunction_body {unit : ExecutableUnit} {handle : FunctionHandle}
   constructor
   · intro h finalFrame evaluatedState control step outcome outcome_eq
     exact h _ outcome
-      (.body handle initialState arguments ns declaration frame root finalFrame
+      (.body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
         evaluatedState _ control outcome namespace_eq declaration_eq frame_eq
         body_eq step outcome_eq rfl)
   · intro h finalState outcome step
     cases step with
-    | body handle initialState arguments ns' declaration' frame' root' finalFrame
+    | body handle typeInstantiation initialState arguments ns' declaration' frame' root' finalFrame
         evaluatedState finalState control outcome namespace_eq' declaration_eq'
         frame_eq' body_eq' body_step outcome_eq finalize_eq =>
       rw [namespace_eq] at namespace_eq'
@@ -141,6 +158,28 @@ theorem wpFunction_body {unit : ExecutableUnit} {handle : FunctionHandle}
       cases body_eq'
       rw [← finalize_eq]
       exact h _ _ _ body_step outcome outcome_eq
+
+/-- Unfold one root invocation into its body's transformer. -/
+theorem wpFunction_body {unit : ExecutableUnit} {handle : FunctionHandle}
+    {initialState : RuntimeState} {arguments : Array RuntimeValue}
+    {ns : ValidatedNamespace} {declaration : FunctionDecl FunctionBody}
+    {frame : RuntimeFrame}
+    {root : ExprId} {post : RuntimeState → Outcome → Prop}
+    (namespace_eq : unit.unit.namespaces[handle.namespaceId.index]? = some ns)
+    (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
+    (frame_eq : initialFrame? declaration arguments #[] = some frame)
+    (body_eq : declaration.body = .structured root) :
+    wpFunction unit handle initialState arguments post ↔
+      wpExpr unit handle.namespaceId frame initialState root
+        fun finalFrame evaluatedState control =>
+          ∀ outcome,
+            finishControl? declaration.signature.results.size control
+              = some outcome →
+            post
+              (finalizeFunctionState unit declaration.profile initialState
+                evaluatedState finalFrame outcome)
+              outcome :=
+  wpFunctionAt_body namespace_eq declaration_eq frame_eq body_eq
 
 /-! ## Control classification -/
 
@@ -1112,7 +1151,10 @@ theorem wpExpr_call {unit : ExecutableUnit} {namespaceId : NamespaceId}
         (valuesPost post fun argumentFrame argumentState values =>
           ∀ handle,
             resolveFunction? unit.unit namespaceId reference = some handle →
-            wpFunction unit handle argumentState values.toArray
+            wpFunctionAt unit handle
+              (callTypeInstantiation unit.unit handle
+                argumentFrame.typeInstantiation instantiations)
+              argumentState values.toArray
               (outcomePost
                 (fun finalState results =>
                   post (registerReturnedLoan
@@ -1300,7 +1342,8 @@ theorem wpExpr_invoke {unit : ExecutableUnit} {namespaceId : NamespaceId}
         (valuesPost post fun argumentFrame argumentState values =>
           ∀ handle captures rest,
             values = .closure handle captures :: rest →
-            wpFunction unit handle argumentState (captures ++ rest.toArray)
+            wpFunctionAt unit handle argumentFrame.typeInstantiation argumentState
+              (captures ++ rest.toArray)
               (outcomePost
                 (fun finalState results =>
                   post (applyPendingFrom argumentState.pending argumentFrame finalState).1
@@ -1987,7 +2030,10 @@ def wpExprStep (unit : ExecutableUnit) (namespaceId : NamespaceId)
                     (valuesPost post fun argumentFrame argumentState values =>
                       ∀ handle,
                         resolveFunction? unit.unit namespaceId reference = some handle →
-                        wpFunction unit handle argumentState values.toArray
+                        wpFunctionAt unit handle
+                          (callTypeInstantiation unit.unit handle
+                            argumentFrame.typeInstantiation instantiations)
+                          argumentState values.toArray
                           (outcomePost
                             (fun finalState results =>
                               post (registerReturnedLoan
@@ -2025,7 +2071,8 @@ def wpExprStep (unit : ExecutableUnit) (namespaceId : NamespaceId)
                     (valuesPost post fun argumentFrame argumentState values =>
                       ∀ handle captures rest,
                         values = .closure handle captures :: rest →
-                        wpFunction unit handle argumentState (captures ++ rest.toArray)
+                        wpFunctionAt unit handle argumentFrame.typeInstantiation argumentState
+                          (captures ++ rest.toArray)
                           (outcomePost
                             (fun finalState results =>
                               post (applyPendingFrom argumentState.pending argumentFrame finalState).1
@@ -2174,8 +2221,9 @@ theorem wpArms_nil_eq (unit : ExecutableUnit) (namespaceId : NamespaceId)
   simp only [eq_iff_iff, iff_true]
   exact wpArms_nil
 
-/-- One symbolic step of a function transformer. -/
-def wpFunctionStep (unit : ExecutableUnit) (handle : FunctionHandle)
+/-- One symbolic step of an instantiated function transformer. -/
+def wpFunctionStepAt (unit : ExecutableUnit) (handle : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId))
     (initialState : RuntimeState) (arguments : Array RuntimeValue)
     (post : RuntimeState → Outcome → Prop) : Prop :=
   match unit.unit.namespaces[handle.namespaceId.index]? with
@@ -2187,7 +2235,7 @@ def wpFunctionStep (unit : ExecutableUnit) (handle : FunctionHandle)
           match declaration.body with
           | .absent => True
           | .structured root =>
-              match initialFrame? declaration arguments with
+              match initialFrame? declaration arguments typeInstantiation with
               | none => True
               | some frame =>
                   wpExpr unit handle.namespaceId frame initialState root
@@ -2200,14 +2248,21 @@ def wpFunctionStep (unit : ExecutableUnit) (handle : FunctionHandle)
                             initialState evaluatedState finalFrame outcome)
                           outcome
 
-/-- Symbolic execution of one invocation: an unconditional rewrite. -/
-theorem wpFunction_eq (unit : ExecutableUnit) (handle : FunctionHandle)
+/-- One symbolic step of a root function transformer. -/
+def wpFunctionStep (unit : ExecutableUnit) (handle : FunctionHandle)
+    (initialState : RuntimeState) (arguments : Array RuntimeValue)
+    (post : RuntimeState → Outcome → Prop) : Prop :=
+  wpFunctionStepAt unit handle #[] initialState arguments post
+
+/-- Symbolic execution of one instantiated invocation: an unconditional rewrite. -/
+theorem wpFunctionAt_eq (unit : ExecutableUnit) (handle : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId))
     (initialState : RuntimeState) (arguments : Array RuntimeValue)
     (post : RuntimeState → Outcome → Prop) :
-    wpFunction unit handle initialState arguments post
-      = wpFunctionStep unit handle initialState arguments post := by
+    wpFunctionAt unit handle typeInstantiation initialState arguments post
+      = wpFunctionStepAt unit handle typeInstantiation initialState arguments post := by
   apply propext
-  unfold wpFunctionStep
+  unfold wpFunctionStepAt
   split
   case _ missing =>
     constructor
@@ -2240,7 +2295,15 @@ theorem wpFunction_eq (unit : ExecutableUnit) (handle : FunctionHandle)
       exfalso
       cases step <;> simp_all
   case _ frame frame_eq =>
-    exact wpFunction_body namespace_eq declaration_eq frame_eq body_eq
+    exact wpFunctionAt_body namespace_eq declaration_eq frame_eq body_eq
+
+/-- Symbolic execution of one root invocation: an unconditional rewrite. -/
+theorem wpFunction_eq (unit : ExecutableUnit) (handle : FunctionHandle)
+    (initialState : RuntimeState) (arguments : Array RuntimeValue)
+    (post : RuntimeState → Outcome → Prop) :
+    wpFunction unit handle initialState arguments post
+      = wpFunctionStep unit handle initialState arguments post :=
+  wpFunctionAt_eq unit handle #[] initialState arguments post
 
 /-! ## Normalization inventory
 
@@ -2483,23 +2546,7 @@ under sign tests nothing later consumes.  These equations characterize them
 by the `Int.tdiv`/`Int.tmod` the arithmetic finish understands, and the ops
 themselves are reduction-sealed so only the equations fire. -/
 
-@[lir_data_norm] theorem truncatingQuotient?_eq (left right : Int) :
-    SemanticOperations.truncatingQuotient? left right =
-      if right = 0 then none else some (left.tdiv right) := by
-  unfold SemanticOperations.truncatingQuotient?
-  rcases left with m | m <;> rcases right with n | n <;>
-    simp [Int.tdiv, Int.natAbs, beq_iff_eq]
-  · by_cases h : n = 0 <;> simp [h]
-    omega
-  · rintro rfl; simp
-  · by_cases h : n = 0 <;> simp [h]
-
-@[lir_data_norm] theorem truncatingRemainder?_eq (left right : Int) :
-    SemanticOperations.truncatingRemainder? left right =
-      if right = 0 then none else some (left.tmod right) := by
-  unfold SemanticOperations.truncatingRemainder?
-  simp only [truncatingQuotient?_eq, Int.tmod_def]
-  by_cases h : right = 0 <;> simp [h, Option.bind, Int.mul_comm]
+attribute [lir_data_norm] truncatingQuotient?_eq truncatingRemainder?_eq
 
 /-! The declaration resolvers a call, constant, or constructor step consults
 search the quoted unit through `Array.findIdx?` and `Array.any` — well-founded
@@ -2580,7 +2627,7 @@ assert each exposed range certificate as an independent arithmetic
 hypothesis, since the certificate proof itself ends up inside the branch
 equation where the closing normalization cannot touch it. -/
 private partial def destructureTwins (goal : Lean.MVarId) :
-    Lean.MetaM Lean.MVarId := do
+    Lean.MetaM (Array Lean.MVarId) := do
   let target? ← goal.withContext do
     (← Lean.getLCtx).findDeclM? fun declaration => do
       if declaration.isImplementationDetail then return none
@@ -2606,9 +2653,11 @@ private partial def destructureTwins (goal : Lean.MVarId) :
             (← Lean.Meta.inferType fact) fact
           return (← asserted.intro1P).2
         return goal
-      match (← goal.cases fvarId).toList with
-      | [subgoal] => destructureTwins subgoal.mvarId
-      | _ => return goal
+      let branches ← goal.cases fvarId
+      let mut goals := #[]
+      for branch in branches do
+        goals := goals ++ (← destructureTwins branch.mvarId)
+      return goals
   | none =>
       -- Range facts of the certificates the split exposed, asserted in the
       -- arithmetic form `omega` reads directly.
@@ -2639,13 +2688,14 @@ private partial def destructureTwins (goal : Lean.MVarId) :
         let goal ← current.assert `fits (← Lean.Meta.inferType fact) fact
         let (_, goal) ← goal.intro1P
         current := goal
-      return current
+      return #[current]
 
 /-- Certify every typed value in the context: destructure twin-typed
 hypotheses into scalar fields and assert each certificate's bounds in the
 arithmetic form `omega` reads. -/
 elab "leaner_certify!" : tactic =>
-  Lean.Elab.Tactic.liftMetaTactic1 fun goal => destructureTwins goal
+  Lean.Elab.Tactic.liftMetaTactic fun goal => do
+    return (← destructureTwins goal).toList
 
 /-! ### Naming the facts a contract's precondition leaves
 
@@ -2746,32 +2796,6 @@ elab "leaner_name_facts" : tactic => do
       goal ← goal.rename declaration.fvarId (Lean.Name.mkSimple name)
     return goal
 
-/-- Name the local reads the drive introduced and has not yet named: each
-`row[i]?.join = some v` (or `readLocal? … = some v`) becomes
-`rowReadEq<k>` with its value `rowRead<k>`, numbered in context order from
-zero.  Shape-directed, so the drive introducing further binders after a
-read (a bare local as a block's value) cannot displace them. -/
-elab "leaner_name_reads" : tactic => do
-  Lean.Elab.Tactic.liftMetaTactic1 fun goal => do
-    let mut goal := goal
-    let mut index := 0
-    let declarations ← goal.withContext do
-      pure ((← Lean.getLCtx).decls.toList.filterMap id).toArray
-    for declaration in declarations do
-      if declaration.isImplementationDetail then continue
-      unless declaration.userName.hasMacroScopes do continue
-      let type ← goal.withContext do Lean.instantiateMVars declaration.type
-      unless type.isAppOfArity ``Eq 3 do continue
-      let lhs := type.getArg! 1
-      let rhs := type.getArg! 2
-      unless lhs.isAppOf ``Option.join || lhs.isAppOf ``SemanticOperations.readLocal? do continue
-      unless rhs.isAppOfArity ``Option.some 2 do continue
-      let .fvar valueId := rhs.getArg! 1 | continue
-      goal ← goal.rename valueId (Lean.Name.mkSimple s!"rowRead{index}")
-      goal ← goal.rename declaration.fvarId (Lean.Name.mkSimple s!"rowReadEq{index}")
-      index := index + 1
-    return goal
-
 /-- Bind a route's own vocabulary to a hypothesis by name. -/
 elab "leaner_rename" old:ident " => " new:ident : tactic => do
   Lean.Elab.Tactic.liftMetaTactic1 fun goal => do
@@ -2799,20 +2823,16 @@ elab "leaner_cases" hypothesis:ident : tactic => do
         try pure (some (← Lean.Meta.getLocalDeclFromUserName userName).fvarId)
         catch _ => pure none
       let some fvarId := fvarId? | return [goal]
-      /- Expose the head only when that uncovers structure: a contract
-      field applied to its arguments unfolds to the quantified proposition,
-      but a leaf fact keeps its authored form — reducing `0 ≤ x` to its
-      `Int.NonNeg` unfolding would only obscure it. -/
+      /- Generated contracts are simplified before this tactic, so their
+      quantifiers and conjunctions are already syntactically visible.  Do
+      not `whnf` every non-structural leaf merely to rediscover that it is a
+      leaf: family representations and codec equalities can have large
+      reducible bodies, and unfolding them here is both unnecessary and
+      quadratic in the number of conjuncts. -/
       let isStructural (type : Lean.Expr) : Bool :=
         type.getAppFn.constName? == some ``Exists ||
           type.getAppFn.constName? == some ``And ||
           type.getAppFn.constName? == some ``Or
-      let goal ← goal.withContext do
-        let type ← Lean.instantiateMVars (← fvarId.getType)
-        if isStructural type then pure goal else
-        let reduced ← Lean.Meta.whnf type
-        if reduced == type || !isStructural reduced then pure goal
-        else goal.changeLocalDecl fvarId reduced
       let fvarId? ← goal.withContext do
         try pure (some (← Lean.Meta.getLocalDeclFromUserName userName).fvarId)
         catch _ => pure none

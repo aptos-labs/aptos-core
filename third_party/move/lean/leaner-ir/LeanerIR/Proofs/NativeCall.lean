@@ -357,7 +357,7 @@ theorem wpRowThrow_returnedReborrow (referenceType : ReferenceType)
       cases Option.some.inj evaluation
     exact ⟨_, ⟨#[(⟨lex⟩, state.nextLoan)],
       #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
-        (state.nextLoan, ⟨.local ⟨0⟩, #[.deref], true⟩)]⟩, rfl, exit⟩
+        (state.nextLoan, ⟨.local ⟨0⟩, #[.deref], true⟩)], #[]⟩, rfl, exit⟩
 
 /-- Every step of the call statement, characterized: the callee threw and
 the caller's throw obligation is discharged, or it returned, the loan
@@ -1069,7 +1069,7 @@ theorem wpRowThrow_callReturnedReborrow
             transferLoanLocation_hole _ _ _ _ _ separate]
           exact ⟨_, ⟨#[(⟨lex⟩, returned)],
             #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
-              (returned, ⟨.local ⟨0⟩, #[.deref], true⟩)]⟩, rfl, continuation⟩
+              (returned, ⟨.local ⟨0⟩, #[.deref], true⟩)], #[]⟩, rfl, continuation⟩
     · obtain ⟨rfl, rfl, -⟩ := reborrowRun reborrowStep
       simp [valuesNil] at nilStep
 
@@ -1354,6 +1354,78 @@ theorem wpRowThrow_callValue
           rw [applyPendingFrom_none pendingEq]
           exact ⟨_, registries, rfl, continuation⟩
     · simp [valuesNil] at nilStep
+
+/-! ## An invocation-aware call over an arbitrary stable operand row
+
+Generic callees are selected by the type substitution carried by the frame
+reached after evaluating their operands.  The operands used by lowered direct
+calls are row-stable, so their frame has the caller's registry component and
+therefore its already-computed substitution.  This arity-independent bridge
+keeps the modular call path constant-size for one, two, and larger value rows.
+-/
+
+theorem wpRowThrow_callAt
+    (handle : FunctionHandle)
+    (callee : Array (TypeId × TypeId) → FunctionDenotation)
+    (operands : ValuesDenotation)
+    {row : Row} {registries : Registries} {state : RuntimeState}
+    {postValue : Row → Registries → RuntimeState → Control → Prop}
+    {postThrow : ThrowKind → Array RuntimeValue → Prop}
+    (stable : RowStableValues operands)
+    (stepped : wpValuesRow operands row registries state fun result =>
+      match result with
+      | .control operandState operandRow control =>
+          match control with
+          | .throw_ kind thrown => postThrow kind thrown
+          | _ => postValue operandRow registries operandState control
+      | .values operandState operandRow values =>
+          wpFunction (callee registries.typeInstantiation)
+            operandState values.toArray fun calleeFinal outcome =>
+              match outcome with
+              | .returned results =>
+                  calleeFinal.pending = operandState.pending ∧
+                  postValue operandRow registries
+                    { globals := calleeFinal.globals
+                      globalLoans := calleeFinal.globalLoans
+                      nextLoan := calleeFinal.nextLoan
+                      pending := operandState.pending }
+                    (.value (packResults results))
+              | .threw kind thrown => postThrow kind thrown) :
+    wpRowThrow (nativeCallAt handle none callee operands)
+      row registries state postValue postThrow := by
+  rintro finalFrame finalState control
+    (⟨operandFrame, operandState, propagated, operandStep, rfl, rfl, rfl⟩ |
+      ⟨operandFrame, operandState, values, calleeState, outcome, operandStep,
+        calleeStep, rfl, rfl, rfl⟩)
+  · obtain ⟨operandRow, shape⟩ := stable row registries state _ operandStep
+    rcases shape with ⟨resultState, resultValues, impossible⟩ |
+      ⟨resultState, resultControl, equal⟩
+    · cases impossible
+    · cases equal
+      have applied := stepped (.control finalState operandRow control)
+        (by simpa [RowValuesResult.embed] using operandStep)
+      cases control with
+      | throw_ kind thrown => exact applied
+      | value runtimeValue => exact ⟨operandRow, registries, rfl, applied⟩
+      | return_ results => exact ⟨operandRow, registries, rfl, applied⟩
+      | break_ label => exact ⟨operandRow, registries, rfl, applied⟩
+      | continue_ label => exact ⟨operandRow, registries, rfl, applied⟩
+  · obtain ⟨operandRow, shape⟩ := stable row registries state _ operandStep
+    rcases shape with ⟨resultState, resultValues, equal⟩ |
+      ⟨resultState, resultControl, impossible⟩
+    · cases equal
+      have opened := stepped (.values operandState operandRow values)
+        (by simpa [RowValuesResult.embed] using operandStep)
+      unfold wpFunction at opened
+      have applied := opened calleeState outcome (by simpa using calleeStep)
+      cases outcome with
+      | threw kind thrown => exact applied
+      | returned results =>
+          obtain ⟨pendingEq, continuation⟩ := applied
+          simp only [callControl, callFrame_returned, registerReturnedLoan]
+          rw [applyPendingFrom_none pendingEq]
+          exact ⟨operandRow, registries, rfl, continuation⟩
+    · cases impossible
 
 /-! ## Two reborrows, one call
 

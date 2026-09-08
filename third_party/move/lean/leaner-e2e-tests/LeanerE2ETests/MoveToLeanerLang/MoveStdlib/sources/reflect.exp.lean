@@ -72,12 +72,13 @@ leaner module 0x1::reflect where
   Returns numerical code associated with error.
   -/
   public fun error_code(self : ReflectionError) -> u64 :=
-    match self with
-      | ReflectionError::InvalidIdentifier {} => 0
-      | ReflectionError::FunctionNotFound {} => 1
-      | ReflectionError::FunctionNotAccessible {} => 2
-      | ReflectionError::FunctionIncompatibleType {} => 3
-      | ReflectionError::FunctionNotInstantiated {} => 4
+    if self is InvalidIdentifier then 0
+    else
+      if self is FunctionNotFound then 1
+      else
+        if self is FunctionNotAccessible then 2
+        else
+          if self is FunctionIncompatibleType then 3 else 4
 
   native fun native_resolve {FuncType}(
     addr : Address, module_name : &String, func_name : &String

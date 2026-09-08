@@ -154,6 +154,39 @@ private def validationHasDiagnosticAt (raw : RawUnit) (code : String) (loc : Loc
       diagnostic.code == code && diagnostic.primary == some loc
   | .ok _ => false
 
+/- Global ownership changes use the same live-loan conflict check as local
+consumption. Keep the later read so this is not an already-ended loan. -/
+private def takeWhileBorrowedFixture (shared : Bool) : RawUnit :=
+  let ns := fixture.namespaces[0]!
+  let kind : BorrowKind := if shared then .immutable else .mutable
+  let types := fixture.tables.types.set! 3
+    (.reference {
+      profile := .move
+      kind := if shared then .shared else .mutable
+      referent := ⟨5⟩
+      lifetime := ⟨0⟩ })
+  let expressions := (ns.expressions.set! 5 {
+    ns.expressions[5]! with
+      kind := .operation (.global (.borrow kind)) #[.typeArg (typeUse 5 5)] #[⟨0⟩] }).set! 9 {
+        ns.expressions[9]! with kind := .block #[⟨11⟩] (some ⟨8⟩) }
+  { fixture with
+    tables := { fixture.tables with types }
+    namespaces := #[{ ns with expressions, functions := #[ns.functions[0]!] }] }
+
+#guard preparationHasDiagnosticAt (takeWhileBorrowedFixture false)
+  "LIR-SEMANTIC-BORROW-CONFLICT" ⟨11⟩
+#guard preparationHasDiagnosticAt (takeWhileBorrowedFixture true)
+  "LIR-SEMANTIC-BORROW-CONFLICT" ⟨11⟩
+
+private def publishWhileBorrowedFixture : RawUnit :=
+  let raw := takeWhileBorrowedFixture true
+  let ns := raw.namespaces[0]!
+  { raw with namespaces := #[{ ns with expressions := ns.expressions.set! 9 {
+      ns.expressions[9]! with kind := .block #[⟨13⟩] (some ⟨8⟩) } }] }
+
+#guard preparationHasDiagnosticAt publishWhileBorrowedFixture
+  "LIR-SEMANTIC-BORROW-CONFLICT" ⟨13⟩
+
 private def badPublishValueFixture : RawUnit :=
   let ns := fixture.namespaces[0]!
   { fixture with namespaces := #[{
@@ -220,7 +253,7 @@ private def prepared : ExecutableUnit := executable?.get (by native_decide)
 private theorem successfulRunHasDerivation (function : FunctionHandle) (fuel : Nat)
     (success : (LeanerIR.Interpreter.run prepared fuel function #[]).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction prepared function {} #[] finalState outcome.value := by
+      BigStep.EvalFunction prepared function #[] {} #[] finalState outcome.value := by
   generalize result_eq : LeanerIR.Interpreter.run prepared fuel function #[] = result
   cases result with
   | error error => simp [result_eq, Except.isOk, Except.toBool] at success
@@ -230,12 +263,12 @@ private theorem successfulRunHasDerivation (function : FunctionHandle) (fuel : N
           result.1 result.2 result_eq⟩
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared (handle 0) {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared (handle 0) #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation (handle 0) 48
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared (handle 1) {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared (handle 1) #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation (handle 1) 32
   native_decide
 

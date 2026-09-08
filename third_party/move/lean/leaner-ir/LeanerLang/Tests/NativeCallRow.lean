@@ -211,7 +211,7 @@ theorem bumpTwiceModular {registry : LeanerIR.Validation.SemanticsRegistry}
             Option.map_eq_map, Option.map_some, Option.some.injEq]
             at finishEq
           subst finishEq
-          simp only [LeanerIR.SemanticOperations.finalizeFunctionState]
+          leaner_finalize
           rw [LeanerIR.Proofs.Denotation.exportFrameLoans_rowFrame_singleInteger
             _ _ _ _ _ ?keyStillFree]
           case keyStillFree =>

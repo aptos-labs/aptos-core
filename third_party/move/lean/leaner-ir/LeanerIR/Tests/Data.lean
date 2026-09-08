@@ -501,7 +501,7 @@ private def prepared : ExecutableUnit := executable?.get (by native_decide)
 private theorem successfulRunHasDerivation (fuel : Nat) (function : FunctionHandle)
     (success : (Interpreter.run prepared fuel function #[]).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction prepared function {} #[] finalState outcome.value := by
+      BigStep.EvalFunction prepared function #[] {} #[] finalState outcome.value := by
   generalize result_eq : Interpreter.run prepared fuel function #[] = result
   cases result with
   | error error => simp [result_eq, Except.isOk, Except.toBool] at success
@@ -511,7 +511,7 @@ private theorem successfulRunHasDerivation (fuel : Nat) (function : FunctionHand
           result.1 result.2 result_eq⟩
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-    BigStep.EvalFunction prepared (handle 0) {} #[] finalState outcome.value := by
+    BigStep.EvalFunction prepared (handle 0) #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation 32 (handle 0)
   native_decide
 

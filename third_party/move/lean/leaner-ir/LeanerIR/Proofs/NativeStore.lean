@@ -23,6 +23,30 @@ namespace LeanerIR.Proofs.Denotation
 
 open LeanerIR.SemanticOperations
 
+/-- Native vector construction is a closed row operation. -/
+theorem vector_evaluate (values : Array RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    PrimitiveLocationOperation.vector.evaluate? values frame state =
+      some (.value frame state (.vector values)) := rfl
+
+/-- Native vector append is a closed row operation. -/
+theorem pushVector_evaluate (values : Array RuntimeValue)
+    (value : RuntimeValue) (frame : RuntimeFrame) (state : RuntimeState) :
+    PrimitiveLocationOperation.pushVector.evaluate?
+        #[.vector values, value] frame state =
+      some (.value frame state (.vector (values.push value))) := rfl
+
+/- Keep focused aggregate projections opaque until the focus laws can
+rewrite them.  Unfolding `RuntimeValue.field` first exposes symbolic array
+lookups and makes the arithmetic closer pay for irrelevant tails. -/
+attribute [lir_data_norm high]
+  VectorFocus.runtimeField_fill
+  VectorFocus.runtimeAsIntField_fill
+  VectorFocus.runtimeField_fill_zero
+  VectorFocus.runtimeAsIntField_fill_zero
+  VectorFocus.runtimeField_vector_zero
+  VectorFocus.runtimeAsIntField_vector_zero
+
 /-! ## Entry: the global borrow and the field reborrow, computed -/
 
 /-- A mutable borrow of a present resource, over a row whose local 0 holds
@@ -33,7 +57,9 @@ theorem globalBorrow_evaluate_rowFrame (namespaceId : NamespaceId)
     (address : String) (rest : List (Option RuntimeValue))
     (registries : Registries) (state : RuntimeState) (resource : RuntimeValue)
     (present : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = some resource) :
+      (globalKey namespaceId
+        (instantiatedTypeId registries.typeInstantiation typeId)
+        (.address address)) = some resource) :
     (GlobalLocationOperation.borrow
       { resource := ⟨namespaceId, typeId⟩, referenceType, kind := .mutable
         lexicalLoan := lex }).evaluate?
@@ -46,14 +72,20 @@ theorem globalBorrow_evaluate_rowFrame (namespaceId : NamespaceId)
               (⟨lex⟩, state.nextLoan)
           loanLocations := registries.loanLocations.push
             (state.nextLoan,
-              { root := .global (globalKey namespaceId typeId
-                  (.address address)) }) })
+              { root := .global (globalKey namespaceId
+                  (instantiatedTypeId registries.typeInstantiation typeId)
+                  (.address address)) })
+          typeInstantiation := registries.typeInstantiation })
       { state with
         globals := state.globals.insert
-          (globalKey namespaceId typeId (.address address))
+          (globalKey namespaceId
+            (instantiatedTypeId registries.typeInstantiation typeId)
+            (.address address))
           (.loanHole state.nextLoan)
         globalLoans :=
-          (state.nextLoan, globalKey namespaceId typeId (.address address))
+          (state.nextLoan, globalKey namespaceId
+            (instantiatedTypeId registries.typeInstantiation typeId)
+            (.address address))
             :: state.globalLoans
         nextLoan := state.nextLoan + 1 }
       (.borrow state.nextLoan resource)) := by
@@ -87,7 +119,8 @@ theorem derefLocalBorrow_evaluate_nominalPath (referenceType : ReferenceType)
               (⟨lex⟩, state.nextLoan)
           loanLocations := registries.loanLocations.push
             (state.nextLoan,
-              ⟨.local localId, #[.deref] ++ focusProjections steps, true⟩) })
+              ⟨.local localId, #[.deref] ++ focusProjections steps, true⟩)
+          typeInstantiation := registries.typeInstantiation })
       { state with nextLoan := state.nextLoan + 1 }
       (.borrow state.nextLoan leaf)) := by
   have inBounds : localId.index < row.size :=
@@ -96,7 +129,8 @@ theorem derefLocalBorrow_evaluate_nominalPath (referenceType : ReferenceType)
   have notBeyond : ¬ (row.size ≤ localId.index) := Nat.not_le.mpr inBounds
   have resolved : resolveNominalFieldSteps?
       { locals := row, activeLoans := registries.activeLoans,
-        loanLocations := registries.loanLocations }
+        loanLocations := registries.loanLocations,
+        typeInstantiation := registries.typeInstantiation }
       state (focusFields steps) { root := .local localId, projections := #[.deref] } =
       some { root := .local localId, projections := #[.deref] ++ focusProjections steps } := by
     have resolved := resolveNominalFieldSteps?_focus (rowFrame row registries) state
@@ -111,6 +145,797 @@ theorem derefLocalBorrow_evaluate_nominalPath (referenceType : ReferenceType)
     writeRuntimePlace?, writeRoot?, writeProjections?, writeProjections?_focusValue,
     rowFrame, mutableKind, inBounds, slotElem, notBeyond,
     show (ReferenceKind.mutable != ReferenceKind.mutable) = false from rfl]
+
+/-- A literal-index reborrow through a mutable vector parameter.  The
+element is replaced by the fresh loan hole and the compact indexed path is
+registered without consulting the source place arena. -/
+theorem indexedLocalBorrow_evaluate_derefVector
+    (referenceType : ReferenceType)
+    (mutableKind : referenceType.kind = .mutable) (lex : Nat)
+    (outerLoan : Nat) (focus : VectorFocus) (current : RuntimeValue)
+    (registries : Registries) (state : RuntimeState) :
+    (({ location := ⟨⟨0⟩⟩, dereference := true, index := focus.index,
+        referenceType, kind := .mutable, lexicalLoan := lex } :
+      IndexedLocalBorrowOperation)).evaluate? #[]
+      (rowFrame #[some (.borrow outerLoan (focus.fill current)), none]
+        registries) state =
+    some (.value
+      (rowFrame #[some (.borrow outerLoan
+            (focus.fill (.loanHole state.nextLoan))), none]
+        { activeLoans :=
+            (registries.activeLoans.filter (·.1 != ⟨lex⟩)).push
+              (⟨lex⟩, state.nextLoan)
+          loanLocations := registries.loanLocations.push
+            (state.nextLoan,
+              ⟨.local ⟨0⟩, #[.deref, .index focus.index], true⟩)
+          typeInstantiation := registries.typeInstantiation })
+      { state with nextLoan := state.nextLoan + 1 }
+      (.borrow state.nextLoan current)) := by
+  have at_ := focus.getElem?_fill current
+  have inBounds := (Array.getElem?_eq_some_iff.mp at_).1
+  have elementEq := (Array.getElem?_eq_some_iff.mp at_).2
+  have focusBound : focus.before.size <
+      focus.before.size + 1 + focus.after.size := by omega
+  simp [IndexedLocalBorrowOperation.evaluate?, liftPlaceEvaluator,
+    IndexedLocalBorrowOperation.resolve?, resolveLocalLiteralIndex?,
+    readRuntimePlace?, readRoot?, readLocal?, readProjections?, rowFrame,
+    borrowRuntimePlaceAt?, mutableKind, inBounds, elementEq,
+    writeRuntimePlace?, writeRoot?, writeProjections?, Array.set!,
+    VectorFocus.fill, VectorFocus.index, VectorFocus.set!_fill,
+    VectorFocus.setIfInBounds_push, focusBound,
+    show (ReferenceKind.mutable != ReferenceKind.mutable) = false from rfl]
+
+/-! ## A field below an indexed owned local
+
+The source path `local[0].field` is lowered to two fixed numeric indices.
+These closed rows keep the borrow, mutation, and retirement constant-time:
+none of them searches the source place arena or a symbolic aggregate. -/
+
+/-- Mutable entry through `local0[0].field0` for the single-element pair
+shape used by an owned-vector borrow. -/
+theorem indexedLocalFieldBorrow_evaluate_ownedPair
+    (referenceType : ReferenceType)
+    (mutableKind : referenceType.kind = .mutable) (lex : Nat)
+    (source : StructHandle) (left right : Int) (state : RuntimeState) :
+    (({ location := ⟨⟨0⟩⟩, index := 0,
+        field := ⟨source, none, 0⟩,
+        referenceType, kind := .mutable, lexicalLoan := lex } :
+      IndexedLocalFieldBorrowOperation)).evaluate? #[]
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.integer left, .integer right]]), none, none, none]
+        { activeLoans := #[], loanLocations := #[] }) state =
+    some (.value
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.loanHole state.nextLoan, .integer right]]),
+          none, none, none]
+        { activeLoans := #[(⟨lex⟩, state.nextLoan)]
+          loanLocations := #[(state.nextLoan,
+            ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] })
+      { state with nextLoan := state.nextLoan + 1 }
+      (.borrow state.nextLoan (.integer left))) := by
+  simp [IndexedLocalFieldBorrowOperation.evaluate?, liftPlaceEvaluator,
+    IndexedLocalFieldBorrowOperation.resolve?, resolveLocalLiteralIndexField?,
+    resolveLocalLiteralIndex?, readRuntimePlace?, readRoot?, readLocal?,
+    readProjections?, borrowRuntimePlaceAt?, mutableKind,
+    writeRuntimePlace?, writeRoot?, writeProjections?, rowFrame]
+  rw [show (ReferenceKind.mutable != ReferenceKind.mutable) = false from rfl]
+  rfl
+
+/-- Lift the owned indexed-field entry into the throw-aware row WP. -/
+theorem wpRowThrow_indexedLocalFieldBorrow0_ownedPair
+    (referenceType : ReferenceType)
+    (mutableKind : referenceType.kind = .mutable) (lex : Nat)
+    (source : StructHandle) (left right : Int) (state : RuntimeState)
+    (postValue : Row → Registries → RuntimeState → Control → Prop)
+    (postThrow : ThrowKind → Array RuntimeValue → Prop)
+    (exit : postValue
+      #[some (.vector #[.nominal source none
+          #[.loanHole state.nextLoan, .integer right]]),
+        none, none, none]
+      { activeLoans := #[(⟨lex⟩, state.nextLoan)]
+        loanLocations := #[(state.nextLoan,
+          ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] }
+      { state with nextLoan := state.nextLoan + 1 }
+      (.value (.borrow state.nextLoan (.integer left)))) :
+    wpRowThrow
+      (nativeIndexedLocalFieldBorrowOperation
+        { location := ⟨⟨0⟩⟩, index := 0,
+          field := ⟨source, none, 0⟩,
+          referenceType, kind := .mutable, lexicalLoan := lex }
+        valuesNil)
+      #[some (.vector #[.nominal source none
+          #[.integer left, .integer right]]), none, none, none]
+      { activeLoans := #[], loanLocations := #[] }
+      state postValue postThrow := by
+  rintro finalFrame finalState control
+    (⟨operandFrame, operandState, propagated, nilStep, -⟩ |
+      ⟨operandFrame, operandState, values, nilStep, evaluated⟩)
+  · simp [valuesNil] at nilStep
+  · simp only [valuesNil] at nilStep
+    injection nilStep with frameEq stateEq valuesEq
+    subst operandFrame operandState values
+    rcases evaluated with ⟨runtimeValue, evaluation, rfl⟩ |
+      ⟨kind, thrown, evaluation, rfl⟩ <;>
+      rw [indexedLocalFieldBorrow_evaluate_ownedPair referenceType mutableKind
+        lex source left right state] at evaluation
+    · cases Option.some.inj evaluation
+      exact ⟨_, _, rfl, exit⟩
+    · cases Option.some.inj evaluation
+
+/-- Write the new scalar into the borrow resting in local 1. -/
+theorem mutate_evaluate_ownedPairField (source : StructHandle)
+    (state : RuntimeState) (lex loan : Nat) (left right written : Int) :
+    ReferenceLocationOperation.mutate.evaluate?
+      #[.borrow loan (.integer left), .integer written]
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.loanHole loan, .integer right]]),
+          some (.borrow loan (.integer left)), none, none]
+        { activeLoans := #[(⟨lex⟩, loan)]
+          loanLocations := #[(loan,
+            ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] })
+      state =
+    some (.value
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.loanHole loan, .integer right]]),
+          some (.borrow loan (.integer written)), none, none]
+        { activeLoans := #[(⟨lex⟩, loan)]
+          loanLocations := #[(loan,
+            ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] })
+      state .unit) := by
+  have untouched : rewriteFirst (borrowRewrite? loan (.integer written))
+      (.vector #[.nominal source none #[.loanHole loan, .integer right]]) = none := by
+    simp [rewriteFirst.eq_def, rewriteFirstList.eq_def]
+  simp [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator,
+    mutateBorrow?, rowFrame, updateBorrowValue?, updateLocalBorrowValue?,
+    localLoanPlace?, readRuntimePlace?, readRoot?, readLocal?, readProjections?,
+    writeRuntimePlace?, writeRoot?, writeProjections?, rewriteFirst, untouched]
+
+/-- Retire the indexed-field loan, restore the field, and clear local 1. -/
+theorem endLoan_evaluate_ownedPairField (source : StructHandle)
+    (state : RuntimeState) (loan : Nat) (right written : Int) :
+    (ReferenceLocationOperation.endLoan #[⟨0⟩]).evaluate? #[]
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.loanHole loan, .integer right]]),
+          some (.borrow loan (.integer written)), none, none]
+        { activeLoans := #[(⟨0⟩, loan)]
+          loanLocations := #[(loan,
+            ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] })
+      state =
+    some (.value
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.integer written, .integer right]]),
+          some .unit, none, none]
+        { activeLoans := #[]
+          loanLocations := #[(loan,
+            ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] })
+      state .unit) := by
+  have siteSelf : (((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true) := by decide
+  have siteNotDifferent : (((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false) := by decide
+  simp [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator, rowFrame,
+    endLoans?, findBorrowValue?, findFirst, findFirstList, List.findSome?,
+    clearBorrowValue, rewriteFirst, rewriteFirstList, applyWriteBack,
+    fillVisibleHole, holeInFrame, holeWithin, fillHole?, Array.filter,
+    globalLoanKey?, globalLoanKeyIn?, transferGlobalLoan, transferredLoan?,
+    siteSelf, siteNotDifferent]
+
+/-- Retire the indexed-field loan on the throw-aware statement spine.
+Keeping the concrete row parameters in this rule prevents rewriting the
+generic evaluator equation from leaving unresolved row metavariables in
+the following expression. -/
+theorem wpRowThrow_endLoan_ownedPairField (source : StructHandle)
+    (state : RuntimeState) (loan : Nat) (right written : Int)
+    (postValue : Row → Registries → RuntimeState → Control → Prop)
+    (postThrow : ThrowKind → Array RuntimeValue → Prop)
+    (exit : postValue
+      #[some (.vector #[.nominal source none
+          #[.integer written, .integer right]]),
+        some .unit, none, none]
+      { activeLoans := #[]
+        loanLocations := #[(loan,
+          ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] }
+      state (.value .unit)) :
+    wpRowThrow
+      (nativeReferenceOperation (.endLoan #[⟨0⟩]) valuesNil)
+      #[some (.vector #[.nominal source none
+          #[.loanHole loan, .integer right]]),
+        some (.borrow loan (.integer written)), none, none]
+      { activeLoans := #[(⟨0⟩, loan)]
+        loanLocations := #[(loan,
+          ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] }
+      state postValue postThrow := by
+  apply wpRowThrow_endLoanStatement
+  intro finalFrame finalState retired evaluated
+  rw [endLoan_evaluate_ownedPairField source state loan right written]
+    at evaluated
+  injection evaluated with inner
+  injection inner with frameEq stateEq retiredEq
+  subst finalFrame finalState retired
+  exact ⟨_, _, rfl, exit⟩
+
+/-- A shared read of the restored element leaves the row unchanged. -/
+theorem indexedLocalBorrow_evaluate_ownedPair
+    (referenceType : ReferenceType)
+    (sharedKind : referenceType.kind = .shared) (lex loan : Nat)
+    (source : StructHandle) (left right : Int) (state : RuntimeState) :
+    (({ location := ⟨⟨0⟩⟩, dereference := false, index := 0,
+        referenceType, kind := .immutable, lexicalLoan := lex } :
+      IndexedLocalBorrowOperation)).evaluate? #[]
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.integer left, .integer right]]),
+          some .unit, none, none]
+        { activeLoans := #[]
+          loanLocations := #[(loan,
+            ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] })
+      state =
+    some (.value
+      (rowFrame
+        #[some (.vector #[.nominal source none
+            #[.integer left, .integer right]]),
+          some .unit, none, none]
+        { activeLoans := #[]
+          loanLocations := #[(loan,
+            ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] })
+      state (.nominal source none #[.integer left, .integer right])) := by
+  simp [IndexedLocalBorrowOperation.evaluate?, liftPlaceEvaluator,
+    IndexedLocalBorrowOperation.resolve?, resolveLocalLiteralIndex?,
+    readRuntimePlace?, readRoot?, readLocal?, readProjections?,
+    borrowRuntimePlaceAt?, sharedKind, rowFrame]
+  rw [show (ReferenceKind.shared != ReferenceKind.shared) = false from rfl]
+  rfl
+
+/-- Lift the shared owned-element read into the throw-aware row WP. -/
+theorem wpRowThrow_indexedLocalBorrow0_ownedPair
+    (referenceType : ReferenceType)
+    (sharedKind : referenceType.kind = .shared) (lex loan : Nat)
+    (source : StructHandle) (left right : Int) (state : RuntimeState)
+    (postValue : Row → Registries → RuntimeState → Control → Prop)
+    (postThrow : ThrowKind → Array RuntimeValue → Prop)
+    (exit : postValue
+      #[some (.vector #[.nominal source none
+          #[.integer left, .integer right]]),
+        some .unit, none, none]
+      { activeLoans := #[]
+        loanLocations := #[(loan,
+          ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] }
+      state (.value (.nominal source none #[.integer left, .integer right]))) :
+    wpRowThrow
+      (nativeIndexedLocalBorrowOperation
+        { location := ⟨⟨0⟩⟩, dereference := false, index := 0,
+          referenceType, kind := .immutable, lexicalLoan := lex }
+        valuesNil)
+      #[some (.vector #[.nominal source none
+          #[.integer left, .integer right]]),
+        some .unit, none, none]
+      { activeLoans := #[]
+        loanLocations := #[(loan,
+          ⟨.local ⟨0⟩, #[.index 0, .field 0], true⟩)] }
+      state postValue postThrow := by
+  rintro finalFrame finalState control
+    (⟨operandFrame, operandState, propagated, nilStep, -⟩ |
+      ⟨operandFrame, operandState, values, nilStep, evaluated⟩)
+  · simp [valuesNil] at nilStep
+  · simp only [valuesNil] at nilStep
+    injection nilStep with frameEq stateEq valuesEq
+    subst operandFrame operandState values
+    rcases evaluated with ⟨runtimeValue, evaluation, rfl⟩ |
+      ⟨kind, thrown, evaluation, rfl⟩ <;>
+      rw [indexedLocalBorrow_evaluate_ownedPair referenceType sharedKind lex
+        loan source left right state] at evaluation
+    · cases Option.some.inj evaluation
+      exact ⟨_, _, rfl, exit⟩
+    · cases Option.some.inj evaluation
+
+/-- Any immutable compact indexed-local borrow preserves the row; failure
+also leaves no result to account for. -/
+theorem evaluatorRowStable_indexedLocalBorrow_immutable
+    (operation : IndexedLocalBorrowOperation)
+    (immutable : operation.kind = .immutable)
+    (sharedKind : operation.referenceType.kind = .shared) :
+    EvaluatorRowStable operation.evaluate? := by
+  intro operands row registries state result evaluated
+  simp only [IndexedLocalBorrowOperation.evaluate?, liftPlaceEvaluator]
+    at evaluated
+  rw [immutable] at evaluated
+  split at evaluated
+  · cases evaluated
+  · cases resolved : operation.resolve? (rowFrame row registries) state with
+    | none => simp [resolved] at evaluated
+    | some place =>
+      simp only [resolved] at evaluated
+      simp [borrowRuntimePlaceAt?, sharedKind] at evaluated
+      rw [show (ReferenceKind.shared != ReferenceKind.shared) = false from rfl,
+        show (ReferenceKind.shared == ReferenceKind.mutable) = false from rfl]
+        at evaluated
+      cases read : readRuntimePlace? (rowFrame row registries) state place with
+      | none => simp [read] at evaluated
+      | some value =>
+        simp [read] at evaluated
+        cases evaluated
+        exact ⟨row, rfl⟩
+
+/-- Lift the closed indexed-borrow evaluation into the throw-aware row
+weakest precondition.  This is the entry law used by vector-element borrow
+scopes; its operand row is empty, so no generic evaluator reduction is
+needed at the call site. -/
+theorem wpRowThrow_indexedLocalBorrow0
+    (referenceType : ReferenceType)
+    (mutableKind : referenceType.kind = .mutable) (lex : Nat)
+    (outerLoan : Nat) (focus : VectorFocus) (current : RuntimeValue)
+    (registries : Registries) (state : RuntimeState)
+    (postValue : Row → Registries → RuntimeState → Control → Prop)
+    (postThrow : ThrowKind → Array RuntimeValue → Prop)
+    (exit : postValue
+      #[some (.borrow outerLoan
+          (focus.fill (.loanHole state.nextLoan))), none]
+      { activeLoans :=
+          (registries.activeLoans.filter (·.1 != ⟨lex⟩)).push
+            (⟨lex⟩, state.nextLoan)
+        loanLocations := registries.loanLocations.push
+          (state.nextLoan,
+            ⟨.local ⟨0⟩, #[.deref, .index focus.index], true⟩)
+        typeInstantiation := registries.typeInstantiation }
+      { state with nextLoan := state.nextLoan + 1 }
+      (.value (.borrow state.nextLoan current))) :
+    wpRowThrow
+      (nativeIndexedLocalBorrowOperation
+        { location := ⟨⟨0⟩⟩, dereference := true, index := focus.index,
+          referenceType, kind := .mutable, lexicalLoan := lex }
+        valuesNil)
+      #[some (.borrow outerLoan (focus.fill current)), none]
+      registries state postValue postThrow := by
+  rintro finalFrame finalState control
+    (⟨operandFrame, operandState, propagated, nilStep, -⟩ |
+      ⟨operandFrame, operandState, values, nilStep, evaluated⟩)
+  · simp [valuesNil] at nilStep
+  · simp only [valuesNil] at nilStep
+    injection nilStep with frameEq stateEq valuesEq
+    subst operandFrame operandState values
+    rcases evaluated with ⟨runtimeValue, evaluation, rfl⟩ |
+      ⟨kind, thrown, evaluation, rfl⟩ <;>
+      rw [indexedLocalBorrow_evaluate_derefVector referenceType mutableKind lex
+        outerLoan focus current registries state] at evaluation
+    · cases Option.some.inj evaluation
+      exact ⟨_, _, rfl, exit⟩
+    · cases Option.some.inj evaluation
+
+/-- The indexed-borrow entry specialized to a single mutable parameter.
+Its statement keeps the two registry rows literal, which lets the scalar
+inner script match its mutation law without reducing array programs. -/
+theorem wpRowThrow_indexedLocalBorrow0_parameter
+    (referenceType : ReferenceType)
+    (mutableKind : referenceType.kind = .mutable) (lex : Nat)
+    (outerLoan : Nat) (focus : VectorFocus) (current : RuntimeValue)
+    (state : RuntimeState)
+    (postValue : Row → Registries → RuntimeState → Control → Prop)
+    (postThrow : ThrowKind → Array RuntimeValue → Prop)
+    (exit : postValue
+      #[some (.borrow outerLoan
+          (focus.fill (.loanHole state.nextLoan))), none]
+      { activeLoans := #[(⟨lex⟩, state.nextLoan)]
+        loanLocations := #[(outerLoan, ⟨.local ⟨0⟩, #[], true⟩),
+          (state.nextLoan,
+            ⟨.local ⟨0⟩, #[.deref, .index focus.index], true⟩)] }
+      { state with nextLoan := state.nextLoan + 1 }
+      (.value (.borrow state.nextLoan current))) :
+    wpRowThrow
+      (nativeIndexedLocalBorrowOperation
+        { location := ⟨⟨0⟩⟩, dereference := true, index := focus.index,
+          referenceType, kind := .mutable, lexicalLoan := lex }
+        valuesNil)
+      #[some (.borrow outerLoan (focus.fill current)), none]
+      { activeLoans := #[]
+        loanLocations := #[(outerLoan, ⟨.local ⟨0⟩, #[], true⟩)] }
+      state postValue postThrow := by
+  apply wpRowThrow_indexedLocalBorrow0 referenceType mutableKind lex outerLoan
+    focus current _ state
+  simpa using exit
+
+/-! ## An indexed loan of an owned vector beside a live parameter -/
+
+/-- Borrow `local1[0]` while local 0 contains an unrelated mutable
+parameter.  The row is the exact three-local shape emitted for the loans
+regression, so locating the owned vector remains a constant computation. -/
+theorem indexedLocalBorrow_evaluate_ownedVectorBesideParameter
+    (referenceType : ReferenceType)
+    (mutableKind : referenceType.kind = .mutable) (lex : Nat)
+    (outer : Nat) (outerCurrent current : RuntimeValue)
+    (state : RuntimeState) :
+    (({ location := ⟨⟨1⟩⟩, dereference := false, index := 0,
+        referenceType, kind := .mutable, lexicalLoan := lex } :
+      IndexedLocalBorrowOperation)).evaluate? #[]
+      (rowFrame #[some (.borrow outer outerCurrent),
+          some (.vector #[current]), none]
+        { activeLoans := #[]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩)] }) state =
+    some (.value
+      (rowFrame #[some (.borrow outer outerCurrent),
+          some (.vector #[.loanHole state.nextLoan]), none]
+        { activeLoans := #[(⟨lex⟩, state.nextLoan)]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (state.nextLoan, ⟨.local ⟨1⟩, #[.index 0], true⟩)] })
+      { state with nextLoan := state.nextLoan + 1 }
+      (.borrow state.nextLoan current)) := by
+  simp [IndexedLocalBorrowOperation.evaluate?, liftPlaceEvaluator,
+    IndexedLocalBorrowOperation.resolve?, resolveLocalLiteralIndex?,
+    readRuntimePlace?, readRoot?, readLocal?, readProjections?,
+    borrowRuntimePlaceAt?, mutableKind, writeRuntimePlace?, writeRoot?,
+    writeProjections?, rowFrame]
+  rw [show (ReferenceKind.mutable != ReferenceKind.mutable) = false from rfl]
+  rfl
+
+/-- Throw-aware entry rule for the owned-vector element loan. -/
+theorem wpRowThrow_indexedLocalBorrow1_ownedVectorBesideParameter
+    (referenceType : ReferenceType)
+    (mutableKind : referenceType.kind = .mutable) (lex : Nat)
+    (outer : Nat) (outerCurrent current : RuntimeValue)
+    (state : RuntimeState)
+    (postValue : Row → Registries → RuntimeState → Control → Prop)
+    (postThrow : ThrowKind → Array RuntimeValue → Prop)
+    (exit : postValue
+      #[some (.borrow outer outerCurrent),
+        some (.vector #[.loanHole state.nextLoan]), none]
+      { activeLoans := #[(⟨lex⟩, state.nextLoan)]
+        loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+          (state.nextLoan, ⟨.local ⟨1⟩, #[.index 0], true⟩)] }
+      { state with nextLoan := state.nextLoan + 1 }
+      (.value (.borrow state.nextLoan current))) :
+    wpRowThrow
+      (nativeIndexedLocalBorrowOperation
+        { location := ⟨⟨1⟩⟩, dereference := false, index := 0,
+          referenceType, kind := .mutable, lexicalLoan := lex }
+        valuesNil)
+      #[some (.borrow outer outerCurrent), some (.vector #[current]), none]
+      { activeLoans := #[]
+        loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩)] }
+      state postValue postThrow := by
+  rintro finalFrame finalState control
+    (⟨operandFrame, operandState, propagated, nilStep, -⟩ |
+      ⟨operandFrame, operandState, values, nilStep, evaluated⟩)
+  · simp [valuesNil] at nilStep
+  · simp only [valuesNil] at nilStep
+    injection nilStep with frameEq stateEq valuesEq
+    subst operandFrame operandState values
+    rcases evaluated with ⟨runtimeValue, evaluation, rfl⟩ |
+      ⟨kind, thrown, evaluation, rfl⟩ <;>
+      rw [indexedLocalBorrow_evaluate_ownedVectorBesideParameter
+        referenceType mutableKind lex outer outerCurrent current state]
+        at evaluation
+    · cases Option.some.inj evaluation
+      exact ⟨_, _, rfl, exit⟩
+    · cases Option.some.inj evaluation
+
+/-- Write through the element borrow in local 2 without inspecting the
+unrelated parameter's typed current value. -/
+theorem mutate_evaluate_ownedVectorBesideParameter
+    (state : RuntimeState) (outer loan : Nat)
+    (outerCurrent current written : RuntimeValue)
+    (outerPlain : Plain outerCurrent) (separate : outer ≠ loan) :
+    ReferenceLocationOperation.mutate.evaluate?
+      #[.borrow loan current, written]
+      (rowFrame #[some (.borrow outer outerCurrent),
+          some (.vector #[.loanHole loan]), some (.borrow loan current)]
+        { activeLoans := #[(⟨0⟩, loan)]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (loan, ⟨.local ⟨1⟩, #[.index 0], true⟩)] }) state =
+    some (.value
+      (rowFrame #[some (.borrow outer outerCurrent),
+          some (.vector #[.loanHole loan]), some (.borrow loan written)]
+        { activeLoans := #[(⟨0⟩, loan)]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (loan, ⟨.local ⟨1⟩, #[.index 0], true⟩)] })
+      state .unit) := by
+  have outerUntouched : rewriteFirst (borrowRewrite? loan written)
+      (.borrow outer outerCurrent) = none := by
+    rw [rewriteFirst.eq_def]
+    simp [borrowRewrite?, separate,
+      rewriteFirst_eq_none_of_plain (LoanMatcher.borrowRewrite? loan written)
+        outerPlain]
+  have holeUntouched : rewriteFirstList (borrowRewrite? loan written)
+      [.loanHole loan] = none := by
+    simp [rewriteFirstList.eq_def, rewriteFirst.eq_def, borrowRewrite?]
+  simp [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator,
+    mutateBorrow?, rowFrame, updateBorrowValue?, updateLocalBorrowValue?,
+    localLoanPlace?, readRuntimePlace?, readRoot?, readLocal?,
+    readProjections?, writeRuntimePlace?, writeRoot?, writeProjections?,
+    rewriteFirst, rewriteFirstList, outerUntouched, holeUntouched, separate]
+
+/-- Retire the owned element loan, restoring the vector in local 1 and
+clearing its temporary borrow in local 2. -/
+theorem endLoan_evaluate_ownedVectorBesideParameter
+    (state : RuntimeState) (outer loan : Nat)
+    (outerCurrent written : RuntimeValue)
+    (outerPlain : Plain outerCurrent) (writtenPlain : Plain written)
+    (separate : outer ≠ loan) :
+    (ReferenceLocationOperation.endLoan #[⟨0⟩]).evaluate? #[]
+      (rowFrame #[some (.borrow outer outerCurrent),
+          some (.vector #[.loanHole loan]), some (.borrow loan written)]
+        { activeLoans := #[(⟨0⟩, loan)]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (loan, ⟨.local ⟨1⟩, #[.index 0], true⟩)] }) state =
+    some (.value
+      (rowFrame #[some (.borrow outer outerCurrent),
+          some (.vector #[written]), some .unit]
+        { activeLoans := #[]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (loan, ⟨.local ⟨1⟩, #[.index 0], true⟩)] })
+      state .unit) := by
+  have siteSelf : (((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true) := by decide
+  have siteNotDifferent : (((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false) := by decide
+  have firstUntouched : rewriteFirst (borrowClear? loan)
+      (.borrow outer outerCurrent) = none := by
+    rw [rewriteFirst.eq_def]
+    simp [borrowClear?, separate,
+      rewriteFirst_eq_none_of_plain (LoanMatcher.borrowClear? loan) outerPlain]
+  have noOuterBorrow := findFirst_eq_none_of_plain
+    (LoanMatcher.borrowCurrent? loan) outerPlain
+  have noOuterHole := findFirst_eq_none_of_plain
+    (LoanMatcher.holeMark? loan) outerPlain
+  have noWrittenHole := findFirst_eq_none_of_plain
+    LoanMatcher.anyHole? writtenPlain
+  have outerFillUntouched := rewriteFirst_eq_none_of_plain
+    (LoanMatcher.holeFill? loan written) outerPlain
+  simp [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator, rowFrame,
+    endLoans?, findBorrowValue?, findFirst, findFirstList, List.findSome?,
+    clearBorrowValue, rewriteFirst, rewriteFirstList, applyWriteBack,
+    fillVisibleHole, holeInFrame, holeWithin, fillHole?, Array.filter,
+    globalLoanKey?, globalLoanKeyIn?, transferGlobalLoan, transferredLoan?,
+    firstUntouched, noOuterBorrow, noOuterHole, noWrittenHole,
+    outerFillUntouched, separate, siteSelf, siteNotDifferent]
+
+/-- Once the independent element loan has retired, writing the unrelated
+mutable parameter uses its cached local-zero address.  The stale element
+location is harmless and deliberately retained, matching the runtime. -/
+theorem mutate_evaluate_parameterBesideRetiredOwnedVector
+    (state : RuntimeState) (outer retired : Nat)
+    (current replacement element : RuntimeValue) (separate : outer ≠ retired) :
+    ReferenceLocationOperation.mutate.evaluate?
+      #[.borrow outer current, replacement]
+      (rowFrame #[some (.borrow outer current),
+          some (.vector #[element]), some .unit]
+        { activeLoans := #[]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (retired, ⟨.local ⟨1⟩, #[.index 0], true⟩)] }) state =
+    some (.value
+      (rowFrame #[some (.borrow outer replacement),
+          some (.vector #[element]), some .unit]
+        { activeLoans := #[]
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (retired, ⟨.local ⟨1⟩, #[.index 0], true⟩)] })
+      state .unit) := by
+  have retiredSeparate : retired ≠ outer := Ne.symm separate
+  simp [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator,
+    mutateBorrow?, rowFrame, updateBorrowValue?, updateLocalBorrowValue?,
+    localLoanPlace?, readRuntimePlace?, readRoot?, readLocal?,
+    readProjections?, writeRuntimePlace?, writeRoot?, writeProjections?,
+    rewriteFirst, separate, retiredSeparate]
+
+/-- Retire a literal-index reborrow after its body: the element's current
+value fills the hole in the outer vector borrow and the temporary local is
+cleared. -/
+theorem endLoans?_indexedReborrow_zero
+    (state : RuntimeState) (outerLoan loan : Nat)
+    (focus : VectorFocus) (current argument : RuntimeValue)
+    (loanLocations : Array (Nat × RuntimePlace))
+    (plain : focus.Plain) (separate : outerLoan ≠ loan) :
+    endLoans? #[(⟨0⟩ : LoanId)] #[argument]
+        { locals := #[some (.borrow outerLoan
+              (focus.fill (.loanHole loan))),
+            some (.borrow loan current)]
+          activeLoans := #[(⟨0⟩, loan)]
+          loanLocations } state =
+      some
+        ({ locals := #[some (.borrow outerLoan
+              (focus.fill current)), some .unit]
+           activeLoans := #[]
+           loanLocations },
+         state, argument) := by
+  have siteSelf : ((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true := by decide
+  have siteNotDifferent : ((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false := by decide
+  obtain ⟨holeMark, anyHole, borrowCurrent, holeFill, borrowRewrite,
+      borrowClear⟩ := focus.walks plain
+  simp [endLoans?, findBorrowValue?, findFirst, clearBorrowValue,
+    rewriteFirst, applyWriteBack, fillVisibleHole,
+    holeInFrame, holeWithin, fillHole?, Array.filter,
+    holeMark, anyHole, borrowCurrent, holeFill, borrowRewrite, borrowClear,
+    separate, siteSelf, siteNotDifferent]
+
+theorem endLoan_evaluate_indexedReborrow
+    (state : RuntimeState) (outerLoan loan : Nat)
+    (focus : VectorFocus) (current argument : RuntimeValue)
+    (loanLocations : Array (Nat × RuntimePlace))
+    (plain : focus.Plain) (separate : outerLoan ≠ loan) :
+    (ReferenceLocationOperation.endLoan #[⟨0⟩]).evaluate? #[argument]
+      (rowFrame #[some (.borrow outerLoan
+            (focus.fill (.loanHole loan))),
+          some (.borrow loan current)]
+        { activeLoans := #[(⟨0⟩, loan)], loanLocations }) state =
+      some (.value
+        (rowFrame #[some (.borrow outerLoan
+              (focus.fill current)), some .unit]
+          { activeLoans := #[], loanLocations })
+        state argument) := by
+  simp only [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator, rowFrame]
+  rw [endLoans?_indexedReborrow_zero state outerLoan loan focus current
+    argument loanLocations plain separate]
+  rfl
+
+/-! ## Two disjoint field reborrows of one parameter -/
+
+/-- Retire the right-hand field loan while the left-hand sibling loan is
+still live.  The row is the exact five-local shape generated by
+`read_siblings`; keeping it literal makes the two-hole walk a closed
+computation rather than a symbolic search. -/
+theorem endLoan_evaluate_siblingRight (source : StructHandle)
+    (state : RuntimeState) (outer first second : Nat) (left right : Int)
+    (outerFirst : outer ≠ first) (outerSecond : outer ≠ second)
+    (distinct : first ≠ second) :
+    (ReferenceLocationOperation.endLoan #[⟨1⟩]).evaluate? #[]
+      (rowFrame
+        #[some (.borrow outer (.nominal source none
+              #[.loanHole first, .loanHole second])),
+          some (.borrow first (.integer left)),
+          some (.borrow second (.integer right)),
+          some (.integer right), none]
+        { activeLoans := #[(⟨0⟩, first), (⟨1⟩, second)]
+          loanLocations :=
+            #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+              (first, ⟨.local ⟨0⟩, #[.deref, .field 0], true⟩),
+              (second, ⟨.local ⟨0⟩, #[.deref, .field 1], true⟩)] })
+      state =
+    some (.value
+      (rowFrame
+        #[some (.borrow outer (.nominal source none
+              #[.loanHole first, .integer right])),
+          some (.borrow first (.integer left)), some .unit,
+          some (.integer right), none]
+        { activeLoans := #[(⟨0⟩, first)]
+          loanLocations :=
+            #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+              (first, ⟨.local ⟨0⟩, #[.deref, .field 0], true⟩),
+              (second, ⟨.local ⟨0⟩, #[.deref, .field 1], true⟩)] })
+      state .unit) := by
+  have zeroOne : (((⟨0⟩ : ExprId) == (⟨1⟩ : ExprId)) = false) := by decide
+  have oneSelf : (((⟨1⟩ : ExprId) == (⟨1⟩ : ExprId)) = true) := by decide
+  have zeroNeOne : (((⟨0⟩ : ExprId) != (⟨1⟩ : ExprId)) = true) := by decide
+  have oneNe : (((⟨1⟩ : ExprId) != (⟨1⟩ : ExprId)) = false) := by decide
+  have secondFirst : second ≠ first := Ne.symm distinct
+  have firstOuter : first ≠ outer := Ne.symm outerFirst
+  have secondOuter : second ≠ outer := Ne.symm outerSecond
+  simp only [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator, rowFrame]
+  simp [endLoans?, findBorrowValue?, findFirst, findFirstList, List.findSome?,
+    clearBorrowValue, rewriteFirst, rewriteFirstList,
+    applyWriteBack, fillVisibleHole, holeInFrame, holeWithin,
+    fillHole?, Array.filter, globalLoanKey?, globalLoanKeyIn?,
+    transferGlobalLoan, transferredLoan?, zeroOne, oneSelf, zeroNeOne, oneNe,
+    outerFirst, outerSecond, distinct, secondFirst, firstOuter, secondOuter]
+
+/-- Retire the remaining left-hand field loan after the right sibling has
+already been restored. -/
+theorem endLoan_evaluate_siblingLeft (source : StructHandle)
+    (state : RuntimeState) (outer first second : Nat) (left right : Int)
+    (outerFirst : outer ≠ first) :
+    (ReferenceLocationOperation.endLoan #[⟨0⟩]).evaluate? #[]
+      (rowFrame
+        #[some (.borrow outer (.nominal source none
+              #[.loanHole first, .integer right])),
+          some (.borrow first (.integer left)), some .unit,
+          some (.integer right), some (.integer left)]
+        { activeLoans := #[(⟨0⟩, first)]
+          loanLocations :=
+            #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+              (first, ⟨.local ⟨0⟩, #[.deref, .field 0], true⟩),
+              (second, ⟨.local ⟨0⟩, #[.deref, .field 1], true⟩)] })
+      state =
+    some (.value
+      (rowFrame
+        #[some (.borrow outer (.nominal source none
+              #[.integer left, .integer right])),
+          some .unit, some .unit, some (.integer right), some (.integer left)]
+        { activeLoans := #[]
+          loanLocations :=
+            #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+              (first, ⟨.local ⟨0⟩, #[.deref, .field 0], true⟩),
+              (second, ⟨.local ⟨0⟩, #[.deref, .field 1], true⟩)] })
+      state .unit) := by
+  have zeroSelf : (((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true) := by decide
+  have zeroNe : (((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false) := by decide
+  have firstOuter : first ≠ outer := Ne.symm outerFirst
+  simp only [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator, rowFrame]
+  simp [endLoans?, findBorrowValue?, findFirst, findFirstList, List.findSome?,
+    clearBorrowValue, rewriteFirst, rewriteFirstList,
+    applyWriteBack, fillVisibleHole, holeInFrame, holeWithin, fillHole?,
+    Array.filter, globalLoanKey?, globalLoanKeyIn?, transferGlobalLoan,
+    transferredLoan?, zeroSelf, zeroNe, outerFirst, firstOuter]
+
+/-- Export the restored pair parameter after both temporary field loans
+have been cleared.  Read-only scalar locals cannot contribute write-backs. -/
+theorem exportFrameLoans_rowFrame_siblingReads (source : StructHandle)
+    (state : RuntimeState) (outer first second : Nat) (left right : Int)
+    (noGlobal : globalLoanKeyIn? state.globalLoans outer = none) :
+    exportFrameLoans
+      (rowFrame
+        #[some (.borrow outer (.nominal source none
+              #[.integer left, .integer right])),
+          some .unit, some .unit, some (.integer right), some (.integer left)]
+        { activeLoans := #[]
+          loanLocations :=
+            #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+              (first, ⟨.local ⟨0⟩, #[.deref, .field 0], true⟩),
+              (second, ⟨.local ⟨0⟩, #[.deref, .field 1], true⟩)] })
+      state =
+    { state with pending := state.pending.push (outer,
+        RuntimeValue.nominal source none #[.integer left, .integer right]) } := by
+  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
+  simp [rowFrame, exportFrameLoans, exportSettledLoans, frameBorrows,
+    outermostBorrows, borrowEntry?, collectPruned, holeInFrame, holeWithin,
+    findFirst, findFirstList, List.findSome?, applyWriteBack_empty,
+    globalLoanKey?, noGlobal]
+
+/-- Write through a focused vector-element borrow resting beside its
+outer mutable vector parameter. -/
+theorem mutate_evaluate_indexedLocal1 (state : RuntimeState)
+    (outer loan : Nat) (focus : VectorFocus) (plain : focus.Plain)
+    (current written : RuntimeValue)
+    (activeLoans : Array (ExprId × Nat)) (separate : outer ≠ loan) :
+    ReferenceLocationOperation.mutate.evaluate? #[.borrow loan current, written]
+      (rowFrame #[some (.borrow outer (focus.fill (.loanHole loan))),
+          some (.borrow loan current)]
+        { activeLoans
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (loan, ⟨.local ⟨0⟩, #[.deref, .index focus.index], true⟩)] })
+      state =
+    some (.value
+      (rowFrame #[some (.borrow outer (focus.fill (.loanHole loan))),
+          some (.borrow loan written)]
+        { activeLoans
+          loanLocations := #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
+            (loan, ⟨.local ⟨0⟩, #[.deref, .index focus.index], true⟩)] })
+      state .unit) := by
+  obtain ⟨-, -, -, -, borrowRewrite, -⟩ := focus.walks plain
+  have focusedHole : readProjections? (focus.fill (.loanHole loan))
+      [.index focus.index] = some (.loanHole loan) := by
+    rw [VectorFocus.fill, readProjections?]
+    rw [focus.getElem?_fill]
+    rfl
+  have focusedBorrow : readProjections?
+      (.borrow outer (focus.fill (.loanHole loan)))
+      [.deref, .index focus.index] = some (.loanHole loan) := by
+    rw [readProjections?]
+    exact focusedHole
+  simp [ReferenceLocationOperation.evaluate?, liftPlaceEvaluator,
+    mutateBorrow?, rowFrame, updateBorrowValue?, updateLocalBorrowValue?,
+    localLoanPlace?, readRuntimePlace?, readRoot?, readLocal?,
+    borrowRewrite, rewriteFirst, writeRuntimePlace?, writeRoot?,
+    separate, focusedBorrow]
+
+/-- Finalize one mutable parameter whose current value is any loan-free
+runtime value.  Vector-element scopes use this after the temporary element
+loan has been retired and the vector has been reconstructed. -/
+theorem exportFrameLoans_rowFrame_singlePlainBorrow (state : RuntimeState)
+    (loan : Nat) (value : RuntimeValue) (plain : Plain value)
+    (activeLoans : Array (ExprId × Nat))
+    (loanLocations : Array (Nat × RuntimePlace))
+    (noGlobal : globalLoanKeyIn? state.globalLoans loan = none) :
+    exportFrameLoans
+        (rowFrame #[some (.borrow loan value), some .unit]
+          { activeLoans, loanLocations })
+        state =
+      { state with pending := state.pending.push (loan, value) } := by
+  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
+  have noNested := plain.outermostBorrows_eq_empty
+  have noHole := findFirst_eq_none_of_plain
+    (LoanMatcher.holeMark? loan) plain
+  simp [rowFrame, exportFrameLoans, exportSettledLoans, frameBorrows,
+    outermostBorrows, borrowEntry?, collectPruned, noNested,
+    holeInFrame, holeWithin, findFirst, applyWriteBack_empty_export,
+    globalLoanKey?, noGlobal, noHole]
 
 /-- A write through the focused field borrow of the bracket: the borrow's
 current is replaced where it rests, in local 2.  The registries are the
@@ -333,8 +1158,10 @@ theorem wpRowThrow_focusedFieldBracket (namespaceId : NamespaceId)
             at evaluation <;>
           rw [globalBorrow_evaluate_rowFrame namespaceId typeId borrowType
             borrowMutable 0 address [some (.integer amount), none, none]
-            { activeLoans := #[], loanLocations := #[] } state _ present]
+            { activeLoans := #[], loanLocations := #[], typeInstantiation := #[] }
+            state _ (by simpa only [instantiatedTypeId_empty] using present)]
             at evaluation <;>
+          simp only [instantiatedTypeId_empty] at evaluation <;>
           cases Option.some.inj evaluation
         refine ⟨?_, rfl, rfl⟩
         simp [rowFrame, Array.filter]
@@ -638,7 +1465,8 @@ theorem globalBorrow_evaluate_absent (namespaceId : NamespaceId)
     (typeId : TypeId) (referenceType : ReferenceType) (lex : Nat)
     (address : String) (frame : RuntimeFrame) (state : RuntimeState)
     (absent : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = none) :
+      (globalKey namespaceId (instantiatedTypeId frame.typeInstantiation typeId)
+        (.address address)) = none) :
     (GlobalLocationOperation.borrow
       { resource := ⟨namespaceId, typeId⟩, referenceType, kind := .mutable,
         lexicalLoan := lex }).evaluate? #[.address address] frame state =
@@ -706,7 +1534,9 @@ theorem globalBorrow_onlyThrows (namespaceId : NamespaceId) (typeId : TypeId)
     (rest : List (Option RuntimeValue)) (registries : Registries)
     (state : RuntimeState)
     (absent : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = none) :
+      (globalKey namespaceId
+        (instantiatedTypeId registries.typeInstantiation typeId)
+        (.address address)) = none) :
     OnlyThrows
       (nativeGlobalOperation
         (GlobalLocationOperation.borrow
@@ -764,7 +1594,9 @@ theorem wpRowThrow_fieldBracketAbsent (namespaceId : NamespaceId) (typeId : Type
     {postValue : Row → Registries → RuntimeState → Control → Prop}
     {postThrow : ThrowKind → Array RuntimeValue → Prop}
     (absent : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = none)
+      (globalKey namespaceId
+        (instantiatedTypeId registries.typeInstantiation typeId)
+        (.address address)) = none)
     (thrown : postThrow .abort #[]) :
     wpRowThrow
       (nativeReferenceOperation (ReferenceLocationOperation.endLoan loans)
@@ -795,7 +1627,9 @@ theorem wpRowThrow_wholeBracketAbsent (namespaceId : NamespaceId) (typeId : Type
     {postValue : Row → Registries → RuntimeState → Control → Prop}
     {postThrow : ThrowKind → Array RuntimeValue → Prop}
     (absent : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = none)
+      (globalKey namespaceId
+        (instantiatedTypeId registries.typeInstantiation typeId)
+        (.address address)) = none)
     (thrown : postThrow .abort #[]) :
     wpRowThrow
       (nativeReferenceOperation (ReferenceLocationOperation.endLoan loans)
@@ -1003,8 +1837,10 @@ theorem wpRowThrow_wholeResourceBracket (namespaceId : NamespaceId)
             at evaluation <;>
           rw [globalBorrow_evaluate_rowFrame namespaceId typeId borrowType
             borrowMutable 0 address [some (.integer amount), none]
-            { activeLoans := #[], loanLocations := #[] } state _ present]
+            { activeLoans := #[], loanLocations := #[], typeInstantiation := #[] }
+            state _ (by simpa only [instantiatedTypeId_empty] using present)]
             at evaluation <;>
+          simp only [instantiatedTypeId_empty] at evaluation <;>
           cases Option.some.inj evaluation
         refine ⟨?_, rfl, rfl⟩
         simp [rowFrame, Array.filter]
@@ -1202,6 +2038,344 @@ theorem endLoan_evaluate_focusedFieldSaved (globals : GlobalMap)
   rw [endLoans?_focusedGlobalSaved _ _ _ _ _ _ _ _ _ _ steps plainSteps]
   rfl
 
+/-- Retire a focused mutable-storage bracket whose lexical ids follow a
+shared read.  Shared global borrows mint no runtime loan, but they still
+occupy lexical id `0`; consequently the mutable resource and field loans
+are registered at ids `1` and `2`.  Keeping this common composition as a
+closed evaluator law prevents normalization from unfolding the generic
+loan search through the two plain nominal locals. -/
+theorem endLoans?_focusedGlobalAfterSharedNominal
+    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
+    (key : GlobalKey) (address : String) (source : StructHandle)
+    (saved value : Int) (steps : List FocusStep)
+    (plainSteps : PlainSteps steps) (argument : RuntimeValue) :
+    endLoans? #[(⟨1⟩ : LoanId), (⟨2⟩ : LoanId)] #[argument]
+        { locals := #[some (.address address),
+            some (.nominal source none #[.integer saved]),
+            some (.nominal source none #[.integer saved]),
+            some (.borrow (loan + 1) (.integer value)),
+            some (.borrow loan (focusValue steps (.loanHole (loan + 1))))]
+          activeLoans := #[(⟨1⟩, loan), (⟨2⟩, loan + 1)]
+          loanLocations := #[(loan, { root := .global key }),
+            (loan + 1,
+              (⟨.local (⟨4⟩ : LocalId), #[.deref] ++ focusProjections steps, true⟩ :
+                RuntimePlace))] }
+        { globals := globals.insert key (.loanHole loan)
+          globalLoans := (loan, key) :: rest
+          nextLoan
+          pending } =
+      some
+        ({ locals := #[some (.address address),
+              some (.nominal source none #[.integer saved]),
+              some (.nominal source none #[.integer saved]),
+              some .unit, some .unit]
+           activeLoans := #[]
+           loanLocations := #[(loan, { root := .global key }),
+             (loan + 1,
+               (⟨.local (⟨4⟩ : LocalId), #[.deref] ++ focusProjections steps, true⟩ :
+                 RuntimePlace))] },
+         { globals := (globals.insert key (.loanHole loan)).insert key
+               (focusValue steps (.integer value))
+           globalLoans := rest
+           nextLoan
+           pending },
+         argument) := by
+  have one_eq_one : (((⟨1⟩ : ExprId) == (⟨1⟩ : ExprId)) = true) := by decide
+  have two_eq_two : (((⟨2⟩ : ExprId) == (⟨2⟩ : ExprId)) = true) := by decide
+  have one_eq_two : (((⟨1⟩ : ExprId) == (⟨2⟩ : ExprId)) = false) := by decide
+  have one_ne_one : (((⟨1⟩ : ExprId) != (⟨1⟩ : ExprId)) = false) := by decide
+  have two_ne_two : (((⟨2⟩ : ExprId) != (⟨2⟩ : ExprId)) = false) := by decide
+  have one_ne_two : (((⟨1⟩ : ExprId) != (⟨2⟩ : ExprId)) = true) := by decide
+  obtain ⟨holeMark, anyHole, -, holeFill, -, -⟩ := focus_walks plainSteps
+  simp [endLoans?, Array.find?, findBorrowValue?, findFirst_unit,
+    findFirst_integer, findFirst_address, findFirst_borrow, findFirst_loanHole,
+    findFirst_nominal, findFirstList_nil, findFirstList_cons,
+    holeMark, anyHole, holeFill,
+    clearBorrowValue, rewriteFirst_unit, rewriteFirst_integer,
+    rewriteFirst_address, rewriteFirst_borrow, rewriteFirst_loanHole,
+    rewriteFirst_nominal, rewriteFirstList_nil, rewriteFirstList_cons,
+    applyWriteBack, fillVisibleHole, holeInFrame, holeWithin,
+    fillHole?, globalLoanKey?, globalLoanKeyIn?, removeGlobalLoan,
+    transferGlobalLoan, transferredLoan?, Array.filter,
+    one_eq_one, two_eq_two, one_eq_two, one_ne_one, two_ne_two, one_ne_two]
+
+/-- The flat, one-field instance used by generated field borrows.  Unlike
+`endLoans?_focusedGlobalAfterSharedNominal`, this has no `PlainSteps` side
+condition for the simplifier to discover while normalizing a closed frame. -/
+theorem endLoans?_focusedGlobalAfterSharedNominal_singleField
+    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
+    (key : GlobalKey) (address : String) (source focusSource : StructHandle)
+    (saved value : Int) (argument : RuntimeValue) :
+    endLoans? #[(⟨1⟩ : LoanId), (⟨2⟩ : LoanId)] #[argument]
+        (rowFrame #[some (.address address),
+            some (.nominal source none #[.integer saved]),
+            some (.nominal source none #[.integer saved]),
+            some (.borrow (loan + 1) (.integer value)),
+            some (.borrow loan
+              (.nominal focusSource none #[.loanHole (loan + 1)]))]
+          { activeLoans := #[(⟨1⟩, loan), (⟨2⟩, loan + 1)]
+            loanLocations := #[(loan, { root := .global key }),
+            (loan + 1,
+              (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                RuntimePlace))] })
+        { globals := globals.insert key (.loanHole loan)
+          globalLoans := (loan, key) :: rest
+          nextLoan
+          pending } =
+      some
+        (rowFrame #[some (.address address),
+              some (.nominal source none #[.integer saved]),
+              some (.nominal source none #[.integer saved]),
+              some .unit, some .unit]
+           { activeLoans := #[]
+             loanLocations := #[(loan, { root := .global key }),
+             (loan + 1,
+               (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                 RuntimePlace))] },
+         { globals := (globals.insert key (.loanHole loan)).insert key
+               (.nominal focusSource none #[.integer value])
+           globalLoans := rest
+           nextLoan
+           pending },
+         argument) := by
+  simpa [rowFrame, focusValue, FocusStep.fill, focusProjections,
+      FocusStep.index] using
+    (endLoans?_focusedGlobalAfterSharedNominal
+      (globals := globals) (rest := rest) (nextLoan := nextLoan)
+      (loan := loan) (pending := pending) (key := key) (address := address)
+      (source := source) (saved := saved) (value := value)
+      (steps := [⟨focusSource, #[], #[], none⟩])
+      (plainSteps := by simp [PlainSteps, FocusStep.Plain])
+      (argument := argument))
+
+/-- Retire two independent mutable global-field brackets in one death
+marker.  The generated row keeps each field borrow immediately before its
+resource holder, while the global-loan stack is newest first.  A dedicated
+closed equation keeps this common multi-resource case linear instead of
+unfolding four nested searches through the full symbolic frame. -/
+theorem endLoans?_twoFocusedGlobals_singleField
+    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
+    (key₁ key₂ : GlobalKey) (address : String)
+    (source₁ source₂ : StructHandle) (amount value₁ value₂ : Int)
+    (argument : RuntimeValue) :
+    endLoans? #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId),
+        (⟨2⟩ : LoanId), (⟨3⟩ : LoanId)] #[argument]
+        (rowFrame #[some (.address address), some (.integer amount),
+            some (.borrow (loan + 1) (.integer value₁)),
+            some (.borrow (loan + 3) (.integer value₂)),
+            some (.borrow loan
+              (.nominal source₁ none #[.loanHole (loan + 1)])),
+            some (.borrow (loan + 2)
+              (.nominal source₂ none #[.loanHole (loan + 3)]))]
+          { activeLoans := #[(⟨0⟩, loan), (⟨1⟩, loan + 1),
+              (⟨2⟩, loan + 2), (⟨3⟩, loan + 3)]
+            loanLocations := #[(loan, { root := .global key₁ }),
+              (loan + 1,
+                (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                  RuntimePlace)),
+              (loan + 2, { root := .global key₂ }),
+              (loan + 3,
+                (⟨.local (⟨5⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                  RuntimePlace))] })
+        { globals := (globals.insert key₁ (.loanHole loan)).insert key₂
+              (.loanHole (loan + 2))
+          globalLoans := (loan + 2, key₂) :: (loan, key₁) :: rest
+          nextLoan
+          pending } =
+      some
+        (rowFrame #[some (.address address), some (.integer amount),
+              some .unit, some .unit, some .unit, some .unit]
+           { activeLoans := #[]
+             loanLocations := #[(loan, { root := .global key₁ }),
+               (loan + 1,
+                 (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                   RuntimePlace)),
+               (loan + 2, { root := .global key₂ }),
+               (loan + 3,
+                 (⟨.local (⟨5⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                   RuntimePlace))] },
+         { globals :=
+             ((((globals.insert key₁ (.loanHole loan)).insert key₂
+                 (.loanHole (loan + 2))).insert key₂
+                 (.nominal source₂ none #[.integer value₂])).insert key₁
+                 (match
+                   (((globals.insert key₁ (.loanHole loan)).insert key₂
+                       (.loanHole (loan + 2))).insert key₂
+                       (.nominal source₂ none #[.integer value₂])).lookup key₁ with
+                  | some stored =>
+                      (rewriteFirst
+                        (holeFill? loan
+                          (.nominal source₁ none #[.integer value₁]))
+                        stored).getD
+                          (.nominal source₁ none #[.integer value₁])
+                  | none => .nominal source₁ none #[.integer value₁]))
+           globalLoans := rest
+           nextLoan
+           pending },
+         argument) := by
+  have zero_eq_zero : (((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true) := by decide
+  have one_eq_one : (((⟨1⟩ : ExprId) == (⟨1⟩ : ExprId)) = true) := by decide
+  have two_eq_two : (((⟨2⟩ : ExprId) == (⟨2⟩ : ExprId)) = true) := by decide
+  have three_eq_three : (((⟨3⟩ : ExprId) == (⟨3⟩ : ExprId)) = true) := by decide
+  have zero_eq_one : (((⟨0⟩ : ExprId) == (⟨1⟩ : ExprId)) = false) := by decide
+  have zero_eq_two : (((⟨0⟩ : ExprId) == (⟨2⟩ : ExprId)) = false) := by decide
+  have zero_eq_three : (((⟨0⟩ : ExprId) == (⟨3⟩ : ExprId)) = false) := by decide
+  have one_eq_two : (((⟨1⟩ : ExprId) == (⟨2⟩ : ExprId)) = false) := by decide
+  have one_eq_three : (((⟨1⟩ : ExprId) == (⟨3⟩ : ExprId)) = false) := by decide
+  have two_eq_three : (((⟨2⟩ : ExprId) == (⟨3⟩ : ExprId)) = false) := by decide
+  have zero_ne_zero : (((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false) := by decide
+  have one_ne_one : (((⟨1⟩ : ExprId) != (⟨1⟩ : ExprId)) = false) := by decide
+  have two_ne_two : (((⟨2⟩ : ExprId) != (⟨2⟩ : ExprId)) = false) := by decide
+  have three_ne_three : (((⟨3⟩ : ExprId) != (⟨3⟩ : ExprId)) = false) := by decide
+  have zero_ne_one : (((⟨0⟩ : ExprId) != (⟨1⟩ : ExprId)) = true) := by decide
+  have zero_ne_two : (((⟨0⟩ : ExprId) != (⟨2⟩ : ExprId)) = true) := by decide
+  have zero_ne_three : (((⟨0⟩ : ExprId) != (⟨3⟩ : ExprId)) = true) := by decide
+  have one_ne_two : (((⟨1⟩ : ExprId) != (⟨2⟩ : ExprId)) = true) := by decide
+  have one_ne_three : (((⟨1⟩ : ExprId) != (⟨3⟩ : ExprId)) = true) := by decide
+  have two_ne_three : (((⟨2⟩ : ExprId) != (⟨3⟩ : ExprId)) = true) := by decide
+  have loan_ne_one : loan ≠ loan + 1 := by omega
+  have loan_ne_two : loan ≠ loan + 2 := by omega
+  have loan_ne_three : loan ≠ loan + 3 := by omega
+  have loan_one_ne_two : loan + 1 ≠ loan + 2 := by omega
+  have loan_one_ne_three : loan + 1 ≠ loan + 3 := by omega
+  have loan_two_ne_three : loan + 2 ≠ loan + 3 := by omega
+  simp [endLoans?, rowFrame, Array.find?, findBorrowValue?, findFirst_unit,
+    findFirst_integer, findFirst_address, findFirst_borrow, findFirst_loanHole,
+    findFirst_nominal, findFirstList_nil, findFirstList_cons,
+    clearBorrowValue, rewriteFirst_unit, rewriteFirst_integer,
+    rewriteFirst_address, rewriteFirst_borrow, rewriteFirst_loanHole,
+    rewriteFirst_nominal, rewriteFirstList_nil, rewriteFirstList_cons,
+    applyWriteBack, fillVisibleHole, holeInFrame, holeWithin,
+    fillHole?, globalLoanKey?, globalLoanKeyIn?, removeGlobalLoan,
+    transferGlobalLoan, transferredLoan?, Array.filter,
+    zero_eq_zero, one_eq_one, two_eq_two, three_eq_three,
+    zero_eq_one, zero_eq_two, zero_eq_three, one_eq_two, one_eq_three,
+    two_eq_three, zero_ne_zero, one_ne_one, two_ne_two, three_ne_three,
+    zero_ne_one, zero_ne_two, zero_ne_three, one_ne_two, one_ne_three,
+    two_ne_three,
+    loan_ne_one, loan_ne_two, loan_ne_three, loan_one_ne_two,
+    loan_one_ne_three, loan_two_ne_three]
+  rfl
+
+/-- Retire a flat global-field bracket after an earlier independent bracket
+has already been cleared.  Hidden resource holders remain at the end of the
+fixed local row and old loan locations remain as harmless provenance, while
+only lexical loans `2` and `3` are active. -/
+theorem endLoans?_focusedGlobalPadded_singleField
+    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
+    (previousKey key : GlobalKey) (address : String)
+    (source : StructHandle) (amount value : Int) (argument : RuntimeValue) :
+    endLoans? #[(⟨2⟩ : LoanId), (⟨3⟩ : LoanId)] #[argument]
+        (rowFrame #[some (.address address), some (.integer amount), some .unit,
+            some (.borrow (loan + 3) (.integer value)), some .unit,
+            some (.borrow (loan + 2)
+              (.nominal source none #[.loanHole (loan + 3)]))]
+          { activeLoans := #[(⟨2⟩, loan + 2), (⟨3⟩, loan + 3)]
+            loanLocations := #[(loan, { root := .global previousKey }),
+              (loan + 1,
+                (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                  RuntimePlace)),
+              (loan + 2, { root := .global key }),
+              (loan + 3,
+                (⟨.local (⟨5⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                  RuntimePlace))] })
+        { globals := globals.insert key (.loanHole (loan + 2))
+          globalLoans := (loan + 2, key) :: rest
+          nextLoan
+          pending } =
+      some
+        (rowFrame #[some (.address address), some (.integer amount), some .unit,
+              some .unit, some .unit, some .unit]
+           { activeLoans := #[]
+             loanLocations := #[(loan, { root := .global previousKey }),
+               (loan + 1,
+                 (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                   RuntimePlace)),
+               (loan + 2, { root := .global key }),
+               (loan + 3,
+                 (⟨.local (⟨5⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                   RuntimePlace))] },
+         { globals := (globals.insert key (.loanHole (loan + 2))).insert key
+               (.nominal source none #[.integer value])
+           globalLoans := rest
+           nextLoan
+           pending },
+         argument) := by
+  have two_eq_two : (((⟨2⟩ : ExprId) == (⟨2⟩ : ExprId)) = true) := by decide
+  have three_eq_three : (((⟨3⟩ : ExprId) == (⟨3⟩ : ExprId)) = true) := by decide
+  have two_eq_three : (((⟨2⟩ : ExprId) == (⟨3⟩ : ExprId)) = false) := by decide
+  have two_ne_two : (((⟨2⟩ : ExprId) != (⟨2⟩ : ExprId)) = false) := by decide
+  have three_ne_three : (((⟨3⟩ : ExprId) != (⟨3⟩ : ExprId)) = false) := by decide
+  have two_ne_three : (((⟨2⟩ : ExprId) != (⟨3⟩ : ExprId)) = true) := by decide
+  simp [endLoans?, rowFrame, Array.find?, findBorrowValue?, findFirst_unit,
+    findFirst_integer, findFirst_address, findFirst_borrow, findFirst_loanHole,
+    findFirst_nominal, findFirstList_nil, findFirstList_cons,
+    clearBorrowValue, rewriteFirst_unit, rewriteFirst_integer,
+    rewriteFirst_address, rewriteFirst_borrow, rewriteFirst_loanHole,
+    rewriteFirst_nominal, rewriteFirstList_nil, rewriteFirstList_cons,
+    applyWriteBack, fillVisibleHole, holeInFrame, holeWithin,
+    fillHole?, globalLoanKey?, globalLoanKeyIn?, removeGlobalLoan,
+    transferGlobalLoan, transferredLoan?, Array.filter,
+    two_eq_two, three_eq_three, two_eq_three, two_ne_two, three_ne_three,
+    two_ne_three]
+
+/-- Retire the first flat global-field bracket in a frame whose later user
+and hidden-resource slots have already been reserved but are still empty. -/
+theorem endLoans?_focusedGlobalReserved_singleField
+    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
+    (key : GlobalKey) (address : String) (source : StructHandle)
+    (amount value : Int) :
+    endLoans? #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId)] #[]
+        (rowFrame #[some (.address address), some (.integer amount),
+            some (.borrow (loan + 1) (.integer value)), none,
+            some (.borrow loan
+              (.nominal source none #[.loanHole (loan + 1)])), none]
+          { activeLoans := #[(⟨0⟩, loan), (⟨1⟩, loan + 1)]
+            loanLocations := #[(loan, { root := .global key }),
+              (loan + 1,
+                (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                  RuntimePlace))] })
+        { globals := globals.insert key (.loanHole loan)
+          globalLoans := (loan, key) :: rest
+          nextLoan
+          pending } =
+      some
+        (rowFrame #[some (.address address), some (.integer amount), some .unit,
+              none, some .unit, none]
+           { activeLoans := #[]
+             loanLocations := #[(loan, { root := .global key }),
+               (loan + 1,
+                 (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0], true⟩ :
+                   RuntimePlace))] },
+         { globals := (globals.insert key (.loanHole loan)).insert key
+               (.nominal source none #[.integer value])
+           globalLoans := rest
+           nextLoan
+           pending },
+         .unit) := by
+  have zero_eq_zero : (((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true) := by decide
+  have one_eq_one : (((⟨1⟩ : ExprId) == (⟨1⟩ : ExprId)) = true) := by decide
+  have zero_eq_one : (((⟨0⟩ : ExprId) == (⟨1⟩ : ExprId)) = false) := by decide
+  have zero_ne_zero : (((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false) := by decide
+  have one_ne_one : (((⟨1⟩ : ExprId) != (⟨1⟩ : ExprId)) = false) := by decide
+  have zero_ne_one : (((⟨0⟩ : ExprId) != (⟨1⟩ : ExprId)) = true) := by decide
+  simp [endLoans?, rowFrame, Array.find?, findBorrowValue?, findFirst_unit,
+    findFirst_integer, findFirst_address, findFirst_borrow, findFirst_loanHole,
+    findFirst_nominal, findFirstList_nil, findFirstList_cons,
+    clearBorrowValue, rewriteFirst_unit, rewriteFirst_integer,
+    rewriteFirst_address, rewriteFirst_borrow, rewriteFirst_loanHole,
+    rewriteFirst_nominal, rewriteFirstList_nil, rewriteFirstList_cons,
+    applyWriteBack, fillVisibleHole, holeInFrame, holeWithin,
+    fillHole?, globalLoanKey?, globalLoanKeyIn?, removeGlobalLoan,
+    transferGlobalLoan, transferredLoan?, Array.filter,
+    zero_eq_zero, one_eq_one, zero_eq_one, zero_ne_zero, one_ne_one,
+    zero_ne_one]
+
 /-- The saved bracket law: the resource borrow bound to local 4, the field
 reborrow bound to local 2, the inner block on the throw-aware spine at the
 bracket's registries, and the death marker left as a generic step. -/
@@ -1331,8 +2505,10 @@ theorem wpRowThrow_focusedFieldBracketSaved (namespaceId : NamespaceId)
             at evaluation <;>
           rw [globalBorrow_evaluate_rowFrame namespaceId typeId borrowType
             borrowMutable 0 address [some (.integer amount), none, none, none]
-            { activeLoans := #[], loanLocations := #[] } state _ present]
+            { activeLoans := #[], loanLocations := #[], typeInstantiation := #[] }
+            state _ (by simpa only [instantiatedTypeId_empty] using present)]
             at evaluation <;>
+          simp only [instantiatedTypeId_empty] at evaluation <;>
           cases Option.some.inj evaluation
         refine ⟨?_, rfl, rfl⟩
         simp [rowFrame, Array.filter]
@@ -1531,7 +2707,8 @@ theorem globalBorrowShared_evaluate_present (namespaceId : NamespaceId)
     (sharedKind : referenceType.kind = .shared) (address : String)
     (frame : RuntimeFrame) (state : RuntimeState) (resource : RuntimeValue)
     (present : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = some resource) :
+      (globalKey namespaceId (instantiatedTypeId frame.typeInstantiation typeId)
+        (.address address)) = some resource) :
     (GlobalLocationOperation.borrow
       { resource := ⟨namespaceId, typeId⟩, referenceType, kind := .immutable,
         lexicalLoan := lex }).evaluate? #[.address address] frame state =
@@ -1546,7 +2723,8 @@ theorem globalBorrowShared_evaluate_absent (namespaceId : NamespaceId)
     (typeId : TypeId) (referenceType : ReferenceType) (lex : Nat)
     (address : String) (frame : RuntimeFrame) (state : RuntimeState)
     (absent : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = none) :
+      (globalKey namespaceId (instantiatedTypeId frame.typeInstantiation typeId)
+        (.address address)) = none) :
     (GlobalLocationOperation.borrow
       { resource := ⟨namespaceId, typeId⟩, referenceType, kind := .immutable,
         lexicalLoan := lex }).evaluate? #[.address address] frame state =
@@ -1560,7 +2738,9 @@ theorem contains_evaluate (namespaceId : NamespaceId) (typeId : TypeId)
     (GlobalLocationOperation.contains ⟨namespaceId, typeId⟩).evaluate?
         #[.address address] frame state =
       some (.value frame state (.bool
-        (state.globals.lookup (globalKey namespaceId typeId (.address address))).isSome)) := by
+        (state.globals.lookup (globalKey namespaceId
+          (instantiatedTypeId frame.typeInstantiation typeId)
+          (.address address))).isSome)) := by
   simp [GlobalLocationOperation.evaluate?, containsGlobalAt?, globalExists,
     globalValue?, RuntimeValue.storageKey?]
 
@@ -2184,8 +3364,10 @@ theorem wpRowThrow_focusedFieldBracketOneThrow (namespaceId : NamespaceId)
             at evaluation <;>
           rw [globalBorrow_evaluate_rowFrame namespaceId typeId borrowType
             borrowMutable 0 address [none, none]
-            { activeLoans := #[], loanLocations := #[] } state _ present]
+            { activeLoans := #[], loanLocations := #[], typeInstantiation := #[] }
+            state _ (by simpa only [instantiatedTypeId_empty] using present)]
             at evaluation <;>
+          simp only [instantiatedTypeId_empty] at evaluation <;>
           cases Option.some.inj evaluation
         refine ⟨?_, rfl, rfl⟩
         simp [rowFrame, Array.filter]
@@ -2426,7 +3608,8 @@ theorem wpRowThrow_returnedReborrowAt (referenceType : ReferenceType)
       { activeLoans :=
           (registries.activeLoans.filter (·.1 != ⟨lex⟩)).push (⟨lex⟩, state.nextLoan)
         loanLocations := registries.loanLocations.push
-          (state.nextLoan, ⟨.local localId, #[.deref], true⟩) }
+          (state.nextLoan, ⟨.local localId, #[.deref], true⟩)
+        typeInstantiation := registries.typeInstantiation }
       { state with nextLoan := state.nextLoan + 1 }
       (.value (.borrow state.nextLoan current))) :
     wpRowThrow
@@ -3174,7 +4357,8 @@ theorem wpRowThrow_returnedReborrowPath (referenceType : ReferenceType)
       { activeLoans :=
           (registries.activeLoans.filter (·.1 != ⟨lex⟩)).push (⟨lex⟩, state.nextLoan)
         loanLocations := registries.loanLocations.push
-          (state.nextLoan, ⟨.local localId, #[.deref] ++ focusProjections steps, true⟩) }
+          (state.nextLoan, ⟨.local localId, #[.deref] ++ focusProjections steps, true⟩)
+        typeInstantiation := registries.typeInstantiation }
       { state with nextLoan := state.nextLoan + 1 }
       (.value (.borrow state.nextLoan leaf))) :
     wpRowThrow
@@ -3379,7 +4563,7 @@ theorem wpRowThrow_callReturnedProjected
             transferLoanLocation_focusHole _ _ _ _ _ _ plainSteps separate]
           exact ⟨_, ⟨#[(⟨lex⟩, returned)],
             #[(outer, ⟨.local ⟨0⟩, #[], true⟩),
-              (returned, ⟨.local ⟨0⟩, #[.deref], true⟩)]⟩, rfl, continuation⟩
+              (returned, ⟨.local ⟨0⟩, #[.deref], true⟩)], #[]⟩, rfl, continuation⟩
     · obtain ⟨rfl, rfl, -⟩ := reborrowRun reborrowStep
       simp [valuesNil] at nilStep
 
@@ -3504,7 +4688,8 @@ theorem wpRowThrow_globalBorrowLocal0 (namespaceId : NamespaceId) (typeId : Type
     (exit : postValue (some (.address address) :: rest).toArray
       { activeLoans := #[(⟨lex⟩, state.nextLoan)]
         loanLocations :=
-          #[(state.nextLoan, { root := .global (globalKey namespaceId typeId (.address address)) })] }
+          #[(state.nextLoan, { root := .global (globalKey namespaceId typeId (.address address)) })]
+        typeInstantiation := #[] }
       { state with
         globals := state.globals.insert
           (globalKey namespaceId typeId (.address address)) (.loanHole state.nextLoan)
@@ -3519,7 +4704,8 @@ theorem wpRowThrow_globalBorrowLocal0 (namespaceId : NamespaceId) (typeId : Type
           { resource := ⟨namespaceId, typeId⟩, referenceType := borrowType,
             kind := .mutable, lexicalLoan := lex })
         (valuesCons (localVar ⟨0⟩) valuesNil))
-      (some (.address address) :: rest).toArray { activeLoans := #[], loanLocations := #[] }
+      (some (.address address) :: rest).toArray
+      { activeLoans := #[], loanLocations := #[], typeInstantiation := #[] }
       state postValue postThrow := by
   rintro finalFrame finalState control
     (⟨oF, oS, propagated, operandStep, frameEq, stateEq, controlEq⟩ |
@@ -3556,9 +4742,11 @@ theorem wpRowThrow_globalBorrowLocal0 (namespaceId : NamespaceId) (typeId : Type
       rcases evaluated with ⟨rv, evaluation, rfl⟩ |
         ⟨kind, thrown, evaluation, rfl⟩ <;>
         rw [globalBorrow_evaluate_rowFrame namespaceId typeId borrowType
-          borrowMutable lex address rest { activeLoans := #[], loanLocations := #[] }
-          state _ present]
+          borrowMutable lex address rest
+          { activeLoans := #[], loanLocations := #[], typeInstantiation := #[] }
+          state _ (by simpa only [instantiatedTypeId_empty] using present)]
           at evaluation <;>
+        simp only [instantiatedTypeId_empty] at evaluation <;>
         cases Option.some.inj evaluation
       refine ⟨_, _, ?_, exit⟩
       simp [rowFrame, Array.filter]
@@ -3747,12 +4935,15 @@ theorem globalTake_evaluate_present (namespaceId : NamespaceId) (typeId : TypeId
     (address : String) (frame : RuntimeFrame) (state : RuntimeState)
     (resource : RuntimeValue)
     (present : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = some resource) :
+      (globalKey namespaceId (instantiatedTypeId frame.typeInstantiation typeId)
+        (.address address)) = some resource) :
     (GlobalLocationOperation.take ⟨namespaceId, typeId⟩).evaluate?
       #[.address address] frame state =
     some (.value frame
       { state with
-        globals := state.globals.erase (globalKey namespaceId typeId (.address address)) }
+        globals := state.globals.erase
+          (globalKey namespaceId (instantiatedTypeId frame.typeInstantiation typeId)
+            (.address address)) }
       resource) := by
   simp [GlobalLocationOperation.evaluate?, takeGlobalAt?, globalValue?, present,
     RuntimeValue.storageKey?]
@@ -3760,7 +4951,8 @@ theorem globalTake_evaluate_present (namespaceId : NamespaceId) (typeId : TypeId
 theorem globalTake_evaluate_absent (namespaceId : NamespaceId) (typeId : TypeId)
     (address : String) (frame : RuntimeFrame) (state : RuntimeState)
     (absent : state.globals.lookup
-      (globalKey namespaceId typeId (.address address)) = none) :
+      (globalKey namespaceId (instantiatedTypeId frame.typeInstantiation typeId)
+        (.address address)) = none) :
     (GlobalLocationOperation.take ⟨namespaceId, typeId⟩).evaluate?
       #[.address address] frame state =
     some (.throw_ frame state .abort) := by

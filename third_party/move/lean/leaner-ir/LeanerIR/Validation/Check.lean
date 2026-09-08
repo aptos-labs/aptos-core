@@ -6,6 +6,7 @@ import LeanerIR.Validation.Diagnostic
 import LeanerIR.Validation.Validated
 import LeanerIR.Validation.Profiles
 import LeanerIR.Validation.Capability
+import LeanerIR.Validation.NominalCycles
 
 /-!
 # Shared checked-construction boundary
@@ -1164,7 +1165,7 @@ private def normalizeValueBorrows (tables : Tables) (ns : RawNamespace) : RawNam
                       -- A reference-typed field select already normalizes to
                       -- the referent's storage path; only a reference-typed
                       -- value (a reborrow) dereferences its holder.
-                      | .operation (.data _) _ _ _, _ => (place, places)
+                      | .operation (.data _) _ _ _, some (.reference _) => (place, places)
                       | _, some (.reference argumentReference) =>
                           if resultReference.referent == argumentReference.referent then
                             internNormalizedPlace places (.deref place)
@@ -1408,6 +1409,7 @@ private def checkUnit (registry : ProfileRegistry) (unit : RawUnit) : Array Diag
       checkTables registry unit unit.tables ++ checkDependencies registry unit ++
       checkAcyclic "type" unit.tables.types.size (fun index =>
         (unit.tables.types[index]?).map (typeChildren · |>.map (·.index)) |>.getD #[]) ++
+      checkMoveNominalCycles unit ++
       (if unit.namespaces.size <= unit.tables.namespaces.size then #[] else
         #[.error "LIR-NAMESPACE-TABLE"
           s!"unit has {unit.namespaces.size} owned namespaces but its table has only {unit.tables.namespaces.size} entries"]))

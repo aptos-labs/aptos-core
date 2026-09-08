@@ -19,9 +19,9 @@ open LeanerIR.Validation
 open SemanticOperations
 
 private structure MonoAt (fuel : Nat) : Prop where
-  function : ∀ executable handle state arguments result,
-    Internal.evalFunction fuel executable handle state arguments = .ok result →
-      Internal.evalFunction (fuel + 1) executable handle state arguments = .ok result
+  function : ∀ executable handle typeInstantiation state arguments result,
+    Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result →
+      Internal.evalFunction (fuel + 1) executable handle typeInstantiation state arguments = .ok result
   expression : ∀ executable namespaceId frame state exprId result,
     Internal.evalExpr fuel executable namespaceId frame state exprId = .ok result →
       Internal.evalExpr (fuel + 1) executable namespaceId frame state exprId = .ok result
@@ -61,7 +61,7 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
       let previous := monoAt fuel
       {
         function := by
-          intro executable handle state arguments result h
+          intro executable handle typeInstantiation state arguments result h
           simp only [Internal.evalFunction, bind, Except.bind] at h
           rw [Internal.evalFunction.eq_2]
           simp only [bind, Except.bind]
@@ -76,7 +76,7 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                   by_cases arity_ne : arguments.size != declaration.signature.parameters.size
                   · simp [arity_ne, failAt] at h
                   · simp only [arity_ne] at h ⊢
-                    cases frame_eq : initialFrame? declaration arguments with
+                    cases frame_eq : initialFrame? declaration arguments typeInstantiation with
                     | none => simp [frame_eq, failAt] at h
                     | some initialFrame =>
                         simp only [frame_eq] at h ⊢
@@ -373,11 +373,13 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                                       | some handle =>
                                           simp only [resolve_eq] at h ⊢
                                           cases fn_eq : Internal.evalFunction fuel
-                                              executable handle valuesState
+                                              executable handle
+                                              (callTypeInstantiation executable.unit handle
+                                                valuesFrame.typeInstantiation instantiations) valuesState
                                               values.toArray with
                                           | error error => simp [fn_eq] at h
                                           | ok functionResult =>
-                                              rw [previous.function _ _ _ _ _ fn_eq]
+                                              rw [previous.function _ _ _ _ _ _ fn_eq]
                                               simp only [fn_eq] at h
                                               exact h
                           | invoke =>
@@ -400,11 +402,11 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                                           case closure handle captures =>
                                               dsimp only at h ⊢
                                               cases fn_eq : Internal.evalFunction fuel
-                                                  executable handle valuesState
+                                                  executable handle valuesFrame.typeInstantiation valuesState
                                                   (captures ++ callArguments.toArray) with
                                               | error error => simp [fn_eq] at h
                                               | ok functionResult =>
-                                                  rw [previous.function _ _ _ _ _ fn_eq]
+                                                  rw [previous.function _ _ _ _ _ _ fn_eq]
                                                   simp only [fn_eq] at h
                                                   exact h
                                           all_goals exact h
@@ -646,12 +648,12 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
 
 /-- Success of the fuelled evaluator is stable under any additional fuel. -/
 theorem evalFunction_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
-    {executable handle state arguments result}
-    (h : Internal.evalFunction fuel executable handle state arguments = .ok result) :
-    Internal.evalFunction fuel' executable handle state arguments = .ok result := by
+    {executable handle typeInstantiation state arguments result}
+    (h : Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result) :
+    Internal.evalFunction fuel' executable handle typeInstantiation state arguments = .ok result := by
   induction le with
   | refl => exact h
-  | step _ ih => exact (monoAt _).function _ _ _ _ _ ih
+  | step _ ih => exact (monoAt _).function _ _ _ _ _ _ ih
 
 /-- Success of the fuelled expression evaluator is stable under any
 additional fuel. -/
@@ -704,7 +706,7 @@ theorem run_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
     (h : Interpreter.run executable fuel function arguments state = .ok result) :
     Interpreter.run executable fuel' function arguments state = .ok result := by
   simp only [Interpreter.run, bind, Except.bind] at h ⊢
-  cases eval_eq : Internal.evalFunction fuel executable function state arguments with
+  cases eval_eq : Internal.evalFunction fuel executable function #[] state arguments with
   | error error => simp [eval_eq] at h
   | ok evaluation =>
       rw [evalFunction_mono le eval_eq]

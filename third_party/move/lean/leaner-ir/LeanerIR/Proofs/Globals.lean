@@ -33,7 +33,8 @@ theorem evaluateGlobalOperation?_contains_unfold
       = (do
           let _ ← key.storageKey?
           some (.value frame state
-            (.bool (globalExists state ns.identity resource.typeId key)))) :=
+            (.bool (globalExists state ns.identity
+              (instantiatedTypeId frame.typeInstantiation resource.typeId) key)))) :=
   rfl
 
 theorem evaluateGlobalOperation?_borrow_unfold
@@ -44,13 +45,15 @@ theorem evaluateGlobalOperation?_borrow_unfold
         #[.typeArg resource] #[key] frame state
       = (do
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resource.typeId key with
+          match globalValue? state ns.identity
+              (instantiatedTypeId frame.typeInstantiation resource.typeId) key with
           | none => some (.throw_ frame state .abort)
           | some _ => do
               let .reference referenceType ← ns.tables.types[resultType.index]? | none
               let (frame, state, value) ← borrowRuntimePlace? unit ns site
                 referenceType kind frame state
-                { root := .global (globalKey ns.identity resource.typeId key) }
+                { root := .global (globalKey ns.identity
+                    (instantiatedTypeId frame.typeInstantiation resource.typeId) key) }
               some (.value frame state value)) :=
   rfl
 
@@ -62,13 +65,15 @@ theorem evaluateGlobalOperation?_take_unfold
         #[.typeArg resource] #[key] frame state
       = (do
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resource.typeId key with
+          match globalValue? state ns.identity
+              (instantiatedTypeId frame.typeInstantiation resource.typeId) key with
           | none => some (.throw_ frame state .abort)
           | some value =>
               some (.value frame
                 { state with
                   globals :=
-                    state.globals.erase (globalKey ns.identity resource.typeId key) }
+                    state.globals.erase (globalKey ns.identity
+                      (instantiatedTypeId frame.typeInstantiation resource.typeId) key) }
                 value)) :=
   rfl
 
@@ -80,13 +85,15 @@ theorem evaluateGlobalOperation?_publish_unfold
         #[.typeArg resource] #[key, value] frame state
       = (do
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resource.typeId key with
+          match globalValue? state ns.identity
+              (instantiatedTypeId frame.typeInstantiation resource.typeId) key with
           | some _ => some (.throw_ frame state .abort)
           | none =>
               some (.value frame
                 { state with
                   globals := state.globals.insert
-                    (globalKey ns.identity resource.typeId key) value }
+                    (globalKey ns.identity
+                      (instantiatedTypeId frame.typeInstantiation resource.typeId) key) value }
                 .unit)) :=
   rfl
 
@@ -107,11 +114,13 @@ theorem evaluateGlobalOperation?_borrowImmutable
     (kind_eq : referenceType.kind = .shared) :
     evaluateGlobalOperation? unit ns resultType site (.borrow .immutable)
         #[.typeArg resource] #[key] frame state
-      = some (match globalValue? state ns.identity resource.typeId key with
+      = some (match globalValue? state ns.identity
+          (instantiatedTypeId frame.typeInstantiation resource.typeId) key with
           | none => .throw_ frame state .abort
           | some value => .value frame state value) := by
   rw [evaluateGlobalOperation?_borrow_unfold]
-  cases found : globalValue? state ns.identity resource.typeId key with
+  cases found : globalValue? state ns.identity
+      (instantiatedTypeId frame.typeInstantiation resource.typeId) key with
   | none => simp [shaped, found]
   | some published =>
       simp only [globalValue?] at found

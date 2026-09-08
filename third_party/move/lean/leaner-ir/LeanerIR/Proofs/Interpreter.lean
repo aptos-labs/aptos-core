@@ -28,9 +28,10 @@ private def statementsResult : Internal.StatementsEvaluation → BigStep.Stateme
   | .control state frame control => .control state frame control.value
 
 private structure SoundAt (fuel : Nat) : Prop where
-  function : ∀ executable handle state arguments result,
-    Internal.evalFunction fuel executable handle state arguments = .ok result →
-      BigStep.EvalFunction executable handle state arguments result.state result.outcome.value
+  function : ∀ executable handle typeInstantiation state arguments result,
+    Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result →
+      BigStep.EvalFunction executable handle typeInstantiation state arguments
+        result.state result.outcome.value
   expression : ∀ executable namespaceId frame state exprId result,
     Internal.evalExpr fuel executable namespaceId frame state exprId = .ok result →
       BigStep.EvalExpr executable namespaceId frame state exprId
@@ -74,7 +75,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
       let previous := soundAt fuel
       {
         function := by
-          intro executable handle state arguments result h
+          intro executable handle typeInstantiation state arguments result h
           simp only [Internal.evalFunction] at h
           cases namespace_eq : executable.unit.namespaces[handle.namespaceId.index]? with
           | none => simp [namespace_eq, failAt] at h
@@ -84,7 +85,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
               | some declaration =>
                   by_cases arity_ne : arguments.size != declaration.signature.parameters.size
                   · simp [namespace_eq, declaration_eq, arity_ne, failAt] at h
-                  · cases frame_eq : initialFrame? declaration arguments with
+                  · cases frame_eq : initialFrame? declaration arguments typeInstantiation with
                     | none =>
                         simp [namespace_eq, declaration_eq, arity_ne, frame_eq, failAt] at h
                     | some initialFrame =>
@@ -314,16 +315,21 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             resolve_eq, failAt] at h
                                       | some handle =>
+                                          let calleeInstantiation := callTypeInstantiation
+                                            executable.unit handle operandFrame.typeInstantiation
+                                              instantiations
                                           cases callee_eq : Internal.evalFunction fuel executable handle
-                                              operandState values.toArray with
+                                              calleeInstantiation operandState values.toArray with
                                           | error error =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                                resolve_eq, callee_eq, Located.pushCaller] at h
+                                                resolve_eq, calleeInstantiation, callee_eq,
+                                                Located.pushCaller] at h
                                           | ok calleeResult =>
                                               have callee_sound := previous.function executable handle
-                                                operandState values.toArray calleeResult callee_eq
+                                                calleeInstantiation operandState values.toArray
+                                                  calleeResult callee_eq
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                                resolve_eq, callee_eq] at h
+                                                resolve_eq, calleeInstantiation, callee_eq] at h
                                               cases h
                                               cases outcome_eq : calleeResult.outcome.value with
                                               | returned results =>
@@ -471,14 +477,16 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           cases callable with
                                           | closure handle captures =>
                                               cases callee_eq : Internal.evalFunction fuel executable
-                                                  handle operandState (captures ++ arguments.toArray) with
+                                                  handle operandFrame.typeInstantiation operandState
+                                                    (captures ++ arguments.toArray) with
                                               | error error =>
                                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                     callee_eq, Located.pushCaller] at h
                                               | ok calleeResult =>
                                                   have callee_sound := previous.function executable handle
-                                                    operandState (captures ++ arguments.toArray)
-                                                    calleeResult callee_eq
+                                                    operandFrame.typeInstantiation operandState
+                                                      (captures ++ arguments.toArray)
+                                                      calleeResult callee_eq
                                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                     callee_eq] at h
                                                   cases h
@@ -1994,13 +2002,13 @@ theorem run_sound (executable : ExecutableUnit) (fuel : Nat) (function : Functio
     (arguments : Array RuntimeValue) (state finalState : RuntimeState)
     (outcome : LocatedOutcome)
     (execution : run executable fuel function arguments state = .ok (finalState, outcome)) :
-    BigStep.EvalFunction executable function state arguments finalState outcome.value := by
+    BigStep.EvalFunction executable function #[] state arguments finalState outcome.value := by
   simp only [run] at execution
-  cases result_eq : Internal.evalFunction fuel executable function state arguments with
+  cases result_eq : Internal.evalFunction fuel executable function #[] state arguments with
   | error error => simp [result_eq] at execution
   | ok result =>
       simp [result_eq] at execution
       cases execution
-      exact (soundAt fuel).function executable function state arguments result result_eq
+      exact (soundAt fuel).function executable function #[] state arguments result result_eq
 
 end LeanerIR.Proofs.Interpreter

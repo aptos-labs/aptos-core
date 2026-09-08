@@ -21,7 +21,7 @@ set_option Elab.async false
 /-- The path `Coin.amount.value`: the resource, then its one field, no
 siblings at either step. -/
 private def coinPath : List LeanerIR.SemanticOperations.FocusStep :=
-  [⟨⟨⟨0⟩, 1⟩, #[], #[]⟩, ⟨⟨⟨0⟩, 0⟩, #[], #[]⟩]
+  [⟨⟨⟨0⟩, 1⟩, #[], #[], none⟩, ⟨⟨⟨0⟩, 0⟩, #[], #[], none⟩]
 
 leaner module 0x42::storeprobe where
   struct Amount has Copy, Drop, Store where
@@ -169,7 +169,7 @@ theorem depositRowRoute {registry : LeanerIR.Validation.SemanticsRegistry}
             LeanerIR.SemanticOperations.unpackFallthrough,
             Option.map_eq_map, Option.map_some, Option.some.injEq] at finished
           subst finished
-          simp only [LeanerIR.SemanticOperations.finalizeFunctionState]
+          leaner_finalize
           rw [LeanerIR.Proofs.Denotation.exportFrameLoans_rowFrame_borrowFree _ _ _
             (by
               intro slot mem value eq

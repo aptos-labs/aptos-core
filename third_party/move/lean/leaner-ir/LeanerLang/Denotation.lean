@@ -4,6 +4,7 @@
 import LeanerLang.Quote
 import LeanerIR.Proofs.Denotation
 import LeanerIR.Proofs.Recursion
+import LeanerIR.Proofs.Tree
 
 /-!
 # Generation of native verification denotations
@@ -23,6 +24,11 @@ open LeanerIR.Validation
 open LeanerIR.SemanticOperations
 open LeanerLang.Quote
 
+initialize registerTraceClass `leaner.agreement
+
+elab "leaner_agreement_tick " label:str : tactic => do
+  trace[leaner.agreement] "{label.getString}: {← IO.getNumHeartbeats}"
+
 deriving instance ToExpr for LeanerIR.StructHandle
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.ResourceLocation
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.BorrowLocation
@@ -31,8 +37,12 @@ deriving instance ToExpr for LeanerIR.Proofs.Denotation.LocalLocation
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.LocalLocationOperation
 deriving instance ToExpr for LeanerIR.SemanticOperations.NominalFieldStep
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.DerefLocalBorrowOperation
+deriving instance ToExpr for LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation
+deriving instance ToExpr for LeanerIR.Proofs.Denotation.IndexedLocalFieldBorrowOperation
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.NominalConstructor
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.NominalFieldLocation
+deriving instance ToExpr for LeanerIR.Proofs.Denotation.NominalVariantFieldLocation
+deriving instance ToExpr for LeanerIR.Proofs.Denotation.NominalVariantTest
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.PrimitiveLocationOperation
 deriving instance ToExpr for LeanerIR.Proofs.Denotation.ReferenceLocationOperation
 deriving instance ToExpr for LeanerIR.SemanticOperations.NativePattern
@@ -55,6 +65,10 @@ structure Generated where
   /-- For a recursive function, the body abstracted over the body of its
   recursive calls (`fun executable self => …`); `body` is its fixed point. -/
   openBody : Option Name := none
+  /-- The body as a literal tree, and the reflexivity that it denotes the
+  body (the open body, for a recursive function). -/
+  tree : Name
+  treeDenotes : Name
 
 /-- Whether native generation succeeded.  Unsupported is deliberately data,
 not an elaboration error: coexistence requires the caller to select the deep
@@ -83,6 +97,12 @@ def bodyName (segments : Array String) (function : String) : Name :=
 
 def openBodyName (segments : Array String) (function : String) : Name :=
   Name.str (Name.str (pathName segments) function) "denotationOpenBody"
+
+def treeName (segments : Array String) (function : String) : Name :=
+  Name.str (Name.str (pathName segments) function) "denotationTree"
+
+def treeDenotesName (segments : Array String) (function : String) : Name :=
+  Name.str (Name.str (pathName segments) function) "denotationTree_denotes"
 
 def openBodyAgreementName (segments : Array String) (function : String) : Name :=
   Name.str (Name.str (pathName segments) function) "denotationOpenBody_agrees"
@@ -137,6 +157,18 @@ private def genericArgumentMentionsParameter (unit : ValidatedUnit)
   | .typeArg value => typeMentionsParameter unit parameter #[] value.typeId
   | .const _ | .lifetime _ | .evidence _ => false
 
+/-- A resource whose head is the parameter itself has no statically known
+family to index.  A known nominal head such as `Vault<T>` does: its inner
+argument remains parametric while the generated family accessor supplies the
+corresponding store member. -/
+private def genericArgumentIsParameter (unit : ValidatedUnit)
+    (parameter : Nat) : GenericArgument → Bool
+  | .typeArg value =>
+      match unit.tables.types[value.typeId.index]? with
+      | some (.typeParameter index) => index == parameter
+      | _ => false
+  | .const _ | .lifetime _ | .evidence _ => false
+
 /-- Determine whether a function parameter reaches the type component of a
 global-storage key.  Ordinary appearances in values, locals, aggregates,
 operations, and direct generic calls remain parametric: Move's executable
@@ -167,7 +199,7 @@ where
     match expression.kind with
     | .operation (.global _) instantiations _ _ =>
         if instantiations.any
-            (genericArgumentMentionsParameter unit parameter) then
+            (genericArgumentIsParameter unit parameter) then
           some s!"global operation {id.index} uses it in the resource key"
         else
           (Validation.expressionChildren expression.kind).findSome? descend
@@ -200,7 +232,14 @@ private inductive LoweredOperation where
   | local (operation : LeanerIR.Proofs.Denotation.LocalLocationOperation)
   | derefLocalBorrow
       (operation : LeanerIR.Proofs.Denotation.DerefLocalBorrowOperation)
+  | indexedLocalBorrow
+      (operation : LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation)
+  | indexedLocalFieldBorrow
+      (operation : LeanerIR.Proofs.Denotation.IndexedLocalFieldBorrowOperation)
   | field (location : LeanerIR.Proofs.Denotation.NominalFieldLocation)
+  | variantField
+      (location : LeanerIR.Proofs.Denotation.NominalVariantFieldLocation)
+  | variantTest (test : LeanerIR.Proofs.Denotation.NominalVariantTest)
   | reference (operation : LeanerIR.Proofs.Denotation.ReferenceLocationOperation)
   | constructor (constructor : LeanerIR.Proofs.Denotation.NominalConstructor)
   | function (reference : QualifiedRef)
@@ -215,6 +254,21 @@ private def lowerLocal (ns : ValidatedNamespace) (operation : Operation)
   | .copy _ => return .local (.copy location)
   | .move _ => return .local (.move location)
   | _ => throw "internal native-local lowering mismatch"
+
+private def lowerLocalBorrow (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (resultType : TypeId) (site : ExprId) (kind : BorrowKind)
+    (localId : LocalId) : Except String LoweredOperation := do
+  let some (.reference referenceType) := ns.tables.types[resultType.index]?
+    | throw "a native local borrow requires a resolved reference result type"
+  let lexicalLoan ← match kind with
+    | .immutable => pure 0
+    | .mutable =>
+        let some lexicalLoan := certificateLoanId? unit ns.identity site
+          | throw s!"local borrow site {site.index} has no checked loan identity"
+        pure lexicalLoan
+    | .profile _ =>
+        throw "profile-defined local borrow has no native V1 descriptor"
+  return .local (.borrow { localId } referenceType kind lexicalLoan)
 
 /-- Resolve a `deref (localVar ...) / field*` source place to the closed
 native descriptor consumed by a local reborrow. Validation has already
@@ -233,9 +287,13 @@ private partial def lowerDerefLocalPlace (unit : ValidatedUnit)
         | throw "native projected borrow could not resolve its nominal owner"
       let some fieldName := sourceFieldName? ns fieldNameId
         | throw s!"native projected borrow could not resolve field name {fieldNameId.index}"
-      let some index := handleFieldIndex? unit source none fieldName
-        | throw s!"native projected borrow could not resolve field `{fieldName}`"
-      return (localId, fields ++ [{ source, variant := none, index }])
+      let (variant, index) ← match handleFieldIndex? unit source none fieldName with
+        | some index => pure (none, index)
+        | none =>
+          match variantFieldChoices? unit source #[fieldName] with
+          | some #[(variant, index)] => pure (some variant, index)
+          | _ => throw s!"native projected borrow requires a uniquely located field `{fieldName}`"
+      return (localId, fields ++ [{ source, variant, index }])
   | _ =>
       throw s!"borrow place {place.index} is not a dereferenced local reference"
 
@@ -259,6 +317,76 @@ private def lowerDerefLocalBorrow (unit : ValidatedUnit)
   return .derefLocalBorrow {
     location := { localId }, fields, referenceType, kind, lexicalLoan }
 
+/-- Lower literal and local-read indexes without retaining source arena
+nodes in the native operation. -/
+private def lowerIndexedLocalBorrow (unit : ValidatedUnit)
+    (ns : ValidatedNamespace) (resultType : TypeId) (site : ExprId)
+    (kind : BorrowKind) (place : PlaceId) : Except String LoweredOperation := do
+  let some (.index basePlace indexExpr) := ns.places[place.index]?
+    | throw s!"borrow place {place.index} is not an indexed local"
+  let (index, indexLocal) ← match placeIndexForm? ns indexExpr with
+    | some (.literal value) =>
+        if value < 0 then throw s!"indexed borrow place {place.index} has a negative literal index"
+        else pure (value.toNat, none)
+    | some (.local localId) | some (.copyLocal localId) => pure (0, some localId)
+    | _ => throw s!"indexed borrow place {place.index} requires a literal or local index"
+  let (localId, dereference) ← match ns.places[basePlace.index]? with
+    | some (.localVar localId) => pure (localId, false)
+    | some (.deref localPlace) =>
+        let some (.localVar localId) := ns.places[localPlace.index]?
+          | throw s!"indexed borrow base {basePlace.index} is not rooted at a local"
+        pure (localId, true)
+    | _ => throw s!"indexed borrow base {basePlace.index} is not rooted at a local"
+  let some (.reference referenceType) := ns.tables.types[resultType.index]?
+    | throw "a native indexed borrow requires a resolved reference result type"
+  let lexicalLoan ← match kind with
+    | .immutable => pure 0
+    | .mutable =>
+        let some lexicalLoan := certificateLoanId? unit ns.identity site
+          | throw s!"indexed borrow site {site.index} has no checked loan identity"
+        pure lexicalLoan
+    | .profile _ =>
+        throw "profile-defined indexed borrow has no native V1 descriptor"
+  return .indexedLocalBorrow {
+    location := { localId }, dereference, index, indexLocal,
+    referenceType, kind, lexicalLoan }
+
+/-- Lower `ownedLocal[literal].field` to a descriptor which retains no
+place-arena or declaration lookup. -/
+private def lowerIndexedLocalFieldBorrow (unit : ValidatedUnit)
+    (ns : ValidatedNamespace) (resultType : TypeId) (site : ExprId)
+    (kind : BorrowKind) (place : PlaceId) : Except String LoweredOperation := do
+  let some (.field indexPlace owner fieldNameId) := ns.places[place.index]?
+    | throw s!"borrow place {place.index} is not an indexed local field"
+  let some (.index basePlace indexExpr) := ns.places[indexPlace.index]?
+    | throw s!"indexed-field borrow base {indexPlace.index} is not an index"
+  let some (.literal value) := placeIndexForm? ns indexExpr
+    | throw s!"indexed-field borrow place {place.index} does not use a literal index"
+  if value < 0 then
+    throw s!"indexed-field borrow place {place.index} has a negative literal index"
+  let some (.localVar localId) := ns.places[basePlace.index]?
+    | throw s!"indexed-field borrow base {basePlace.index} is not an owned local"
+  let some source := resolveStruct? unit ns.identity owner
+    | throw "native indexed-field borrow could not resolve its nominal owner"
+  let some fieldName := sourceFieldName? ns fieldNameId
+    | throw s!"native indexed-field borrow could not resolve field name {fieldNameId.index}"
+  let some fieldIndex := handleFieldIndex? unit source none fieldName
+    | throw s!"native indexed-field borrow could not resolve field `{fieldName}`"
+  let some (.reference referenceType) := ns.tables.types[resultType.index]?
+    | throw "a native indexed-field borrow requires a resolved reference result type"
+  let lexicalLoan ← match kind with
+    | .immutable => pure 0
+    | .mutable =>
+        let some lexicalLoan := certificateLoanId? unit ns.identity site
+          | throw s!"indexed-field borrow site {site.index} has no checked loan identity"
+        pure lexicalLoan
+    | .profile _ =>
+        throw "profile-defined indexed-field borrow has no native V1 descriptor"
+  return .indexedLocalFieldBorrow {
+    location := { localId }, index := value.toNat,
+    field := { source, variant := none, index := fieldIndex },
+    referenceType, kind, lexicalLoan }
+
 private def lowerPrimitive (ns : ValidatedNamespace) (resultType : TypeId)
     (operation : PrimitiveOperation) : Except String LoweredOperation := do
   let some resolved := ns.tables.types[resultType.index]?
@@ -267,6 +395,25 @@ private def lowerPrimitive (ns : ValidatedNamespace) (resultType : TypeId)
     throw "V1 native lowering requires a source-independent integer width"
   let lowered := match operation with
     | .tuple => some .tuple
+    | .vector => some .vector
+    | .pushVector => some .pushVector
+    | .concatVector => some .concatVector
+    | .slice => some .slice
+    | .insertVector => some .insertVector
+    | .removeVector => some .removeVector
+    | .swapVector => some .swapVector
+    | .reverseSliceVector => some .reverseSliceVector
+    | .destroyEmptyVector => some .destroyEmptyVector
+    | .containsVector => some .containsVector
+    | .checkVectorIndex failure => some (.checkVectorIndex failure)
+    | .indexOfVector => match resolved with
+        | .tuple #[_, index] => match ns.tables.types[index.index]? with
+            | some (.integer .pointer _) | none => none
+            | some indexType => some (.indexOfVector indexType)
+        | _ => none
+    | .length => some (.length resolved)
+    | .logicalNot => some .logicalNot
+    | .index => some (.index resolved)
     | .copyValue => some (.copyValue resolved)
     | .moveValue => some (.moveValue resolved)
     | .add => some (.add resolved)
@@ -285,6 +432,18 @@ private def lowerPrimitive (ns : ValidatedNamespace) (resultType : TypeId)
     | .checkedDivide failure => some (.checkedDivide failure resolved)
     | .modulo => some (.modulo resolved)
     | .checkedModulo failure => some (.checkedModulo failure resolved)
+    | .bitwiseOr => some (.bitwiseOr resolved)
+    | .bitwiseAnd => some (.bitwiseAnd resolved)
+    | .bitwiseXor => some (.bitwiseXor resolved)
+    | .bitwiseNot => some (.bitwiseNot resolved)
+    | .shiftLeft => some (.shiftLeft resolved)
+    | .checkedShiftLeft failure => some (.checkedShiftLeft failure resolved)
+    | .shiftRight => some (.shiftRight resolved)
+    | .checkedShiftRight failure => some (.checkedShiftRight failure resolved)
+    | .cast => some (.cast resolved)
+    | .checkedCast failure => some (.checkedCast failure resolved)
+    | .logicalAnd => some .logicalAnd
+    | .logicalOr => some .logicalOr
     | _ => none
   let some lowered := lowered
     | throw s!"primitive operation `{repr operation}` has no native V1 descriptor"
@@ -330,6 +489,16 @@ private def lowerData (unit : ValidatedUnit) (ns : ValidatedNamespace)
       let some index := handleFieldIndex? unit handle none fieldName
         | throw s!"native field selection could not resolve field `{fieldName}`"
       return .field { source := handle, variant := none, index }
+  | .selectVariants reference fields =>
+      let some handle := resolveStruct? unit ns.identity reference
+        | throw "native variant field selection could not resolve its nominal owner"
+      let some choices := variantFieldChoices? unit handle fields
+        | throw "native variant field selection could not resolve its payload map"
+      return .variantField { source := handle, choices }
+  | .testVariants reference variants =>
+      let some handle := resolveStruct? unit ns.identity reference
+        | throw "native variant test could not resolve its nominal owner"
+      return .variantTest { source := handle, variants }
   | _ => throw s!"data operation `{repr operation}` has no native V1 descriptor"
 
 private def lowerReference (ns : ValidatedNamespace) (resultType : TypeId)
@@ -369,7 +538,17 @@ private def lowerOperation (unit : ValidatedUnit) (namespaceId : NamespaceId)
   | .copy place => lowerLocal ns operation place
   | .move place => lowerLocal ns operation place
   | .borrow kind place =>
-      lowerDerefLocalBorrow unit ns resultType site kind place
+      match ns.places[place.index]? with
+      | some (.localVar localId) =>
+          lowerLocalBorrow unit ns resultType site kind localId
+      | some (.index ..) =>
+          lowerIndexedLocalBorrow unit ns resultType site kind place
+      | some (.field base ..) =>
+          match ns.places[base.index]? with
+          | some (.index ..) =>
+              lowerIndexedLocalFieldBorrow unit ns resultType site kind place
+          | _ => lowerDerefLocalBorrow unit ns resultType site kind place
+      | _ => lowerDerefLocalBorrow unit ns resultType site kind place
   | .call _ => .error s!"call form at expression {site.index} is not in V1"
   | .assert => .error s!"assert at expression {site.index} is not in V1"
   | .write _ | .drop _ =>
@@ -378,18 +557,45 @@ private def lowerOperation (unit : ValidatedUnit) (namespaceId : NamespaceId)
   | .specification _ =>
       .error s!"logical operation reached executable expression {site.index}"
 
-/-- The runtime value of a constant whose initializer is a literal: the
-big-step rule evaluates the initializer in an empty frame, which for a
-literal is that value, so the constant denotes as `value`. -/
-private def literalConstant? (unit : ValidatedUnit) (namespaceId : NamespaceId)
+/-- Fold only closed, successful primitive expressions. Each folded node
+is certified against the existing semantics by `leaner_constant_agree`.
+Fuel bounds reference chains, including malformed cycles. -/
+private def constantValueFuel? (unit : ValidatedUnit) (fuel : Nat)
+    (namespaceId : NamespaceId) (id : ExprId) : Option RuntimeValue := do
+  let fuel + 1 := fuel | none
+  let ns ← unit.namespaces[namespaceId.index]?
+  let expression ← ns.expressions[id.index]?
+  match expression.kind with
+  | .value literal _ => constValue? literal
+  | .constant reference =>
+      let handle ← resolveConstant? unit namespaceId reference
+      let targetNs ← unit.namespaces[handle.namespaceId.index]?
+      let declaration ← targetNs.constants[handle.constantId]?
+      constantValueFuel? unit fuel handle.namespaceId declaration.value
+  | .operation (.primitive operation) _ arguments _ =>
+      let values ← arguments.mapM (constantValueFuel? unit fuel namespaceId)
+      let .ok value ← evaluatePrimitiveOperation? ns expression.typeId operation values | none
+      some value
+  | _ => none
+
+private def foldedConstant? (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (reference : QualifiedRef) : Option RuntimeValue := do
   let handle ← resolveConstant? unit namespaceId reference
   let targetNs ← unit.namespaces[handle.namespaceId.index]?
   let declaration ← targetNs.constants[handle.constantId]?
-  let initializer ← targetNs.expressions[declaration.value.index]?
-  match initializer.kind with
-  | .value literal _ => constValue? literal
-  | _ => none
+  let fuel := unit.namespaces.foldl (fun count ns => count + ns.expressions.size) 1
+  constantValueFuel? unit fuel handle.namespaceId declaration.value
+
+/-- Classify an assignment through a vector/tuple held directly in a local,
+with an index that preparation reduced to a direct or copied local read. -/
+private def localIndexAssignment? (ns : ValidatedNamespace) (place : PlaceId) :
+    Option (LocalId × LocalId) := do
+  let .index basePlace indexExpr ← ns.places[place.index]? | none
+  let .localVar base ← ns.places[basePlace.index]? | none
+  let index ← match placeIndexForm? ns indexExpr with
+    | some (.local index) | some (.copyLocal index) => some index
+    | _ => none
+  some (base, index)
 
 private partial def checkExpr (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (ns : ValidatedNamespace) (seen : Array Nat)
@@ -421,8 +627,8 @@ private partial def checkExpr (unit : ValidatedUnit) (namespaceId : NamespaceId)
       initializer.forM descend
       descend body
   | .constant reference =>
-      unless (literalConstant? unit namespaceId reference).isSome do
-        throw s!"constant expression {id.index} has no literal initializer; only literal constants are in V1"
+      unless (foldedConstant? unit namespaceId reference).isSome do
+        throw s!"constant expression {id.index} is not a closed, successful primitive initializer"
   | .ifElse condition thenBranch elseBranch =>
       descend condition
       descend thenBranch
@@ -436,8 +642,10 @@ private partial def checkExpr (unit : ValidatedUnit) (namespaceId : NamespaceId)
   | .return_ values => values.forM descend
   | .throw_ _ arguments => arguments.forM descend
   | .assign place child =>
-      let some (.localVar _) := ns.places[place.index]?
-        | throw s!"assignment at expression {id.index} is not to a closed local"
+      match ns.places[place.index]? with
+      | some (.localVar _) => pure ()
+      | _ => unless (localIndexAssignment? ns place).isSome do
+          throw s!"assignment at expression {id.index} is not to a closed local or local index"
       descend child
   | .assignPattern .. =>
       throw s!"pattern assignment at expression {id.index} is not in V1"
@@ -472,148 +680,261 @@ private structure CalleeDenotation where
   /-- The callee's generated names; none for the recursive call. -/
   generated : Option Generated
 
-private partial def emitExpr (unit : ValidatedUnit) (ns : ValidatedNamespace)
+/-- The constructors one reading of a body is built from: the relational
+combinators, or the tree's constructors.  One traversal emits either. -/
+structure Builder where
+  value : Lean.Expr → MetaM Lean.Expr
+  localVar : Lean.Expr → MetaM Lean.Expr
+  primitive : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  global : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  local_ : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  derefLocalBorrow : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  indexedLocalBorrow : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  indexedLocalFieldBorrow : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  reference : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  field : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  variantField : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  variantTest : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  constructor : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  call : Lean.Expr → Lean.Expr → Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  callAt : Lean.Expr → Lean.Expr → Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  branch : Lean.Expr → Lean.Expr → Option Lean.Expr → MetaM Lean.Expr
+  return_ : Lean.Expr → MetaM Lean.Expr
+  throw_ : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  loop : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  break_ : Lean.Expr → MetaM Lean.Expr
+  continue_ : Lean.Expr → MetaM Lean.Expr
+  assignLocal : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  assignLocalIndex : Lean.Expr → Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  spec : MetaM Lean.Expr
+  blockUnit : Lean.Expr → MetaM Lean.Expr
+  blockResult : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  letNoValue : Lean.Expr → MetaM Lean.Expr
+  letValue : Lean.Expr → Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  valuesNil : MetaM Lean.Expr
+  valuesCons : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+  statementsNil : MetaM Lean.Expr
+  statementsCons : Lean.Expr → Lean.Expr → MetaM Lean.Expr
+
+/-- The relational combinators. -/
+def relationalBuilder : Builder where
+  value v := mkAppM ``LeanerIR.Proofs.Denotation.value #[v]
+  localVar i := mkAppM ``LeanerIR.Proofs.Denotation.localVar #[i]
+  primitive op os := mkAppM ``LeanerIR.Proofs.Denotation.nativePrimitiveOperation #[op, os]
+  global op os := mkAppM ``LeanerIR.Proofs.Denotation.nativeGlobalOperation #[op, os]
+  local_ op os := mkAppM ``LeanerIR.Proofs.Denotation.nativeLocalOperation #[op, os]
+  derefLocalBorrow op os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeDerefLocalBorrowOperation #[op, os]
+  indexedLocalBorrow op os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeIndexedLocalBorrowOperation #[op, os]
+  indexedLocalFieldBorrow op os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeIndexedLocalFieldBorrowOperation #[op, os]
+  reference op os := mkAppM ``LeanerIR.Proofs.Denotation.nativeReferenceOperation #[op, os]
+  field location os := do
+    let evaluate ← mkAppM
+      ``LeanerIR.Proofs.Denotation.NominalFieldLocation.evaluateSelect? #[location]
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeOperation #[evaluate, os]
+  variantField location os := do
+    let evaluate ← mkAppM
+      ``LeanerIR.Proofs.Denotation.NominalVariantFieldLocation.evaluateSelect?
+      #[location]
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeOperation #[evaluate, os]
+  variantTest test os := do
+    let evaluate ← mkAppM
+      ``LeanerIR.Proofs.Denotation.NominalVariantTest.evaluate? #[test]
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeOperation #[evaluate, os]
+  constructor c os := do
+    let evaluate ← mkAppM ``LeanerIR.Proofs.Denotation.NominalConstructor.evaluate? #[c]
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeOperation #[evaluate, os]
+  call handle lexical relation os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeCall #[handle, lexical, relation, os]
+  callAt handle lexical relation os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeCallAt #[handle, lexical, relation, os]
+  branch c t e := do
+    let e ← match e with
+      | none =>
+          mkAppOptM ``Option.none
+            #[some (mkConst ``LeanerIR.Proofs.Denotation.ExprDenotation)]
+      | some e =>
+          mkAppM ``Option.some #[e]
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeBranch #[c, t, e]
+  return_ vs := mkAppM ``LeanerIR.Proofs.Denotation.nativeReturn #[vs]
+  throw_ kind as := mkAppM ``LeanerIR.Proofs.Denotation.nativeThrow #[kind, as]
+  loop site body := mkAppM ``LeanerIR.Proofs.Denotation.nativeLoop #[site, body]
+  break_ nest := do
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeBreak
+      #[nest, ← mkAppOptM ``Option.none
+        #[some (mkConst ``LeanerIR.Proofs.Denotation.ExprDenotation)]]
+  continue_ nest := mkAppM ``LeanerIR.Proofs.Denotation.nativeContinue #[nest]
+  assignLocal i v := mkAppM ``LeanerIR.Proofs.Denotation.nativeAssignLocal #[i, v]
+  assignLocalIndex base index value :=
+    mkAppM ``LeanerIR.Proofs.Denotation.nativeAssignLocalIndex #[base, index, value]
+  spec := pure (mkConst ``LeanerIR.Proofs.Denotation.nativeSpec)
+  blockUnit ss := mkAppM ``LeanerIR.Proofs.Denotation.blockUnit #[ss]
+  blockResult ss r := mkAppM ``LeanerIR.Proofs.Denotation.blockResult #[ss, r]
+  letNoValue body := mkAppM ``LeanerIR.Proofs.Denotation.letNoValue #[body]
+  letValue binder i body :=
+    mkAppM ``LeanerIR.Proofs.Denotation.letNativeValue #[binder, i, body]
+  valuesNil := pure (mkConst ``LeanerIR.Proofs.Denotation.valuesNil)
+  valuesCons h t := mkAppM ``LeanerIR.Proofs.Denotation.valuesCons #[h, t]
+  statementsNil := pure (mkConst ``LeanerIR.Proofs.Denotation.statementsNil)
+  statementsCons h t := mkAppM ``LeanerIR.Proofs.Denotation.statementsCons #[h, t]
+
+/-- The tree's constructors. -/
+def treeBuilder : Builder where
+  value v := mkAppM ``LeanerIR.Proofs.Denotation.Tree.value #[v]
+  localVar i := mkAppM ``LeanerIR.Proofs.Denotation.Tree.localVar #[i]
+  primitive op os := mkAppM ``LeanerIR.Proofs.Denotation.Tree.primitive #[op, os]
+  global op os := mkAppM ``LeanerIR.Proofs.Denotation.Tree.global #[op, os]
+  local_ op os := mkAppM ``LeanerIR.Proofs.Denotation.Tree.local_ #[op, os]
+  derefLocalBorrow op os := mkAppM ``LeanerIR.Proofs.Denotation.Tree.derefLocalBorrow #[op, os]
+  indexedLocalBorrow op os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.Tree.indexedLocalBorrow #[op, os]
+  indexedLocalFieldBorrow op os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.Tree.indexedLocalFieldBorrow #[op, os]
+  reference op os := mkAppM ``LeanerIR.Proofs.Denotation.Tree.reference #[op, os]
+  field location os := mkAppM ``LeanerIR.Proofs.Denotation.Tree.field #[location, os]
+  variantField location os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.Tree.variantField #[location, os]
+  variantTest test os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.Tree.variantTest #[test, os]
+  constructor c os := mkAppM ``LeanerIR.Proofs.Denotation.Tree.constructor #[c, os]
+  call handle lexical relation os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.Tree.call #[handle, lexical, relation, os]
+  callAt handle lexical relation os :=
+    mkAppM ``LeanerIR.Proofs.Denotation.Tree.callAt #[handle, lexical, relation, os]
+  branch c t e :=
+    match e with
+    | none => mkAppM ``LeanerIR.Proofs.Denotation.Tree.branchNone #[c, t]
+    | some e => mkAppM ``LeanerIR.Proofs.Denotation.Tree.branchSome #[c, t, e]
+  return_ vs := mkAppM ``LeanerIR.Proofs.Denotation.Tree.return_ #[vs]
+  throw_ kind as := mkAppM ``LeanerIR.Proofs.Denotation.Tree.throw_ #[kind, as]
+  loop site body := mkAppM ``LeanerIR.Proofs.Denotation.Tree.loop #[site, body]
+  break_ nest := mkAppM ``LeanerIR.Proofs.Denotation.Tree.break_ #[nest]
+  continue_ nest := mkAppM ``LeanerIR.Proofs.Denotation.Tree.continue_ #[nest]
+  assignLocal i v := mkAppM ``LeanerIR.Proofs.Denotation.Tree.assignLocal #[i, v]
+  assignLocalIndex base index value :=
+    mkAppM ``LeanerIR.Proofs.Denotation.Tree.assignLocalIndex #[base, index, value]
+  spec := pure (mkConst ``LeanerIR.Proofs.Denotation.Tree.spec)
+  blockUnit ss := mkAppM ``LeanerIR.Proofs.Denotation.Tree.blockUnit #[ss]
+  blockResult ss r := mkAppM ``LeanerIR.Proofs.Denotation.Tree.blockResult #[ss, r]
+  letNoValue body := mkAppM ``LeanerIR.Proofs.Denotation.Tree.letNoValue #[body]
+  letValue binder i body := mkAppM ``LeanerIR.Proofs.Denotation.Tree.letValue #[binder, i, body]
+  valuesNil := pure (mkConst ``LeanerIR.Proofs.Denotation.Operands.nil)
+  valuesCons h t := mkAppM ``LeanerIR.Proofs.Denotation.Operands.cons #[h, t]
+  statementsNil := pure (mkConst ``LeanerIR.Proofs.Denotation.Statements.nil)
+  statementsCons h t := mkAppM ``LeanerIR.Proofs.Denotation.Statements.cons #[h, t]
+
+private partial def emitWith (b : Builder) (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (namespaceId : NamespaceId)
     (namespaceTerm executable : Lean.Expr)
     (callees : Array CalleeDenotation) (id : ExprId) : MetaM Lean.Expr := do
   let some expression := ns.expressions[id.index]?
     | throwError "expression {id.index} is out of range during denotation generation"
+  let emit := emitWith b unit ns namespaceId namespaceTerm executable callees
   match expression.kind with
   | .value literal _ =>
       let some runtimeValue := constValue? literal
         | throwError "literal at expression {id.index} has no runtime representation"
-      mkAppM ``LeanerIR.Proofs.Denotation.value #[toExpr runtimeValue]
-  | .localVar localId =>
-      mkAppM ``LeanerIR.Proofs.Denotation.localVar #[toExpr localId]
+      b.value (toExpr runtimeValue)
+  | .localVar localId => b.localVar (toExpr localId)
   | .constant reference =>
-      let some runtimeValue := literalConstant? unit namespaceId reference
-        | throwError "constant expression {id.index} has no literal initializer"
-      mkAppM ``LeanerIR.Proofs.Denotation.value #[toExpr runtimeValue]
+      let some runtimeValue := foldedConstant? unit namespaceId reference
+        | throwError "constant expression {id.index} could not be folded"
+      b.value (toExpr runtimeValue)
   | .operation operation instantiations arguments _ =>
-      let operands ←
-        emitValues unit ns namespaceId namespaceTerm executable callees arguments
+      let operands ← emitValues arguments
       let lowered ← match lowerOperation unit namespaceId ns expression.typeId id
           operation instantiations with
         | .ok lowered => pure lowered
         | .error reason => throwError reason
       match lowered with
-      | .primitive operation =>
-          mkAppM ``LeanerIR.Proofs.Denotation.nativePrimitiveOperation
-            #[toExpr operation, operands]
-      | .global operation =>
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeGlobalOperation
-            #[toExpr operation, operands]
-      | .local operation =>
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeLocalOperation
-            #[toExpr operation, operands]
-      | .derefLocalBorrow operation =>
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeDerefLocalBorrowOperation
-            #[toExpr operation, operands]
-      | .field location =>
-          let evaluate ← mkAppM
-            ``LeanerIR.Proofs.Denotation.NominalFieldLocation.evaluateSelect?
-            #[toExpr location]
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeOperation #[evaluate, operands]
-      | .reference operation =>
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeReferenceOperation
-            #[toExpr operation, operands]
-      | .constructor constructor =>
-          let evaluate ← mkAppM
-            ``LeanerIR.Proofs.Denotation.NominalConstructor.evaluate?
-            #[toExpr constructor]
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeOperation #[evaluate, operands]
+      | .primitive operation => b.primitive (toExpr operation) operands
+      | .global operation => b.global (toExpr operation) operands
+      | .local operation => b.local_ (toExpr operation) operands
+      | .derefLocalBorrow operation => b.derefLocalBorrow (toExpr operation) operands
+      | .indexedLocalBorrow operation => b.indexedLocalBorrow (toExpr operation) operands
+      | .indexedLocalFieldBorrow operation =>
+          b.indexedLocalFieldBorrow (toExpr operation) operands
+      | .field location => b.field (toExpr location) operands
+      | .variantField location => b.variantField (toExpr location) operands
+      | .variantTest test => b.variantTest (toExpr test) operands
+      | .reference operation => b.reference (toExpr operation) operands
+      | .constructor constructor => b.constructor (toExpr constructor) operands
       | .function reference =>
           let some handle := resolveFunction? unit namespaceId reference
             | throwError "direct call escaped denotation resolution"
           let some callee := callees.find? (fun candidate => candidate.handle == handle)
             | throwError "direct call escaped denotation dependency generation"
           let lexical := certificateLoanId? unit namespaceId id
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeCall
-            #[toExpr handle, toExpr lexical, ← callee.relationTerm executable, operands]
+          if instantiations.isEmpty then
+            let relation ← callee.relationTerm executable
+            let relation := if callee.generated.isNone then relation else
+              (Lean.mkApp relation (toExpr (#[] : Array (TypeId × TypeId)))).headBeta
+            return ← b.call (toExpr handle) (toExpr lexical) relation operands
+          let pairType ← mkAppM ``Prod #[mkConst ``TypeId, mkConst ``TypeId]
+          let mapType ← mkAppM ``Array #[pairType]
+          withLocalDeclD `outerTypeInstantiation mapType fun outer => do
+            let executableUnit ← mkAppM ``ExecutableUnit.unit #[executable]
+            let calleeMap ← mkAppM ``callTypeInstantiation
+              #[executableUnit, toExpr handle, outer, toExpr instantiations]
+            let relation ← callee.relationTerm executable
+            let relation := Lean.mkApp relation calleeMap
+            let family ← mkLambdaFVars #[outer] relation
+            b.callAt (toExpr handle) (toExpr lexical) family operands
   | .ifElse condition thenBranch elseBranch =>
-      let conditionTerm ←
-        emitExpr unit ns namespaceId namespaceTerm executable callees condition
-      let thenTerm ←
-        emitExpr unit ns namespaceId namespaceTerm executable callees thenBranch
-      match elseBranch with
-      | none =>
-          let elseTerm ← mkAppOptM ``Option.none
-            #[some (mkConst ``LeanerIR.Proofs.Denotation.ExprDenotation)]
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeBranch
-            #[conditionTerm, thenTerm, elseTerm]
-      | some elseBranch =>
-          let elseTerm ←
-            emitExpr unit ns namespaceId namespaceTerm executable callees elseBranch
-          let elseTerm ← mkAppM ``Option.some #[elseTerm]
-          mkAppM ``LeanerIR.Proofs.Denotation.nativeBranch
-            #[conditionTerm, thenTerm, elseTerm]
-  | .return_ values =>
-      mkAppM ``LeanerIR.Proofs.Denotation.nativeReturn
-        #[← emitValues unit ns namespaceId namespaceTerm executable callees values]
-  | .throw_ kind arguments =>
-      mkAppM ``LeanerIR.Proofs.Denotation.nativeThrow
-        #[toExpr kind,
-          ← emitValues unit ns namespaceId namespaceTerm executable callees arguments]
-  | .loop _ body =>
-      mkAppM ``LeanerIR.Proofs.Denotation.nativeLoop
-        #[toExpr id,
-          ← emitExpr unit ns namespaceId namespaceTerm executable callees body]
-  | .break_ nest none =>
-      mkAppM ``LeanerIR.Proofs.Denotation.nativeBreak
-        #[toExpr nest, ← mkAppOptM ``Option.none
-          #[some (mkConst ``LeanerIR.Proofs.Denotation.ExprDenotation)]]
-  | .continue_ nest =>
-      mkAppM ``LeanerIR.Proofs.Denotation.nativeContinue #[toExpr nest]
+      let conditionTerm ← emit condition
+      let thenTerm ← emit thenBranch
+      let elseTerm ← match elseBranch with
+        | none => pure none
+        | some elseBranch => some <$> emit elseBranch
+      b.branch conditionTerm thenTerm elseTerm
+  | .return_ values => b.return_ (← emitValues values)
+  | .throw_ kind arguments => b.throw_ (toExpr kind) (← emitValues arguments)
+  | .loop _ body => b.loop (toExpr id) (← emit body)
+  | .break_ nest none => b.break_ (toExpr nest)
+  | .continue_ nest => b.continue_ (toExpr nest)
   | .assign place child =>
-      let some (.localVar localId) := ns.places[place.index]?
-        | throwError "assignment escaped closed-local native lowering"
-      mkAppM ``LeanerIR.Proofs.Denotation.nativeAssignLocal
-        #[toExpr localId,
-          ← emitExpr unit ns namespaceId namespaceTerm executable callees child]
-  | .spec _ =>
-      pure (mkConst ``LeanerIR.Proofs.Denotation.nativeSpec)
+      match ns.places[place.index]? with
+      | some (.localVar localId) => b.assignLocal (toExpr localId) (← emit child)
+      | _ =>
+          let some (base, index) := localIndexAssignment? ns place
+            | throwError "assignment escaped closed-local native lowering"
+          b.assignLocalIndex (toExpr base) (toExpr index) (← emit child)
+  | .spec _ => b.spec
   | .block statements result =>
-      let statementTerm ←
-        emitStatements unit ns namespaceId namespaceTerm executable callees statements
+      let statementTerm ← emitStatements statements
       match result with
-      | none => mkAppM ``LeanerIR.Proofs.Denotation.blockUnit #[statementTerm]
-      | some result =>
-          mkAppM ``LeanerIR.Proofs.Denotation.blockResult
-            #[statementTerm,
-              ← emitExpr unit ns namespaceId namespaceTerm executable callees result]
+      | none => b.blockUnit statementTerm
+      | some result => b.blockResult statementTerm (← emit result)
   | .letDecl pattern initializer body =>
-      let body ← emitExpr unit ns namespaceId namespaceTerm executable callees body
+      let body ← emit body
       match initializer with
-      | none => mkAppM ``LeanerIR.Proofs.Denotation.letNoValue #[body]
+      | none => b.letNoValue body
       | some initializer =>
           let some binder := lowerPattern? unit ns pattern
             | throwError "pattern {pattern.index} escaped native lowering"
-          mkAppM ``LeanerIR.Proofs.Denotation.letNativeValue
-            #[toExpr binder,
-              ← emitExpr unit ns namespaceId namespaceTerm executable callees initializer,
-              body]
+          b.letValue (toExpr binder) (← emit initializer) body
   | _ => throwError "unsupported expression escaped the denotation precheck"
 where
-  emitValues (unit : ValidatedUnit) (ns : ValidatedNamespace)
-      (namespaceId : NamespaceId)
-      (namespaceTerm executable : Lean.Expr)
-      (callees : Array CalleeDenotation) (ids : Array ExprId) :
-      MetaM Lean.Expr := do
-    let mut tail := mkConst ``LeanerIR.Proofs.Denotation.valuesNil
+  emitValues (ids : Array ExprId) : MetaM Lean.Expr := do
+    let mut tail ← b.valuesNil
     for id in ids.reverse do
-      tail ← mkAppM ``LeanerIR.Proofs.Denotation.valuesCons
-        #[← emitExpr unit ns namespaceId namespaceTerm executable callees id, tail]
+      tail ← b.valuesCons
+        (← emitWith b unit ns namespaceId namespaceTerm executable callees id) tail
     return tail
-  emitStatements (unit : ValidatedUnit) (ns : ValidatedNamespace)
-      (namespaceId : NamespaceId)
-      (namespaceTerm executable : Lean.Expr)
-      (callees : Array CalleeDenotation) (ids : Array ExprId) :
-      MetaM Lean.Expr := do
-    let mut tail := mkConst ``LeanerIR.Proofs.Denotation.statementsNil
+  emitStatements (ids : Array ExprId) : MetaM Lean.Expr := do
+    let mut tail ← b.statementsNil
     for id in ids.reverse do
-      tail ← mkAppM ``LeanerIR.Proofs.Denotation.statementsCons
-        #[← emitExpr unit ns namespaceId namespaceTerm executable callees id, tail]
+      tail ← b.statementsCons
+        (← emitWith b unit ns namespaceId namespaceTerm executable callees id) tail
     return tail
+
+/-- The relational denotation of an expression. -/
+private def emitExpr := emitWith relationalBuilder
+
+/-- The tree of an expression. -/
+private def emitTree := emitWith treeBuilder
 
 /-! ## Uniform agreement proof -/
 
@@ -623,15 +944,171 @@ and recursion follows only the native child terms already present in the
 goal. -/
 syntax "leaner_denotation_agree " ident ident : tactic
 
+/-- Closed arena lookups need only walk to the requested slot. Avoid the
+array bounds check, which first traverses the complete literal arena. -/
+elab "leaner_arena_rfl" : tactic => do
+  let (arrayLookup, certificate?) ← withMainContext do
+    let target ← instantiateMVars (← (← getMainGoal).getType)
+    let some (_, lhs, _) := target.eq? | return (false, none)
+    unless lhs.isAppOf ``getElem? && (lhs.getArg! 0).isAppOf ``Array do
+      return (false, none)
+    let arguments := lhs.getAppArgs
+    let array := arguments[arguments.size - 2]!
+    let namespace? := array.find? fun term => match term with
+      | .const (.str _ "denotationNamespace") _ => true
+      | _ => false
+    if let some (.const namespaceName _) := namespace? then
+      for field in ["expressions", "places"] do
+        let name := Name.str namespaceName (field ++ "_index_eq")
+        if !(← getEnv).contains name then continue
+        let some (_, indexed, _) := (← inferType (mkConst name)).eq? | continue
+        if ← withTransparency .reducible <| isDefEq array (indexed.getArg! 1) then
+          return (true, some name)
+    return (true, none)
+  if let some certificate := certificate? then
+    evalTactic (← `(tactic|
+      (rw [LeanerIR.Validation.IndexedArena.get?_of_index_eq $(mkIdent certificate)]
+       rfl)))
+    return
+  if arrayLookup then
+    evalTactic (← `(tactic| rw [← Array.getElem?_toList]; rfl))
+  else
+    evalTactic (← `(tactic| rfl))
+
 /-- Reuse the exact agreement theorem attached to a named generated callee
 relation.  Generic V1 relations are instantiated with one abstract inhabited
 carrier here; no representation-specific fact enters the proof. -/
 syntax "leaner_denotation_reuse " ident : tactic
 
+/-- Build one small semantic certificate per folded expression/operand node. -/
+syntax "leaner_constant_agree " Lean.Parser.Tactic.rwRule : tactic
+
+macro_rules
+  | `(tactic| leaner_constant_agree $unitRule:rwRule) => `(tactic|
+      first
+      | (apply LeanerIR.Proofs.Denotation.value_agrees
+          (by first | rfl | (rw [$unitRule]; rfl)) (by rfl) (by rfl)
+          (by first | rfl | (simp [LeanerIR.SemanticOperations.constValue?] <;> rfl)))
+      | (apply LeanerIR.Proofs.Denotation.primitive_computed_agrees
+          (by first | rfl | (rw [$unitRule]; rfl)) (by rfl) (by rfl)
+          (by leaner_constant_agree $unitRule)
+          (by first | rfl | (simp [LeanerIR.SemanticOperations.evaluatePrimitiveOperation?,
+            LeanerIR.SemanticOperations.resolveTargetIntegerType?,
+            LeanerIR.SemanticOperations.checkedBinaryInteger,
+            LeanerIR.SemanticOperations.checkedInteger, LeanerIR.Ty.integerBounds?] <;> rfl)))
+      | (apply LeanerIR.Proofs.Denotation.constant_computed_agrees
+          (by first | rfl | (rw [$unitRule]; rfl)) (by rfl) (by rfl)
+          (by rw [$unitRule]; rfl) (by rw [$unitRule]; rfl) (by rfl)
+          (by leaner_constant_agree $unitRule))
+      | exact LeanerIR.Proofs.Denotation.literalValues_nil_agrees
+      | (apply LeanerIR.Proofs.Denotation.literalValues_cons_agrees
+          (by leaner_constant_agree $unitRule) (by leaner_constant_agree $unitRule)))
+
 /-- Build the proof-only static path certificate for a generated local
 reborrow.  Each constructor closes one literal arena lookup; recursion ends
 at `deref (localVar _)`. -/
 syntax "leaner_deref_local_path" : tactic
+
+private def fieldVariantNames (unit : ValidatedUnit) (handle : StructHandle) :
+    List String :=
+  match unit.namespaces[handle.namespaceId.index]? with
+  | none => []
+  | some ns =>
+    match ns.structs[handle.structId]? with
+    | none => []
+    | some declaration => declaration.variants.toList.filterMap fun variant =>
+        ns.tables.names[variant.name.index]?.map (·.name)
+
+/-- Discharge the open-string branch using only the declaration's finite
+variant-name list, without simplifying an entire generated namespace. -/
+private theorem fieldIndexAbsent (unit : ValidatedUnit) (handle : StructHandle)
+    (name field : String) (absent : name ∉ fieldVariantNames unit handle) :
+    handleFieldIndex? unit handle (some name) field = none := by
+  unfold handleFieldIndex?
+  suffices fields : handleFields? unit handle (some name) = none by simp [fields]
+  cases hns : unit.namespaces[handle.namespaceId.index]? with
+  | none => simp [handleFields?, hns]
+  | some ns =>
+    cases hd : ns.structs[handle.structId]? with
+    | none => simp [handleFields?, hns, hd]
+    | some declaration =>
+      simp only [fieldVariantNames, hns, hd] at absent
+      have missing : declaration.variants.toList.find? (fun candidate =>
+          (ns.tables.names[candidate.name.index]?).any (·.name == name)) = none := by
+        apply List.find?_eq_none.mpr
+        intro candidate member
+        cases hn : ns.tables.names[candidate.name.index]? with
+        | none => simp
+        | some entry =>
+          have neq : entry.name ≠ name := by
+            intro equal
+            apply absent
+            exact List.mem_filterMap.mpr ⟨candidate, member, by simp [hn, equal]⟩
+          simp [neq]
+      simp only [handleFields?, hns, hd, Option.bind_eq_bind,
+        Option.bind_some, missing, Option.bind_none]
+
+/-- A static table equation must not rewrite a closed namespace back to the
+symbolic namespace from the surrounding execution-agreement hypotheses. -/
+elab "leaner_static_field_index" : tactic => do
+  liftMetaTactic fun goal => do
+    let goal ← if (← goal.getType).isForall then do
+        let (_, goal) ← goal.intro1P
+        pure goal
+      else pure goal
+    let mut hypotheses := #[]
+    for declaration in (← goal.getDecl).lctx do
+      hypotheses := hypotheses.push declaration.fvarId
+    return [← goal.tryClearMany hypotheses]
+  let (actualVariant, unitTerm, handleTerm, fieldTerm, variants) ← withMainContext do
+    let goal ← getMainGoal
+    let target ← instantiateMVars (← goal.getType)
+    let some (_, lhs, rhs) := target.eq?
+      | throwError "expected a static field-index equation"
+    unless lhs.isAppOfArity ``handleFieldIndex? 4 do
+      throwError "expected a static handle field lookup"
+    -- Compute the field name before simplification. It is often an arena
+    -- projection from the generated namespace, not yet a string literal.
+    let fieldName ← withTransparency .all <| reduce (lhs.getArg! 3)
+    let handle ← withTransparency .all <| reduce (lhs.getArg! 1)
+    let lhs := mkApp lhs.appFn! fieldName
+    let normalized ← mkEq lhs rhs
+    replaceMainGoal [← goal.change normalized]
+    let names ← mkAppM ``fieldVariantNames #[lhs.getArg! 0, lhs.getArg! 1]
+    let mut names ← withTransparency .all <| reduce names
+    let mut variants := #[]
+    while names.isAppOfArity ``List.cons 3 do
+      let .lit (.strVal name) := names.getArg! 1
+        | throwError "expected a literal variant name"
+      variants := variants.push name
+      names := names.getArg! 2
+    unless names.isAppOfArity ``List.nil 1 do
+      throwError "expected a closed variant table"
+    return (← PrettyPrinter.delab (lhs.getArg! 2),
+      ← PrettyPrinter.delab (lhs.getArg! 0), ← PrettyPrinter.delab handle,
+      ← PrettyPrinter.delab fieldName, variants)
+  let value := mkIdent (← mkFreshUserName `variant)
+  let variantNames ← withMainContext <| PrettyPrinter.delab (toExpr variants.toList)
+  let mut proof ← `(tactic|
+    (have absent : ¬ $value ∈ $variantNames := by simp_all
+     have missing := fieldIndexAbsent $unitTerm
+       ($handleTerm : LeanerIR.StructHandle) $value $fieldTerm (by
+       change ¬ $value ∈ $variantNames
+       exact absent)
+     rw [missing]
+     simp_all))
+  for variant in variants.reverse do
+    let name := Syntax.mkStrLit variant
+    let hypothesis := mkIdent (← mkFreshUserName `variant_eq)
+    proof ← `(tactic|
+      (by_cases $hypothesis : $value = $name
+       · subst $value; rfl
+       have := Ne.symm $hypothesis
+       $proof))
+  evalTactic (← `(tactic|
+    cases $actualVariant:term with
+    | none => rfl
+    | some $value => $proof:tactic))
 
 macro_rules
   | `(tactic| leaner_deref_local_path) =>
@@ -646,12 +1123,14 @@ macro_rules
             (resolved_eq := by rfl)
             (name_eq := by rfl)
             (index_eq := by
-              intro actualVariant
-              cases actualVariant <;> rfl))
+              first
+              | (intro actualVariant; cases actualVariant <;> rfl)
+              | leaner_static_field_index))
 
 elab_rules : tactic
   | `(tactic| leaner_denotation_reuse $unitEq:ident) => do
       let goal ← Lean.Elab.Tactic.getMainGoal
+      trace[leaner.agreement] "node: {← goal.withContext do pure ((← instantiateMVars (← goal.getType)).getAppArgs.back?.map (·.getAppFn))}, {← IO.getNumHeartbeats}"
       let relationName ← goal.withContext do
         let target ← Lean.instantiateMVars (← goal.getType)
         unless target.getAppFn.isConstOf
@@ -683,6 +1162,39 @@ elab_rules : tactic
 private def tag (name : String) : Lean.Ident :=
   Lean.mkIdent (Lean.Name.mkSimple name)
 
+/-- Constructor arity is a closed boundary lookup. Array's well-founded
+search is not definitionally reducible, so use its list equation rather
+than relying on `rfl` for enum variants. -/
+elab "leaner_constructor_fields" : tactic => do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  let definitions ← goal.withContext do
+    let target ← Lean.instantiateMVars (← goal.getType)
+    let some lookup := target.find? (·.isAppOfArity
+        ``LeanerIR.SemanticOperations.constructorFields? 3)
+      | Lean.Meta.throwTacticEx `leaner_constructor_fields goal "not a constructor-field lookup"
+    let unit := lookup.getArg! 0
+    unless unit.isConst do
+      Lean.Meta.throwTacticEx `leaner_constructor_fields goal "constructor unit is not a closed definition"
+    -- Preparation shares unchanged tables and declarations with preceding
+    -- units. Expose that short chain before rewriting Array's opaque search,
+    -- without unfolding the preparation algorithms themselves.
+    let mut pending := [unit.constName!]
+    let mut names : Array Name := #[]
+    while !pending.isEmpty do
+      let name := pending.head!
+      pending := pending.tail!
+      if names.contains name then continue
+      let info ← getConstInfo name
+      unless info.type.isConstOf ``LeanerIR.Validation.ValidatedUnit do continue
+      let some value := info.value? | continue
+      names := names.push name
+      pending := value.getUsedConstants.toList ++ pending
+    names.mapM fun name =>
+      `(Lean.Parser.Tactic.simpLemma| $(mkCIdent name):ident)
+  Lean.Elab.Tactic.evalTactic (← `(tactic|
+    simp [LeanerIR.SemanticOperations.constructorFields?, $definitions,*,
+      List.findIdx?_toArray, List.findIdx?, List.findIdx?.go]))
+
 elab_rules : tactic
   | `(tactic| leaner_denotation_agree $namespaceEq:ident $unitEq:ident) => do
       /- A well-formed rewrite rule, not a bare identifier coerced to one:
@@ -690,6 +1202,7 @@ elab_rules : tactic
       let unitRule ← `(Lean.Parser.Tactic.rwRule| $unitEq:ident)
       let unitSimp : TSyntax ``Lean.Parser.Tactic.simpLemma := ⟨unitEq.raw⟩
       let goal ← Lean.Elab.Tactic.getMainGoal
+      trace[leaner.agreement] "agree: {← goal.withContext do pure ((← instantiateMVars (← goal.getType)).getAppArgs.back?.map (·.getAppFn))}, {← IO.getNumHeartbeats}"
       let isValuesAgreement ← goal.withContext do
         let target ← Lean.instantiateMVars (← goal.getType)
         return target.getAppFn.isConstOf
@@ -724,89 +1237,178 @@ elab_rules : tactic
         let target ← Lean.instantiateMVars (← goal.getType)
         return target.getAppArgs.back?.bind (·.getAppFn.constName?)
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.value then
-        /- A literal, or a constant whose initializer is one. -/
+        /- A literal, or a certified folded constant initializer. -/
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             first
             | (apply LeanerIR.Proofs.Denotation.value_agrees
-                (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+                (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
                 first
-                | rfl
+                | leaner_arena_rfl
                 | simp [LeanerIR.SemanticOperations.constValue?])
-            | (apply LeanerIR.Proofs.Denotation.constant_agrees
-                (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-               /- By name, and the names spliced without macro scopes so
-               they meet the goal tags: the equations assign the lemma's
-               data, and a blanket pass over every goal would also visit
-               the assigned data goals, where its last alternative fails. -/
-               case $(tag "expression_eq"):ident => rfl
-               case $(tag "kind_eq"):ident => rfl
-               case $(tag "resolve_eq"):ident => rw [$unitRule]; rfl
-               case $(tag "target_namespace_eq"):ident => rw [$unitRule]; rfl
-               case $(tag "declaration_eq"):ident => rfl
-               case $(tag "initializer_eq"):ident => rfl
-               case $(tag "initializer_kind_eq"):ident => rfl
-               case $(tag "value_eq"):ident =>
-                 first | rfl | simp [LeanerIR.SemanticOperations.constValue?])))
+            | leaner_constant_agree $unitRule))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.localVar then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.local_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;> rfl)))
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;> leaner_arena_rfl)))
+        return
+      if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeBranch then
+        /- Select the certificate from the generated constructor. Trying
+        reflexivity or unrelated agreement lemmas on a branch unfolds its
+        entire relational continuation before visiting its children. -/
+        let hasElse ← goal.withContext do
+          let target ← Lean.instantiateMVars (← goal.getType)
+          return (target.getAppArgs.back!.getArg! 2).isAppOf ``Option.some
+        let agreement := mkIdent <| if hasElse then
+          ``LeanerIR.Proofs.Denotation.nativeBranchElse_agrees
+        else
+          ``LeanerIR.Proofs.Denotation.nativeBranchUnit_agrees
+        Lean.Elab.Tactic.evalTactic (← `(tactic|
+          (apply $agreement
+            (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+            (by leaner_arena_rfl) (by leaner_arena_rfl) <;>
+            leaner_denotation_agree $namespaceEq $unitEq)))
+        return
+      let dataEvaluator? ← goal.withContext do
+        let target ← Lean.instantiateMVars (← goal.getType)
+        let some denotation := target.getAppArgs.back? | return none
+        unless denotation.getAppFn.isConstOf
+            ``LeanerIR.Proofs.Denotation.nativeOperation do return none
+        return (denotation.getArg! 0).getAppFn.constName?
+      let dataAgreement? := match dataEvaluator? with
+        | some ``LeanerIR.Proofs.Denotation.NominalVariantTest.evaluate? =>
+            some ``LeanerIR.Proofs.Denotation.NominalVariantTest.evaluator_eq_of_unit
+        | some ``LeanerIR.Proofs.Denotation.NominalVariantFieldLocation.evaluateSelect? =>
+            some ``LeanerIR.Proofs.Denotation.NominalVariantFieldLocation.select_evaluator_eq_of_unit
+        | _ => none
+      if let some dataAgreement := dataAgreement? then
+        let agreement := mkIdent dataAgreement
+        Lean.Elab.Tactic.evalTactic (← `(tactic|
+          apply LeanerIR.Proofs.Denotation.nativeData_agrees
+            (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+            (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
+            (by apply $agreement $unitEq <;> leaner_arena_rfl)
+            (by leaner_denotation_agree $namespaceEq $unitEq)))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeReturn then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeReturn_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl)
               (by leaner_denotation_agree $namespaceEq $unitEq))))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeThrow then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeThrow_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl)
               (by leaner_denotation_agree $namespaceEq $unitEq))))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeLoop then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeLoop_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl)
               (by leaner_denotation_agree $namespaceEq $unitEq))))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeBreak then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeBreakNone_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl))))
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl))))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeContinue then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeContinue_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl))))
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl))))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeAssignLocal then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeAssignLocal_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl) (by rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
+              (by leaner_denotation_agree $namespaceEq $unitEq))))
+        return
+      if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeAssignLocalIndex then
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            (apply LeanerIR.Proofs.Denotation.nativeAssignLocalIndex_agrees
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
+              (by first | exact Or.inl rfl | exact Or.inr rfl)
               (by leaner_denotation_agree $namespaceEq $unitEq))))
         return
       if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeSpec then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeSpec_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl))))
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl))))
+        return
+      if denotationHead? == some ``LeanerIR.Proofs.Denotation.blockResult then
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            (apply LeanerIR.Proofs.Denotation.blockResult_agrees
+                (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+             · leaner_arena_rfl
+             · leaner_arena_rfl
+             · leaner_denotation_agree $namespaceEq $unitEq
+             · leaner_denotation_agree $namespaceEq $unitEq)))
+        return
+      if denotationHead? == some ``LeanerIR.Proofs.Denotation.letNativeValue then
+        /- Keep native lets on a deterministic agreement path.  In
+        particular, owned-local loan scopes contain calls and constructors;
+        letting the generic alternative chain backtrack across that whole
+        subtree both hides the failing child and duplicates substantial
+        elaboration work. -/
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            (apply LeanerIR.Proofs.Denotation.letNativeValue_agrees_of_unit
+                $unitEq
+                (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+             · leaner_arena_rfl
+             · leaner_arena_rfl
+             · leaner_arena_rfl
+             · leaner_denotation_agree $namespaceEq $unitEq
+             · leaner_denotation_agree $namespaceEq $unitEq)))
+        return
+      if denotationHead? == some ``LeanerIR.Proofs.Denotation.nativeLocalOperation then
+        -- Local reads and borrows select their semantic certificate directly.
+        -- Reflexivity on an evaluator equation unfolds the whole place
+        -- resolver before the reusable certificate gets a chance to apply.
+        Lean.Elab.Tactic.evalTactic (← `(tactic|
+          apply LeanerIR.Proofs.Denotation.nativeLocal_agrees
+            (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+            (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
+            (by
+              first
+              | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.read_evaluator_eq
+                  <;> leaner_arena_rfl)
+              | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.copy_evaluator_eq
+                  <;> leaner_arena_rfl)
+              | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.move_evaluator_eq
+                  <;> leaner_arena_rfl)
+              | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.borrow_evaluator_eq
+                 · leaner_arena_rfl
+                 · leaner_arena_rfl
+                 · funext frame state place
+                   first
+                   | exact
+                       (LeanerIR.SemanticOperations.borrowRuntimePlace?_immutable_at
+                         _ _ _ _ _ _ _ _).symm
+                   | exact
+                       (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
+                         _ _ _ _ _ _ _ _ (by rw [$unitRule]; leaner_arena_rfl)).symm))
+            (by leaner_denotation_agree $namespaceEq $unitEq)))
         return
       let isNativeCall ← goal.withContext do
         let target ← Lean.instantiateMVars (← goal.getType)
@@ -816,15 +1418,67 @@ elab_rules : tactic
       if isNativeCall then
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
-            (apply LeanerIR.Proofs.Denotation.nativeCall_agrees
-              (by exact $namespaceEq) (by rfl) (by rfl)
+            (apply LeanerIR.Proofs.Denotation.nativeCall_monomorphic_agrees
+              (by exact $namespaceEq) (by leaner_arena_rfl) (by leaner_arena_rfl)
+              (by leaner_arena_rfl)
               (by leaner_denotation_agree $namespaceEq $unitEq)
               (by assumption)
               (by assumption)
               (by
                 have unitEquality := $unitEq
                 rw [unitEquality]
-                rfl))))
+                leaner_arena_rfl))))
+        return
+      let isNativeCallAt ← goal.withContext do
+        let target ← Lean.instantiateMVars (← goal.getType)
+        let some denotation := target.getAppArgs.back? | return false
+        return denotation.getAppFn.isConstOf
+          ``LeanerIR.Proofs.Denotation.nativeCallAt
+      if isNativeCallAt then
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            (apply LeanerIR.Proofs.Denotation.nativeCallAt_agrees
+              (by exact $namespaceEq) (by leaner_arena_rfl) (by leaner_arena_rfl)
+              (by leaner_denotation_agree $namespaceEq $unitEq)
+              (by
+                intro outer
+                first
+                | apply_assumption
+                | (apply LeanerIR.Proofs.Denotation.FunctionDenotation.AgreesWith.of_typeInstantiation_eq
+                      (expected := #[])
+                   · leaner_arena_rfl
+                   · assumption)
+                | (have unitEquality := $unitEq
+                   rw [unitEquality]
+                   assumption))
+              (by assumption)
+              (by
+                have unitEquality := $unitEq
+                rw [unitEquality]
+                leaner_arena_rfl))))
+        return
+      /- Nominal constructors are represented by the generic native-operation
+      combinator.  Dispatch them before the fallback search so a constructor
+      nested under a loan scope does not make the enclosing expression's
+      entire agreement branch backtrack. -/
+      let isNativeConstructor ← goal.withContext do
+        let target ← Lean.instantiateMVars (← goal.getType)
+        let some denotation := target.getAppArgs.back? | return false
+        unless denotation.getAppFn.isConstOf
+            ``LeanerIR.Proofs.Denotation.nativeOperation do
+          return false
+        return (denotation.getArg! 0).getAppFn.isConstOf
+          ``LeanerIR.Proofs.Denotation.NominalConstructor.evaluate?
+      if isNativeConstructor then
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            (apply LeanerIR.Proofs.Denotation.nativeConstructor_agrees
+                (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+             · leaner_arena_rfl
+             · leaner_arena_rfl
+             · apply LeanerIR.Proofs.Denotation.NominalConstructor.evaluator_eq_of_unit
+                 $unitEq <;> first | leaner_arena_rfl | leaner_constructor_fields
+             · leaner_denotation_agree $namespaceEq $unitEq)))
         return
       let isNativePrimitive ← goal.withContext do
         let target ← Lean.instantiateMVars (← goal.getType)
@@ -835,47 +1489,119 @@ elab_rules : tactic
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativePrimitiveOperation_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl) (by rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
               (by first
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.add_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.tuple_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.vector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.pushVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.concatVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.slice_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.insertVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.removeVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.swapVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.reverseSliceVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.destroyEmptyVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.containsVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.indexOfVector_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkVectorIndex_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.length_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.logicalNot_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.index_evaluator_eq
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.copyValue_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.moveValue_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedAdd_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.subtract_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedSubtract_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.multiply_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedMultiply_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.greater_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.lessEqual_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.greaterEqual_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.equal_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.notEqual_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.divide_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedDivide_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.modulo_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedModulo_evaluator_eq
-                    <;> rfl)
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseOr_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseAnd_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseXor_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseNot_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.shiftLeft_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedShiftLeft_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.shiftRight_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedShiftRight_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.cast_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedCast_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.logicalAnd_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.logicalOr_evaluator_eq
+                    <;> leaner_arena_rfl)
                 | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.less_evaluator_eq
-                    <;> rfl))
+                    <;> leaner_arena_rfl))
+              (by leaner_denotation_agree $namespaceEq $unitEq))))
+        return
+      if denotationHead? == some
+          ``LeanerIR.Proofs.Denotation.nativeReferenceOperation then
+        /- Reference operations commonly wrap calls when the lowered form
+        retires a temporary reborrow.  Keep that composition on a direct
+        path so agreement construction does not backtrack over the callee. -/
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            (apply LeanerIR.Proofs.Denotation.nativeReference_agrees
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
+              (by first
+                | apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.dereference_evaluator_eq
+                | apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.mutate_evaluator_eq
+                | (apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.freeze_evaluator_eq
+                    <;> leaner_arena_rfl)
+                | apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.endLoan_evaluator_eq)
               (by leaner_denotation_agree $namespaceEq $unitEq))))
         return
       let isNativeDerefLocalBorrow ← goal.withContext do
@@ -887,14 +1613,14 @@ elab_rules : tactic
         Lean.Elab.Tactic.evalTactic
           (← `(tactic|
             (apply LeanerIR.Proofs.Denotation.nativeDerefLocalBorrow_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl) (by rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
               (by
                 apply LeanerIR.Proofs.Denotation.DerefLocalBorrowOperation.evaluator_eq_path_of_unit
                   $unitEq (path := by leaner_deref_local_path)
-                · rfl
+                · leaner_arena_rfl
                 · decide
-                · rfl
+                · leaner_arena_rfl
                 · funext frame state place
                   first
                   | exact
@@ -903,8 +1629,120 @@ elab_rules : tactic
                   | exact
                       (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
                         _ _ _ _ _ _ _ _
-                        (by rfl)).symm)
+                        (by leaner_arena_rfl)).symm)
               (by leaner_denotation_agree $namespaceEq $unitEq))))
+        return
+      let indexedLocalFieldBorrowShape? ← goal.withContext do
+        let target ← Lean.instantiateMVars (← goal.getType)
+        let some denotation := target.getAppArgs.back? | return none
+        unless denotation.getAppFn.isConstOf
+            ``LeanerIR.Proofs.Denotation.nativeIndexedLocalFieldBorrowOperation do
+          return none
+        let operation := denotation.getArg! 0
+        unless operation.getAppFn.isConstOf
+            ``LeanerIR.Proofs.Denotation.IndexedLocalFieldBorrowOperation.mk do
+          return none
+        return some ((operation.getArg! 4).isConstOf ``BorrowKind.mutable)
+      if let some mutable := indexedLocalFieldBorrowShape? then
+        let borrower ← if mutable then
+          `(tactic|
+            exact
+              (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
+                _ _ _ _ _ _ _ _ (by leaner_arena_rfl)).symm)
+        else
+          `(tactic|
+            exact
+              (LeanerIR.SemanticOperations.borrowRuntimePlace?_immutable_at
+                _ _ _ _ _ _ _ _).symm)
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            apply LeanerIR.Proofs.Denotation.nativeIndexedLocalFieldBorrow_agrees
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            apply LeanerIR.Proofs.Denotation.IndexedLocalFieldBorrowOperation.evaluator_eq_of_unit
+              $unitEq))
+        Lean.Elab.Tactic.evalTactic (← `(tactic| leaner_arena_rfl))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic| funext frame state))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic| simp only [LeanerIR.Proofs.Denotation.IndexedLocalFieldBorrowOperation.resolve?]))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic| exact
+            (LeanerIR.SemanticOperations.resolvePlace?_fieldOfLocalLiteralIndex
+              (place_eq := by leaner_arena_rfl) (index_place_eq := by leaner_arena_rfl)
+              (base_eq := by leaner_arena_rfl) (index_eq := by leaner_arena_rfl)
+              (resolved_eq := by leaner_arena_rfl) (name_eq := by leaner_arena_rfl)
+              (field_index_eq := by
+                intro actualVariant
+                cases actualVariant <;> leaner_arena_rfl)).symm))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic| funext frame state place; $borrower:tactic))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic| leaner_denotation_agree $namespaceEq $unitEq))
+        return
+      let indexedLocalBorrowShape? ← goal.withContext do
+        let target ← Lean.instantiateMVars (← goal.getType)
+        let some denotation := target.getAppArgs.back? | return none
+        unless denotation.getAppFn.isConstOf
+            ``LeanerIR.Proofs.Denotation.nativeIndexedLocalBorrowOperation do
+          return none
+        let operation := denotation.getArg! 0
+        unless operation.isAppOfArity
+            ``LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation.mk 7 do
+          return none
+        let dereference := (operation.getArg! 1).isConstOf ``Bool.true
+        let mutable := (operation.getArg! 4).isConstOf ``BorrowKind.mutable
+        let dynamic := (operation.getArg! 6).isAppOfArity ``Option.some 2
+        return some (dereference, mutable, dynamic)
+      if let some (dereference, mutable, dynamic) := indexedLocalBorrowShape? then
+        let resolver ← if dynamic then
+          if dereference then
+            `(tactic| exact
+              LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation.resolve_eq_dynamic_deref_of_unit
+                $unitEq _ (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
+                (by first | exact Or.inl rfl | exact Or.inr rfl))
+          else
+            `(tactic| exact
+              LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation.resolve_eq_dynamic_local_of_unit
+                $unitEq _ (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)
+                (by first | exact Or.inl rfl | exact Or.inr rfl))
+        else if dereference then
+          `(tactic|
+            exact
+              LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation.resolve_eq_deref_of_unit
+                $unitEq _ (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl))
+        else
+          `(tactic|
+            exact
+              LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation.resolve_eq_local_of_unit
+                $unitEq _ (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl))
+        let borrower ← if mutable then
+          `(tactic|
+            exact
+              (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
+                _ _ _ _ _ _ _ _ (by leaner_arena_rfl)).symm)
+        else
+          `(tactic|
+            exact
+              (LeanerIR.SemanticOperations.borrowRuntimePlace?_immutable_at
+                _ _ _ _ _ _ _ _).symm)
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            apply LeanerIR.Proofs.Denotation.nativeIndexedLocalBorrow_agrees
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by leaner_arena_rfl)))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic|
+            apply LeanerIR.Proofs.Denotation.IndexedLocalBorrowOperation.evaluator_eq_of_unit
+              $unitEq))
+        Lean.Elab.Tactic.evalTactic (← `(tactic| leaner_arena_rfl))
+        Lean.Elab.Tactic.evalTactic resolver
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic| funext frame state place; $borrower:tactic))
+        Lean.Elab.Tactic.evalTactic
+          (← `(tactic| leaner_denotation_agree $namespaceEq $unitEq))
         return
       let script ← `(tactic|
         first
@@ -925,57 +1763,111 @@ elab_rules : tactic
         | (apply LeanerIR.Proofs.Denotation.statementsCons_agrees <;>
             leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.value_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;> rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;> leaner_arena_rfl)
         | (apply LeanerIR.Proofs.Denotation.local_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;> rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;> leaner_arena_rfl)
         | (apply LeanerIR.Proofs.Denotation.nativePrimitiveOperation_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
             first
-            | rfl
+            | leaner_arena_rfl
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.add_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.vector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.pushVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.concatVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.slice_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.insertVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.removeVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.swapVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.reverseSliceVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.destroyEmptyVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.containsVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.indexOfVector_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkVectorIndex_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.length_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.logicalNot_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.index_evaluator_eq
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.copyValue_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.moveValue_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedAdd_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.subtract_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedSubtract_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.multiply_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedMultiply_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.greater_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.lessEqual_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.greaterEqual_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.equal_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.notEqual_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.divide_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedDivide_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.modulo_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedModulo_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseOr_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseAnd_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseXor_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.bitwiseNot_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.shiftLeft_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedShiftLeft_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.shiftRight_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedShiftRight_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.cast_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.checkedCast_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.logicalAnd_evaluator_eq
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.logicalOr_evaluator_eq
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.PrimitiveLocationOperation.less_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeGlobal_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
             first
-            | rfl
+            | leaner_arena_rfl
             | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.borrow_evaluator_eq_of_unit
                   $unitEq <;> first
-                | rfl
+                | leaner_arena_rfl
                 | (funext frame state place
                    first
                    | exact
@@ -983,14 +1875,14 @@ elab_rules : tactic
                          _ _ _ _ _ _ _ _).symm
                    | exact
                        (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
-                         _ _ _ _ _ _ _ _ (by rfl)).symm))
+                         _ _ _ _ _ _ _ _ (by leaner_arena_rfl)).symm))
             | (simp only [$unitSimp]
                first
                | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.contains_evaluator_eq
-                   <;> rfl)
+                   <;> leaner_arena_rfl)
                | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.borrow_evaluator_eq
                    <;> first
-                   | rfl
+                   | leaner_arena_rfl
                    | (funext frame state place
                       first
                       | exact
@@ -998,18 +1890,18 @@ elab_rules : tactic
                             _ _ _ _ _ _ _ _).symm
                       | exact
                           (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
-                            _ _ _ _ _ _ _ _ (by rfl)).symm)
-                   | (rw [$unitRule]; rfl))
+                            _ _ _ _ _ _ _ _ (by leaner_arena_rfl)).symm)
+                   | (rw [$unitRule]; leaner_arena_rfl))
                | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.take_evaluator_eq
-                   <;> rfl)
+                   <;> leaner_arena_rfl)
                | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.publish_evaluator_eq
-                   <;> rfl))
+                   <;> leaner_arena_rfl))
             | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.contains_evaluator_eq
-                <;> first | rfl | (rw [$unitRule]; rfl))
+                <;> first | leaner_arena_rfl | (rw [$unitRule]; leaner_arena_rfl))
             | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.borrow_evaluator_eq
                 <;> first
-                | rfl
-                | (rw [$unitRule]; rfl)
+                | leaner_arena_rfl
+                | (rw [$unitRule]; leaner_arena_rfl)
                 | (funext frame state place
                    first
                    | exact
@@ -1017,119 +1909,148 @@ elab_rules : tactic
                          _ _ _ _ _ _ _ _).symm
                    | exact
                        (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
-                         _ _ _ _ _ _ _ _ (by rw [$unitRule]; rfl)).symm))
+                         _ _ _ _ _ _ _ _ (by rw [$unitRule]; leaner_arena_rfl)).symm))
             | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.take_evaluator_eq
-                <;> first | rfl | (rw [$unitRule]; rfl))
+                <;> first | leaner_arena_rfl | (rw [$unitRule]; leaner_arena_rfl))
             | (apply LeanerIR.Proofs.Denotation.GlobalLocationOperation.publish_evaluator_eq
-                <;> first | rfl | (rw [$unitRule]; rfl))
+                <;> first | leaner_arena_rfl | (rw [$unitRule]; leaner_arena_rfl))
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeLocal_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
             first
-            | rfl
+            | leaner_arena_rfl
             | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.read_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.copy_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.move_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.LocalLocationOperation.borrow_evaluator_eq
+                <;> first
+                | leaner_arena_rfl
+                | (funext frame state place
+                   first
+                   | exact
+                       (LeanerIR.SemanticOperations.borrowRuntimePlace?_immutable_at
+                         _ _ _ _ _ _ _ _).symm
+                   | exact
+                       (LeanerIR.SemanticOperations.borrowRuntimePlace?_mutable_at
+                         _ _ _ _ _ _ _ _ (by rw [$unitRule]; leaner_arena_rfl)).symm))
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeData_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
             first
-            | rfl
+            | leaner_arena_rfl
             | (apply LeanerIR.Proofs.Denotation.NominalFieldLocation.select_evaluator_eq_of_unit
                  $unitEq <;> first
-                 | rfl
-                 | (intro actualVariant; cases actualVariant <;> rfl))
+                 | leaner_arena_rfl
+                 | (intro actualVariant; cases actualVariant <;> leaner_arena_rfl))
+            | (apply LeanerIR.Proofs.Denotation.NominalVariantFieldLocation.select_evaluator_eq_of_unit
+                 $unitEq <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.NominalFieldLocation.select_evaluator_eq
                 <;> first
-                | rfl
-                | (rw [$unitRule]; rfl)
+                | leaner_arena_rfl
+                | (rw [$unitRule]; leaner_arena_rfl)
                 | (intro actualVariant; cases actualVariant <;>
-                    rw [$unitRule] <;> rfl))
+                    rw [$unitRule] <;> leaner_arena_rfl))
+            | (apply LeanerIR.Proofs.Denotation.NominalVariantFieldLocation.select_evaluator_eq
+                <;> first | leaner_arena_rfl | (rw [$unitRule]; leaner_arena_rfl))
+            | (apply LeanerIR.Proofs.Denotation.NominalVariantTest.evaluator_eq_of_unit
+                 $unitEq <;> leaner_arena_rfl)
+            | (apply LeanerIR.Proofs.Denotation.NominalVariantTest.evaluator_eq
+                <;> first | leaner_arena_rfl | (rw [$unitRule]; leaner_arena_rfl))
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeReference_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
             first
-            | rfl
+            | leaner_arena_rfl
             | (apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.dereference_evaluator_eq)
             | (apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.mutate_evaluator_eq)
             | (apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.freeze_evaluator_eq
-                <;> rfl)
+                <;> leaner_arena_rfl)
             | (apply LeanerIR.Proofs.Denotation.ReferenceLocationOperation.endLoan_evaluator_eq)
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeConstructor_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
             first
-            | rfl
+            | leaner_arena_rfl
             | (apply LeanerIR.Proofs.Denotation.NominalConstructor.evaluator_eq_of_unit
-                 $unitEq <;> rfl)
+                 $unitEq <;> first | leaner_arena_rfl | leaner_constructor_fields)
             | (apply LeanerIR.Proofs.Denotation.NominalConstructor.evaluator_eq
-                <;> first | rfl | (rw [$unitRule]; rfl))
+                <;> first | leaner_arena_rfl | leaner_constructor_fields | (rw [$unitRule]; leaner_constructor_fields))
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.primitive_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.global_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.data_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.reference_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.constructor_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeBranchUnit_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeBranchElse_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeReturn_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeThrow_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.blockUnit_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.blockResult_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.letNoValue_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.letNativeValue_agrees_of_unit $unitEq
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
             first
-            | rfl
+            | leaner_arena_rfl
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.letValue_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl)) <;>
-            first | rfl | leaner_denotation_agree $namespaceEq $unitEq)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl)) <;>
+            first | leaner_arena_rfl | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.call_agrees
-              (by first | exact $namespaceEq | (rw [$unitRule]; rfl))
-              (by rfl) (by rfl) (by rw [$unitRule]; rfl)
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by rw [$unitRule]; leaner_arena_rfl)
               (loan_eq := by
                 have unitEquality := $unitEq
                 rw [unitEquality]
-                rfl)
+                leaner_arena_rfl)
             · leaner_denotation_agree $namespaceEq $unitEq
             · assumption)
+        | (apply LeanerIR.Proofs.Denotation.callAt_agrees
+              (by first | exact $namespaceEq | (rw [$unitRule]; leaner_arena_rfl))
+              (by leaner_arena_rfl) (by leaner_arena_rfl) (by rw [$unitRule]; leaner_arena_rfl)
+              (loan_eq := by
+                have unitEquality := $unitEq
+                rw [unitEquality]
+                leaner_arena_rfl)
+            · leaner_denotation_agree $namespaceEq $unitEq
+            · intro outer
+              solve_by_elim)
         | (apply LeanerIR.Proofs.Denotation.functionRelation_agrees <;>
             first
-            | rfl
-            | (rw [$unitRule]; rfl)
+            | leaner_arena_rfl
+            | (rw [$unitRule]; leaner_arena_rfl)
             | leaner_denotation_agree $namespaceEq $unitEq)
         | (apply LeanerIR.Proofs.Denotation.nativeFunctionRelation_agrees <;>
             first
-            | rfl
-            | (rw [$unitRule]; rfl)
+            | leaner_arena_rfl
+            | (rw [$unitRule]; leaner_arena_rfl)
             | leaner_denotation_agree $namespaceEq $unitEq)
         | fail "no denotation agreement rule applies")
       evalTactic script
@@ -1140,6 +2061,31 @@ private def addAbbrev (name : Name) (type value : Lean.Expr) : TermElabM Unit :=
   addDecl (.defnDecl {
     name, levelParams := [], type, value, hints := .abbrev, safety := .safe })
   enableRealizationsForConst name
+
+/-- Build each namespace's balanced view once. Per-function aliases share
+its certificate, so agreement does not re-scan the source arena per node. -/
+private def ensureArenaIndex {α : Type} [ToExpr α] (unitDef namespaceDef : Name)
+    (namespaceIndex : Nat) (field : String) (arraySyntax : Term)
+    (values : Array α) : TermElabM Unit := do
+  let aliasName := Name.str namespaceDef (field ++ "_index_eq")
+  if (← getEnv).contains aliasName then return
+  let base := Name.str unitDef s!"arena{namespaceIndex}"
+  let indexName := Name.str base field
+  let certificateName := Name.str base (field ++ "_eq")
+  let array ← Lean.Elab.Term.elabTerm arraySyntax none
+  Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+  let array ← instantiateMVars array
+  let indexed ← mkAppM ``IndexedArena.ofArray #[array]
+  if !(← getEnv).contains indexName then
+    addAbbrev indexName (← inferType indexed) (toExpr (IndexedArena.ofArray values))
+  let equation ← mkEq indexed (mkConst indexName)
+  if !(← getEnv).contains certificateName then
+    addDecl (.thmDecl {
+      name := certificateName, levelParams := [], type := equation
+      value := ← mkEqRefl (mkConst indexName) })
+  addDecl (.thmDecl {
+    name := aliasName, levelParams := [], type := equation
+    value := mkConst certificateName })
 
 private structure DirectCall where
   reference : QualifiedRef
@@ -1242,7 +2188,15 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
       | .generated generated => pure generated
     callees := callees.push {
       reference := directCall.reference, handle
-      relationTerm := fun executable => mkAppM generated.relation #[executable]
+      relationTerm := fun executable => do
+        let relation ← mkAppM generated.relation #[executable]
+        if generated.typeParameterCount != 0 then
+          pure relation
+        else
+          let pairType ← mkAppM ``Prod #[mkConst ``TypeId, mkConst ``TypeId]
+          let mapType ← mkAppM ``Array #[pairType]
+          withLocalDeclD `typeInstantiation mapType fun typeInstantiation =>
+            mkLambdaFVars #[typeInstantiation] relation
       generated := some generated }
   let namespaceDef := namespaceName definitionSegments
   let declarationConst := declarationName definitionSegments function
@@ -1270,7 +2224,19 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
   let env ← getEnv
   if !env.contains namespaceDef then
     liftTermElabM do
-      addAbbrev namespaceDef (mkConst ``ValidatedNamespace) (toExpr ns)
+      -- Share the namespace already quoted in the semantic unit. A second
+      -- literal copy makes every function's namespace-agreement reflexivity
+      -- compare every arena and declaration in the namespace again.
+      let value ← Lean.Elab.Term.elabTerm
+        (← `(($(mkIdent unitDef):term).namespaces[$(Syntax.mkNatLit namespaceIndex)]!))
+        (some (mkConst ``ValidatedNamespace))
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      addAbbrev namespaceDef (mkConst ``ValidatedNamespace) (← instantiateMVars value)
+  liftTermElabM do
+    ensureArenaIndex unitDef namespaceDef namespaceIndex "expressions"
+      (← `(($(mkIdent namespaceDef):term).expressions)) ns.expressions
+    ensureArenaIndex unitDef namespaceDef namespaceIndex "places"
+      (← `(($(mkIdent namespaceDef):term).places)) ns.places
   let env ← getEnv
   if !env.contains declarationConst then
     liftTermElabM do
@@ -1314,26 +2280,93 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
               #[← mkAppM openBody #[executable]]
             let value ← mkLambdaFVars #[executable] value
             addAbbrev body (← inferType value) value
+  /- The body as a literal tree, beside the combinator term: the same
+  traversal with the tree's constructors, and the reflexivity that its
+  denotation is the body.  The normalization route computes over it. -/
+  let tree := treeName definitionSegments function
+  let treeDenotesDeclaration := treeDenotesName definitionSegments function
+  let treeDenotes := currentNamespace ++ treeDenotesDeclaration
+  let env ← getEnv
+  if !env.contains tree then
+    liftTermElabM do
+      match selfCall? with
+      | none =>
+          withLocalDeclD `executable (mkConst ``ExecutableUnit) fun executable => do
+            let value ← emitTree unit ns current.namespaceId
+              (mkConst namespaceDef) executable callees root
+            let value ← mkLambdaFVars #[executable] value
+            addAbbrev tree (← inferType value) value
+      | some selfCall =>
+          withLocalDeclD `executable (mkConst ``ExecutableUnit) fun executable =>
+            withLocalDeclD `self
+                (mkConst ``LeanerIR.Proofs.Denotation.ExprDenotation) fun self => do
+              let selfRelation ← mkAppM
+                ``LeanerIR.Proofs.Denotation.nativeFunctionRelation
+                #[executable, mkConst shapeConst, self]
+              let value ← emitTree unit ns current.namespaceId
+                (mkConst namespaceDef) executable
+                (callees.push {
+                  reference := selfCall.reference, handle := current
+                  relationTerm := fun _ => pure selfRelation
+                  generated := none })
+                root
+              let value ← mkLambdaFVars #[executable, self] value
+              addAbbrev tree (← inferType value) value
+  let env ← getEnv
+  if !env.contains treeDenotes then
+    let command ← match selfCall? with
+      | none =>
+          `(command|
+            theorem $(mkIdent treeDenotesDeclaration)
+                (executable : LeanerIR.Validation.ExecutableUnit) :
+                ($(mkIdent tree) executable).denote = $(mkIdent body) executable := rfl)
+      | some _ =>
+          `(command|
+            theorem $(mkIdent treeDenotesDeclaration)
+                (executable : LeanerIR.Validation.ExecutableUnit)
+                (self : LeanerIR.Proofs.Denotation.ExprDenotation) :
+                ($(mkIdent tree) executable self).denote =
+                  $(mkIdent openBody) executable self := rfl)
+    elabCommand command
   let env ← getEnv
   if !env.contains relation then
     liftTermElabM do
       withLocalDeclD `executable (mkConst ``ExecutableUnit) fun executable => do
         let nativeBody ← mkAppM body #[executable]
-        let value ← mkAppM ``LeanerIR.Proofs.Denotation.nativeFunctionRelation
-          #[executable, mkConst shapeConst, nativeBody]
+        let value ← if typeParameterCount == 0 then
+          mkAppM ``LeanerIR.Proofs.Denotation.nativeFunctionRelation
+            #[executable, mkConst shapeConst, nativeBody]
+        else do
+          let pairType ← mkAppM ``Prod #[mkConst ``TypeId, mkConst ``TypeId]
+          let mapType ← mkAppM ``Array #[pairType]
+          withLocalDeclD `typeInstantiation mapType fun typeInstantiation => do
+            let relation ← mkAppM
+              ``LeanerIR.Proofs.Denotation.nativeFunctionRelationAt
+              #[executable, mkConst shapeConst, typeInstantiation, nativeBody]
+            mkLambdaFVars #[typeInstantiation] relation
         let value ← mkLambdaFVars #[executable] value
         addAbbrev relation (← inferType value) value
   let env ← getEnv
   if !env.contains denotation then
     liftTermElabM do
       let argumentsType ← mkAppM ``Array #[mkConst ``RuntimeValue]
-      withLocalDeclD `executable (mkConst ``ExecutableUnit) fun executable =>
-        withLocalDeclD `arguments argumentsType fun arguments => do
-          let nativeBody ← mkAppM body #[executable]
-          let value ← mkAppM ``LeanerIR.Proofs.Denotation.nativeFunction
-            #[executable, mkConst shapeConst, nativeBody, arguments]
-          let value ← mkLambdaFVars #[executable, arguments] value
-          addAbbrev denotation (← inferType value) value
+      withLocalDeclD `executable (mkConst ``ExecutableUnit) fun executable => do
+        let nativeBody ← mkAppM body #[executable]
+        if typeParameterCount == 0 then
+          withLocalDeclD `arguments argumentsType fun arguments => do
+            let value ← mkAppM ``LeanerIR.Proofs.Denotation.nativeFunction
+              #[executable, mkConst shapeConst, nativeBody, arguments]
+            let value ← mkLambdaFVars #[executable, arguments] value
+            addAbbrev denotation (← inferType value) value
+        else do
+          let pairType ← mkAppM ``Prod #[mkConst ``TypeId, mkConst ``TypeId]
+          let mapType ← mkAppM ``Array #[pairType]
+          withLocalDeclD `typeInstantiation mapType fun typeInstantiation =>
+            withLocalDeclD `arguments argumentsType fun arguments => do
+              let value ← mkAppM ``LeanerIR.Proofs.Denotation.nativeFunctionAt
+                #[executable, mkConst shapeConst, typeInstantiation, nativeBody, arguments]
+              let value ← mkLambdaFVars #[executable, typeInstantiation, arguments] value
+              addAbbrev denotation (← inferType value) value
   let namespaceIndexSyntax := Syntax.mkNatLit namespaceIndex
   let functionIndexSyntax := Syntax.mkNatLit functionIndex
   let mut calleeAgreementSetup : Lean.TSyntax `tactic ← `(tactic| skip)
@@ -1355,7 +2388,9 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
         `(term| $theoremName (by assumption))
       else
         let carrierIdent := mkIdent `Carrier
-        `(term| $theoremName ($carrierIdent := fun _ => PUnit) (by assumption))
+        `(term| fun typeInstantiation =>
+          $theoremName ($carrierIdent := fun _ => PUnit)
+            typeInstantiation (by assumption))
       /- Under the recursive body's oracle, every other callee keeps its
       closed agreement. -/
       let proof ← if selfCall?.isSome then
@@ -1450,9 +2485,12 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
             rw [unit_eq]
             rfl
           $calleeAgreementSetup
+          leaner_agreement_tick "relation start"
           simp only [$(mkIdent relation):term]
+          leaner_agreement_tick "relation unfolded"
           apply LeanerIR.Proofs.Denotation.nativeFunctionRelation_agrees
             namespace_eq (by rfl) (by rfl) (by rfl)
+          leaner_agreement_tick "function agreed"
           simp only [$(mkIdent body):term]
           leaner_denotation_agree namespace_eq unit_eq)
     else
@@ -1465,18 +2503,20 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
             {$carrierIdent : Fin $countSyntax → Type}
             [$carrierInhabitedIdent : ∀ index, Nonempty ($carrierIdent index)]
             {executable : LeanerIR.Validation.ExecutableUnit}
+            (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
             (unit_eq : executable.unit = $(mkIdent unitDef)) :
-            LeanerIR.Proofs.Denotation.FunctionDenotation.Agrees executable
+            LeanerIR.Proofs.Denotation.FunctionDenotation.AgreesAt executable
               ⟨⟨$namespaceIndexSyntax⟩, ⟨$functionIndexSyntax⟩⟩
-              ($(mkIdent relation) executable) := by
+              typeInstantiation
+              ($(mkIdent relation) executable typeInstantiation) := by
           have namespace_eq : executable.unit.namespaces[$namespaceIndexSyntax]? =
               some $(mkIdent namespaceDef) := by
             rw [unit_eq]
             rfl
           $calleeAgreementSetup
           simp only [$(mkIdent relation):term]
-          apply LeanerIR.Proofs.Denotation.nativeFunctionRelation_agrees
-            namespace_eq (by rfl) (by rfl) (by rfl)
+          apply LeanerIR.Proofs.Denotation.nativeFunctionRelationAt_agrees
+            typeInstantiation namespace_eq (by rfl) (by rfl) (by rfl)
           simp only [$(mkIdent body):term]
           leaner_denotation_agree namespace_eq unit_eq)
     elabCommand command
@@ -1495,7 +2535,9 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
                   ⟨⟨$namespaceIndexSyntax⟩,
                     ⟨$functionIndexSyntax⟩⟩ arguments) := by
           intro arguments
-          simpa only [$(mkIdent denotation):term, $(mkIdent relation):term] using
+          leaner_agreement_tick "spec transport"
+          simpa only [$(mkIdent denotation):term, $(mkIdent relation):term,
+            LeanerIR.Proofs.Denotation.nativeFunction] using
             (LeanerIR.Proofs.Denotation.nativeFunction_agrees_of_relation
               ($(mkIdent relationAgreement) unit_eq) arguments))
     else
@@ -1511,21 +2553,23 @@ private partial def ensureDefinitionsInternal (unit : ValidatedUnit)
             (unit_eq : executable.unit = $(mkIdent unitDef)) :
             ∀ arguments,
               LeanerIR.Proofs.Spec.Equiv
-                ($(mkIdent denotation) executable arguments)
+                ($(mkIdent denotation) executable #[] arguments)
                 (LeanerIR.Proofs.functionSpec executable
                   ⟨⟨$namespaceIndexSyntax⟩,
                     ⟨$functionIndexSyntax⟩⟩ arguments) := by
           intro arguments
-          simpa only [$(mkIdent denotation):term, $(mkIdent relation):term] using
+          simpa only [$(mkIdent denotation):term, $(mkIdent relation):term,
+            LeanerIR.Proofs.Denotation.nativeFunction] using
             (LeanerIR.Proofs.Denotation.nativeFunction_agrees_of_relation
               ($(mkIdent relationAgreement)
-                ($carrierIdent := $carrierIdent) unit_eq) arguments))
+                ($carrierIdent := $carrierIdent) #[] unit_eq) arguments))
     elabCommand command
   return .generated {
     unitDef, namespaceDef, declaration := declarationConst, shape := shapeConst, body
     relation, relationAgreement, denotation, agreement, typeParameterCount
     requiresUnitEquality := true
-    openBody := if selfCall?.isSome then some openBody else none }
+    openBody := if selfCall?.isSome then some openBody else none
+    tree, treeDenotes }
 
 /-- Generate the native denotation and exact agreement theorem for a V1
 function, or return the reason the existing deep route must be used. -/

@@ -30,7 +30,7 @@ syntax "leaner_oracle_premise " term : tactic
 
 macro_rules
   | `(tactic| leaner_oracle_premise $lift:term) =>
-    `(tactic| first | assumption | exact $lift _ _ _ _ _ ‹_›)
+    `(tactic| first | assumption | exact $lift _ _ _ _ _ _ ‹_›)
 
 /-- Close one mirror case: the goal is the conclusion of an open-semantics
 constructor under a new oracle, and every premise is closed by
@@ -122,9 +122,9 @@ variable {unit : ExecutableUnit} {callee callee' : CalleeRelation}
 
 /-- Every open derivation survives enlarging the oracle. -/
 theorem EvalExprWith.mono
-    (le : ∀ handle state arguments final outcome,
-      callee handle state arguments final outcome →
-        callee' handle state arguments final outcome)
+    (le : ∀ handle typeInstantiation state arguments final outcome,
+      callee handle typeInstantiation state arguments final outcome →
+        callee' handle typeInstantiation state arguments final outcome)
     {namespaceId : NamespaceId} {frame finalFrame : RuntimeFrame}
     {state finalState : RuntimeState} {exprId : ExprId} {control : Control}
     (step : EvalExprWith unit callee namespaceId frame state exprId finalFrame
@@ -148,14 +148,15 @@ theorem EvalExprWith.mono
   all_goals leaner_oracle_mirror le
 
 theorem EvalFunctionWith.mono
-    (le : ∀ handle state arguments final outcome,
-      callee handle state arguments final outcome →
-        callee' handle state arguments final outcome)
+    (le : ∀ handle typeInstantiation state arguments final outcome,
+      callee handle typeInstantiation state arguments final outcome →
+        callee' handle typeInstantiation state arguments final outcome)
     {handle : FunctionHandle} {initialState finalState : RuntimeState}
+    {typeInstantiation : Array (TypeId × TypeId)}
     {arguments : Array RuntimeValue} {outcome : Outcome}
-    (step : EvalFunctionWith unit callee handle initialState arguments finalState
+    (step : EvalFunctionWith unit callee handle typeInstantiation initialState arguments finalState
       outcome) :
-    EvalFunctionWith unit callee' handle initialState arguments finalState outcome := by
+    EvalFunctionWith unit callee' handle typeInstantiation initialState arguments finalState outcome := by
   obtain ⟨ns, declaration, frame, root, finalFrame, evaluatedState, control,
     namespace_eq, declaration_eq, frame_eq, body_eq, body_step, outcome_eq,
     finalize_eq⟩ := step
@@ -172,16 +173,17 @@ variable {unit : ExecutableUnit}
 /-- Least-fixed-point induction: the closed semantics is contained in every
 oracle closed under one unfolding of the function boundary. -/
 theorem EvalFunction.induction (motive : CalleeRelation)
-    (closed : ∀ handle initialState arguments finalState outcome,
-      EvalFunctionWith unit motive handle initialState arguments finalState outcome →
-        motive handle initialState arguments finalState outcome)
+    (closed : ∀ handle typeInstantiation initialState arguments finalState outcome,
+      EvalFunctionWith unit motive handle typeInstantiation initialState arguments finalState outcome →
+        motive handle typeInstantiation initialState arguments finalState outcome)
     {handle : FunctionHandle} {initialState finalState : RuntimeState}
+    {typeInstantiation : Array (TypeId × TypeId)}
     {arguments : Array RuntimeValue} {outcome : Outcome}
-    (step : EvalFunction unit handle initialState arguments finalState outcome) :
-    motive handle initialState arguments finalState outcome := by
+    (step : EvalFunction unit handle typeInstantiation initialState arguments finalState outcome) :
+    motive handle typeInstantiation initialState arguments finalState outcome := by
   apply EvalFunction.rec
-    (motive_1 := fun handle initialState arguments finalState outcome _ =>
-      motive handle initialState arguments finalState outcome)
+    (motive_1 := fun handle typeInstantiation initialState arguments finalState outcome _ =>
+      motive handle typeInstantiation initialState arguments finalState outcome)
     (motive_2 := fun namespaceId frame state exprId finalFrame finalState control _ =>
       EvalExprWith unit motive namespaceId frame state exprId finalFrame finalState
         control)
@@ -199,24 +201,26 @@ theorem EvalFunction.induction (motive : CalleeRelation)
     apply closed
     exact ⟨_, _, _, _, _, _, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
   all_goals intros
-  all_goals leaner_oracle_mirror (fun _ _ _ _ _ fact => fact)
+  all_goals leaner_oracle_mirror (fun _ _ _ _ _ _ fact => fact)
 
 /-- The closed semantics unfolds to the open boundary over itself. -/
 theorem EvalFunction.unfold {handle : FunctionHandle}
     {initialState finalState : RuntimeState} {arguments : Array RuntimeValue}
+    {typeInstantiation : Array (TypeId × TypeId)}
     {outcome : Outcome}
-    (step : EvalFunction unit handle initialState arguments finalState outcome) :
-    EvalFunctionWith unit (EvalFunction unit) handle initialState arguments finalState
+    (step : EvalFunction unit handle typeInstantiation initialState arguments finalState outcome) :
+    EvalFunctionWith unit (EvalFunction unit) handle typeInstantiation initialState arguments finalState
       outcome :=
-  (EvalFunction_iff unit handle initialState arguments finalState outcome).mp step
+  (EvalFunction_iff unit handle typeInstantiation initialState arguments finalState outcome).mp step
 
 theorem EvalFunction.fold {handle : FunctionHandle}
     {initialState finalState : RuntimeState} {arguments : Array RuntimeValue}
+    {typeInstantiation : Array (TypeId × TypeId)}
     {outcome : Outcome}
-    (step : EvalFunctionWith unit (EvalFunction unit) handle initialState arguments
+    (step : EvalFunctionWith unit (EvalFunction unit) handle typeInstantiation initialState arguments
       finalState outcome) :
-    EvalFunction unit handle initialState arguments finalState outcome :=
-  (EvalFunction_iff unit handle initialState arguments finalState outcome).mpr step
+    EvalFunction unit handle typeInstantiation initialState arguments finalState outcome :=
+  (EvalFunction_iff unit handle typeInstantiation initialState arguments finalState outcome).mpr step
 
 end Induction
 

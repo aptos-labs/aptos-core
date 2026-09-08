@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerIR
+import LeanerIR.Tests.NominalCycles
 
 namespace LeanerIR.Tests.Validation
 

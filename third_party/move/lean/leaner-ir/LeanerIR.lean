@@ -23,3 +23,8 @@ import LeanerIR.Proofs.Denotation
 import LeanerIR.Proofs.Recursion
 import LeanerIR.Proofs.WP
 import LeanerIR.Proofs.Native
+import LeanerIR.Proofs.RowSpec
+import LeanerIR.Proofs.Tree
+import LeanerIR.Proofs.Normalize
+import LeanerIR.Proofs.Decode
+import LeanerIR.Proofs.Represent

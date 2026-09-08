@@ -43,6 +43,15 @@ theorem encode_injective (codec : Codec Native Runtime) :
   have decoded := congrArg codec.decode? equal
   simpa [codec.decode_encode] using decoded
 
+@[simp] theorem encode_eq_encode (codec : Codec Native Runtime)
+    (left right : Native) :
+    codec.encode left = codec.encode right ↔ left = right := by
+  constructor
+  · intro equal
+    exact codec.encode_injective equal
+  · intro equal
+    exact congrArg codec.encode equal
+
 /-- Runtime values themselves form the representation used for an abstract
 storage-parametric carrier. -/
 def identity (Runtime : Type) : Codec Runtime Runtime where
@@ -87,7 +96,109 @@ def unit : Codec Unit RuntimeValue where
   decode? := decodeUnit?
   decode_encode := by intro value; cases value; rfl
 
+/-! A tuple local keeps a heterogeneous nested product natively.  The row
+codec is assembled one statically typed component at a time, then wrapped in
+the VM's flat `RuntimeValue.tuple`.  No universal value appears in the local. -/
+
+def tupleNil : Codec Unit (List RuntimeValue) where
+  encode := fun _ => []
+  decode?
+    | [] => some ()
+    | _ => none
+  decode_encode := by intro value; cases value; rfl
+
+def tupleCons (head : Codec Head RuntimeValue)
+    (tail : Codec Tail (List RuntimeValue)) :
+    Codec (Head × Tail) (List RuntimeValue) where
+  encode := fun value => head.encode value.1 :: tail.encode value.2
+  decode?
+    | first :: rest => do
+        let decodedHead ← head.decode? first
+        let decodedTail ← tail.decode? rest
+        pure (decodedHead, decodedTail)
+    | [] => none
+  decode_encode := by
+    intro value
+    simp [head.decode_encode, tail.decode_encode]
+
+def tuple (row : Codec Native (List RuntimeValue)) :
+    Codec Native RuntimeValue where
+  encode := fun value => .tuple (row.encode value).toArray
+  decode?
+    | .tuple values => row.decode? values.toList
+    | _ => none
+  decode_encode := by
+    intro value
+    simp [row.decode_encode]
+
+/-- Lift a certified element representation pointwise through runtime
+vectors.  The generated wrapper therefore exposes `Array Native` while the
+core evaluator continues to use `RuntimeValue.vector`. -/
+def vector (codec : Codec Native RuntimeValue) :
+    Codec (Array Native) RuntimeValue where
+  encode := fun values => .vector (values.map codec.encode)
+  decode?
+    | .vector values => (values.toList.mapM codec.decode?).map List.toArray
+    | _ => none
+  decode_encode := by
+    intro values
+    change ((values.map codec.encode).toList.mapM codec.decode?).map List.toArray =
+      some values
+    simp only [Array.toList_map, List.mapM_map]
+    have decoded : values.toList.mapM (codec.decode? ∘ codec.encode) =
+        some values.toList := by
+      induction values.toList with
+      | nil => simp
+      | cons value values ih =>
+          simp [Function.comp_apply, codec.decode_encode, ih]
+    simp [decoded]
+
+/-- Expose pointwise encoding without unfolding the vector decoder. -/
+theorem vector_encode (codec : Codec Native RuntimeValue)
+    (values : Array Native) :
+    (vector codec).encode values = .vector (values.map codec.encode) := rfl
+
+/-- Move vectors retain their native length certificate at the boundary.
+The raw array codec remains available to language-neutral and Rust clients. -/
+def boundedVector (codec : Codec Native RuntimeValue) :
+    Codec (SpecVector Native) RuntimeValue where
+  encode := fun value => .vector (value.values.map codec.encode)
+  decode?
+    | .vector values => do
+        let decoded ← values.toList.mapM codec.decode?
+        if bound : decoded.length < 2 ^ 64 then
+          some ⟨decoded.toArray, by simpa only [List.size_toArray] using bound⟩
+        else none
+    | _ => none
+  decode_encode := by
+    intro ⟨values, bounded⟩
+    have decoded : values.toList.mapM (codec.decode? ∘ codec.encode) =
+        some values.toList := by
+      induction values.toList with
+      | nil => simp
+      | cons value values ih =>
+          simp [Function.comp_apply, codec.decode_encode, ih]
+    simp [List.mapM_map, decoded, bounded]
+
+theorem boundedVector_encode (codec : Codec Native RuntimeValue)
+    (value : SpecVector Native) :
+    (boundedVector codec).encode value = .vector (value.values.map codec.encode) := rfl
+
+/-- Normalize mapping over the list-backed representation emitted for a
+source vector literal. -/
+theorem array_map_reverse_toArray (map : Native → Runtime)
+    (values : List Native) :
+    values.reverse.toArray.map map = (values.map map).reverse.toArray := by
+  simp
+
+attribute [lir_data_norm high] vector_encode boundedVector_encode array_map_reverse_toArray
+-- A preceding operation may already have normalized the literal's reverse.
+-- Pointwise encoding must normalize in that spelling as well.
+attribute [lir_data_norm] List.map_toArray List.map_cons List.map_nil
 attribute [lir_data_norm] identity specInt bool string address signer bytes unit
+  tupleNil tupleCons tuple vector boundedVector
+attribute [lir_data_norm] decodeBool?_bool decodeString?_string decodeAddress?_address
+  decodeSigner?_signer decodeBytes?_bytes decodeUnit?_unit
 
 end Codec
 
@@ -130,6 +241,39 @@ theorem specInt_decode?_eq_some {width : IntWidth} {signed : Bool}
   · cases Option.some.inj decoded
     rfl
   · exact absurd decoded (by simp)
+
+private theorem decodedList_shape (codec : Codec Native RuntimeValue)
+    (elementShape : ∀ {runtime value}, codec.decode? runtime = some value →
+      runtime = codec.encode value)
+    {runtime : List RuntimeValue} {values : List Native}
+    (decoded : runtime.mapM codec.decode? = some values) :
+    runtime = values.map codec.encode := by
+  induction runtime generalizing values with
+  | nil => simpa using decoded.symm
+  | cons head tail ih =>
+      simp only [List.mapM_cons, bind, Option.bind_eq_some_iff] at decoded
+      obtain ⟨value, headDecoded, rest⟩ := decoded
+      obtain ⟨values, tailDecoded, result⟩ := rest
+      cases result
+      simp only [List.map_cons, elementShape headDecoded, ih tailDecoded]
+
+/-- Exact element decoding lifts through a bounded vector. A codec's left
+inverse alone does not imply this property, so retain the element premise. -/
+theorem boundedVector_decode?_eq_some (codec : Codec Native RuntimeValue)
+    (elementShape : ∀ {runtime value}, codec.decode? runtime = some value →
+      runtime = codec.encode value)
+    {runtime : RuntimeValue} {value : SpecVector Native}
+    (decoded : (boundedVector codec).decode? runtime = some value) :
+    runtime = .vector (value.values.map codec.encode) := by
+  cases runtime <;> try contradiction
+  case vector elements =>
+    simp only [boundedVector, bind, Option.bind_eq_some_iff] at decoded
+    obtain ⟨values, decoded, bounded⟩ := decoded
+    split at bounded <;> try contradiction
+    cases bounded
+    have shape := decodedList_shape codec elementShape decoded
+    have := congrArg List.toArray shape
+    simpa using congrArg RuntimeValue.vector this
 
 /-- A mutable reference decodes only from a borrow of its loan whose
 current decodes to its value. -/

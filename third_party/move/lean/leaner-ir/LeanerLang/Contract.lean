@@ -2,15 +2,23 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerLang.Elab
+import LeanerLang.Frame
 import LeanerLang.Perf
 import LeanerLang.Denotation
-import LeanerLang.RowScript
+import LeanerLang.Options
 import LeanerLang.Quote
 import LeanerLang.Registry
 import LeanerLang.SpecTypes
 import LeanerLang.Syntax
 import LeanerLang.Typed
+import LeanerLang.Computation
+import LeanerLang.NativeLoopInfo
+import LeanerLang.NativeMutable
 import LeanerIR.Proofs.Certify
+import LeanerIR.Proofs.Represent
+import LeanerIR.Proofs.Composition
+import LeanerIR.Proofs.Computation
+import LeanerIR.Proofs.NativeBoundary
 import LeanerIR.Proofs.Meaning
 import LeanerIR.Proofs.DenotationWP
 
@@ -49,7 +57,7 @@ structure Context where
   ns : ValidatedNamespace
   /-- Lean binder for each specification local, indexed by `LocalId`. -/
   locals : Array (Option Lean.Expr)
-  /-- Logical type of each local binder. Mutable references are represented
+  /-- Logical type of each local binder. References are represented
   by their referent even when a specification expression retains the
   physical reference type. -/
   localTypes : Array IrTy := #[]
@@ -71,6 +79,15 @@ structure Context where
   twins : Array SpecTypes.TwinInfo := #[]
   /-- Storable families with typed accessors a clause reads through. -/
   families : Array SpecTypes.FamilyInfo := #[]
+  /-- Native representation environment of a generic contract. -/
+  carrier : Option Lean.Expr := none
+  codecs : Option Lean.Expr := none
+  /-- Sparse declaration-type substitution selected for this invocation. -/
+  typeInstantiation : Option Lean.Expr := none
+  /-- Derived specification calls are expanded from their already-lowered
+  bodies. Keep the active identities so an accidental recursive model is
+  rejected instead of recursing in the command elaborator. -/
+  specCallStack : Array LeanerIR.QualifiedRef := #[]
 
 /-- The logical domain a specification value of one LIR type inhabits.
 Scalars get the Lean type a clause reads naturally; every aggregate stays a
@@ -127,6 +144,174 @@ private def Domain.ofRuntime (domain : Domain) (value : Lean.Expr) :
   | .text _ => mkAppM ``LeanerIR.RuntimeValue.asString #[value]
   | .aggregate => return value
 
+/-- Decode a runtime value to the binder type of one logical domain.  This
+differs from `ofRuntime` only for booleans: a local binder stores `Bool`,
+while a clause which reads that binder denotes the proposition that it is
+true. -/
+private def Domain.binderOfRuntime (domain : Domain) (value : Lean.Expr) :
+    MetaM Lean.Expr := do
+  match domain with
+  | .integer => mkAppM ``LeanerIR.RuntimeValue.asInt #[value]
+  | .boolean => mkAppM ``LeanerIR.RuntimeValue.asBool #[value]
+  | .text _ => mkAppM ``LeanerIR.RuntimeValue.asString #[value]
+  | .aggregate => return value
+
+/- Closed projection equations belong in the data-normalization inventory.
+Keeping the recursive definitions themselves folded avoids branching on an
+unknown runtime value, while constructor images produced by typed codecs
+still reduce to their fields in one rewrite. -/
+@[simp, lir_data_norm] theorem runtimeFieldNominal
+    (source : LeanerIR.StructHandle) (variant : Option String)
+    (fields : Array RuntimeValue) (index : Nat) :
+    RuntimeValue.field (.nominal source variant fields) index =
+      fields[index]?.getD .unit := rfl
+
+/- Enum invariant matches immediately project constructor payloads.  Keep
+these literal-array rows ahead of the generic nominal row so arithmetic sees
+the payload itself instead of an intermediate `getElem?` application. -/
+@[simp, lir_data_norm high] theorem runtimeFieldNominalZero
+    (source : LeanerIR.StructHandle) (variant : Option String)
+    (first : RuntimeValue) (rest : List RuntimeValue) :
+    RuntimeValue.field (.nominal source variant (Array.mk (first :: rest))) 0 =
+      first := rfl
+
+@[simp, lir_data_norm high] theorem runtimeFieldNominalOne
+    (source : LeanerIR.StructHandle) (variant : Option String)
+    (first second : RuntimeValue) (rest : List RuntimeValue) :
+    RuntimeValue.field
+        (.nominal source variant (Array.mk (first :: second :: rest))) 1 =
+      second := rfl
+
+@[simp, lir_data_norm] theorem runtimeAsIntInteger (value : Int) :
+    RuntimeValue.asInt (.integer value) = value := rfl
+
+@[simp, lir_data_norm] theorem runtimeAsBoolBool (value : Bool) :
+    RuntimeValue.asBool (.bool value) = value := rfl
+
+@[simp, lir_data_norm] theorem runtimeAsStringString (value : String) :
+    RuntimeValue.asString (.string value) = value := rfl
+
+@[simp, lir_data_norm] theorem runtimeAsStringAddress (value : String) :
+    RuntimeValue.asString (.address value) = value := rfl
+
+@[simp, lir_data_norm] theorem runtimeAsStringSigner (value : String) :
+    RuntimeValue.asString (.signer value) = value := rfl
+
+/-- Total logical vector update used by generated clauses.  As with the
+other specification projections, an ill-shaped value is junk; successful
+execution and the authored bounds condition rule that case out. -/
+def updateVector (value : RuntimeValue) (index : Nat)
+    (replacement : RuntimeValue) : RuntimeValue :=
+  match value with
+  | .vector elements => .vector (elements.set! index replacement)
+  | _ => .unit
+
+/-- Total logical vector append used by specification-side `pushVector`.
+The executable primitive has the same constructor equation. -/
+@[simp, lir_data_norm] def pushVector (value element : RuntimeValue) : RuntimeValue :=
+  match value with
+  | .vector elements => .vector (elements.push element)
+  | _ => .unit
+
+/-- Total logical concatenation corresponding to the value-level primitive. -/
+@[simp, lir_data_norm] def concatVector (left right : RuntimeValue) : RuntimeValue :=
+  match left, right with
+  | .vector left, .vector right => .vector (left ++ right)
+  | _, _ => .unit
+
+/-- Total logical vector length used by generated clauses.  Ill-shaped
+specification operands denote the same default integer value as the other
+total runtime projections. -/
+def lengthVector (value : RuntimeValue) : Int :=
+  match value with
+  | .vector elements => Int.ofNat elements.size
+  | _ => 0
+
+@[simp, lir_data_norm, lir_spec_norm] theorem lengthVector_vector (elements : Array RuntimeValue) :
+    lengthVector (.vector elements) = Int.ofNat elements.size := rfl
+
+/-- Decoding determines the vector behind a precondition's runtime length.
+Expose just those hypotheses before reducing indexed operations; traversing
+all local facts or the whole computational goal here is unnecessary. -/
+elab "leaner_normalize_vector_lengths" : tactic => do
+  Lean.Elab.Tactic.withMainContext do
+    let mut hypotheses := #[]
+    for declaration in ← Lean.getLCtx do
+      if declaration.isImplementationDetail then continue
+      if declaration.type.getUsedConstants.contains ``lengthVector then
+        hypotheses := hypotheses.push (mkIdent declaration.userName)
+    for hypothesis in hypotheses do
+      Lean.Elab.Tactic.evalTactic (← `(tactic|
+        simp only [lengthVector_vector, Array.size_map, Int.ofNat_eq_natCast, Int.natCast_pos,
+          Int.ofNat_lt, Int.ofNat_le] at $hypothesis:ident))
+
+/-- Keep preparation outside the large generated-theorem quotation. -/
+macro "leaner_prepare_normalization" : tactic =>
+  `(tactic| (leaner_subst_decided; leaner_normalize_vector_lengths))
+
+/-- Expose the data-domain certificate of a native aggregate once, before
+walking its fields. Only ownership hypotheses are simplified here. -/
+elab "leaner_prepare_plain_data" " [" facts:Lean.Parser.Tactic.simpLemma,* "]" : tactic => do
+  Lean.Elab.Tactic.withMainContext do
+    let mut hypotheses := #[]
+    for declaration in ← Lean.getLCtx do
+      if declaration.isImplementationDetail then continue
+      if declaration.type.isAppOfArity ``LeanerIR.SemanticOperations.Plain 1 then
+        hypotheses := hypotheses.push (mkIdent declaration.userName)
+    for hypothesis in hypotheses do
+      Lean.Elab.Tactic.evalTactic (← `(tactic|
+        simp (config := { failIfUnchanged := false }) [$facts,*, leaner_plain] at $hypothesis:ident))
+      Lean.Elab.Tactic.evalTactic (← `(tactic| try leaner_cases $hypothesis:ident))
+
+attribute [lir_data_norm] List.size_toArray List.length_cons List.length_nil
+  Array.size_empty Array.size_push Array.size_singleton
+
+attribute [lir_spec_norm] List.size_toArray List.length_cons List.length_nil
+  Array.size_empty Array.size_push Array.size_singleton Int.ofNat_eq_natCast
+
+/-- Closed list lookup for specification-side enum descriptors.  Using the
+literal list directly avoids elaborating `Array.find?` into a `forIn` state
+machine in proof obligations. -/
+@[simp, lir_data_norm] def variantIndex (variant : String) :
+    List (String × Nat) → Option Nat
+  | [] => none
+  | (candidate, index) :: rest =>
+      if candidate == variant then some index else variantIndex variant rest
+
+@[simp, lir_data_norm, lir_spec_norm] def variantMember (variant : String) : List String → Bool
+  | [] => false
+  | candidate :: rest =>
+      if candidate == variant then true else variantMember variant rest
+
+/-- Total enum-payload selection used by specifications after the declaration
+resolver has reduced a source field name to one payload offset per variant. -/
+@[simp, lir_data_norm] def selectVariantField (value : RuntimeValue)
+    (owner : LeanerIR.StructHandle)
+    (variants : Array (String × Nat)) : RuntimeValue :=
+  match value with
+  | .nominal actual (some variant) fields =>
+      if actual == owner then
+        match variantIndex variant variants.toList with
+        | some index => fields[index]?.getD .unit
+        | none => .unit
+      else .unit
+  | _ => .unit
+
+/-- Total enum-variant membership used by generated specification clauses. -/
+@[simp, lir_data_norm] def testVariants (value : RuntimeValue)
+    (owner : LeanerIR.StructHandle)
+    (variants : Array String) : Bool :=
+  match value with
+  | .nominal actual (some variant) _ =>
+      actual == owner && variantMember variant variants.toList
+  | _ => false
+
+@[lir_spec_norm] theorem testVariants_nominal_self (owner : LeanerIR.StructHandle)
+    (variant : String) (fields : Array RuntimeValue) (variants : Array String) :
+    testVariants (.nominal owner (some variant) fields) owner variants =
+      variantMember variant variants.toList := by
+  simp [testVariants]
+
 private def typeOfExpr? (context : Context) (id : ExprId) : Option IrTy := do
   let expression ← context.ns.expressions[id.index]?
   context.unit.tables.types[expression.typeId.index]?
@@ -138,15 +323,36 @@ private def describeType (ty : IrTy) : String :=
 read is twin-typed, and the twin domain follows through `spec.old`,
 dereference, and selection of a nominal field.  Every other expression stays
 in its scalar or runtime-value domain. -/
+private structure AppliedTwin where
+  info : SpecTypes.TwinInfo
+  arguments : Array SpecTypes.FieldRep := #[]
+
+/-- Apply a generated family accessor, selecting its invocation-aware form
+when the surrounding generic contract carries a type substitution. -/
+private def familyAccessor (typeInstantiation : Option Lean.Expr)
+    (family : SpecTypes.FamilyInfo)
+    (suffix : Name) (arguments : Array Lean.Expr) : MetaM Lean.Expr := do
+  let some instantiation := typeInstantiation
+    | return ← mkAppM (family.accessorName suffix) arguments
+  let name := family.accessorName (Name.mkSimple (suffix.toString ++ "At"))
+  let arguments := match suffix with
+    | `get => arguments.insertIdx (arguments.size - 1) instantiation
+    | `read => arguments.insertIdx (arguments.size - 2) instantiation
+    | `key => #[instantiation] ++ arguments
+    | `contains => #[instantiation] ++ arguments
+    | _ => arguments
+  mkAppM name arguments
+
 private partial def twinOfExpr? (context : Context) (id : ExprId) :
-    Option SpecTypes.TwinInfo := do
+    Option AppliedTwin := do
   let expression ← context.ns.expressions[id.index]?
   match expression.kind with
   | .operation (.specification (.global _)) instantiations _ _ =>
       match instantiations.toList with
       | [.typeArg resource] =>
           (context.families.find?
-            (·.typeIndex == resource.typeId.index)).map (·.info)
+            (·.typeIndex == resource.typeId.index)).map fun family =>
+              { info := family.info, arguments := family.arguments }
       | _ => none
   | .operation (.specification .old) _ arguments _ => do
       twinOfExpr? context (← arguments[0]?)
@@ -154,11 +360,41 @@ private partial def twinOfExpr? (context : Context) (id : ExprId) :
       twinOfExpr? context (← arguments[0]?)
   | .operation (.data (.select _ field)) _ arguments _ => do
       let base ← twinOfExpr? context (← arguments[0]?)
-      let (_, rep) ← base.fields.find? (·.1 == field)
-      match rep with
-      | .nominal twin => context.twins.find? (·.twin == twin)
+      let (_, rep) ← base.info.fields.find? (·.1 == field)
+      match rep.instantiate base.arguments with
+      | .nominal twin arguments =>
+          (context.twins.find? (·.twin == twin)).map fun info =>
+            { info, arguments }
       | _ => none
   | _ => none
+
+/-- The resolved twin named by an operation's nominal reference. -/
+private def twinOfReference? (context : Context)
+    (reference : LeanerIR.QualifiedRef) : Option SpecTypes.TwinInfo := do
+  let handle ← LeanerIR.SemanticOperations.resolveStruct?
+    context.unit context.namespaceId reference
+  context.twins.find? fun info =>
+    info.namespaceIndex == handle.namespaceId.index &&
+      info.structIndex == handle.structId
+
+/-- Encode a native generic value when entering the total runtime vocabulary
+of aggregate clauses. Values already in that vocabulary are unchanged. -/
+private def runtimeAggregateValue (context : Context) (id : ExprId)
+    (translated : Lean.Expr) : MetaM Lean.Expr := do
+  if (← inferType translated).isConstOf ``RuntimeValue then return translated
+  match twinOfExpr? context id with
+  | some applied =>
+      let argumentCodecs ← applied.arguments.mapM (·.codec context.codecs)
+      mkAppM (applied.info.twin ++ `erase) (argumentCodecs.push translated)
+  | none =>
+      let some expression := context.ns.expressions[id.index]? | return translated
+      if let some rep := Typed.valueRep? context.unit context.twins
+          expression.typeId context.ns.profile then
+        match rep with
+        | .parameter _ | .twin _ _ | .vector _ _ | .tuple _ =>
+            return ← rep.encode context.codecs translated
+        | _ => pure ()
+      return translated
 
 /-- Translate one specification expression into a Lean term. -/
 private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Expr := do
@@ -190,11 +426,162 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
       (domainOf logicalType).ofBinder binder
   | .operation operation instantiations arguments _ =>
       translateOperation operation instantiations arguments ty
+  | .quantifier kind binders triggers condition body =>
+      unless triggers.isEmpty do
+        throwError "quantifier triggers are not supported in generated contracts"
+      let rec bind (index : Nat) (active : Context) : MetaM Lean.Expr := do
+        if h : index < binders.size then
+          let binder := binders[index]
+          let some pattern := active.ns.patterns[binder.pattern.index]?
+            | throwError "quantifier pattern {binder.pattern.index} is out of range"
+          let .variable localId := pattern.kind
+            | throwError "generated contracts currently require a variable quantifier pattern"
+          let some domainExpression := active.ns.expressions[binder.domain.index]?
+            | throwError "quantifier domain {binder.domain.index} is out of range"
+          let .operation (.specification .typeDomain) #[.typeArg domainType] #[] _ :=
+              domainExpression.kind
+            | throwError "generated contracts currently require a type-domain quantifier"
+          let some patternType := active.unit.tables.types[pattern.typeId.index]?
+            | throwError "quantifier pattern type {pattern.typeId.index} is out of range"
+          let some declaredDomain := active.unit.tables.types[domainType.typeId.index]?
+            | throwError "quantifier domain type {domainType.typeId.index} is out of range"
+          unless patternType == declaredDomain do
+            throwError "quantifier pattern and type domain differ"
+          withLocalDeclD (Name.mkSimple s!"quantified_{localId.index}")
+              (domainOf patternType).leanType fun value => do
+            let inner ← bind (index + 1) { active with
+              locals := active.locals.set! localId.index (some value)
+              oldLocals := active.oldLocals.set! localId.index (some value) }
+            match kind with
+            | .forall => mkForallFVars #[value] inner
+            | .exists => mkAppM ``Exists #[← mkLambdaFVars #[value] inner]
+            | _ => throwError "choice quantifiers are not supported in generated contracts"
+        else
+          let proposition ← translate active body
+          match condition with
+          | none => pure proposition
+          | some guard =>
+              let guard ← translate active guard
+              match kind with
+              | .forall => pure (← mkArrow guard proposition)
+              | .exists => mkAppM ``And #[guard, proposition]
+              | _ => throwError "choice quantifiers are not supported in generated contracts"
+      bind 0 context
+  | .match_ scrutinee arms =>
+      if arms.isEmpty then
+        throwError "a specification match must contain an arm"
+      -- The term below deliberately makes the final arm unconditional, as
+      -- source matching does after an exhaustive decision tree. Establish
+      -- that invariant here instead of giving a partial match a total but
+      -- unintended logical meaning.
+      let mut owner? : Option LeanerIR.StructHandle := none
+      let mut declaredVariants : Array String := #[]
+      let mut coveredVariants : Array String := #[]
+      let mut hasWildcard := false
+      for (arm, index) in arms.zipIdx do
+        let some pattern := context.ns.patterns[arm.pattern.index]?
+          | throwError "specification match pattern {arm.pattern.index} is out of range"
+        match pattern.kind with
+        | .wildcard =>
+            if index + 1 < arms.size then
+              throwError "a wildcard arm in a specification match must be last"
+            hasWildcard := true
+        | .constructor owner _ (some variant) _ =>
+            let some qualified := context.unit.tables.names[owner.index]?
+              | throwError "specification match constructor has an unknown owner"
+            let reference : LeanerIR.QualifiedRef := {
+              namespaceId := qualified.namespaceId, name := owner }
+            let some handle := LeanerIR.SemanticOperations.resolveStruct?
+                context.unit context.namespaceId reference
+              | throwError "specification match constructor does not resolve"
+            if let some previous := owner? then
+              unless previous == handle do
+                throwError "specification match arms name different enum owners"
+            else
+              owner? := some handle
+              let some targetNs := context.unit.namespaces[handle.namespaceId.index]?
+                | throwError "specification match constructor namespace is out of range"
+              let some declaration := targetNs.structs[handle.structId]?
+                | throwError "specification match constructor declaration is out of range"
+              declaredVariants := declaration.variants.filterMap fun declaration =>
+                (context.unit.tables.names[declaration.name.index]?).map (·.name)
+            unless declaredVariants.contains variant do
+              throwError "specification match names unknown variant `{variant}`"
+            coveredVariants := coveredVariants.push variant
+        | _ =>
+            throwError "generated contracts require enum-constructor or wildcard match patterns"
+      unless hasWildcard || declaredVariants.all coveredVariants.contains do
+        let missing := declaredVariants.filter (!coveredVariants.contains ·)
+        throwError "a specification match must cover every variant (missing: \
+          {String.intercalate ", " missing.toList})"
+      let scrutineeValue ← runtimeAggregate scrutinee
+      let mut lowered : Array (Option Lean.Expr × Lean.Expr) := #[]
+      for arm in arms do
+        if arm.guard.isSome then
+          throwError "guards in specification matches are not supported in generated contracts"
+        let some pattern := context.ns.patterns[arm.pattern.index]?
+          | throwError "specification match pattern {arm.pattern.index} is out of range"
+        let (condition?, armContext) ← match pattern.kind with
+          | .wildcard => pure (none, context)
+          | .constructor owner _ (some variant) fields => do
+              let some qualified := context.unit.tables.names[owner.index]?
+                | throwError "specification match constructor has an unknown owner"
+              let reference : LeanerIR.QualifiedRef := {
+                namespaceId := qualified.namespaceId, name := owner }
+              let some handle := LeanerIR.SemanticOperations.resolveStruct?
+                  context.unit context.namespaceId reference
+                | throwError "specification match constructor does not resolve"
+              let variantLiteral ← mkArrayLit (mkConst ``String) [toExpr variant]
+              let test ← mkAppM ``LeanerLang.Contract.testVariants
+                #[scrutineeValue, toExpr handle, variantLiteral]
+              let condition ← mkEq test (mkConst ``Bool.true)
+              let mut armLocals := context.locals
+              let mut armOldLocals := context.oldLocals
+              for (childId, index) in fields.zipIdx do
+                let some child := context.ns.patterns[childId.index]?
+                  | throwError "specification match child pattern {childId.index} is out of range"
+                match child.kind with
+                | .wildcard => pure ()
+                | .variable localId =>
+                    let selected ← mkAppM ``LeanerIR.RuntimeValue.field
+                      #[scrutineeValue, toExpr index]
+                    let some childType := context.unit.tables.types[child.typeId.index]?
+                      | throwError "specification match child has an unknown type"
+                    let value ← match domainOf childType with
+                      | .integer => mkAppM ``LeanerIR.RuntimeValue.asInt #[selected]
+                      | .boolean => mkAppM ``LeanerIR.RuntimeValue.asBool #[selected]
+                      | .text _ => mkAppM ``LeanerIR.RuntimeValue.asString #[selected]
+                      | .aggregate => pure selected
+                    armLocals := armLocals.set! localId.index (some value)
+                    armOldLocals := armOldLocals.set! localId.index (some value)
+                | _ =>
+                    throwError "generated contracts require variable or wildcard enum payload patterns"
+              pure (some condition, { context with
+                locals := armLocals, oldLocals := armOldLocals })
+          | _ =>
+              throwError "generated contracts require enum-constructor or wildcard match patterns"
+        let body ← translate armContext arm.body
+        let body ← if domainOf ty == .aggregate then
+            runtimeAggregateValue armContext arm.body body else pure body
+        lowered := lowered.push (condition?, body)
+      let mut result? : Option Lean.Expr := none
+      for (condition?, body) in lowered.reverse do
+        result? ← match result?, condition? with
+          | none, _ => pure (some body)
+          | some _, none => pure (some body)
+          | some fallback, some condition =>
+              some <$> mkAppOptM ``ite #[none, condition, none, body, fallback]
+      let some result := result? | unreachable!
+      pure result
   | .ifElse condition thenBranch (some elseBranch) =>
       -- A conditional in a clause is Lean's `ite` on the decided test.
       let test ← translate context condition
       let thenTerm ← translate context thenBranch
       let elseTerm ← translate context elseBranch
+      let thenTerm ← if domainOf ty == .aggregate then
+          runtimeAggregateValue context thenBranch thenTerm else pure thenTerm
+      let elseTerm ← if domainOf ty == .aggregate then
+          runtimeAggregateValue context elseBranch elseTerm else pure elseTerm
       mkAppOptM ``ite #[none, test, none, thenTerm, elseTerm]
   | kind =>
       throwError "specification node {repr kind} is not supported in generated contracts"
@@ -206,6 +593,7 @@ where
     | .bool false, .bool => return mkConst ``False
     | .string value, .string => return toExpr value
     | .address value, .address => return toExpr value
+    | .bytes value, .bytes => mkAppM ``RuntimeValue.bytes #[toExpr value]
     | _, _ =>
         throwError "specification literal {repr literal} at type {describeType ty} \
           is not supported in generated contracts"
@@ -213,12 +601,28 @@ where
   positions — a storage key, a published resource — where a clause hands a
   value back to the runtime vocabulary. -/
   runtimeOperand (id : ExprId) : MetaM Lean.Expr := do
-    let some ty := typeOfExpr? context id
+    let some expression := context.ns.expressions[id.index]?
+      | throwError "a specification operand is out of range"
+    let some ty := context.unit.tables.types[expression.typeId.index]?
       | throwError "a specification operand has an unknown type"
     let translated ← translate context id
+    -- Constructors and total field projections already produce runtime
+    -- aggregates. Native generic binders need encoding, but encoding an
+    -- already translated constructor again is a representation mismatch.
+    if (← inferType translated).isConstOf ``RuntimeValue then return translated
+    if let some rep := Typed.valueRep? context.unit context.twins
+        expression.typeId context.ns.profile then
+      match rep with
+      | .parameter _ | .twin _ _ | .vector _ _ | .tuple _ =>
+          return ← rep.encode context.codecs translated
+      | _ => pure ()
     match domainOf ty with
     | .boolean => mkAppM ``RuntimeValue.bool #[← mkAppM ``Decidable.decide #[translated]]
     | domain => domain.encode translated
+  /-- Translate an aggregate and erase it when it is currently represented
+  by a generated twin. -/
+  runtimeAggregate (id : ExprId) : MetaM Lean.Expr := do
+    runtimeAggregateValue context id (← translate context id)
   /-- The resource family a global operation is instantiated at. -/
   resourceType (instantiations : Array LeanerIR.GenericArgument) : MetaM TypeId := do
     match instantiations.toList with
@@ -245,6 +649,54 @@ where
       (instantiations : Array LeanerIR.GenericArgument) (arguments : Array ExprId)
       (ty : IrTy) : MetaM Lean.Expr := do
     match operation with
+    | .specification (.functionCall reference _) =>
+        if context.specCallStack.contains reference then
+          throwError "recursive specification function `{repr reference}` is not supported in generated contracts"
+        unless instantiations.isEmpty do
+          throwError "generic specification function calls are not supported in generated contracts"
+        let some qualified := context.unit.tables.names[reference.name.index]?
+          | throwError "specification function call has an unknown name"
+        unless qualified.namespaceId == reference.namespaceId do
+          throwError "specification function call name belongs to a different namespace"
+        let some targetNs := context.unit.namespaces[reference.namespaceId.index]?
+          | throwError "specification function call namespace is out of range"
+        let some functionId := context.unit.resolution.specFunction? reference.name
+          | throwError "specification function call target does not resolve"
+        let some declaration := targetNs.specFunctions[functionId.index]?
+          | throwError "specification function declaration is out of range"
+        let some body := declaration.body
+          | throwError "an opaque specification function cannot be expanded in a generated contract"
+        unless arguments.size == declaration.signature.parameters.size do
+          throwError "specification function call argument count differs from its declaration"
+        unless declaration.signature.results.size == 1 do
+          throwError "generated contracts currently expand specification functions with one result"
+        let mut targetLocals : Array (Option Lean.Expr) :=
+          Array.replicate declaration.locals.size none
+        let mut targetTypes : Array IrTy := #[]
+        for localDecl in declaration.locals do
+          let some localType := context.unit.tables.types[localDecl.type.typeId.index]?
+            | throwError "specification function local has an unknown type"
+          targetTypes := targetTypes.push localType
+        for (argument, index) in arguments.zipIdx do
+          let some parameter := declaration.signature.parameters[index]?
+            | throwError "specification function parameter is out of range"
+          let some parameterType := context.unit.tables.types[parameter.typeUse.typeId.index]?
+            | throwError "specification function parameter has an unknown type"
+          let value ← translate context argument
+          let value ← match domainOf parameterType with
+            | .boolean => mkAppM ``Decidable.decide #[value]
+            | _ => pure value
+          targetLocals := targetLocals.set! index (some value)
+        translate {
+          context with
+          namespaceId := reference.namespaceId
+          ns := targetNs
+          locals := targetLocals
+          localTypes := targetTypes
+          oldLocals := targetLocals
+          results := #[]
+          resultTypes := #[]
+          specCallStack := context.specCallStack.push reference } body
     | .specification (.result index) =>
         match context.ns.profile, context.resultTypes[0]?, context.results[0]? with
         | some .move, some (.tuple _), some packed =>
@@ -266,37 +718,67 @@ where
           | throwError "spec.old expects one argument"
         translate { context with
           locals := context.oldLocals, state := context.oldState } argument
-    | .specification .bitVectorToInt =>
+    | .specification .bitVectorToInt | .specification .intToBitVector =>
         -- The logical domain already represents every integer unbounded, so
         -- reading a fixed-width value at `Int` is the identity.
         let some argument := arguments[0]?
           | throwError "spec.bitVectorToInt expects one argument"
         translate context argument
+    | .specification .indexVector =>
+        let some vector := arguments[0]?
+          | throwError "spec.indexVector expects a vector operand"
+        let some index := arguments[1]?
+          | throwError "spec.indexVector expects an index operand"
+        let selected ← mkAppM ``LeanerIR.RuntimeValue.field
+          #[← runtimeAggregate vector,
+            ← mkAppM ``Int.toNat #[← translate context index]]
+        (domainOf ty).ofRuntime selected
+    | .specification .lengthVector =>
+        let some vector := arguments[0]?
+          | throwError "spec.lengthVector expects a vector operand"
+        mkAppM ``LeanerLang.Contract.lengthVector #[← runtimeAggregate vector]
+    | .specification .updateVector =>
+        let some vector := arguments[0]?
+          | throwError "spec.updateVector expects a vector operand"
+        let some index := arguments[1]?
+          | throwError "spec.updateVector expects an index operand"
+        let some replacement := arguments[2]?
+          | throwError "spec.updateVector expects a replacement operand"
+        mkAppM ``LeanerLang.Contract.updateVector
+          #[← runtimeAggregate vector,
+            ← mkAppM ``Int.toNat #[← translate context index],
+            ← runtimeOperand replacement]
     | .specification (.global _) =>
         let some key := arguments[0]?
           | throwError "a storage read expects one key"
         let family ← storableFamily instantiations "read"
         let globals ← mkAppM ``LeanerIR.RuntimeState.globals #[← currentState]
-        mkAppM (family.info.twin ++ `get) #[globals, ← runtimeOperand key]
+        let codecArguments ← family.outerCodecs context.codecs
+        familyAccessor context.typeInstantiation family `get
+          (codecArguments ++ #[globals, ← runtimeOperand key])
     | .global .contains =>
         let some key := arguments[0]?
           | throwError "a storage existence test expects one key"
         let family ← storableFamily instantiations "existence test"
         let globals ← mkAppM ``LeanerIR.RuntimeState.globals #[← currentState]
-        let test ← mkAppM (family.info.twin ++ `contains)
+        let test ← familyAccessor context.typeInstantiation family `contains
           #[globals, ← runtimeOperand key]
         mkEq test (mkConst ``Bool.true)
     | .data (.select reference field) =>
         let some base := arguments[0]?
           | throwError "a field selection expects one operand"
         match twinOfExpr? context base with
-        | some info =>
-            let some (fieldName, rep) := info.fields.find? (·.1 == field)
+        | some applied =>
+            let some (fieldName, declarationRep) :=
+                applied.info.fields.find? (·.1 == field)
               | throwError "field `{field}` does not exist on the typed \
-                  twin of `{info.name}`"
-            let projected := mkApp
-              (mkConst (info.twin ++ Name.mkSimple fieldName))
-              (← translate context base)
+                  twin of `{applied.info.name}`"
+            let rep := declarationRep.instantiate applied.arguments
+            let projection ← applied.arguments.foldlM
+              (init := mkConst (applied.info.twin ++ Name.mkSimple fieldName))
+              fun projection argument =>
+                return mkApp projection (← argument.leanType context.carrier)
+            let projected := mkApp projection (← translate context base)
             match rep with
             | .int _ _ => mkAppM ``LeanerIR.SpecInt.val #[projected]
             | .bool => mkEq projected (mkConst ``Bool.true)
@@ -307,8 +789,53 @@ where
               | throwError "specification field `{field}` does not resolve in \
                   generated contracts"
             let selected ← mkAppM ``LeanerIR.RuntimeValue.field
-              #[← translate context base, toExpr index]
+              #[← runtimeAggregate base, toExpr index]
             (domainOf ty).ofRuntime selected
+    | .data (.selectVariants reference fields) =>
+        let some base := arguments[0]?
+          | throwError "a variant field selection expects one operand"
+        let some info := twinOfReference? context reference
+          | throwError "the owner of a variant field selection has no typed twin"
+        let handle ← mkAppM ``LeanerIR.StructHandle.mk
+          #[← mkAppM ``LeanerIR.NamespaceId.mk #[toExpr info.namespaceIndex],
+            toExpr info.structIndex]
+        let mut choices : Array Lean.Expr := #[]
+        for variant in info.variants do
+          if let some index := variant.fields.findIdx? fun candidate =>
+              fields.contains candidate.1 then
+            choices := choices.push
+              (← mkAppM ``Prod.mk #[toExpr variant.name, toExpr index])
+        let pairType ← mkAppM ``Prod #[mkConst ``String, mkConst ``Nat]
+        let choicesLiteral ← mkArrayLit pairType choices.toList
+        let selected ← mkAppM ``LeanerLang.Contract.selectVariantField
+          #[← runtimeAggregate base, handle, choicesLiteral]
+        (domainOf ty).ofRuntime selected
+    | .data (.testVariants reference variants) =>
+        let some base := arguments[0]?
+          | throwError "a variant test expects one operand"
+        let some info := twinOfReference? context reference
+          | throwError "the owner of a variant test has no typed twin"
+        let handle ← mkAppM ``LeanerIR.StructHandle.mk
+          #[← mkAppM ``LeanerIR.NamespaceId.mk #[toExpr info.namespaceIndex],
+            toExpr info.structIndex]
+        let variants ← mkArrayLit (mkConst ``String)
+          (variants.toList.map toExpr)
+        let test ← mkAppM ``LeanerLang.Contract.testVariants
+          #[← runtimeAggregate base, handle, variants]
+        mkEq test (mkConst ``Bool.true)
+    | .call (.constructor reference variant) =>
+        let some info := twinOfReference? context reference
+          | throwError "a specification constructor has no typed twin"
+        let handle ← mkAppM ``LeanerIR.StructHandle.mk
+          #[← mkAppM ``LeanerIR.NamespaceId.mk #[toExpr info.namespaceIndex],
+            toExpr info.structIndex]
+        let variant ← match variant with
+          | some name => mkAppM ``Option.some #[toExpr name]
+          | none => pure (mkApp (mkConst ``Option.none [Lean.Level.zero])
+              (mkConst ``String))
+        let operands ← arguments.mapM runtimeOperand
+        let operands ← mkArrayLit (mkConst ``RuntimeValue) operands.toList
+        mkAppM ``RuntimeValue.nominal #[handle, variant, operands]
     | .reference .dereference =>
         -- Specifications see through references: the accessors read a
         -- borrow's content, so a dereference is the operand itself.
@@ -329,23 +856,70 @@ where
   translatePrimitive (primitive : PrimitiveOperation) (arguments : Array ExprId)
       (ty : IrTy) : MetaM Lean.Expr := do
     match primitive with
+    | .vector =>
+        let encoded ← arguments.mapM runtimeOperand
+        let literal ← mkArrayLit (mkConst ``LeanerIR.RuntimeValue) encoded.toList
+        mkAppM ``LeanerIR.RuntimeValue.vector #[literal]
+    | .pushVector =>
+        let some vector := arguments[0]?
+          | throwError "pushVector expects a vector operand"
+        let some element := arguments[1]?
+          | throwError "pushVector expects an element operand"
+        mkAppM ``LeanerLang.Contract.pushVector
+          #[← runtimeAggregate vector, ← runtimeOperand element]
+    | .concatVector =>
+        let some left := arguments[0]?
+          | throwError "concatVector expects two vector operands"
+        let some right := arguments[1]?
+          | throwError "concatVector expects two vector operands"
+        mkAppM ``LeanerLang.Contract.concatVector
+          #[← runtimeAggregate left, ← runtimeAggregate right]
     | .add => let (l, r) ← binary arguments; mkAppM ``HAdd.hAdd #[l, r]
     | .subtract => let (l, r) ← binary arguments; mkAppM ``HSub.hSub #[l, r]
     | .multiply => let (l, r) ← binary arguments; mkAppM ``HMul.hMul #[l, r]
     | .divide => let (l, r) ← binary arguments; mkAppM ``Int.tdiv #[l, r]
     | .modulo => let (l, r) ← binary arguments; mkAppM ``Int.tmod #[l, r]
     | .negate => let value ← unary arguments; mkAppM ``Neg.neg #[value]
+    | .bitwiseAnd =>
+        let (l, r) ← binary arguments
+        if ty == LeanerIR.Ty.bool then mkAppM ``And #[l, r]
+        else mkAppM ``LeanerIR.Proofs.IntegerArithmetic.bitwiseAnd #[l, r]
+    | .bitwiseOr =>
+        let (l, r) ← binary arguments
+        if ty == LeanerIR.Ty.bool then mkAppM ``Or #[l, r]
+        else mkAppM ``LeanerIR.Proofs.IntegerArithmetic.bitwiseOr #[l, r]
+    | .bitwiseXor =>
+        let (l, r) ← binary arguments
+        if ty == LeanerIR.Ty.bool then mkAppM ``Not #[← mkAppM ``Iff #[l, r]]
+        else mkAppM ``LeanerIR.Proofs.IntegerArithmetic.bitwiseXor #[l, r]
+    | .bitwiseNot => let value ← unary arguments; mkAppM ``Int.not #[value]
+    | .shiftLeft =>
+        let (l, r) ← binary arguments
+        mkAppM ``Int.shiftLeft #[l, ← mkAppM ``Int.toNat #[r]]
+    | .shiftRight =>
+        let (l, r) ← binary arguments
+        mkAppM ``Int.shiftRight #[l, ← mkAppM ``Int.toNat #[r]]
     | .less => let (l, r) ← binary arguments; mkAppM ``LT.lt #[l, r]
     | .greater => let (l, r) ← binary arguments; mkAppM ``LT.lt #[r, l]
     | .lessEqual => let (l, r) ← binary arguments; mkAppM ``LE.le #[l, r]
     | .greaterEqual => let (l, r) ← binary arguments; mkAppM ``LE.le #[r, l]
     | .equal =>
-        let (l, r) ← binary arguments
+        let some left := arguments[0]?
+          | throwError "an equality needs two operands"
+        let some right := arguments[1]?
+          | throwError "an equality needs two operands"
+        let l ← runtimeAggregate left
+        let r ← runtimeAggregate right
         let some operandTy := arguments[0]?.bind (typeOfExpr? context)
           | throwError "an equality operand has an unknown type"
         if operandTy == LeanerIR.Ty.bool then mkAppM ``Iff #[l, r] else mkAppM ``Eq #[l, r]
     | .notEqual =>
-        let (l, r) ← binary arguments
+        let some left := arguments[0]?
+          | throwError "an inequality needs two operands"
+        let some right := arguments[1]?
+          | throwError "an inequality needs two operands"
+        let l ← runtimeAggregate left
+        let r ← runtimeAggregate right
         let some operandTy := arguments[0]?.bind (typeOfExpr? context)
           | throwError "an inequality operand has an unknown type"
         if operandTy == LeanerIR.Ty.bool then
@@ -390,6 +964,13 @@ private structure Slot where
   kind : SlotKind := .plain
   physical : IrTy
   leanType : Lean.Expr
+  /-- Native generic representation, when this slot depends on a function
+  type parameter. -/
+  rep : Option Typed.ValueRep := none
+  codec : Option Lean.Expr := none
+  /-- Move type arguments denote data, not runtime reference/loan wrappers.
+  Raw generic contracts state this domain restriction explicitly. -/
+  plainData : Bool := false
   /-- A result that is a tuple of mutable references to scalars is one
   runtime value whose components each carry a loan: the components are
   slots of their own, so a summary can name each returned loan. -/
@@ -416,7 +997,7 @@ private def slotOf (context : Context) (name : Name) (typeId : TypeId)
   let some declared := context.unit.tables.types[typeId.index]?
     | throwError "slot type {typeId.index} is out of range"
   let components := (tupleReferenceComponents? context name declared).getD #[]
-  let (kind, physical) ← match declared with
+  let (kind, physical, physicalId) ← match declared with
     | .reference reference => do
         unless allowReference do
           throwError "a result of reference type is not supported in           generated contracts"
@@ -425,9 +1006,16 @@ private def slotOf (context : Context) (name : Name) (typeId : TypeId)
         let kind := match reference.kind with
           | .shared => SlotKind.sharedRef
           | .mutable => SlotKind.mutableRef
-        pure (kind, referent)
-    | declared => pure (SlotKind.plain, declared)
-  return { name, kind, physical, leanType := (domainOf physical).leanType, components }
+        pure (kind, referent, reference.referent)
+    | declared => pure (SlotKind.plain, declared, typeId)
+  let rep := (Typed.valueRep? context.unit context.twins physicalId context.ns.profile).filter
+    (·.mentionsParameter)
+  let leanType ← match rep with
+    | some rep => rep.leanType context.carrier
+    | none => pure (domainOf physical).leanType
+  let codec ← rep.mapM (·.codec context.codecs)
+  let plainData := context.ns.profile == some .move && rep.isSome
+  return { name, kind, physical, leanType, rep, codec, components, plainData }
 
 private def conjunction (parts : Array Lean.Expr) : MetaM Lean.Expr := do
   match parts.toList with
@@ -512,9 +1100,16 @@ private def withSlotBinders (slots : Array Slot) (withExit : Bool)
 /-- The runtime argument a slot's binders encode. -/
 private def slotRuntimeValue (slot : Slot) (binders : SlotBinders) :
     MetaM Lean.Expr := do
-  let some encoded ← encodeValue? slot.physical binders.entry
-    | throwError "a value of type {describeType slot.physical} has no runtime \
-        encoding in generated contracts"
+  let encoded ← match slot.rep with
+    | some _ =>
+        let some codec := slot.codec
+          | throwError "a native generic slot has no codec"
+        mkAppM ``LeanerIR.Proofs.Codec.encode #[codec, binders.entry]
+    | none =>
+        let some encoded ← encodeValue? slot.physical binders.entry
+          | throwError "a value of type {describeType slot.physical} has no runtime \
+              encoding in generated contracts"
+        pure encoded
   match slot.kind, binders.loan with
   | .plain, _ | .sharedRef, _ => return encoded
   | .mutableRef, some loan =>
@@ -551,6 +1146,12 @@ private def mutableLoanFacts (state : Lean.Expr) (slots : Array Slot)
     (bound : Array SlotBinders) : MetaM (Array Lean.Expr) := do
   let fresh ← mkAppM ``LeanerIR.SemanticOperations.FreshGlobalLoanIds #[state]
   let mut parts : Array Lean.Expr := #[fresh]
+  for (slot, binders) in slots.zip bound do
+    if slot.plainData then
+      let some codec := slot.codec
+        | throwError "a generic data argument has no codec"
+      let encoded ← mkAppM ``LeanerIR.Proofs.Codec.encode #[codec, binders.entry]
+      parts := parts.push (← mkAppM ``LeanerIR.SemanticOperations.Plain #[encoded])
   let mutableSlots := (slots.zip bound).filter fun (slot, _) =>
     slot.kind == .mutableRef
   for (_, binders) in mutableSlots do
@@ -799,7 +1400,8 @@ private def focusedTransfer? (replacement hole : Lean.Expr) (focus : LenderFocus
       let runtimeValue := mkConst ``LeanerIR.RuntimeValue
       let before ← mkArrayLit runtimeValue (siblings.extract 0 focus.field).toList
       let after ← mkArrayLit runtimeValue (siblings.extract focus.field siblings.size).toList
-      let step ← mkAppM ``LeanerIR.SemanticOperations.FocusStep.mk #[handle, before, after]
+      let step ← mkAppM ``LeanerIR.SemanticOperations.FocusStep.mk
+        #[handle, before, after, toExpr (none : Option String)]
       let steps ← mkListLit (mkConst ``LeanerIR.SemanticOperations.FocusStep) [step]
       let focused ← mkAppM ``LeanerIR.SemanticOperations.focusValue #[steps, hole]
       mkAppM ``Eq #[replacement, focused]
@@ -888,8 +1490,7 @@ private def pendingEquation? (initial final : Lean.Expr)
 /-! ## Native loop invariants -/
 
 /-- Find source-normalized `spec invariant; loop` pairs.  The expression id
-is retained only as a static proof tag by the native loop combinator; the
-generated predicate below reads the current frame directly. -/
+identifies the generated predicate over the loop's typed header product. -/
 private partial def loopSpecifications (ns : ValidatedNamespace)
     (root : ExprId) (seen : Array Nat := #[]) :
     Array (ExprId × LeanerIR.SpecBlock) := Id.run do
@@ -897,6 +1498,15 @@ private partial def loopSpecifications (ns : ValidatedNamespace)
   let some expression := ns.expressions[root.index]? | return #[]
   let seen := seen.push root.index
   let mut found := #[]
+  -- A while annotation is carried by its condition, not a preceding
+  -- statement. Discover that representation without rewriting the loop.
+  if let .loop _ body := expression.kind then
+    if let some { kind := .ifElse condition _ _, .. } := ns.expressions[body.index]? then
+      if let some { kind := .block statements _, .. } := ns.expressions[condition.index]? then
+        for statement in statements do
+          if let some { kind := .spec block, .. } := ns.expressions[statement.index]? then
+            if block.conditions.any (·.kind == .loopInvariant) then
+              found := found.push (root, block)
   if let .block statements _ := expression.kind then
     for index in [0:statements.size] do
       if h : index + 1 < statements.size then
@@ -908,79 +1518,123 @@ private partial def loopSpecifications (ns : ValidatedNamespace)
               found := found.push (loopId, block)
   for child in LeanerIR.Validation.expressionChildren expression.kind do
     found := found ++ loopSpecifications ns child seen
+  -- Unannotated loops still need a typed header invariant. Authored clauses
+  -- strengthen that invariant, but are not required for type/range facts.
+  if let .loop .. := expression.kind then
+    unless found.any (fun (site, _) => site == root) do
+      found := found.push (root, { loc := expression.loc })
+  -- An annotation preceding a loop and the recursive visit name the same
+  -- site. Keep the authored entry, discovered before its default.
+  found := found.foldl (fun acc item =>
+    if acc.any (fun previous => previous.1 == item.1) then acc else acc.push item) #[]
   return found
 
-/-- Translate every authored loop invariant to a closed predicate over the
-native runtime frame and state. Every local is existentially decoded and tied
-to its actual slot so the predicate records the complete native frame shape;
-no source path or expression evaluation is present in the resulting term. -/
-private def buildLoopInvariants (unit : ValidatedUnit)
+/-- Locals lexically available at a loop header. Body-local slots exist in
+the runtime row but are not initialized on the first visit. -/
+private partial def loopHeaderLocals (ns : ValidatedNamespace) (root target : ExprId)
+    (available : Array LocalId) : Option (Array LocalId) := do
+  if root == target then return available
+  let expression ← ns.expressions[root.index]?
+  if let .letDecl pattern value body := expression.kind then
+    if let some value := value then
+      if let some found := loopHeaderLocals ns value target available then return found
+    let rec boundLocals (pattern : LeanerIR.PatternId) : Array LocalId :=
+      match ns.patterns[pattern.index]? with
+      | some { kind := .variable localId, .. } => #[localId]
+      | some { kind := .tuple children, .. }
+      | some { kind := .constructor _ _ _ children, .. } => children.flatMap boundLocals
+      | _ => #[]
+    loopHeaderLocals ns body target (available ++ boundLocals pattern)
+  else
+    (LeanerIR.Validation.expressionChildren expression.kind).findSome?
+      fun child => loopHeaderLocals ns child target available
+
+/-- Every erased in-body specification must be accounted for. Until inline
+assertions/assumptions have native obligations, only linked loop annotations
+may accompany a generated loop computation. -/
+private partial def checkLoopAnnotations (ns : ValidatedNamespace) (root : ExprId)
+    (specifications : Array (ExprId × LeanerIR.SpecBlock)) : MetaM Unit := do
+  let some expression := ns.expressions[root.index]? | return
+  if let .spec block := expression.kind then
+    unless block.frame.isNone && block.pragmas.isEmpty &&
+        block.conditions.all (·.kind == .loopInvariant) do
+      throwError "native loops do not yet translate inline specification obligations"
+    unless block.conditions.isEmpty || specifications.any (·.2 == block) do
+      throwError "native loop invariant has no consuming loop"
+  for child in LeanerIR.Validation.expressionChildren expression.kind do
+    checkLoopAnnotations ns child specifications
+
+/-- Authored invariants over a heterogeneous product of native header locals.
+Fixed-width integers carry their ranges in their types. Unchanged locals are
+tied to their entry values; old parameters select the original native argument.
+No frame, decoder, runtime-value binder, or slot-shape existential is generated. -/
+private def buildNativeLoopInvariants (unit : ValidatedUnit)
     (namespaceId : LeanerIR.NamespaceId) (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
-    (twins : Array SpecTypes.TwinInfo) : MetaM (Array (ExprId × Lean.Expr)) := do
+    (twins : Array SpecTypes.TwinInfo) (artifacts : Typed.Artifacts) :
+    MetaM (Array (NativeLoopInfo.Loop × Lean.Expr)) := do
   let .structured root := declaration.body | return #[]
-  let families := SpecTypes.familyInfos unit twins
-  let allSlots ← declaration.locals.mapM fun localDecl =>
-    slotOf { unit, namespaceId, ns, locals := #[], results := #[] }
-      (Name.mkSimple s!"loop_local_{localDecl.id.index}") localDecl.type.typeId
-      (allowReference := true)
-  let localTypes := allSlots.map (·.physical)
+  let specifications := loopSpecifications ns root
+  if specifications.isEmpty then return #[]
+  checkLoopAnnotations ns root specifications
+  unless artifacts.signature.typeParameterCount == 0 do
+    throwError "native loop invariants require a monomorphic typed header"
+  let logical (rep : Typed.ValueRep) (value : Lean.Expr) : MetaM Lean.Expr := do
+    match rep with
+    | .int .. => mkAppM ``LeanerIR.SpecInt.val #[value]
+    | .bool => pure value
+    | _ => throwError "native loop invariants require integer or Boolean header values"
+  let productType (reps : Array Typed.ValueRep) : MetaM Lean.Expr := do
+    let mut result := mkConst ``Unit
+    for rep in reps.reverse do
+      result := mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) (← rep.leanType none) result
+    return result
+  let projections (value : Lean.Expr) (count : Nat) : MetaM (Array Lean.Expr) := do
+    let mut rest := value
+    let mut fields := #[]
+    for _ in [:count] do
+      fields := fields.push (← mkAppM ``Prod.fst #[rest])
+      rest ← mkAppM ``Prod.snd #[rest]
+    return fields
+  let localTypes := declaration.locals.map fun decl =>
+    unit.tables.types[decl.type.typeId.index]!
   let mut predicates := #[]
-  for (site, block) in loopSpecifications ns root do
-    let conditions := block.conditions.filter
-      (fun condition => condition.kind == .loopInvariant)
-    /- Close over every local, not only the ones named by the authored
-    clause.  This gives the invariant a complete native frame shape, which
-    is required both for scalar frame finalization and for retaining the
-    prophecy identities of reference-shaped locals. -/
-    let slots := allSlots
-    let predicate ←
-      withLocalDeclD `loopEntryFrame (mkConst ``LeanerIR.RuntimeFrame) fun entryFrame =>
-      withLocalDeclD `loopEntryState (mkConst ``LeanerIR.RuntimeState) fun entryState =>
-      withLocalDeclD `loopFrame (mkConst ``LeanerIR.RuntimeFrame) fun frame =>
-      withLocalDeclD `loopState (mkConst ``LeanerIR.RuntimeState) fun state =>
-        withSlotBinders slots (withExit := false) fun bound => do
-          let mut locals : Array (Option Lean.Expr) :=
-            Array.replicate declaration.locals.size none
-          let mut encodedLocals := #[]
-          let mut equations := #[]
-          let mut entryEquations := #[]
-          for ((localDecl, slot), binders) in
-              (declaration.locals.zip slots).zip bound do
-            let localId := localDecl.id
-            locals := locals.set! localId.index (some binders.current)
-            let encoded ← slotRuntimeValue slot binders
-            encodedLocals := encodedLocals.push
-              (← mkAppM ``Option.some #[encoded])
-            let read ← mkAppM ``LeanerIR.SemanticOperations.readLocal?
-              #[frame, toExpr localId]
-            equations := equations.push
-              (← mkAppM ``Eq #[read, ← mkAppM ``Option.some #[encoded]])
-            unless localDecl.mutable do
-              let entryRead ← mkAppM ``LeanerIR.SemanticOperations.readLocal?
-                #[entryFrame, toExpr localId]
-              entryEquations := entryEquations.push
-                (← mkAppM ``Eq
-                  #[entryRead, ← mkAppM ``Option.some #[encoded]])
-          let optionRuntimeValue := Lean.mkApp
-            (Lean.mkConst ``Option [Lean.Level.zero])
-            (mkConst ``LeanerIR.RuntimeValue)
-          let localsLiteral ← mkArrayLit optionRuntimeValue encodedLocals.toList
-          let frameLocals ← mkAppM ``LeanerIR.RuntimeFrame.locals #[frame]
-          let frameShape ← mkAppM ``Eq #[frameLocals, localsLiteral]
-          let context : Context :=
-            { unit, namespaceId, ns, twins, families, locals, localTypes
-              oldLocals := locals, results := #[], state := some state,
-              oldState := some state }
-          let clauses ← conditions.mapM (translate context ·.expression)
-          let ranges ← slotRanges slots (some ·.entry) bound
-          let stateStable ← mkAppM ``Eq #[state, entryState]
-          let body ← conjunction
-            (#[stateStable, frameShape] ++ equations ++ entryEquations ++
-              ranges ++ clauses)
-          let closed ← existsOver (bound.flatMap SlotBinders.flat) body
-          mkLambdaFVars #[entryFrame, entryState, frame, state] closed
-    predicates := predicates.push (site, predicate)
+  for (site, block) in specifications do
+    let available := (loopHeaderLocals ns root site
+      (declaration.locals.extract 0 declaration.signature.parameters.size |>.map (·.id))).getD #[]
+    let declarations := declaration.locals.filter (fun decl => available.contains decl.id)
+    let reps ← declarations.mapM fun decl => do
+      let slot := artifacts.signature.locals[decl.id.index]!
+      unless slot.kind == .plain do
+        throwError "native loop invariants do not yet carry reference headers"
+      match slot.rep with
+      | .int (.bits _) _ | .bool => pure slot.rep
+      | _ => throwError "native loop invariants require integer or Boolean header values"
+    let headerType ← productType reps
+    let predicate ← withLocalDeclD `args (mkConst artifacts.argumentsType) fun args =>
+      withLocalDeclD `loopEntry headerType fun initial =>
+      withLocalDeclD `loopLocals headerType fun current =>
+      withLocalDeclD `loopState (mkConst ``LeanerIR.RuntimeState) fun state => do
+        let initialValues ← projections initial reps.size
+        let currentValues ← projections current reps.size
+        let mut locals := Array.replicate declaration.locals.size none
+        let mut oldLocals := Array.replicate declaration.locals.size none
+        let mut unchanged := #[]
+        for ((decl, rep), index) in (declarations.zip reps).zipIdx do
+          locals := locals.set! decl.id.index (some (← logical rep currentValues[index]!))
+          unless decl.mutable do
+            unchanged := unchanged.push (← mkEq
+              (← logical rep currentValues[index]!) (← logical rep initialValues[index]!))
+        for (argument, index) in artifacts.signature.arguments.zipIdx do
+          let value ← mkAppM (artifacts.argumentsType ++ argument.name) #[args]
+          oldLocals := oldLocals.set! index (some (← logical argument.rep value))
+        let context : Context := {
+          unit, namespaceId, ns, twins, locals, oldLocals, localTypes, results := #[]
+          state := some state, oldState := none }
+        let clauses ← block.conditions.mapM (translate context ·.expression)
+        mkLambdaFVars #[args, initial, current, state] (← conjunction (unchanged ++ clauses))
+    predicates := predicates.push
+      (⟨site, declarations.map (·.id), reps, .anonymous⟩, predicate)
   return predicates
 
 /-- One `aborts_if` clause: its condition, the abort code the failure
@@ -1004,6 +1658,190 @@ private def conditionRange (unit : ValidatedUnit) (condition : LeanerIR.Conditio
       | some range => (range.startByte, range.endByte)
       | none => (0, 0)
   | none => (0, 0)
+
+/-- One total resource read in a module invariant.  `old` selects whether its
+implicit existence guard observes the entry or current state. -/
+private structure InvariantValueRead where
+  typeIndex : Nat
+  key : ExprId
+  atEntry : Bool := false
+  deriving BEq
+
+private structure ModifiedResource where
+  typeIndex : Nat
+  key : ExprId
+
+/-- Resource reads whose totalized values occur in an invariant.  Existence
+tests are deliberately absent: unlike a value read, they do not need an
+implicit guard. -/
+private partial def invariantValueReads (ns : ValidatedNamespace) (root : ExprId)
+    (inOld : Bool := false) : Array InvariantValueRead :=
+  match ns.expressions[root.index]? with
+  | none => #[]
+  | some expression =>
+      match expression.kind with
+      | .operation (.specification .old) _ arguments _ =>
+          arguments.flatMap fun child => invariantValueReads ns child true
+      | .operation (.specification (.global _)) instantiations arguments _ =>
+          let read := match instantiations.toList, arguments[0]? with
+            | [.typeArg resource], some key =>
+                #[{ typeIndex := resource.typeId.index, key, atEntry := inOld }]
+            | _, _ => #[]
+          read ++ arguments.flatMap fun child => invariantValueReads ns child inOld
+      | kind =>
+          (LeanerIR.Validation.expressionChildren kind).flatMap fun child =>
+            invariantValueReads ns child inOld
+
+/-- The implicit existence premise for one totalized invariant read. -/
+private def invariantReadGuard (context : Context) (read : InvariantValueRead) :
+    MetaM Lean.Expr := do
+  let some family := context.families.find? (fun family =>
+      family.typeIndex == read.typeIndex)
+    | throwError "a resource read in a namespace invariant has no typed family"
+  let readContext := if read.atEntry then
+      { context with locals := context.oldLocals, state := context.oldState }
+    else context
+  let some state := readContext.state
+    | throwError "a namespace invariant resource read has no state"
+  let some keyTy := typeOfExpr? readContext read.key
+    | throwError "a namespace invariant resource key has an unknown type"
+  let encodedKey ← (domainOf keyTy).encode (← translate readContext read.key)
+  let globals ← mkAppM ``LeanerIR.RuntimeState.globals #[state]
+  let contains ← familyAccessor context.typeInstantiation family `contains
+    #[globals, encodedKey]
+  mkEq contains (mkConst ``Bool.true)
+
+/-- Translate the body at one fixed quantifier assignment and add Move's
+implicit guard: a value-based invariant constrains an address only while all
+resources it reads exist in the selected pre/post states. -/
+private def guardedInvariantBody (context : Context) (root body : ExprId)
+    (condition : Option ExprId) : MetaM Lean.Expr := do
+  let proposition ← translate context body
+  let mut guards := #[]
+  if let some condition := condition then
+    guards := guards.push (← translate context condition)
+  let reads := (invariantValueReads context.ns root).foldl
+    (fun unique read => if unique.contains read then unique else unique.push read) #[]
+  for read in reads do
+    guards := guards.push (← invariantReadGuard context read)
+  if guards.isEmpty then return proposition
+  mkArrow (← conjunction guards) proposition
+
+private inductive InvariantPhase where
+  | entry
+  | exit
+  deriving BEq
+
+/-- Translate this namespace's invariants in the state selected by `context`.
+Invariant locals are declaration-owned, so their quantifier binders start
+unbound even when the surrounding function has locals with the same IDs.
+Update invariants are obligations only at exit; regular invariants are also
+assumptions at entry. -/
+private def namespaceInvariantTerms (context : Context)
+    (modifiedResources : Option (Array ModifiedResource)) (phase : InvariantPhase) :
+    MetaM (Array (Lean.Expr × Nat × Nat)) := do
+  let mut terms := #[]
+  for declaration in context.ns.invariants do
+    let (typeParameters, isUpdate) ← match declaration.condition.kind with
+      | .globalInvariant typeParameters => pure (typeParameters, false)
+      | .globalInvariantUpdate typeParameters => pure (typeParameters, true)
+      | kind => throwError "namespace condition {repr kind} is not a global invariant"
+    if phase == .entry && isUpdate then continue
+    unless typeParameters.isEmpty do
+      throwError "generic namespace invariants are not supported in generated contracts"
+    unless declaration.condition.auxiliary.isEmpty do
+      throwError "namespace invariants cannot carry auxiliary expressions"
+    let localTypes ← declaration.locals.mapM fun localDecl => do
+      let some ty := context.unit.tables.types[localDecl.type.typeId.index]?
+        | throwError "namespace invariant local type {localDecl.type.typeId.index} is out of range"
+      pure ty
+    let emptyLocals := Array.replicate declaration.locals.size none
+    let invariantContext := { context with
+      locals := emptyLocals
+      localTypes
+      oldLocals := emptyLocals
+      results := #[]
+      resultTypes := #[] }
+    let range := conditionRange context.unit declaration.condition
+    let invariantFamilies := (invariantValueReads context.ns
+      declaration.condition.expression).map (fun read => read.typeIndex)
+    let modifiedKeys := modifiedResources.map fun resources =>
+      resources.filterMap fun resource =>
+        if invariantFamilies.contains resource.typeIndex then some resource.key else none
+    match modifiedKeys with
+    | none =>
+        let some root := context.ns.expressions[declaration.condition.expression.index]?
+          | throwError "namespace invariant expression is out of range"
+        match root.kind with
+        | .quantifier .forall #[binder] triggers condition body =>
+            unless triggers.isEmpty do
+              throwError "namespace invariant triggers are not supported in generated contracts"
+            let some pattern := context.ns.patterns[binder.pattern.index]?
+              | throwError "namespace invariant quantifier pattern is out of range"
+            let .variable localId := pattern.kind
+              | throwError "namespace invariants require a variable binder"
+            let some patternType := context.unit.tables.types[pattern.typeId.index]?
+              | throwError "namespace invariant binder type is out of range"
+            let proposition ← withLocalDeclD (Name.mkSimple s!"invariant_{localId.index}")
+                (domainOf patternType).leanType fun value => do
+              let active := { invariantContext with
+                locals := invariantContext.locals.set! localId.index (some value)
+                oldLocals := invariantContext.oldLocals.set! localId.index (some value) }
+              let bodyProposition ← guardedInvariantBody active
+                declaration.condition.expression body condition
+              mkForallFVars #[value] bodyProposition
+            terms := terms.push (proposition, range.1, range.2)
+        | _ =>
+            let proposition ← guardedInvariantBody invariantContext
+              declaration.condition.expression declaration.condition.expression none
+            terms := terms.push (proposition, range.1, range.2)
+    | some keys =>
+        if keys.isEmpty then continue
+        let some root := context.ns.expressions[declaration.condition.expression.index]?
+          | throwError "namespace invariant expression is out of range"
+        match root.kind with
+        | .quantifier .forall #[binder] triggers condition body =>
+            unless triggers.isEmpty do
+              throwError "namespace invariant triggers are not supported in generated contracts"
+            let some pattern := context.ns.patterns[binder.pattern.index]?
+              | throwError "namespace invariant quantifier pattern is out of range"
+            let .variable localId := pattern.kind
+              | throwError "modified-key invariant specialization requires a variable binder"
+            let mut translatedKeys := #[]
+            for key in keys do
+              let key ← translate context key
+              if translatedKeys.any (· == key) then continue
+              translatedKeys := translatedKeys.push key
+              let active := { invariantContext with
+                locals := invariantContext.locals.set! localId.index (some key)
+                oldLocals := invariantContext.oldLocals.set! localId.index (some key) }
+              let proposition ← guardedInvariantBody active
+                declaration.condition.expression body condition
+              terms := terms.push (proposition, range.1, range.2)
+        | _ =>
+            let proposition ← guardedInvariantBody invariantContext
+              declaration.condition.expression declaration.condition.expression none
+            terms := terms.push (proposition, range.1, range.2)
+  pure terms
+
+/-- Source-key expressions named by the function's frame. Specializing a
+universal invariant at precisely these keys is sufficient together with the
+generated frame, and avoids duplicating a quantified final-state expression. -/
+private def invariantModifiedResources (ns : ValidatedNamespace)
+    (contract : LeanerIR.FunctionContract) : MetaM (Option (Array ModifiedResource)) := do
+  if contract.modifiesAll || hasLooseFrame contract then return none
+  let mut resources := #[]
+  for modified in contract.modifies do
+    let some expression := ns.expressions[modified.index]?
+      | throwError "a modifies expression is out of range"
+    let .operation (.specification (.global _)) instantiations arguments _ := expression.kind
+      | throwError "a modifies clause must name a resource at a key"
+    let [.typeArg resource] := instantiations.toList
+      | throwError "a modifies clause must name one resource type"
+    let some key := arguments[0]?
+      | throwError "a modifies clause expects one key"
+    resources := resources.push { typeIndex := resource.typeId.index, key }
+  pure (some resources)
 
 private def groupConditions (unit : ValidatedUnit)
     (conditions : Array LeanerIR.Condition) : MetaM ClauseGroups := do
@@ -1030,6 +1868,128 @@ private def markObligation (range : Nat × Nat) (clause : Lean.Expr) : Lean.Expr
   mkApp3 (mkConst ``LeanerIR.Proofs.Obligation)
     (mkRawNatLit range.1) (mkRawNatLit range.2) clause
 
+/-! ## Data invariants
+
+Data invariants belong to values, rather than to the function which happens
+to consume or produce them.  The runtime representation deliberately erases
+those proofs, so the generated contract restores their verification meaning:
+incoming values provide invariant assumptions, while outgoing values and
+modified resources owe the invariant again. -/
+
+/-- The declaration and owning namespace of a nominal type. -/
+private def nominalDeclaration? (context : Context) (ty : IrTy) :
+    Option (LeanerIR.NamespaceId × ValidatedNamespace × LeanerIR.StructDecl) := do
+  let .nominal name _ := ty | none
+  let qualified ← context.unit.tables.names[name.index]?
+  let ns ← context.unit.namespaces[qualified.namespaceId.index]?
+  let declaration ← ns.structs.find? (·.name == name)
+  some (qualified.namespaceId, ns, declaration)
+
+/-- Whether a physical type actually contributes a data-invariant clause. -/
+private def hasDataInvariant (context : Context) (ty : IrTy) : Bool :=
+  match nominalDeclaration? context ty with
+  | some (_, _, declaration) => declaration.contract.conditions.any
+      (fun condition => condition.kind == .structInvariant)
+  | none => false
+
+/-- Specialize every invariant declared by `ty` to its erased runtime value.
+Struct invariant locals are the fields in declaration order; enum invariants
+receive the whole tagged value as local zero and bind payloads in their own
+logical match. -/
+private def dataInvariantTerms (context : Context) (ty : IrTy)
+    (value : Lean.Expr) : MetaM (Array (Lean.Expr × Nat × Nat)) := do
+  let some (namespaceId, ns, declaration) := nominalDeclaration? context ty
+    | return #[]
+  let conditions := declaration.contract.conditions.filter
+    (fun condition => condition.kind == .structInvariant)
+  if conditions.isEmpty then return #[]
+  let localTypes ← declaration.locals.mapM fun localDecl => do
+    let some localType := context.unit.tables.types[localDecl.type.typeId.index]?
+      | throwError "data invariant local type {localDecl.type.typeId.index} is out of range"
+    pure localType
+  let mut locals := Array.replicate declaration.locals.size none
+  if declaration.variants.isEmpty then
+    unless declaration.fields.size <= declaration.locals.size do
+      throwError "a struct invariant has fewer declaration locals than fields"
+    for (_, index) in declaration.fields.zipIdx do
+      let some localType := localTypes[index]?
+        | throwError "a struct invariant field local is out of range"
+      let selected ← mkAppM ``LeanerIR.RuntimeValue.field #[value, toExpr index]
+      locals := locals.set! index
+        (some (← (domainOf localType).binderOfRuntime selected))
+  else
+    unless !declaration.locals.isEmpty do
+      throwError "an enum invariant has no `this` declaration local"
+    locals := locals.set! 0 (some value)
+  let invariantContext : Context := {
+    context with
+    namespaceId, ns, locals, localTypes, oldLocals := locals
+    results := #[], resultTypes := #[] }
+  conditions.mapM fun condition => do
+    unless condition.auxiliary.isEmpty do
+      throwError "a data invariant cannot carry auxiliary expressions"
+    let proposition ← translate invariantContext condition.expression
+    let range := conditionRange context.unit condition
+    pure (proposition, range.1, range.2)
+
+/-- Encode the logical value of a slot without adding the outer borrow which
+appears in an argument row.  Data invariants constrain the referent. -/
+private def slotValueRuntime (context : Context) (slot : Slot)
+    (value : Lean.Expr) : MetaM Lean.Expr := do
+  match slot.rep with
+  | some rep => rep.encode context.codecs value
+  | none => (domainOf slot.physical).encode value
+
+/-- Data invariants carried by selected binders of a parameter/result row. -/
+private def slotDataInvariantTerms (context : Context) (slots : Array Slot)
+    (bound : Array SlotBinders)
+    (binderOf : SlotBinders → Option Lean.Expr) :
+    MetaM (Array (Lean.Expr × Nat × Nat)) := do
+  let mut terms := #[]
+  for (slot, binders) in slots.zip bound do
+    unless hasDataInvariant context slot.physical do continue
+    let some binder := binderOf binders | continue
+    let value ← slotValueRuntime context slot binder
+    terms := terms ++ (← dataInvariantTerms context slot.physical value)
+  pure terms
+
+/-- Re-establish a resource invariant only when the modified slot exists in
+the post-state.  Removal is therefore vacuous; publication and mutation owe
+the invariant of the exact runtime value left at the key. -/
+private def modifiedDataInvariantTerms (context : Context)
+    (modifiedResources : Option (Array ModifiedResource)) :
+    MetaM (Array Lean.Expr) := do
+  let some resources := modifiedResources | return #[]
+  /- Module invariants also populate `modifiedResources`; most such resource
+  types have no data invariant.  Reject those before constructing post-state
+  lookups, which keeps their existing verification path cost-neutral. -/
+  let resources := resources.filter fun resource =>
+    match context.unit.tables.types[resource.typeIndex]? with
+    | some resourceType => hasDataInvariant context resourceType
+    | none => false
+  if resources.isEmpty then return #[]
+  let some state := context.state
+    | throwError "modified-resource invariants require a post-state"
+  let globals ← mkAppM ``LeanerIR.RuntimeState.globals #[state]
+  let mut obligations := #[]
+  for resource in resources do
+    let some family := context.families.find? (·.typeIndex == resource.typeIndex)
+      | throwError "a modified resource with a data invariant has no typed family"
+    let some resourceType := context.unit.tables.types[resource.typeIndex]?
+      | throwError "a modified resource type is out of range"
+    let some keyType := typeOfExpr? context resource.key
+      | throwError "a modified resource key has an unknown type"
+    let encodedKey ← (domainOf keyType).encode (← translate context resource.key)
+    let key ← familyAccessor context.typeInstantiation family `key #[encodedKey]
+    let lookup ← mkAppM ``LeanerIR.GlobalMap.lookup #[globals, key]
+    let present ← mkEq (← mkAppM ``Option.isSome #[lookup]) (mkConst ``Bool.true)
+    let value ← mkAppM ``Option.getD #[lookup, mkConst ``RuntimeValue.unit]
+    let invariants ← dataInvariantTerms context resourceType value
+    for (invariant, start, stop) in invariants do
+      obligations := obligations.push
+        (← mkArrow present (markObligation (start, stop) invariant))
+  pure obligations
+
 /-- The runtime key a `modifies global<T>(k)` clause names, as a
 `GlobalKey`-valued term over the contract's logical binders. -/
 private def modifiedKeyTerm (context : Context) (id : ExprId) :
@@ -1049,19 +2009,20 @@ private def modifiedKeyTerm (context : Context) (id : ExprId) :
       let some keyTy := typeOfExpr? context key
         | throwError "a modifies key has an unknown type"
       let encoded ← (domainOf keyTy).encode (← translate context key)
-      mkAppM (family.info.twin ++ `key) #[encoded]
+      familyAccessor context.typeInstantiation family `key #[encoded]
   | _ =>
       throwError "a modifies clause must name a resource at a key in \
         generated contracts"
 
 /-- Bind one typed-contents binder per storable family and continue. -/
 private def withFamilyContents (families : Array SpecTypes.FamilyInfo)
+    (carrier : Option Lean.Expr)
     (k : Array Lean.Expr → MetaM α) : MetaM α :=
   let rec go (index : Nat) (bound : Array Lean.Expr) : MetaM α := do
     if h : index < families.size then
       let family := families[index]
       let contentsType ← mkArrow (mkConst ``LeanerIR.StorageKey)
-        (← mkAppM ``Option #[mkConst family.info.twin])
+        (← mkAppM ``Option #[← family.leanType carrier])
       withLocalDeclD (Name.mkSimple (family.info.name ++ "_contents"))
         contentsType fun binder => go (index + 1) (bound.push binder)
     else k bound
@@ -1070,13 +2031,20 @@ private def withFamilyContents (families : Array SpecTypes.FamilyInfo)
 /-- The representation conjuncts tying each family binder to the runtime
 map: this is the well-typed-store precondition, in the shape that rewrites. -/
 private def familyConjuncts (families : Array SpecTypes.FamilyInfo)
-    (bound : Array Lean.Expr) (state : Lean.Expr) : MetaM (Array Lean.Expr) := do
+    (bound : Array Lean.Expr) (state : Lean.Expr)
+    (codecs typeInstantiation : Option Lean.Expr) : MetaM (Array Lean.Expr) := do
   let globals ← mkAppM ``LeanerIR.RuntimeState.globals #[state]
-  (families.zip bound).mapM fun (family, binder) =>
+  (families.zip bound).mapM fun (family, binder) => do
+    let typeId := toExpr (⟨family.typeIndex⟩ : LeanerIR.TypeId)
+    let typeId ← match typeInstantiation with
+      | none => pure typeId
+      | some instantiation =>
+          mkAppM ``LeanerIR.SemanticOperations.instantiatedTypeId
+            #[instantiation, typeId]
     mkAppM ``LeanerIR.FamilyRepresentation
-      #[mkConst (family.info.twin ++ `erase),
+      #[← family.erase codecs,
         toExpr (⟨family.info.namespaceIndex⟩ : LeanerIR.NamespaceId),
-        toExpr (⟨family.typeIndex⟩ : LeanerIR.TypeId),
+        typeId,
         binder, globals]
 
 /-- Whether the lowered contract sets a boolean pragma.  Lowering already
@@ -1098,6 +2066,8 @@ private def familiesUsed (ns : ValidatedNamespace)
   let mut roots : Array ExprId :=
     declaration.contract.conditions.flatMap fun condition =>
       #[condition.expression] ++ condition.auxiliary.map (·.2)
+  roots := roots ++ ns.invariants.flatMap fun invariant =>
+    #[invariant.condition.expression] ++ invariant.condition.auxiliary.map (·.2)
   if let .structured root := declaration.body then
     roots := roots.push root
   let mut work := roots.toList
@@ -1141,6 +2111,7 @@ clauses see its pending export. -/
 private def withGlobalLender (state final : Lean.Expr)
     (parameterSlots : Array Slot) (parameterBound : Array SlotBinders)
     (resultSlots : Array Slot) (resultBound : Array SlotBinders)
+    (typeInstantiation : Option Lean.Expr)
     (lender? : Option GlobalLender)
     (k : GlobalLenderBound → MetaM Lean.Expr) : MetaM Lean.Expr := do
   let some lender := lender? | k { resolvedFinal := final }
@@ -1151,7 +2122,7 @@ private def withGlobalLender (state final : Lean.Expr)
   let some resultLoan := resultBound[0]?.bind (·.loan)
     | throwError "internal: a global lender's result has no loan binder"
   let encodedKey ← (domainOf keySlot.physical).encode keyBinders.current
-  let key ← mkAppM (lender.family.info.twin ++ `key) #[encodedKey]
+  let key ← familyAccessor typeInstantiation lender.family `key #[encodedKey]
   let encodedResults ← (resultSlots.zip resultBound).mapM fun (slot, binders) =>
     slotRuntimeValue slot binders
   let resultRow ← mkArrayLit (mkConst ``LeanerIR.RuntimeValue) encodedResults.toList
@@ -1190,21 +2161,42 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
     (twins : Array SpecTypes.TwinInfo := #[])
-    (families : Array SpecTypes.FamilyInfo := #[]) :
+    (families : Array SpecTypes.FamilyInfo := #[])
+    (carrier : Option Lean.Expr := none)
+    (codecs : Option Lean.Expr := none)
+    (typeInstantiation : Option Lean.Expr := none) :
     MetaM Lean.Expr := do
   let families := familiesUsed ns declaration families
   let groups ← groupConditions unit declaration.contract.conditions
+  let invariantResources ← invariantModifiedResources ns declaration.contract
   let isPartial := pragmaEnabled declaration.contract "aborts_if_is_partial"
   let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict"
   let parameterSlots ← declaration.signature.parameters.mapIdxM fun index parameter =>
-    slotOf { unit, namespaceId, ns, locals := #[], results := #[] }
+    slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
+             locals := #[], results := #[], twins := twins, families := families,
+             carrier := carrier, codecs := codecs,
+             typeInstantiation := typeInstantiation }
       (Name.mkSimple (if parameter.name.isEmpty then s!"argument{index}" else parameter.name))
       parameter.typeUse.typeId (allowReference := true)
   let resultSlots ← declaration.signature.results.mapIdxM fun index result =>
-    slotOf { unit, namespaceId, ns, locals := #[], results := #[] }
+    slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
+             locals := #[], results := #[], twins := twins, families := families,
+             carrier := carrier, codecs := codecs,
+             typeInstantiation := typeInstantiation }
       (Name.mkSimple (if declaration.signature.results.size == 1 then "result"
         else s!"result{index}"))
       result.typeId (allowReference := true)
+  let functionLocalTypes ← declaration.locals.mapM fun localDecl => do
+    let some ty := unit.tables.types[localDecl.type.typeId.index]?
+      | throwError "function local has an unknown type"
+    match ty with
+    | .reference reference =>
+        let some referent := unit.tables.types[reference.referent.index]?
+          | throwError "function reference local has an unknown referent type"
+        pure referent
+    | _ => pure ty
+  let padLocals (values : Array (Option Lean.Expr)) : Array (Option Lean.Expr) :=
+    values ++ Array.replicate (declaration.locals.size - values.size) none
   let runtimeValues := mkApp (mkConst ``Array [.zero]) (mkConst ``LeanerIR.RuntimeValue)
   let runtimeState := mkConst ``LeanerIR.RuntimeState
   let failure := mkConst ``LeanerIR.Proofs.Failure
@@ -1214,9 +2206,11 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
   mutable reference — and `spec.old` reaches the entry. -/
   let contextOf (state : Lean.Expr) (bound : Array SlotBinders) : Context :=
     { unit, namespaceId, ns, twins, families
-      locals := bound.map fun binders => some binders.entry
-      localTypes := parameterSlots.map (·.physical)
-      oldLocals := bound.map fun binders => some binders.entry
+      carrier := carrier, codecs := codecs,
+      typeInstantiation := typeInstantiation
+      locals := padLocals (bound.map fun binders => some binders.entry)
+      localTypes := functionLocalTypes
+      oldLocals := padLocals (bound.map fun binders => some binders.entry)
       results := #[]
       state := some state, oldState := some state }
   let translateAll (context : Context) (clauses : Array ExprId) :
@@ -1226,15 +2220,21 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     bound.flatMap SlotBinders.flat
   let requiresTerm ← withLocalDeclD `arguments runtimeValues fun arguments =>
     withLocalDeclD `state runtimeState fun state =>
-      withFamilyContents families fun familyBound =>
+      withFamilyContents families carrier fun familyBound =>
         withSlotBinders parameterSlots (withExit := false) fun bound => do
-          let represented ← familyConjuncts families familyBound state
+          let context := contextOf state bound
+          let represented ← familyConjuncts families familyBound state codecs typeInstantiation
           let equation ← rowEquation arguments parameterSlots bound
           let ranges ← slotRanges parameterSlots (some ·.entry) bound
           let ownership ← mutableLoanFacts state parameterSlots bound
-          let clauses ← translateAll (contextOf state bound) groups.requires
+          let dataInvariants ← slotDataInvariantTerms context parameterSlots bound
+            (some ·.entry)
+          let clauses ← translateAll context groups.requires
+          let invariants ← namespaceInvariantTerms
+            context invariantResources .entry
           let body ← conjunction
-            (represented ++ #[equation] ++ ranges ++ ownership ++ clauses)
+            (represented ++ #[equation] ++ ranges ++ ownership ++ clauses ++
+              dataInvariants.map (·.1) ++ invariants.map (·.1))
           let closed ← existsOver (familyBound ++ flatten bound) body
           mkLambdaFVars #[arguments, state] closed
   let ensuresTerm ← withLocalDeclD `arguments runtimeValues fun arguments =>
@@ -1244,6 +2244,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
           withSlotBinders parameterSlots (withExit := true) fun parameterBound =>
             withSlotBinders resultSlots (withExit := false) fun resultBound =>
             withGlobalLender state final parameterSlots parameterBound resultSlots resultBound
+              typeInstantiation
               (globalReborrowLender? unit namespaceId ns twins families declaration)
               fun globalBound => do
               let argumentEquation ← rowEquation arguments parameterSlots parameterBound
@@ -1258,17 +2259,32 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
                 resultSlots resultBound (reborrowLenders unit namespaceId ns twins declaration)
               let context : Context :=
                 { unit, namespaceId, ns, twins, families
-                  locals := parameterBound.map fun binders => some binders.current
-                  localTypes := parameterSlots.map (·.physical)
-                  oldLocals := parameterBound.map fun binders => some binders.entry
+                  carrier := carrier, codecs := codecs,
+                  typeInstantiation := typeInstantiation
+                  locals := padLocals (parameterBound.map fun binders => some binders.current)
+                  localTypes := functionLocalTypes
+                  oldLocals := padLocals (parameterBound.map fun binders => some binders.entry)
                   results := resultBound.map (·.entry)
                   resultTypes := resultSlots.map (·.physical)
                   state := some globalBound.resolvedFinal, oldState := some state }
               let clauses ← groups.ensures.mapM fun (clause, range) =>
                 return markObligation range (← translate context clause)
+              let resultInvariants ← slotDataInvariantTerms context resultSlots resultBound
+                (some ·.entry)
+              let exitInvariants ← slotDataInvariantTerms context parameterSlots parameterBound
+                (·.exit)
+              let dataInvariantObligations :=
+                (resultInvariants ++ exitInvariants).map fun (clause, start, stop) =>
+                  markObligation (start, stop) clause
+              let modifiedDataInvariants ←
+                modifiedDataInvariantTerms context invariantResources
+              let invariants ← namespaceInvariantTerms context invariantResources .exit
+              let invariantObligations := invariants.map fun (clause, start, stop) =>
+                markObligation (start, stop) clause
               let body ← conjunction
                 (#[argumentEquation, resultEquation] ++ componentEquations ++ pending.toArray ++
-                  globalBound.facts ++ ranges ++ componentRanges ++ exitRanges ++ clauses)
+                  globalBound.facts ++ ranges ++ componentRanges ++ exitRanges ++ clauses ++
+                  dataInvariantObligations ++ modifiedDataInvariants ++ invariantObligations)
               let closed ← existsOver
                 (flatten parameterBound ++ flatten resultBound ++ globalBound.binders) body
               mkLambdaFVars #[arguments, state, results, final] closed
@@ -1354,15 +2370,46 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
               let equation ← rowEquation arguments parameterSlots bound
               let keys ← declaration.contract.modifies.mapM
                 (modifiedKeyTerm context)
-              let quantified ←
-                withLocalDeclD `key (mkConst ``LeanerIR.GlobalKey) fun key => do
-                  let mut implication ← mkAppM ``Eq
-                    #[← mkAppM ``LeanerIR.GlobalMap.lookup #[finalGlobals, key],
-                      ← mkAppM ``LeanerIR.GlobalMap.lookup #[initialGlobals, key]]
-                  for modified in keys.reverse do
-                    implication ←
-                      mkArrow (← mkAppM ``Ne #[key, modified]) implication
-                  mkForallFVars #[key] implication
+              let frameAt (key : Lean.Expr)
+                  (family : Option (Lean.Expr × Lean.Expr × Lean.Expr) := none) : MetaM Lean.Expr := do
+                let mut implication ← mkAppM ``Eq
+                  #[← mkAppM ``LeanerIR.GlobalMap.lookup #[finalGlobals, key],
+                    ← mkAppM ``LeanerIR.GlobalMap.lookup #[initialGlobals, key]]
+                for modified in keys.reverse do
+                  let mut query := key
+                  let mut written := modified
+                  if let some (namespaceId, typeId, storageKey) := family then
+                    let modifiedNamespace ← withTransparency .default <|
+                      whnf (← mkAppM ``LeanerIR.GlobalKey.namespaceId #[modified])
+                    let modifiedType ← withTransparency .default <|
+                      whnf (← mkAppM ``LeanerIR.GlobalKey.typeId #[modified])
+                    if namespaceId == modifiedNamespace && typeId == modifiedType then
+                      query := storageKey
+                      written ← withTransparency .default <|
+                        whnf (← mkAppM ``LeanerIR.GlobalKey.key #[modified])
+                  implication ← mkArrow (← mkAppM ``Ne #[query, written]) implication
+                pure implication
+              let quantified ← if hasLooseFrame declaration.contract then do
+                  -- Quantify inside each listed family, as in v0. Its
+                  -- namespace/type are structural, not hypotheses a closer
+                  -- must rediscover when framing an unrelated-family write.
+                  let mut seen : Std.HashSet (Lean.Expr × Lean.Expr) := {}
+                  let mut frames := #[]
+                  for modified in keys do
+                    let namespaceId ← withTransparency .default <|
+                      whnf (← mkAppM ``LeanerIR.GlobalKey.namespaceId #[modified])
+                    let typeId ← withTransparency .default <|
+                      whnf (← mkAppM ``LeanerIR.GlobalKey.typeId #[modified])
+                    if seen.contains (namespaceId, typeId) then continue
+                    seen := seen.insert (namespaceId, typeId)
+                    let frame ← withLocalDeclD `key (mkConst ``LeanerIR.StorageKey) fun key => do
+                      let globalKey ← mkAppM ``LeanerIR.GlobalKey.mk #[namespaceId, typeId, key]
+                      mkForallFVars #[key] (← frameAt globalKey (some (namespaceId, typeId, key)))
+                    frames := frames.push frame
+                  conjunction frames
+                else
+                  withLocalDeclD `key (mkConst ``LeanerIR.GlobalKey) fun key => do
+                    mkForallFVars #[key] (← frameAt key)
               existsOver (flatten bound) (← conjunction #[equation, quantified])
         mkLambdaFVars #[arguments, initial, final]
           (← mkAppM ``And #[body, loanDiscipline])
@@ -1370,6 +2417,82 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     #[some runtimeState, some failure, some runtimeValues, some runtimeValues,
       some requiresTerm, some ensuresTerm, some abortsTerm,
       some abortConditionTerm, some abortConditionTerm, some frameTerm]
+
+/-- Translate authored clauses over the typed entry and updated owner.
+This contract is independent of the assignment expression. The runtime
+contract remains a separate boundary obligation, never the native postcondition.
+The initial fragment has one integer owner and no returned references. -/
+private def buildNativeOwnerContract (unit : ValidatedUnit)
+    (namespaceId : LeanerIR.NamespaceId) (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
+    (artifacts : Typed.Artifacts) (typedContract : Name) : MetaM Lean.Expr := do
+  let argument := artifacts.signature.arguments[0]!
+  let valueType ← argument.rep.leanType none
+  let ownerType := mkApp (mkConst ``LeanerIR.Proofs.MutableArgument) valueType
+  let argsType := mkConst artifacts.argumentsType
+  let stateType := mkConst ``LeanerIR.RuntimeState
+  let failureType := mkConst ``LeanerIR.Proofs.Failure
+  let groups ← groupConditions unit declaration.contract.conditions
+  let declaredAborts := !groups.abortsIf.isEmpty
+  let isPartial := pragmaEnabled declaration.contract "aborts_if_is_partial"
+  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict"
+  let input (args : Lean.Expr) := mkAppM (artifacts.argumentsType ++ argument.name) #[args]
+  let logical (owner : Lean.Expr) : MetaM Lean.Expr := do
+    mkAppM ``LeanerIR.SpecInt.val #[← mkAppM ``LeanerIR.Proofs.MutableArgument.value #[owner]]
+  let .reference reference := unit.tables.types[declaration.signature.parameters[0]!.typeUse.typeId.index]!
+    | throwError "native owner contract requires a reference parameter"
+  let physical := unit.tables.types[reference.referent.index]!
+  let context (args initial current state : Lean.Expr) : MetaM Context := do
+    return {
+      unit, namespaceId, ns, locals := #[some (← logical current)],
+      oldLocals := #[some (← logical (← input args))], localTypes := #[physical],
+      results := #[], state := some state, oldState := some initial }
+  let condition (args initial : Lean.Expr) : MetaM Lean.Expr := do
+    let ctx ← context args initial (← input args) initial
+    disjunction (← groups.abortsIf.mapM (translate ctx ·.condition))
+  let ensures ← withLocalDeclD `args argsType fun args =>
+    withLocalDeclD `initial stateType fun initial =>
+    withLocalDeclD `output ownerType fun output =>
+    withLocalDeclD `final stateType fun final => do
+      let ctx ← context args initial output final
+      let clauses ← groups.ensures.mapM fun (clause, range) =>
+        return markObligation range (← translate ctx clause)
+      let sameLoan ← mkEq (← mkAppM ``LeanerIR.Proofs.MutableArgument.loan #[output])
+        (← mkAppM ``LeanerIR.Proofs.MutableArgument.loan #[← input args])
+      let post ← conjunction clauses
+      if post.getUsedConstants.contains ``LeanerIR.RuntimeValue then
+        throwError "native owner clauses require native value projections"
+      mkLambdaFVars #[args, initial, output, final] (← mkAppM ``And #[sameLoan, post])
+  let mayAbort ← withLocalDeclD `args argsType fun args =>
+    withLocalDeclD `initial stateType fun initial => do
+      mkLambdaFVars #[args, initial] (← condition args initial)
+  let aborts ← withLocalDeclD `args argsType fun args =>
+    withLocalDeclD `initial stateType fun initial =>
+    withLocalDeclD `failure failureType fun failure => do
+      let ctx ← context args initial (← input args) initial
+      let matched ← groups.abortsIf.mapM fun clause => do
+        let cond ← translate ctx clause.condition
+        let cond ← match clause.code with
+          | none => pure cond
+          | some code => do
+            let encoded ← mkAppM ``LeanerIR.RuntimeValue.integer #[← translate ctx code]
+            let payload ← mkArrayLit (mkConst ``LeanerIR.RuntimeValue) [encoded]
+            let outcome ← mkAppM ``Prod.mk #[mkConst ``LeanerIR.ThrowKind.abort, payload]
+            mkAppM ``And #[cond, ← mkEq failure outcome]
+        return markObligation clause.range cond
+      let mut allowed ← disjunction matched
+      if !declaredAborts then allowed := mkConst (if isStrict then ``False else ``True)
+      else if isPartial then
+        allowed ← mkAppM ``Or #[allowed, ← mkAppM ``Not #[← condition args initial]]
+      mkLambdaFVars #[args, initial, failure] allowed
+  let frame ← withLocalDeclD `args argsType fun args =>
+    withLocalDeclD `initial stateType fun initial =>
+    withLocalDeclD `final stateType fun final => do
+      mkLambdaFVars #[args, initial, final] (← mkEq final initial)
+  mkAppOptM ``LeanerIR.Proofs.Contract.mk
+    #[some stateType, some failureType, some argsType, some ownerType,
+      some (← mkAppM ``LeanerIR.Proofs.Contract.requires #[mkConst typedContract]),
+      some ensures, some aborts, some mayAbort, some mayAbort, some frame]
 
 /-- Segments of a `leanerPath`, ignoring separators. -/
 private partial def pathSegments (stx : Syntax) : Array String :=
@@ -1456,38 +2579,227 @@ def semanticsEqName (namespaceSegments : Array String) : Name :=
 def pointerWidthEqName (namespaceSegments : Array String) : Name :=
   Name.str (pathName namespaceSegments) "targetPointerWidth_eq"
 
-/-- Quote the semantically prepared unit as a literal, once per namespace,
-with the equations connecting it to `prepareExecution`.  The preparation
-runs natively in the elaborator and the kernel certifies the quoted result
-by one definitional-equality check, so symbolic execution references the
-prepared unit by name: every verify in the namespace shares one
-preparation, and goals carry a constant instead of the unit literal. -/
+initialize Lean.registerTraceClass `leaner.preparation
+
+/-- Quote a preparation update while sharing unchanged metadata with the
+preceding unit. Re-quoting every declaration, table, and borrow certificate
+made the kernel compare enormous copies of fields neither pass changes. -/
+private def quotePreparationUpdate (parentName : Name)
+    (parent result : ValidatedUnit) : TermElabM Lean.Expr := do
+  let parentExpr := mkConst parentName
+  let template := toExpr (default : ValidatedUnit)
+  let mut fields := template.getAppArgs
+  for i in [:fields.size] do
+    fields := fields.set! i (mkProj ``ValidatedUnit i parentExpr)
+  let tables := if parent.tables == result.tables then fields[0]!
+    else toExpr result.tables
+  fields := fields.set! 0 tables
+  let mut namespaces := #[]
+  for i in [:result.namespaces.size] do
+    let ns := result.namespaces[i]!
+    let parentNs ← Lean.Elab.Term.elabTerm
+      (← `(($(rootIdent parentName):term).namespaces[$(Syntax.mkNatLit i)]!))
+      (some (mkConst ``ValidatedNamespace))
+    Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+    let parentNs ← instantiateMVars parentNs
+    let nsTemplate := toExpr (default : ValidatedNamespace)
+    let nsCore := nsTemplate.getAppArgs[0]!
+    let mut nsFields := nsCore.getAppArgs
+    let originalCore := mkProj ``ValidatedNamespace 0 parentNs
+    -- Namespace's first constructor argument is its body-stage type.
+    for field in [1:nsFields.size] do
+      nsFields := nsFields.set! field (mkProj ``LeanerIR.Namespace (field - 1) originalCore)
+    if ns.expressions != parent.namespaces[i]!.expressions then
+      nsFields := nsFields.set! 5 (toExpr ns.expressions)
+    if ns.places != parent.namespaces[i]!.places then
+      nsFields := nsFields.set! 7 (toExpr ns.places)
+    let core := mkAppN nsCore.getAppFn nsFields
+    namespaces := namespaces.push (mkAppN nsTemplate.getAppFn #[core, tables])
+  fields := fields.set! 2 (← mkArrayLit (mkConst ``ValidatedNamespace) namespaces.toList)
+  return mkAppN template.getAppFn fields
+
+/-- Completed stages survive a later failed certificate. Reuse them on a
+retry instead of masking the original failure with duplicate declarations. -/
+private def addPreparationDecl (declaration : Declaration) : TermElabM Unit := do
+  let env ← getEnv
+  if declaration.getTopLevelNames.all env.contains then return
+  addDecl declaration
+  match declaration with
+  | .defnDecl value => enableRealizationsForConst value.name
+  | _ => pure ()
+
+/-- Quote the semantically prepared unit once per namespace. The elaborator
+computes each pass natively and the kernel checks its result by definitional
+equality. A small transitivity certificate connects the named intermediate
+and final units to `prepareExecution`; there is no native-decision axiom.
+Every verify shares these certificates, and goals carry constants instead
+of repeatedly reducing the complete preparation pipeline. -/
 def ensureSemanticsDefinitions (namespaceSegments : Array String)
     (unit : ValidatedUnit) : CommandElabM (Name × Name) := do
+  trace[leaner.preparation] "unit quotation start: {← IO.getNumHeartbeats}"
   let unitDefinition ← ensureUnitDefinition namespaceSegments unit
+  trace[leaner.preparation] "unit quotation done: {← IO.getNumHeartbeats}"
   let name := semanticsName namespaceSegments
   let eqName := semanticsEqName namespaceSegments
   let widthEqName := pointerWidthEqName namespaceSegments
-  if (← getEnv).contains eqName then return (eqName, widthEqName)
-  let prepared := (LeanerIR.Validation.prepareSemantics unit).1
+  if (← getEnv).contains eqName && (← getEnv).contains widthEqName then
+    return (eqName, widthEqName)
+  let marked := (LeanerIR.Validation.markLoanDeaths unit).1
+  let indexes := LeanerIR.Validation.sharedReferenceErasureIndexes marked
+  let chunks := LeanerIR.Validation.sharedReferenceErasureChunks marked
+  let plan := LeanerIR.Validation.erasurePlanFromChunks chunks
+  let expressionArenas := LeanerIR.Validation.erasedExpressionArenas marked
+  let prepared := LeanerIR.Validation.applySharedReferenceErasure marked plan
   liftTermElabM do
-    addDecl (.defnDecl {
+    let markedName := Name.str name "marked"
+    let markedEqName := Name.str name "marked_eq"
+    addPreparationDecl (.defnDecl {
+      name := markedName, levelParams := []
+      type := mkConst ``LeanerIR.Validation.ValidatedUnit
+      value := ← quotePreparationUpdate unitDefinition unit marked
+      hints := .abbrev, safety := .safe })
+    trace[leaner.preparation] "marked quotation done: {← IO.getNumHeartbeats}"
+    let markedTerm ← mkAppM ``Prod.fst
+      #[mkApp (mkConst ``LeanerIR.Validation.markLoanDeaths)
+        (mkConst unitDefinition)]
+    addPreparationDecl (.thmDecl {
+      name := markedEqName, levelParams := []
+      type := ← mkEq markedTerm (mkConst markedName)
+      value := ← mkEqRefl (mkConst markedName) })
+    trace[leaner.preparation] "marked certificate done: {← IO.getNumHeartbeats}"
+    let indexesName := Name.str name "erasureIndexes"
+    let indexesEqName := Name.str name "erasureIndexes_eq"
+    addPreparationDecl (.defnDecl {
+      name := indexesName, levelParams := []
+      type := mkConst ``LeanerIR.Validation.SharedReferenceErasureIndexes
+      value := toExpr indexes
+      hints := .abbrev, safety := .safe })
+    addPreparationDecl (.thmDecl {
+      name := indexesEqName, levelParams := []
+      type := ← mkEq
+        (mkApp (mkConst ``LeanerIR.Validation.sharedReferenceErasureIndexes) (mkConst markedName))
+        (mkConst indexesName)
+      value := ← mkEqRefl (mkConst indexesName) })
+    trace[leaner.preparation] "erasure indexes certificate done: {← IO.getNumHeartbeats}"
+    let chunksName := Name.str name "erasureChunks"
+    let chunksEqName := Name.str name "erasureChunks_eq"
+    let indexedChunksEqName := Name.str name "erasureIndexedChunks_eq"
+    addPreparationDecl (.defnDecl {
+      name := chunksName, levelParams := []
+      type := mkConst ``LeanerIR.Validation.SharedReferenceErasureChunks
+      value := toExpr chunks
+      hints := .abbrev, safety := .safe })
+    addPreparationDecl (.thmDecl {
+      name := indexedChunksEqName, levelParams := []
+      type := ← mkEq
+        (mkAppN (mkConst ``LeanerIR.Validation.sharedReferenceErasureChunksIndexed)
+          #[mkConst markedName, mkConst indexesName])
+        (mkConst chunksName)
+      value := ← mkEqRefl (mkConst chunksName) })
+    addPreparationDecl (.thmDecl {
+      name := chunksEqName, levelParams := []
+      type := ← mkEq
+        (mkApp (mkConst ``LeanerIR.Validation.sharedReferenceErasureChunks) (mkConst markedName))
+        (mkConst chunksName)
+      value := mkAppN (mkConst ``LeanerIR.Validation.sharedReferenceErasureChunks_eq_of_indexes)
+        #[mkConst markedName, mkConst indexesName, mkConst chunksName,
+          mkConst indexesEqName, mkConst indexedChunksEqName] })
+    trace[leaner.preparation] "erasure chunks certificate done: {← IO.getNumHeartbeats}"
+    let planName := Name.str name "erasurePlan"
+    let planEqName := Name.str name "erasurePlan_eq"
+    let sortedEqName := Name.str name "erasureSorted_eq"
+    addPreparationDecl (.defnDecl {
+      name := planName, levelParams := []
+      type := mkConst ``LeanerIR.Validation.SharedReferenceErasurePlan
+      value := toExpr plan
+      hints := .abbrev, safety := .safe })
+    addPreparationDecl (.thmDecl {
+      name := sortedEqName, levelParams := []
+      type := ← mkEq
+        (mkApp (mkConst ``LeanerIR.Validation.erasurePlanFromChunks) (mkConst chunksName))
+        (mkConst planName)
+      value := ← mkEqRefl (mkConst planName) })
+    addPreparationDecl (.thmDecl {
+      name := planEqName, levelParams := []
+      type := ← mkEq
+        (mkApp (mkConst ``LeanerIR.Validation.sharedReferenceErasurePlan) (mkConst markedName))
+        (mkConst planName)
+      value := mkAppN (mkConst ``LeanerIR.Validation.sharedReferenceErasurePlan_eq_of_chunks)
+        #[mkConst markedName, mkConst chunksName, mkConst planName,
+          mkConst chunksEqName, mkConst sortedEqName] })
+    trace[leaner.preparation] "erasure plan certificate done: {← IO.getNumHeartbeats}"
+    let arenasName := Name.str name "expressionArenas"
+    let arenasEqName := Name.str name "expressionArenas_eq"
+    let indexedArenasEqName := Name.str name "expressionArenasIndexed_eq"
+    addPreparationDecl (.defnDecl {
+      name := arenasName, levelParams := []
+      type := mkConst ``LeanerIR.Validation.ErasedExpressionArenas
+      value := toExpr expressionArenas
+      hints := .abbrev, safety := .safe })
+    addPreparationDecl (.thmDecl {
+      name := indexedArenasEqName, levelParams := []
+      type := ← mkEq
+        (mkAppN (mkConst ``LeanerIR.Validation.erasedExpressionArenasIndexed)
+          #[mkConst markedName, mkConst indexesName]) (mkConst arenasName)
+      value := ← mkEqRefl (mkConst arenasName) })
+    addPreparationDecl (.thmDecl {
+      name := arenasEqName, levelParams := []
+      type := ← mkEq
+        (mkApp (mkConst ``LeanerIR.Validation.erasedExpressionArenas) (mkConst markedName))
+        (mkConst arenasName)
+      value := mkAppN (mkConst ``LeanerIR.Validation.erasedExpressionArenas_eq_of_indexes)
+        #[mkConst markedName, mkConst indexesName, mkConst arenasName,
+          mkConst indexesEqName, mkConst indexedArenasEqName] })
+    trace[leaner.preparation] "expression arenas certificate done: {← IO.getNumHeartbeats}"
+    addPreparationDecl (.defnDecl {
       name, levelParams := []
       type := mkConst ``LeanerIR.Validation.ValidatedUnit
-      value := toExpr prepared
+      value := ← quotePreparationUpdate markedName marked prepared
       hints := .abbrev, safety := .safe })
-    enableRealizationsForConst name
+    trace[leaner.preparation] "erased quotation done: {← IO.getNumHeartbeats}"
     let preparedTerm ← mkAppM ``Prod.fst
       #[mkApp (mkConst ``LeanerIR.Validation.prepareSemantics)
         (mkConst unitDefinition)]
-    addDecl (.thmDecl {
+    let eraseEqName := Name.str name "erased_eq"
+    let applyEqName := Name.str name "erasureApplied_eq"
+    let applyArenasEqName := Name.str name "erasureArenasApplied_eq"
+    addPreparationDecl (.thmDecl {
+      name := applyArenasEqName, levelParams := []
+      type := ← mkEq
+        (mkAppN (mkConst ``LeanerIR.Validation.applySharedReferenceErasureArenas)
+          #[mkConst markedName, mkConst planName, mkConst arenasName])
+        (mkConst name)
+      value := ← mkEqRefl (mkConst name) })
+    addPreparationDecl (.thmDecl {
+      name := applyEqName, levelParams := []
+      type := ← mkEq
+        (mkAppN (mkConst ``LeanerIR.Validation.applySharedReferenceErasure)
+          #[mkConst markedName, mkConst planName])
+        (mkConst name)
+      value := mkAppN (mkConst ``LeanerIR.Validation.applySharedReferenceErasure_eq_of_arenas)
+        #[mkConst markedName, mkConst name, mkConst planName, mkConst arenasName,
+          mkConst arenasEqName, mkConst applyArenasEqName] })
+    addPreparationDecl (.thmDecl {
+      name := eraseEqName, levelParams := []
+      type := ← mkEq
+        (mkApp (mkConst ``LeanerIR.Validation.eraseSharedReferences) (mkConst markedName))
+        (mkConst name)
+      value := mkAppN (mkConst ``LeanerIR.Validation.eraseSharedReferences_eq_of_plan)
+        #[mkConst markedName, mkConst name, mkConst planName,
+          mkConst planEqName, mkConst applyEqName] })
+    trace[leaner.preparation] "erased certificate done: {← IO.getNumHeartbeats}"
+    addPreparationDecl (.thmDecl {
       name := eqName, levelParams := []
       type := ← mkEq preparedTerm (mkConst name)
-      value := ← mkEqRefl (mkConst name) })
+      -- Supply the implicit units explicitly: inferring them from the
+      -- certificates can reduce a preparation pass again during unification.
+      value := mkAppN (mkConst ``LeanerIR.Validation.prepareSemantics_eq_of_stages)
+        #[mkConst unitDefinition, mkConst markedName, mkConst name,
+          mkConst markedEqName, mkConst eraseEqName] })
     let width := LeanerIR.Validation.targetPointerWidth? unit
     let widthTerm := mkApp (mkConst ``LeanerIR.Validation.targetPointerWidth?)
       (mkConst unitDefinition)
-    addDecl (.thmDecl {
+    addPreparationDecl (.thmDecl {
       name := widthEqName, levelParams := []
       type := ← mkEq widthTerm (toExpr width)
       value := ← mkEqRefl (toExpr width) })
@@ -1520,22 +2832,43 @@ def ensureContractDefinition (namespaceSegments : Array String)
   let name := contractName namespaceSegments function
   if (← getEnv).contains name then return name
   let (twins, families) ← SpecTypes.ensureSpecTypes namespaceSegments unit
-  let value ← liftTermElabM
-    (buildContract unit ⟨namespaceIndex⟩ ns declaration twins families)
-  let type := mkConst ``LeanerIR.Proofs.FunctionContract
   let signatureResult ← Typed.ensureSignatureDefinitions unit namespaceSegments
     function declaration twins
   match signatureResult with
   | .error reason =>
       logInfo m!"V3 native wrapper unavailable for `{function}`: {reason}; using runtime rows"
       liftTermElabM do
+        let value ← buildContract unit ⟨namespaceIndex⟩ ns declaration twins families
         addDecl (.defnDecl {
-          name, levelParams := [], type, value
+          name, levelParams := [], type := mkConst ``LeanerIR.Proofs.FunctionContract, value
           hints := .abbrev, safety := .safe })
         enableRealizationsForConst name
   | .ok artifacts =>
       let rawName := rawContractName namespaceSegments function
+      let generic := artifacts.signature.typeParameterCount != 0
       liftTermElabM do
+        let value ← if !generic then
+          buildContract unit ⟨namespaceIndex⟩ ns declaration twins families
+        else
+          let carrierType ← mkArrow (mkConst ``Nat) (mkSort (.succ .zero))
+          withLocalDecl `Carrier .implicit carrierType fun carrier => do
+            let inhabitedType ← withLocalDeclD `index (mkConst ``Nat) fun index => do
+              let inhabited ← mkAppM ``Inhabited #[mkApp carrier index]
+              mkForallFVars #[index] inhabited
+            let codecsType ← withLocalDeclD `index (mkConst ``Nat) fun index => do
+              let codec ← mkAppM ``LeanerIR.Proofs.Codec
+                #[mkApp carrier index, mkConst ``LeanerIR.RuntimeValue]
+              mkForallFVars #[index] codec
+            let instantiationType ← mkAppM ``Array
+              #[← mkAppM ``Prod #[mkConst ``LeanerIR.TypeId, mkConst ``LeanerIR.TypeId]]
+            withLocalDecl `carrierInhabited .instImplicit inhabitedType fun carrierInhabited =>
+              withLocalDeclD `typeInstantiation instantiationType fun typeInstantiation =>
+                withLocalDeclD `codecs codecsType fun codecs => do
+                  let body ← buildContract unit ⟨namespaceIndex⟩ ns declaration twins families
+                    (some carrier) (some codecs) (some typeInstantiation)
+                  mkLambdaFVars
+                    #[carrier, carrierInhabited, typeInstantiation, codecs] body
+        let type ← inferType value
         addDecl (.defnDecl {
           name := rawName, levelParams := [], type, value
           hints := .abbrev, safety := .safe })
@@ -1571,13 +2904,16 @@ def ensureContractDefinition (namespaceSegments : Array String)
       else
         elabCommand (← `(def $typedName:ident
             {$carrier:ident : Nat → Type}
+            [carrierInhabited : ∀ index, Inhabited ($carrier index)]
+            (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
             ($codecs:ident : ∀ index,
               LeanerIR.Proofs.Codec ($carrier index) LeanerIR.RuntimeValue) :
             LeanerIR.Proofs.Contract LeanerIR.RuntimeState
               LeanerIR.Proofs.Failure $argumentsType $resultsType :=
-          LeanerIR.Proofs.Contract.typed
+            LeanerIR.Proofs.Contract.typed
             ($(rootIdent artifacts.argumentsCodec) $codecs)
-            ($(rootIdent artifacts.resultsCodec) $codecs) $rawIdent))
+            ($(rootIdent artifacts.resultsCodec) $codecs)
+            ($rawIdent typeInstantiation $codecs)))
         let runtimeCodecs ← `(term|
           fun (_ : Nat) => LeanerIR.Proofs.Codec.identity LeanerIR.RuntimeValue)
         elabCommand (← `(def $publicName:ident :
@@ -1585,7 +2921,7 @@ def ensureContractDefinition (namespaceSegments : Array String)
           LeanerIR.Proofs.Contract.runtime
             ($(rootIdent artifacts.argumentsCodec) $runtimeCodecs)
             ($(rootIdent artifacts.resultsCodec) $runtimeCodecs)
-            ($typedName $runtimeCodecs)))
+            ($typedName #[] $runtimeCodecs)))
   return name
 
 @[command_elab leanerContractCommand]
@@ -1595,21 +2931,6 @@ def elabLeanerContract : CommandElab := fun stx => do
     resolvePath pathSyntax
   discard <| ensureContractDefinition namespaceSegments function unit namespaceIndex
     ns declaration
-
-/-- Report every residual verification condition at its authored clause and
-fail.  A goal that survives the automatic finish still carries the
-`Obligation` markers of the clauses it obligates; each marker's byte range
-locates the clause in the source file.  With no residual goals this is a
-no-op, so the generated script always ends with it. -/
-elab "leaner_report" : tactic => do
-  let goals ← Tactic.getUnsolvedGoals
-  if goals.isEmpty then return
-  for goal in goals do
-    LeanerIR.Proofs.Certify.reportObligation goal
-    if leaner.rowDebug.get (← getOptions) then
-      goal.withContext do
-        logError m!"residual obligation:\n{(← Lean.Meta.ppGoal goal)}"
-  throwError "leaner verification failed"
 
 /-- Name of the V3 theorem over the generated native signature. -/
 def typedVerifiedName (namespaceSegments : Array String) (function : String) : Name :=
@@ -1621,9 +2942,11 @@ mutable integer becomes its loan id, mathematical value, and range proof;
 `omega` then sees one atom instead of alternate projection spellings of the
 same `SpecInt`. -/
 elab "leaner_native_cases" hypothesis:ident : tactic => do
+  let env ← Lean.getEnv
   let isNativeWrapper (type : Lean.Expr) : Bool :=
     type.getAppFn.constName? == some ``LeanerIR.SpecInt ||
-      type.getAppFn.constName? == some ``LeanerIR.Proofs.MutableArgument
+      type.getAppFn.constName? == some ``LeanerIR.Proofs.MutableArgument ||
+      type.getAppFn.constName?.any (LeanerIR.Proofs.leanerTwinAttribute.hasTag env)
   /- Each field is named by its path: a parameter by its name, a mutable
   reference's loan as `<p>_loan` and its value as `<p>`, a certified
   integer's value as `<p>` and its certificate as `<p>_fits`.  Generated
@@ -1638,59 +2961,64 @@ elab "leaner_native_cases" hypothesis:ident : tactic => do
         named := named.push (id, name)
     pure (goal, named)
   let rec destructWrappers (goal : Lean.MVarId) (fields : Array (Lean.FVarId × String))
-      (fuel : Nat) : Lean.MetaM Lean.MVarId := do
+      (fuel : Nat) : Lean.MetaM (Array Lean.MVarId) := do
     match fuel with
-    | 0 => return goal
+    | 0 => return #[goal]
     | fuel + 1 =>
-        let some (field, base) := fields[0]? | return goal
+        let some (field, base) := fields[0]? | return #[goal]
         let rest := fields.extract 1 fields.size
         let type ← goal.withContext do
           Lean.instantiateMVars (← field.getType)
         if !isNativeWrapper type then
           destructWrappers goal rest fuel
         else
-          let subnames : Array String :=
-            if type.getAppFn.constName? == some ``LeanerIR.Proofs.MutableArgument then
-              #[s!"{base}_loan", base]
-            else
-              #[base, s!"{base}_fits"]
-          match ← goal.cases field with
-          | #[subgoal] =>
-              let (goal, named) ← nameFields subgoal.mvarId subgoal.fields subnames
-              destructWrappers goal (rest ++ named) fuel
-          | _ => return goal
-  Lean.Elab.Tactic.liftMetaTactic1 fun goal => do
+          let cases ← goal.cases field
+          let mut goals := #[]
+          for subgoal in cases do
+            let subnames : Array String :=
+              if type.getAppFn.constName? == some ``LeanerIR.Proofs.MutableArgument then
+                #[s!"{base}_loan", base]
+              else if type.getAppFn.constName? == some ``LeanerIR.SpecInt then
+                #[base, s!"{base}_fits"]
+              else
+                subgoal.fields.mapIdx fun index _ => s!"{base}_field{index}"
+            let (goal, named) ← nameFields subgoal.mvarId subgoal.fields subnames
+            goals := goals ++ (← destructWrappers goal (rest ++ named) fuel)
+          return goals
+  Lean.Elab.Tactic.liftMetaTactic fun goal => do
     let declaration ← Lean.Meta.getLocalDeclFromUserName hypothesis.getId
     let structName? ← goal.withContext do
       pure (← Lean.instantiateMVars declaration.type).getAppFn.constName?
-    let env ← Lean.getEnv
     let fieldNames := match structName? with
       | some structName => (Lean.getStructureFields env structName).map (·.toString)
       | none => #[]
     match ← goal.cases declaration.fvarId with
     | #[subgoal] =>
         let (goal, named) ← nameFields subgoal.mvarId subgoal.fields fieldNames
-        destructWrappers goal named 64
-    | _ => return goal
+        return (← destructWrappers goal named 64).toList
+    | subgoals => return subgoals.toList.map fun subgoal => subgoal.mvarId
   /- Reduce the projection redexes the substitution leaves in retained
   facts, so `omega` sees the destructured components as atoms.  The goal is
   left to the drive's own normalization order. -/
-  let goal ← Lean.Elab.Tactic.getMainGoal
-  let hypotheses ← goal.withContext do
-    let mut found : Array (Lean.TSyntax `ident) := #[]
-    for declaration in ← Lean.getLCtx do
-      if declaration.isImplementationDetail then continue
-      found := found.push ⟨(Lean.mkIdent declaration.userName).raw⟩
-    pure found
-  unless hypotheses.isEmpty do
-    Lean.Elab.Tactic.evalTactic
-      (← `(tactic| try simp only [] at $hypotheses*))
-  Lean.Elab.Tactic.evalTactic (← `(tactic| try leaner_certify!))
-  Lean.Elab.Tactic.evalTactic (← `(tactic| leaner_name_facts))
+  Lean.Elab.Tactic.evalTactic (← `(tactic| all_goals try simp only [] at *))
+  -- Reconstruct certified range conjunctions before route vocabulary is
+  -- assigned. Scalar call routes consume both the split bounds and their
+  -- compact conjunction.
+  Lean.Elab.Tactic.evalTactic (← `(tactic| all_goals try leaner_certify!))
+  Lean.Elab.Tactic.evalTactic (← `(tactic| all_goals leaner_name_facts))
 
 /-- The errors a message log holds, reported or not. -/
 private def countErrors (log : MessageLog) : Nat :=
   log.reportedPlusUnreported.toList.filter (·.severity == .error) |>.length
+
+/-- Native transport either preserves the state representation directly or
+uses both an exact ownership-output agreement and a checked contract bridge.
+A boundary certificate alone never qualifies a source theorem. -/
+private def hasNativeTransport (proof : Lean.Expr) : Bool :=
+  let constants := proof.getUsedConstants
+  constants.contains ``LeanerIR.Proofs.Represents.typed ||
+    (constants.contains ``LeanerIR.Proofs.NativeBoundary.Represents.typed &&
+      constants.contains ``LeanerIR.Proofs.NativeBoundary.Transports.satisfies)
 
 /-- Prove the native V3 view directly over the shallow denotation.  Generic
 functions quantify over the abstract carrier and its certified codec; the
@@ -1698,7 +3026,7 @@ proof is shared by every concrete instantiation. -/
 private def ensureTypedVerificationTheorem (reference : Syntax)
     (namespaceSegments : Array String) (function : String)
     (namespaceIndex functionIndex : Nat)
-    (unitDefinition semanticsEq widthEq : Name)
+    (unitDefinition semanticsEq : Name)
     (preparedUnit : ValidatedUnit) (preparedNs : ValidatedNamespace)
     (preparedDeclaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
     (generated : LeanerLang.Denotation.Generated)
@@ -1707,623 +3035,136 @@ private def ensureTypedVerificationTheorem (reference : Syntax)
     (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)) : CommandElabM Name := do
   let theoremName := typedVerifiedName namespaceSegments function
   let qualifiedTheoremName := (← getCurrNamespace) ++ theoremName
-  if (← getEnv).contains qualifiedTheoremName then return theoremName
+  if let some existing := (← getEnv).find? qualifiedTheoremName then
+    if !(existing.value? (allowOpaque := true)).any hasNativeTransport then
+      throwErrorAt reference m!"`{function}` was already verified by another route; \
+        the native route cannot reuse its frame/row proof"
+    return theoremName
   let typedContract := typedContractName namespaceSegments function
   let rawContract := rawContractName namespaceSegments function
-  let loopInvariants ← liftTermElabM <|
-    buildLoopInvariants preparedUnit ⟨namespaceIndex⟩ preparedNs
-      preparedDeclaration twins
-  for (site, predicate) in loopInvariants do
-    let localName := Name.str (Name.str (pathName namespaceSegments) function)
-      s!"loopInvariant_{site.index}"
-    let qualifiedName := (← getCurrNamespace) ++ localName
-    unless (← getEnv).contains qualifiedName do
-      liftTermElabM do
-        let predicate ← Lean.instantiateMVars predicate
-        let type ← Lean.instantiateMVars (← Lean.Meta.inferType predicate)
-        addDecl (.defnDecl {
-          name := qualifiedName, levelParams := [], type, value := predicate
-          hints := .abbrev, safety := .safe })
-        enableRealizationsForConst qualifiedName
-  /- The frame-free route, generated per body from its combinator tree
-  when the tree is inside the modeled subset.  The frame script stays
-  behind it: a generation gap costs one failed deterministic attempt,
-  visible in the benchmark rather than silent. -/
-  /- A recursive body is planned with its recursive calls resolved to the
-  function's own relation: the plan reads the tree, and the script it
-  emits consumes the recursive call's contract from the induction
-  hypothesis (`RowScript.CallerNames.selfRelation`). -/
-  let bodyValue? ← match generated.openBody with
-    | none => pure ((← getEnv).find? generated.body |>.bind (·.value?))
-    | some openBody =>
-        match (← getEnv).find? openBody |>.bind (·.value?) with
-        | none => pure none
-        | some openValue => liftTermElabM do
-            Lean.Meta.lambdaTelescope openValue fun binders tree => do
-              let #[executable, self] := binders | return none
-              let closed := tree.replaceFVar self
-                (Lean.mkApp (Lean.mkConst generated.body) executable)
-              return some (← Lean.Meta.mkLambdaFVars #[executable] closed)
-  let rowAlternative? ← do
-    match bodyValue? with
-    | none => pure none
-    | some bodyValue =>
-        if artifacts.signature.typeParameterCount != 0 then
-          /- A generic body's theorem is over abstract codecs; the one
-          generic shape generated is the move-out. -/
-          let shape := LeanerIR.SemanticOperations.FunctionShape.ofDeclaration
-            preparedDeclaration
-          let parameters := preparedDeclaration.signature.parameters.zipIdx.map
-            fun (parameter, index) =>
-              if parameter.name.isEmpty then s!"argument{index}" else parameter.name
-          let genericCaller : RowScript.CallerNames :=
-            { rawContract := ← `(term| $(rootIdent rawContract):term)
-              resultsCodec := ← `(term| $(rootIdent artifacts.resultsCodec):term)
-              argumentsCodec := ← `(term| $(rootIdent artifacts.argumentsCodec):term)
-              shape := ← `(term| $(mkIdent generated.shape):term)
-              parameters }
-          match RowScript.genericCallPlan? bodyValue shape.parameterCount
-              shape.localCount shape.resultCount (parameters.getD 0 "value") with
-          | some genericCallPlan =>
-              let script ← RowScript.genericCallScript genericCaller genericCallPlan
-              pure (some script)
-          | none =>
-          match RowScript.genericPlan? bodyValue shape.parameterCount
-              shape.localCount shape.resultCount (parameters.getD 0 "value") with
-          | none => pure none
-          | some genericPlan =>
-              let script ← RowScript.genericScript
-                { rawContract := ← `(term| $(rootIdent rawContract):term)
-                  resultsCodec := ← `(term| $(rootIdent artifacts.resultsCodec):term)
-                  argumentsCodec := ← `(term| $(rootIdent artifacts.argumentsCodec):term)
-                  shape := ← `(term| $(mkIdent generated.shape):term)
-                  parameters }
-                genericPlan
-              pure (some script)
-        else
-        let shape := LeanerIR.SemanticOperations.FunctionShape.ofDeclaration
-          preparedDeclaration
-        let families := SpecTypes.familyInfos preparedUnit twins
-        let currentNamespace ← getCurrNamespace
-        let caller : RowScript.CallerNames :=
-          { rawContract := ← `(term| $(rootIdent rawContract):term)
-            resultsCodec := ← `(term| $(rootIdent artifacts.resultsCodec):term)
-            argumentsCodec := ← `(term| $(rootIdent artifacts.argumentsCodec):term)
-            shape := ← `(term| $(mkIdent generated.shape):term)
-            parameters := preparedDeclaration.signature.parameters.zipIdx.map
-              fun (parameter, index) =>
-                if parameter.name.isEmpty then s!"argument{index}" else parameter.name
-            requiresCount := preparedDeclaration.contract.conditions.foldl
-              (fun count condition =>
-                match condition.kind with
-                | .requires => count + 1
-                | _ => count) 0
-            loopInvariant := fun site => mkIdent (rootNamespace ++ currentNamespace ++ Name.str
-              (Name.str (pathName namespaceSegments) function) s!"loopInvariant_{site}")
-            selfRelation := if generated.openBody.isSome then some generated.relation
-              else none }
-        /- A plain parameter's kind: an integer (`true`) or a `Bool`.  A
-        shared reference to one is that value at the boundary — its codec
-        encodes the referent — so it has the referent's kind. -/
-        let rec plainKind? (typeId : LeanerIR.TypeId) (fuel : Nat) : Option Bool :=
-          match fuel with
-          | 0 => none
-          | fuel + 1 =>
-            match preparedUnit.tables.types[typeId.index]? with
-            | some (.integer _ _) => some true
-            | some .bool => some false
-            | some (.reference reference) =>
-                if reference.kind == .shared then plainKind? reference.referent fuel
-                else none
-            | _ => none
-        /- Two mutable scalar parameters: the second is a mutable reference
-        to an integer, like the first. -/
-        let secondBorrow := match preparedDeclaration.signature.parameters[1]? with
-          | some parameter =>
-              match preparedUnit.tables.types[parameter.typeUse.typeId.index]? with
-              | some (.reference reference) =>
-                  reference.kind == .mutable &&
-                    match preparedUnit.tables.types[reference.referent.index]? with
-                    | some (.integer _ _) => true
-                    | _ => false
-              | _ => false
-          | none => false
-        /- Every parameter's kind, for the routes reading the whole
-        signature. -/
-        let parameterKind (parameter : LeanerIR.Parameter) : RowScript.ParamKind :=
-          match preparedUnit.tables.types[parameter.typeUse.typeId.index]? with
-          | some (.integer _ _) => RowScript.ParamKind.integer
-          | some .bool => RowScript.ParamKind.bool
-          | some (.reference reference) =>
-              if reference.kind == .mutable then
-                match preparedUnit.tables.types[reference.referent.index]? with
-                | some (.integer _ _) => RowScript.ParamKind.borrow
-                | _ => RowScript.ParamKind.other
-              else
-                match plainKind? reference.referent 8 with
-                | some true => RowScript.ParamKind.integer
-                | some false => RowScript.ParamKind.bool
-                | none => RowScript.ParamKind.other
-          | _ => RowScript.ParamKind.other
-        let parameterKinds : Array RowScript.ParamKind :=
-          preparedDeclaration.signature.parameters.map parameterKind
-        /- The value route reads an integer parameter's facts. -/
-        let integerParameter := preparedDeclaration.signature.parameters.all fun parameter =>
-          plainKind? parameter.typeUse.typeId 8 == some true
-        /- The plain rows hold integers and `Bool`s, by kind. -/
-        let plainKinds : Option (Array Bool) :=
-          preparedDeclaration.signature.parameters.mapM fun parameter =>
-            plainKind? parameter.typeUse.typeId 8
-        /- The scalar rows hold one borrow in front of plain integers. -/
-        let tailKinds : Option (Array Bool) :=
-          (preparedDeclaration.signature.parameters.extract 1
-            preparedDeclaration.signature.parameters.size).mapM fun parameter =>
-            plainKind? parameter.typeUse.typeId 8
-        /- A reference-returning callee is consumed only when its summary
-        states the transfer of its lender's prophecy. -/
-        let env ← getEnv
-        let statesTransfer (rawContract : Name) : Bool :=
-          match env.find? rawContract |>.bind (·.value?) with
-          | some value => (value.find? (·.isConstOf ``LeanerIR.RuntimeValue.loanHole)).isSome
-          | none => false
-        let twinOf (namespaceIndex typeIndex : Nat) : Option (Name × Nat) := do
-          let family ← families.find? (·.typeIndex == typeIndex)
-          guard (family.info.namespaceIndex == namespaceIndex)
-          pure (rootNamespace ++ family.info.twin, family.info.structIndex)
-        /- A value callee is consumed at the unit carrier: its agreement
-        quantifies over one. -/
-        let genericCallee (agreement : Name) : CommandElabM Bool := do
-          let rec quantifiesCarrier : Lean.Expr → Bool
-            | .forallE name _ body _ =>
-                name.eraseMacroScopes == `Carrier || quantifiesCarrier body
-            | _ => false
-          match ← liftCoreM (Lean.resolveGlobalName agreement) with
-          | (constant, _) :: _ =>
-              match env.find? constant with
-              | some info => pure (quantifiesCarrier info.type)
-              | none => pure false
-          | [] => pure false
-        /- A callee is consumed through its verified contract; one without
-        a contract is run inline, by the call's own semantics, when its
-        body is inside the scalar subset and takes one plain parameter. -/
-        let inlineCallee? (relation : Name) (handle : Nat × Nat) :
-            Option RowScript.InlineCallee := do
-          let names ← RowScript.calleeNames? relation
-          let (namespaceIndex, functionIndex) := handle
-          let calleeNamespace ← preparedUnit.namespaces[namespaceIndex]?
-          let calleeDeclaration ← calleeNamespace.functions[functionIndex]?
-          guard calleeDeclaration.contract.conditions.isEmpty
-          guard (calleeDeclaration.signature.parameters.size == 1)
-          guard (calleeDeclaration.locals.size == 1)
-          let parameter ← calleeDeclaration.signature.parameters[0]?
-          let integerParameter ← match preparedUnit.tables.types[parameter.typeUse.typeId.index]? with
-            | some (.integer _ _) => some true
-            | some .bool => some false
-            | _ => none
-          let calleeBody ← env.find? names.body |>.bind (·.value?)
-          let events ← RowScript.calleeEvents? calleeBody
-          pure { names, events, integerParameter }
-        /- A callee with a contract is consumed modularly at a spine call
-        when its contract is in the destructured grammar — one integer or
-        `Bool` parameter, one integer result, one `ensures` clause — and
-        it is verified, or is the function itself under induction. -/
-        let modularCallee? (relation : Name) (handle : Nat × Nat) :
-            CommandElabM (Option RowScript.ModularCallee) := do
-          let some names := RowScript.calleeNames? relation | return none
-          let (namespaceIndex, functionIndex) := handle
-          let some calleeNamespace := preparedUnit.namespaces[namespaceIndex]? | return none
-          let some calleeDeclaration := calleeNamespace.functions[functionIndex]?
-            | return none
-          let conditions := calleeDeclaration.contract.conditions
-          let ensuresCount := conditions.foldl (fun count condition =>
-            match condition.kind with
-            | .ensures => count + 1
-            | _ => count) 0
-          unless ensuresCount == 1 && conditions.all (fun condition =>
-              match condition.kind with
-              | .ensures | .abortsIf => true
-              | _ => false) do
-            return none
-          unless calleeDeclaration.signature.parameters.size == 1 &&
-              calleeDeclaration.signature.results.size == 1 do
-            return none
-          let some parameter := calleeDeclaration.signature.parameters[0]? | return none
-          let some integerParameter :=
-              (match preparedUnit.tables.types[parameter.typeUse.typeId.index]? with
-                | some (.integer _ _) => some true
-                | some .bool => some false
-                | _ => none) | return none
-          let some result := calleeDeclaration.signature.results[0]? | return none
-          let some (.integer _ _) := preparedUnit.tables.types[result.typeId.index]?
-            | return none
-          if caller.selfRelation == some relation then
-            return some { names, integerParameter }
-          match ← liftCoreM (Lean.resolveGlobalName names.verified) with
-          | [] => return none
-          | _ => return some { names, integerParameter }
-        let spinePlan? : CommandElabM (Option RowScript.SpinePlan) := do
-          let some kinds := plainKinds | return none
-          let some spine := RowScript.spine? bodyValue.bindingBody! | return none
-          let calls := spine.calls
-          if calls.isEmpty then return none
-          let mut callees : Array (Name × RowScript.SpineCallee) := #[]
-          for (relation, handle) in calls do
-            match inlineCallee? relation handle with
-            | some callee => callees := callees.push (relation, .inline callee)
-            | none =>
-                match ← modularCallee? relation handle with
-                | some callee => callees := callees.push (relation, .modular callee)
-                | none => return none
-          return some { spine, parameterCount := shape.parameterCount,
-                        localCount := shape.localCount, kinds, callees }
-        let spinePlan? ← spinePlan?
-        let valuePlan? ← match RowScript.valuePlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount plainKinds with
-          | some valuePlan => do
-              if caller.selfRelation == some valuePlan.callee.relation then
-                /- The recursive call: its contract is the induction
-                hypothesis, at the function's own codecs. -/
-                pure (some { valuePlan with generic := false })
-              else
-              match ← liftCoreM (Lean.resolveGlobalName valuePlan.callee.verified) with
-              | [] => pure none
-              | _ =>
-                  let generic ← genericCallee valuePlan.callee.agreement
-                  pure (some { valuePlan with generic })
-          | none => pure none
-        match valuePlan? with
-        | some valuePlan =>
-            let script ← if valuePlan.generic then RowScript.valueScript caller valuePlan
-              else RowScript.valueScriptMono caller valuePlan
-            pure (some script)
-        | none =>
-        match spinePlan? with
-        | some spinePlan =>
-            let script ← RowScript.spineScript caller spinePlan
-            pure (some script)
-        | none =>
-        /- The parameter's twin, when it borrows a struct of integers. -/
-        let parameterTwin? : Option (Name × Nat × Nat × Nat) := do
-          let parameter ← preparedDeclaration.signature.parameters[0]?
-          let .reference reference ← preparedUnit.tables.types[parameter.typeUse.typeId.index]?
-            | none
-          guard (reference.kind == .mutable)
-          let .nominal name _ ← preparedUnit.tables.types[reference.referent.index]? | none
-          let qualified ← preparedUnit.tables.names[name.index]?
-          let info ← twins.find? (·.qualified == qualified)
-          guard (info.fields.all fun (_, rep) => match rep with
-            | .int _ _ => true
-            | _ => false)
-          pure (rootNamespace ++ info.twin, info.namespaceIndex, info.structIndex,
-            info.fields.size)
-        /- The field a callee's returned reborrow projects from its first
-        parameter, read off its carried loan. -/
-        let calleeFocus? (handle : Nat × Nat) : Option Nat := do
-          let (namespaceIndex, functionIndex) := handle
-          let calleeNamespace ← preparedUnit.namespaces[namespaceIndex]?
-          let calleeDeclaration ← calleeNamespace.functions[functionIndex]?
-          let lenders := reborrowLenders preparedUnit ⟨namespaceIndex⟩ calleeNamespace twins
-            calleeDeclaration
-          let lender ← lenders.find? (·.parameter == 0)
-          let focus ← lender.focus
-          pure focus.field
-        let twinInfoOf (namespaceIndex structIndex : Nat) :
-            Option (Name × Array (String × SpecTypes.FieldRep)) := do
-          let info ← twins.find? fun info =>
-            info.namespaceIndex == namespaceIndex && info.structIndex == structIndex
-          pure (rootNamespace ++ info.twin, info.fields)
-        /- The family, resource struct, and field a callee's returned
-        reborrow projects from storage, read off its global lender. -/
-        let calleeGlobalLender? (handle : Nat × Nat) : Option (Nat × Nat × Nat × Nat) := do
-          let (namespaceIndex, functionIndex) := handle
-          let calleeNamespace ← preparedUnit.namespaces[namespaceIndex]?
-          let calleeDeclaration ← calleeNamespace.functions[functionIndex]?
-          let lender ← globalReborrowLender? preparedUnit ⟨namespaceIndex⟩ calleeNamespace twins
-            families calleeDeclaration
-          pure (lender.family.info.namespaceIndex, lender.family.typeIndex,
-            lender.focus.twin.structIndex, lender.focus.field)
-        match RowScript.globalSetPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount calleeGlobalLender? twinOf twinInfoOf with
-        | some globalSetPlan =>
-            if caller.requiresCount > 0 then
-              pure (some (← RowScript.globalSetScript caller globalSetPlan))
-            else pure none
-        | none =>
-        match RowScript.projectedSetPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount parameterTwin? calleeFocus? with
-        | some projectedSetPlan =>
-            pure (some (← RowScript.projectedSetScript caller projectedSetPlan))
-        | none =>
-        /- The whole-reborrow routes read an integer through the parameter. -/
-        let integerBorrow := parameterKinds[0]? == some RowScript.ParamKind.borrow
-        match if integerBorrow then RowScript.setPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount statesTransfer else none with
-        | some setPlan =>
-            let script ← RowScript.setScript
-              caller
-              setPlan
-            pure (some script)
-        | none =>
-        match if integerBorrow then RowScript.forwardPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount statesTransfer else none with
-        | some forwardPlan =>
-            let script ← RowScript.forwardScript
-              caller
-              forwardPlan
-            pure (some script)
-        | none =>
-        match RowScript.returnPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount with
-        | some returnPlan =>
-            let script ← RowScript.returnScript
-              caller
-              returnPlan
-            pure (some script)
-        | none =>
-        let structOf (namespaceIndex structIndex : Nat) : Option (Name × Array String) := do
-          let info ← twins.find? fun info =>
-            info.namespaceIndex == namespaceIndex && info.structIndex == structIndex
-          pure (rootNamespace ++ info.twin, info.fields.map (·.1))
-        match RowScript.readPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount twinOf structOf with
-        | some readPlan =>
-            let script ← RowScript.readScript
-              caller
-              readPlan
-            pure (some script)
-        | none =>
-        match RowScript.takePlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount twinOf twinInfoOf structOf with
-        | some takePlan =>
-            pure (some (← RowScript.takeScript caller takePlan))
-        | none =>
-        match RowScript.globalReturnPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount twinOf twinInfoOf with
-        | some globalReturnPlan =>
-            if caller.requiresCount > 0 then
-              pure (some (← RowScript.globalReturnScript caller globalReturnPlan))
-            else pure none
-        | none =>
-        match RowScript.projectPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount twinInfoOf with
-        | some projectPlan =>
-            pure (some (← RowScript.projectScript caller projectPlan))
-        | none =>
-        match RowScript.choosePlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount parameterKinds with
-        | some choosePlan =>
-            pure (some (← RowScript.chooseScript caller choosePlan))
-        | none =>
-        match RowScript.setPairPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount parameterKinds statesTransfer with
-        | some setPairPlan =>
-            pure (some (← RowScript.setPairScript caller setPairPlan))
-        | none =>
-        match RowScript.returnPairPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount parameterKinds with
-        | some returnPairPlan =>
-            pure (some (← RowScript.returnPairScript caller returnPairPlan))
-        | none =>
-        match RowScript.fieldCallPlan? bodyValue shape.parameterCount
-            shape.localCount twinOf twinInfoOf with
-        | some fieldCallPlan =>
-            if caller.requiresCount > 0 then
-              pure (some (← RowScript.fieldCallScript caller fieldCallPlan))
-            else pure none
-        | none =>
-        match RowScript.storePlan? bodyValue shape.parameterCount
-            shape.localCount twinOf twinInfoOf with
-        | some storePlan =>
-            let script ← RowScript.storeScript
-              caller
-              storePlan
-            pure (some script)
-        | none =>
-        /- A callee's `ensures` clauses, each an obligation conjunct of its
-        summary a call site destructures. -/
-        let clauseCountOf (handle : Nat × Nat) : Nat :=
-          let (namespaceIndex, functionIndex) := handle
-          match preparedUnit.namespaces[namespaceIndex]?.bind
-              (·.functions[functionIndex]?) with
-          | some calleeDeclaration =>
-              (calleeDeclaration.contract.conditions.filter (·.kind == .ensures)).size
-          | none => 1
-        match RowScript.callPlan? bodyValue shape.parameterCount
-            shape.localCount tailKinds clauseCountOf secondBorrow with
-        | some callPlan =>
-            let script ← RowScript.callScript
-              caller
-              callPlan
-            pure (some script)
-        | none =>
-        /- The parameter's twin, when it is a struct passed by value. -/
-        let valueTwin? : Option Name := do
-          let parameter ← preparedDeclaration.signature.parameters[0]?
-          let .nominal name _ ← preparedUnit.tables.types[parameter.typeUse.typeId.index]?
-            | none
-          let qualified ← preparedUnit.tables.names[name.index]?
-          let info ← twins.find? (·.qualified == qualified)
-          pure (rootNamespace ++ info.twin)
-        match RowScript.nominalReturnPlan? bodyValue shape.parameterCount
-            shape.localCount shape.resultCount valueTwin? with
-        | some nominalPlan =>
-            let script ← RowScript.nominalReturnScript caller nominalPlan
-            pure (some script)
-        | none =>
-        match RowScript.plan? bodyValue shape.parameterCount
-            shape.localCount tailKinds plainKinds secondBorrow with
-        | none => pure none
-        | some plan =>
-            let script ← RowScript.script caller plan
-            pure (some script)
-  /- The proof is the generated row script, or an authored script in its
-  place.  A body no route recognizes is an error at the `verify`: there is
-  no slower proof behind the generated one. -/
-  let rowTactic ← match rowAlternative? with
-    | some tactic =>
-        if leaner.rowDebug.get (← getOptions) then
-          logInfo m!"row script for {theoremName}:\n{tactic}"
-        pure (some tactic)
-    | none => pure none
-  let tailTactic ← match script?, rowTactic with
-    | some script, _ => `(tactic| ($script:tacticSeq))
-    | none, some tactic => pure tactic
-    | none, none =>
-        throwErrorAt reference m!"no generated route for `{function}`: \
-          the body is outside the generated subset"
-  let genericTail := tailTactic
+  if script?.isSome then
+    throwErrorAt reference "the native route consumes computation certificates, not row scripts"
+  let loopSites := match preparedDeclaration.body with
+    | .structured root => loopSpecifications preparedNs root
+    | _ => #[]
+  unless loopSites.isEmpty do
+    let loopBase := (← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function
+    let names := loopSites.map fun (site, _) => loopBase ++ Name.mkSimple s!"nativeLoopInvariant_{site.index}"
+    Perf.measureArtifacts s!"{pathName namespaceSegments}::{function} typed" names do
+      let loopInvariants ← liftTermElabM <|
+        buildNativeLoopInvariants preparedUnit ⟨namespaceIndex⟩ preparedNs
+          preparedDeclaration twins artifacts
+      let mut loopMetadata := #[]
+      for (info, predicate) in loopInvariants do
+        let localName := Name.str (Name.str (pathName namespaceSegments) function)
+          s!"nativeLoopInvariant_{info.site.index}"
+        let qualifiedName := (← getCurrNamespace) ++ localName
+        unless (← getEnv).contains qualifiedName do
+          liftTermElabM do
+            let predicate ← Lean.instantiateMVars predicate
+            let type ← Lean.instantiateMVars (← Lean.Meta.inferType predicate)
+            addDecl (.defnDecl {
+              name := qualifiedName, levelParams := [], type, value := predicate
+              hints := .abbrev, safety := .safe })
+            enableRealizationsForConst qualifiedName
+        loopMetadata := loopMetadata.push { info with predicate := qualifiedName }
+      modifyEnv (NativeLoopInfo.entries.addEntry ·
+        ⟨(← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function, loopMetadata⟩)
   let publicContract := contractName namespaceSegments function
-  let command ← if artifacts.signature.typeParameterCount == 0 &&
-      generated.openBody.isSome then
-    /- A recursive function: the fixed point by induction — the body is
-    proved under the hypothesis that its recursive calls satisfy the
-    contract, which the row script consumes at those calls exactly as it
-    consumes a verified callee. -/
+  let carrierInhabitedIdent := mkIdent `carrierInhabited
+  let executableIdent := mkIdent `executable
+  let registryIdent := mkIdent `registry
+  let command ← do
+    let ownerBase := (← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function
+    let some bodyValue := (← getEnv).find? generated.body |>.bind (·.value?)
+      | throwErrorAt reference "missing native denotation body"
+    let body := bodyValue.bindingBody!
+    if !(← getEnv).contains (ownerBase ++ `computation) &&
+        NativeMutable.eligible artifacts.signature body then
+      let ownerErrorsBefore := countErrors (← get).messages
+      let names := #[`nativeContract, `computation, `computationVerified,
+        `exitFrame, `project, `commit, `commit_eq, `computationBoundary,
+        `computationRepresents].map (ownerBase ++ ·)
+      let ownerOptions := maxHeartbeats.set ((← getOptions).setBool `Elab.async false)
+        (leaner.verifyHeartbeats.get (← getOptions))
+      withScope (fun scope => { scope with opts := ownerOptions }) do
+        Perf.measureArtifacts s!"{pathName namespaceSegments}::{function} typed" names do
+          liftTermElabM do
+            let value ← buildNativeOwnerContract preparedUnit ⟨namespaceIndex⟩ preparedNs
+              preparedDeclaration artifacts typedContract
+            let name := ownerBase ++ `nativeContract
+            addDecl (.defnDecl {
+              name, levelParams := [], type := ← Lean.Meta.inferType value,
+              value, hints := .abbrev, safety := .safe })
+            enableRealizationsForConst name
+          NativeMutable.generate ownerBase generated artifacts rawContract typedContract body
+      if countErrors (← get).messages > ownerErrorsBefore then
+        throwErrorAt reference "native owner generation failed"
+    LeanerLang.Computation.ensure namespaceSegments function generated artifacts twins
+      rawContract typedContract
+      (leaner.verifyHeartbeats.get (← getOptions))
+    /- Native computations and exact execution certificates are separate
+    artifacts. A missing certificate is a generation error, never a fallback. -/
+    let base := (← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function
+    let computation := rootIdent (base ++ `computation)
+    let verified := rootIdent (base ++ `computationVerified)
+    let represents := rootIdent (base ++ `computationRepresents)
     let budget := Syntax.mkNumLit (toString (leaner.verifyHeartbeats.get (← getOptions)))
-    let some openBody := generated.openBody | unreachable!
-    let some selfNames := RowScript.calleeNames? generated.relation
-      | throwErrorAt reference m!"the relation of `{function}` has no callee names"
-    `(command|
-      set_option Elab.async false in
-      set_option maxRecDepth 100000 in
-      set_option maxHeartbeats $budget:num in
-      theorem $(mkIdent theoremName)
-          {registry : LeanerIR.Validation.SemanticsRegistry}
-          {executable : LeanerIR.Validation.ExecutableUnit}
-          ($(mkIdent `prepared):ident : LeanerIR.Validation.prepareExecution registry
-            $(mkIdent unitDefinition) = .ok executable) :
-          LeanerIR.Proofs.Satisfies
-            ($(rootIdent artifacts.denotation) executable)
-            $(rootIdent typedContract) := by
-        have $(mkIdent `hu):ident :=
-          (LeanerIR.Validation.prepareExecution_unit $(mkIdent `prepared):ident).trans
-          $(mkIdent semanticsEq)
-        have $(mkIdent `hw):ident :=
-          (LeanerIR.Validation.prepareExecution_targetPointerWidth $(mkIdent `prepared):ident).trans
-            $(mkIdent widthEq)
-        have $(mkIdent `hn):ident : executable.unit.namespaces[$(Syntax.mkNatLit namespaceIndex)]? =
-            some $(mkIdent generated.namespaceDef) := by
-          rw [$(mkIdent `hu):ident]
-          rfl
-        simp only [$(rootIdent artifacts.denotation):term,
-          $(mkIdent generated.denotation):term, $(mkIdent generated.body):term]
-        apply LeanerIR.Proofs.Denotation.satisfies_typed_fixBody
-        intro $(mkIdent `self):ident $(mkIdent `selfSatisfies):ident
-        have $(RowScript.calleeSatIdent selfNames):ident :
+    for suffix in [`computation, `computationVerified, `computationRepresents] do
+      unless (← getEnv).contains (base ++ suffix) do
+        throwErrorAt reference m!"native route for `{function}` requires `{base ++ suffix}`; \
+          frame/row fallback is disabled"
+    let hasBoundary := (← getEnv).contains (base ++ `computationBoundary)
+    if hasBoundary && artifacts.signature.typeParameterCount != 0 then
+      throwErrorAt reference "generic ownership-output boundary transport is not implemented"
+    if artifacts.signature.typeParameterCount == 0 then
+      let proof ← if hasBoundary then
+        `(tactic| exact (LeanerIR.Proofs.satisfies_congr
+          (LeanerIR.Proofs.NativeBoundary.Represents.typed
+            (body := $computation) ($represents $executableIdent))
+          $(rootIdent typedContract)).mpr
+            (LeanerIR.Proofs.NativeBoundary.Transports.satisfies
+              $(rootIdent (base ++ `computationBoundary)) $verified))
+      else
+        `(tactic| exact (LeanerIR.Proofs.satisfies_congr
+          (LeanerIR.Proofs.Represents.typed
+            (computation := $computation) ($represents $executableIdent))
+          $(rootIdent typedContract)).mpr $verified)
+      `(command|
+        set_option Elab.async false in
+        set_option maxHeartbeats $budget:num in
+        theorem $(mkIdent theoremName)
+            {$registryIdent:ident : LeanerIR.Validation.SemanticsRegistry}
+            {$executableIdent:ident : LeanerIR.Validation.ExecutableUnit}
+            (_prepared : LeanerIR.Validation.prepareExecution $registryIdent
+              $(mkIdent unitDefinition) = .ok $executableIdent) :
             LeanerIR.Proofs.Satisfies
-              (LeanerIR.Proofs.Denotation.nativeFunction executable
-                $(mkIdent generated.shape) $(mkIdent `self):ident)
-              $(rootIdent publicContract) := by
-          simpa only [$(rootIdent publicContract):term] using
-            (LeanerIR.Proofs.satisfies_runtime
-              $(rootIdent artifacts.argumentsCodec)
-              $(rootIdent artifacts.resultsCodec)
-              (LeanerIR.Proofs.Denotation.nativeFunction executable
-                $(mkIdent generated.shape) $(mkIdent `self):ident)
-              $(rootIdent typedContract)
-              $(mkIdent `selfSatisfies):ident)
-        apply LeanerIR.Proofs.satisfies_of_wp
-        intro arguments $(mkIdent `initial):ident permitted
-        simp only [$(rootIdent typedContract):term,
-          LeanerIR.Proofs.Contract.typed] at permitted ⊢
-        simp [$(rootIdent rawContract):term,
-          $(rootIdent artifacts.argumentsCodec):term, lir_data_norm] at permitted
-        leaner_cases permitted
-        all_goals
-          (leaner_native_cases arguments
-           rw [LeanerIR.Proofs.wp_typedFunction]
-           simp only [$(mkIdent openBody):term]
-           rw [LeanerIR.Proofs.Denotation.wp_nativeFunction]
-           $tailTactic:tactic
-           leaner_report))
-  else if artifacts.signature.typeParameterCount == 0 then
-    let budget := Syntax.mkNumLit (toString (leaner.verifyHeartbeats.get (← getOptions)))
-    `(command|
-      set_option Elab.async false in
-      set_option maxRecDepth 100000 in
-      set_option maxHeartbeats $budget:num in
-      theorem $(mkIdent theoremName)
-          {registry : LeanerIR.Validation.SemanticsRegistry}
-          {executable : LeanerIR.Validation.ExecutableUnit}
-          ($(mkIdent `prepared):ident : LeanerIR.Validation.prepareExecution registry
-            $(mkIdent unitDefinition) = .ok executable) :
-          LeanerIR.Proofs.Satisfies
-            ($(rootIdent artifacts.denotation) executable)
-            $(rootIdent typedContract) := by
-        /- Raw names: the spliced row script consumes the callee facts these
-        two establish, and a name written inside this quotation would carry
-        a macro scope the splice cannot see. -/
-        have $(mkIdent `hu):ident :=
-          (LeanerIR.Validation.prepareExecution_unit $(mkIdent `prepared):ident).trans
-          $(mkIdent semanticsEq)
-        have $(mkIdent `hw):ident :=
-          (LeanerIR.Validation.prepareExecution_targetPointerWidth $(mkIdent `prepared):ident).trans
-            $(mkIdent widthEq)
-        have $(mkIdent `hn):ident : executable.unit.namespaces[$(Syntax.mkNatLit namespaceIndex)]? =
-            some $(mkIdent generated.namespaceDef) := by
-          rw [$(mkIdent `hu):ident]
-          rfl
-        apply LeanerIR.Proofs.satisfies_of_wp
-        intro arguments $(mkIdent `initial):ident permitted
-        simp only [$(rootIdent typedContract):term,
-          LeanerIR.Proofs.Contract.typed] at permitted ⊢
-        simp [$(rootIdent rawContract):term,
-          $(rootIdent artifacts.argumentsCodec):term, lir_data_norm] at permitted
-        leaner_cases permitted
-        /- A `Bool` argument's contract enumerates its values: one goal per
-        alternative, each proved by the same script. -/
-        all_goals
-          (leaner_native_cases arguments
-           simp only [$(rootIdent artifacts.denotation):term]
-           rw [LeanerIR.Proofs.wp_typedFunction]
-           simp only [$(mkIdent generated.denotation):term,
-             $(mkIdent generated.body):term]
-           rw [LeanerIR.Proofs.Denotation.wp_nativeFunction]
-           $tailTactic:tactic
-           leaner_report))
-  else
-    let carrier := mkIdent `Carrier
-    let codecs := mkIdent `codecs
-    let budget := Syntax.mkNumLit (toString (leaner.verifyHeartbeats.get (← getOptions)))
-    `(command|
-      set_option Elab.async false in
-      set_option maxRecDepth 100000 in
-      set_option maxHeartbeats $budget:num in
-      theorem $(mkIdent theoremName)
-          {$carrier:ident : Nat → Type}
-          ($codecs:ident : ∀ index,
-            LeanerIR.Proofs.Codec ($carrier index) LeanerIR.RuntimeValue)
-          {registry : LeanerIR.Validation.SemanticsRegistry}
-          {executable : LeanerIR.Validation.ExecutableUnit}
-          (prepared : LeanerIR.Validation.prepareExecution registry
-            $(mkIdent unitDefinition) = .ok executable) :
-          LeanerIR.Proofs.Satisfies
-            ($(rootIdent artifacts.denotation) $codecs executable)
-            ($(rootIdent typedContract) $codecs) := by
-        have hu := (LeanerIR.Validation.prepareExecution_unit prepared).trans
-          $(mkIdent semanticsEq)
-        have $(mkIdent `hw):ident :=
-          (LeanerIR.Validation.prepareExecution_targetPointerWidth prepared).trans
-            $(mkIdent widthEq)
-        have $(mkIdent `hn):ident : executable.unit.namespaces[$(Syntax.mkNatLit namespaceIndex)]? =
-            some $(mkIdent generated.namespaceDef) := by
-          rw [hu]
-          rfl
-        apply LeanerIR.Proofs.satisfies_of_wp
-        intro arguments $(mkIdent `initial):ident permitted
-        simp only [$(rootIdent typedContract):term,
-          LeanerIR.Proofs.Contract.typed] at permitted ⊢
-        simp [$(rootIdent rawContract):term,
-          $(rootIdent artifacts.argumentsCodec):term, lir_data_norm] at permitted
-        leaner_cases permitted
-        leaner_native_cases arguments
-        simp only [$(rootIdent artifacts.denotation):term]
-        rw [LeanerIR.Proofs.wp_typedFunction]
-        simp only [$(mkIdent generated.denotation):term,
-          $(mkIdent generated.body):term]
-        rw [LeanerIR.Proofs.Denotation.wp_nativeFunction]
-        $genericTail:tactic
-        leaner_report)
+              ($(rootIdent artifacts.denotation) $executableIdent)
+              $(rootIdent typedContract) := by
+          $proof:tactic)
+    else
+      let carrier := mkIdent `Carrier
+      let codecs := mkIdent `codecs
+      `(command|
+        set_option Elab.async false in
+        set_option maxHeartbeats $budget:num in
+        theorem $(mkIdent theoremName)
+            {$carrier:ident : Nat → Type}
+            [$carrierInhabitedIdent:ident : ∀ index, Inhabited ($carrier index)]
+            ($codecs:ident : ∀ index,
+              LeanerIR.Proofs.Codec ($carrier index) LeanerIR.RuntimeValue)
+            (types : Array (LeanerIR.TypeId × LeanerIR.TypeId))
+            {$registryIdent:ident : LeanerIR.Validation.SemanticsRegistry}
+            {$executableIdent:ident : LeanerIR.Validation.ExecutableUnit}
+            (_prepared : LeanerIR.Validation.prepareExecution $registryIdent
+              $(mkIdent unitDefinition) = .ok $executableIdent) :
+            LeanerIR.Proofs.Satisfies
+              ($(rootIdent artifacts.denotation) $codecs types $executableIdent)
+              ($(rootIdent typedContract) types $codecs) := by
+          exact (LeanerIR.Proofs.satisfies_congr
+            (LeanerIR.Proofs.Represents.typed
+              (computation := $computation) ($represents $codecs types $executableIdent))
+            ($(rootIdent typedContract) types $codecs)).mpr ($verified $codecs types))
   /- A clause the closing could not establish was reported at its range
   and admitted; the command fails on that report, before anything
   transports the admitted theorem. -/
@@ -2340,7 +3181,41 @@ private def ensureTypedVerificationTheorem (reference : Syntax)
   from the denotation to the authoritative big-step meaning. -/
   let namespaceName := pathName namespaceSegments
   let verifiedName := Name.str (Name.str namespaceName function) "verified"
-  let carrierIdent := Lean.mkIdent `Carrier
+  let instantiatedVerifiedName :=
+    Name.str (Name.str namespaceName function) "instantiatedVerified"
+  let nativeBase := (← getCurrNamespace) ++ Name.str namespaceName function
+  let nativeRepresents := rootIdent (nativeBase ++ `computationRepresents)
+  let nativeVerified := rootIdent (nativeBase ++ `computationVerified)
+  if artifacts.signature.typeParameterCount != 0 then
+    let carrier := mkIdent `Carrier
+    let carrierInhabited := mkIdent `carrierInhabited
+    let concreteCodecs := mkIdent `concreteCodecs
+    let typeInstantiation := mkIdent `typeInstantiation
+    let registry := mkIdent `registry
+    let executable := mkIdent `executable
+    let proof ← `(tactic| exact LeanerIR.Proofs.Represents.satisfies
+      ($nativeRepresents $concreteCodecs $typeInstantiation $executable)
+      ($nativeVerified $concreteCodecs $typeInstantiation))
+    let command ← `(theorem $(mkIdent instantiatedVerifiedName)
+        {$carrier:ident : Nat → Type}
+        [$carrierInhabited:ident : ∀ index, Inhabited ($carrier index)]
+        ($concreteCodecs:ident : ∀ index,
+          LeanerIR.Proofs.Codec ($carrier index) LeanerIR.RuntimeValue)
+        ($typeInstantiation:ident :
+          Array (LeanerIR.TypeId × LeanerIR.TypeId))
+        {$registry:ident : LeanerIR.Validation.SemanticsRegistry}
+        {$executable:ident : LeanerIR.Validation.ExecutableUnit}
+        ($(mkIdent `prepared) : LeanerIR.Validation.prepareExecution $registry
+          $(mkIdent unitDefinition) = .ok $executable) :
+        LeanerIR.Proofs.Satisfies
+          ($(mkIdent generated.denotation) $executable $typeInstantiation)
+          (LeanerIR.Proofs.Contract.runtime
+            ($(rootIdent artifacts.argumentsCodec) $concreteCodecs)
+            ($(rootIdent artifacts.resultsCodec) $concreteCodecs)
+            ($(rootIdent typedContract) $typeInstantiation $concreteCodecs)) := by
+      $proof:tactic)
+    Perf.measure s!"{namespaceName}::{function} typed"
+      ((← getCurrNamespace) ++ instantiatedVerifiedName) (elabCommand command)
   let agreementApplication ← if generated.typeParameterCount == 0 &&
       generated.requiresUnitEquality then
     `(term| $(mkIdent generated.agreement) hu)
@@ -2348,10 +3223,10 @@ private def ensureTypedVerificationTheorem (reference : Syntax)
     `(term| $(mkIdent generated.agreement) hn)
   else if generated.requiresUnitEquality then
     `(term| $(mkIdent generated.agreement)
-      ($carrierIdent := fun _ => PUnit) hu)
+      (Carrier := fun _ => PUnit) hu)
   else
     `(term| $(mkIdent generated.agreement)
-      ($carrierIdent := fun _ => PUnit) hn)
+      (Carrier := fun _ => PUnit) hn)
   let runtimeCommand ← if artifacts.signature.typeParameterCount == 0 then
     `(command|
       theorem $(mkIdent verifiedName)
@@ -2380,19 +3255,22 @@ private def ensureTypedVerificationTheorem (reference : Syntax)
             ($(mkIdent theoremName) prepared)))
   else
     let runtimeCodecs := mkIdent `runtimeCodecs
+    let proof ← `(tactic| exact LeanerIR.Proofs.Represents.satisfies
+      ($nativeRepresents $runtimeCodecs #[] $(mkIdent `executable))
+      ($nativeVerified $runtimeCodecs #[]))
     `(command|
       theorem $(mkIdent verifiedName)
           {registry : LeanerIR.Validation.SemanticsRegistry}
-          {executable : LeanerIR.Validation.ExecutableUnit}
-          (prepared : LeanerIR.Validation.prepareExecution registry
-            $(mkIdent unitDefinition) = .ok executable) :
-          LeanerIR.Proofs.SatisfiesFunction executable
+          {$(mkIdent `executable) : LeanerIR.Validation.ExecutableUnit}
+          ($(mkIdent `prepared) : LeanerIR.Validation.prepareExecution registry
+            $(mkIdent unitDefinition) = .ok $(mkIdent `executable)) :
+          LeanerIR.Proofs.SatisfiesFunction $(mkIdent `executable)
             ⟨⟨$(Syntax.mkNatLit namespaceIndex)⟩,
               ⟨$(Syntax.mkNatLit functionIndex)⟩⟩
             $(rootIdent publicContract) := by
-        have hu := (LeanerIR.Validation.prepareExecution_unit prepared).trans
+        have hu := (LeanerIR.Validation.prepareExecution_unit $(mkIdent `prepared)).trans
           $(mkIdent semanticsEq)
-        have hn : executable.unit.namespaces[$(Syntax.mkNatLit namespaceIndex)]? =
+        have hn : ($(mkIdent `executable):ident).unit.namespaces[$(Syntax.mkNatLit namespaceIndex)]? =
             some $(mkIdent generated.namespaceDef) := by
           rw [hu]
           rfl
@@ -2401,16 +3279,7 @@ private def ensureTypedVerificationTheorem (reference : Syntax)
         let $runtimeCodecs:ident : ∀ _ : Nat,
             LeanerIR.Proofs.Codec LeanerIR.RuntimeValue LeanerIR.RuntimeValue :=
           fun _ => LeanerIR.Proofs.Codec.identity LeanerIR.RuntimeValue
-        simpa only [$(rootIdent publicContract):term] using
-          (LeanerIR.Proofs.satisfies_runtime
-            ($(rootIdent artifacts.argumentsCodec) $runtimeCodecs)
-            ($(rootIdent artifacts.resultsCodec) $runtimeCodecs)
-            ($(mkIdent generated.denotation) executable)
-            ($(rootIdent (typedContractName namespaceSegments function))
-              $runtimeCodecs)
-            ($(mkIdent theoremName)
-              ($carrierIdent := fun _ => LeanerIR.RuntimeValue)
-              $runtimeCodecs prepared)))
+        $proof:tactic)
   try
     Perf.measure s!"{pathName namespaceSegments}::{function} transport"
       ((← getCurrNamespace) ++ verifiedName) (elabCommand runtimeCommand)
@@ -2418,20 +3287,26 @@ private def ensureTypedVerificationTheorem (reference : Syntax)
     throwErrorAt reference m!"failed to transport V3 theorem for `{function}`:\n{error.toMessageData}"
   return theoremName
 
-/-- Elaborate the verification theorem of one function of a registered
-unit: materialize the unit, its prepared semantics, its native denotation
-and the generated contract, then prove the typed theorem over the native
-denotation and transport it to the ordinary theorem
-`<path>.<function>.verified`.  Failure is an error at the elaborating
-command: a body without a native denotation, a body no generated route
-recognizes, or a clause the generated script cannot establish, reported at
-its authored range.  An authored script replaces the generated row script
-after the shared entry (`leaner_cases`, `leaner_native_cases`, the native
-`wp`), and reaches the facts by their contract-derived names. -/
-def verifyFunction (reference : Syntax) (namespaceSegments : Array String)
-    (function : String)
-    (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none) :
-    CommandElabM Unit := do
+/-- Checked source artifacts for native verification and execution agreement.
+Preparing these does not prove the function's authored contract. -/
+structure VerificationInput where
+  namespaceIndex : Nat
+  functionIndex : Nat
+  unitDefinition : Name
+  semanticsEq : Name
+  widthEq : Name
+  preparedUnit : ValidatedUnit
+  preparedNs : ValidatedNamespace
+  preparedDeclaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody
+  generated : LeanerLang.Denotation.Generated
+  artifacts : Typed.Artifacts
+  twins : Array SpecTypes.TwinInfo
+
+/-- Materialize verification inputs without choosing or running a VC route.
+Native computation generation can use this boundary without first proving
+the same function through the retiring frame route. -/
+def prepareVerification (reference : Syntax) (namespaceSegments : Array String)
+    (function : String) : CommandElabM VerificationInput := do
   let namespaceName := pathName namespaceSegments
   let some unit := LeanerLang.registeredUnit? (← getEnv) namespaceName
     | throwErrorAt reference s!"unknown Leaner namespace `{namespaceName}`"
@@ -2460,9 +3335,80 @@ def verifyFunction (reference : Syntax) (namespaceSegments : Array String)
         | .error reason =>
             throwErrorAt reference m!"no native wrapper for `{function}`: {reason}"
   let twins := SpecTypes.twinInfos namespaceSegments unit
-  discard <| ensureTypedVerificationTheorem reference namespaceSegments function
-    namespaceIndex functionIndex unitDefinition semanticsEq widthEq preparedUnit
-    preparedNs preparedDeclaration generated artifacts twins script?
+  return {
+    namespaceIndex, functionIndex, unitDefinition, semanticsEq, widthEq,
+    preparedUnit, preparedNs, preparedDeclaration, generated, artifacts, twins }
+
+/-- Shared no-fallback audit for one generated source function. -/
+def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
+  let function := base.getString!
+  let theoremName := base ++ `typedVerified
+  let env ← getEnv
+  unless (env.find? theoremName |>.bind (·.value? (allowOpaque := true))).any
+      hasNativeTransport do
+    throwError m!"`{function}` has no native computation transport; \
+      a frame/row typed theorem does not qualify"
+  unless env.contains (base ++ `computationRepresents) do
+    throwError m!"missing native execution agreement for `{function}`"
+  for suffix in [`computation, `computationVerified] do
+    let mut pending := #[base ++ suffix]
+    let mut visited : NameSet := {}
+    while let some name := pending.back? do
+      pending := pending.pop
+      if visited.contains name then continue
+      visited := visited.insert name
+      let some declaration := env.find? name
+        | throwError m!"missing native artifact `{name}`"
+      let constants := declaration.type.getUsedConstants ++
+        ((declaration.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[]
+      for dependency in constants do
+        if dependency == ``LeanerIR.RuntimeFrame ||
+            dependency == ``LeanerIR.Proofs.typedFunction ||
+            dependency == ``LeanerIR.Proofs.decodeSpec ||
+            (`LeanerIR.Proofs.Denotation).isPrefixOf dependency ||
+            (`LeanerIR.Proofs.ComputationAgreement).isPrefixOf dependency ||
+            (`LeanerIR.Proofs.NativeBoundary).isPrefixOf dependency ||
+            dependency.getString! == "computationRepresents" ||
+            dependency.getString! == "computationBoundary" ||
+            dependency.getString! == "computationState" || dependency == ``sorryAx ||
+            (suffix == `computation && dependency == ``LeanerIR.RuntimeValue) then
+          throwError m!"native artifact `{name}` retains forbidden dependency `{dependency}`"
+        if base.isPrefixOf dependency then pending := pending.push dependency
+
+/-- Verify and transport a function natively. Reject retired route selections
+before preparation or reuse of any previously published proof. -/
+def verifyFunction (reference : Syntax) (namespaceSegments : Array String)
+    (function : String)
+    (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none) :
+    CommandElabM Unit := do
+  let route := leaner.route.get (← getOptions)
+  unless route == "native" do
+    throwErrorAt reference m!"legacy verification route `{route}` is disabled; \
+      use `native` and migrate unsupported computations"
+  if script?.isSome then
+    throwErrorAt reference "native verification consumes computation certificates, not row scripts"
+  let input ← prepareVerification reference namespaceSegments function
+  let saved ← get
+  try
+    discard <| ensureTypedVerificationTheorem reference namespaceSegments function
+      input.namespaceIndex input.functionIndex input.unitDefinition input.semanticsEq
+      input.preparedUnit input.preparedNs input.preparedDeclaration
+      input.generated input.artifacts input.twins script?
+    let base := (← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function
+    withRef reference <| requireNativeArtifacts base
+  catch failure =>
+    modify fun state => { saved with messages := state.messages }
+    throw failure
+
+/-- Expose generated contracts, representations and execution agreement for
+an explicitly supplied native computation. This does not verify a contract. -/
+syntax (name := leanerPrepareCommand) "#leaner_prepare" leanerPath : command
+
+@[command_elab leanerPrepareCommand]
+def elabLeanerPrepare : CommandElab := fun stx => do
+  let path := stx[1]
+  let (segments, function, _, _, _, _, _) ← resolvePath path
+  discard <| prepareVerification path segments function
 
 /-- Turn verification-cost measurement on for the rest of this file.  Only
 the benchmark file uses it, so an ordinary `verify` never pays for it. -/
@@ -2526,21 +3472,30 @@ def elabLeanerVerify : CommandElab := fun stx => do
   verifyFunction pathSyntax segments.pop function
     (scriptOfOptional (stx[2]?.getD .missing))
 
+/-- Check native computation/VC artifacts, not merely the existence of the
+typed wrapper theorem (which the retiring routes also generate). -/
+syntax (name := leanerRequireNativeCommand) "#leaner_require_native" leanerPath : command
+
+
+@[command_elab leanerRequireNativeCommand]
 def elabLeanerRequireNative : CommandElab := fun stx => do
   let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
-  let (namespaceSegments, function, unit, namespaceIndex, _, functionIndex, _) ←
-    resolvePath pathSyntax
-  let currentNamespace ← getCurrNamespace
-  let theoremName :=
-    currentNamespace ++ typedVerifiedName namespaceSegments function
-  if (← getEnv).contains theoremName then return
-  let preparedUnit := (LeanerIR.Validation.prepareSemantics unit).1
-  let diagnostic := match LeanerLang.Denotation.checkFunction preparedUnit {
-      namespaceId := ⟨namespaceIndex⟩, functionId := ⟨functionIndex⟩ } with
-    | .ok _ => "native denotation eligibility succeeded, but no typed proof theorem was emitted"
-    | .error reason => s!"native denotation rejected the function: {reason}"
-  throwErrorAt pathSyntax
-    m!"`{pathName namespaceSegments}::{function}` was not verified through the native path; {diagnostic}"
+  let (namespaceSegments, function, _, _, _, _, _) ← resolvePath pathSyntax
+  let base := (← getCurrNamespace) ++ Name.str (pathName namespaceSegments) function
+  withRef pathSyntax <| requireNativeArtifacts base
+
+/-- Audit every successfully verified source function declared in this file.
+Imported declarations are excluded by the environment's current-module stage;
+an omitted per-target assertion cannot hide a legacy-backed proof. -/
+syntax (name := leanerRequireNativeAllCommand) "#leaner_require_native_all" : command
+
+@[command_elab leanerRequireNativeAllCommand]
+def elabLeanerRequireNativeAll : CommandElab := fun _ => do
+  let env ← getEnv
+  let bases : Array Name := env.constants.foldStage2 (fun bases name _ =>
+    if name.getString! == "typedVerified" then bases.push name.getPrefix else bases) #[]
+  unless !bases.isEmpty do throwError "native audit found no verified source functions in this file"
+  for base in bases.qsort Name.quickLt do requireNativeArtifacts base
 
 /-- The in-module `verify` items of a namespace command, in source order. -/
 private partial def verifyItems (stx : Syntax) : Array Syntax :=

@@ -3,6 +3,7 @@
 
 import Lean.Data.Json
 import LeanerLang.Builtins
+import LeanerLang.Frame
 import LeanerLang.Profile
 import LeanerLang.Print.Layout
 
@@ -660,10 +661,15 @@ private def integerLiteralText (unit : ValidatedUnit) (ns : ValidatedNamespace)
 private def failureText : LeanerIR.ThrowKind → Except String String
   | .abort => pure "abort"
   | .panic => pure "panic"
-  | .profile value => throw s!"profile throw `{value.tag}` has no core LeanerLang spelling"
+  | .profile value =>
+      if value == { profile := .move, tag := "runtime.vector_error" } then
+        pure "moveVectorError"
+      else throw s!"profile throw `{value.tag}` has no core LeanerLang spelling"
 
 private def checkedPrimitiveText (name : String) (failure : LeanerIR.ThrowKind) :
     Except String String := do
+  if failure == .profile { profile := .move, tag := "runtime.vector_error" } then
+    return s!"{name}[moveVectorError]"
   let suffix ← match failure with
     | .abort => pure "Abort"
     | .panic => pure "Panic"
@@ -675,7 +681,15 @@ private def primitiveText : PrimitiveOperation → Except String String
   | .vector => pure "vector"
   | .repeatVector => pure "repeatVector"
   | .pushVector => pure "pushVector"
+  | .concatVector => pure "concatVector"
+  | .insertVector => pure "insertVector"
+  | .removeVector => pure "removeVector"
   | .swapVector => pure "swapVector"
+  | .reverseSliceVector => pure "reverseSliceVector"
+  | .destroyEmptyVector => pure "destroyEmptyVector"
+  | .containsVector => pure "containsVector"
+  | .indexOfVector => pure "indexOfVector"
+  | .checkVectorIndex failure => checkedPrimitiveText "checkVectorIndex" failure
   | .length => pure "length"
   | .index => pure "index"
   | .slice => pure "slice"
@@ -976,11 +990,15 @@ private structure Context where
   logicalLocals : Array LocalId := #[]
   specification : Bool := false
   constantLocals : Array (LocalId × String) := #[]
+  /-- Shared pattern binders rendered as implicitly read field selections. -/
+  fieldAliasLocals : Array LocalId := #[]
   temporaryLocals : Array LocalId := #[]
   /-- Iterator whose canonical `for` body is currently being rendered.  It
   lets the source backend hide the increment inserted before a current-level
   `continue` by the surface lowerer. -/
   forIterator : Option LocalId := none
+  /-- Enclosing loop labels, innermost first, for nonlocal control exits. -/
+  loopLabels : Array (Option String) := #[]
   /-- Bindings of the declaration being printed whose mutability the pattern
   itself must carry, as in `let (mut head, tail) := ...`. -/
   mutableBindings : Array LocalId := #[]
@@ -1227,6 +1245,14 @@ private def borrowedReferentText? (value : String) : Option String :=
   else if value.startsWith "&" then some (value.drop 1).toString
   else none
 
+private def placeContainsIndex (ns : ValidatedNamespace) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, id => match ns.places[id.index]? with
+    | some (.index ..) => true
+    | some (.deref base) | some (.field base ..) | some (.downcast base _) |
+        some (.subslice base ..) => placeContainsIndex ns fuel base
+    | _ => false
+
 private partial def placeText (context : Context)
     (indexText : ExprId → Except String String) (id : PlaceId)
     (fuel : Nat := 0) : Except String String := do
@@ -1304,6 +1330,7 @@ freeze? Move reads such a selection implicitly, so its dereference and the
 freeze have no spelling of their own. -/
 private partial def selectsFieldThroughReference (context : Context) (id : ExprId) : Bool :=
   match context.ns.expressions[id.index]? with
+  | some { kind := .localVar localId, .. } => context.fieldAliasLocals.contains localId
   | some { kind := .operation (.data (.select ..)) _ _ _, .. }
   | some { kind := .operation (.data (.selectVariants ..)) _ _ _, .. } => true
   | some { kind := .operation (.reference (.freeze _)) _ #[operand] _, .. } =>
@@ -1361,8 +1388,11 @@ private def incrementsLocalByOne? (ns : ValidatedNamespace) (iterator : LocalId)
     (id : ExprId) : Bool :=
   (do
     let incrementNode ← ns.expressions[id.index]?
-    let .assignPattern incrementPattern incrementValue := incrementNode.kind | none
-    let incrementLocal ← variablePatternLocal? ns incrementPattern
+    let (incrementLocal, incrementValue) ← match incrementNode.kind with
+      | .assignPattern pattern value => do
+          some (← variablePatternLocal? ns pattern, value)
+      | .assign place value => do some (← localPlace? ns place, value)
+      | _ => none
     guard (incrementLocal == iterator)
     let incrementValueNode ← ns.expressions[incrementValue.index]?
     let .operation (.primitive operation) _ #[incrementRead, oneId] _ :=
@@ -1411,10 +1441,19 @@ private def forRangeShape? (context : Context) (root : ExprId) : Option ForRange
   if !upperDecl.name.startsWith "$" || upperLocal == iterator || upperLocal == lowerLocal then
     none
   else
+  let (entryCondition?, loopId) ← do
+    let entry ← context.ns.expressions[loopId.index]?
+    match entry.kind with
+    | .ifElse condition body (some empty) =>
+        let empty ← context.ns.expressions[empty.index]?
+        let .value .unit := empty.kind | none
+        pure (some condition, body)
+    | _ => pure (none, loopId)
   let loopNode ← context.ns.expressions[loopId.index]?
   let .loop none guardedId := loopNode.kind | none
   let guardedNode ← context.ns.expressions[guardedId.index]?
   let .ifElse conditionId iterationId (some stopId) := guardedNode.kind | none
+  guard (entryCondition?.all (· == conditionId))
   let stopNode ← context.ns.expressions[stopId.index]?
   let .break_ 0 none := stopNode.kind | none
   let conditionNode ← context.ns.expressions[conditionId.index]?
@@ -2006,6 +2045,67 @@ private partial def bindingPatternTextFuel (context : Context) (id : PatternId)
 private def bindingPatternText (context : Context) (id : PatternId) : Except String String :=
   bindingPatternTextFuel context id (context.ns.patterns.size + 1)
 
+/-- Canonicalize the copyable-local enum matches that source lowering turns
+into variant tests. Imported LIR can still contain a match node, so its first
+print must use the same decision tree as its source round trip. Specification
+matches, consuming matches, and effectful scrutinees retain their match form. -/
+private def enumDecisionArms? (context : Context) (scrutinee : ExprId)
+    (arms : Array MatchArm) :
+    Option (Option ReferenceKind × Array (Option String × Array (LocalId × String))) := do
+  if context.specification || context.ns.profile != some .move then none else
+  let value ← context.ns.expressions[scrutinee.index]?
+  let localId? := match value.kind with
+    | .localVar localId => some localId
+    | .operation (.read place) _ _ _ | .operation (.copy place) _ _ _ =>
+        localPlace? context.ns place
+    | _ => none
+  let localId ← localId?
+  guard (!(← context.locals[localId.index]?).mutable)
+  let valueType ← context.unit.tables.types[value.typeId.index]?
+  let (referenceKind, nominalType) ← match valueType with
+    | .reference reference => do
+        pure (some reference.kind, ← context.unit.tables.types[reference.referent.index]?)
+    | _ => pure (none, valueType)
+  let .nominal owner _ := nominalType | none
+  let declaration ← nominalAt? context.unit owner
+  if declaration.variants.isEmpty ||
+      (referenceKind.isNone && !declaration.abilities.contains .copy) then none else
+  let mut result := #[]
+  let mut covered := #[]
+  let mut wildcard := false
+  for (arm, index) in arms.zipIdx do
+    guard arm.guard.isNone
+    let pattern ← context.ns.patterns[arm.pattern.index]?
+    match pattern.kind with
+    | .wildcard =>
+        guard (index + 1 == arms.size)
+        wildcard := true
+        result := result.push (none, #[])
+    | .constructor name _ (some variant) children =>
+        guard (name == owner)
+        let variantDecl ← declaration.variants.find? fun candidate =>
+          (context.unit.tables.names[candidate.name.index]?.map (·.name)) == some variant
+        guard (children.size == variantDecl.fields.size)
+        let mut aliases := #[]
+        for (child, field) in children.zip variantDecl.fields do
+          match (← context.ns.patterns[child.index]?).kind with
+          | .wildcard => pure ()
+          | .variable localId =>
+              guard (!(← context.locals[localId.index]?).mutable)
+              let fieldName ← context.unit.tables.names[field.name.index]?.map (·.name)
+              -- A surface field projection has no variant qualifier. Retain
+              -- the match when that name denotes different payload types.
+              guard (declaration.variants.all fun candidate => candidate.fields.all fun other =>
+                other.name != field.name || other.type.typeId == field.type.typeId)
+              aliases := aliases.push (localId, sourceIdentifier fieldName)
+          | _ => failure
+        covered := covered.push variantDecl.name
+        result := result.push (some (sourceIdentifier variant), aliases)
+    | _ => failure
+  if !wildcard && !declaration.variants.all (fun variant => covered.contains variant.name) then
+    none
+  else some (referenceKind, result)
+
 /-- Does this statement's text end inside a block of its own? A separator
 there would attach to that block's last entry rather than to the statement
 around it. It is the last thing printed that decides: a conditional whose
@@ -2030,6 +2130,69 @@ private def statementTerminator (ns : ValidatedNamespace) (id : ExprId)
     (text : String) : String :=
   if text.contains '\n' && endsInsideBlock ns id (ns.expressions.size + 1) then "" else ";"
 
+/-- Undo only the single-write holder introduced by `pushReferenceMutation`.
+The holder must not occur in the value (including through a place). This is
+not general reference substitution: shared/user-written bindings keep their
+identity and evaluation order. -/
+private def hiddenReferenceMutation? (context : Context) (pattern : PatternId)
+    (body : ExprId) : Option ExprId := do
+  let .variable holder := (← context.ns.patterns[pattern.index]?).kind | none
+  let declaration ← context.locals[holder.index]?
+  if !declaration.name.startsWith "$t" then none else
+  let .operation (.reference .mutate) #[] #[reference, value] _ :=
+    (← context.ns.expressions[body.index]?).kind | none
+  let .localVar target := (← context.ns.expressions[reference.index]?).kind | none
+  if target != holder then none else
+  -- Place IDs are namespace-wide but local IDs are function-relative. Only
+  -- follow places reachable from this value; an unrelated function can use
+  -- the same local number without referring to this holder.
+  let rec independent (pending : List (Sum ExprId PlaceId))
+      (seenExpr : Std.HashSet ExprId) (seenPlace : Std.HashSet PlaceId)
+      (fuel : Nat) : Bool :=
+    match pending with
+    | [] => true
+    | .inl node :: rest =>
+        if seenExpr.contains node then independent rest seenExpr seenPlace fuel else
+        match fuel, context.ns.expressions[node.index]? with
+        | 0, _ | _, none => false
+        | fuel + 1, some expression =>
+            if expression.kind == .localVar holder then false else
+            let place? := match expression.kind with
+              | .assign place _ => some place
+              | .operation operation _ _ _ => match operation with
+                | .move place | .copy place | .borrow _ place | .read place |
+                    .write place | .drop place => some place
+                | _ => none
+              | _ => none
+            let pending := (expressionChildren expression.kind).toList.map Sum.inl ++ rest
+            let pending := place?.map (fun place => Sum.inr place :: pending) |>.getD pending
+            independent pending (seenExpr.insert node) seenPlace fuel
+    | .inr node :: rest =>
+        if seenPlace.contains node then independent rest seenExpr seenPlace fuel else
+        match fuel, context.ns.places[node.index]? with
+        | 0, _ | _, none => false
+        | fuel + 1, some place =>
+            let next := fun pending => independent pending seenExpr (seenPlace.insert node) fuel
+            match place with
+            | .localVar localId => localId != holder && next rest
+            | .index base index => next (.inr base :: .inl index :: rest)
+            | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
+                next (.inr base :: rest)
+    termination_by (fuel, pending.length)
+    decreasing_by all_goals simp_wf; simp_all [wfParam]; omega
+  if independent [.inl value] {} {} (context.ns.expressions.size + context.ns.places.size + 1) then
+    some value
+  else none
+
+private def referenceMutationText (context : Context) (referenceId : ExprId)
+    (reference value : String) : String :=
+  if let some referent := borrowedReferentText? reference then
+    s!"{referent} := {value}"
+  else if context.ns.profile == some .move &&
+      selectsFieldThroughReference context referenceId then
+    s!"{reference} := {value}"
+  else s!"*({reference}) := {value}"
+
 private partial def expressionText (context : Context) (id : ExprId)
     (fuel : Nat) (tailPosition : Bool := false) (statementPosition : Bool := false) :
     Except String String := do
@@ -2049,7 +2212,9 @@ private partial def expressionText (context : Context) (id : ExprId)
     let iterator ← localName context range.iterator
     let lower ← expressionText context range.lower (fuel - 1)
     let upper ← expressionText context range.upper (fuel - 1)
-    let bodyContext := { context with forIterator := some range.iterator }
+    let bodyContext := { context with
+      forIterator := some range.iterator,
+      loopLabels := #[none] ++ context.loopLabels }
     let rendered ← range.bodyStatements.mapM fun statement => do
       let statementText ← expressionText bodyContext statement (fuel - 1) false true
       pure (statementText ++ statementTerminator context.ns statement statementText)
@@ -2132,6 +2297,10 @@ private partial def expressionText (context : Context) (id : ExprId)
             | .immutable => pure "immutable"
             | .mutable => pure "mut"
             | .profile value => throw s!"profile borrow `{value.tag}` has no core spelling"
+          if context.ns.profile == some .move &&
+              placeContainsIndex context.ns (context.ns.places.size + 1) place then
+            return s!"core.borrowPlace({kind}, {← placeText context
+              (fun index => expressionText context index (fuel - 1)) place})"
           pure s!"({if kind == "mut" then "&mut " else "&"}{
             ← placeText context (fun index => expressionText context index (fuel - 1)) place})"
       | .reference (.borrow kind) =>
@@ -2167,12 +2336,7 @@ private partial def expressionText (context : Context) (id : ExprId)
             throw "a reference mutation must have exactly two operands"
           let reference ← expressionText context arguments[0]! (fuel - 1)
           let value ← expressionText context arguments[1]! (fuel - 1)
-          if let some referent := borrowedReferentText? reference then
-            return s!"{referent} := {value}"
-          if context.ns.profile == some .move then
-            if selectsFieldThroughReference context arguments[0]! then
-              return s!"{reference} := {value}"
-          pure s!"*({reference}) := {value}"
+          pure (referenceMutationText context arguments[0]! reference value)
       | .global global =>
           let some typeIds := typeInstantiationIds? instantiations
             | throw "a global operation requires one resource type argument"
@@ -2203,6 +2367,22 @@ private partial def expressionText (context : Context) (id : ExprId)
           let arguments ← arguments.mapM (expressionText context · (fuel - 1))
           pure <| name ++ typeArguments resource ++ s!"({commaSep arguments})"
       | .primitive primitive =>
+          if !context.specification && (primitive == .logicalAnd || primitive == .logicalOr) then
+            let rec pureOperand (id : ExprId) : Nat → Bool
+              | 0 => false
+              | fuel + 1 => match context.ns.expressions[id.index]? with
+                | some { kind := .value .., .. } | some { kind := .localVar .., .. } => true
+                | some { kind := .operation (.primitive operation) _ children _, .. } =>
+                    let safe := match operation with
+                      | .equal | .notEqual | .less | .lessEqual | .greater | .greaterEqual |
+                          .logicalAnd | .logicalOr | .logicalNot | .tuple => true
+                      | _ => false
+                    safe && children.all (pureOperand · fuel)
+                | _ => false
+            unless arguments.all (pureOperand · fuel) do
+              let name := if primitive == .logicalAnd then "logicalAnd" else "logicalOr"
+              let rendered ← arguments.mapM (expressionText context · (fuel - 1))
+              return s!"core.prim.{name}({commaSep rendered})"
           if primitive == .tuple && instantiations.isEmpty && arguments.isEmpty then
             return "()"
           if primitive == .tuple && instantiations.isEmpty && arguments.size == 1 then
@@ -2782,7 +2962,9 @@ private partial def expressionText (context : Context) (id : ExprId)
           else none then
         let condition ← expressionText context condition (fuel - 1)
         let loopBodyId := loopBody
-        let loopBody ← expressionText context loopBodyId (fuel - 1) false true
+        let loopBody ← expressionText
+          { context with loopLabels := #[none] ++ context.loopLabels }
+          loopBodyId (fuel - 1) false true
         let head := s!"while {condition} do"
         let whileText := if loopBody.startsWith "do\n" then
             s!"{head}\n{loopBody.drop 3}"
@@ -2914,6 +3096,10 @@ private partial def expressionText (context : Context) (id : ExprId)
         temporaryLocals := context.temporaryLocals ++ temporaryLocals }
         body (fuel - 1) tailPosition
   | .letDecl pattern (some value) body =>
+      if let some assigned := hiddenReferenceMutation? context pattern body then
+        return referenceMutationText context value
+          (← expressionText context value (fuel - 1))
+          (← expressionText context assigned (fuel - 1))
       if let some substitution ← temporaryConstant? context pattern value then
         return ← expressionText
           { context with constantLocals := context.constantLocals.push substitution }
@@ -2960,7 +3146,9 @@ private partial def expressionText (context : Context) (id : ExprId)
           return (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
         match expression.kind with
         | .letDecl pattern (some value) body =>
-            if let some substitution ← temporaryConstant? active pattern value then
+            if (hiddenReferenceMutation? active pattern body).isSome then
+              pure (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
+            else if let some substitution ← temporaryConstant? active pattern value then
               collectTail { active with
                 constantLocals := active.constantLocals.push substitution } body (fuel - 1)
             else if let some holder := hiddenStorageBorrow? active pattern value then
@@ -3059,6 +3247,39 @@ private partial def expressionText (context : Context) (id : ExprId)
   | .match_ scrutinee arms =>
       unless !arms.isEmpty do
         throw "a match expression has no arms"
+      if let some (referenceKind, decisions) := enumDecisionArms? context scrutinee arms then
+        let scrutineeText ← expressionText context scrutinee (fuel - 1)
+        let mut result? : Option String := none
+        for (arm, variant, aliases) in (arms.zip decisions).reverse do
+          let active := if referenceKind == some .mutable then context else { context with
+            fieldAliasLocals := (if referenceKind == some .shared then aliases.map (·.1)
+              else #[]) ++ context.fieldAliasLocals
+            constantLocals := aliases.map
+                (fun (localId, field) => (localId, s!"{scrutineeText}.{field}")) ++
+              context.constantLocals }
+          let mut body ← expressionText active arm.body (fuel - 1) tailPosition statementPosition
+          if referenceKind == some .mutable && !aliases.isEmpty then
+            let declarations ← aliases.mapM fun (localId, field) => do
+              let some localDecl := context.locals[localId.index]?
+                | throw "a reference pattern names a missing local"
+              pure s!"let {← localName context localId} : \
+                {← typeText context.unit context.ns context.binders localDecl.type.typeId} := \
+                (&mut {scrutineeText}.{field});"
+            if body.startsWith "do\n" then
+              body := s!"do\n{indent (lines declarations)}\n{body.drop 3}"
+            else
+              let unitResult := (context.ns.expressions[arm.body.index]?).any fun node =>
+                context.unit.tables.types[node.typeId.index]? == some .unit
+              let result := if isDivergingExpression context.ns arm.body || unitResult then
+                  body ++ statementTerminator context.ns arm.body body
+                else s!"return {body}"
+              body := blockText (declarations.push result)
+          result? := some <| match result?, variant with
+            | some fallback, some variant =>
+                let grouped (text : String) := if text.contains '\n' then s!"({text})" else text
+                s!"if {scrutineeText} is {variant} then {grouped body} else {grouped fallback}"
+            | _, _ => body
+        return result?.getD "()"
       let scrutinee ← expressionText context scrutinee (fuel - 1)
       let arms ← arms.mapM fun arm => do
         let guard ← match arm.guard with
@@ -3068,8 +3289,7 @@ private partial def expressionText (context : Context) (id : ExprId)
         pure s!"| {← bindingPatternText context arm.pattern}{guard} => {body}"
       pure s!"match {scrutinee} with\n{indent (lines arms)}"
   | .loop label body =>
-      unless label.isNone do
-        throw "labeled loops are outside the current LeanerLang parser"
+      let loopContext := { context with loopLabels := #[label] ++ context.loopLabels }
       let rec isLoopExit (node : ExprId) (fuel : Nat) : Bool :=
         if fuel == 0 then false else
           match context.ns.expressions[node.index]? with
@@ -3089,7 +3309,8 @@ private partial def expressionText (context : Context) (id : ExprId)
         | .block #[] (some result)
         | .block #[result] none => guardedLoop? result (fuel - 1)
         | _ => none
-      let whileShape := guardedLoop? body (context.ns.expressions.size + 1)
+      let whileShape := if label.isNone then
+          guardedLoop? body (context.ns.expressions.size + 1) else none
       match whileShape with
       | some (condition, loopBody) =>
         let (invariants, condition) := match context.ns.expressions[condition.index]? with
@@ -3102,9 +3323,9 @@ private partial def expressionText (context : Context) (id : ExprId)
           | _ => (#[], condition)
         let invariantTexts ← invariants.mapM fun invariant =>
           expressionText context invariant (fuel - 1) false
-        let condition ← expressionText context condition (fuel - 1)
+        let condition ← expressionText loopContext condition (fuel - 1)
         let loopBodyId := loopBody
-        let loopBody ← expressionText context loopBodyId (fuel - 1)
+        let loopBody ← expressionText loopContext loopBodyId (fuel - 1)
         let head := s!"while {condition} do"
         let whileText := if loopBody.startsWith "do\n" then
             s!"{head}\n{loopBody.drop 3}"
@@ -3114,18 +3335,27 @@ private partial def expressionText (context : Context) (id : ExprId)
           pure s!"do\n{indent (lines ((#[whileText] ++ invariantTexts).push "return ()"))}"
         else
           pure (lines (#[whileText] ++ invariantTexts))
-      | none => pure s!"loop {← expressionText context body (fuel - 1)}"
+      | none => pure s!"loop{(label.map ("@" ++ ·)).getD ""} {← expressionText loopContext body (fuel - 1)}"
   | .break_ nest value =>
-      unless nest == 0 do
-        throw "nonlocal breaks are outside the current LeanerLang parser"
+      let suffix ← if nest == 0 then pure "" else do
+        let some (some label) := context.loopLabels[nest]?
+          | throw "nonlocal break targets an unlabeled loop"
+        pure ("@" ++ label)
       match value with
-      | none => pure "break"
-      | some value => pure s!"break {← expressionText context value (fuel - 1)}"
+      | none => pure s!"break{suffix}"
+      | some value => pure s!"break{suffix} {← expressionText context value (fuel - 1)}"
   | .continue_ nest =>
-      unless nest == 0 do
-        throw "nonlocal continues are outside the current LeanerLang parser"
-      pure "continue"
+      let suffix ← if nest == 0 then pure "" else do
+        let some (some label) := context.loopLabels[nest]?
+          | throw "nonlocal continue targets an unlabeled loop"
+        pure ("@" ++ label)
+      pure s!"continue{suffix}"
   | .assign place value =>
+      if context.ns.profile == some .move &&
+          placeContainsIndex context.ns (context.ns.places.size + 1) place then
+        return s!"core.assignPlace({← placeText context
+          (fun index => expressionText context index (fuel - 1)) place}, \
+          {← expressionText context value (fuel - 1)})"
       pure s!"{← placeText context (fun index => expressionText context index (fuel - 1)) place} := \
         {← expressionText context value (fuel - 1)}"
   | .assignPattern pattern value => do
@@ -3241,6 +3471,14 @@ private def conditionText (context : Context) (condition : Condition) : Except S
     | .ensures => pure ("ensures", none)
     | .abortsIf => pure ("aborts_if", none)
     | .structInvariant => pure ("invariant", none)
+    | .globalInvariant typeParameters => do
+        unless typeParameters.isEmpty do
+          throw "generic module invariants are outside the current LeanerLang parser"
+        pure ("invariant", none)
+    | .globalInvariantUpdate typeParameters => do
+        unless typeParameters.isEmpty do
+          throw "generic update module invariants are outside the current LeanerLang parser"
+        pure ("invariant [update]", none)
     | kind => throw s!"condition kind `{repr kind}` is outside the current LeanerLang parser"
   let properties ← condition.properties.mapM flagAttributeName
   let properties := if properties.isEmpty then "" else s!"[{commaSep properties}] "
@@ -3281,7 +3519,7 @@ private def frameTexts (context : Context) (contract : FunctionContract) :
   let mut entries := #[]
   for expression in contract.modifies do
     entries := entries.push s!"modifies {← expressionText context expression
-      (context.ns.expressions.size + 1)};"
+      (context.ns.expressions.size + 1)}{if hasLooseFrame contract then ", *" else ""};"
   for type in contract.reads do
     entries := entries.push s!"reads {← typeText context.unit context.ns context.binders type.typeId};"
   if contract.modifiesAll then entries := entries.push "modifies *;"
@@ -3317,13 +3555,32 @@ private def fieldText (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (field : LeanerIR.FieldDecl) : Except String String := do
   pure s!"{← nameAt unit field.name} : {← typeText unit ns binders field.type.typeId}"
 
+/-- Canonical declaration metadata, separate from contract pragmas. -/
+private partial def sourceAttributeText : Attribute → Except String String
+  | .call name arguments _ => do
+      let arguments ← arguments.mapM sourceAttributeText
+      pure <| sourceIdentifier name ++ (if arguments.isEmpty then "" else
+        s!" ({commaSep arguments})")
+  | .assign name (.constant (.integer value)) _ => do
+      unless 0 ≤ value do throw "negative attribute literals have no source spelling"
+      pure s!"{sourceIdentifier name} = {value}"
+  | .assign name (.constant (.string value)) _ =>
+      pure s!"{sourceIdentifier name} = {repr value}"
+  | .assign name (.name none value) _ =>
+      pure s!"{sourceIdentifier name} = {sourceIdentifier value}"
+  | attr => throw s!"attribute `{repr attr}` has no canonical source spelling"
+
+private def isFunctionModifierAttribute : Attribute → Bool
+  | .assign "visibility" (.qualifiedName _) _ => true
+  | .call name _ _ =>
+      ["entry", "native", "opaque", "deprecated", "view", "bytecode_instruction"].contains name
+  | _ => false
+
 private def nominalText (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : LeanerIR.StructDecl) :
     Except String String := do
   unless declaration.properties.all isMoveVariantsProperty do
     throw "nominal profile properties are outside the current LeanerLang printer"
-  unless declaration.attributes.isEmpty do
-    throw "nominal attributes are outside the current LeanerLang printer"
   let name ← nameAt unit declaration.name
   let binders := " ".intercalate (← declaration.generics.mapM (binderText unit)).toList
   let binders := if binders.isEmpty then "" else " " ++ binders
@@ -3408,7 +3665,7 @@ private def functionModifiers
     | .call "bytecode_instruction" arguments _ =>
         unless arguments.isEmpty do
           throw "the `bytecode_instruction` provenance attribute has arguments"
-    | attr => throw s!"function attribute `{repr attr}` has no canonical LeanerLang spelling yet"
+    | _ => pure () -- Ordinary metadata is printed above the declaration.
   result := { result with visibility := visibility.getD .private_ }
   if result.isNative && result.isOpaque then
     throw "a function cannot be both native and opaque"
@@ -3470,7 +3727,10 @@ private def contractText? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     logicalLocals := declaration.locals.map (fun localDecl => localDecl.id) }
   let entries ← conditionTexts context conditions
   let entries := entries ++ (← frameTexts context contract)
-  let entries := entries ++ contractPragmas.map fun pragma => s!"pragma {pragma};"
+  let printedPragmas := (contract.pragmas.zip contractPragmas).filterMap fun (property, text) =>
+    if hasLooseFrame contract && !contract.modifies.isEmpty &&
+        pragmaName property == "leaner_loose_frame" then none else some s!"pragma {text};"
+  let entries := entries ++ printedPragmas
   pure <| some s!"spec {name} where\n{indent (lines entries)}"
 
 private def constantText (unit : ValidatedUnit) (ns : ValidatedNamespace)
@@ -3679,8 +3939,7 @@ private def specFunctionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
     throw "mutable specification-function parameters have no LeanerLang spelling"
   let contract := declaration.contract
   unless contract.conditions.isEmpty && contract.modifies.isEmpty && contract.reads.isEmpty &&
-      !contract.hasFrame && !contract.modifiesAll && !contract.readsAll &&
-      contract.pragmas.isEmpty do
+      !contract.hasFrame && !contract.modifiesAll && !contract.readsAll do
     throw "specification-function contracts are outside the current LeanerLang printer"
   match declaration.body with
   | some _ => unless declaration.profileData.all isDerivedSpecMetadata do
@@ -3765,8 +4024,6 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
   unless ns.specVars.isEmpty do
     throw <| errorAt unit ns.loc
       "namespace specification variables are outside the current LeanerLang printer"
-  unless ns.invariants.isEmpty do
-    throw <| errorAt unit ns.loc "namespace invariants are outside the current LeanerLang printer"
   -- Intrinsic declarations print inverted, as source attributes on their
   -- owner and target declarations (`@[intrinsic_map]` on the owner,
   -- `@[map_new (Owner)]` on each bound function or specification function),
@@ -3784,11 +4041,14 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
           "an intrinsic binding outside its owner's namespace is outside the current LeanerLang printer"
       intrinsicAttributes := intrinsicAttributes.push
         (binding.target.name.index, s!"{binding.role} ({ownerText})")
-  let withAttributes (name : NameId) (body : String) : String :=
+  let withAttributes (name : NameId) (attributes : Array Attribute)
+      (body : String) : Except Error String := do
     let values := intrinsicAttributes.filterMap fun (index, value) =>
       if index == name.index then some value else none
-    if values.isEmpty then body
-    else s!"@[{", ".intercalate values.toList}]\n{body}"
+    let values := values ++ (← (attributes.mapM sourceAttributeText).mapError
+      fun message => ({ message } : Error))
+    pure <| if values.isEmpty then body
+      else s!"@[{", ".intercalate values.toList}]\n{body}"
   let mut ordered : Array SourceOrderedText := #[]
   let mut fallback := 0
   for declaration in ns.constants do
@@ -3803,7 +4063,7 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
     ordered := ordered.push {
       file, start, priority := 1, fallback
       text := documented (nominalDocumentation declaration)
-        (withAttributes declaration.name
+        (← withAttributes declaration.name declaration.attributes
           (← atLocation unit declaration.loc (nominalText unit ns declaration))) }
     fallback := fallback + 1
   for declaration in ns.specFunctions do
@@ -3812,15 +4072,30 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
       ordered := ordered.push {
         file, start, priority := 1, fallback
         text := documented declaration.doc
-          (withAttributes declaration.name
+          (← withAttributes declaration.name declaration.contract.pragmas
             (← atLocation unit declaration.loc (specFunctionText unit ns declaration))) }
       fallback := fallback + 1
+  for declaration in ns.invariants do
+    let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+    let context : Context := {
+      unit, ns, locals := declaration.locals
+      localNames := declarationLocalNames ns declaration.locals 0
+        (some declaration.condition.expression)
+      specification := true
+      logicalLocals := declaration.locals.map (fun localDecl => localDecl.id) }
+    let invariant ← atLocation unit declaration.loc
+      (conditionText context declaration.condition)
+    ordered := ordered.push {
+      file, start, priority := 1, fallback
+      text := s!"spec module where\n{indent invariant}" }
+    fallback := fallback + 1
   for declaration in ns.functions do
     let (file, start, _) := sourceOrderKey unit declaration.loc fallback
     ordered := ordered.push {
       file, start, priority := 1, fallback
       text := documented declaration.doc
-        (withAttributes declaration.name
+        (← withAttributes declaration.name
+          (declaration.attributes.filter (!isFunctionModifierAttribute ·))
           (← atLocation unit declaration.loc (functionText unit ns declaration))) }
     fallback := fallback + 1
   -- Compiler-v2 can retain comments from dependency files whose inline
@@ -3828,7 +4103,8 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
   -- survive as Leaner items, so their comments have no valid attachment here
   -- (the legacy Move printer dropped the same unmatched pool entries).
   let declarationLocations := #[ns.loc] ++ ns.constants.map (·.loc) ++
-    ns.structs.map (·.loc) ++ ns.specFunctions.map (·.loc) ++ ns.functions.map (·.loc)
+    ns.structs.map (·.loc) ++ ns.specFunctions.map (·.loc) ++
+    ns.invariants.map (·.loc) ++ ns.functions.map (·.loc)
   let declarationFiles := declarationLocations.filterMap fun loc =>
     (primaryRange? unit.tables loc (unit.tables.locations.size + 1)).map (·.file.index)
   for comment in ns.comments do
@@ -3933,6 +4209,7 @@ private def dependencyInterfaceItem? : Item → Option Item
   | .enum declaration => some <| .enum {
       declaration with contract := #[], pragmas := #[] }
   | .constant _ => none
+  | .namespaceInvariants _ => none
 
 private def dependencyInterfaceNamespace (source : Namespace) : Namespace := {
   source with

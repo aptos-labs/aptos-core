@@ -1,194 +1,277 @@
-# Test organization: verification checks as baselines
+# Test organization and current native migration status
 
-Status: plan, revised 2026-09-02 with the user's decisions (no Move
-Prover differential; verification tests are baseline tests in the
-end-to-end package; the v0 trees are ported one file at a time).
-T0 and T3 are implemented; T1 is in progress (4 of the 23 verification
-files are ported, and every generated-route gap those ports exposed has
-been closed, recursion included); T2 is not started.
+Updated 2026-09-08. The last full audit covers literal scalar-owner mutation;
+the subsequent checked-expression work is unfinished, as recorded below.
+These are **partial validation results recorded in a checkpoint commit**, not
+evidence that the migration is complete. This document is the current
+ledger; old milestones and measurements are in
+[the history archive](test-organization-history.md).
 
-## The two needs
+**“Source checkpoint” is a retired historical label, not a completion status.**
+It meant a source translation was committed and passed at that earlier point,
+possibly using legacy encoding. **Yes, those files can still contain unresolved
+problems today.** Use the explicit pass/fail rows below, not that old label or
+the existence of a commit, to determine what remains.
 
-1. **A benchmark plugged into the ground.** v0 (the deprecated `move`
-   package) verified its acceptance corpus with mostly bare `verify`
-   commands, and its language and negative tests pinned elaboration,
-   compilation, and diagnostics.  The leaner stack must reach parity on
-   that corpus and then be measured against it:
-   - [`move/Move/Tests/Verification/`](../move/Move/Tests/Verification/):
-     23 files, 174 `verify` commands, 99 bare (automatic) and 75 with
-     proof scripts; `Quicksort.lean` (3 verifies, ~220 proof lines) and
-     `OrderedMap.lean` (9 verifies, ~480 proof lines) carry the
-     AI-generated proofs.
-   - [`move/Move/Tests/Language/`](../move/Move/Tests/Language/): 21
-     files covering the language surface (integers of every width, signed
-     arithmetic, enums and their payloads and references, generics,
-     loops, tuples, vectors, addresses, attributes, abilities).
-   - [`move/Move/Tests/Negative/`](../move/Move/Tests/Negative/): 9 files
-     pinning diagnostics (borrow errors, returned `&mut` shapes, lowering
-     and surface rejections, spec-function and specification errors,
-     verification failures).
-2. **Every end-to-end test verifies.** We map one language with
-   specifications into LeanerLang, and the produced LeanerLang must
-   verify.  Today no end-to-end test elaborates its output.
+Read [the audit summary](#current-result) for totals,
+[unfinished changes](#unfinished-changes-after-the-last-full-audit) for newer
+failures, and [per-file status](#per-file-status) for the remaining work in each
+acceptance fixture. Implementation details and test-running rules follow the
+ledger.
 
-## What exists today
+## Current result
 
-| Suite | What it checks | Verification |
+**Last full audit: 19 of 61 existing Check files passed; 42 failed. Migration is not finished.** Of the failures,
+39 files contain native implementation/proof gaps and three have diagnostic
+baseline mismatches. These are file counts, not counts of independent bugs.
+Seven additional v0 files still have no acceptance fixture (listed below).
+
+Read the per-file tables for test failures, the gate table for package and
+performance failures, and the implementation section for what the latest
+batch actually supports. A passing pilot does not promote an acceptance file.
+
+Legacy verification fallback is **off**. Retired route selections reject,
+including cached-proof reuse; every successful `verify` audits its generated
+native computation and verification-condition dependencies. Unsupported cases
+fail rather than falling back. Native verification does **not** yet mean all
+legacy code is gone: compatible `RuntimeState`, failure, and contract adapters
+remain. See [generic-route](generic-route.md) for the native route's boundary.
+
+### What the labels mean
+
+| Status | Meaning in the last full audit | Is there unfinished work in this file? |
 |---|---|---|
-| `leaner-ir` `LeanerIR/Tests` (16 files) | IR validation, semantics, interpreter, codecs | none (unit tests) |
-| `leaner-ir` `LeanerLang/Tests` | elaborator (`Frontend`), three hand row proofs, 10 `Verification*.lean` fixtures (46 verifies), the `Performance` gate (15 targets) | yes, on hand-authored LeanerLang |
-| `leaner-move` `Tests` (2 files) | profile, intrinsics | none |
-| `leaner-rust` `LeanerRust/Tests` | driver, registry, source backend, 9 LeanerLang programs | none |
-| `leaner-e2e-tests` `MoveToLeanerLang` | 13 direct `.move` files plus MoveStdlib (14 modules, 106 spec blocks), AptosStdlib (6), AptosFramework (2): printed LeanerLang compared textually and re-parsed for a canonical fixed point | none |
-| `leaner-e2e-tests` `RustToLeanerLang` | 53 `.rs` fixtures, same textual baseline | none |
-| `leaner-e2e-tests` `MonoVM`, `MonoDifferential` | linked MonoVM smoke test; three-engine differential execution | none (execution) |
+| PASS | The entire current fixture matches its expected output at the unchanged cap, with fallback disabled. Successful verifies pass the automatic native audit. | No failure in this audit; coverage is limited to the assertions in the file. An execution-only or diagnostic-only pass is not a verification port. |
+| FAIL — native gap | At least one intended positive verification or required proof is unsupported or fails. Other targets may already pass natively. | **Yes.** The row names known gaps; it is not promoted by partial success. |
+| FAIL — diagnostics | Intended negative cases reject, but their diagnostics differ from the checked-in baseline. | **Yes.** Review the rejection reason and diagnostics before updating expectations. |
+| MISSING | No corresponding current Check fixture exists. | **Yes.** Translate the v0 cases and implement their native support. |
 
-The gap: the corpus that defines "done" is not run by anything, the
-end-to-end output is text that nobody elaborates, and the verification
-fixtures that do exist are a small hand-picked set with no relation to
-either.
+The historical 18/23 verification, 19/20 language, and 7/9 negative counts
+are **not current completion counts**. Likewise, the old 60/61 mixed-route
+result is not native coverage.
 
-## The convention
+### Unfinished changes after the last full audit
 
-A **check** is a LeanerLang source file under
-`leaner-e2e-tests/LeanerE2ETests/Check/`: a `.lean` file that imports
-`LeanerLang` and contains `leaner module` declarations with
-specifications, `verify` commands (bare, or with an inline proof script
-where real mathematics lives, as v0 did), and whatever other commands the
-test needs.  **Everything under `Check/` is LeanerLang** — no Move
-sources, no Rust sources, and not the v0 surface: a v0 test is ported by
-rewriting it in LeanerLang.  The frontend paths keep their own
-directories (`MoveToLeanerLang`, `RustToLeanerLang`).  The driver
-elaborates the file and records its diagnostics.
+Checked expressions in mutable assignments (`*slot := *slot + 1`, division,
+and multiplication) are being implemented. They are **not accepted as a
+completed batch**:
 
-- **The output is the baseline, verbatim**, side by side as `<name>.exp`,
-  the way compiler-v2's baseline tests record theirs
-  (`move-prover/test-utils/src/baseline_test.rs`,
-  `verify_or_update_baseline`): the `.exp` is exactly what `lean` prints
-  for the file — `LeanerE2ETests/Check/Verification/WrongIncrement.lean:12:2:
-  error: verification failed for …` and the message body as the user
-  reads it — with no reformatting.  The only cleaning is compiler-v2's:
-  trailing whitespace trimmed, a single trailing newline.  The driver
-  invokes `lean` on the package-relative path, so the path in the
-  message is stable across machines without rewriting.
-- **A clean check has no `.exp`.**  As in compiler-v2, `UB=1` writes the
-  file when there is output and **removes** it when there is none, and
-  a missing file is an empty expectation.  Positive and negative tests
-  are therefore the same kind of file; a negative test is one whose
-  `.exp` exists — a verification failure at its clause range, a rejected
-  borrow, an unsupported construct.  Every severity is recorded, so an
-  unexpected warning is as visible as an error; tests set options locally
-  when they mean to silence something.
-- **Each file runs in its own `lean` process** with the package's search
-  path, so a runaway proof or a crash in one check cannot take the driver
-  down, and under a per-command heartbeat cap that the driver passes
-  (start at 50M, five times the largest generated route), so a proof that
-  silently falls back to search surfaces as a diff instead of a slow
-  suite.  Cost stays gated precisely by `LeanerLang/Tests/Performance`;
-  the cap only catches collapses.
-- **Discovery, not registration.** Every `.lean` under `Check/` is a
-  check; subdirectories mirror the v0 categories.
-
-```text
-leaner-e2e-tests/LeanerE2ETests/
-  Check/
-    Verification/
-      Account.lean            # clean: no .exp
-      Quicksort.lean          # proofs inline, clean: no .exp
-      WrongIncrement.lean     # negative
-      WrongIncrement.exp      # LeanerE2ETests/Check/Verification/WrongIncrement.lean:12:2: error: verification failed …
-    Negative/
-      Borrows.lean
-      Borrows.exp
-    Language/
-      Integers.lean
-  MoveToLeanerLang/           # unchanged (see T2 for the verifying stage)
-  RustToLeanerLang/           # unchanged
-  MonoVM/, MonoDifferential/  # unchanged
-```
-
-`LEANER_E2E_SUITE=check` selects the suite; `lake test` runs it with the
-others.  `LeanerIR.TestInfra.Baseline` gains compiler-v2's semantics
-(`check` today always writes the file, even an empty one): write when
-the output is non-empty, remove when it is empty, trim trailing
-whitespace.
-
-## The port ledger
-
-The v0 trees are ported one file at a time — each file rewritten in
-LeanerLang, since the v0 surface is a different language — each check
-landing only when it passes: a clean run for a positive test, the
-intended diagnostics for a negative one.  The deprecated file stays as
-the reference until its port lands.  The ledger below is kept current in this document; a row
-moves to **ported** with the commit that lands it.
-
-| v0 file | verifies (proofs) | status |
+| Check | Latest observed result | Remaining work |
 |---|---|---|
-| `Verification/AbortDirections.lean` | 5 | **ported** (2026-09-02, `Check/Verification/Aborts.lean`; all five verify, `withdraw` through the path-generic bracket and the absent-resource abort direction) |
-| `Verification/Account.lean` | 2 | **ported** (2026-09-02, `Check/Verification/Account.lean`; its `#test` execution assertions are left to the differential suite) |
-| `Verification/BorrowCertificates.lean` | 0 (certificates only) | not ported |
-| `Verification/Callees.lean` | 13 (3 proofs) | **ported** (2026-09-02, `Check/Verification/Callees.lean`; `bump`, `bump_twice`, `take_and_bump`, the added `add_two`/`bump_then_add_two` (a callee whose exit value is not the entry plus one), the unspecified-helper callers `calls_pure_helper`, `embedded_helper`, `helper_condition`, `set_pair`, `forward_set_pair`, and `bump_counter` verify; `drain` and `call_drain` verify since 2026-09-03 through the recursive fixed point, where v0 needed hand proofs over the recursive contract) |
-| `Verification/Calls.lean` | 10 (3 proofs) | **ported** (2026-09-02, `Check/Verification/Calls.lean`; `twice`, `increment`, `increment_unspecified`, `add_to`, `effect_caller`, `read_counter`, `choose`, `call_choose` verify, and `recursive_choose` since 2026-09-03 through the recursive fixed point, where v0 needed a hand proof over the recursive contract) |
-| `Verification/CorePrimitives.lean` | 5 | not ported |
-| `Verification/CrossInv.lean` | 1 | not ported |
-| `Verification/EnumRefs.lean` | 10 | not ported |
-| `Verification/GenericStorage.lean` | 7 | not ported |
-| `Verification/GlobalBorrows.lean` | 6 | not ported |
-| `Verification/GlobalInv.lean` | 5 | not ported |
-| `Verification/Invariants.lean` | 5 (3 proofs) | not ported |
-| `Verification/Loans.lean` | 3 | not ported |
-| `Verification/LoopInvariants.lean` | 3 | not ported |
-| `Verification/LooseFrame.lean` | 2 | not ported |
-| `Verification/OrderedMap.lean` | 9 (9 proofs) | not ported |
-| `Verification/Quicksort.lean` | 3 (3 proofs) | not ported |
-| `Verification/Read.lean` | 2 (2 proofs) | not ported |
-| `Verification/ResourceComposition.lean` | 1 | not ported |
-| `Verification/ReturnedMutRefs.lean` | 66 (51 proofs) | not ported |
-| `Verification/SpecFunctions.lean` | 12 | not ported |
-| `Verification/SpecLogicalArithmetic.lean` | 1 (1 proofs) | not ported |
-| `Verification/Summaries.lean` | 3 | not ported |
-| `Negative/` (9 files, 39 pinned diagnostics) | | not ported |
-| `Language/` (21 files) | | not ported |
+| Production `LeanerLang` build | PASS | Compilation alone does not establish the source proofs. |
+| `NativeMutableGenerated` extended regression | PASS (focused rerun) | The bounded `square` proof is fixed by reducing operand tuple projections before arithmetic reasoning. All 14 positive targets, four false-contract rejections, existing execution assertions, and artifact guards pass. Maximum cost is 8.410M heartbeats / 10,115 objects, below the unchanged 10M/15k ceiling. Additional checked-update execution coverage and broader gates remain pending. |
+| Full acceptance and package gates for these changes | NOT RERUN | The results below belong to the earlier literal-assignment batch, not these newer edits. |
 
-Totals to reach: 174 verifies (99 automatic, 75 with proofs) across the
-23 verification files.  v0 files also carry `#test` execution assertions
-over the lowered module; a port keeps them where the leaner surface has
-an equivalent and otherwise leaves execution to the MonoVM differential
-suite, which owns it.
+Evidence: `/tmp/dev3-native-square-fix-build.log` and
+`/tmp/dev3-native-square-fix-test.log`. These supersede the earlier failing
+square regression. No acceptance file is promoted by these partial results.
+The current worktree is **not fully validated**. Work is suspended at the
+user's request after this focused fix. The subsequent checkpoint commit records
+the unfinished work without promoting any acceptance status.
 
-## Where existing tests go
+### Other required gates — last full audit, before unfinished changes
 
-- `LeanerLang/Tests/Verification*.lean` (46 verifies): each becomes a
-  check under `Check/Verification/` and the fixture is deleted once its
-  check lands; the negative ones (`VerificationAborts`, `reborrow_bad`)
-  land with their `.exp`.
-- `LeanerLang/Tests/Performance.lean` and `.exp`: unchanged; it is the
-  cost gate and stays a curated set.
-- The hand row proofs (`NativeRow`, `NativeCallRow`, `NativeStoreRow`):
-  unchanged; they test proof rules, not programs.
-- Assertion-style tests in `leaner-move`, `leaner-rust`, and
-  `LeanerIR/Tests`: unchanged.
-- The deprecated packages stay until the ledger is complete.
+These results include automatic scalar-owner mutation. The full IR suite still
+fails; its failures are separate from the passing native regression subset.
 
-## Milestones
-
-| Status | Step | Gate |
+| Gate | Last completed batch result | Remaining problem |
 |---|---|---|
-| **DONE (2026-09-02)** | **T0 the check driver.** `LEANER_E2E_SUITE=check` (`LeanerE2ETests/Check.lean`): discovers `Check/**/*.lean`, runs each in its own `lean` process under the heartbeat cap, records its output verbatim, compares against the optional `.exp` through `Baseline.checkOutput` (`UB=1` writes or removes, as compiler-v2 does). The cap reaches the generated theorems through the registered option `leaner.verifyHeartbeats`, which the generator reads in place of its former literal budget (default unchanged); the driver passes it as `-Dweak.leaner.verifyHeartbeats`. Seeded with `Check/Verification/Increment.lean` (clean, no `.exp`) and `Check/Negative/WrongIncrement.lean`, whose `.exp` is lean's two diagnostics: the clause not established at its range, and the module's verification failure. | Met: the suite runs in `lake test`; the positive seed has no `.exp`, the negative seed's `.exp` is the verbatim output; a deliberately wrong clause on the positive seed produced a baseline diff, and a budget of 10 produced the deterministic timeout at the `verify`. |
-| **IN PROGRESS (since 2026-09-02)** | **T1 port the v0 trees.** One file at a time, ledger kept current. Recommended order: `Verification/` first (it exercises `verify`, the thing being measured; automatic ones before the proof-carrying ones, `Quicksort` and `OrderedMap` last), then `Negative/` (diagnostics depend on validation messages that must be stable first), then `Language/` (many of its assertions need interpreter and compilation hooks the leaner surface must expose). A file that cannot pass yet lands as a negative check whose `.exp` names the construct, so the gap is visible instead of silent. Progress 2026-09-03: `AbortDirections`, `Account`, `Callees`, and `Calls` are ported; the constructs their `.exp` files named (a `let` before a call, `Bool` parameters, unspecified helpers, both-parameter reborrows, global field borrows, the path-generic bracket, the absent-resource abort direction) all landed on generated routes, and recursion followed on 2026-09-03, so none of the four carries a `.exp`. | Every ledger row is ported. Parity target: every v0 automatic verify is automatic here; every v0 proof-carrying verify carries a proof here. |
-| NOT STARTED | **T2 the produced LeanerLang verifies.** The Move stage appends `verify f` for every spec'd function with a body (v0's `--verify`), so the `.exp.lean` baselines carry the commands, and every `.exp.lean` under `MoveToLeanerLang` runs as a check with `<module>.check.exp` beside it. Most stdlib rows will read as failures at first: that is the benchmark plugged into the ground. Same later for `RustToLeanerLang` once Rust contracts exist (rust-mir-design M2). | Every produced module with a spec has a check result; a `proved` that turns into anything else fails the suite. |
-| **DONE (2026-09-02)** | **T3 retire the hand fixtures.** The ten `LeanerLang/Tests/Verification*.lean` fixtures are checks under `Check/Verification/` (`Prophecies`, `Aborts`, `Storage`, `Generics`, `Corpus`, `References`, `Loops`, `Typed`, `Rust`, plus the seeds `Increment` and `Account`); their `.exp` files record the constructs without a generated route, since the frame route was retired the same day. | Met: `leaner-ir`'s verification tests are the row proofs and the cost gate only. |
+| IR/native regression subset | PASS (200 build jobs) | All registered roots except the six explicitly failing targets below. Includes boundary and generated mutation tests. |
+| Native cost gates | PASS | Existing budgets unchanged. Nine generated mutable targets cost 3.28–4.23M heartbeats and at most 5,384 objects across all stages, within the reference-test 10M/15k ceiling. The tight prepared-call gate remains 9.923M/11,631. Shared boundary kernels retain their 1M caps and selected 10k-object guards. |
+| Full IR test target | FAIL | Six targets: `NativeRow`, `NativeCallRow`, `NativeStoreRow`, `CompositionPerformance`, `Performance`, `Frontend`. Not dismissed by the native unit passes. |
+| Move tests | PASS (71 build jobs) | None observed in this run. |
+| Rust tests | PASS (165 build jobs) | None observed in this run. |
 
-T0 and T2 are driver work with no proof engineering and are independent
-of the route work in [`certifying-execution.md`](certifying-execution.md);
-they are what makes that work measurable.  T1 is where the frontends'
-and routes' gaps become ledger rows.
+A completed port requires the intended v0 cases, native proofs, execution and
+negative assertions, admission/agreement checks, and unchanged performance gates
+to pass. A commit is recorded separately; it cannot change a failing status.
+The overall migration is not complete while these failures remain.
 
-## Deliberately not in scope
+## Per-file status
 
-- A Move Prover differential.  The parity claim is against v0's recorded
-  verdicts and proofs, not against Boogie's.
-- Proving compiler correctness for the emitted bytecode; the claim is
-  "the same verdict on the same specification", per the CLAUDE.md
-  separation of claims.
-- Deleting the deprecated packages before the ledger is complete.
+Paths below are relative to
+[`leaner-e2e-tests/LeanerE2ETests/Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/);
+each name denotes a `.lean` file. All 61 existing files appear exactly once.
+The problem column summarizes observed failures and known missing support,
+not a claim that fixing the first error will finish the file.
+
+### Language (19 files: 8 pass, 11 fail)
+
+| File | Status | Passing coverage / remaining problem |
+|---|---|---|
+| `Language/Abilities` | PASS | Declaration and ability metadata; no verification targets. |
+| `Language/Addresses` | FAIL — native gap | Resource reads and reference locals/calls remain unsupported. |
+| `Language/Arithmetic` | FAIL — native gap | Ten scalar targets pass; resource-reference `multiply` and `divide` do not. |
+| `Language/Attributes` | PASS | Declaration metadata, diagnostics, and round trips; not a verification port. |
+| `Language/ControlForms` | FAIL — native gap | Fifteen targets pass, including conditional assignment and checked assertions; reference/tuple and other unsupported body shapes remain. |
+| `Language/EmptyModule` | PASS | Empty-module elaboration/preparation; no verification targets. |
+| `Language/EnumPatterns` | PASS | All six verified targets and interpreter assertions. |
+| `Language/EnumPayloads` | FAIL — native gap | Unsupported value and checked-arithmetic shapes remain in payload/vector cases. |
+| `Language/EnumRefs` | PASS | Execution-only: sixteen functions and ten execution assertions, **zero verifies**. |
+| `Language/Enums` | PASS | All five verified targets and interpreter assertions. |
+| `Language/Generics` | FAIL — native gap | Generic aggregates/results, resource operations, and vector type metadata remain unsupported. |
+| `Language/Integers` | PASS | All twelve verified targets, including the shared-reference case, and interpreter assertions. |
+| `Language/Literals` | FAIL — native gap | `fixed_address` passes; vector classification does not. |
+| `Language/Loops` | FAIL — native gap | Ten targets in the original module and two return-scope regressions pass native audits. Only `drain` remains a verification gap: resource/reference loop state. |
+| `Language/PositionalStructs` | PASS | Both verified targets and interpreter assertions. |
+| `Language/Signed` | FAIL — native gap | Five scalar arithmetic targets pass; resource-reference `credit` does not. The port must retain VM-correct remainder overflow. |
+| `Language/Tuples` | FAIL — native gap | Tuple parameter/result and local-sequencing representations remain unsupported. |
+| `Language/VectorOperations` | FAIL — native gap | `borrowed_length`, `nested`, `bool_round_trip`, `read_out_of_bounds` pass; remaining operations include mutation and unresolved value/type shapes. |
+| `Language/Vectors` | FAIL — native gap | `make`, `length`, `middle` pass; `replace`, `insert_middle`, `remove_middle` do not. |
+
+### Verification (30 files: 7 pass, 23 fail)
+
+| File | Status | Passing coverage / remaining problem |
+|---|---|---|
+| `Verification/Aborts` | FAIL — native gap | Six state-free targets pass; resource-backed `withdraw` does not. Intentional false-contract rejection is separate. Includes the v0 `AbortDirections` port. |
+| `Verification/Account` | FAIL — native gap | Resource-effect function shapes remain unsupported. |
+| `Verification/BorrowCertificates` | PASS | Certificate assertions, not source verification targets. |
+| `Verification/Callees` | FAIL — native gap | Reference locals, unavailable native callee summaries, and recursive/effectful cases remain. |
+| `Verification/Calls` | FAIL — native gap | Reference locals and unsupported parameter/result/effect shapes remain. |
+| `Verification/Composition` | FAIL — native gap | Native callee availability and supported call-argument shapes remain incomplete. |
+| `Verification/CorePrimitives` | FAIL — native gap | Unsupported effectful body shapes and local arithmetic remain. |
+| `Verification/Corpus` | FAIL — native gap | Reference locals and unsupported effectful function shapes remain. |
+| `Verification/CrossInv` | FAIL — native gap | Cross-resource invariant bodies need native reference/storage effects. |
+| `Verification/EnumRefs` | FAIL — native gap | Selected-variant payload handling and reference locals remain incomplete. |
+| `Verification/GenericScalarCalls` | PASS | Ten verified targets and eight generic-summary reuse guards. |
+| `Verification/GenericStorage` | FAIL — native gap | Generic storage operations and their value representations remain unsupported. |
+| `Verification/Generics` | PASS | Four existing native proofs and native-artifact checks; not the broader `Language/Generics` fixture. |
+| `Verification/GlobalBorrows` | FAIL — native gap | Resource/reference effects and reference locals remain unsupported. |
+| `Verification/GlobalInv` | FAIL — native gap | Resource mutation/invariant bodies and value representations remain unsupported. |
+| `Verification/Increment` | PASS | Positive verification seed. |
+| `Verification/Invariants` | FAIL — native gap | Native arithmetic/input handling, enum invariant closing, and resource-effect cases remain. |
+| `Verification/Loans` | FAIL — native gap | Native loan/reference effects and composition remain incomplete. |
+| `Verification/LoopInvariants` | FAIL — native gap | `count_to` and `sum_ones` pass; `clear` needs mutable vector/reference loop state. |
+| `Verification/Loops` | PASS | `count_to` and `count_to_with_continue` pass with native audits. |
+| `Verification/LooseFrame` | FAIL — native gap | Native resource-effect bodies remain unsupported. |
+| `Verification/Normalized` | FAIL — native gap | Reference locals and unsupported value representations remain. |
+| `Verification/Prophecies` | FAIL — native gap | Reference locals remain unsupported. |
+| `Verification/Read` | FAIL — native gap | Reference-local sequencing remains unsupported. |
+| `Verification/References` | FAIL — native gap | Returned-reference representations and reference/effectful function shapes remain. This is **not** the v0 `Verification/ReturnedMutRefs` port. |
+| `Verification/ResourceComposition` | FAIL — native gap | Native sequential resource-write composition remains unsupported. |
+| `Verification/Rust` | FAIL — native gap | Reference-local and effectful function shapes remain unsupported. Separate from the passing Rust package gate. |
+| `Verification/SpecLogicalArithmetic` | PASS | Current logical-arithmetic verification/assertions pass. |
+| `Verification/Storage` | FAIL — native gap | Native reference/storage effects and value representations remain unsupported. |
+| `Verification/Typed` | PASS | Native struct identity verification; expected `#check` output matches. Typed compatibility adapters still appear in interface assertions. |
+
+### Negative and support (12 files: 4 pass, 8 fail)
+
+Negative fixtures can contain positive controls. A correct rejection does not
+make the file pass if its intended positive proof fails.
+
+| File | Status | Passing coverage / remaining problem |
+|---|---|---|
+| `Negative/BorrowGlobals` | PASS | Borrow-safety rejection and positive execution controls. |
+| `Negative/Borrows` | FAIL — native gap | Positive reference-local proofs fail; not merely a diagnostic mismatch. |
+| `Negative/IntrinsicUnsupported` | PASS | Schema/lowering rejection and validation controls; not native-map execution support. |
+| `Negative/LoopInvariants` | FAIL — diagnostics | Incorrect invariant contracts reject through native generation; diagnostic text/reasons still need review against the baseline. |
+| `Negative/Lowering` | FAIL — native gap | Positive resource/value-representation cases fail, including missing `receiver_insert` proof. |
+| `Negative/ReturnedMutRefs` | FAIL — native gap | Local/global-root return rejections are retained; valid parameter-derived reference proofs still lack native support. |
+| `Negative/Specifications` | FAIL — native gap | The positive old-value proof fails on reference-local sequencing. |
+| `Negative/Surface` | PASS | Intended surface rejections, execution controls, and round trips. |
+| `Negative/Verification` | FAIL — diagnostics | Wrong contracts reject; native failure diagnostics differ from the baseline. |
+| `Negative/WrongIncrement` | FAIL — diagnostics | Wrong increment rejects; native failure diagnostics differ from the baseline. |
+| `PreparationRetry` | PASS | Preparation/retry assertions and the constant function's native verification. |
+| `VectorBounds` | FAIL — native gap | `read_bad` and `read_reference` pass; mutable indexing and remaining value/local shapes do not. |
+
+### Missing v0 fixtures (outside the 61-file audit)
+
+| v0 file | Status | Remaining work |
+|---|---|---|
+| `Verification/OrderedMap.lean` | MISSING | Port nine proof-carrying verification targets and their dependencies. |
+| `Verification/Quicksort.lean` | MISSING | Port three proof-carrying verification targets and their dependencies. |
+| `Verification/ReturnedMutRefs.lean` | MISSING | Port the 66-target verification corpus; the hand `References` and negative fixture do not replace it. |
+| `Verification/SpecFunctions.lean` | MISSING | Port twelve verification targets. |
+| `Verification/Summaries.lean` | MISSING | Port three verification targets. |
+| `Negative/SpecFunctions.lean` | MISSING | Port the diagnostic cases. |
+| `Language/BorrowChecker.lean` | MISSING | Port the language/borrow-checker cases. |
+
+## Last completed implementation batch and next work
+
+The last completed batch automatically emits a typed ownership-output body,
+authored native contract, exact execution agreement, and checked boundary
+transport for a direct integer-literal assignment through one mutable
+fixed-width integer parameter, with no extra locals or returned values.
+It does not recognize test names or synthesize a contract from the body.
+`ensures` uses the typed updated owner; `old(...)` uses its entry value.
+
+At that audit, `NativeMutableGenerated` had nine positive cases, three
+false-contract rejections, and five execution/result/loan assertions. It covered
+signed/unsigned widths, `old`, conditional abort codes, partial/strict/unspecified
+abort behavior, and absent postconditions. The route regression's direct
+writer passed natively; its reborrow case remained an explicit rejection.
+Failed generation rolls back all native artifacts. These counts describe the
+completed batch, not the newer focused extension documented above.
+
+Extra reference locals, reborrows, owner-returning callee summaries, and generic
+boundary transport remain unsupported. Neither `clear` nor `drain` is promoted.
+
+Generated owner contracts are translated independently of the assignment body.
+The native VC proves the authored predicates; the boundary transports those
+facts to the source contract and performs loan export only in the agreement
+layer. Dependency guards check both the generated computation and its native
+postcondition for encoded values, codecs, frames, and boundary finalization.
+Generation uses the existing verification cap synchronously and rejects any
+proof-stage error before publishing a native source theorem.
+
+The earlier explicit boundary, mutation/invariant, scalar/nested-loop, and
+early-return regressions remain passing. No existing budget or baseline was
+relaxed. This is prerequisite implementation, not a completed port of a failing
+Check file. Next, compose dereference/checked replacement evaluation with owner
+updates, then reference-local/reborrow handling and owner-returning summaries.
+
+Next priorities are native mutable vector/reference loop state (`clear` and
+`drain`), reference/storage effects and composition, generic aggregates, and
+remaining control/call shapes. Continue existing native migrations before new
+v0 ports. Fix diagnostic mismatches by reviewing intended behavior, never by
+accepting unsupported positive proofs as expected failures. Performance remains
+a completion gate, not a later optimization task.
+
+## Test convention and completion rules
+
+A Check file is LeanerLang source, with contracts, `verify` commands and its
+execution/diagnostic assertions. Discover every `Check/**/*.lean`; run each in
+its own Lean process under the unchanged 50M per-command verification cap.
+Compare all diagnostics to the adjacent `.exp`; absence of `.exp` means empty
+output. Expected failures belong in negative cases, not in a baseline that hides
+a missing positive proof. `UB=1` deliberately updates baselines and requires
+review; ordinary builds must not rewrite them.
+
+Run the Check driver from `leaner-e2e-tests` with
+`LEANER_E2E_SUITE=check lake test`. Keep assertion-style IR, Move and Rust tests
+in their owning packages. Keep native cost regressions and the separate
+`LeanerLang/Tests/Performance` gate; do not raise caps to count a port as done.
+Use explicit `#leaner_require_native` assertions for partial migrations and
+`#leaner_require_native_all` for completed verification fixtures, in addition to
+the automatic audit performed by `verify`.
+
+T0 (Check driver) and T3 (moving hand fixtures into Check) are implemented.
+T1 (v0 parity with native verification) is incomplete as recorded above.
+T2 (elaborating/verifying frontend-produced LeanerLang) has not started.
+Do not run or extend the deprecated packages: their tests are reference material.
+No Move Prover differential is planned. Source verification is not a
+compiler-correctness theorem for emitted bytecode.
+
+## Audit evidence and maintenance
+
+The per-file tables and completed-batch gates use the 2026-09-08 generated-owner
+audit. They have not been rerun for the unfinished changes listed above. Local logs:
+
+- Check summary: `/tmp/dev3-native-owner-check-audit1.log`.
+- Per-file results: `/tmp/dev3-native-owner-audit.qHGzPJ/`.
+- Native units/executions: `/tmp/dev3-native-owner-unit-gate1.log`.
+- Source generation: `/tmp/dev3-native-owner-generator-build10.log`.
+- IR: `/tmp/dev3-native-owner-ir-gate1.log`; Move/Rust:
+  `/tmp/dev3-native-owner-{move,rust}-gate1.log`.
+
+Older failed boundary builds were superseded by the completed batch, and the
+checked-expression square failure by the focused rerun above. The six full-IR
+failures and 42 Check failures remain outstanding; no full audit has been run
+for the checked-expression changes.
+
+These local logs are ephemeral; the test sources and checked-in baselines are
+the reproducible evidence. After each batch, update the date, counts, affected
+rows, gate results, and latest-batch paragraph **in place**. Record commits
+separately. Put detailed chronology in
+[the history archive](test-organization-history.md), not another competing
+status table. Preserve original v0 case mappings and semantic decisions there.

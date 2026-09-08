@@ -94,6 +94,10 @@ older source-specific work those packages own.
   current verification design — the frame-free row route that proves every
   generated theorem by its row script, its status table, the corpus census
   ledger, and the recursive fixed point.
+- [`designs/generic-route.md`](designs/generic-route.md): the generic route
+  replacing the per-shape row scripts — verification by normalization of a
+  computational denotation, piloted on `withdraw` and benchmarked before
+  generalizing, with correctness and performance gates over the corpus.
 - [`designs/test-organization.md`](designs/test-organization.md): verification
   checks as baselines under `leaner-e2e-tests/LeanerE2ETests/Check/` and
   the ledger of v0 tests ported so far.

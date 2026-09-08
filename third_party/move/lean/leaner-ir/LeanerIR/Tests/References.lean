@@ -3,6 +3,7 @@
 
 import LeanerIR.Proofs.Interpreter
 import LeanerIR.Validation.Check
+import Lean
 
 namespace LeanerIR.Tests.References
 
@@ -10,6 +11,43 @@ open LeanerIR
 open LeanerIR.Import
 open LeanerIR.SemanticOperations
 open LeanerIR.Validation
+
+#guard [0, 1, 2, 3, 4, 7, 8, 17, 31, 32, 33, 65, 129].all fun count =>
+  let values := Array.range count
+  let index := IndexedArena.ofArray values
+  ((List.range (count + 3)).cons 1000000000).all fun position =>
+    index.get? position == values[position]?
+
+set_option maxHeartbeats 1000 in
+example (values : Array α) (position : Nat) :
+    (IndexedArena.ofArray values).get? position = values[position]? :=
+  IndexedArena.get?_ofArray values position
+
+set_option maxHeartbeats 1000 in
+example {α : Type} (a b c d : α) :
+    sortByIndex [(3, a), (1, b), (2, c), (1, d)] =
+      [(1, b), (1, d), (2, c), (3, a)] := by
+  -- Match preparation's certificate path: emit reflexivity and let the
+  -- kernel check reduction, without a duplicate elaborator conversion.
+  run_tac (← Lean.Elab.Tactic.getMainGoal).refl (check := false)
+
+set_option maxHeartbeats 1000 in
+example (a b c : Place) :
+    applyPlaceCopies #[a, b, c] [(1, ⟨0⟩), (2, ⟨1⟩)] = #[a, a, a] := by
+  run_tac (← Lean.Elab.Tactic.getMainGoal).refl (check := false)
+
+/- An independent sequential oracle covers both copy orders, transitive
+copies, and overwrites of the same slot. Place contents are not inspected. -/
+#guard Id.run do
+  let original : Array Place := #[.localVar ⟨0⟩, .deref ⟨0⟩, .localVar ⟨1⟩, .deref ⟨2⟩]
+  let events := (List.range 4).flatMap fun index =>
+    (List.range 4).map fun base => (index, (⟨base⟩ : PlaceId))
+  return events.all fun first => events.all fun second =>
+    let copies := [first, second]
+    applyPlaceCopies original copies == copies.foldl
+      (fun places (index, base) => places.set! index places[base.index]!) original
+
+#guard applyPlaceCopies #[.localVar ⟨0⟩] [(3, ⟨0⟩)] == #[.localVar ⟨0⟩]
 
 private def config : ProfileConfig := { profile := .rust, name := "rust-test" }
 private def schema : ProfileSchema := { profile := .rust, name := "rust-test" }
@@ -85,9 +123,65 @@ private def fixture : RawUnit where
           mutable := false, loc := ⟨13⟩ }]
       }] }]
 
+/- Duplicate edges, cycles, unreachable places, and place-index expressions
+exercise the queue-once bound independently of type-directed erasure. -/
+#guard match validate #[schema] fixture with
+  | .error _ => false
+  | .ok checked => Id.run do
+      let original := checked.namespaces[0]!
+      let node := original.expressions[0]!
+      let ns := { original with
+        expressions := #[
+          { node with kind := .block ((Array.replicate 64 ⟨1⟩).push ⟨0⟩) none },
+          { node with kind := .operation (.read ⟨1⟩) #[] #[] },
+          { node with kind := .operation (.read ⟨3⟩) #[] #[] }]
+        places := #[.localVar ⟨0⟩, .deref ⟨0⟩, .localVar ⟨1⟩, .deref ⟨2⟩] }
+      if reachableDereferences ns ⟨0⟩ != [(1, ⟨0⟩)] ||
+          reachableDereferences ns ⟨2⟩ != [(3, ⟨2⟩)] ||
+          !(reachableDereferences ns ⟨3⟩).isEmpty ||
+          !(reachableDereferences ns ⟨1000000000⟩).isEmpty then return false
+      let indexed := { ns with
+        expressions := ns.expressions.set! 1
+          { node with kind := .operation (.read ⟨4⟩) #[] #[] }
+        places := ns.places.push (.index ⟨0⟩ ⟨2⟩) }
+      return reachableDereferences indexed ⟨0⟩ == [(3, ⟨2⟩)]
+
 private def executable? : Option ExecutableUnit := do
   let checked ← (validate #[schema] fixture).toOption
   (prepareExecution #[semantics] checked).toOption
+
+/- The erasure precheck must look through containers and mutable references:
+their projected contents can still be shared references. -/
+#guard [3, 4, 5, 6].all fun rootType => Id.run do
+  let shared : Ty := .reference {
+    profile := .rust, kind := .shared, referent := ⟨1⟩, lifetime := ⟨0⟩ }
+  let nested : Ty := .reference {
+    profile := .rust, kind := .mutable, referent := ⟨3⟩, lifetime := ⟨0⟩ }
+  let source := fixture.namespaces[0]!
+  let function := source.functions[0]!
+  let places : Array Place := if rootType == 3 then
+      #[.localVar ⟨0⟩, .localVar ⟨1⟩, .deref ⟨1⟩]
+    else if rootType == 5 then
+      #[.localVar ⟨1⟩, .deref ⟨0⟩, .deref ⟨1⟩]
+    else
+      #[.localVar ⟨1⟩, .index ⟨0⟩ ⟨0⟩, .deref ⟨1⟩]
+  let raw := { fixture with
+    tables := { fixture.tables with
+      types := fixture.tables.types ++ #[shared, .vector ⟨3⟩, nested, .tuple #[⟨3⟩]] }
+    namespaces := #[{ source with
+      places
+      expressions := source.expressions.set! 0
+        { source.expressions[0]! with kind := .value (.integer 0) }
+      functions := #[{ function with
+        signature := { function.signature with parameters := #[
+          { name := "value", typeUse := typeUse 1 10, mutable := true },
+          { name := "reference", typeUse := typeUse rootType 10 }] }
+        body := .structured ⟨4⟩
+        locals := function.locals.set! 1
+          { function.locals[1]! with type := typeUse rootType 10 } },
+        { source.functions[1]! with body := .absent }] }] }
+  let some checked := (validate #[schema] raw).toOption | return false
+  return sharedReferenceErasureChunks checked == #[#[[(2, ⟨1⟩)], []]]
 
 private def verifiable? : Option VerifiableUnit := do
   let checked ← (validate #[schema] fixture).toOption
@@ -179,6 +273,73 @@ private def markerExecutable? : Option ExecutableUnit := do
   let checked ← (validate #[schema] markerFixture).toOption
   (prepareExecution #[semantics] checked).toOption
 
+-- An independent sequential reference for the batched preparation pass.
+-- It pins the complete arena, not just marker counts or execution results.
+private def sequentialMarkers (unit : ValidatedUnit) (ns : ValidatedNamespace) : Array Expr := Id.run do
+  let mut marks : Array (ExprId × Array LoanId × Array LoanId) := #[]
+  for certificate in unit.borrowCertificates do
+    if certificate.namespaceId != ns.identity then continue
+    for (loan, index) in certificate.loans.zipIdx do
+      for death in loan.deaths do
+        let position := (marks.findIdx? (·.1 == death.anchor)).getD marks.size
+        if position == marks.size then marks := marks.push (death.anchor, #[], #[])
+        let (anchor, before, after) := marks[position]!
+        let loanId : LoanId := ⟨index⟩
+        let insert (values : Array LoanId) :=
+          if values.contains loanId then values else values.push loanId
+        marks := marks.set! position
+          (anchor, if death.before then insert before else before,
+            if death.before then after else insert after)
+  let mut expressions := ns.expressions
+  for (anchor, before, after) in marks do
+    let node := expressions[anchor.index]!
+    let mut current := node
+    if !after.isEmpty then
+      let moved : ExprId := ⟨expressions.size⟩
+      current := { node with kind := .operation (.reference (.endLoan after)) #[] #[moved] }
+      expressions := expressions.push node |>.set! anchor.index current
+    if !before.isEmpty then
+      let moved : ExprId := ⟨expressions.size⟩
+      let markerId : ExprId := ⟨expressions.size + 1⟩
+      let marker : Expr := {
+        loc := node.loc
+        typeId := ⟨0⟩
+        kind := .operation (.reference (.endLoan before)) #[] #[] }
+      let wrapper := { node with kind := .block #[markerId] (some moved) }
+      expressions := expressions.push current |>.push marker |>.set! anchor.index wrapper
+  return expressions
+
+private def manyMarkerFixture (count : Nat) : RawUnit := Id.run do
+  let source := markerFixture.namespaces[0]!
+  let mut expressions := #[]
+  let mut functions := #[]
+  for index in [:count] do
+    let base := expressions.size
+    let expr (offset : Nat) : ExprId := ⟨base + offset⟩
+    let nodes := source.expressions
+      |>.set! 3 { source.expressions[3]! with
+        kind := .operation (.write ⟨2⟩) #[] #[expr 2] }
+      |>.set! 5 { source.expressions[5]! with kind := .block #[expr 3] (some (expr 4)) }
+      |>.set! 6 { source.expressions[6]! with kind := .letDecl ⟨1⟩ (some (expr 1)) (expr 5) }
+      |>.set! 7 { source.expressions[7]! with kind := .letDecl ⟨0⟩ (some (expr 0)) (expr 6) }
+    expressions := expressions ++ nodes
+    functions := functions.push { source.functions[0]! with
+      name := ⟨index⟩
+      body := .structured (expr 7) }
+  return { markerFixture with
+    tables := { markerFixture.tables with names := (Array.range count).map fun index =>
+      { namespaceId := ⟨0⟩, name := s!"marker_{index}" } }
+    namespaces := #[{ source with expressions, functions }] }
+
+#guard [fixture, markerFixture, manyMarkerFixture 32].all fun raw =>
+  match (validate #[schema] raw).toOption with
+  | none => false
+  | some unit =>
+      let (marked, diagnostics) := markLoanDeaths unit
+      diagnostics.isEmpty &&
+        (unit.namespaces.zip marked.namespaces).all fun (before, after) =>
+          after.expressions == sequentialMarkers unit before
+
 -- The analysis records the death before the lender's consuming move.
 #guard match (validate #[schema] markerFixture).toOption with
   | some checked =>
@@ -208,6 +369,41 @@ private def markerExecutable? : Option ExecutableUnit := do
       | .ok (_, { value := .returned #[.integer 9], .. }) => true
       | _ => false
   | none => false
+
+/-- An unrelated specification must not keep every old reference live.
+The first borrow is dead before its successor, despite the spec statement. -/
+private def successorBorrowFixture : RawUnit :=
+  let ns := markerFixture.namespaces[0]!
+  let expressions := ns.expressions.set! 4 {
+    loc := ⟨4⟩, typeId := ⟨2⟩, kind := .operation (.borrow .mutable ⟨0⟩) #[] #[] }
+  let expressions := expressions.set! 5 {
+    loc := ⟨5⟩, typeId := ⟨1⟩, kind := .block #[⟨3⟩, ⟨10⟩] (some ⟨8⟩) }
+  let expressions := expressions.push
+      { loc := ⟨11⟩, typeId := ⟨1⟩,
+        kind := .operation (.reference .dereference) #[] #[⟨4⟩] }
+  let expressions := expressions.push {
+    loc := ⟨12⟩, typeId := ⟨3⟩, kind := .value (.bool true) }
+  let expressions := expressions.push {
+    loc := ⟨13⟩, typeId := ⟨0⟩, kind := .spec {
+      loc := ⟨13⟩, conditions := #[{ loc := ⟨13⟩, kind := .assertion, expression := ⟨9⟩ }] } }
+  { markerFixture with
+    tables := { markerFixture.tables with types := markerFixture.tables.types.push .bool }
+    namespaces := #[{ ns with expressions }] }
+
+#guard match (validate #[schema] successorBorrowFixture).toOption with
+  | none => false
+  | some checked => match (prepareExecution #[semantics] checked).toOption with
+    | none => false
+    | some executable =>
+      executable.unit.borrowCertificates.any (·.loans.size == 2) &&
+      executable.unit.borrowCertificates.all fun certificate =>
+        certificate.loans.zipIdx.all fun (loan, index) =>
+          SemanticOperations.certificateLoanId? executable.unit certificate.namespaceId
+            loan.expression == some index &&
+          (match executable.unit.namespaces[certificate.namespaceId.index]?.bind
+              (·.expressions[loan.expression.index]?) with
+           | some { kind := .operation (.borrow ..) .., .. } => true
+           | _ => false)
 
 private def lifetimeClosureFixture : RawUnit :=
   let ns := fixture.namespaces[0]!
@@ -2596,6 +2792,21 @@ private def dynamicIndexFixture : RawUnit :=
 
 #guard preparationHasCode dynamicIndexFixture "LIR-SEMANTIC-PLACE-INDEX"
 
+-- Mathematical indexes are admitted only in logical specification bodies,
+-- never in executable places (even when their value is a small literal).
+#guard Id.run do
+  let ns := dynamicIndexFixture.namespaces[0]!
+  let raw := { dynamicIndexFixture with
+    tables := { dynamicIndexFixture.tables with
+      types := dynamicIndexFixture.tables.types.push (.integer .unbounded true) }
+    namespaces := #[{ ns with
+      expressions := ns.expressions.set! 10 {
+        ns.expressions[10]! with typeId := ⟨4⟩, kind := .value (.integer 0) } }] }
+  return match validate #[schema] raw with
+    | .error diagnostics => diagnostics.any fun diagnostic =>
+        diagnostic.message.endsWith "place index is not a nonzero fixed-width integer"
+    | .ok _ => false
+
 private def projectedMoveFixture : RawUnit :=
   let ns := fixture.namespaces[0]!
   { fixture with namespaces := #[{
@@ -2666,7 +2877,7 @@ private theorem successfulRunHasDerivation (executable : ExecutableUnit)
     (fuel : Nat) (function : FunctionHandle) (arguments : Array RuntimeValue)
     (success : (LeanerIR.Interpreter.run executable fuel function arguments).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
-      BigStep.EvalFunction executable function {} arguments finalState outcome.value := by
+      BigStep.EvalFunction executable function #[] {} arguments finalState outcome.value := by
   generalize result_eq : LeanerIR.Interpreter.run executable fuel function arguments = result
   cases result with
   | error error => simp [result_eq, Except.isOk, Except.toBool] at success
@@ -2677,14 +2888,14 @@ private theorem successfulRunHasDerivation (executable : ExecutableUnit)
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
     BigStep.EvalFunction prepared { namespaceId := ⟨0⟩, functionId := ⟨0⟩ }
-      {} #[] finalState outcome.value := by
+      #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation prepared 32
     { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } #[]
   native_decide
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
     BigStep.EvalFunction valuePrepared { namespaceId := ⟨0⟩, functionId := ⟨2⟩ }
-      {} #[] finalState outcome.value := by
+      #[] {} #[] finalState outcome.value := by
   apply successfulRunHasDerivation valuePrepared 32
     { namespaceId := ⟨0⟩, functionId := ⟨2⟩ } #[]
   native_decide

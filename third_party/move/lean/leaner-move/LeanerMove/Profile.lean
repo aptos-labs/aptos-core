@@ -47,7 +47,11 @@ private def classifySemanticTag (site : ProfileSemanticSite)
   match site with
   | .type => none
   | .constant => none
-  | .operation | .borrow | .throw_ | .call => none
+  | .operation | .borrow | .call => none
+  | .throw_ =>
+      if value.tag == "runtime.vector_error" && value.payload.isEmpty then
+        some .executable
+      else none
   | .surface => none
   | .property =>
       if propertyTags.contains value.tag then some .frontendOnly
@@ -60,13 +64,16 @@ def semantics : SemanticProfile where
   name := profileName
   version := profileVersion
   classify := classifySemanticTag
-  rollbackThrow := fun kind => kind == .abort
+  rollbackThrow := fun kind => kind == .abort ||
+    kind == .profile { profile := .move, tag := "runtime.vector_error" }
 
 /-- Whether every tag admitted by the structural Move schema has an explicit
 M0 semantic classification at its owning semantic site. -/
 def semanticInventoryComplete : Bool :=
-  propertyTags.all fun tag =>
-    (classifySemanticTag .property { profile := .move, tag }).isSome
+  (propertyTags.all fun tag =>
+    (classifySemanticTag .property { profile := .move, tag }).isSome) &&
+  (classifySemanticTag .throw_
+    { profile := .move, tag := "runtime.vector_error" }).isSome
 
 private def unknown (kind : String) (value : ProfileValue) : Array Diagnostic :=
   #[.error "LIR-MOVE-TAG" s!"unknown Move {kind} tag `{value.tag}`"]
@@ -80,7 +87,9 @@ def schema : ProfileSchema where
   version := profileVersion
   checkReference := fun _ => #[]
   checkType := checkTag "type" #[]
-  checkOperation := checkTag "operation" #[]
+  checkOperation := fun value =>
+    if value.tag == "runtime.vector_error" && value.payload.isEmpty then #[]
+    else unknown "operation" value
   checkSurface := checkTag "surface" #[]
   checkProperty := checkTag "property" propertyTags
   checkIntrinsic := Intrinsics.check

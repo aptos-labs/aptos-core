@@ -143,9 +143,7 @@ leaner module 0x1::option where
   public fun borrow_with_default {Element}(
     self : &Option<Element>, default_ref : &Element
   ) -> &Element :=
-    match self with
-      | Option<Element>::None {} => default_ref
-      | Option<Element>::Some { e := e } => e
+    if self is None then default_ref else self.e
 
   spec borrow_with_default where
     pragma opaque
@@ -159,9 +157,7 @@ leaner module 0x1::option where
   public fun get_with_default {Element has Copy, Drop}(
     self : &Option<Element>, default : Element
   ) -> Element :=
-    match self with
-      | Option<Element>::None {} => default
-      | Option<Element>::Some { e := e } => *e
+    if self is None then default else self.e
 
   spec get_with_default where
     pragma opaque
@@ -176,9 +172,7 @@ leaner module 0x1::option where
     self : &mut Option<Element>, e : Element
   ) -> Unit := do
     let «old» := replace(self, new Option<Element>::Some { e })
-    match «old» with
-      | Option<Element>::None {} => ()
-      | Option<Element>::Some { e := _ } => abort(EOPTION_IS_SET)
+    assert!(«old» is None, EOPTION_IS_SET)
 
   spec fill where
     pragma opaque
@@ -192,9 +186,7 @@ leaner module 0x1::option where
   -/
   public fun extract {Element}(self : &mut Option<Element>) -> Element := do
     let inner := replace(self, new Option<Element>::None {})
-    return match inner with
-      | Option<Element>::Some { e := e } => e
-      | Option<Element>::None {} => abort(EOPTION_NOT_SET)
+    return if inner is Some then inner.e else abort(EOPTION_NOT_SET)
 
   spec extract where
     pragma opaque
@@ -209,9 +201,10 @@ leaner module 0x1::option where
   public fun borrow_mut {Element}(
     self : &mut Option<Element>
   ) -> &mut Element :=
-    match self with
-      | Option<Element>::None {} => abort(EOPTION_NOT_SET)
-      | Option<Element>::Some { e := e } => e
+    if self is None then abort(EOPTION_NOT_SET)
+    else
+      let e := &mut self.e
+      return e
 
   spec borrow_mut where
     aborts_if self.is_none() with EOPTION_NOT_SET
@@ -225,9 +218,10 @@ leaner module 0x1::option where
   public fun swap {Element}(
     self : &mut Option<Element>, el : Element
   ) -> Element :=
-    match self with
-      | Option<Element>::None {} => abort(EOPTION_NOT_SET)
-      | Option<Element>::Some { e := e } => replace(e, el)
+    if self is None then abort(EOPTION_NOT_SET)
+    else
+      let e := &mut self.e
+      return replace(e, el)
 
   spec swap where
     pragma opaque
@@ -257,9 +251,7 @@ leaner module 0x1::option where
   public fun destroy_with_default {Element has Drop}(
     self : Option<Element>, default : Element
   ) -> Element :=
-    match self with
-      | Option<Element>::None {} => default
-      | Option<Element>::Some { e := e } => e
+    if self is None then default else self.e
 
   spec destroy_with_default where
     pragma opaque
@@ -271,9 +263,7 @@ leaner module 0x1::option where
   Aborts if `self` does not hold a value
   -/
   public fun destroy_some {Element}(self : Option<Element>) -> Element :=
-    match self with
-      | Option<Element>::None {} => abort(EOPTION_NOT_SET)
-      | Option<Element>::Some { e := e } => e
+    if self is None then abort(EOPTION_NOT_SET) else self.e
 
   spec destroy_some where
     pragma opaque
@@ -285,9 +275,7 @@ leaner module 0x1::option where
   Aborts if `self` holds a value
   -/
   public fun destroy_none {Element}(self : Option<Element>) -> Unit :=
-    match self with
-      | Option<Element>::None {} => ()
-      | Option<Element>::Some { e := _ } => abort(EOPTION_IS_SET)
+    assert!(self is None, EOPTION_IS_SET)
 
   spec destroy_none where
     pragma opaque
@@ -298,9 +286,7 @@ leaner module 0x1::option where
   and an empty vector otherwise
   -/
   public fun to_vec {Element}(self : Option<Element>) -> Vector<Element> :=
-    match self with
-      | Option<Element>::None {} => vector<Element>[]
-      | Option<Element>::Some { e := e } => singleton(e)
+    if self is None then vector<Element>[] else singleton(self.e)
 
   spec to_vec where
     pragma opaque

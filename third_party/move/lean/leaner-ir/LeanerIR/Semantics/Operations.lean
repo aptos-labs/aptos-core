@@ -17,6 +17,54 @@ namespace SemanticOperations
 
 open Validation
 
+/-- Apply the compact type-id substitution carried by a function frame.
+The row is deliberately sparse: ids not affected by the invocation are
+identity-mapped without an allocation or table lookup. -/
+@[irreducible] def instantiatedTypeId (instantiation : Array (TypeId × TypeId))
+    (typeId : TypeId) : TypeId :=
+  (instantiation.find? fun entry => entry.1 == typeId).map (·.2) |>.getD typeId
+
+@[simp] theorem instantiatedTypeId_empty (typeId : TypeId) :
+    instantiatedTypeId #[] typeId = typeId := by
+  simp only [instantiatedTypeId, Array.find?_empty, Option.map_none,
+    Option.getD_none]
+
+/-- Rewrite type arguments inherited from an outer generic invocation before
+they are used to instantiate a direct callee. -/
+def instantiateGenericArguments (outer : Array (TypeId × TypeId))
+    (arguments : Array GenericArgument) : Array GenericArgument :=
+  arguments.map fun argument => match argument with
+    | .typeArg value => .typeArg
+        { value with typeId := instantiatedTypeId outer value.typeId }
+    | argument => argument
+
+/-- Compute the sparse declaration-type substitution for one generic call.
+The shared type arena already contains every structurally instantiated node;
+the scan happens once at the call boundary, while storage operations perform
+only a lookup in the resulting compact array. -/
+def invocationTypeInstantiation (ns : ValidatedNamespace)
+    (outer : Array (TypeId × TypeId))
+    (arguments : Array GenericArgument) : Array (TypeId × TypeId) :=
+  let arguments := instantiateGenericArguments outer arguments
+  (Array.range ns.tables.types.size).foldl (init := #[]) fun result index =>
+    let symbolic : TypeId := ⟨index⟩
+    match Validation.instantiatePlaceFieldType? ns arguments symbolic with
+    | some concrete =>
+        if concrete == symbolic then result else result.push (symbolic, concrete)
+    | none => result
+
+/-- Resolve the target namespace and build its invocation substitution. A
+validated direct-call handle always selects a namespace; the empty fallback
+keeps this helper total for defensive consumers. Monomorphic callees do not
+inherit the caller's substitution and need no scan of the type arena. -/
+def callTypeInstantiation (unit : ValidatedUnit) (handle : FunctionHandle)
+    (outer : Array (TypeId × TypeId))
+    (arguments : Array GenericArgument) : Array (TypeId × TypeId) :=
+  if arguments.isEmpty then #[] else
+    match unit.namespaces[handle.namespaceId.index]? with
+    | some ns => invocationTypeInstantiation ns outer arguments
+    | none => #[]
+
 def referencedName? (ns : ValidatedNamespace) (reference : QualifiedRef) :
     Option (NamespaceRef × String) := do
   let name ← ns.tables.names[reference.name.index]?
@@ -414,6 +462,127 @@ def checkedModuloIntegers? (failure : ThrowKind) (resultType : Ty)
           return checkedInteger failure resultType (left - quotient * right)
   | _ => none
 
+/-- Value-level insertion shared by execution and normalized proofs. The
+end position is valid; negative and beyond-end indexes preserve the abort. -/
+def insertVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements, .integer index, value] =>
+      if index < 0 || elements.size < index.toNat then
+        some (.error (.abort, #[.integer index]))
+      else some (.ok (.vector (elements.insertIdxIfInBounds index.toNat value)))
+  | _ => none
+
+/-- Removal transfers the removed element along with the updated vector;
+unlike insertion, the end position is out of bounds. -/
+def removeVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements, .integer index] =>
+      if index < 0 then some (.error (.abort, #[.integer index]))
+      else match elements[index.toNat]? with
+        | some value => some (.ok (.tuple #[value,
+            .vector (elements.eraseIdxIfInBounds index.toNat)]))
+        | none => some (.error (.abort, #[.integer index]))
+  | _ => none
+
+/-- Swap two vector elements without allocating an intermediate list. -/
+def swapVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements, .integer left, .integer right] =>
+      if left < 0 || right < 0 || elements.size ≤ left.toNat ||
+          elements.size ≤ right.toNat then
+        some (.error (.abort, #[.integer left, .integer right]))
+      else
+        match elements[left.toNat]?, elements[right.toNat]? with
+        | some leftValue, some rightValue =>
+            some (.ok (.vector ((elements.set! left.toNat rightValue).set!
+              right.toNat leftValue)))
+        | _, _ => some (.error (.abort, #[.integer left, .integer right]))
+  | _ => none
+
+/-- A structural swap schedule without an intermediate index list or rebuilt
+prefix/suffix. The caller checks the complete range once. -/
+private def reverseVectorRange : Nat → Nat → Nat → Array RuntimeValue → Array RuntimeValue
+  | 0, _, _, elements => elements
+  | count + 1, left, right, elements =>
+      reverseVectorRange count (left + 1) (right - 1)
+        (elements.swapIfInBounds left right)
+
+/-- Raw range reversal. Move library range/error policy is represented by
+its guards before invoking this kernel, just as for insertion and removal. -/
+def reverseSliceVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements, .integer start, .integer stop] =>
+      if start < 0 || stop < start || elements.size < stop.toNat then
+        some (.error (.abort, #[.integer start, .integer stop]))
+      else some (.ok (.vector (reverseVectorRange
+        ((stop.toNat - start.toNat) / 2) start.toNat (stop.toNat - 1) elements)))
+  | _ => none
+
+/-- Search without allocating a list of elements or indexes; the first match
+wins. The structural count bounds the traversal even for malformed callers. -/
+private def findVectorIndex (elements : Array RuntimeValue) (needle : RuntimeValue) :
+    Nat → Nat → Option Nat
+  | 0, _ => none
+  | count + 1, index =>
+      if elements[index]?.any (· == needle) then some index
+      else findVectorIndex elements needle count (index + 1)
+
+def checkVectorIndex? (failure : ThrowKind) (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements, .integer index] =>
+      if 0 ≤ index ∧ index < Int.ofNat elements.size then some (.ok .unit)
+      else some (.error (failure, #[.integer 1]))
+  | _ => none
+
+def containsVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements, needle] =>
+      some (.ok (.bool (findVectorIndex elements needle elements.size 0).isSome))
+  | _ => none
+
+def indexOfVector? (indexType : Ty) (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) := do
+  let [.vector elements, needle] := arguments.toList | none
+  let found := findVectorIndex elements needle elements.size 0
+  let position := Int.ofNat (found.getD 0)
+  let index ← match indexType with
+    | .integer .unbounded _ => some (.integer position)
+    | _ => modularInteger indexType position
+  some (.ok (.tuple #[.bool found.isSome, index]))
+
+/-- Consume an empty vector without requiring Drop on its element type.
+Move's native failure policy is checked before this raw operation. -/
+def destroyEmptyVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements] =>
+      if elements.isEmpty then some (.ok .unit) else some (.error (.abort, #[]))
+  | _ => none
+
+/-- Value-level concatenation shared by the interpreter and proof denotation. -/
+def concatVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector left, .vector right] => some (.ok (.vector (left ++ right)))
+  | _ => none
+
+/-- Copy a half-open slice. Bounds checks are explicit; `extract` must not
+silently clamp an invalid range. -/
+def sliceVector? (arguments : Array RuntimeValue) :
+    Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
+  match arguments.toList with
+  | [.vector elements, .integer start, .integer stop] =>
+      if start < 0 || stop < start || elements.size < stop.toNat then
+        some (.error (.abort, #[.integer start, .integer stop]))
+      else some (.ok (.vector (elements.extract start.toNat stop.toNat)))
+  | _ => none
+
 /-- Deterministic meaning of the shared Move/Rust pure primitive vocabulary. -/
 def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
     (operation : PrimitiveOperation) (arguments : Array RuntimeValue)
@@ -432,18 +601,20 @@ def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
   | .pushVector => match arguments.toList with
       | [.vector elements, value] => some (.ok (.vector (elements.push value)))
       | _ => none
-  | .swapVector => match arguments.toList with
-      | [.vector elements, .integer left, .integer right] =>
-          if left < 0 || right < 0 || elements.size ≤ left.toNat ||
-              elements.size ≤ right.toNat then
-            some (.error (.abort, #[.integer left, .integer right]))
-          else
-            match elements[left.toNat]?, elements[right.toNat]? with
-            | some leftValue, some rightValue =>
-                some (.ok (.vector ((elements.set! left.toNat rightValue).set!
-                  right.toNat leftValue)))
-            | _, _ => some (.error (.abort, #[.integer left, .integer right]))
-      | _ => none
+  | .insertVector => insertVector? arguments
+  | .concatVector => concatVector? arguments
+  | .removeVector => removeVector? arguments
+  | .swapVector => swapVector? arguments
+  | .reverseSliceVector => reverseSliceVector? arguments
+  | .containsVector => containsVector? arguments
+  | .checkVectorIndex failure => checkVectorIndex? failure arguments
+  | .indexOfVector =>
+      let .tuple elements := resultType | none
+      let [_, index] := elements.toList | none
+      let indexType ← ns.tables.types[index.index]? >>=
+        resolveTargetIntegerType? targetPointerWidth
+      indexOfVector? indexType arguments
+  | .destroyEmptyVector => destroyEmptyVector? arguments
   | .length =>
       let lengthValue (length : Nat) := match resultType with
         | .integer .unbounded _ => some (.integer (Int.ofNat length))
@@ -460,12 +631,7 @@ def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
             | some element => some (.ok element)
             | none => some (.error (.abort, #[.integer index]))
       | _ => none
-  | .slice => match arguments.toList with
-      | [.vector elements, .integer start, .integer stop] =>
-          if start < 0 || stop < start || elements.size < stop.toNat then
-            some (.error (.abort, #[.integer start, .integer stop]))
-          else some (.ok (.vector (elements.extract start.toNat stop.toNat)))
-      | _ => none
+  | .slice => sliceVector? arguments
   | .add => modularBinaryInteger resultType arguments (fun left right => left + right)
   | .checkedAdd failure =>
       checkedBinaryInteger failure resultType arguments (fun left right => left + right)
@@ -647,6 +813,30 @@ def handleFieldIndex? (unit : ValidatedUnit) (handle : StructHandle)
   let (targetNs, fields) ← handleFields? unit handle variant
   fieldIndexIn targetNs fieldName fields.toList 0
 
+/-- Resolve a variant-field name set to its closed per-variant payload
+offsets.  Variants without any requested field are omitted. -/
+def variantFieldChoices? (unit : ValidatedUnit) (handle : StructHandle)
+    (fields : Array String) : Option (Array (String × Nat)) := do
+  let targetNs ← unit.namespaces[handle.namespaceId.index]?
+  let declaration ← targetNs.structs[handle.structId]?
+  return declaration.variants.filterMap fun variant => do
+    let variantName ← targetNs.tables.names[variant.name.index]?
+    let field ← fields.find? fun field =>
+      (fieldIndexIn targetNs field variant.fields.toList 0).isSome
+    let index ← fieldIndexIn targetNs field variant.fields.toList 0
+    some (variantName.name, index)
+
+/-- Select through a closed per-variant payload map. -/
+def selectNominalVariantFieldAt? (owner : StructHandle)
+    (choices : Array (String × Nat))
+    (arguments : Array RuntimeValue) : Option RuntimeValue :=
+  match arguments.toList with
+  | [.nominal actualSource (some actualVariant) values] => do
+      if actualSource != owner then none else
+      let (_, index) ← choices.find? fun choice => choice.1 == actualVariant
+      values[index]?
+  | _ => none
+
 /-- Position of a named field in a referenced nominal declaration, which a
 generated contract needs to project the same field the program selects. -/
 def referencedFieldIndex? (unit : ValidatedUnit) (sourceNamespace : NamespaceId)
@@ -679,13 +869,10 @@ def evaluateDataOperation? (unit : ValidatedUnit) (sourceNamespace : NamespaceId
       if actualSource != handle then none else
       let index ← handleFieldIndex? unit handle variant field
       values[index]?
-  | .selectVariants reference fields, [.nominal actualSource (some variant) values] =>
+  | .selectVariants reference fields, _ =>
       let handle ← resolveStruct? unit sourceNamespace reference
-      if actualSource != handle then none else
-      let field ← fields.find? fun field =>
-        (handleFieldIndex? unit handle (some variant) field).isSome
-      let fieldIndex ← handleFieldIndex? unit handle (some variant) field
-      values[fieldIndex]?
+      let choices ← variantFieldChoices? unit handle fields
+      selectNominalVariantFieldAt? handle choices arguments
   | .testVariants reference variants, [.nominal actualSource actualVariant _] =>
       let handle ← resolveStruct? unit sourceNamespace reference
       if actualSource != handle then none else
@@ -712,6 +899,34 @@ def selectNominalFieldAt? (owner : StructHandle) (variant : Option String)
       if actualSource != owner || actualVariant != variant then none
       else values[index]?
   | _ => none
+
+/-- Test a closed nominal handle against a closed variant set. -/
+def testNominalVariants? (owner : StructHandle) (variants : Array String)
+    (arguments : Array RuntimeValue) : Option RuntimeValue :=
+  match arguments.toList with
+  | [.nominal actualSource actualVariant _] =>
+      if actualSource != owner then none
+      else some (.bool (actualVariant.any variants.contains))
+  | _ => none
+
+theorem evaluateDataOperation?_testVariants_at
+    {unit : ValidatedUnit} {sourceNamespace : NamespaceId}
+    {reference : QualifiedRef} {variants : Array String} {handle : StructHandle}
+    (resolved_eq : resolveStruct? unit sourceNamespace reference = some handle)
+    (arguments : Array RuntimeValue) :
+    evaluateDataOperation? unit sourceNamespace (.testVariants reference variants)
+        arguments = testNominalVariants? handle variants arguments := by
+  generalize list_eq : arguments.toList = values
+  cases values with
+  | nil => simp [evaluateDataOperation?, testNominalVariants?, list_eq]
+  | cons value rest =>
+      cases rest with
+      | nil =>
+          cases value <;>
+            simp [evaluateDataOperation?, testNominalVariants?, list_eq,
+              resolved_eq]
+      | cons second tail =>
+          simp [evaluateDataOperation?, testNominalVariants?, list_eq]
 
 /-- Lower a nominal selection once its resolution and per-variant field map
 have been certified. -/
@@ -746,6 +961,20 @@ theorem evaluateDataOperation?_select_at
       | cons second tail =>
           simp [evaluateDataOperation?, selectNominalFieldAt?, list_eq]
 
+/-- Lower a single-name variant selection once lowering has certified the
+unique variant and payload offset containing that name. -/
+theorem evaluateDataOperation?_selectVariants_at
+    {unit : ValidatedUnit} {sourceNamespace : NamespaceId}
+    {reference : QualifiedRef} {fields : Array String} {handle : StructHandle}
+    {choices : Array (String × Nat)}
+    (resolved_eq : resolveStruct? unit sourceNamespace reference = some handle)
+    (choices_eq : variantFieldChoices? unit handle fields = some choices)
+    (arguments : Array RuntimeValue) :
+    evaluateDataOperation? unit sourceNamespace
+        (.selectVariants reference fields) arguments =
+      selectNominalVariantFieldAt? handle choices arguments := by
+  simp [evaluateDataOperation?, resolved_eq, choices_eq]
+
 
 /-! Data operations resolve field and variant names against the declaration
 tables, a search reduction cannot execute.  Sealing the operation keeps
@@ -773,11 +1002,9 @@ theorem evaluateDataOperation?_selectVariants {unit : ValidatedUnit}
         #[.nominal source (some variant) values]
       = (do
           let handle ← resolveStruct? unit sourceNamespace reference
-          if source != handle then none else
-          let field ← fields.find? fun field =>
-            (handleFieldIndex? unit handle (some variant) field).isSome
-          let fieldIndex ← handleFieldIndex? unit handle (some variant) field
-          values[fieldIndex]?) := rfl
+          let choices ← variantFieldChoices? unit handle fields
+          selectNominalVariantFieldAt? handle choices
+            #[.nominal source (some variant) values]) := rfl
 
 theorem evaluateDataOperation?_testVariants {unit : ValidatedUnit}
     {sourceNamespace : NamespaceId} {reference : QualifiedRef} {variants : Array String}
@@ -1056,6 +1283,13 @@ theorem globalLoanKeyIn?_head (loan : Nat) (key : GlobalKey)
     globalLoanKeyIn? ((loan, key) :: rest) loan = some key := by
   simp [globalLoanKeyIn?]
 
+/-- A distinct registration cannot capture an unregistered identity. -/
+theorem globalLoanKeyIn?_cons_none {registered loan : Nat} {key : GlobalKey}
+    {rest : List (Nat × GlobalKey)} (different : registered ≠ loan)
+    (absent : globalLoanKeyIn? rest loan = none) :
+    globalLoanKeyIn? ((registered, key) :: rest) loan = none := by
+  simpa [globalLoanKeyIn?, different] using absent
+
 /-- The key whose global slot holds the hole of `loan`, per the state's
 loan registry.  Registration at the borrow is what keys the write-back:
 certified exclusivity keeps the recorded key the hole's location for the
@@ -1076,6 +1310,14 @@ local loan route to an ancestor frame rather than aliasing a global loan. -/
 def FreshGlobalLoanIds (state : RuntimeState) : Prop :=
   ∀ loan, state.nextLoan ≤ loan →
     globalLoanKeyIn? state.globalLoans loan = none
+
+/-- Any identifier at or beyond the allocation frontier is globally
+unregistered.  This named form lets generated closers consume the invariant
+without unfolding it or searching the whole local context. -/
+theorem FreshGlobalLoanIds.lookup_of_le {state : RuntimeState} {loan : Nat}
+    (fresh : FreshGlobalLoanIds state) (bound : state.nextLoan ≤ loan) :
+    globalLoanKeyIn? state.globalLoans loan = none :=
+  fresh loan bound
 
 /-- The next identifier itself is globally unregistered. -/
 theorem FreshGlobalLoanIds.lookup_next {state : RuntimeState}
@@ -1258,6 +1500,21 @@ theorem removeGlobalLoan_of_free (loans : List (Nat × GlobalKey)) (loan : Nat)
             if_false] using free
         simp only [removeGlobalLoan, h, Bool.false_eq_true, if_false, ih restFree]
 
+/-- Retirement changes only the selected identity's lookup. No registry
+shape or resource payload is exposed to consumers of this law. -/
+theorem globalLoanKeyIn?_remove_other (loans : List (Nat × GlobalKey))
+    (retired loan : Nat) (different : retired ≠ loan) :
+    globalLoanKeyIn? (removeGlobalLoan loans retired) loan =
+      globalLoanKeyIn? loans loan := by
+  induction loans with
+  | nil => rfl
+  | cons entry rest ih =>
+      by_cases removed : entry.1 = retired
+      · simp [removeGlobalLoan, globalLoanKeyIn?, removed, different]
+      · by_cases matched : entry.1 = loan
+        · simp [removeGlobalLoan, globalLoanKeyIn?, matched, Ne.symm different]
+        · simpa [removeGlobalLoan, globalLoanKeyIn?, removed, matched] using ih
+
 /-- Whether the hole of `loan` sits in a global slot. A contract over a
 borrow-taking function assumes this is false for its argument loans: the
 lender's hole lives in a caller frame, so the loan's death exports through
@@ -1275,6 +1532,17 @@ the proof-facing reduction path. -/
   | entry :: rest, index =>
       if accepts entry then some index else indexOfFrom accepts rest (index + 1)
 
+/-- Relate the evaluator's structural search to a public list certificate.
+The executable search itself remains unchanged. -/
+private theorem indexOfFrom_eq_findIdx? {α : Type} (accepts : α → Bool)
+    (xs : List α) (offset : Nat) :
+    indexOfFrom accepts xs offset = (xs.findIdx? accepts).map (· + offset) := by
+  induction xs generalizing offset with
+  | nil => simp [indexOfFrom]
+  | cons x xs ih =>
+    simp only [indexOfFrom, List.findIdx?_cons]
+    split <;> simp_all [Option.map_map, Function.comp_def, Nat.add_comm, Nat.add_left_comm]
+
 /-- Whether the hole of `loan` sits inside this frame's locals. -/
 def holeInFrame (frame : RuntimeFrame) (loan : Nat) : Bool :=
   (indexOfFrom (fun slot => (slot.map (holeWithin loan)).getD false)
@@ -1285,8 +1553,9 @@ a symbolic frame stays folded — so no search over it is ever exposed —
 while a built frame computes. -/
 theorem holeInFrame_mk {locals : Array (Option RuntimeValue)}
     {activeLoans : Array (ExprId × Nat)}
-    {loanLocations : Array (Nat × RuntimePlace)} {loan : Nat} :
-    holeInFrame ⟨locals, activeLoans, loanLocations⟩ loan =
+    {loanLocations : Array (Nat × RuntimePlace)}
+    {typeInstantiation : Array (TypeId × TypeId)} {loan : Nat} :
+    holeInFrame ⟨locals, activeLoans, loanLocations, typeInstantiation⟩ loan =
       (indexOfFrom (fun slot => (slot.map (holeWithin loan)).getD false)
         locals.toList 0).isSome :=
   rfl
@@ -1765,6 +2034,31 @@ def updateLocalBorrowValue? (frame : RuntimeFrame) (state : RuntimeState)
   let updated ← rewriteFirst (borrowRewrite? loan replacement) value
   writeRuntimePlace? frame state place updated
 
+/-- No cached address requires no traversal of a mutation's write path. -/
+theorem updateLocalBorrowValue_no_location (frame : RuntimeFrame) (state : RuntimeState)
+    (loan : Nat) (replacement : RuntimeValue)
+    (location : localLoanPlace? frame loan = none) :
+    updateLocalBorrowValue? frame state loan replacement = none := by
+  simp [updateLocalBorrowValue?, location]
+
+/-- A stale address can designate a local that has already been consumed. -/
+theorem updateLocalBorrowValue_no_read (frame : RuntimeFrame) (state : RuntimeState)
+    (loan : Nat) (replacement : RuntimeValue) (place : RuntimePlace)
+    (location : localLoanPlace? frame loan = some place)
+    (read : readRuntimePlace? frame state place = none) :
+    updateLocalBorrowValue? frame state loan replacement = none := by
+  simp [updateLocalBorrowValue?, location, read]
+
+/-- A cached hole or unrelated value cannot be rewritten as this borrow.
+Keep the unreachable write operation out of each generated certificate. -/
+theorem updateLocalBorrowValue_no_rewrite (frame : RuntimeFrame) (state : RuntimeState)
+    (loan : Nat) (replacement value : RuntimeValue) (place : RuntimePlace)
+    (location : localLoanPlace? frame loan = some place)
+    (read : readRuntimePlace? frame state place = some value)
+    (absent : rewriteFirst (borrowRewrite? loan replacement) value = none) :
+    updateLocalBorrowValue? frame state loan replacement = none := by
+  simp [updateLocalBorrowValue?, location, read, absent]
+
 /-- Update the current value of the live borrow `loan` wherever it rests in
 the frame locals or global slots, descending into borrow currents. `none`
 when the borrow is not at rest — a consumed temporary. -/
@@ -1790,6 +2084,21 @@ def updateBorrowValue? (frame : RuntimeFrame) (state : RuntimeState)
                     globals := ⟨state.globals.entries.set! index { slot with value }⟩ })
           | none => none
 
+/-- A stale cache does not prevent a resting borrow from being mutated.
+The certificate identifies the first matching local in an arbitrary frame;
+unrelated suffix locals and global storage remain untouched. -/
+theorem updateBorrowValue_uncached_local (frame : RuntimeFrame) (state : RuntimeState)
+    (slot : LocalId) (loan : Nat) (current replacement : RuntimeValue)
+    (cached : updateLocalBorrowValue? frame state loan replacement = none)
+    (found : frame.locals.toList.findIdx? (fun value =>
+      (value.bind (rewriteFirst (borrowRewrite? loan replacement))).isSome) = some slot.index)
+    (read : frame.locals[slot.index]? = some (some (.borrow loan current))) :
+    updateBorrowValue? frame state loan replacement =
+      some ({ frame with
+        locals := frame.locals.set! slot.index (some (.borrow loan replacement)) }, state) := by
+  simp [updateBorrowValue?, cached, indexOfFrom_eq_findIdx?, found, read,
+    rewriteFirst, borrowRewrite?]
+
 /-- Remove the resting occurrence of the ended borrow `loan`: a reconciled
 loan's stale borrow value must not be exported again when its holder's
 frame dies. -/
@@ -1814,6 +2123,18 @@ def clearBorrowValue (frame : RuntimeFrame) (state : RuntimeState)
               (frame, { state with globals := ⟨state.globals.entries.set! index updated⟩ })
           | none => (frame, state)
       | none => (frame, state)
+
+/-- A certified first local holder can be cleared without revisiting the
+global fallback. The certificate preserves the semantic search order. -/
+theorem clearBorrowValue_local (frame : RuntimeFrame) (state : RuntimeState)
+    (slot : LocalId) (loan : Nat) (current : RuntimeValue)
+    (found : frame.locals.toList.findIdx? (fun value =>
+      (value.bind (rewriteFirst (borrowClear? loan))).isSome) = some slot.index)
+    (read : frame.locals[slot.index]? = some (some (.borrow loan current))) :
+    clearBorrowValue frame state loan =
+      ({ frame with locals := frame.locals.set! slot.index (some .unit) }, state) := by
+  simp [clearBorrowValue, indexOfFrom_eq_findIdx?, found, read,
+    rewriteFirst, borrowClear?]
 
 /-- The current value of the live borrow `loan`, searched through the frame
 locals and global slots, descending into borrow currents. -/
@@ -1855,6 +2176,14 @@ theorem resolveReturnedBorrows_empty (replacement : RuntimeValue) :
 theorem resolveReturnedBorrows_integer (value : Int)
     (replacement : RuntimeValue) :
     resolveReturnedBorrows #[.integer value] replacement = replacement := by
+  simp [resolveReturnedBorrows, outermostBorrows, collectPruned, borrowEntry?]
+
+/-- A callee returning one borrow fills that loan's hole in the export,
+whatever the export's spelling: the general row the literal spellings
+evaluate through. -/
+theorem resolveReturnedBorrows_singleBorrow (loan : Nat) (current replacement : RuntimeValue) :
+    resolveReturnedBorrows #[.borrow loan current] replacement =
+      (fillHole? loan current replacement).getD replacement := by
   simp [resolveReturnedBorrows, outermostBorrows, collectPruned, borrowEntry?]
 
 /-- A callee returning a reborrow fills its lender's hole with the returned
@@ -1957,6 +2286,108 @@ theorem exportFrameLoans_borrowFree (frame : RuntimeFrame) (state : RuntimeState
     (borrowFree : frameBorrows frame = #[]) :
     exportFrameLoans frame state = state := by
   simp [exportFrameLoans, exportSettledLoans, borrowFree]
+
+mutual
+  /-- Clear the dying frame's copies of returned handles. Do not descend
+  into another borrow's current: it is owned by that borrow and must travel
+  with its export. The returned values themselves are never changed. -/
+  def maskReturnedBorrows (loans : Array Nat) (value : RuntimeValue) : RuntimeValue :=
+    match value with
+    | .borrow loan _ => if loans.contains loan then .unit else value
+    | .vector elements => .vector (maskReturnedBorrowList loans elements.toList).toArray
+    | .tuple elements => .tuple (maskReturnedBorrowList loans elements.toList).toArray
+    | .nominal source variant fields =>
+        .nominal source variant (maskReturnedBorrowList loans fields.toList).toArray
+    | .closure function captures =>
+        .closure function (maskReturnedBorrowList loans captures.toList).toArray
+    | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ |
+        .string _ | .bytes _ | .loanHole _ => value
+  termination_by sizeOf value
+  decreasing_by
+    all_goals simp_wf
+    all_goals first
+      | (have := sizeOf_toList_lt elements; omega)
+      | (have := sizeOf_toList_lt fields; omega)
+      | (have := sizeOf_toList_lt captures; omega)
+
+  def maskReturnedBorrowList (loans : Array Nat) : List RuntimeValue → List RuntimeValue
+    | [] => []
+    | value :: rest => maskReturnedBorrows loans value :: maskReturnedBorrowList loans rest
+  termination_by values => sizeOf values
+  decreasing_by all_goals (simp_wf; omega)
+end
+
+/-- Dynamic identities that leave the invocation with its result, not loans
+that die with the invocation's frame. This uses the same outermost ownership
+boundary as ordinary frame export. -/
+def returnedBorrowIds (results : Array RuntimeValue) : Array Nat :=
+  results.foldl (init := #[]) fun loans result =>
+    loans ++ (outermostBorrows result).map (·.1)
+
+/-- Recognize the common singleton scalar result without inspecting its
+payload or the dying frame. Aggregate results retain the loan-aware path. -/
+def scalarFunctionResult (results : Array RuntimeValue) : Bool :=
+  match results.toList with
+  | [.unit] | [.bool _] | [.character _] | [.integer _] | [.address _]
+  | [.signer _] | [.string _] | [.bytes _] => true
+  | _ => false
+
+theorem scalarFunctionResult_noBorrows (results : Array RuntimeValue)
+    (scalar : scalarFunctionResult results = true) : returnedBorrowIds results = #[] := by
+  rcases results with ⟨values⟩
+  cases values with
+  | nil => simp [scalarFunctionResult] at scalar
+  | cons value rest =>
+      cases rest with
+      | cons next rest => simp [scalarFunctionResult] at scalar
+      | nil =>
+          cases value <;>
+            simp [scalarFunctionResult, returnedBorrowIds, outermostBorrows,
+              collectPruned, borrowEntry?] at scalar ⊢
+
+/-- A result may copy a reference still present in a local. Such a local is
+not a dying loan: its identity has escaped in the result. Mask those local
+copies before settling/exporting the other loans, preserving holes in lenders
+for the caller to fill. In particular, a global lender transfers its key to
+the returned field loan instead of prematurely restoring the old value.
+
+Empty results use the existing export path immediately. A borrow-free frame
+returns without traversing a potentially large result. Other results with no
+references reuse the existing export path. -/
+def exportReturnedFrameLoans (results : Array RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) : RuntimeState :=
+  if results.isEmpty then exportFrameLoans frame state else
+  if scalarFunctionResult results then exportFrameLoans frame state else
+  if (frameBorrows frame).isEmpty then state else
+    let loans := returnedBorrowIds results
+    if loans.isEmpty then exportFrameLoans frame state else
+      exportFrameLoans { frame with
+        locals := frame.locals.map (Option.map (maskReturnedBorrows loans)) } state
+
+theorem exportReturnedFrameLoans_borrowFree (results : Array RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) (borrowFree : frameBorrows frame = #[]) :
+    exportReturnedFrameLoans results frame state = state := by
+  simp [exportReturnedFrameLoans, borrowFree, exportFrameLoans_borrowFree _ _ borrowFree]
+
+theorem exportReturnedFrameLoans_noReturnedBorrows (results : Array RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) (noReturned : returnedBorrowIds results = #[]) :
+    exportReturnedFrameLoans results frame state = exportFrameLoans frame state := by
+  by_cases h : (frameBorrows frame).isEmpty
+  · have empty : frameBorrows frame = #[] := Array.isEmpty_iff.mp h
+    simp [exportReturnedFrameLoans, noReturned, h, exportFrameLoans_borrowFree _ _ empty]
+  · simp [exportReturnedFrameLoans, noReturned, h]
+
+/-- A frame with no resting aliases of the returned handles uses ordinary
+export, independently of its shape or the returned referents' payloads. -/
+theorem exportReturnedFrameLoans_noAliases (results : Array RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState)
+    (unchanged : frame.locals.map (Option.map (maskReturnedBorrows (returnedBorrowIds results))) =
+      frame.locals) :
+    exportReturnedFrameLoans results frame state = exportFrameLoans frame state := by
+  by_cases h : (frameBorrows frame).isEmpty
+  · have empty : frameBorrows frame = #[] := Array.isEmpty_iff.mp h
+    simp [exportReturnedFrameLoans, h, exportFrameLoans_borrowFree _ _ empty]
+  · simp [exportReturnedFrameLoans, h, unchanged]
 
 /-- Closed finalization rule for the common scalar mutable-reference case.
 The parameter location is already native in the frame, and the dying frame
@@ -2837,6 +3268,239 @@ def resolvePlace? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     Option RuntimePlace :=
   resolvePlaceFuel? unit ns frame state (2 * ns.places.size + 3) placeId
 
+/-- Resolve the indexed element of a vector or tuple held directly in a
+local.  Lowering has already classified the index expression as a local
+read, so execution retains only the two slots and the dynamic bounds check. -/
+def resolveLocalIndex? (base index : LocalId) (frame : RuntimeFrame) :
+    Option RuntimePlace := do
+  if base.index >= frame.locals.size then none else
+  let .integer position ← readLocal? frame index | none
+  if position < 0 then none else
+  let value ← readLocal? frame base
+  let size ← match value with
+    | .vector elements | .tuple elements => some elements.size
+    | _ => none
+  if position.toNat < size then
+    some { root := .local base, projections := #[.index position.toNat] }
+  else none
+
+/-- Resolve a statically indexed vector or tuple rooted at a known local.
+`deref` distinguishes an owned local aggregate from an aggregate reached
+through a mutable-reference parameter.  The index expression itself has
+already been classified and erased by lowering. -/
+def resolveLocalLiteralIndex? (base : LocalId) (deref : Bool) (index : Nat)
+    (frame : RuntimeFrame) (state : RuntimeState) : Option RuntimePlace := do
+  if base.index >= frame.locals.size then none else
+  let root : RuntimePlace := { root := .local base }
+  let root ← if deref then do
+      let .borrow _ _ ← readLocal? frame base | none
+      some { root with projections := #[.deref] }
+    else some root
+  let value ← readRuntimePlace? frame state root
+  let size ← match value with
+    | .vector elements | .tuple elements => some elements.size
+    | _ => none
+  if index < size then
+    some { root with projections := root.projections.push (.index index) }
+  else none
+
+/-- Resolve an index read from a known local, optionally through a borrow.
+Only the two local slots survive lowering; the source arena is absent. -/
+def resolveLocalDynamicIndex? (base index : LocalId) (deref : Bool)
+    (frame : RuntimeFrame) (state : RuntimeState) : Option RuntimePlace := do
+  if base.index >= frame.locals.size then none else
+  let .integer position ← readLocal? frame index | none
+  if position < 0 then none else
+  resolveLocalLiteralIndex? base deref position.toNat frame state
+
+/-- Resolve one statically selected nominal field below a literal-indexed
+owned local aggregate.  Both indices are fixed by lowering; execution only
+checks the vector bound and the nominal value's runtime shape. -/
+def resolveLocalLiteralIndexField? (base : LocalId) (index : Nat)
+    (field : NominalFieldStep) (frame : RuntimeFrame)
+    (state : RuntimeState) : Option RuntimePlace := do
+  let element ← resolveLocalLiteralIndex? base false index frame state
+  let .nominal source actualVariant _ ←
+    readRuntimePlace? frame state element | none
+  if source != field.source then none else
+  let actualIndex ←
+    if actualVariant == field.variant then some field.index else none
+  some { element with
+    projections := element.projections.push (.field actualIndex) }
+
+/-- A literal index into an aggregate held directly in a local is exactly
+the compact static-index resolver. -/
+theorem resolvePlace?_localLiteralIndex {unit : ValidatedUnit}
+    {ns : ValidatedNamespace} {frame : RuntimeFrame} {state : RuntimeState}
+    {placeId basePlaceId : PlaceId} {indexExpr : ExprId}
+    {base : LocalId} {index : Nat}
+    (place_eq : ns.places[placeId.index]? =
+      some (.index basePlaceId indexExpr))
+    (base_eq : ns.places[basePlaceId.index]? = some (.localVar base))
+    (index_eq : placeIndexForm? ns indexExpr =
+      some (.literal (index : Int))) :
+    resolvePlace? unit ns frame state placeId =
+      resolveLocalLiteralIndex? base false index frame state := by
+  have nonnegative : ¬ (index : Int) < 0 :=
+    Int.not_lt_of_ge (Int.ofNat_nonneg index)
+  by_cases in_bounds : base.index < frame.locals.size
+  · have not_out_of_bounds : ¬ frame.locals.size ≤ base.index := by omega
+    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+      index_eq, resolveLocalLiteralIndex?, readRuntimePlace?, readRoot?,
+      readProjections?, in_bounds, not_out_of_bounds, nonnegative]
+  · have out_of_bounds : frame.locals.size ≤ base.index := by omega
+    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+      index_eq, resolveLocalLiteralIndex?, in_bounds, out_of_bounds]
+
+/-- A field directly below a literal index into an owned local has the
+compact indexed-field resolver shape. -/
+theorem resolvePlace?_fieldOfLocalLiteralIndex {unit : ValidatedUnit}
+    {ns : ValidatedNamespace} {frame : RuntimeFrame} {state : RuntimeState}
+    {placeId indexPlaceId basePlaceId : PlaceId} {indexExpr : ExprId}
+    {base : LocalId} {index fieldIndex : Nat}
+    {owner : QualifiedRef} {fieldNameId : NameId} {fieldName : String}
+    {handle : StructHandle}
+    (place_eq : ns.places[placeId.index]? =
+      some (.field indexPlaceId owner fieldNameId))
+    (index_place_eq : ns.places[indexPlaceId.index]? =
+      some (.index basePlaceId indexExpr))
+    (base_eq : ns.places[basePlaceId.index]? = some (.localVar base))
+    (index_eq : placeIndexForm? ns indexExpr =
+      some (.literal (index : Int)))
+    (resolved_eq : resolveStruct? unit ns.identity owner = some handle)
+    (name_eq : sourceFieldName? ns fieldNameId = some fieldName)
+    (field_index_eq : ∀ actualVariant,
+      handleFieldIndex? unit handle actualVariant fieldName =
+        if actualVariant == none then some fieldIndex else none) :
+    resolvePlace? unit ns frame state placeId =
+      resolveLocalLiteralIndexField? base index
+        ⟨handle, none, fieldIndex⟩ frame state := by
+  have nonnegative : ¬ (index : Int) < 0 :=
+    Int.not_lt_of_ge (Int.natCast_nonneg index)
+  by_cases in_bounds : base.index < frame.locals.size
+  · have not_out_of_bounds : ¬ frame.locals.size ≤ base.index := by omega
+    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq,
+      index_place_eq, base_eq, index_eq, resolved_eq, name_eq,
+      field_index_eq, resolveLocalLiteralIndexField?,
+      resolveLocalLiteralIndex?, resolveNominalFieldSteps?,
+      readRuntimePlace?, readRoot?, readProjections?, in_bounds,
+      not_out_of_bounds, nonnegative]
+    cases value_eq : readLocal? frame base with
+    | none => simp [value_eq]
+    | some value =>
+        cases value <;> simp [value_eq, readProjections?, resolved_eq,
+          name_eq, field_index_eq, bne_iff_ne]
+        case vector elements | tuple elements =>
+          apply Option.bind_congr
+          intro element _
+          apply Option.bind_congr
+          intro elementValue _
+          cases elementValue <;> simp
+          case nominal =>
+            rename_i actualSource actualVariant fields elementEq
+            by_cases source_eq : actualSource = handle
+            · subst actualSource
+              by_cases variant_eq : actualVariant = none <;>
+                simp [variant_eq]
+            · simp [source_eq]
+  · have out_of_bounds : frame.locals.size ≤ base.index := by omega
+    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq,
+      index_place_eq, base_eq, index_eq, resolveLocalLiteralIndexField?,
+      resolveLocalLiteralIndex?, in_bounds, out_of_bounds, nonnegative]
+
+/-- The corresponding compact equation when the indexed aggregate is the
+referent of a mutable-reference local. -/
+theorem resolvePlace?_derefLocalLiteralIndex {unit : ValidatedUnit}
+    {ns : ValidatedNamespace} {frame : RuntimeFrame} {state : RuntimeState}
+    {placeId basePlaceId localPlaceId : PlaceId} {indexExpr : ExprId}
+    {base : LocalId} {index : Nat}
+    (place_eq : ns.places[placeId.index]? =
+      some (.index basePlaceId indexExpr))
+    (base_eq : ns.places[basePlaceId.index]? = some (.deref localPlaceId))
+    (local_eq : ns.places[localPlaceId.index]? = some (.localVar base))
+    (index_eq : placeIndexForm? ns indexExpr =
+      some (.literal (index : Int))) :
+    resolvePlace? unit ns frame state placeId =
+      resolveLocalLiteralIndex? base true index frame state := by
+  have nonnegative : ¬ (index : Int) < 0 :=
+    Int.not_lt_of_ge (Int.ofNat_nonneg index)
+  by_cases in_bounds : base.index < frame.locals.size
+  · have not_out_of_bounds : ¬ frame.locals.size ≤ base.index := by omega
+    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+      local_eq, index_eq, resolveLocalLiteralIndex?, readRuntimePlace?,
+      readRoot?, readProjections?, in_bounds, not_out_of_bounds, nonnegative]
+    cases value_eq : readLocal? frame base with
+    | none => simp [value_eq]
+    | some value => cases value <;> simp [value_eq, readProjections?]
+  · have out_of_bounds : frame.locals.size ≤ base.index := by omega
+    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+      local_eq, index_eq, resolveLocalLiteralIndex?, in_bounds, out_of_bounds]
+
+/-- Dynamic indexing through a borrowed local agrees with the same source
+place resolver as literal indexing. -/
+theorem resolvePlace?_derefLocalDynamicIndex {unit : ValidatedUnit}
+    {ns : ValidatedNamespace} {frame : RuntimeFrame} {state : RuntimeState}
+    {placeId basePlaceId localPlaceId : PlaceId} {indexExpr : ExprId}
+    {base index : LocalId}
+    (place_eq : ns.places[placeId.index]? = some (.index basePlaceId indexExpr))
+    (base_eq : ns.places[basePlaceId.index]? = some (.deref localPlaceId))
+    (local_eq : ns.places[localPlaceId.index]? = some (.localVar base))
+    (index_eq : placeIndexForm? ns indexExpr = some (.local index) ∨
+      placeIndexForm? ns indexExpr = some (.copyLocal index)) :
+    resolvePlace? unit ns frame state placeId =
+      resolveLocalDynamicIndex? base index true frame state := by
+  rcases index_eq with index_eq | index_eq
+  all_goals
+    by_cases in_bounds : base.index < frame.locals.size
+    · have not_out_of_bounds : ¬ frame.locals.size ≤ base.index := by omega
+      simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+        local_eq, index_eq, resolveLocalDynamicIndex?, resolveLocalLiteralIndex?,
+        readRuntimePlace?, readRoot?, readProjections?, in_bounds, not_out_of_bounds]
+      cases index_value : readLocal? frame index with
+      | none => simp [index_value]
+      | some value =>
+          cases value <;> simp [index_value]
+          case integer position =>
+            by_cases negative : position < 0 <;> simp [negative]
+            cases base_value : readLocal? frame base with
+            | none => simp [base_value]
+            | some value => cases value <;> simp [base_value, readProjections?]
+    · have out_of_bounds : frame.locals.size ≤ base.index := by omega
+      simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+        local_eq, index_eq, resolveLocalDynamicIndex?, resolveLocalLiteralIndex?,
+        in_bounds, out_of_bounds]
+
+/-- A source index place whose base and index are local reads is exactly the
+compact local-index resolver.  The disjunction covers both the direct and
+explicit-copy spellings admitted by `placeIndexForm?`. -/
+theorem resolvePlace?_localIndex {unit : ValidatedUnit}
+    {ns : ValidatedNamespace} {frame : RuntimeFrame} {state : RuntimeState}
+    {placeId basePlaceId : PlaceId} {indexExpr : ExprId}
+    {base index : LocalId}
+    (place_eq : ns.places[placeId.index]? =
+      some (.index basePlaceId indexExpr))
+    (base_eq : ns.places[basePlaceId.index]? = some (.localVar base))
+    (index_eq : placeIndexForm? ns indexExpr = some (.local index) ∨
+      placeIndexForm? ns indexExpr = some (.copyLocal index)) :
+    resolvePlace? unit ns frame state placeId =
+      resolveLocalIndex? base index frame := by
+  rcases index_eq with index_eq | index_eq
+  all_goals
+    by_cases in_bounds : base.index < frame.locals.size
+    · have not_out_of_bounds : ¬ frame.locals.size ≤ base.index := by omega
+      simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+        index_eq, resolveLocalIndex?, readRuntimePlace?, readRoot?,
+        readProjections?, Option.bind_assoc, in_bounds, not_out_of_bounds]
+      cases index_value : readLocal? frame index with
+      | none => simp [index_value]
+      | some value =>
+          cases value <;> simp [index_value]
+          case integer position =>
+            by_cases negative : position < 0 <;> simp [negative]
+    · have out_of_bounds : frame.locals.size ≤ base.index := by omega
+      simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+        index_eq, resolveLocalIndex?, in_bounds, out_of_bounds]
+
 /-- Soundness of a compact local-field path certificate for the public
 place resolver.  The numeric side condition is closed by generation and
 prevents the theorem from unfolding the surrounding unit. -/
@@ -3217,40 +3881,41 @@ def evaluateGlobalOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (arguments : Array RuntimeValue) (frame : RuntimeFrame) (state : RuntimeState) :
     Option GlobalOperationResult := do
   let #[.typeArg resource] := instantiations | none
+  let resourceType := instantiatedTypeId frame.typeInstantiation resource.typeId
   match kind with
   | .contains =>
       let [key] := arguments.toList | none
       let _ ← key.storageKey?
       some (.value frame state
-        (.bool (globalExists state ns.identity resource.typeId key)))
+        (.bool (globalExists state ns.identity resourceType key)))
   | .borrow kind =>
       let [key] := arguments.toList | none
       let _ ← key.storageKey?
-      match globalValue? state ns.identity resource.typeId key with
+      match globalValue? state ns.identity resourceType key with
       | none => some (.throw_ frame state .abort)
       | some _ => do
           let .reference referenceType ← ns.tables.types[resultType.index]? | none
           let (frame, state, value) ← borrowRuntimePlace? unit ns site
             referenceType kind frame state
-            { root := .global (globalKey ns.identity resource.typeId key) }
+            { root := .global (globalKey ns.identity resourceType key) }
           some (.value frame state value)
   | .take =>
       let [key] := arguments.toList | none
       let _ ← key.storageKey?
-      match globalValue? state ns.identity resource.typeId key with
+      match globalValue? state ns.identity resourceType key with
       | none => some (.throw_ frame state .abort)
       | some value =>
           let globals := state.globals.erase
-            (globalKey ns.identity resource.typeId key)
+            (globalKey ns.identity resourceType key)
           some (.value frame { state with globals } value)
   | .publish =>
       let [key, value] := arguments.toList | none
       let _ ← key.storageKey?
-      match globalValue? state ns.identity resource.typeId key with
+      match globalValue? state ns.identity resourceType key with
       | some _ => some (.throw_ frame state .abort)
       | none =>
           let globals := state.globals.insert
-            (globalKey ns.identity resource.typeId key) value
+            (globalKey ns.identity resourceType key) value
           some (.value frame { state with globals } .unit)
 
 /-- Equation after lowering has selected the sole resource instantiation.
@@ -3262,16 +3927,18 @@ theorem evaluateGlobalOperation?_typeArg (unit : ValidatedUnit)
     (frame : RuntimeFrame) (state : RuntimeState) :
     evaluateGlobalOperation? unit ns resultType site kind #[.typeArg resource]
         arguments frame state =
+      (let resourceType :=
+        instantiatedTypeId frame.typeInstantiation resource.typeId
       (match kind with
       | .contains => do
           let [key] := arguments.toList | none
           let _ ← key.storageKey?
           some (.value frame state
-            (.bool (globalExists state ns.identity resource.typeId key)))
+            (.bool (globalExists state ns.identity resourceType key)))
       | .borrow borrowKind => do
           let [key] := arguments.toList | none
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resource.typeId key with
+          match globalValue? state ns.identity resourceType key with
           | none => some (.throw_ frame state .abort)
           | some _ => do
               let .reference referenceType ←
@@ -3279,26 +3946,26 @@ theorem evaluateGlobalOperation?_typeArg (unit : ValidatedUnit)
               let (frame, state, value) ← borrowRuntimePlace? unit ns site
                 referenceType borrowKind frame state
                 { root := .global
-                    (globalKey ns.identity resource.typeId key) }
+                    (globalKey ns.identity resourceType key) }
               some (.value frame state value)
       | .take => do
           let [key] := arguments.toList | none
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resource.typeId key with
+          match globalValue? state ns.identity resourceType key with
           | none => some (.throw_ frame state .abort)
           | some value =>
               let globals := state.globals.erase
-                (globalKey ns.identity resource.typeId key)
+                (globalKey ns.identity resourceType key)
               some (.value frame { state with globals } value)
       | .publish => do
           let [key, value] := arguments.toList | none
           let _ ← key.storageKey?
-          match globalValue? state ns.identity resource.typeId key with
+          match globalValue? state ns.identity resourceType key with
           | some _ => some (.throw_ frame state .abort)
           | none =>
               let globals := state.globals.insert
-                (globalKey ns.identity resource.typeId key) value
-              some (.value frame { state with globals } .unit)) := rfl
+                (globalKey ns.identity resourceType key) value
+              some (.value frame { state with globals } .unit))) := rfl
 
 /-! Native reference-value operations.  These helpers are below the lowering
 boundary: result types and loan rows are direct arguments, never table or
@@ -3309,6 +3976,10 @@ def dereferenceBorrow? (arguments : Array RuntimeValue)
     Option (RuntimeFrame × RuntimeState × RuntimeValue) :=
   match arguments.toList with
   | [.borrow _ current] => some (frame, state, current)
+  -- Shared references are represented by the observed value itself.  The
+  -- static reference type distinguishes this case; no runtime wrapper or
+  -- loan reconciliation is needed.
+  | [value] => some (frame, state, value)
   | _ => none
 
 def freezeBorrow? (resultType : ReferenceType) (arguments : Array RuntimeValue)
@@ -5669,12 +6340,14 @@ def initialLocals (localCount : Nat) (arguments : Array RuntimeValue) :
 /-- Create a fresh function frame and initialize the leading parameter locals
 in declaration order. Arity or a missing leading local makes invocation stuck. -/
 def initialFrame? (declaration : FunctionDecl FunctionBody)
-    (arguments : Array RuntimeValue) : Option RuntimeFrame :=
+    (arguments : Array RuntimeValue)
+    (typeInstantiation : Array (TypeId × TypeId) := #[]) : Option RuntimeFrame :=
   if arguments.size != declaration.signature.parameters.size then none else
   if declaration.locals.size < arguments.size then none else
     some {
       locals := initialLocals declaration.locals.size arguments
-      loanLocations := parameterLoanLocations arguments }
+      loanLocations := parameterLoanLocations arguments
+      typeInstantiation }
 
 /-- The closed runtime-relevant projection of a function declaration.
 Lowering computes this once; native execution and verification do not retain
@@ -5696,12 +6369,14 @@ def FunctionShape.ofDeclaration
 /-- Create a frame from a lowered function shape.  All local locations are
 materialized by `localCount`, and arguments occupy the leading slots. -/
 def nativeInitialFrame? (shape : FunctionShape)
-    (arguments : Array RuntimeValue) : Option RuntimeFrame :=
+    (arguments : Array RuntimeValue)
+    (typeInstantiation : Array (TypeId × TypeId) := #[]) : Option RuntimeFrame :=
   if arguments.size != shape.parameterCount then none else
   if shape.localCount < arguments.size then none else
     some {
       locals := initialLocals shape.localCount arguments
-      loanLocations := parameterLoanLocations arguments }
+      loanLocations := parameterLoanLocations arguments
+      typeInstantiation }
 
 /-- Closed initial frame for a one-parameter mutable function.  Lowered
 verification uses this constructor equation instead of re-running arity,
@@ -5801,7 +6476,7 @@ expose the evaluated nonlocal state. Missing semantics cannot occur for an
 `ExecutableUnit` and conservatively preserve that state. -/
 def finalizeFunctionState (executable : ExecutableUnit) (profile : Profile)
     (initialState evaluatedState : RuntimeState) (frame : RuntimeFrame) : Outcome → RuntimeState
-  | .returned _ => exportFrameLoans frame evaluatedState
+  | .returned results => exportReturnedFrameLoans results frame evaluatedState
   | .threw kind _ =>
       match semanticProfile? executable.semantics profile with
       | some semantics => if semantics.rollbackThrow kind then initialState

@@ -411,9 +411,26 @@ inductive PrimitiveOperation where
   a reference write, which is how Move's `vector::push_back` and its
   reference-taking siblings reach it. -/
   | pushVector
+  /-- Concatenate two vectors, transferring both operands into the result. -/
+  | concatVector
+  /-- Insert before an index, permitting the end position. Returns the new
+  vector; out-of-range indexes abort. -/
+  | insertVector
+  /-- Remove an indexed element, returning `(element, remaining vector)` so
+  removal does not silently discard a potentially linear value. -/
+  | removeVector
   /-- Exchange two elements of a vector, as a value. Aborts when either index
   is out of range, matching element access. -/
   | swapVector
+  /-- Reverse a half-open range without rebuilding the untouched prefix/suffix. -/
+  | reverseSliceVector
+  | destroyEmptyVector
+  | containsVector
+  /-- Return `(found, index)`, using index zero when no element matches. -/
+  | indexOfVector
+  /-- Validate an element index against the actual vector size, without
+  converting that size to a fixed-width language integer. -/
+  | checkVectorIndex (failure : ThrowKind)
   | length
   | index
   | slice

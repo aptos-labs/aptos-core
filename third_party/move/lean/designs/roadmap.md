@@ -67,6 +67,12 @@ compiler-correctness claims) they re-emerge inside the designs below.
    recursive body is the least fixed point of its open body); T1
    continues with the 19 unported v0 verification files, then `Negative/`
    and `Language/`; T2 (the produced LeanerLang verifies) is not started.
+   **Frozen 2026-09-03**: the route was found to be per-shape scripts that
+   do not compose (22 plans for 50 targets, against v0's compositional WP
+   for 176); the next work is [`generic-route.md`](generic-route.md): verification
+   by normalization of a computational denotation, as v0 did, piloted on
+   `withdraw` and benchmarked against its script, with the current corpus
+   as the acceptance and performance gate, before any further port.
 
 3. **MonoVM differential harness** —
    [`monovm-link-design.md`](monovm-link-design.md).

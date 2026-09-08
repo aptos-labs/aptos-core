@@ -48,6 +48,18 @@ private def unit (kind : ExprKind) : RawUnit :=
 
 #guard semanticInventoryComplete
 
+private def vectorError : ProfileValue :=
+  { profile := .move, tag := "runtime.vector_error" }
+
+#guard (schema.checkOperation vectorError).isEmpty
+#guard !(schema.checkOperation { vectorError with payload := "unexpected" }).isEmpty
+#guard semantics.classify .throw_ vectorError == some .executable
+#guard (semantics.classify .operation vectorError).isNone
+#guard semantics.rollbackThrow (.profile vectorError)
+#guard semantics.rollbackThrow .abort
+#guard !semantics.rollbackThrow .panic
+#guard !semantics.rollbackThrow (.profile { vectorError with tag := "runtime.unknown" })
+
 private def coreExecutableUnit : RawUnit :=
   let base := unit (.value (.address "0x1"))
   let ns := base.namespaces[0]!

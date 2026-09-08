@@ -3,6 +3,8 @@
 
 import LeanerLang
 
+set_option leaner.route "native"
+
 /-!
 # Storage-parametric V1 denotations
 
@@ -104,6 +106,11 @@ leaner module 0x42::verification_generics where
   verify carry_bool
   verify forward
 
+#leaner_require_native 0x42::verification_generics::carry
+#leaner_require_native 0x42::verification_generics::carry_u64
+#leaner_require_native 0x42::verification_generics::carry_bool
+#leaner_require_native 0x42::verification_generics::forward
+
 /-! Direct verification and both concrete callers must share the same
 handle-keyed agreement theorem; no entry-point-keyed copy may exist.  Generic
 forwarding stays parametric, while a resource-key use is classified for
@@ -112,12 +119,19 @@ specialization. -/
 
 /-! V3 retains the generic body as one theorem over an abstract carrier.
 The proof-facing boundary contains no runtime value row. -/
-#check («0x42».verification_generics.carry.typedDenotation :
-  {Carrier : Nat → Type} →
-    (∀ index, LeanerIR.Proofs.Codec (Carrier index) LeanerIR.RuntimeValue) →
-      LeanerIR.Validation.ExecutableUnit →
-        «0x42».verification_generics.carry.Arguments Carrier →
-          LeanerIR.Proofs.Spec LeanerIR.RuntimeState LeanerIR.Proofs.Failure
-            (Carrier 0))
+example {Carrier : Nat → Type}
+    (arguments : «0x42».verification_generics.carry.Arguments Carrier) :
+    LeanerIR.Proofs.Spec LeanerIR.RuntimeState LeanerIR.Proofs.Failure (Carrier 0) :=
+  «0x42».verification_generics.carry.computation arguments
+
+/-! The generated local frame preserves the carrier type as well.  Initial
+parameter placement is a definitional projection, with `Option` tracking the
+Move local's availability independently of its value representation. -/
+example (Carrier : Nat → Type) : Type := «0x42».verification_generics.carry.Locals Carrier
+
+example {Carrier : Nat → Type}
+    (arguments : «0x42».verification_generics.carry.Arguments Carrier) :
+    («0x42».verification_generics.carry.initialLocals arguments).local0 =
+      some arguments.value := rfl
 
 end LeanerLang.Tests.VerificationGenerics

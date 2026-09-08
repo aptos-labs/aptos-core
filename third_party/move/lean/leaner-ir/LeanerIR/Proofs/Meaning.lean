@@ -35,10 +35,10 @@ def functionSpec (unit : ExecutableUnit) (function : FunctionHandle)
     (arguments : Array RuntimeValue) :
     Spec RuntimeState Failure (Array RuntimeValue) where
   ok := fun initial results final =>
-    BigStep.EvalFunction unit function initial arguments final (.returned results)
+    BigStep.EvalFunction unit function #[] initial arguments final (.returned results)
   aborts := fun initial failure =>
     ∃ final,
-      BigStep.EvalFunction unit function initial arguments final
+      BigStep.EvalFunction unit function #[] initial arguments final
         (.threw failure.1 failure.2)
 
 /-- The M1 executable subset owes no unchecked proofs. -/

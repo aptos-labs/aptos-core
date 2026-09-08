@@ -7,6 +7,218 @@ open Lean
 open Lean.Elab.Command
 open LeanerIR
 
+-- Calls keep mathematical scalar results in derived specifications; their
+-- containing vectors keep physical elements. Only that boundary is injected.
+leaner module 0x42::scalar_call_elements where
+  fun scalar(value : u8) -> u8 := value
+  fun identity {T has Copy, Drop} (value : T) -> T := value
+  fun direct(value : u8) -> Vector<u8> := vector<u8>[scalar(value)]
+  fun explicit_type(value : u8) -> Vector<u8> := vector<u8>[identity::<u8>(value)]
+  fun inferred_type(value : u8) -> Vector<u8> := vector<u8>[identity(value)]
+  spec fun logical(value : Int) : Int := value
+  spec fun logical_vector(value : Int) : Vector<u8> := vector<u8>[logical(value)]
+
+run_cmd do
+  let env ← getEnv
+  let some unit := LeanerLang.registeredUnit? env `«0x42».scalar_call_elements
+    | throwError "missing scalar-call vector fixture"
+  let ns := unit.namespaces[0]!
+  for name in ["direct", "explicit_type", "inferred_type", "logical_vector"] do
+    let some specification := ns.specFunctions.find? fun declaration =>
+        unit.tables.names[declaration.name.index]?.any (·.name == name)
+      | throwError "missing vector specification {name}"
+    let some body := specification.body.bind (ns.expressions[·.index]?)
+      | throwError "missing vector specification body {name}"
+    let .operation (.primitive .vector) _ #[element] _ := body.kind
+      | throwError "specification {name} lost its vector constructor"
+    let injected := ns.expressions[element.index]!
+    let .operation (.specification .intToBitVector) _ #[call] _ := injected.kind
+      | throwError "specification {name} did not inject its logical call result"
+    unless unit.tables.types[injected.typeId.index]? == some (.integer (.bits 8) false) &&
+        unit.tables.types[ns.expressions[call.index]!.typeId.index]? ==
+          some (.integer .unbounded true) do
+      throwError "specification {name} changed the call signature or vector element type"
+    if let some executable := ns.functions.find? fun declaration =>
+        unit.tables.names[declaration.name.index]?.any (·.name == name) then
+      let .structured root := executable.body
+        | throwError "missing executable vector {name}"
+      let .operation (.primitive .vector) _ #[element] _ := ns.expressions[root.index]!.kind
+        | throwError "missing executable vector constructor {name}"
+      unless ns.expressions[element.index]!.kind matches .operation (.call _) _ _ _ do
+        throwError "a specification conversion leaked into executable vector {name}"
+  let bad := "leaner module 0x42::bad_call_element where\n" ++
+    "  fun scalar() -> u16 := 1\n" ++
+    "  fun vector_value() -> Vector<u8> := vector<u8>[scalar()]\n"
+  match LeanerLang.Print.formatSource env bad with
+  | .ok _ => throwError "a mismatched executable call result was implicitly converted"
+  | .error error => unless (toString error).contains "LEANER-TYPE-MISMATCH" do
+      throwError "wrong executable call-result diagnostic: {error}"
+
+-- Boolean coverage must count distinct, well-typed patterns, and eager core
+-- primitives must not turn into short-circuit source during a round trip.
+run_cmd do
+  let env ← getEnv
+  for arms in ["| true => 1", "| true => 1\n      | true => 2"] do
+    let source := "leaner module 0x42::incomplete_bool where\n" ++
+      "  fun test(flag : Bool) -> u64 := match flag with\n      " ++ arms ++ "\n"
+    match LeanerLang.Print.formatSource env source with
+    | .ok _ => throwError "incomplete Boolean match was accepted"
+    | .error error => unless (toString error).contains "must cover every value" do
+        throwError "wrong Boolean coverage diagnostic: {error}"
+  let incompleteTuple := "leaner module 0x42::incomplete_tuple where\n" ++
+    "  fun test(left : Bool, right : Bool) -> u64 := match (left, right) with\n" ++
+    "    | (true, true) => 1\n    | (true, false) => 2\n" ++
+    "    | (false, true) => 3\n    | (false, true) => 4\n"
+  match LeanerLang.Print.formatSource env incompleteTuple with
+  | .ok _ => throwError "duplicate tuple arm was counted as coverage"
+  | .error error => unless (toString error).contains "must cover every value" do
+      throwError "wrong tuple coverage diagnostic: {error}"
+  let source := "leaner module 0x42::boolean_evaluation where\n" ++
+    "  fun lazy(value : u64) -> Bool := false && value + 1 == 0\n" ++
+    "  fun eager(value : u64) -> Bool := core.prim.logicalAnd(false, value + 1 == 0)\n" ++
+    "  fun eager_or(value : u64) -> Bool := core.prim.logicalOr(true, value + 1 == 0)\n"
+  let .ok printed := LeanerLang.Print.formatSource env source
+    | throwError "Boolean evaluation fixture did not format"
+  unless printed.contains "core.prim.logicalAnd(false, value + 1 == 0)" &&
+      printed.contains "core.prim.logicalOr(true, value + 1 == 0)" do
+    throwError "an eager primitive became short-circuiting:\n{printed}"
+  let .ok formatted := LeanerLang.Print.formatSource env printed
+    | throwError "Boolean evaluation fixture did not re-import"
+  unless printed == formatted do
+    throwError "Boolean evaluation is not a fixed point:\n{printed}\n{formatted}"
+
+-- Labels resolve by lexical nesting, including through ordinary while/for
+-- loops. Printing must carry that nesting through its surface recognizers.
+leaner module 0x42::labeled_loops where
+  fun through_while(flag : Bool) -> Unit :=
+    loop@outer do
+      while flag do
+        continue@outer
+      break
+  fun through_range() -> Unit :=
+    loop@outer do
+      for i in 0..3 do
+        if i == 1 then break@outer
+      break
+  fun nested_labels() -> Unit :=
+    loop@outer do
+      loop@inner do
+        break@inner
+      break@outer
+  fun labeled_value() -> u64 :=
+    loop@outer do
+      loop do
+        break@outer 7
+
+run_cmd do
+  let env ← getEnv
+  let some unit := LeanerLang.registeredUnit? env `«0x42».labeled_loops
+    | throwError "missing labeled-loop fixture"
+  let .ok printed := LeanerLang.Print.render env unit
+    | throwError "labeled loops did not render"
+  unless printed.contains "continue@outer" && printed.contains "break@outer" &&
+      printed.contains "for i in 0..3 do" do
+    throwError "labeled loop nesting was lost:\n{printed}"
+  let .ok formatted := LeanerLang.Print.formatSource env printed
+    | throwError "labeled loops did not re-import:\n{printed}"
+  unless formatted == printed do
+    throwError "labeled loops are not a canonical fixed point:\n{printed}\n{formatted}"
+  for control in ["break", "continue"] do
+    let source := s!"leaner module 0x42::bad_label where\n  fun test() -> Unit := loop do\n    {control}@missing\n"
+    match LeanerLang.Print.formatSource env source with
+    | .ok _ => throwError "unknown loop label was accepted: {control}"
+    | .error error => unless (toString error).contains "unknown loop label" do
+        throwError "unknown loop label has the wrong diagnostic: {error}"
+  let duplicate := "leaner module 0x42::duplicate_label where\n" ++
+    "  fun test() -> Unit := loop@same do\n    loop@same do\n      break@same\n    break@same\n"
+  match LeanerLang.Print.formatSource env duplicate with
+  | .ok _ => throwError "duplicate active Move loop labels were accepted"
+  | .error error => unless (toString error).contains "already used by an outer loop" do
+      throwError "duplicate loop labels have the wrong diagnostic: {error}"
+
+-- A mutable enum payload is one stable place reborrow, not a data-select
+-- operation on a mutable reference. Pin the checked execution-agreement
+-- certificate as well as the contract, including the absent variant.
+set_option maxHeartbeats 50000 in
+set_option leaner.verifyHeartbeats 50000 in
+leaner module 0x42::enum_payload_reborrow where
+  enum Slot has Copy, Drop where
+    | Filled (value : u64)
+    | Empty
+  fun replace(self : &mut Slot, value : u64) -> u64 :=
+    match self with
+      | Slot::Filled { value := payload } => do
+          let previous := *payload
+          *payload := value
+          return previous
+      | Slot::Empty {} => abort(7)
+  spec replace where
+    ensures self == new Slot::Filled { value } && result == old(self).value
+    aborts_if !(self is Filled) with 7
+  verify replace
+
+-- A shared field name need not have one type across enum variants. Preserve
+-- the typed pattern instead of replacing it with an ambiguous projection.
+leaner module 0x42::typed_enum_patterns where
+  enum Either {T} {E} has Copy, Drop where
+    | Left (value : T)
+    | Right (value : E)
+  fun unwrap_left {T} {E}(self : Either<T, E>) -> T :=
+    match self with
+      | Either<T, E>::Left { value := payload } => payload
+      | _ => abort(7)
+
+run_cmd do
+  let env ← getEnv
+  let some unit := LeanerLang.registeredUnit? env `«0x42».typed_enum_patterns
+    | throwError "the typed enum pattern fixture was not registered"
+  let .ok printed := LeanerLang.Print.render env unit
+    | throwError "the typed enum pattern fixture did not render"
+  unless printed.contains "match self with" && !printed.contains "self.value" do
+    throwError "variant-specific payload types lost their patterns:\n{printed}"
+  let .ok formatted := LeanerLang.Print.formatSource env printed
+    | throwError "the typed enum pattern fixture did not re-import:\n{printed}"
+  unless printed == formatted do
+    throwError "typed enum patterns are not a fixed point:\n{formatted}"
+
+-- Mutation holders are semantic lowering artifacts, not extra source lets.
+-- Pin the first print as well as the fixed point, including a holder nested
+-- after an ordinary declaration and an explicitly shared user reference.
+leaner module 0x42::mutation_printing where
+  struct Counter has Drop where
+    value : u64
+  fun bump(self : &mut Counter) -> Unit := self.value := self.value + 1
+  fun set(self : &mut Counter, value : u64) -> Unit := self.value := value
+  -- This function's local place shares the generated holder's numeric ID,
+  -- but cannot refer to the holder in `set`.
+  fun other_function(first : u64, second : u64) -> u64 := do
+    let mut saved := second
+    saved := first
+    return saved
+  fun after_binding(self : &mut Counter, value : u64) -> Unit := do
+    let saved := value + 1
+    self.value := saved
+  fun shared_holder(self : &mut Counter) -> Unit := do
+    let holder := &mut self.value
+    *holder := *holder + 1
+    *holder := *holder + 1
+
+run_cmd do
+  let env ← getEnv
+  let some unit := LeanerLang.registeredUnit? env `«0x42».mutation_printing
+    | throwError "mutation-printing fixture was not registered"
+  let .ok printed := LeanerLang.Print.render env unit
+    | throwError "mutation-printing fixture did not render"
+  unless printed.contains "fun bump(self : &mut Counter) -> Unit := self.value := self.value + 1" &&
+      printed.contains "fun set(self : &mut Counter, value : u64) -> Unit := self.value := value" &&
+      printed.contains "self.value := saved" && printed.contains "let holder" &&
+      !printed.contains "_t0" do
+    throwError "mutation holders changed their source spelling:\n{printed}"
+  let .ok formatted := LeanerLang.Print.formatSource env printed
+    | throwError "mutation-printing fixture did not re-import:\n{printed}"
+  unless formatted == printed do
+    throwError "mutation printing is not a fixed point:\n{printed}\nsecond:\n{formatted}"
+
 leaner module 0x42::math where
   const ZERO : UInt<64> := 0
   const GREETING : string := "hello"
@@ -296,6 +508,15 @@ leaner module 0x42::module_relations where
     return value
   spec fun total (value : u64) : Bool := ∀ (other : u64), other >= 0
 
+leaner module 0x42::module_invariants where
+  struct Debit has Key where
+    value : u64
+  struct Credit has Key where
+    value : u64
+  spec module where
+    invariant forall (address : Address),
+      global<Debit>(address).value <= global<Credit>(address).value
+
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
     value : u64
@@ -354,6 +575,10 @@ leaner module 0x42::surface_regressions where
     if value == 0 then true else odd(value - 1)
   fun odd(value : u64) -> Bool :=
     if value == 0 then false else even(value - 1)
+  fun rotated_split(values : &mut Vector<u64>, split : u64) -> u64 :=
+    values.rotate(split)
+  fun rotated_slice_split(values : &mut Vector<u64>, left : u64, split : u64,
+      right : u64) -> u64 := values.rotate_slice(left, split, right)
 
 set_option maxHeartbeats 4000000 in
 elab "#guard_leaner_frontend" : command => do
@@ -747,14 +972,27 @@ elab "#guard_leaner_frontend" : command => do
       | .error error => throwError "the module-relation fixture did not re-import: {error}"
       | .ok formatted => unless formatted == printed do
           throwError "module relations are not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
+  let some moduleInvariants := LeanerLang.registeredUnit? env `«0x42».module_invariants
+    | throwError "the module-invariant fixture was not registered"
+  match LeanerLang.Print.render env moduleInvariants with
+  | .error error => throwError "the module-invariant fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains
+          "spec module where\n    invariant ∀ (address : Address),\n        global<Debit>(address).value <= global<Credit>(address).value" do
+        throwError "module invariants lost their canonical spelling:\n{printed}"
+      match LeanerLang.Print.formatSource env printed with
+      | .error error => throwError "the module-invariant fixture did not re-import: {error}"
+      | .ok formatted => unless formatted == printed do
+          throwError "module invariants are not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
   let some move2Index := LeanerLang.registeredUnit? env `«0x42».move2_index
     | throwError "the Move 2 index-syntax fixture was not registered"
   match LeanerLang.Print.render env move2Index with
   | .error error => throwError "the Move 2 index-syntax fixture did not render: {error}"
   | .ok printed =>
       unless printed.contains "self.values[index]" &&
-          printed.contains "&mut self.values[index]" &&
-          printed.contains "self.values[index] := value" &&
+          printed.contains "core.prim.checkVectorIndex[moveVectorError](self.values, index)" &&
+          printed.contains "core.borrowPlace(mut, self.values[index])" &&
+          printed.contains "core.assignPlace(self.values[index], value)" &&
           printed.contains "&Resource[address]" &&
           printed.contains "&mut Resource[address].value" &&
           printed.contains "Resource[address] := value" &&
@@ -783,6 +1021,8 @@ elab "#guard_leaner_frontend" : command => do
           printed.contains "values.contains(value)" &&
           printed.contains "values.push_back(value)" &&
           printed.contains "values.pop_back()" &&
+          printed.contains "values.rotate(split)" &&
+          printed.contains "values.rotate_slice(left, split, right)" &&
           printed.contains "new ConstructorOuter {\n      nested_field := new ConstructorInner {\n        first_field := 1, second_field := 2\n      }\n    }" &&
           !printed.contains "(vector::contains" &&
           !printed.contains "(vector::push_back" &&

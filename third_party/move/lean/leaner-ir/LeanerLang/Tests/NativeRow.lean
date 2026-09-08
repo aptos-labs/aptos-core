@@ -123,7 +123,7 @@ theorem bumpRowRoute {registry : LeanerIR.Validation.SemanticsRegistry}
             LeanerIR.SemanticOperations.unpackFallthrough,
             Option.map_eq_map, Option.map_some, Option.some.injEq] at finished
           subst finished
-          simp only [LeanerIR.SemanticOperations.finalizeFunctionState]
+          leaner_finalize
           rw [LeanerIR.Proofs.Denotation.exportFrameLoans_rowFrame_singleInteger
             _ _ _ _ _ (by assumption)]
           leaner_certified_close!

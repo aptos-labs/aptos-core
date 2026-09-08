@@ -72,6 +72,23 @@ theorem SpecInt.signed_bounds {width : Nat} (n : SpecInt (.bits width) true) :
     -(2 ^ (width - 1)) ≤ n.val ∧ n.val ≤ 2 ^ (width - 1) - 1 :=
   n.fits.signed_bounds
 
+/-! ## Certified Move vectors
+
+Move's native vector carries the same unsigned-64 length bound as v0.
+The neutral runtime and non-Move native arrays remain unrestricted. -/
+
+structure SpecVector (α : Type) where
+  values : Array α
+  bounded : values.size < 2 ^ 64
+
+theorem SpecVector.ext {a b : SpecVector α} (h : a.values = b.values) : a = b := by
+  cases a
+  cases b
+  cases h
+  rfl
+
+instance : Inhabited (SpecVector α) := ⟨⟨#[], by change 0 < 2 ^ 64; decide⟩⟩
+
 /-! ## Field codecs
 
 A generated twin's `decode?` composes these per-primitive decoders, one per
@@ -140,6 +157,46 @@ def decodeUnit? : RuntimeValue → Option Unit
 
 @[simp] theorem decodeUnit?_unit : decodeUnit? .unit = some () := rfl
 
+/-! Successful canonical scalar decoding determines the runtime shape.
+These are stronger than an arbitrary codec's `decode_encode` law: only
+these concrete decoders reject all noncanonical representations. Modular
+callers use the shared lemmas instead of splitting every runtime constructor
+again for each call site. -/
+
+theorem decodeInt?_shape {width : IntWidth} {signed : Bool}
+    {runtime : RuntimeValue} {value : SpecInt width signed}
+    (decoded : decodeInt? width signed runtime = some value) :
+    runtime = .integer value.val := by
+  cases runtime <;> simp only [decodeInt?] at decoded <;> try contradiction
+  split at decoded
+  · cases Option.some.inj decoded
+    rfl
+  · contradiction
+
+theorem decodeBool?_shape {runtime : RuntimeValue} {value : Bool}
+    (decoded : decodeBool? runtime = some value) : runtime = .bool value := by
+  cases runtime <;> simp_all [decodeBool?]
+
+theorem decodeString?_shape {runtime : RuntimeValue} {value : String}
+    (decoded : decodeString? runtime = some value) : runtime = .string value := by
+  cases runtime <;> simp_all [decodeString?]
+
+theorem decodeAddress?_shape {runtime : RuntimeValue} {value : String}
+    (decoded : decodeAddress? runtime = some value) : runtime = .address value := by
+  cases runtime <;> simp_all [decodeAddress?]
+
+theorem decodeSigner?_shape {runtime : RuntimeValue} {value : String}
+    (decoded : decodeSigner? runtime = some value) : runtime = .signer value := by
+  cases runtime <;> simp_all [decodeSigner?]
+
+theorem decodeBytes?_shape {runtime : RuntimeValue} {value : Array UInt8}
+    (decoded : decodeBytes? runtime = some value) : runtime = .bytes value := by
+  cases runtime <;> simp_all [decodeBytes?]
+
+theorem decodeUnit?_shape {runtime : RuntimeValue} {value : Unit}
+    (decoded : decodeUnit? runtime = some value) : runtime = .unit := by
+  cases runtime <;> simp_all [decodeUnit?]
+
 /-! ## Family representation
 
 One resource family's typed contents, represented in the runtime map through
@@ -172,6 +229,17 @@ namespace FamilyRepresentation
 
 variable {T : Type} {erase : T → RuntimeValue} {namespaceId : NamespaceId}
   {typeId : TypeId} {contents : StorageKey → Option T} {globals : GlobalMap}
+
+/-- Presence transfers from the represented runtime map to its typed family.
+This is the precondition bridge used when a caller establishes `exists<T>`
+and a callee consumes the same requirement through its typed summary. -/
+theorem isSome_of_lookup
+    (represented : FamilyRepresentation erase namespaceId typeId contents globals)
+    {key : StorageKey}
+    (present : (globals.lookup ⟨namespaceId, typeId, key⟩).isSome = true) :
+    (contents key).isSome = true := by
+  rw [represented key] at present
+  simpa using present
 
 /-- The empty state represents the empty contents: the typed-state
 precondition every contract carries is satisfiable, so verification under it
