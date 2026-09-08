@@ -653,6 +653,8 @@ pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Resul
         TypeTag::Vector(elem) => interner.vector_of(intern_type_tag(elem, interner)?),
         TypeTag::Struct(struct_tag) => intern_struct_tag(struct_tag, interner)?,
         TypeTag::Function(function_tag) => {
+            // TODO: reject abilities for which `is_valid_for_function_type()` is false, as the
+            // MoveVM does when converting tags to runtime types.
             let args = intern_function_param_tags(&function_tag.args, interner)?;
             let results = intern_function_param_tags(&function_tag.results, interner)?;
             interner.function_of(

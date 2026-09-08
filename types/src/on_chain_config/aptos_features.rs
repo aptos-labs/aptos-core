@@ -227,6 +227,11 @@ pub enum FeatureFlag {
     LAZY_MODULE_INITIALIZATION = 127,
     /// When enabled, new MonoMove VM is used for execution instead of the V1 Move VM.
     ENABLE_MONO_MOVE = 128,
+    /// When enabled, function types whose abilities are not a subset of `copy + drop + store`
+    /// are rejected during `TypeTag` construction and module or script verification. Modules
+    /// are verified on every load, so a previously published module with such a signature
+    /// stops loading once this is enabled.
+    CHECK_FUNCTION_TYPE_ABILITIES = 129,
 }
 
 impl FeatureFlag {
@@ -341,6 +346,7 @@ impl FeatureFlag {
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
+            Self::CHECK_FUNCTION_TYPE_ABILITIES,
         ]
     }
 }

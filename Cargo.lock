@@ -8916,6 +8916,7 @@ dependencies = [
  "rstest",
  "serde",
  "sha3 0.9.1",
+ "tempfile",
  "test-case",
  "thousands",
  "tokio",
