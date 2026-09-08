@@ -153,6 +153,13 @@ impl FlowSession {
                             ))]))
                         },
                     };
+                    // Model construction runs the whole inliner before
+                    // non-matching modules are demoted, so its warning buffer
+                    // can describe unrelated dependency functions. The cached
+                    // package was already checked for compilation errors above.
+                    // Start the requested WP operation with a clean buffer, as
+                    // the unfiltered path below already does.
+                    fresh.clear_diag();
                     let result = move_prover::inference::run_spec_inference_with_model(
                         &mut fresh,
                         &mut error_writer,
@@ -299,7 +306,7 @@ impl FlowSession {
                             let mut check_diags = String::new();
                             for path in &modified_files {
                                 let source = fs::read_to_string(path).unwrap_or_default();
-                                let result = source_check::check(path, &source);
+                                let result = source_check::check_inferred_output(path, &source);
                                 if !result.has_parse_errors {
                                     source_check::format_file(path);
                                 }

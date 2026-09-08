@@ -5564,6 +5564,53 @@ mod tests {
     }
 
     #[test]
+    fn vector_is_empty_wp() {
+        let mut env = test_env();
+        let vec_mid = add_vector_module(&mut env, &["is_empty"]);
+        let vec_ty = Type::Vector(Box::new(u64_ty()));
+        let v = var(&env, "v", vec_ty);
+        let wp = vector_wp(&env, vec_mid, "is_empty", &[v], &[BOOL_TYPE.clone()]);
+        assert_eq!(render(&env, std::slice::from_ref(&wp.aborts)), vec![
+            "false"
+        ]);
+        assert_eq!(render(&env, &wp.outputs), vec!["Eq(Len(v), 0)"]);
+    }
+
+    #[test]
+    fn every_vector_intrinsic_has_a_wp_arm() {
+        let mut env = test_env();
+        let names = well_known::VECTOR_MOVE_INTRINSICS;
+        let vec_mid = add_vector_module(&mut env, names);
+        let vec_ty = Type::Vector(Box::new(u64_ty()));
+        // Supplying the maximum argument/output count is intentional: this
+        // test checks that every declared intrinsic name reaches a concrete
+        // arm rather than silently falling back to behavioral predicates.
+        let args = vec![
+            var(&env, "v0", vec_ty.clone()),
+            var(&env, "a1", u64_ty()),
+            var(&env, "a2", u64_ty()),
+            var(&env, "v3", vec_ty.clone()),
+            var(&env, "a4", u64_ty()),
+        ];
+        let outputs = vec![vec_ty.clone(), vec_ty.clone(), vec_ty];
+        for name in names {
+            let fid = FunId::new(env.symbol_pool().make(name));
+            assert!(
+                well_known::vector_intrinsic_wp(
+                    &env,
+                    &test_gen(&env),
+                    vec_mid.qualified(fid),
+                    &[u64_ty()],
+                    &args,
+                    &outputs,
+                )
+                .is_some(),
+                "missing WP model for std::vector::{name}"
+            );
+        }
+    }
+
+    #[test]
     fn vector_swap_remove_wp() {
         let mut env = test_env();
         let vec_mid = add_vector_module(&mut env, &["swap_remove"]);

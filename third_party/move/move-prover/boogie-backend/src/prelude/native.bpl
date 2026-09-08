@@ -337,6 +337,23 @@ procedure {:inline 1} $1_vector_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) 
     m' := $UpdateMutation(m, RemoveAtVec(v, i));
 }
 
+procedure {:inline 1} $1_vector_remove_value{{S}}(m: $Mutation (Vec ({{T}})), e: {{T}})
+returns (removed: Vec ({{T}}), m': $Mutation (Vec ({{T}})))
+{
+    var i: int;
+    var v: Vec ({{T}});
+
+    v := $Dereference(m);
+    i := $IndexOfVec{{S}}(v, e);
+    if (i >= 0) {
+        removed := MakeVec1(ReadVec(v, i));
+        m' := $UpdateMutation(m, RemoveAtVec(v, i));
+    } else {
+        removed := EmptyVec();
+        m' := m;
+    }
+}
+
 procedure {:inline 1} $1_vector_swap_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) returns (e: {{T}}, m': $Mutation (Vec ({{T}})))
 {
     var len: int;

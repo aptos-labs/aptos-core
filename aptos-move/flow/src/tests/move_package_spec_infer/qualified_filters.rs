@@ -86,3 +86,35 @@ async fn qualified_filters_reject_ambiguous_and_missing_targets() {
         );
     }
 }
+
+#[tokio::test]
+async fn filtered_wp_does_not_report_unrelated_model_warnings() {
+    let pkg = common::make_package("named", &[
+        (
+            "selected",
+            "module 0xCAFE::selected {
+                fun add_one(x: u64): u64 { x + 1 }
+            }",
+        ),
+        (
+            "unselected",
+            "module 0xBEEF::unselected {
+                fun noisy() { let unused = 1; }
+            }",
+        ),
+    ]);
+    let client = common::make_client().await;
+    let result = common::call_tool(
+        &client,
+        "move_package_wp",
+        serde_json::json!({
+            "package_path": pkg.path(),
+            "filter": "selected::add_one",
+        }),
+    )
+    .await;
+    let output = common::format_tool_result(&result);
+    assert_ne!(result.is_error, Some(true), "{output}");
+    assert!(!output.contains("unused"), "{output}");
+    assert!(!output.contains("unselected"), "{output}");
+}

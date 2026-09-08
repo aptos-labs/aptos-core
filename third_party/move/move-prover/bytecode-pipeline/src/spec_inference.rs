@@ -1791,6 +1791,8 @@ fn update_spec<'env>(
     // Every reason the emitted abort clauses became a lower bound rather than
     // an exact characterization. Reported to the caller at the end.
     let mut partial_abort_reasons: Vec<String> = vec![];
+    let mut partial_abort_has_transparent_callee = false;
+    let mut partial_abort_has_unmodeled_intrinsic = false;
 
     // Read the inference pragma to decide what to emit.
     let infer_ensures;
@@ -2097,10 +2099,42 @@ fn update_spec<'env>(
                     PartialAbortReason::MemoryHavoc => {
                         "an abort condition did not survive a memory-havocking loop".to_owned()
                     },
-                    PartialAbortReason::UnknownCallee(callee) => format!(
-                        "callee `{}` has no trusted complete abort summary",
-                        env.get_function(*callee).get_full_name_with_address()
-                    ),
+                    PartialAbortReason::UnknownCallee(callee_id) => {
+                        let callee = env.get_function(*callee_id);
+                        let callee_name = callee.get_full_name_with_address();
+                        if callee.is_intrinsic() && well_known::is_boogie_prelude_intrinsic(&callee)
+                        {
+                            partial_abort_has_unmodeled_intrinsic = true;
+                            format!(
+                                "intrinsic callee `{callee_name}` has no internal WP model; this is \
+                                 a WP tool bug, not a missing source-level spec"
+                            )
+                        } else if !callee.is_native_or_intrinsic()
+                            && !callee.is_pragma_true(OPAQUE_PRAGMA, || false)
+                        {
+                            partial_abort_has_transparent_callee = true;
+                            if callee.module_env.is_target() {
+                                format!(
+                                    "transparent callee `{callee_name}` is inside the editable WP \
+                                     scope but has no complete opaque contract; infer and verify an \
+                                     opaque specification for that callee first, then rerun WP for \
+                                     the caller"
+                                )
+                            } else {
+                                format!(
+                                    "transparent callee `{callee_name}` is outside the editable WP \
+                                     scope and has no complete opaque contract; WP cannot construct \
+                                     a complete caller specification. The package or corpus must \
+                                     provide and verify a complete opaque contract for that callee \
+                                     before the caller is rerun"
+                                )
+                            }
+                        } else {
+                            format!(
+                                "callee `{callee_name}` has no trusted complete abort summary"
+                            )
+                        }
+                    },
                     PartialAbortReason::DynamicCall => {
                         "a dynamic call has no trusted complete abort summary".to_owned()
                     },
@@ -2537,7 +2571,12 @@ fn update_spec<'env>(
         }
     }
 
-    report_partial_aborts(fun_env, &partial_abort_reasons);
+    report_partial_aborts(
+        fun_env,
+        &partial_abort_reasons,
+        partial_abort_has_transparent_callee,
+        partial_abort_has_unmodeled_intrinsic,
+    );
 }
 
 /// Report that the emitted abort clauses are a lower bound, not an exact
@@ -2548,17 +2587,37 @@ fn update_spec<'env>(
 /// exact no-abort behavior. It is still an incomplete result, so name it and
 /// the reasons for it rather than leaving the pragma to be discovered in the
 /// generated source.
-fn report_partial_aborts(fun_env: &FunctionEnv, reasons: &[String]) {
+fn report_partial_aborts(
+    fun_env: &FunctionEnv,
+    reasons: &[String],
+    has_transparent_callee: bool,
+    has_unmodeled_intrinsic: bool,
+) {
     if reasons.is_empty() {
         return;
     }
-    let mut message = format!(
-        "WP could not characterize the aborts of `{}` exactly, so its emitted \
-         `aborts_if` clauses are a lower bound and the specification carries \
-         `aborts_if_is_partial`. Complete the abort behavior and remove that pragma \
-         before relying on the contract. Reasons:",
-        fun_env.get_full_name_str()
-    );
+    let mut message = if has_unmodeled_intrinsic {
+        format!(
+            "WP cannot complete `{}` because a prover intrinsic has no internal WP model. \
+             Do not add a source-level spec to the intrinsic. Reasons:",
+            fun_env.get_full_name_str()
+        )
+    } else if has_transparent_callee {
+        format!(
+            "WP cannot complete `{}` while a transparent callee lacks a complete opaque \
+             contract. Repair the named callee boundary before changing or rerunning the \
+             caller. Reasons:",
+            fun_env.get_full_name_str()
+        )
+    } else {
+        format!(
+            "WP could not characterize the aborts of `{}` exactly, so its emitted \
+             `aborts_if` clauses are a lower bound and the specification carries \
+             `aborts_if_is_partial`. Complete the abort behavior and remove that pragma \
+             before relying on the contract. Reasons:",
+            fun_env.get_full_name_str()
+        )
+    };
     let mut seen = BTreeSet::new();
     for reason in reasons {
         if seen.insert(reason) {
@@ -2566,10 +2625,17 @@ fn report_partial_aborts(fun_env: &FunctionEnv, reasons: &[String]) {
             message.push_str(reason);
         }
     }
+    let severity = if has_unmodeled_intrinsic {
+        Severity::Bug
+    } else if has_transparent_callee {
+        Severity::Error
+    } else {
+        Severity::Warning
+    };
     fun_env
         .module_env
         .env
-        .diag(Severity::Warning, &fun_env.get_loc(), &message);
+        .diag(severity, &fun_env.get_loc(), &message);
 }
 
 /// Collect every module mentioned by an expression, including modules carried
@@ -4360,8 +4426,7 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
 
                     // Direct function call
                     Operation::Function(module_id, fun_id, type_inst) => {
-                        // Vector bytecode-instruction natives (and
-                        // singleton/contains) get their WP applied directly
+                        // Prelude-backed vector operations get their WP applied directly
                         // via substitution, so no BP over a vector op appears
                         // in the inferred spec. Checked before the pure path
                         // so the rewrite wins for both pure (e.g., `borrow`)
@@ -5818,8 +5883,22 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             )
         };
 
-        // Collect all substitutions and apply simultaneously: sequential
-        // substitution would re-substitute inside already-substituted args.
+        // Chain already-captured caller parameters before inserting this
+        // call's result expressions. Those results describe the call's
+        // pre-state; rewriting their `old(param)` after insertion would
+        // incorrectly move them to the preceding call's post-state.
+        let chained_old_subs = mut_ref_srcs
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, idx))| {
+                self.is_mut_ref_param(*idx) && state.captured_mut_params.contains(idx)
+            })
+            .map(|(j, (_, idx))| (*idx, mk_write_of_for(self, j)))
+            .collect::<Vec<_>>();
+        *state = self.substitute_old_params_in_state(state, &chained_old_subs);
+
+        // Collect all ordinary substitutions and apply simultaneously:
+        // sequential substitution would re-substitute inside inserted args.
         let mut all_subs: Vec<(TempIndex, Exp)> = Vec::new();
 
         for (i, &dest) in dests.iter().enumerate() {
@@ -5835,8 +5914,8 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             all_subs.push((dest, result_exp));
         }
 
-        // Skip already-captured caller-`&mut`-params: their `old(param)`
-        // gets handled by `substitute_old_param_in_state` below; adding a
+        // Skip already-captured caller-`&mut`-params: their `old(param)` was
+        // handled above; adding a
         // direct substitution here would cause double-application.
         for (j, &(_, idx)) in mut_ref_srcs.iter().enumerate() {
             if self.is_mut_ref_param(idx) && state.captured_mut_params.contains(&idx) {
@@ -5866,7 +5945,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
 
         // For caller-`&mut`-params: on first encounter, add the binding
         // `Eq(param, write_of(...))` and mark captured. On subsequent
-        // calls, substitute `old(param)` with the chained write_of.
+        // calls, the chaining was already performed above.
         for (j, &(_, idx)) in mut_ref_srcs.iter().enumerate() {
             if self.is_mut_ref_param(idx) {
                 if !state.captured_mut_params.contains(&idx) {
@@ -5876,9 +5955,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                         state.add_ensures(self.mk_eq(param_exp, write_exp));
                     }
                     state.captured_mut_params.insert(idx);
-                } else {
-                    let write_exp = mk_write_of_for(self, j);
-                    *state = self.substitute_old_param_in_state(state, idx, &write_exp);
                 }
             }
         }
@@ -6096,10 +6172,11 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         Reducer { analyzer: self }.rewrite_exp(exp.clone())
     }
 
-    /// WP for a `std::vector` bytecode-instruction native (and `singleton`/
-    /// `contains`) — applies the call's spec semantics directly via
-    /// substitution, so no behavioral predicate over the vector intrinsic
-    /// ever appears in inferred specs.
+    /// WP for a supported prelude-backed `std::vector` operation — including
+    /// every Move-level vector intrinsic —
+    /// applies the call's spec semantics directly via substitution, so no
+    /// behavioral predicate over the vector intrinsic ever appears in inferred
+    /// specs.
     ///
     /// Returns `true` when the callee is a recognized vector intrinsic and
     /// the WP rewrite was applied; `false` otherwise (caller falls back to
@@ -6148,6 +6225,16 @@ impl<'env> SpecInferenceAnalyzer<'env> {
 
         let num_explicit = dests.len();
 
+        let chained_old_subs = mut_ref_srcs
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, idx))| {
+                self.is_mut_ref_param(*idx) && state.captured_mut_params.contains(idx)
+            })
+            .map(|(j, (_, idx))| (*idx, wp.outputs[num_explicit + j].clone()))
+            .collect::<Vec<_>>();
+        *state = self.substitute_old_params_in_state(state, &chained_old_subs);
+
         let mut all_subs: Vec<(TempIndex, Exp)> = Vec::new();
         for (i, &dest) in dests.iter().enumerate() {
             all_subs.push((dest, wp.outputs[i].clone()));
@@ -6176,8 +6263,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                         state.add_ensures(self.mk_eq(param_exp, post_exp));
                     }
                     state.captured_mut_params.insert(*idx);
-                } else {
-                    *state = self.substitute_old_param_in_state(state, *idx, &post_exp);
                 }
             }
         }
@@ -6220,6 +6305,16 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         };
 
         let num_explicit = dests.len();
+        let chained_old_subs = mut_ref_srcs
+            .iter()
+            .enumerate()
+            .filter(|(_, src)| {
+                self.is_mut_ref_param(**src) && state.captured_mut_params.contains(src)
+            })
+            .map(|(i, src)| (*src, wp.outputs[num_explicit + i].clone()))
+            .collect::<Vec<_>>();
+        *state = self.substitute_old_params_in_state(state, &chained_old_subs);
+
         let mut substitutions = Vec::with_capacity(wp.outputs.len());
         substitutions.extend(
             dests
@@ -6246,8 +6341,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                         state.add_ensures(self.mk_eq(self.mk_temporary(*src), post));
                     }
                     state.captured_mut_params.insert(*src);
-                } else {
-                    *state = self.substitute_old_param_in_state(state, *src, &post);
                 }
             }
         }
@@ -6393,11 +6486,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             .collect()
     }
 
-    /// For native `std::vector` functions that have a direct spec-language equivalent
+    /// For `std::vector` functions that have a direct spec-language equivalent
     /// (built-in operations like `[]`, `len`, index), return the equivalent spec
-    /// expression substituting for the call result.  This avoids wrapping the function
-    /// reference in an anonymous lambda that gets compiled to an uninterpreted
-    /// behavioral spec function.
+    /// expression substituting for the call result. This includes both bytecode
+    /// natives and Move functions whose verification semantics are supplied by the
+    /// Boogie intrinsic implementation. It avoids wrapping the function reference
+    /// in an anonymous lambda that becomes an uninterpreted behavioral spec function.
     ///
     /// Returns `Some(exp)` where `exp` is the spec expression for the result, or `None`
     /// if the function has no direct spec equivalent.
@@ -6433,6 +6527,14 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             "length" if !srcs.is_empty() => {
                 let v = self.mk_temporary(srcs[0]);
                 Some(self.mk_call(&NUM_TYPE, AstOp::Len, vec![v]))
+            },
+            // vector::is_empty<T>(v) -> len(v) == 0. Although the Move
+            // function has a body, `pragma intrinsic` replaces it with a
+            // Boogie prelude implementation during verification. WP needs
+            // the same builtin value meaning without adding a spec block.
+            "is_empty" if !srcs.is_empty() => {
+                let v = self.mk_temporary(srcs[0]);
+                Some(self.mk_eq(self.mk_len(v), self.mk_num_const(BigInt::from(0))))
             },
             // vector::borrow<T>(v, i) → v[i]
             "borrow" if srcs.len() >= 2 => {
@@ -7554,6 +7656,39 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         new_val: &Exp,
     ) -> WPState {
         state.map(|e| self.substitute_old_param(e, param_idx, new_val))
+    }
+
+    /// Simultaneously substitute `old($param_idx)` expressions in a state.
+    /// Replacements are not recursively rewritten, so each expression keeps
+    /// referring to the same call pre-state when multiple `&mut` parameters
+    /// are involved.
+    fn substitute_old_params_in_state(
+        &self,
+        state: &WPState,
+        substitutions: &[(TempIndex, Exp)],
+    ) -> WPState {
+        struct OldParamsRewriter<'a> {
+            substitutions: &'a [(TempIndex, Exp)],
+        }
+
+        impl ExpRewriterFunctions for OldParamsRewriter<'_> {
+            fn rewrite_call(&mut self, _id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
+                if matches!(oper, AstOp::Old)
+                    && args.len() == 1
+                    && let ExpData::Temporary(_, idx) = args[0].as_ref()
+                {
+                    return self.substitutions.iter().find_map(|(param, replacement)| {
+                        (*param == *idx).then(|| replacement.clone())
+                    });
+                }
+                None
+            }
+        }
+
+        if substitutions.is_empty() {
+            return state.clone();
+        }
+        state.map(|exp| OldParamsRewriter { substitutions }.rewrite_exp(exp.clone()))
     }
 
     /// Substitute all occurrences of `pattern` with `replacement` in an expression,

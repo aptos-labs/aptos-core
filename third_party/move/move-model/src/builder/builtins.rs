@@ -755,6 +755,18 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             },
         );
         trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("reverse_vector"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::ReverseVec,
+                type_params: vec![param_t_decl.clone()],
+                type_param_constraints: BTreeMap::default(),
+                params: vec![mk_param(trans, 1, vector_t.clone())],
+                result_type: vector_t.clone(),
+                visibility: Spec,
+            },
+        );
+        trans.define_spec_or_builtin_fun(
             trans.builtin_qualified_symbol("contains"),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),

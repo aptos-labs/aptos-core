@@ -2119,6 +2119,7 @@ impl SpecTranslator<'_> {
                 ),
             Operation::UpdateVec => self.translate_primitive_call("UpdateVec", args),
             Operation::ConcatVec => self.translate_primitive_call("ConcatVec", args),
+            Operation::ReverseVec => self.translate_primitive_call("ReverseVec", args),
             Operation::EmptyVec => self.translate_primitive_inst_call(node_id, "$EmptyVec", args),
             Operation::SingleVec => self.translate_primitive_call("MakeVec1", args),
             Operation::IndexOfVec => {

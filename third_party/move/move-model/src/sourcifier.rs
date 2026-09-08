@@ -3047,6 +3047,11 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, &args[1]);
                 emit!(self.wr(), ")")
             }),
+            Operation::ReverseVec => self.parenthesize(context_prio, Prio::Postfix, || {
+                emit!(self.wr(), "reverse_vector(");
+                self.print_exp(Prio::General, false, &args[0]);
+                emit!(self.wr(), ")")
+            }),
             Operation::IndexOfVec => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "index_of(");
                 self.print_exp(Prio::General, false, &args[0]);

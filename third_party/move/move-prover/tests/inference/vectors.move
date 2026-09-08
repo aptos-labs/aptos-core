@@ -1,5 +1,5 @@
 // Spec inference for `std::vector` bytecode-instruction natives (and
-// `singleton` / `contains`). Exercises the direct WP path in
+// `singleton` / `is_empty` / `contains`). Exercises the direct WP path in
 // `spec_inference::try_wp_vector_intrinsic_call`; the expected
 // `.exp.move` should contain only direct spec expressions
 // (`!in_range(v, i)`, `len(v)`, `concat(v, vec(e))`, `update(...)`,
@@ -15,6 +15,12 @@ module 0x42::vectors {
     // length: never aborts; result is len(v)
     fun lengthof<T>(v: &vector<T>): u64 {
         vector::length(v)
+    }
+
+    // is_empty: never aborts; result is exactly the length test implemented
+    // by the intrinsic Boogie procedure.
+    fun isempty<T>(v: &vector<T>): bool {
+        vector::is_empty(v)
     }
 
     // borrow: aborts iff out of range; result is v[i]
@@ -47,6 +53,14 @@ module 0x42::vectors {
         vector::pop_back(v)
     }
 
+    // Results from consecutive mutating calls must each refer to that call's
+    // own pre-state, while the final vector state chains through both calls.
+    fun pop_two<T>(v: &mut vector<T>): (T, T) {
+        let first = vector::pop_back(v);
+        let second = vector::pop_back(v);
+        (first, second)
+    }
+
     // push_back: never aborts; mutates v
     fun push<T: drop>(v: &mut vector<T>, e: T) {
         vector::push_back(v, e)
@@ -65,5 +79,69 @@ module 0x42::vectors {
     // contains: never aborts; result is contains(v, e)
     fun has<T>(v: &vector<T>, e: &T): bool {
         vector::contains(v, e)
+    }
+
+    // Every pragma intrinsic in std::vector must be modeled internally. These
+    // wrappers ensure inference never asks for source contracts on intrinsics.
+    fun reverse<T>(v: &mut vector<T>) {
+        vector::reverse(v)
+    }
+
+    fun reverse_slice<T>(v: &mut vector<T>, left: u64, right: u64) {
+        vector::reverse_slice(v, left, right)
+    }
+
+    fun append<T>(v: &mut vector<T>, other: vector<T>) {
+        vector::append(v, other)
+    }
+
+    fun reverse_append<T>(v: &mut vector<T>, other: vector<T>) {
+        vector::reverse_append(v, other)
+    }
+
+    fun trim<T>(v: &mut vector<T>, new_len: u64): vector<T> {
+        vector::trim(v, new_len)
+    }
+
+    fun trim_reverse<T>(v: &mut vector<T>, new_len: u64): vector<T> {
+        vector::trim_reverse(v, new_len)
+    }
+
+    fun find_index<T>(v: &vector<T>, e: &T): (bool, u64) {
+        vector::index_of(v, e)
+    }
+
+    fun insert<T>(v: &mut vector<T>, i: u64, e: T) {
+        vector::insert(v, i, e)
+    }
+
+    fun remove<T>(v: &mut vector<T>, i: u64): T {
+        vector::remove(v, i)
+    }
+
+    fun remove_value<T>(v: &mut vector<T>, e: &T): vector<T> {
+        vector::remove_value(v, e)
+    }
+
+    fun swap_remove<T>(v: &mut vector<T>, i: u64): T {
+        vector::swap_remove(v, i)
+    }
+
+    fun rotate<T>(v: &mut vector<T>, rot: u64): u64 {
+        vector::rotate(v, rot)
+    }
+
+    fun rotate_slice<T>(v: &mut vector<T>, left: u64, rot: u64, right: u64): u64 {
+        vector::rotate_slice(v, left, rot, right)
+    }
+
+    fun move_range<T>(
+        from: &mut vector<T>,
+        removal_position: u64,
+        count: u64,
+        to: &mut vector<T>,
+        insert_position: u64,
+    ) {
+        vector::move_range(from, removal_position, count, to, insert_position)
     }
 }
