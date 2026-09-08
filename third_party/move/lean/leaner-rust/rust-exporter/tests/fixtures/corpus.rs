@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 pub enum Choice {
     First(u32),
     Second(u32),

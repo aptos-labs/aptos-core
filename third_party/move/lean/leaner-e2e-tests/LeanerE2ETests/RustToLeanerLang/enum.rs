@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
 #[repr(isize)]
 pub enum Choice {
     First(u32) = 4,
@@ -14,4 +17,3 @@ pub fn select(value: Choice) -> u32 {
         Choice::Second(value) => value,
     }
 }
-
