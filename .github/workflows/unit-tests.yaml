@@ -39,24 +39,20 @@ jobs:
         run: cargo x affected-packages -vvv
         shell: bash
 
+      - name: Set skip_tests
+        id: archive
+        run: cargo x targeted-unit-tests -vvv --dry-run
+        shell: bash
+
       - name: Archive targeted unit tests
+        if: steps.archive.outputs.skip_tests != 'true'
         run: |
           cargo x targeted-unit-tests -vvv \
             --profile ci \
             --cargo-profile ci \
             --locked \
             --archive-file unit-test-archive.tar.zst
-        shell: bash
-
-      # Isolated from cargo: this step's GITHUB_OUTPUT is not inherited by build.rs.
-      - name: Set skip_tests
-        id: archive
-        run: |
-          if [[ -f unit-test-archive.tar.zst ]]; then
-            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip_tests=true" >> "$GITHUB_OUTPUT"
-          fi
+          test -f unit-test-archive.tar.zst
         shell: bash
 
       - name: Save unit test archive
