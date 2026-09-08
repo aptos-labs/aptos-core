@@ -434,6 +434,208 @@ impl SpecInstrumentationProcessor {
     }
 }
 
+/// Returns the set of labels DEFINED by a condition (all range.post labels).
+pub fn defined_state_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
+    let mut labels = BTreeSet::new();
+    exp.visit_pre_order(&mut |node| {
+        // A bound state is an existential/universal proof obligation, not
+        // a free intermediate state whose definition can be assumed.
+        if matches!(node, ExpData::Quant(..) | ExpData::Lambda(..)) {
+            return false;
+        }
+        if let ExpData::Call(_, op, _) = node {
+            match op {
+                ast::Operation::Behavior(_, range)
+                | ast::Operation::SpecFunction(_, _, range)
+                | ast::Operation::SpecPublish(range)
+                | ast::Operation::SpecRemove(range)
+                | ast::Operation::SpecUpdate(range) => labels.extend(range.post),
+                _ => {},
+            }
+        }
+        true
+    });
+    labels
+}
+
+/// Extract intermediate-state definitions, preserving guards and binding scope.
+/// Merely containing a definition does not make an entire conjunct assumable:
+/// it may also constrain the actual return state. A result projection defines
+/// its intermediate state through the corresponding `ensures_of`, not through
+/// a property of the projected value (which still has to be proved).
+pub fn state_label_defining_fragment<'env>(generator: &impl ExpGenerator<'env>, exp: &Exp) -> Exp {
+    state_label_defining_fragment_in_context(generator, exp, true)
+}
+
+/// Extracts only facts which are entailed by the expression. `positive` is false
+/// in contexts where a Boolean child is merely inspected, rather than asserted.
+/// Result projections still contribute their callee relation in those contexts:
+/// using a projected result denotes the call independently of how that value is
+/// subsequently tested.
+fn state_label_defining_fragment_in_context<'env>(
+    generator: &impl ExpGenerator<'env>,
+    exp: &Exp,
+    positive: bool,
+) -> Exp {
+    use ast::{BehaviorKind, Operation as Op};
+    let env = generator.global_env();
+    let bool_node = || env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+    let truth = || ExpData::Value(bool_node(), Value::Bool(true)).into_exp();
+    let and = |a, b| ExpData::Call(bool_node(), Op::And, vec![a, b]).into_exp();
+    let or = |a, b| ExpData::Call(bool_node(), Op::Or, vec![a, b]).into_exp();
+    if defined_state_labels(exp).is_empty() {
+        return truth();
+    }
+    match exp.as_ref() {
+        ExpData::Call(id, op, args) => {
+            let term_children = || {
+                args.iter()
+                    .map(|arg| state_label_defining_fragment_in_context(generator, arg, false))
+                    .fold(truth(), and)
+            };
+            match op {
+                Op::And if positive => and(
+                    state_label_defining_fragment_in_context(generator, &args[0], true),
+                    state_label_defining_fragment_in_context(generator, &args[1], true),
+                ),
+                Op::Or if positive => or(
+                    state_label_defining_fragment_in_context(generator, &args[0], true),
+                    state_label_defining_fragment_in_context(generator, &args[1], true),
+                ),
+                Op::Implies if positive => and(
+                    state_label_defining_fragment_in_context(generator, &args[0], false),
+                    ExpData::Call(bool_node(), Op::Implies, vec![
+                        args[0].clone(),
+                        state_label_defining_fragment_in_context(generator, &args[1], true),
+                    ])
+                    .into_exp(),
+                ),
+                Op::SpecPublish(range) | Op::SpecRemove(range) | Op::SpecUpdate(range)
+                    if positive && range.post.is_some() =>
+                {
+                    let exists_node = bool_node();
+                    env.set_node_instantiation(exists_node, env.get_node_instantiation(*id));
+                    let exists =
+                        ExpData::Call(exists_node, Op::Exists(range.pre), vec![args[0].clone()])
+                            .into_exp();
+                    // Procedure instrumentation has explicit pre-state saves.
+                    // In a behavioral spec body the implicit pre-state is old_.
+                    let exists = if range.pre.is_none() {
+                        generator.mk_old(exists)
+                    } else {
+                        exists
+                    };
+                    let enabled = if matches!(op, Op::SpecPublish(_)) {
+                        generator.mk_not(exists)
+                    } else {
+                        exists
+                    };
+                    and(term_children(), generator.mk_implies(enabled, exp.clone()))
+                },
+                Op::Behavior(kind, range) if range.post.is_some() => {
+                    let definition = match kind {
+                        BehaviorKind::ResultOf => {
+                            let node = bool_node();
+                            env.set_node_instantiation(node, env.get_node_instantiation(*id));
+                            let Type::Fun(inputs, results, _) =
+                                env.get_node_type(args[0].node_id())
+                            else {
+                                return truth();
+                            };
+                            let num_inputs = inputs.flatten().len();
+                            let num_results = results.clone().flatten().len();
+                            let mut canonical_args = args[..1 + num_inputs].to_vec();
+                            for index in 0..num_results {
+                                canonical_args.push(generator.mk_result_of_at_with_state(
+                                    args[0].clone(),
+                                    args[1..].to_vec(),
+                                    &results,
+                                    index,
+                                    num_results,
+                                    range.pre,
+                                    range.post,
+                                ));
+                            }
+                            canonical_args.extend_from_slice(&args[1 + num_inputs..]);
+                            ExpData::Call(
+                                node,
+                                Op::Behavior(BehaviorKind::EnsuresOf, range.clone()),
+                                canonical_args,
+                            )
+                            .into_exp()
+                        },
+                        BehaviorKind::EnsuresOf if positive => exp.clone(),
+                        _ => truth(),
+                    };
+                    // A call's postcondition is available only in its valid,
+                    // non-aborting domain. In particular, an always-aborting
+                    // callee may legitimately have `ensures false`; importing
+                    // that as a definition would prove every abort obligation.
+                    let definition = if matches!(kind, BehaviorKind::ResultOf)
+                        || positive && matches!(kind, BehaviorKind::EnsuresOf)
+                    {
+                        let Type::Fun(inputs, _, _) = env.get_node_type(args[0].node_id()) else {
+                            return truth();
+                        };
+                        let inputs = args[..1 + inputs.flatten().len()].to_vec();
+                        let pre_range = ast::MemoryRange {
+                            pre: range.pre,
+                            post: None,
+                        };
+                        let requires = generator.mk_bool_call(
+                            Op::Behavior(BehaviorKind::RequiresOf, pre_range.clone()),
+                            inputs.clone(),
+                        );
+                        let aborts = generator
+                            .mk_bool_call(Op::Behavior(BehaviorKind::AbortsOf, pre_range), inputs);
+                        generator.mk_implies(and(requires, generator.mk_not(aborts)), definition)
+                    } else {
+                        definition
+                    };
+                    and(term_children(), definition)
+                },
+                Op::SpecFunction(_, _, range)
+                    if positive && range.post.is_some() && env.get_node_type(*id) == BOOL_TYPE =>
+                {
+                    and(term_children(), exp.clone())
+                },
+                // Negation, equivalence, equality on Booleans, and other
+                // non-monotone contexts do not entail their Boolean children.
+                // Descend in term context only to retain call-result relations.
+                _ => term_children(),
+            }
+        },
+        ExpData::Block(_, pattern, binding, body) => {
+            let body = ExpData::Block(
+                bool_node(),
+                pattern.clone(),
+                binding.clone(),
+                state_label_defining_fragment_in_context(generator, body, positive),
+            )
+            .into_exp();
+            if let Some(binding) = binding {
+                and(
+                    state_label_defining_fragment_in_context(generator, binding, false),
+                    body,
+                )
+            } else {
+                body
+            }
+        },
+        ExpData::IfElse(_, cond, then, otherwise) => and(
+            state_label_defining_fragment_in_context(generator, cond, false),
+            ExpData::IfElse(
+                bool_node(),
+                cond.clone(),
+                state_label_defining_fragment_in_context(generator, then, positive),
+                state_label_defining_fragment_in_context(generator, otherwise, positive),
+            )
+            .into_exp(),
+        ),
+        _ => truth(),
+    }
+}
+
 struct Instrumenter<'a> {
     options: &'a ProverOptions,
     builder: FunctionDataBuilder<'a>,
@@ -447,6 +649,7 @@ struct Instrumenter<'a> {
     /// Resource types explicitly framed by opaque callees before call-site type
     /// substitution.
     opaque_callee_framed_memory: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
+    memory_free_callees: BTreeSet<QualifiedId<FunId>>,
     /// Unframed memory possibly modified by opaque closures invoked in this function.
     opaque_closure_modifies: BTreeSet<QualifiedInstId<StructId>>,
     /// Map from Nop AttrId to split expression and optional guard (for `split` proof items).
@@ -476,6 +679,32 @@ impl<'a> Instrumenter<'a> {
         >,
     ) -> (FunctionData, Vec<(AttrId, Exp, Option<Exp>)>) {
         // Pre-collect properties and opaque-callee effects from the original code.
+        let memory_free_callees = data
+            .code
+            .iter()
+            .filter_map(|bc| {
+                let Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) = bc else {
+                    return None;
+                };
+                let qid = mid.qualified(*fid);
+                if qid == fun_env.get_qualified_id() {
+                    return None;
+                }
+                let callee = fun_env.module_env.env.get_function(qid);
+                let target = targets.get_target(&callee, &FunctionVariant::Baseline);
+                (usage_analysis::get_memory_usage(&target)
+                    .accessed
+                    .all
+                    .is_empty()
+                    && callee.get_spec_used_memory().is_empty()
+                    && callee.get_spec_generic_used_memory().is_empty()
+                    && callee.get_parameters().iter().all(|p| {
+                        !p.1.is_mutable_reference()
+                            && !matches!(p.1.skip_reference(), Type::Fun(..))
+                    }))
+                .then_some(qid)
+            })
+            .collect();
         let props: Vec<_> = data
             .code
             .iter()
@@ -645,6 +874,7 @@ impl<'a> Instrumenter<'a> {
             mem_info: &mem_info,
             opaque_callee_modifies,
             opaque_callee_framed_memory,
+            memory_free_callees,
             opaque_closure_modifies,
             split_points: vec![],
             self_is_bv_internal: fun_env.is_pragma_true(BV_INTERNAL_PRAGMA, || false),
@@ -1104,23 +1334,9 @@ impl<'a> Instrumenter<'a> {
             // aborts_if conditions. Uses abort_path=true to emit only the
             // defining fragment (label-defining conjuncts), not full postcondition
             // properties that reference post-havoc state.
-            let defining_indices =
-                self.emit_state_label_assumes(&callee_spec, true, callee_is_bv_internal);
-            // Remove defining conditions from post so they aren't double-emitted
-            // later when assumes for ensures are emitted on the non-abort path.
-            if !defining_indices.is_empty() {
-                let post_count = callee_spec.post.len();
-                callee_spec.post = callee_spec
-                    .post
-                    .drain(..)
-                    .enumerate()
-                    .filter(|(i, _)| !defining_indices.contains(i))
-                    .map(|(_, v)| v)
-                    .collect();
-                // Adjust aborts indices (they start after post in the combined list)
-                // No adjustment needed — aborts are separate from post in callee_spec
-                let _ = post_count; // suppress unused warning
-            }
+            self.emit_state_label_assumes(&callee_spec, true, callee_is_bv_internal);
+            // Keep the full postconditions for the successful-call path: the
+            // definitions above deliberately omit their final-state properties.
 
             let callee_aborts_if_is_partial =
                 callee_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false);
@@ -1358,6 +1574,60 @@ impl<'a> Instrumenter<'a> {
             }
 
             // Generate OpaqueCallEnd instruction if invariant_v2.
+            // A memory-free Move call is a deterministic function of its inputs.
+            // Its actual return is the result_of carrier even when its stated
+            // postconditions do not uniquely determine that return. The ordinary
+            // contract still constrains the carrier only on successful calls.
+            let uses_result_carrier = spec
+                .pre
+                .iter()
+                .chain(&spec.post)
+                .map(|(_, e)| e)
+                .chain(spec.aborts.iter().map(|(_, e, _)| e))
+                .any(|exp| {
+                    exp.any(&mut |node| {
+                        let ExpData::Call(
+                            _,
+                            ast::Operation::Behavior(ast::BehaviorKind::ResultOf, _),
+                            args,
+                        ) = node
+                        else {
+                            return false;
+                        };
+                        matches!(args.first().map(|a| a.as_ref()),
+                        Some(ExpData::Call(_, ast::Operation::Closure(cmid, cfid, _), _))
+                        if *cmid == mid && *cfid == fid)
+                    })
+                });
+            if uses_result_carrier
+                && self
+                    .memory_free_callees
+                    .contains(&callee_env.get_qualified_id())
+            {
+                let args = srcs
+                    .iter()
+                    .map(|s| self.builder.mk_temporary(*s))
+                    .collect::<Vec<_>>();
+                let (closure, _) =
+                    self.builder
+                        .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);
+                let result_ty = callee_env.get_result_type().instantiate(targs);
+                for (i, dest) in dests.iter().enumerate() {
+                    let result = self.builder.mk_result_of_at_with_state(
+                        closure.clone(),
+                        args.clone(),
+                        &result_ty,
+                        i,
+                        dests.len(),
+                        None,
+                        None,
+                    );
+                    let actual = self.builder.mk_temporary(*dest);
+                    let equality = self.builder.mk_eq(actual, result);
+                    self.builder.emit_with(|id| Prop(id, Assume, equality));
+                    self.tag_contract_prop(callee_is_bv_internal);
+                }
+            }
             self.generate_opaque_call(dests, mid, fid, targs, srcs, aa, false);
         }
     }
@@ -2342,28 +2612,11 @@ impl<'a> Instrumenter<'a> {
             // Emit well-formedness checks for choice expressions in post-state let bindings.
             self.emit_choice_wellformedness(spec, true);
 
-            let defining_indices =
-                self.emit_state_label_assumes(spec, false, self.self_is_bv_internal);
+            self.emit_state_label_assumes(spec, false, self.self_is_bv_internal);
 
-            // Emit the negation of all aborts conditions.
-            // For defining conditions (already assumed), assert the non-defining
-            // residual so mixed conditions like `mutation(...) && property` still
-            // verify the property part.
-            let post_count = spec.post.len();
-            for (i, (loc, abort_cond, _)) in spec.aborts.iter().enumerate() {
-                if defining_indices.contains(&(post_count + i)) {
-                    if let Some(residual) = self.non_defining_residual(abort_cond) {
-                        self.emit_traces(spec, abort_cond);
-                        let exp = self.builder.mk_not(residual);
-                        self.builder
-                            .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
-                        self.builder.emit_with(|id| Prop(id, Assert, exp));
-                        self.tag_contract_prop(
-                            self.self_is_bv_internal && !self.is_concrete_cond(loc),
-                        );
-                    }
-                    continue;
-                }
+            // Definitions do not replace proof obligations. Assert the full
+            // condition, including any quantified or final-state properties.
+            for (loc, abort_cond, _) in &spec.aborts {
                 self.emit_traces(spec, abort_cond);
                 let exp = self.builder.mk_not(abort_cond.clone());
                 self.builder
@@ -2378,23 +2631,8 @@ impl<'a> Instrumenter<'a> {
                 self.emit_proof_actions(&spec.post_proof, spec);
             }
 
-            // Emit all post-conditions which must hold.
-            // For defining conditions (already assumed), assert the non-defining
-            // residual so mixed conditions like `mutation(...) && result == 0`
-            // still verify the `result == 0` part.
-            for (i, (loc, cond)) in spec.post.iter().enumerate() {
-                if defining_indices.contains(&i) {
-                    if let Some(residual) = self.non_defining_residual(cond) {
-                        self.emit_traces(spec, cond);
-                        self.builder
-                            .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
-                        self.builder.emit_with(move |id| Prop(id, Assert, residual));
-                        self.tag_contract_prop(
-                            self.self_is_bv_internal && !self.is_concrete_cond(loc),
-                        );
-                    }
-                    continue;
-                }
+            // Prove all postconditions, including mixed definition/property clauses.
+            for (loc, cond) in &spec.post {
                 self.emit_traces(spec, cond);
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
@@ -2435,9 +2673,8 @@ impl<'a> Instrumenter<'a> {
     /// Collects all conditions (ensures + aborts), finds which ones define state labels,
     /// and emits them as assumes in topological (dependency) order.
     /// Returns the set of condition indices that were emitted as assumes (defining conditions).
-    /// If `abort_path` is true, assume only the defining fragment of each condition
-    /// (conjuncts that contain label-defining operations), not extra properties
-    /// that only hold on successful returns.
+    /// Assume only intermediate-state definitions, never final-state properties,
+    /// on either path. `abort_path` also includes definitions from abort clauses.
     fn emit_state_label_assumes(
         &mut self,
         spec: &TranslatedSpec,
@@ -2530,11 +2767,7 @@ impl<'a> Instrumenter<'a> {
                             continue;
                         }
                         self.emit_traces(spec, all_conditions[idx]);
-                        let cond = if abort_path {
-                            Self::defining_fragment(all_conditions[idx])
-                        } else {
-                            all_conditions[idx].clone()
-                        };
+                        let cond = self.defining_fragment(all_conditions[idx]);
                         self.builder.emit_with(move |id| Prop(id, Assume, cond));
                         self.tag_contract_prop(
                             owner_is_bv_internal && !self.is_concrete_cond(condition_locs[idx]),
@@ -2558,101 +2791,17 @@ impl<'a> Instrumenter<'a> {
         defining_indices
     }
 
-    /// Returns the set of labels DEFINED by a condition (all range.post labels).
     fn defined_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
-        exp.as_ref().all_defined_labels()
+        defined_state_labels(exp)
     }
 
-    /// Extract the defining fragment of a condition: only the conjuncts that
-    /// contain label-defining operations. Non-defining conjuncts (properties
-    /// that only hold on successful returns) are dropped. Used on the abort
-    /// path to avoid assuming postcondition properties.
-    fn defining_fragment(exp: &Exp) -> Exp {
-        use move_model::exp_simplifier::flatten_conjunction_owned;
-        let conjuncts = flatten_conjunction_owned(exp);
-        let defining: Vec<Exp> = conjuncts
-            .into_iter()
-            .filter(|c| !c.as_ref().all_defined_labels().is_empty())
-            .collect();
-        if defining.is_empty() {
-            // No defining conjuncts — return true (no constraint).
-            let id = exp.as_ref().node_id();
-            ExpData::Value(id, Value::Bool(true)).into_exp()
-        } else {
-            defining
-                .into_iter()
-                .reduce(|a, b| {
-                    let id = a.as_ref().node_id();
-                    ExpData::Call(id, ast::Operation::And, vec![a, b]).into_exp()
-                })
-                .unwrap()
-        }
+    fn defining_fragment(&self, exp: &Exp) -> Exp {
+        state_label_defining_fragment(&self.builder, exp)
     }
 
     /// Returns all labels referenced by a condition.
     fn all_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
         all_labels_in_exp(exp)
-    }
-
-    /// Compute the non-defining residual of a condition: the condition with all
-    /// label-defining operations neutralized. Mutation builtins are replaced by `true`
-    /// (boolean predicates about state transitions). For behavioral predicates and spec
-    /// functions with `range.post`, stripping the label would change the state context
-    /// (evaluating at exit instead of the labeled intermediate state), producing
-    /// semantically incorrect assertions. For those, no residual is returned.
-    /// Returns `None` if the residual is trivially `true` (pure definition) or if
-    /// the condition contains label-defining Behavior/SpecFunction operations.
-    fn non_defining_residual(&self, exp: &Exp) -> Option<Exp> {
-        // If the condition contains label-defining Behavior or SpecFunction operations,
-        // there is no meaningful residual: stripping the label changes the state context.
-        // The assume already covers the verification obligation.
-        let has_non_mutation_definers = {
-            let mut found = false;
-            exp.as_ref().visit_pre_order(&mut |e| {
-                if let ExpData::Call(_, op, _) = e {
-                    match op {
-                        ast::Operation::Behavior(_, range)
-                        | ast::Operation::SpecFunction(_, _, range)
-                            if range.post.is_some() =>
-                        {
-                            found = true;
-                            return false;
-                        },
-                        _ => {},
-                    }
-                }
-                !found
-            });
-            found
-        };
-        if has_non_mutation_definers {
-            return None;
-        }
-        struct MutationStripper;
-        impl ExpRewriterFunctions for MutationStripper {
-            fn rewrite_call(
-                &mut self,
-                id: move_model::model::NodeId,
-                oper: &ast::Operation,
-                _args: &[Exp],
-            ) -> Option<Exp> {
-                match oper {
-                    ast::Operation::SpecPublish(_)
-                    | ast::Operation::SpecRemove(_)
-                    | ast::Operation::SpecUpdate(_) => {
-                        Some(ExpData::Value(id, Value::Bool(true)).into_exp())
-                    },
-                    _ => None,
-                }
-            }
-        }
-        let mut stripper = MutationStripper;
-        let residual = stripper.rewrite_exp(exp.clone());
-        if matches!(residual.as_ref(), ExpData::Value(_, Value::Bool(true))) {
-            None // Pure definition, no residual to assert
-        } else {
-            Some(residual)
-        }
     }
 
     /// Generate a check whether the target can modify the given memory provided

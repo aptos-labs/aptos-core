@@ -4,7 +4,7 @@
 {% include "templates/spec_lang.md" %}
 {% include "templates/core_tools.md" %}
 
-## Editing and simplifying specifications
+## Editing{% if not args.no_wp_simplification or not wp_tool_enabled %} and simplifying{% endif %} specifications
 
 Edit the contract rather than executable behavior. In an inference task, a
 behavior-preserving loop/inline-HOF rewrite is appropriate only when it is
@@ -16,6 +16,7 @@ a whole module to adjust one condition risks disturbing unrelated user-written
 code, and its output is dominated by text that was already correct.
 {% endif %}
 
+{% if not args.no_wp_simplification or not wp_tool_enabled %}
 ### Simplification order
 
 1. **Repair the abstraction first.** Resolve the loop or callee facts behind a
@@ -36,13 +37,16 @@ code, and its output is dominated by text that was already correct.
 
 Every simplification must preserve result, abort, precondition, and frame
 semantics.
+{% endif %}
 
 ### Pragmas and trust boundaries
 
 {% if evaluation_mode %}
 - Never disable or skip verification. `pragma verify = false`,
-  `verify_duration_estimate`, partial abort coverage, axioms, and unproved
+  `verify_duration_estimate`, invented partial abort coverage, axioms, and unproved
   assumptions cannot count as a repaired proof.
+  Preserve partial coverage inherited from a partial callee as described in the
+  inference rules.
 {% else %}
 - Do not add `pragma verify = false`, `verify_duration_estimate`, an axiom, or an
   unproved assumption as an automatic fallback. Use one only when the user or an

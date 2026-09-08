@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import datetime, timezone
+import fcntl
 import json
 import os
 import sys
@@ -12,7 +14,7 @@ from typing import Any
 
 from .config import RunSpec
 from .artifacts import write_json
-from .dispatch import dispatch_round
+from .dispatch import INFRASTRUCTURE_TERMINAL_STATUS, dispatch_round, read_terminal_status
 from .pilot import load_round_shape
 from .pilot_preflight import preflight
 
@@ -25,6 +27,7 @@ async def run_pilot(
     concurrency: int,
     report_path: Path,
     refutation_mutants_root: Path | None = None,
+    resume: bool = False,
 ) -> dict[str, Any]:
     if concurrency < 1:
         raise ValueError("concurrency must be positive")
@@ -67,14 +70,35 @@ async def run_pilot(
             command += ["--refutation-mutants-root", str(refutation_mutants_root)]
         return command
 
-    report = await dispatch_round(
-        [(RunSpec.load(path).run_id, path) for path in run_paths],
-        artifacts_dir,
-        launch_command,
-        concurrency,
-        Path(__file__).resolve().parent.parent,
-    )
-    write_json(report_path, report)
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    with (artifacts_dir / ".dispatch.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        cells = [(RunSpec.load(path).run_id, path) for path in run_paths]
+        acknowledged = frozenset(
+            run_id for run_id, _ in cells
+            if resume and (artifacts_dir / run_id / "judge.json").is_file()
+            and read_terminal_status(artifacts_dir / run_id) == INFRASTRUCTURE_TERMINAL_STATUS
+        )
+        if report_path.exists():
+            if not resume:
+                raise ValueError("launch report already exists; use --resume to archive and continue")
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+            archive = report_path.with_name(f"{report_path.stem}.before-resume-{stamp}.json")
+            with archive.open("x") as output:
+                output.write(report_path.read_text())
+        if resume:
+            write_json(report_path.with_suffix(".resume.json"), {
+                "started_utc": datetime.now(timezone.utc).isoformat(),
+                "acknowledged_failures": sorted(acknowledged),
+                "concurrency": concurrency,
+                "preflight": preflight_result,
+            })
+        report = await dispatch_round(
+            cells, artifacts_dir, launch_command, concurrency,
+            Path(__file__).resolve().parent.parent,
+            acknowledged_failures=acknowledged,
+        )
+        write_json(report_path, report)
     return report
 
 
@@ -91,6 +115,12 @@ def main() -> None:
     parser.add_argument("--sandbox-wrapper", type=Path, required=True)
     parser.add_argument("--concurrency", type=int, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="retain recorded outcomes, archive the prior launch report, and acknowledge "
+        "historical infrastructure failures without counting them as new outages; "
+        "the original apparatus preflight still applies",
+    )
     parser.add_argument(
         "--refutation-mutants-root",
         type=Path,
@@ -111,6 +141,7 @@ def main() -> None:
             args.concurrency,
             args.report.resolve(),
             args.refutation_mutants_root.resolve() if args.refutation_mutants_root else None,
+            args.resume,
         )
     )
     print(json.dumps({"complete": result["complete"], "runs": len(result["results"])}))

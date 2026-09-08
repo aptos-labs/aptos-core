@@ -526,6 +526,7 @@ mod tests {
         context.insert("flow_version", env!("CARGO_PKG_VERSION"));
         let args = PluginArgs {
             output_dir: PathBuf::from("."),
+            no_wp_simplification: false,
             initial_verification_timeout: 10,
             max_verification_timeout: 20,
             default_verification_attempts: 3,

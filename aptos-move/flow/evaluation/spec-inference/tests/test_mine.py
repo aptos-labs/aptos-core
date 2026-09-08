@@ -166,6 +166,14 @@ class SessionTotalTest(unittest.TestCase):
         self.assertEqual(93_626, totals["output_tokens"])
         self.assertEqual(5_851_456, totals["cache_read_input_tokens"])
 
+    def test_top_level_sdk_cost_is_used_when_model_breakdown_is_missing(self) -> None:
+        first = self._turn(100, 0, 10, 20)
+        second = self._turn(200, 0, 20, 30)
+        for event, cost in ((first, 1.0), (second, 2.5)):
+            event["result"]["model_usage"] = {}
+            event["result"]["total_cost_usd"] = cost
+        self.assertEqual(_session_totals([first, second])[3], 2.5)
+
     def test_a_retry_starts_a_fresh_session_whose_totals_add(self) -> None:
         controller = [
             self._turn(100, 1.0, 10, 20),

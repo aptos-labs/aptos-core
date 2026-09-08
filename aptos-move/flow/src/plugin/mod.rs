@@ -36,6 +36,10 @@ pub struct PluginArgs {
     /// Output directory for generated files.
     pub output_dir: PathBuf,
 
+    /// Omit WP simplification instructions from hybrid agent workflows.
+    #[arg(long)]
+    pub no_wp_simplification: bool,
+
     /// Initial timeout (seconds) for verification runs.
     #[arg(long, default_value_t = 5)]
     pub initial_verification_timeout: u64,
@@ -228,6 +232,7 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
         "inference_tactic": evaluation.inference_tactic.as_str(),
         "evaluation_mode": evaluation.evaluation_mode,
         "feedback_level": evaluation.feedback_level.as_str(),
+        "no_wp_simplification": args.no_wp_simplification,
         "rendered_inference_skill_sha256": sha256_hex(rendered_skill.as_bytes()),
         "mcp_tool_list_sha256": tool_list_sha256,
         "mcp_tools": sorted_tool_names,
@@ -261,6 +266,56 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    fn hybrid_plugins_can_skip_wp_simplification() {
+        use crate::{evaluation::InferenceTactic, FlowCli};
+        for tactic in [
+            InferenceTactic::HybridGuided,
+            InferenceTactic::HybridFlexible,
+        ] {
+            for disabled in [false, true] {
+                let output = TempDir::new().unwrap();
+                let mut argv = vec!["move-flow", "plugin", output.path().to_str().unwrap()];
+                if disabled {
+                    argv.push("--no-wp-simplification");
+                }
+                let cli = FlowCli::try_parse_from(argv).unwrap();
+                let crate::FlowCommand::Plugin(args) = cli.command else {
+                    panic!("expected plugin")
+                };
+                let global = GlobalOpts {
+                    platform: Platform::Claude,
+                    content_dir: None,
+                    inference_tactic: Some(tactic),
+                    evaluation_mode: false,
+                    feedback_level: None,
+                };
+                run(&args, &global).unwrap();
+                let skill = std::fs::read_to_string(output.path().join("skills/move-inf/SKILL.md"))
+                    .unwrap();
+                assert_eq!(skill.contains("**Simplify what WP derived**"), !disabled);
+                assert_eq!(skill.contains("### Simplification order"), !disabled);
+                assert_eq!(
+                    skill.contains("simplify as much as the contract"),
+                    !disabled
+                );
+                assert!(skill.contains("**Check the candidate.**"));
+                let normalized_skill = skill.split_whitespace().collect::<Vec<_>>().join(" ");
+                assert!(normalized_skill.contains("complete and correct by construction"));
+                assert!(skill.contains("WP does not run the prover"));
+                assert!(normalized_skill.contains("caller cannot have total abort coverage"));
+                assert!(!skill.contains("repeat on that function until its warning is gone"));
+                assert_eq!(skill.matches("### WP tool").count(), 1);
+                let manifest: serde_json::Value = serde_json::from_str(
+                    &std::fs::read_to_string(output.path().join("move-flow-manifest.json"))
+                        .unwrap(),
+                )
+                .unwrap();
+                assert_eq!(manifest["no_wp_simplification"], disabled);
+            }
+        }
+    }
+
+    #[test]
     fn test_generate_claude() {
         let content_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let output_dir = TempDir::new().unwrap();
@@ -274,6 +329,7 @@ mod tests {
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
+            no_wp_simplification: false,
             initial_verification_timeout: 5,
             max_verification_timeout: 10,
             default_verification_attempts: 3,
@@ -369,9 +425,9 @@ mod tests {
         );
         assert!(inf_content.contains("### Guided hybrid tactic"));
         assert!(inf_content.contains("Follow this order:"));
-        assert!(inf_content.contains("**Run WP over the requested scope.**"));
+        assert!(inf_content.contains("**Run WP over the requested scope**"));
         // One warned function at a time, reran under a function filter.
-        assert!(inf_content.contains("**Take one warned function.**"));
+        assert!(inf_content.contains("**Handle its diagnostics**"));
         assert!(inf_content.contains("filter: \"module::function\""));
         assert!(inf_content.contains("## Final report"));
         // Outside an evaluation a hybrid plugin carries both hybrid tactics,
@@ -384,6 +440,13 @@ mod tests {
         let inf_skill =
             std::fs::read_to_string(output_dir.path().join("skills/move-inf/SKILL.md")).unwrap();
         assert!(inf_skill.contains("argument-hint: [hybrid-guided|hybrid-flexible] [scope]"));
+        for content in [&inf_content, &inf_skill] {
+            assert!(content.contains("### Interpreting abort codes"));
+            assert!(content.contains("move-stdlib/sources/error.move"));
+            assert!(content.contains("error::INVALID_ARGUMENT"));
+            assert!(content.contains("0x10028"));
+            assert!(content.contains("address::module::function"));
+        }
 
         // Verify the move skill contains language reference content
         let skill_content =
@@ -499,6 +562,7 @@ mod tests {
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
+            no_wp_simplification: false,
             initial_verification_timeout: 5,
             max_verification_timeout: 10,
             default_verification_attempts: 3,
@@ -552,6 +616,7 @@ mod tests {
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
+            no_wp_simplification: false,
             initial_verification_timeout: 5,
             max_verification_timeout: 10,
             default_verification_attempts: 3,
@@ -616,6 +681,7 @@ mod tests {
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
+            no_wp_simplification: false,
             initial_verification_timeout: 5,
             max_verification_timeout: 10,
             default_verification_attempts: 3,

@@ -10,8 +10,10 @@ disabled or skipped, a vacuous condition, a partial-abort pragma no callee
 justifies -- and
 reports an obligation category the contract leaves uncovered. Give it
 `package_path` and optionally `filter` to work on one module or function. If a
-candidate needs a larger per-condition solver budget, set `timeout` no higher
-than {{ args.max_verification_timeout }} seconds.
+candidate needs a larger per-condition solver budget, the usual guidance is
+{{ args.initial_verification_timeout }} seconds initially and
+{{ args.max_verification_timeout }} seconds on retry. These are suggestions;
+override `timeout` when the proof warrants it.
 
 It verifies as part of accepting, so it replaces a closing call to
 `{{ tool(name="move_package_verify") }}`: immediately beforehand that repeats

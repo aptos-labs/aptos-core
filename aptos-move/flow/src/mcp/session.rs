@@ -25,6 +25,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use tokio::sync::Mutex as AsyncMutex;
 
 /// MCP session holding a package data cache.
 #[derive(Clone)]
@@ -39,6 +40,10 @@ pub(crate) struct FlowSession {
     package_cache: Arc<Mutex<BTreeMap<String, Arc<Mutex<PackageData>>>>>,
     file_watcher: FileWatcher,
     tool_router: ToolRouter<Self>,
+    /// MCP tool calls are sequential within a session. In particular, package
+    /// resolution mutates the shared cache and file-watcher registrations and
+    /// must not race when a client submits several calls concurrently.
+    tool_call_lock: Arc<AsyncMutex<()>>,
     /// Session-scoped temp directory, automatically deleted on drop.
     temp_dir: Arc<tempfile::TempDir>,
     /// Condition statuses from the previous candidate check of each package.
@@ -162,6 +167,7 @@ impl FlowSession {
             package_cache,
             file_watcher,
             tool_router: Self::all_tool_routers(evaluation),
+            tool_call_lock: Arc::new(AsyncMutex::new(())),
             temp_dir,
             previous_conditions: Arc::new(Mutex::new(BTreeMap::new())),
         }
@@ -259,7 +265,7 @@ impl FlowSession {
             self.emit_package_resolve(&key, false, resolve_start, "error", None);
             return Err(error);
         }
-        {
+        if !self.args.no_package_cache {
             let cache = self
                 .package_cache
                 .lock()
@@ -274,7 +280,7 @@ impl FlowSession {
         // Cache miss — rebuild. Keep existing watches active during compilation
         // so that edits are not missed; the watcher callback will call
         // `cache.remove(key)` which is a no-op while there is no cache entry.
-        let build_start = std::time::SystemTime::now();
+        let build_start = (!self.args.no_package_cache).then(std::time::SystemTime::now);
 
         log::info!("building package `{}`", key);
         // A measured session has no network egress channel by design: `Bash`
@@ -301,12 +307,17 @@ impl FlowSession {
                     )
                 })?;
 
-        // Swap old watches for the new source file set.
-        self.file_watcher.unwatch_package(&key);
         let source_files = data.env().get_source_file_names();
-        let num_dirs = self
-            .file_watcher
-            .watch_package(&key, Path::new(&key), &source_files);
+        // Cache-free sessions neither register file watches nor consult file
+        // modification timestamps. Every subsequent call rebuilds instead.
+        let num_dirs = if self.args.no_package_cache {
+            0
+        } else {
+            // Swap old watches for the new source file set.
+            self.file_watcher.unwatch_package(&key);
+            self.file_watcher
+                .watch_package(&key, Path::new(&key), &source_files)
+        };
         log::info!("built package `{}`, watching {} dirs", key, num_dirs);
         self.emit_package_resolve(
             &key,
@@ -318,13 +329,18 @@ impl FlowSession {
 
         // If any source file was modified during the build, skip caching.
         // The next call will see a cache miss and rebuild with fresh sources.
-        let stale = source_files.iter().any(|f| {
-            std::fs::metadata(f)
-                .and_then(|m| m.modified())
-                .is_ok_and(|mtime| mtime >= build_start)
+        let stale = build_start.is_some_and(|build_start| {
+            source_files.iter().any(|f| {
+                std::fs::metadata(f)
+                    .and_then(|m| m.modified())
+                    .is_ok_and(|mtime| mtime >= build_start)
+            })
         });
 
         let data = Arc::new(Mutex::new(data));
+        if self.args.no_package_cache {
+            return Ok((data, true));
+        }
         if stale {
             log::info!("source changed during build of `{}`, skipping cache", key);
             return Ok((data, true));
@@ -345,6 +361,10 @@ impl ServerHandler for FlowSession {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
+        // Some MCP clients dispatch multiple tool calls from one model turn in
+        // parallel. Flow's package model and watcher are session state, so wait
+        // for the active tool call instead of allowing those requests to race.
+        let _tool_call_guard = self.tool_call_lock.lock().await;
         let start = std::time::Instant::now();
         let tool_name = request.name.to_string();
         // Every field below costs something to produce -- `resolve_package_path`

@@ -56,6 +56,62 @@ It never prints the key.
 sandbox/with-glm-env.sh .venv/bin/python -m harness.pilot_preflight ...
 ```
 
+## Interrupted rounds
+
+`harness.pilot_run --resume` retains terminal outcomes, archives an existing
+launch report, and records which historical infrastructure failures are
+acknowledged before dispatching unfinished cells. It still runs the full
+apparatus preflight: changed harness code, binaries, prompts, or task inputs
+require a separately recorded round, not an in-place continuation.
+
+The outage gate requires failures on two distinct tasks. Repeated failures on
+one task remain invalid observations but do not alone stop unrelated work.
+New failures still count after a resume. A process lock prevents simultaneous
+dispatchers from spending the same schedule twice.
+
+Interrupted sandbox sessions are redacted and archived under the round's
+`interrupted-runs/`, outside published `runs/`. Their raw telemetry and partial
+SDK metrics remain available for cost accounting; missing terminal usage is
+not zero usage. The launch report distinguishes queued aborts (`started: false`)
+from in-flight aborts (`started: true`). Neither is a completed evaluation.
+
+## Select GLM or Opus
+
+Select the model before screening and scheduling. `--model glm` selects
+GLM 5.3 through Z.ai; `--model opus` selects `claude-opus-5` through Anthropic
+with Claude subscription authentication. The selector writes a new config,
+preserves budgets and source provenance, and refuses to overwrite a config:
+
+```text
+.venv/bin/python -m harness.model_profile select --model opus \
+  --config evaluation-artifacts/corpus3.2-run1/config.json \
+  --output evaluation-artifacts/corpus3.2-run1-opus/config.json
+```
+
+For Opus, run `claude setup-token` locally and set `CLAUDE_CODE_OAUTH_TOKEN`
+to its token, or save just the token in a private file outside the repository
+and set `MOVE_INFERENCE_CLAUDE_TOKEN_FILE` to that path. The sandbox passes
+subscription OAuth through and redacts it from artifacts. An API key is not
+used as a fallback for the subscription profile.
+
+This launcher chooses credentials from the config for either model:
+
+```text
+.venv/bin/python -m harness.model_profile exec --config ROUND/config.json -- --preflight
+.venv/bin/python -m harness.model_profile exec --config ROUND/config.json -- \
+  .venv/bin/python -m harness.pilot_preflight --config ROUND/config.json \
+  --schedule-dir ROUND/schedule --sandbox-wrapper scripts/pilot-sandbox \
+  --output ROUND/preflight.json
+```
+
+Use the launcher around `harness.pilot_run` as well. Choose a new round ID,
+refresh screening with the new config, and schedule again: a model change
+changes the config digest. A harness change also invalidates previously
+scheduled harness digests. The credential launcher's `--preflight` checks local
+credentials and the CLI version; it does not make a model request or verify
+account quota. Use the long-lived setup token for unattended runs rather than
+an ordinary short-lived login access token.
+
 ## Run a round
 
 Every round gets a new round ID. Skills, prompts, tools, models, and limits may
@@ -227,6 +283,29 @@ mounted beside it.
 ```
 
 ## Analyse a finished round
+
+Each real session records telemetry before the SDK parser in
+`claude-events.jsonl` (`sdk_message` events), in addition to the typed messages
+used by the controller. Partial-message streaming is enabled. This retains
+native usage fields, per-message IDs and usage, nested cache-write durations,
+per-model usage/cost/provider/context limits, stop reasons, permission denials,
+API errors, rate-limit/reset/overage events, compaction events, and future
+fields whenever Claude Code emits them. HTTP headers and account billing data
+that the CLI does not emit are not available here.
+
+Text/thinking/tool-JSON/signature payload deltas are coalesced into
+`sdk_stream_summary` records with counts, character lengths and first/last
+receipt times; completed content remains in the transcript. Unknown delta
+fields and usage updates are retained verbatim. These receipt timings are
+local observations, not server-side latency measurements.
+
+`sdk-metrics.json` preserves every result and rate-limit event and summarizes
+the reported counters. It sums per-query result usage, takes the last
+cumulative cost/model usage per session, and deduplicates API message IDs.
+Incomplete queries are flagged; missing costs remain unknown. USD figures are
+SDK API-equivalent estimates, not subscription invoices. New runs declare
+`sdk_telemetry_schema: 1`, which makes audit require this artifact and check
+raw-versus-typed result coverage. Credentials are redacted before logging.
 
 ```text
 move-inference-mine-transcripts --runs-dir ROUND/runs \

@@ -26,12 +26,14 @@ use std::time::{Duration, Instant};
 struct MovePackageVerifyParams {
     /// Path to the Move package directory.
     package_path: String,
-    /// Optional filter: `module_name` or `module_name::function_name`.
+    /// Optional filter: `module_name`, `module_name::function_name`, or
+    /// `address::module_name::function_name` (numeric or named address).
+    /// A module name without an address must be unambiguous.
     /// When omitted, all target modules are verified.
     filter: Option<String>,
     /// Optional list of targets to exclude from verification.
-    /// Each entry follows the same format as `filter`: `module_name` or
-    /// `module_name::function_name`. Exclusions take precedence over the filter scope.
+    /// Each entry follows the same format as `filter`.
+    /// Exclusions take precedence over the filter scope.
     exclude: Option<Vec<String>>,
     /// Solver timeout per verification condition, in seconds. Default: 10. Maximum: 60.
     timeout: Option<usize>,
@@ -304,6 +306,8 @@ impl FlowSession {
                         None,
                     ));
                 }
+                // Apply the same ambiguity check as inclusion filters.
+                resolve_filter(data.env(), Some(entry))?;
             }
 
             let exclude_entries: Vec<&str> = exclude

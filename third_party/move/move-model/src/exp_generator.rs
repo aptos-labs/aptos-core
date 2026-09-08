@@ -837,6 +837,11 @@ pub trait ExpGenerator<'env> {
         self.mk_call(vec_ty, Operation::ConcatVec, vec![a, b])
     }
 
+    /// `reverse_vector(v)` — vector reversal.
+    fn mk_reverse_vec(&self, v: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::ReverseVec, vec![v])
+    }
+
     /// `update(v, i, e)` — functional update.
     fn mk_update_vec(&self, v: Exp, i: Exp, e: Exp, vec_ty: &Type) -> Exp {
         self.mk_call(vec_ty, Operation::UpdateVec, vec![v, i, e])

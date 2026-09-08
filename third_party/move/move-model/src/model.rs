@@ -3601,9 +3601,31 @@ impl<'env> ModuleEnv<'env> {
         &self.data.name
     }
 
-    /// Returns true if either the full name or simple name of this module matches the given string
+    /// Match a simple module name or an address-qualified name. Addresses may
+    /// be hexadecimal literals or aliases from the model's address map.
     pub fn matches_name(&self, name: &str) -> bool {
-        self.get_full_name_str() == name || self.get_name().display(self.env).to_string() == name
+        if self.get_full_name_str() == name {
+            return true;
+        }
+        if let Some((address, module)) = name.split_once("::") {
+            let address = if address.starts_with("0x") {
+                AccountAddress::from_hex_literal(address).ok()
+            } else {
+                self.env
+                    .get_address_alias_map()
+                    .get(&self.env.symbol_pool().make(address))
+                    .copied()
+            };
+            address.is_some_and(|a| self.get_name().addr() == &Address::Numerical(a))
+                && self
+                    .get_name()
+                    .name()
+                    .display(self.env.symbol_pool())
+                    .to_string()
+                    == module
+        } else {
+            self.get_name().display(self.env).to_string() == name
+        }
     }
 
     /// Returns the location of this module.
@@ -6467,9 +6489,17 @@ impl<'env> FunctionEnv<'env> {
         self.is_pragma_true(VERIFY_PRAGMA, default)
     }
 
-    /// Returns true if either the name or simple name of this function matches the given string
+    /// Match a simple function name, `module::function`, or
+    /// `address::module::function` (including named address aliases).
     pub fn matches_name(&self, name: &str) -> bool {
-        name.eq(&*self.get_simple_name_string()) || name.eq(&*self.get_name_string())
+        if name == &*self.get_name_string() {
+            return true;
+        }
+        if let Some((module, function)) = name.rsplit_once("::") {
+            self.module_env.matches_name(module) && function.eq(&*self.get_simple_name_string())
+        } else {
+            name.eq(&*self.get_simple_name_string())
+        }
     }
 
     /// Determine whether this function is explicitly deactivated for verification.

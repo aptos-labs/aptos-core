@@ -153,7 +153,9 @@ procedure {:inline 1} $1_vector_reverse_slice{{S}}(m: $Mutation (Vec ({{T}})), l
         call $ExecFailureAbort();
         return;
     }
-    if (left == right) {
+    // The Move loop performs no indexed swap for a zero- or one-element
+    // range, so these cases return before any bounds check.
+    if (right <= left + 1) {
         m' := m;
         return;
     }
@@ -196,8 +198,14 @@ procedure {:inline 1} $1_vector_rotate_slice{{S}}(m: $Mutation (Vec ({{T}})), le
         call $ExecFailureAbort();
         return;
     }
-    if (!(right >= 0 && right <= LenVec(v))) {
-        call $ExecFailureAbort();
+    if (right > left + 1) {
+        if (!(right >= 0 && right <= LenVec(v))) {
+            call $ExecFailureAbort();
+            return;
+        }
+    } else {
+        m' := m;
+        n := left + (right - rot);
         return;
     }
     v := $Dereference(m);
@@ -335,6 +343,23 @@ procedure {:inline 1} $1_vector_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) 
     }
     e := ReadVec(v, i);
     m' := $UpdateMutation(m, RemoveAtVec(v, i));
+}
+
+procedure {:inline 1} $1_vector_remove_value{{S}}(m: $Mutation (Vec ({{T}})), e: {{T}})
+returns (removed: Vec ({{T}}), m': $Mutation (Vec ({{T}})))
+{
+    var i: int;
+    var v: Vec ({{T}});
+
+    v := $Dereference(m);
+    i := $IndexOfVec{{S}}(v, e);
+    if (i >= 0) {
+        removed := MakeVec1(ReadVec(v, i));
+        m' := $UpdateMutation(m, RemoveAtVec(v, i));
+    } else {
+        removed := EmptyVec();
+        m' := m;
+    }
 }
 
 procedure {:inline 1} $1_vector_swap_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) returns (e: {{T}}, m': $Mutation (Vec ({{T}})))

@@ -113,6 +113,8 @@ pub struct ExpSimplifier<'a, 'env, G: ExpGenerator<'env>> {
     inside_old: bool,
     /// Tracks the number of spec function unfold steps to prevent runaway recursion.
     spec_fun_unfold_depth: usize,
+    /// Active calls prevent symbolic recursive expansion from branching exponentially.
+    unfolding_spec_funs: Vec<(ModuleId, SpecFunId)>,
     /// Guard to prevent recursive modus ponens derivation.
     in_modus_ponens: bool,
     /// Binds the `'env` lifetime (used only in the `G: ExpGenerator<'env>` bound).
@@ -130,6 +132,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             spec_mode: true,
             inside_old: false,
             spec_fun_unfold_depth: 0,
+            unfolding_spec_funs: Vec::new(),
             in_modus_ponens: false,
             _phantom: std::marker::PhantomData,
         }
@@ -145,6 +148,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             spec_mode,
             inside_old: false,
             spec_fun_unfold_depth: 0,
+            unfolding_spec_funs: Vec::new(),
             in_modus_ponens: false,
             _phantom: std::marker::PhantomData,
         }
@@ -3903,7 +3907,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         }
     }
 
-    /// Tries to unfold a spec function call where all arguments are constants.
+    /// Tries to unfold a spec function call for partial evaluation.
     /// Returns the substituted body if the function has a non-native, interpreted body,
     /// or `None` if unfolding is not possible.
     fn try_unfold_spec_fun(
@@ -3914,6 +3918,18 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         args: &[Exp],
     ) -> Option<Exp> {
         if self.spec_fun_unfold_depth >= MAX_SPEC_FUN_UNFOLD_DEPTH {
+            return None;
+        }
+        // A depth limit alone permits exponentially many copies of symbolic
+        // recursive bodies, only to discard them when recursion remains. Keep
+        // such calls intact on re-entry. Constant calls may still reach a base
+        // case; the depth limit bounds that evaluation. The backend retains
+        // the function definition, so declining to unfold loses no semantics.
+        if self.unfolding_spec_funs.contains(&(mid, fid))
+            && !args
+                .iter()
+                .all(|arg| matches!(arg.as_ref(), ExpData::Value(..)))
+        {
             return None;
         }
         // Behavioral expressions belong to the caller and carry their own
@@ -5036,7 +5052,9 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
         if let Operation::SpecFunction(mid, fid, _) = oper {
             if let Some(unfolded) = self.try_unfold_spec_fun(id, *mid, *fid, args) {
                 self.spec_fun_unfold_depth += 1;
+                self.unfolding_spec_funs.push((*mid, *fid));
                 let result = self.rewrite_exp(unfolded);
+                self.unfolding_spec_funs.pop();
                 self.spec_fun_unfold_depth -= 1;
                 let still_contains_self = result.as_ref().any(&mut |e| {
                     matches!(e, ExpData::Call(_, Operation::SpecFunction(m, f, _), _)
@@ -7638,6 +7656,58 @@ mod tests {
             true
         });
         assert_eq!(found, vec![closure_inst]);
+    }
+
+    #[test]
+    fn test_symbolic_recursive_unfolding_is_bounded() {
+        // A branching recursive helper must remain a compact call for a
+        // symbolic argument, while concrete arguments can still be evaluated.
+        let mut env = GlobalEnv::new();
+        let ty = Type::Primitive(PrimitiveType::Num);
+        let n = ExpData::LocalVar(
+            env.new_node(Loc::default(), ty.clone()),
+            env.symbol_pool().make("n"),
+        )
+        .into_exp();
+        let op = Operation::SpecFunction(
+            ModuleId::new(0),
+            SpecFunId::new(0),
+            crate::ast::MemoryRange::default(),
+        );
+        let branches = [1, 2]
+            .into_iter()
+            .map(|offset| {
+                let arg = mk_op(&env, ty.clone(), Operation::Sub, vec![
+                    n.clone(),
+                    mk_num(&env, offset),
+                ]);
+                mk_op(&env, ty.clone(), op.clone(), vec![arg])
+            })
+            .collect();
+        let body = ExpData::IfElse(
+            env.new_node(Loc::default(), ty.clone()),
+            mk_bool_op(&env, Operation::Le, vec![n, mk_num(&env, 0)]),
+            mk_num(&env, 1),
+            mk_op(&env, ty.clone(), Operation::Add, branches),
+        )
+        .into_exp();
+        let decl = mk_spec_fun_decl(&env, "branching", vec![("n", ty.clone())], ty.clone(), body);
+        add_spec_funs_to_env(&mut env, vec![decl]);
+        let symbolic = mk_op(&env, ty.clone(), op.clone(), vec![mk_temp(
+            &env,
+            0,
+            ty.clone(),
+        )]);
+        let before = env.next_free_node_number();
+        let mut generator = test_gen(&env);
+        let result = ExpSimplifier::new(&mut generator).simplify(symbolic.clone());
+        assert!(result.structural_eq(&symbolic));
+        assert!(
+            env.next_free_node_number() - before < 200,
+            "symbolic expansion grew excessively"
+        );
+        let concrete = mk_op(&env, ty, op, vec![mk_num(&env, 3)]);
+        assert_is_num(&ExpSimplifier::new(&mut generator).simplify(concrete), 5);
     }
 
     #[test]

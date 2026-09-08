@@ -169,30 +169,48 @@ module 0x42::loops {
         };
     }
     spec inc_global_n_times {
-        // Test with unrolling. Notice that the inferred spec is incomplete and will
-        // fail verification.
+        // Test with unrolling. Each unrolled write must retain its intermediate
+        // state rather than claiming that an earlier value is the final value.
         pragma unroll = 3;
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] 3 < n ==> Counter[addr].value == Counter[addr].value + 1;
-        ensures [inferred] 2 < n ==> Counter[addr].value == Counter[addr].value + 1;
         ensures [inferred] ({
-            let a = S1 |~ global<Counter>(addr);
-            1 < n ==> Counter[addr].value == a.value + 1
+            let a = S3 |~ global<Counter>(addr);
+            3 < n ==> Counter[addr].value == a.value + 1
         });
+        ensures [inferred] 2 < n ==> {
+            let a = update_field(S2 |~ global<Counter>(addr), value, (S2 |~ global<Counter>(addr)).value + 1);
+            S2..S3 |~ update<Counter>(addr, a)
+        };
+        ensures [inferred] 1 < n ==> {
+            let a = update_field(S1 |~ global<Counter>(addr), value, (S1 |~ global<Counter>(addr)).value + 1);
+            S1..S2 |~ update<Counter>(addr, a)
+        };
         ensures [inferred] 0 < n ==> {
             let a = update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
             ..S1 |~ update<Counter>(addr, a)
         };
-        aborts_if [inferred] 3 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 2 < n && !exists<Counter>(addr);
+        aborts_if [inferred] ({
+            let a = S3 |~ exists<Counter>(addr);
+            3 < n && !a
+        });
+        aborts_if [inferred] ({
+            let a = S2 |~ exists<Counter>(addr);
+            2 < n && !a
+        });
         aborts_if [inferred] ({
             let a = S1 |~ exists<Counter>(addr);
             1 < n && !a
         });
         aborts_if [inferred] 0 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 3 < n && Counter[addr].value == MAX_U64;
-        aborts_if [inferred] 2 < n && Counter[addr].value == MAX_U64;
+        aborts_if [inferred] ({
+            let a = S3 |~ global<Counter>(addr);
+            3 < n && a.value == MAX_U64
+        });
+        aborts_if [inferred] ({
+            let a = S2 |~ global<Counter>(addr);
+            2 < n && a.value == MAX_U64
+        });
         aborts_if [inferred] ({
             let a = S1 |~ global<Counter>(addr);
             1 < n && a.value == MAX_U64
@@ -216,7 +234,7 @@ module 0x42::loops {
     spec inc_global_with_invariant(addr: address, n: u64) {
         pragma opaque = true, aborts_if_is_partial = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr].value == old(Counter[addr]).value ==> (forall x: u64, y: Counter: Counter[addr].value == old(Counter[addr]).value + x && x < n ==> update<Counter>(addr, update_field(y, value, y.value + 1)));
+        ensures [inferred = sathard] Counter[addr].value == old(Counter[addr]).value ==> (forall x: u64, y: Counter: Counter[addr].value == old(Counter[addr]).value + x && x < n ==> update<Counter>(addr, update_field(y, value, y.value + 1)));
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -313,6 +331,16 @@ warning: WP inferred `vacuous` conditions after this loop without an invariant. 
        head[3]: n > 2 ==> head[3].n == n - 3
    = seek a predicate which includes the entry facts and is preserved by one back-edge; bounded observations are not an invariant or a proof
 
+warning: WP retained a quantified loop summary despite the supplied invariant. Inference has not established a trusted complete contract. Strengthen the invariant to characterize the loop-carried values and mutated state relative to entry; a bounds-only invariant may not suffice.
+    ┌─ tests/inference/loops.move:149:11
+    │
+149 │           } spec {
+    │ ╭───────────^
+150 │ │             invariant i <= n;
+151 │ │             invariant global<Counter>(addr).value == start + i;
+152 │ │         };
+    │ ╰─────────^
+
 warning: WP could not characterize the aborts of `loops::inc_global_with_invariant` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
   = an abort condition did not survive a memory-havocking loop
     ┌─ tests/inference/loops.move:142:5
@@ -326,84 +354,5 @@ warning: WP could not characterize the aborts of `loops::inc_global_with_invaria
 153 │ │     }
     │ ╰─────^
 
-Verification: exiting with verification errors
-error: post-condition does not hold
-    ┌─ loops.enriched.move:178:9
-    │
-178 │         ensures [inferred] 2 < n ==> Counter[addr].value == Counter[addr].value + 1;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at loops.enriched.move:163: inc_global_n_times
-    =         addr = <redacted>
-    =         n = <redacted>
-    =     at loops.enriched.move:164: inc_global_n_times
-    =         i = <redacted>
-    =     at loops.enriched.move:165: inc_global_n_times
-    =     at loops.enriched.move:166: inc_global_n_times
-    =         c = <redacted>
-    =     at loops.enriched.move:167: inc_global_n_times
-    =     at loops.enriched.move:168: inc_global_n_times
-    =         i = <redacted>
-    =     at loops.enriched.move:165: inc_global_n_times
-    =     at loops.enriched.move:166: inc_global_n_times
-    =         c = <redacted>
-    =     at loops.enriched.move:167: inc_global_n_times
-    =     at loops.enriched.move:168: inc_global_n_times
-    =         i = <redacted>
-    =     at loops.enriched.move:165: inc_global_n_times
-    =     at loops.enriched.move:166: inc_global_n_times
-    =         c = <redacted>
-    =     at loops.enriched.move:167: inc_global_n_times
-    =     at loops.enriched.move:168: inc_global_n_times
-    =         i = <redacted>
-    =     at loops.enriched.move:165: inc_global_n_times
-    =     at loops.enriched.move:170: inc_global_n_times
-    =     at loops.enriched.move:187: inc_global_n_times (spec)
-    =     at loops.enriched.move:188: inc_global_n_times (spec)
-    =     at loops.enriched.move:189: inc_global_n_times (spec)
-    =     at loops.enriched.move:193: inc_global_n_times (spec)
-    =     at loops.enriched.move:194: inc_global_n_times (spec)
-    =     at loops.enriched.move:195: inc_global_n_times (spec)
-    =     at loops.enriched.move:196: inc_global_n_times (spec)
-    =     at loops.enriched.move:200: inc_global_n_times (spec)
-    =     at loops.enriched.move:177: inc_global_n_times (spec)
-    =     at loops.enriched.move:178: inc_global_n_times (spec)
-
-error: abort not covered by any of the `aborts_if` clauses
-    ┌─ loops.enriched.move:171:5
-    │
-167 │               c.value = c.value + 1;
-    │                         ----------- abort happened here with execution failure
-    ·
-171 │ ╭     spec inc_global_n_times {
-172 │ │         // Test with unrolling. Notice that the inferred spec is incomplete and will
-173 │ │         // fail verification.
-174 │ │         pragma unroll = 3;
-    · │
-200 │ │         aborts_if [inferred] 0 < n && Counter[addr].value == MAX_U64;
-201 │ │     }
-    │ ╰─────^
-    │
-    =     at loops.enriched.move:163: inc_global_n_times
-    =         addr = <redacted>
-    =         n = <redacted>
-    =     at loops.enriched.move:164: inc_global_n_times
-    =         i = <redacted>
-    =     at loops.enriched.move:165: inc_global_n_times
-    =     at loops.enriched.move:166: inc_global_n_times
-    =         c = <redacted>
-    =     at loops.enriched.move:167: inc_global_n_times
-    =     at loops.enriched.move:168: inc_global_n_times
-    =         i = <redacted>
-    =     at loops.enriched.move:165: inc_global_n_times
-    =     at loops.enriched.move:166: inc_global_n_times
-    =         c = <redacted>
-    =     at loops.enriched.move:167: inc_global_n_times
-    =     at loops.enriched.move:168: inc_global_n_times
-    =         i = <redacted>
-    =     at loops.enriched.move:165: inc_global_n_times
-    =     at loops.enriched.move:166: inc_global_n_times
-    =         c = <redacted>
-    =     at loops.enriched.move:167: inc_global_n_times
-    =         ABORTED
+Verification: Succeeded.
 */

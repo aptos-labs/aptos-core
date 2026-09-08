@@ -42,6 +42,7 @@ use move_model::{
     },
     code_writer::CodeWriter,
     emit, emitln,
+    exp_generator::FunExpGenerator,
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructEnv, StructId,
@@ -64,6 +65,7 @@ use move_prover_bytecode_pipeline::{
         NumOperation::{Bitwise, Bottom},
     },
     options::ProverOptions,
+    spec_instrumentation::{defined_state_labels, state_label_defining_fragment},
 };
 use move_stackless_bytecode::{
     function_target::FunctionTarget,
@@ -2276,6 +2278,16 @@ impl<'env> BoogieTranslator<'env> {
             .collect();
         let eval_call = format!("{}({})", eval_fun_name, eval_call_args.join(", "));
 
+        // Calls assume the specialized predicate. A reverse trigger makes
+        // that fact visible through the generic evaluator too, including
+        // when the generic application is inside an existential state claim.
+        // With union-memory arguments the RHS may omit bound variables, so
+        // retain only the complete evaluator trigger in that case.
+        let reverse_trigger = if kind == BehaviorKind::EnsuresOf && mem_decls.is_empty() {
+            format!(" {{{}}}", rhs)
+        } else {
+            String::new()
+        };
         if quantifier.is_empty() {
             // Zero-argument function value with no memory dependency: emit a
             // plain axiom (Boogie requires at least one bound variable in a
@@ -2284,9 +2296,10 @@ impl<'env> BoogieTranslator<'env> {
         } else {
             emitln!(
                 self.writer,
-                "axiom (forall {} :: {{{}}} {} <==> {});",
+                "axiom (forall {} :: {{{}}}{} {} <==> {});",
                 quantifier.join(", "),
                 eval_call,
+                reverse_trigger,
                 eval_call,
                 rhs
             );
@@ -3495,8 +3508,8 @@ impl<'env> BoogieTranslator<'env> {
             // SpecRemove/SpecPublish/SpecUpdate define the abstract states. Only the
             // label-defining conjuncts are included (not full postcondition properties).
             // This uses the same analysis as emit_state_label_assumes in
-            // spec_instrumentation.rs: ExpData::all_defined_labels() identifies
-            // which conditions define labels, and we filter to defining conjuncts.
+            // spec_instrumentation.rs: project definitions structurally so a
+            // guard or let containing a definition cannot import final-state claims.
             let frame_translated: Vec<String> = closure_spec
                 .conditions
                 .iter()
@@ -3515,7 +3528,7 @@ impl<'env> BoogieTranslator<'env> {
                         return false;
                     }
                     // Include only conditions that define at least one intermediate label
-                    let defined = c.exp.as_ref().all_defined_labels();
+                    let defined = defined_state_labels(&c.exp);
                     defined
                         .iter()
                         .any(|l| all_labels.iter().any(|(al, _)| al == l))
@@ -3527,7 +3540,16 @@ impl<'env> BoogieTranslator<'env> {
                     let conjuncts = flatten_conjunction_owned(&cond.exp);
                     conjuncts
                         .into_iter()
-                        .filter(|c| !c.as_ref().all_defined_labels().is_empty())
+                        .filter(|c| !defined_state_labels(c).is_empty())
+                        .map(|c| {
+                            state_label_defining_fragment(
+                                &FunExpGenerator::new(
+                                    fun_env.clone(),
+                                    self.env.get_node_loc(c.node_id()),
+                                ),
+                                &c,
+                            )
+                        })
                         .filter_map(|fragment| {
                             let fragment = self.wrap_behavioral_condition_with_lets(
                                 closure_spec,
@@ -3605,7 +3627,7 @@ impl<'env> BoogieTranslator<'env> {
 
             // Collect labels from frame conditions too
             for cond in &closure_spec.conditions {
-                let defined = cond.exp.as_ref().all_defined_labels();
+                let defined = defined_state_labels(&cond.exp);
                 if defined
                     .iter()
                     .any(|l| all_labels.iter().any(|(al, _)| al == l))

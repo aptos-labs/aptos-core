@@ -134,16 +134,16 @@ module 0x42::sourcifier_roundtrip {
     spec nine_hoisted_calls(counter: &mut u64): Nine {
         pragma opaque = true;
         ensures [inferred] ({
-            let a = ..S1 |~ result_of<make>(counter);
-            let b = S1..S2 |~ result_of<make>(counter);
-            let c = S2..S3 |~ result_of<make>(counter);
-            let d = S3..S4 |~ result_of<make>(counter);
-            let e = S4..S5 |~ result_of<make>(counter);
-            let f = S5..S6 |~ result_of<make>(counter);
-            let a_1 = S6..S7 |~ result_of<make>(counter);
-            let b_1 = S7..S8 |~ result_of<make>(counter);
-            let c_1 = S8.. |~ result_of<make>(counter);
-            result == Nine{h1: a, h2: b, h3: c, h4: d, h5: e, h6: f, h7: a_1, h8: b_1, h9: c_1}
+            let a = S1..S2 |~ result_of<make>(counter);
+            let b = S2..S3 |~ result_of<make>(counter);
+            let c = S3..S4 |~ result_of<make>(counter);
+            let d = S4..S5 |~ result_of<make>(counter);
+            let e = S5..S6 |~ result_of<make>(counter);
+            let f = S6..S7 |~ result_of<make>(counter);
+            let a_1 = S7..S8 |~ result_of<make>(counter);
+            let b_1 = S8.. |~ result_of<make>(counter);
+            let c_1 = ..S1 |~ result_of<make>(old(counter));
+            result == Nine{h1: c_1, h2: a, h3: b, h4: c, h5: d, h6: e, h7: f, h8: a_1, h9: b_1}
         });
         aborts_if [inferred] S8 |~ (aborts_of<make>(counter));
         aborts_if [inferred] S7 |~ (aborts_of<make>(counter));

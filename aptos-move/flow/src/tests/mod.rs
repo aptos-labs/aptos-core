@@ -44,3 +44,13 @@ fn inference_tactic_global_flag_is_accepted_after_subcommand() {
     );
     assert!(cli.global.evaluation_mode);
 }
+
+#[test]
+fn mcp_package_cache_can_be_disabled() {
+    let cli = FlowCli::try_parse_from(["move-flow", "mcp", "--no-package-cache"])
+        .expect("parse MCP cache flag");
+    let FlowCommand::Mcp(args) = cli.command else {
+        panic!("expected MCP command");
+    };
+    assert!(args.no_package_cache);
+}

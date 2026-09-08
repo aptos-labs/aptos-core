@@ -284,3 +284,45 @@ class ReportRedactionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ContinuationTest(unittest.TestCase):
+    def test_same_task_failures_do_not_abort_other_tasks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifacts = root / 'runs'
+            cells = []
+            for index in range(3):
+                path = root / f'cell-{index}.json'
+                path.write_text(json.dumps({'task_id': 'hard-task' if index < 2 else 'other-task'}))
+                cells.append((path.stem, path))
+            for run_id, _ in cells[:2]:
+                _write_ledger(artifacts / run_id, 'invalid_infrastructure_failure')
+            result = asyncio.run(dispatch_round(cells, artifacts, _launcher(artifacts, 'operational_success'), 1, root))
+            self.assertFalse(result['aborted'])
+            self.assertEqual(['hard-task'], result['infrastructure_failure_tasks'])
+            self.assertEqual('complete', result['results'][2]['status'])
+            self.assertFalse(result['complete'])  # invalid observations stay invalid
+
+    def test_acknowledged_failures_are_retained_but_new_outages_still_abort(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifacts = root / 'runs'
+            cells = [(f'cell-{i}', root / f'cell-{i}.json') for i in range(5)]
+            for run_id, manifest in cells:
+                manifest.write_text(json.dumps({'task_id': run_id}))
+            for run_id, _ in cells[:2]:
+                _write_ledger(artifacts / run_id, 'invalid_infrastructure_failure')
+            acknowledged = frozenset(run_id for run_id, _ in cells[:2])
+            result = asyncio.run(dispatch_round(cells, artifacts, _launcher(artifacts, 'invalid_infrastructure_failure'), 1, root, acknowledged_failures=acknowledged))
+            self.assertTrue(result['aborted'])
+            self.assertTrue(all(r['acknowledged'] for r in result['results'][:2]))
+            self.assertEqual(['cell-2', 'cell-3'], result['infrastructure_failures'])
+            self.assertEqual('batch_aborted', result['results'][4]['status'])
+            self.assertFalse(result['results'][4]['started'])
+
+    def test_cannot_acknowledge_a_future_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with self.assertRaisesRegex(ValueError, 'only existing'):
+                asyncio.run(dispatch_round([('new', root/'new.json')], root/'runs', _launcher(root/'runs', 'operational_success'), 1, root, acknowledged_failures=frozenset({'new'})))

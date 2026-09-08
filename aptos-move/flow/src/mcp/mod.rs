@@ -82,6 +82,11 @@ pub struct McpArgs {
     #[arg(long, default_value_t = 120)]
     pub tool_timeout: u64,
 
+    /// Rebuild Move packages for every tool call instead of caching compiled
+    /// package models or watching their source files for changes.
+    #[arg(long)]
+    pub no_package_cache: bool,
+
     /// Append structured experiment telemetry to this JSONL file.
     #[arg(long)]
     pub telemetry_jsonl: Option<PathBuf>,

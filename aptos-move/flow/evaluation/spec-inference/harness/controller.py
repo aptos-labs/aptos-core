@@ -31,6 +31,7 @@ from .artifacts import (
 )
 from .config import ARM_TO_TACTIC, ExperimentConfig, ResolvedRunSpec, RunSpec
 from .credentials import redact_tree
+from .sdk_metrics import write_sdk_metrics
 from .identifiers import resolve_within
 from .judge import Judge, JudgeResult
 from .state_machine import ConversationPolicy
@@ -330,7 +331,7 @@ class Controller:
                 ),
             }
             controller_events.emit("run_end", **result)
-        self._finalize(result)
+        self._finalize_with_sdk_metrics(result)
         return result
 
     async def _refute(
@@ -526,6 +527,8 @@ class Controller:
             raise ValueError(
                 "run manifest and experiment configuration hash disagree"
             )
+        if self.agent_kind == "claude":
+            run_record["sdk_telemetry_schema"] = 1
         write_json(self.artifact_dir / "run.json", run_record)
 
     def _refutation_identities(self) -> list[str]:
@@ -646,7 +649,7 @@ class Controller:
         tactic = ARM_TO_TACTIC[self.run.spec.arm]
         level = self._feedback_level()
         command = (
-            f"mcp --inference-tactic {tactic} --evaluation-mode "
+            f"mcp --no-package-cache --inference-tactic {tactic} --evaluation-mode "
             f"--feedback-level {level}"
         )
         # The task criteria are the acceptance intervention. A baseline cell
@@ -829,6 +832,19 @@ class Controller:
         run_record["result"] = result
         write_json(run_path, run_record)
         redact_tree(self.artifact_dir)
+
+    def _finalize_with_sdk_metrics(self, result: dict[str, Any]) -> None:
+        """Preserve a terminal result even if optional SDK telemetry is malformed."""
+        try:
+            write_sdk_metrics(
+                self.artifact_dir / "claude-events.jsonl",
+                self.artifact_dir / "sdk-metrics.json",
+            )
+        except (ValueError, UnicodeDecodeError, KeyError) as error:
+            # The raw transcript remains available. Its summary is
+            # observational and must not strand a completed run in staging.
+            result["sdk_metrics_error"] = type(error).__name__
+        self._finalize(result)
 
     def _wall_seconds(self) -> float:
         return (time.monotonic_ns() - self.started_ns) / 1_000_000_000

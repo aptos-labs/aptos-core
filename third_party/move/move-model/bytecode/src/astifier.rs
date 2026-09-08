@@ -2379,6 +2379,7 @@ impl AssignTransformer<'_> {
                 | Operation::SingleVec
                 | Operation::UpdateVec
                 | Operation::ConcatVec
+                | Operation::ReverseVec
                 | Operation::IndexOfVec
                 | Operation::InRangeRange
                 | Operation::InRangeVec

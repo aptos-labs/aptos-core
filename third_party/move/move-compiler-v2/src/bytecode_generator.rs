@@ -996,6 +996,7 @@ impl Generator<'_> {
             | Operation::SingleVec
             | Operation::UpdateVec
             | Operation::ConcatVec
+            | Operation::ReverseVec
             | Operation::IndexOfVec
             | Operation::ContainsVec
             | Operation::InRangeRange

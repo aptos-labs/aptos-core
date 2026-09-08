@@ -108,6 +108,11 @@ Without the module filter, `debug` produces heavy output from other Move tools.
 
 ## Plugin Generator (`src/plugin/`)
 
+Pass `move-flow plugin DIR --no-wp-simplification` to have hybrid agents check
+WP output directly, without a routine simplification step. Diagnostic repairs,
+including timeout repairs, still apply. The setting is recorded in
+`move-flow-manifest.json`; it does not change WP inference or prover timeouts.
+
 Uses [Tera](https://keats.github.io/tera/) templates to produce
 platform-specific configuration files.
 

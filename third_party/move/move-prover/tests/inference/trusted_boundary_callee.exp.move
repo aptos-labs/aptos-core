@@ -78,7 +78,7 @@ module 0x42::trusted_boundary_callee {
 /*
 Inference diagnostics:
 warning: WP could not characterize the aborts of `trusted_boundary_callee::twice_partial` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition did not survive a memory-havocking loop
+  = callee `0x42::trusted_boundary_callee::read_partial` has no trusted complete abort summary
    ┌─ tests/inference/trusted_boundary_callee.move:40:5
    │
 40 │ ╭     fun twice_partial(a: address): u64 acquires R {

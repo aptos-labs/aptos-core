@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import unittest
 import os
 from pathlib import Path
@@ -179,7 +180,7 @@ class PilotSandboxTest(unittest.TestCase):
             )
             with (
                 patch("harness.pilot_sandbox._required_executable", return_value=Path("/usr/bin/bwrap")),
-                patch.dict(os.environ, {"MOVE_INFERENCE_EVAL_SANDBOXED": "host-value"}),
+                patch.dict(os.environ, {"MOVE_INFERENCE_EVAL_SANDBOXED": "host-value", "CLAUDE_CODE_OAUTH_TOKEN": "test-subscription-token"}),
             ):
                 command = build_bwrap_command(launch, staging)
 
@@ -188,6 +189,9 @@ class PilotSandboxTest(unittest.TestCase):
         self.assertEqual("--setenv", command[marker - 1])
         self.assertEqual("1", command[marker + 1])
         self.assertNotIn("host-value", command)
+        oauth = command.index("CLAUDE_CODE_OAUTH_TOKEN", clearenv)
+        self.assertEqual("--setenv", command[oauth - 1])
+        self.assertEqual("test-subscription-token", command[oauth + 1])
 
     def test_the_agent_is_confined_more_narrowly_than_the_sandbox(self) -> None:
         launch = _example_launch(Path("/eval"))
@@ -309,3 +313,68 @@ class RoundDirectoryTest(unittest.TestCase):
         self.assertIsNone(
             _round_directory(self.ROOT, Path("/eval/evaluation-artifacts"))
         )
+
+
+class InterruptedEvidenceTest(unittest.TestCase):
+    def test_retains_redacted_partial_evidence_without_publishing_outcome(self):
+        import os
+        from unittest.mock import patch
+        from harness.pilot_sandbox import preserve_interrupted_run
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / 'staging' / 'cell-1'
+            run.mkdir(parents=True)
+            (run / 'workspace').mkdir()
+            (run / 'workspace/source.move').write_text('test-secret-value')
+            (run / 'unsafe-link').symlink_to('/etc/passwd')
+            outside = root / 'outside'
+            outside.mkdir()
+            (outside / 'source.move').write_text('test-secret-value')
+            (run / 'unsafe-directory-link').symlink_to(outside, target_is_directory=True)
+            events = run / 'claude-events.jsonl'
+            events.write_bytes(b'{"event":"sdk_query_start","received_monotonic_ns":0}\n{"unfinished":"\xe2')
+            original = events.read_bytes()
+            with (
+                patch.dict(os.environ, {'CLAUDE_CODE_OAUTH_TOKEN': 'test-secret-value'}),
+                patch.object(Path, 'rglob', side_effect=AssertionError('recursive glob is unsafe here')),
+            ):
+                archived = preserve_interrupted_run(run, root/'runs', 'SystemExit')
+            self.assertEqual('[REDACTED]', (archived/'workspace/source.move').read_text())
+            self.assertFalse((archived/'unsafe-link').exists())
+            self.assertFalse((archived/'unsafe-directory-link').exists())
+            self.assertEqual('test-secret-value', (outside/'source.move').read_text())
+            self.assertEqual(original, (archived/'claude-events.jsonl').read_bytes())
+            self.assertFalse((root/'runs/cell-1').exists())
+            self.assertFalse((archived/'judge.json').exists())
+            metrics = json.loads((archived/'sdk-metrics.json').read_text())
+            self.assertFalse(metrics['totals_complete'])
+            self.assertGreater(metrics['truncated_tail_bytes'], 0)
+
+
+    def test_signal_archives_evidence_and_cleans_private_staging(self):
+        import signal
+        from harness.pilot_sandbox import run_isolated
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            launch = _example_launch(root)
+
+            def interrupted_command(_launch, staging):
+                run = staging / launch.run_id
+                run.mkdir()
+                (run / "claude-events.jsonl").write_text(
+                    '{"event":"sdk_query_start","received_monotonic_ns":0}\n'
+                )
+                (staging / ".sandbox-home" / "private").write_text("private")
+                os.kill(os.getpid(), signal.SIGTERM)
+                raise AssertionError("signal did not unwind")
+
+            with patch("harness.pilot_sandbox.build_bwrap_command", side_effect=interrupted_command):
+                with self.assertRaises(SystemExit):
+                    run_isolated(launch)
+            archived = list((root / "interrupted-runs").glob("*/test-run"))
+            self.assertEqual(1, len(archived))
+            self.assertTrue((archived[0] / "interruption.json").is_file())
+            self.assertFalse((launch.artifacts / launch.run_id).exists())
+            self.assertFalse((launch.artifacts / ".sandbox-staging").exists())
+            self.assertFalse(list(root.rglob("private")))

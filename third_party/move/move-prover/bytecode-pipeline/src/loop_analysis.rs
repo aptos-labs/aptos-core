@@ -37,6 +37,10 @@ const LOOP_INVARIANT_INDUCTION_FAILED: &str = "induction case of the loop invari
 #[derive(Clone, Debug, Default)]
 pub struct LoopsWithoutInvariants(pub Vec<LoopWithoutInvariant>);
 
+/// Source locations of summarized loops with user-supplied invariants.
+#[derive(Clone, Debug, Default)]
+pub struct LoopsWithInvariants(pub Vec<Loc>);
+
 #[derive(Clone, Debug)]
 pub struct LoopWithoutInvariant {
     /// Stable within this function and this pipeline run.
@@ -117,6 +121,24 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
             Ok((loops_with_invariants, loops_for_unrolling)) => {
                 let loops_without_invariants =
                     Self::loops_without_invariants(func_env, &data, &loops_with_invariants);
+                let invariant_locations = LoopsWithInvariants(
+                    loops_with_invariants
+                        .fat_loops
+                        .iter()
+                        .filter(|(_, info)| !info.spec_info().invariants.is_empty())
+                        .filter_map(|(header, _)| {
+                            data.code.iter().find_map(|bc| match bc {
+                                Bytecode::Label(attr, label) if label == header => Some(
+                                    data.locations
+                                        .get(attr)
+                                        .cloned()
+                                        .unwrap_or_else(|| func_env.get_loc()),
+                                ),
+                                _ => None,
+                            })
+                        })
+                        .collect(),
+                );
                 // Evidence is a diagnostic about the function the caller asked
                 // about. `module_env.is_target()` only says the module is a
                 // target, so on a package where every module is a target that
@@ -146,6 +168,9 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
                 }
                 // we have unrolled the loop into a DAG, and there will be no loop unrolling marks left
                 data.loop_unrolling.clear();
+                if !invariant_locations.0.is_empty() {
+                    data.annotations.set(invariant_locations, true);
+                }
                 if !loops_without_invariants.0.is_empty() {
                     data.annotations.set(loops_without_invariants, true);
                 }

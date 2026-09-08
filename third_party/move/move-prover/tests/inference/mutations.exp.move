@@ -1,4 +1,5 @@
 // Test spec inference for mutations via references
+// inference-reject-mutation: Counter[a3].value = v3; => Counter[a3].value = v2;
 module 0x42::mutations {
 
     struct Point has copy, drop {
@@ -710,12 +711,15 @@ module 0x42::mutations {
         modifies Counter[a2];
         modifies Counter[a1];
         ensures [inferred] Counter[a3].value == v3;
-        ensures [inferred] Counter[a2].value == v2;
+        ensures [inferred] {
+            let a = update_field(S1 |~ global<Counter>(a2), value, v2);
+            S1..S2 |~ update<Counter>(a2, a)
+        };
         ensures [inferred] {
             let a = update_field(old(Counter[a1]), value, v1);
             ..S1 |~ update<Counter>(a1, a)
         };
-        aborts_if [inferred] !exists<Counter>(a3);
+        aborts_if [inferred] S2 |~ (!exists<Counter>(a3));
         aborts_if [inferred] S1 |~ (!exists<Counter>(a2));
         aborts_if [inferred] !exists<Counter>(a1);
     }
@@ -777,30 +781,6 @@ module 0x42::mutations {
 
 }
 /*
-Verification: exiting with verification errors
-error: post-condition does not hold
-    ┌─ mutations.enriched.move:713:9
-    │
-713 │         ensures [inferred] Counter[a2].value == v2;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at mutations.enriched.move:701: triple_addr_global
-    =         a1 = <redacted>
-    =         a2 = <redacted>
-    =         a3 = <redacted>
-    =         v1 = <redacted>
-    =         v2 = <redacted>
-    =         v3 = <redacted>
-    =     at mutations.enriched.move:703: triple_addr_global
-    =         <redacted> = <redacted>
-    =     at mutations.enriched.move:704: triple_addr_global
-    =         <redacted> = <redacted>
-    =     at mutations.enriched.move:705: triple_addr_global
-    =         <redacted> = <redacted>
-    =     at mutations.enriched.move:706: triple_addr_global
-    =     at mutations.enriched.move:718: triple_addr_global (spec)
-    =     at mutations.enriched.move:719: triple_addr_global (spec)
-    =     at mutations.enriched.move:720: triple_addr_global (spec)
-    =     at mutations.enriched.move:712: triple_addr_global (spec)
-    =     at mutations.enriched.move:713: triple_addr_global (spec)
+Verification: Succeeded.
+Mutation: Rejected by postcondition.
 */

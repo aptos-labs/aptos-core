@@ -10,6 +10,8 @@ module 0x42::ghost_memory_exists {
     spec value {
         pragma opaque;
         ensures result == counter;
+        global counter: u64;
+        ensures [inferred] 7 == counter ==> result == 7;
         aborts_if [inferred] false;
     }
 
@@ -21,21 +23,16 @@ module 0x42::ghost_memory_exists {
     }
     spec caller(): u64 {
         pragma opaque = true;
+        ensures [inferred] result == value();
         aborts_if [inferred] false;
     }
 
 }
 /*
-Verification: exiting with verification errors
-error: post-condition does not hold
-   ┌─ ghost_memory_exists.enriched.move:12:9
+Verification: exiting with compilation errors
+error: duplicate declaration of `ghost_memory_exists::counter`
+   ┌─ ghost_memory_exists.enriched.move:13:9
    │
-12 │         ensures result == counter;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at ghost_memory_exists.enriched.move:6: value
-   =     at ghost_memory_exists.enriched.move:7: value
-   =         result = <redacted>
-   =     at ghost_memory_exists.enriched.move:13: value (spec)
-   =     at ghost_memory_exists.enriched.move:12: value (spec)
+13 │         global counter: u64;
+   │         ^^^^^^^^^^^^^^^^^^^^
 */
