@@ -10,7 +10,7 @@ use cargo::Cargo;
 use clap::{Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
 use determinator::Utf8Paths0;
-use log::{debug, trace};
+use log::{debug, trace, warn};
 
 // Useful package name constants for targeted tests
 const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
@@ -302,7 +302,12 @@ impl AptosCargoCommand {
 
                 // Create and run the command if we found packages to test
                 if !packages_to_test.is_empty() {
-                    println!("Running the targeted unit tests...");
+                    write_github_output("skip_tests", "false");
+                    if nextest_subcommand(&direct_args) == "archive" {
+                        println!("Archiving the targeted unit tests...");
+                    } else {
+                        println!("Running the targeted unit tests...");
+                    }
                     return run_targeted_unit_tests(
                         packages_to_test,
                         direct_args,
@@ -311,6 +316,7 @@ impl AptosCargoCommand {
                 }
 
                 // Otherwise, skip the targeted unit tests
+                write_github_output("skip_tests", "true");
                 println!("Skipping targeted unit tests because no test packages were affected!");
                 Ok(())
             },
@@ -460,6 +466,38 @@ fn run_targeted_compiler_v2_tests(
     Ok(())
 }
 
+/// Returns `archive` when `--archive-file` is present so CI can compile once
+/// and run nextest partitions against the resulting archive.
+fn nextest_subcommand(direct_args: &[String]) -> &'static str {
+    if direct_args.iter().any(|arg| arg == "--archive-file") {
+        "archive"
+    } else {
+        "run"
+    }
+}
+
+/// Appends `key=value` to `$GITHUB_OUTPUT` when running in GitHub Actions.
+fn write_github_output(key: &str, value: &str) {
+    let Ok(path) = std::env::var("GITHUB_OUTPUT") else {
+        return;
+    };
+    use std::io::Write;
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            if let Err(error) = writeln!(file, "{key}={value}") {
+                warn!("Failed to write GitHub output {key}: {error:?}");
+            }
+        },
+        Err(error) => {
+            warn!("Failed to open GITHUB_OUTPUT file {:?}: {:?}", path, error);
+        },
+    }
+}
+
 /// Runs the targeted unit tests
 fn run_targeted_unit_tests(
     packages_to_test: Vec<String>,
@@ -472,10 +510,14 @@ fn run_targeted_unit_tests(
         direct_args.push(package);
     }
 
-    // Create the command to run the unit tests
+    // Create the command to run or archive the unit tests
+    let subcommand = nextest_subcommand(&direct_args);
     let mut command = Cargo::command("nextest");
-    command.args(["run"]);
-    command.args(["--no-tests=warn"]); // Don't fail if no tests are run!
+    command.args([subcommand]);
+    // `nextest archive` does not accept run-only flags.
+    if subcommand == "run" {
+        command.args(["--no-tests=warn"]); // Don't fail if no tests are run!
+    }
     command.args(direct_args).pass_through(push_through_args);
 
     // Run the unit tests
@@ -748,6 +790,24 @@ mod tests {
                 .iter()
                 .any(|glob| glob.starts_with("buildtools")),
             "buildtools/** must be ignored by the unit-test determinator"
+        );
+    }
+
+    #[test]
+    fn nextest_subcommand_archives_when_archive_file_is_set() {
+        assert_eq!(nextest_subcommand(&[]), "run");
+        assert_eq!(
+            nextest_subcommand(&["--profile".into(), "ci".into()]),
+            "run"
+        );
+        assert_eq!(
+            nextest_subcommand(&[
+                "--profile".into(),
+                "ci".into(),
+                "--archive-file".into(),
+                "unit-test-archive.tar.zst".into(),
+            ]),
+            "archive"
         );
     }
 }
