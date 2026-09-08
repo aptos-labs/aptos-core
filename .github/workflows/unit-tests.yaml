@@ -39,15 +39,27 @@ jobs:
         run: cargo x affected-packages -vvv
         shell: bash
 
+      # Do not use `cargo x` here: the `x` alias is PR-controlled (.cargo/config.toml)
+      # and would inherit this step's GITHUB_OUTPUT. Invoke aptos-cargo-cli directly
+      # with GITHUB_OUTPUT unset; bash records skip_tests after cargo exits.
       - name: Set skip_tests
         id: archive
-        run: cargo x targeted-unit-tests -vvv --dry-run
+        run: |
+          set -euo pipefail
+          output="$(env -u GITHUB_OUTPUT cargo run --locked --package aptos-cargo-cli --bin aptos-cargo-cli -- targeted-unit-tests -vvv --dry-run 2>&1)"
+          printf '%s\n' "$output"
+          if printf '%s\n' "$output" | grep -Fq 'Skipping targeted unit tests because no test packages were affected'; then
+            echo "skip_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+          fi
         shell: bash
 
       - name: Archive targeted unit tests
         if: steps.archive.outputs.skip_tests != 'true'
         run: |
-          cargo x targeted-unit-tests -vvv \
+          set -euo pipefail
+          env -u GITHUB_OUTPUT cargo run --locked --package aptos-cargo-cli --bin aptos-cargo-cli -- targeted-unit-tests -vvv \
             --profile ci \
             --cargo-profile ci \
             --locked \
