@@ -10,7 +10,7 @@ use cargo::Cargo;
 use clap::{Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
 use determinator::Utf8Paths0;
-use log::{debug, trace, warn};
+use log::{debug, trace};
 
 // Useful package name constants for targeted tests
 const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
@@ -302,7 +302,6 @@ impl AptosCargoCommand {
 
                 // Create and run the command if we found packages to test
                 if !packages_to_test.is_empty() {
-                    write_github_output("skip_tests", "false");
                     if nextest_subcommand(&direct_args) == "archive" {
                         println!("Archiving the targeted unit tests...");
                     } else {
@@ -316,7 +315,6 @@ impl AptosCargoCommand {
                 }
 
                 // Otherwise, skip the targeted unit tests
-                write_github_output("skip_tests", "true");
                 println!("Skipping targeted unit tests because no test packages were affected!");
                 Ok(())
             },
@@ -473,28 +471,6 @@ fn nextest_subcommand(direct_args: &[String]) -> &'static str {
         "archive"
     } else {
         "run"
-    }
-}
-
-/// Appends `key=value` to `$GITHUB_OUTPUT` when running in GitHub Actions.
-fn write_github_output(key: &str, value: &str) {
-    let Ok(path) = std::env::var("GITHUB_OUTPUT") else {
-        return;
-    };
-    use std::io::Write;
-    match std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        Ok(mut file) => {
-            if let Err(error) = writeln!(file, "{key}={value}") {
-                warn!("Failed to write GitHub output {key}: {error:?}");
-            }
-        },
-        Err(error) => {
-            warn!("Failed to open GITHUB_OUTPUT file {:?}: {:?}", path, error);
-        },
     }
 }
 

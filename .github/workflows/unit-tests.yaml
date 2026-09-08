@@ -40,16 +40,18 @@ jobs:
         shell: bash
 
       - name: Archive targeted unit tests
-        id: archive
         run: |
-          # Unset GITHUB_OUTPUT so PR-controlled cargo/build.rs cannot append
-          # skip_tests=true (GitHub keeps the last write). Decide skip from
-          # whether the archive file exists after cargo returns.
-          env -u GITHUB_OUTPUT cargo x targeted-unit-tests -vvv \
+          cargo x targeted-unit-tests -vvv \
             --profile ci \
             --cargo-profile ci \
             --locked \
             --archive-file unit-test-archive.tar.zst
+        shell: bash
+
+      # Isolated from cargo: this step's GITHUB_OUTPUT is not inherited by build.rs.
+      - name: Set skip_tests
+        id: archive
+        run: |
           if [[ -f unit-test-archive.tar.zst ]]; then
             echo "skip_tests=false" >> "$GITHUB_OUTPUT"
           else
