@@ -11,4 +11,8 @@ extra = []
 [dependencies]
 leaner-rust-cargo-fixture-dependency = { path = "dependency" }
 
+[package.metadata.cargo-machete]
+# Exercise dependency compilation without exporting the dependency's functions.
+ignored = ["leaner-rust-cargo-fixture-dependency"]
+
 [workspace]

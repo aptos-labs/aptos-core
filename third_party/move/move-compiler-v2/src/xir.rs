@@ -1760,7 +1760,13 @@ impl FunctionTranslator<'_> {
                     .iter()
                     .map(|variant| self.variant(sid, *variant))
                     .collect::<Result<Vec<_>>>()?;
-                StacklessOperation::BorrowVariantField(self.module_id, sid, variants, vec![], *field)
+                StacklessOperation::BorrowVariantField(
+                    self.module_id,
+                    sid,
+                    variants,
+                    vec![],
+                    *field,
+                )
             },
             Oper::BorrowVariantFieldInst(variants, field, args) => {
                 arity(dsts, srcs, 1, 1, oper)?;

@@ -315,13 +315,10 @@ impl ResourceReadWriteSet {
             .entries
             .get_mut(key)
             .expect("Entry must exist after mutable borrow attempt");
-        let old_write = std::mem::replace(
-            &mut entry.write,
-            StorageWrite::LocalHeap {
-                ptr,
-                epoch: self.current_epoch,
-            },
-        );
+        let old_write = std::mem::replace(&mut entry.write, StorageWrite::LocalHeap {
+            ptr,
+            epoch: self.current_epoch,
+        });
         self.record_write_to_journal(key, old_write);
     }
 
@@ -345,13 +342,10 @@ impl ResourceReadWriteSet {
                 addr: key.address(),
             });
         }
-        let old_write = std::mem::replace(
-            &mut entry.write,
-            StorageWrite::LocalHeap {
-                ptr,
-                epoch: self.current_epoch,
-            },
-        );
+        let old_write = std::mem::replace(&mut entry.write, StorageWrite::LocalHeap {
+            ptr,
+            epoch: self.current_epoch,
+        });
         self.record_write_to_journal(key, old_write);
         Ok(())
     }
@@ -402,12 +396,9 @@ impl ResourceReadWriteSet {
             .entries
             .get_mut(key)
             .expect("Entry must exist after move_from attempt");
-        let old_write = std::mem::replace(
-            &mut entry.write,
-            StorageWrite::Deleted {
-                epoch: self.current_epoch,
-            },
-        );
+        let old_write = std::mem::replace(&mut entry.write, StorageWrite::Deleted {
+            epoch: self.current_epoch,
+        });
         self.record_write_to_journal(key, old_write);
     }
 
@@ -643,10 +634,10 @@ mod tests {
         )
         .exists());
         // A local write means present, regardless of the read.
-        assert!(entry(
-            StorageRead::DoesNotExist,
-            StorageWrite::LocalHeap { ptr: p, epoch: 0 }
-        )
+        assert!(entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
+            ptr: p,
+            epoch: 0
+        })
         .exists());
         // Deletion shadows any read.
         assert!(!entry(
@@ -674,13 +665,10 @@ mod tests {
             Some(ext)
         );
         assert_eq!(
-            entry(
-                StorageRead::DoesNotExist,
-                StorageWrite::LocalHeap {
-                    ptr: local,
-                    epoch: 0
-                }
-            )
+            entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
+                ptr: local,
+                epoch: 0
+            })
             .as_ptr(),
             Some(local)
         );
@@ -733,10 +721,9 @@ mod tests {
             Some(EntryPtr::NonWritable(p)) if p == local
         ));
         // Deleted / absent have no pointer.
-        assert!(entry(
-            StorageRead::DoesNotExist,
-            StorageWrite::Deleted { epoch: 0 }
-        )
+        assert!(entry(StorageRead::DoesNotExist, StorageWrite::Deleted {
+            epoch: 0
+        })
         .as_ptr_mut(0)
         .is_none());
         assert!(entry(StorageRead::DoesNotExist, StorageWrite::NotModified)
@@ -1118,28 +1105,22 @@ mod tests {
         let k_local = key_a(2);
         let ext = fake_ptr(0xDEAD);
         let mut rws = ResourceReadWriteSet::new();
-        rws.entries.insert(
-            k_ext.clone(),
-            Entry {
-                read: StorageRead::ExternalHeap {
-                    ptr: ext,
-                    version: 0,
-                },
-                write: StorageWrite::NotModified,
-                group: None,
+        rws.entries.insert(k_ext.clone(), Entry {
+            read: StorageRead::ExternalHeap {
+                ptr: ext,
+                version: 0,
             },
-        );
-        rws.entries.insert(
-            k_local.clone(),
-            Entry {
-                read: StorageRead::DoesNotExist,
-                write: StorageWrite::LocalHeap {
-                    ptr: local,
-                    epoch: 0,
-                },
-                group: None,
+            write: StorageWrite::NotModified,
+            group: None,
+        });
+        rws.entries.insert(k_local.clone(), Entry {
+            read: StorageRead::DoesNotExist,
+            write: StorageWrite::LocalHeap {
+                ptr: local,
+                epoch: 0,
             },
-        );
+            group: None,
+        });
 
         rws.scan(&mut scanner);
 

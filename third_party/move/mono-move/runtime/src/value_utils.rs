@@ -1422,14 +1422,10 @@ mod tests {
         }
 
         let mut table = ValueLayoutTable::new();
-        let layout = build_struct_layout(
-            &table,
-            size_of::<S>() as u32,
-            vec![
-                (offset_of!(S, a) as u32, U8_LAYOUT_ID),
-                (offset_of!(S, b) as u32, U64_LAYOUT_ID),
-            ],
-        );
+        let layout = build_struct_layout(&table, size_of::<S>() as u32, vec![
+            (offset_of!(S, a) as u32, U8_LAYOUT_ID),
+            (offset_of!(S, b) as u32, U64_LAYOUT_ID),
+        ]);
         // In-memory 16, BCS 9 (7 bytes padding), so not blittable.
         assert_eq!(layout.fixed_serialized_size(), Some(9));
         assert!(!layout.has_no_pointers_no_padding());
@@ -1458,14 +1454,10 @@ mod tests {
         }
 
         let mut table = ValueLayoutTable::new();
-        let layout = build_struct_layout(
-            &table,
-            size_of::<S>() as u32,
-            vec![
-                (offset_of!(S, a) as u32, U64_LAYOUT_ID),
-                (offset_of!(S, b) as u32, U64_LAYOUT_ID),
-            ],
-        );
+        let layout = build_struct_layout(&table, size_of::<S>() as u32, vec![
+            (offset_of!(S, a) as u32, U64_LAYOUT_ID),
+            (offset_of!(S, b) as u32, U64_LAYOUT_ID),
+        ]);
         // No padding: BCS 16 equals in-memory 16, so blittable.
         assert_eq!(layout.fixed_serialized_size(), Some(16));
         assert!(layout.has_no_pointers_no_padding());
@@ -1496,15 +1488,11 @@ mod tests {
         }
 
         let mut table = ValueLayoutTable::new();
-        let layout = build_struct_layout(
-            &table,
-            size_of::<S>() as u32,
-            vec![
-                (offset_of!(S, a) as u32, U16_LAYOUT_ID),
-                (offset_of!(S, b) as u32, U8_LAYOUT_ID),
-                (offset_of!(S, c) as u32, U64_LAYOUT_ID),
-            ],
-        );
+        let layout = build_struct_layout(&table, size_of::<S>() as u32, vec![
+            (offset_of!(S, a) as u32, U16_LAYOUT_ID),
+            (offset_of!(S, b) as u32, U8_LAYOUT_ID),
+            (offset_of!(S, c) as u32, U64_LAYOUT_ID),
+        ]);
         assert_eq!(layout.fixed_serialized_size(), Some(11));
         assert!(!layout.has_no_pointers_no_padding());
 
@@ -1540,24 +1528,16 @@ mod tests {
         }
 
         let mut table = ValueLayoutTable::new();
-        let inner = build_struct_layout(
-            &table,
-            size_of::<Inner>() as u32,
-            vec![
-                (offset_of!(Inner, a) as u32, U64_LAYOUT_ID),
-                (offset_of!(Inner, b) as u32, U64_LAYOUT_ID),
-            ],
-        );
+        let inner = build_struct_layout(&table, size_of::<Inner>() as u32, vec![
+            (offset_of!(Inner, a) as u32, U64_LAYOUT_ID),
+            (offset_of!(Inner, b) as u32, U64_LAYOUT_ID),
+        ]);
         let inner_id = table.push(U64_TY, inner);
 
-        let outer = build_struct_layout(
-            &table,
-            size_of::<Outer>() as u32,
-            vec![
-                (offset_of!(Outer, x) as u32, inner_id),
-                (offset_of!(Outer, y) as u32, U8_LAYOUT_ID),
-            ],
-        );
+        let outer = build_struct_layout(&table, size_of::<Outer>() as u32, vec![
+            (offset_of!(Outer, x) as u32, inner_id),
+            (offset_of!(Outer, y) as u32, U8_LAYOUT_ID),
+        ]);
         // Outer is BCS 17, size 24 (trailing pad): a blittable child (Inner)
         // does not make the parent blittable.
         assert_eq!(outer.fixed_serialized_size(), Some(17));
@@ -1719,14 +1699,10 @@ mod tests {
         }
 
         let mut table = ValueLayoutTable::new();
-        let kv_layout = build_struct_layout(
-            &table,
-            size_of::<Kv>() as u32,
-            vec![
-                (offset_of!(Kv, k) as u32, U8_LAYOUT_ID),
-                (offset_of!(Kv, v) as u32, U64_LAYOUT_ID),
-            ],
-        );
+        let kv_layout = build_struct_layout(&table, size_of::<Kv>() as u32, vec![
+            (offset_of!(Kv, k) as u32, U8_LAYOUT_ID),
+            (offset_of!(Kv, v) as u32, U64_LAYOUT_ID),
+        ]);
         let kv_id = table.push(U64_TY, kv_layout);
         let vid = table.push(U64_TY, vector_layout(kv_id));
 
@@ -1819,14 +1795,11 @@ mod tests {
         }
 
         let mut table = ValueLayoutTable::new();
-        let eid = build_enum_layout(
-            &mut table,
-            vec![
-                (0, vec![]),
-                (8, vec![(0, U64_LAYOUT_ID)]),
-                (16, vec![(0, U8_LAYOUT_ID), (8, U64_LAYOUT_ID)]),
-            ],
-        );
+        let eid = build_enum_layout(&mut table, vec![
+            (0, vec![]),
+            (8, vec![(0, U64_LAYOUT_ID)]),
+            (16, vec![(0, U8_LAYOUT_ID), (8, U64_LAYOUT_ID)]),
+        ]);
         let values = [
             E::A,
             E::B(0),
@@ -1976,12 +1949,10 @@ mod prop_tests {
         };
     }
 
-    prop_primitive!(
-        prop_bool,
-        bool,
-        BOOL_TY,
-        prop_oneof![Just(false), Just(true)]
-    );
+    prop_primitive!(prop_bool, bool, BOOL_TY, prop_oneof![
+        Just(false),
+        Just(true)
+    ]);
     prop_primitive!(prop_u8, u8, U8_TY, unsigned_strategy!(u8));
     prop_primitive!(prop_u16, u16, U16_TY, unsigned_strategy!(u16));
     prop_primitive!(prop_u32, u32, U32_TY, unsigned_strategy!(u32));
@@ -1992,35 +1963,20 @@ mod prop_tests {
     prop_primitive!(prop_i32, i32, I32_TY, signed_strategy!(i32));
     prop_primitive!(prop_i64, i64, I64_TY, signed_strategy!(i64));
     prop_primitive!(prop_i128, i128, I128_TY, signed_strategy!(i128));
-    prop_primitive!(
-        prop_u256,
-        U256,
-        U256_TY,
-        prop_oneof![
-            Just(U256::MIN),
-            Just(U256::MAX),
-            any::<[u8; 32]>().prop_map(U256::from_le_bytes)
-        ]
-    );
-    prop_primitive!(
-        prop_i256,
-        I256,
-        I256_TY,
-        prop_oneof![
-            Just(I256::MIN),
-            Just(I256::MAX),
-            Just(I256::from_le_bytes([0xFF; 32])),
-            any::<[u8; 32]>().prop_map(I256::from_le_bytes)
-        ]
-    );
-    prop_primitive!(
-        prop_address,
-        AccountAddress,
-        ADDRESS_TY,
-        prop_oneof![
-            Just(AccountAddress::new([0; 32])),
-            Just(AccountAddress::new([0xFF; 32])),
-            any::<[u8; 32]>().prop_map(AccountAddress::new)
-        ]
-    );
+    prop_primitive!(prop_u256, U256, U256_TY, prop_oneof![
+        Just(U256::MIN),
+        Just(U256::MAX),
+        any::<[u8; 32]>().prop_map(U256::from_le_bytes)
+    ]);
+    prop_primitive!(prop_i256, I256, I256_TY, prop_oneof![
+        Just(I256::MIN),
+        Just(I256::MAX),
+        Just(I256::from_le_bytes([0xFF; 32])),
+        any::<[u8; 32]>().prop_map(I256::from_le_bytes)
+    ]);
+    prop_primitive!(prop_address, AccountAddress, ADDRESS_TY, prop_oneof![
+        Just(AccountAddress::new([0; 32])),
+        Just(AccountAddress::new([0xFF; 32])),
+        any::<[u8; 32]>().prop_map(AccountAddress::new)
+    ]);
 }

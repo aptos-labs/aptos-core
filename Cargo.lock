@@ -12998,9 +12998,7 @@ dependencies = [
 name = "mono-move-lean-link"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-move-stdlib",
- "bcs 0.1.4",
  "bytes",
  "codespan-reporting",
  "legacy-move-compiler",

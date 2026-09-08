@@ -13,9 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 aptos-move-stdlib = { workspace = true }
-bcs = { workspace = true }
 bytes = { workspace = true }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }

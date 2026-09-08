@@ -146,12 +146,12 @@ pub fn run_request(request: &Request, abi: u32) -> Response {
             "failed to acquire execution guard 0".to_string(),
         );
     };
-    let natives = production_natives(&guard);
+    let natives = production_natives();
 
     let outcomes = request
         .calls
         .iter()
-        .map(|call| run_call(&guard, &natives, &provider, &request.limits, call))
+        .map(|call| run_call(&guard, natives, &provider, &request.limits, call))
         .collect();
     Response {
         version: PAYLOAD_VERSION,
