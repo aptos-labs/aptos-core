@@ -1,6 +1,13 @@
 # The generic route: verification by normalization, not by stepping
 
-## Native migration priority (2026-09-07)
+> **Historical (moved here 2026-09-08).** This document tracked the
+> normalization route and, from 2026-09-05, the native route that replaced
+> it; both are superseded by [`../denotation.md`](../denotation.md) (V5: one
+> denotation of validated LIR and one agreement proof). Kept for the pilot
+> measurement, the checkpoints, and the native cutover census; no longer
+> updated.
+
+## Native migration priority (2026-09-07, superseded by `denotation.md`)
 
 Native-encoding migration precedes further v0 ports and performance tuning of
 the retiring representation. Source verification is now **native-only by

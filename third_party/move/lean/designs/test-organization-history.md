@@ -1818,7 +1818,7 @@ Two semantic issues surfaced while examining subsequent ports:
 | **DONE (2026-09-02)** | **T3 retire the hand fixtures.** The ten `LeanerLang/Tests/Verification*.lean` fixtures are checks under `Check/Verification/` (`Prophecies`, `Aborts`, `Storage`, `Generics`, `Corpus`, `References`, `Loops`, `Typed`, `Rust`, plus the seeds `Increment` and `Account`); their `.exp` files record the constructs without a generated route, since the frame route was retired the same day. | Met: `leaner-ir`'s verification tests are the row proofs and the cost gate only. |
 
 T0 and T2 are driver work with no proof engineering and are independent
-of the route work in [`certifying-execution.md`](certifying-execution.md);
+of the route work in [`certifying-execution.md`](historical/certifying-execution.md);
 they are what makes that work measurable.  T1 is where the frontends'
 and routes' gaps become ledger rows.
 

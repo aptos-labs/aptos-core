@@ -26,7 +26,7 @@ statements below that place authoritative typing in semantic preparation
 describe the superseded arrangement — `validate` now owns typing and the
 initialization/borrow analyses, and preparation filters capability.
 The verification half of M4–M5 is carried since 2026-09-01 by
-[`certifying-execution.md`](certifying-execution.md) (the frame-free row
+[`certifying-execution.md`](historical/certifying-execution.md) (the frame-free row
 route); this document stays authoritative for the runtime model, the
 big-step semantics, the interpreter, and the correctness obligations.
 
@@ -591,7 +591,7 @@ rules are monotone in the oracle, and `EvalFunction.induction` states that
 the closed semantics is below every oracle closed under one unfolding of
 the function boundary — the least-fixed-point induction a recursive
 function's native denotation is proved against
-([`certifying-execution.md`](certifying-execution.md), *Recursion*).
+([`certifying-execution.md`](historical/certifying-execution.md), *Recursion*).
 
 ## Interpreter
 

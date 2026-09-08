@@ -3,7 +3,7 @@
 > **Historical (moved here 2026-09-03).** This design is executed: V1–V3
 > and V7 are done, and the native elaborated-Lean route its V6 describes
 > was retired 2026-09-02 in favour of the frame-free row route designed
-> and tracked in [`certifying-execution.md`](../certifying-execution.md).
+> and tracked in [`certifying-execution.md`](certifying-execution.md).
 > The items it left open (V4, V5, and the deferred Rust shapes) are
 > carried in that document's register. Kept for the rationale, the V2
 > measurement, and the vacuity finding; no longer updated.

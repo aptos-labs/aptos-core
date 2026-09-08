@@ -90,14 +90,10 @@ older source-specific work those packages own.
   contracts, deferred-work register, and phase roadmap.
 - [`designs/elaboration-design.md`](designs/elaboration-design.md): LIR
   elaboration, verification, execution, runtime semantics, and migration plan.
-- [`designs/certifying-execution.md`](designs/certifying-execution.md): the
-  current verification design — the frame-free row route that proves every
-  generated theorem by its row script, its status table, the corpus census
-  ledger, and the recursive fixed point.
-- [`designs/generic-route.md`](designs/generic-route.md): the generic route
-  replacing the per-shape row scripts — verification by normalization of a
-  computational denotation, piloted on `withdraw` and benchmarked before
-  generalizing, with correctness and performance gates over the corpus.
+- [`designs/denotation.md`](designs/denotation.md): the current
+  verification design — one `denote` of validated LIR into `Spec` and one
+  agreement theorem against `BigStep`, replacing per-target generated
+  agreement proofs; milestones D0–D4 with their fixture gates.
 - [`designs/test-organization.md`](designs/test-organization.md): verification
   checks as baselines under `leaner-e2e-tests/LeanerE2ETests/Check/` and
   the ledger of v0 tests ported so far.
@@ -121,8 +117,8 @@ older source-specific work those packages own.
   exact exporter scope, supported MIR fixtures, commands, and known boundaries.
 
 Executed or superseded designs move to
-[`designs/historical/`](designs/historical/) (currently
-`verification-v2.md`, replaced by `certifying-execution.md`); they are
+[`designs/historical/`](designs/historical/) (`verification-v2.md`, `certifying-execution.md`, and `generic-route.md`,
+all replaced by `denotation.md`); they are
 reference only and are not updated.
 
 ### Leaner Move source and verification (deprecated packages)

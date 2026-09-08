@@ -1,5 +1,11 @@
 # A native denotation: v0's fundamentals over the shared IR
 
+> **Historical (moved here 2026-09-08).** The frame-free row route this
+> document designed was retired with `RowScript.lean`; verification is
+> now designed in [`../denotation.md`](../denotation.md). Kept for the
+> measurements, the corpus census, and the recursion and globals
+> milestones; no longer updated.
+
 **Audience: an implementing agent.** This document is a complete work order.
 Read it fully before changing anything, then work the milestones in order.
 Everything referenced lives under `third_party/move/lean/leaner-ir` unless
@@ -37,8 +43,8 @@ milestone below exists to finish it.
 | **DONE** | **N3: globals as a family indexed by type** | Storage denotes through the per-family typed contents already proved in `Representation.lean`, not through `GlobalMap`. Gate met 2026-09-02: `deposit` 218.4M → **16.6M (−92%)**, `replace` 56.3M → **14.8M (−74%)**, `withdraw` 379.9M → **21.2M (−94%)**, each with a purely typed obligation. Plan below |
 | **DONE (2026-09-03)** | **N4: corpus and retirement** | The frame route is retired (user decision, 2026-09-02): a generated theorem is proved by its row script alone, a body outside the generated subset is an error at its `verify` naming the construct, a clause the closing cannot establish is reported at its range, and every uncovered target is a negative check under `leaner-e2e-tests/LeanerE2ETests/Check/` whose `.exp` names the gap. The census of 2026-09-02 found 20 of the corpus's 46 `verify` targets on a generated route; every construct it named landed by 2026-09-03 (the ledger below), recursion last. Under `Check/` the only diagnostic `.exp` files left are the intended negatives (`WrongIncrement`, `Aborts.off_by_one`). The census forced two generalizations — facts named from the contract, summaries quantifying only over the families a function touches — and the negative tests still fail on the generated route, as they must |
 | **DONE (2026-09-03)** | **Recursion: the fixed point** | `recursive_choose`, `drain`, and `call_drain` verify on generated routes; `Calls.exp` and `Callees.exp` are gone. The big-step rules are stated over a callee oracle and the closed semantics is their least fixed point; a recursive body denotes as the least body closed under one unfolding, agrees by the parametric agreement of its open body, and is verified by fixed-point induction with the recursive call consumed as a verified callee (see *Recursion*). Mutual recursion and generic recursive functions are refused at the `verify` with a diagnostic naming them |
-| **NOT STARTED** | **The rest of the T1 ledger** | 19 v0 verification files, `Negative/`, and `Language/` remain to port ([`test-organization.md`](test-organization.md)); each port lands as a clean check or as a `.exp` naming the construct the route lacks, which is how the next generated-route items are found |
-| **CARRIED** | From the v2 design | V4 (storage-key-dependent instantiation closure and monomorphized views), V5 (a generic induction proof replacing emitted agreement proofs), Rust reference-field decoding, and Rust trait/evidence denotations, as recorded in [`historical/verification-v2.md`](historical/verification-v2.md); none is scheduled |
+| **NOT STARTED** | **The rest of the T1 ledger** | 19 v0 verification files, `Negative/`, and `Language/` remain to port ([`test-organization.md`](../test-organization.md)); each port lands as a clean check or as a `.exp` naming the construct the route lacks, which is how the next generated-route items are found |
+| **CARRIED** | From the v2 design | V4 (storage-key-dependent instantiation closure and monomorphized views), V5 (a generic induction proof replacing emitted agreement proofs), Rust reference-field decoding, and Rust trait/evidence denotations, as recorded in [`historical/verification-v2.md`](verification-v2.md); none is scheduled |
 | **NOT STARTED** | **The generic route** | The per-shape scripts are retired in favour of verification by normalization — a computational denotation whose `wp` rewrites to the obligation, as v0's did — piloted on `withdraw` and benchmarked against its script before generalizing: [`generic-route.md`](generic-route.md). Ledger ports are frozen until it lands |
 
 Update these markers as you work — the user requires textual
@@ -83,7 +89,7 @@ and prove agreement with the registry-based relation once per combinator
 
 ## Why (measured 2026-09-01; progress noted where later work changed it)
 
-Verification v2 (see [`historical/verification-v2.md`](historical/verification-v2.md)) verifies
+Verification v2 (see [`historical/verification-v2.md`](verification-v2.md)) verifies
 its whole corpus from a bare `verify`, but was 20–200× slower than the
 z3-backed Move Prover on the same functions when this document was
 written. A phase profile of the benchmark file (~75s total) showed: simp
@@ -109,7 +115,7 @@ directly. All work here targets the native route.
 The search is symbolic execution implemented in the simplifier:
 
 1. `leaner_denotation_drive`
-   ([`LeanerIR/Proofs/DenotationWP.lean`](../leaner-ir/LeanerIR/Proofs/DenotationWP.lean),
+   ([`LeanerIR/Proofs/DenotationWP.lean`](../../leaner-ir/LeanerIR/Proofs/DenotationWP.lean),
    search for the `elab`) tries up to 18 alternative tactics per program
    point with save/restore. *Partly fixed:* the alternatives that probed
    by unification or normalized shape the drive itself takes apart are
@@ -122,13 +128,13 @@ The search is symbolic execution implemented in the simplifier:
    *Fixed:* the inventory is the registered `lir_reconcile` simp set
    (F0); the tactic keeps only `*` and its four site-specific rows.
 4. The generated closing
-   ([`LeanerLang/Contract.lean`](../leaner-ir/LeanerLang/Contract.lean),
+   ([`LeanerLang/Contract.lean`](../../leaner-ir/LeanerLang/Contract.lean),
    the four scripts) runs up to five `simp_all [~25 entries]` passes per
    residual goal over spent context. *Still open — but see the failed
    experiment below before touching it.*
 
 The fix is the middle row of the cost table in
-[`historical/verification-v2.md`](historical/verification-v2.md) ("emitted proof terms:
+[`historical/verification-v2.md`](verification-v2.md) ("emitted proof terms:
 certifying generator, linear proof check, no search"): keep the exact
 same theorem statement, semantics, agreement, and trust story, and
 replace the search that proves it with a **MetaM metaprogram that
@@ -154,7 +160,7 @@ computes the symbolic execution once and emits the proof term**.
 ## M0 — re-establish the baseline (DONE 2026-09-01)
 
 The gate was red at a clean HEAD: six targets 19–150% over the committed
-[`Performance.exp`](../leaner-ir/LeanerLang/Tests/Performance.exp) and
+[`Performance.exp`](../../leaner-ir/LeanerLang/Tests/Performance.exp) and
 the rest 1–8% over, reproducible to 0.01% across runs and unchanged by
 the profiler. It was not a regression. The pre-amend commits in the
 reflog carry byte-identical trees, so no code landed after the recording;
@@ -170,12 +176,12 @@ change was reverted as unmeasurable noise in an unrelated diff).
 
 Resolved by regenerating against a fresh build, and by making the build
 part of the documented command in
-[`LeanerLang/Perf.lean`](../leaner-ir/LeanerLang/Perf.lean),
-[`../CLAUDE.md`](../CLAUDE.md), and
-[`verification-perf-audit.md`](verification-perf-audit.md).
+[`LeanerLang/Perf.lean`](../../leaner-ir/LeanerLang/Perf.lean),
+[`../CLAUDE.md`](../../CLAUDE.md), and
+[`verification-perf-audit.md`](../verification-perf-audit.md).
 
 The M1–M5 reference figures are **whatever the committed
-[`Performance.exp`](../leaner-ir/LeanerLang/Tests/Performance.exp) holds
+[`Performance.exp`](../../leaner-ir/LeanerLang/Tests/Performance.exp) holds
 when the milestone starts** — F0–F0d already moved every number, and any
 figure copied into prose goes stale the same way. After F0d the typed
 rows are: `guarded` 14.6M, `bump` 35.2M, `set_then_read` 47.9M,
@@ -203,7 +209,7 @@ finisher was accordingly break-even on `guarded`, and on the reference and
 storage targets it was far worse — `reborrow` +770%, `replace` +726%, with
 proof-object counts unchanged, so it searched, failed, and left the
 fallback to redo the work. That experiment was removed. F1b/F1c in
-[`verification-perf-audit.md`](verification-perf-audit.md) describe
+[`verification-perf-audit.md`](../verification-perf-audit.md) describe
 `bump_twice`, whose context is large; they do not describe the rest of the
 benchmark.
 
@@ -294,7 +300,7 @@ Two diagnostic signatures worth knowing when reading benchmark diffs:
 ## What the constructive closing established (2026-09-01)
 
 The obligation side of the executor is implemented, in
-[`LeanerIR/Proofs/Certify.lean`](../leaner-ir/LeanerIR/Proofs/Certify.lean),
+[`LeanerIR/Proofs/Certify.lean`](../../leaner-ir/LeanerIR/Proofs/Certify.lean),
 and it works: `guarded` closes entirely by construction at **7.4M
 heartbeats against 14.6M**, a 49% saving on a target whose closing was
 53% of its cost. Nothing else on the benchmark moves by even 1%. This is
@@ -470,7 +476,7 @@ Practical constraints, all previously measured in this tree:
 ## Milestones in detail
 
 **N1 — locals as binders, no frame.** *In progress; the layer is built and
-unwired.* [`Native.lean`](../leaner-ir/LeanerIR/Proofs/Native.lean) states
+unwired.* [`Native.lean`](../../leaner-ir/LeanerIR/Proofs/Native.lean) states
 the weakest precondition over the locals alone — a `Row` of values, no
 `Option`, and the loan bookkeeping carried as an opaque `Registries`
 parameter rather than a literal to reduce. Covered so far: values, locals,
@@ -507,7 +513,7 @@ death; mutation through it updates the first component and the second is
 determined at exit. Nothing registers a loan for the verifier's benefit:
 `activeLoans`, `loanLocations`, `globalLoans`, and `pending` stay in the
 interpreter, where execution needs them.
-[`prophetic-references.md`](prophetic-references.md) already settles the
+[`prophetic-references.md`](../prophetic-references.md) already settles the
 model — this milestone is that model reaching the denotation.
 
 *Landed already:* exit no longer needs a shape inventory. That a row of
@@ -591,7 +597,7 @@ split goes through.
 
 *The gate result: `bump` verifies frame-free at 6M heartbeats against
 35.2M — -83%.* The proof is checked in as
-[`NativeRow.lean`](../leaner-ir/LeanerLang/Tests/NativeRow.lean), runs in
+[`NativeRow.lean`](../../leaner-ir/LeanerLang/Tests/NativeRow.lean), runs in
 the suite under a hard 30M budget the frame route could not meet, and
 exercises every layer piece end to end: entry law, row drive, evaluator
 resolution for the read, the checked add with its range split, the write
@@ -847,7 +853,7 @@ appears nowhere in a goal.
 **N3 — globals as a family indexed by type.** Storage reads and writes
 denote through the family's typed contents — the
 `FamilyRepresentation erase namespaceId typeId contents globals` already
-proved in [`Representation.lean`](../leaner-ir/LeanerIR/Proofs/Representation.lean),
+proved in [`Representation.lean`](../../leaner-ir/LeanerIR/Proofs/Representation.lean),
 whose `insert_self` and `erase_self` are pointwise updates and whose
 cross-family disjointness is a theorem of key disequality rather than an
 assumption. A contract clause then reads `contents key`, not a
@@ -1903,5 +1909,5 @@ loan (`applyPendingFrom_returnedReborrow_derefLocalZero`).
   `gt submit --draft --no-interactive`), stacked PRs for M1, M2, …, and
   `Copyright © Aptos Foundation` headers on new files.
 - Keep this document's status table and
-  [`verification-perf-audit.md`](verification-perf-audit.md) current as
+  [`verification-perf-audit.md`](../verification-perf-audit.md) current as
   milestones complete; record measured numbers, not adjectives.

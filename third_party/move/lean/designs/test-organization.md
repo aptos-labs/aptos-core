@@ -35,7 +35,7 @@ including cached-proof reuse; every successful `verify` audits its generated
 native computation and verification-condition dependencies. Unsupported cases
 fail rather than falling back. Native verification does **not** yet mean all
 legacy code is gone: compatible `RuntimeState`, failure, and contract adapters
-remain. See [generic-route](generic-route.md) for the native route's boundary.
+remain. See [denotation](denotation.md) for the current design; the native route's boundary is recorded in [generic-route](historical/generic-route.md).
 
 ### What the labels mean
 

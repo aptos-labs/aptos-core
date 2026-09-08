@@ -296,7 +296,7 @@ neutral or worse — including the goal-directed rewrite recorded below.
 The conclusion is a scheduling one: **the closing will not be improved by
 adjusting it, only by not generating its goals in the first place**, which
 is the executor's job in
-[`certifying-execution.md`](certifying-execution.md). Effort spent tuning
+[`certifying-execution.md`](historical/certifying-execution.md). Effort spent tuning
 the `simp_all` chain is effort spent against a local optimum.
 
 That conclusion has since been confirmed from the other side. A
@@ -322,7 +322,7 @@ the benchmark and the two dominant alternatives left in it are
 `leaner_denotation_reduce_head` (23ms a call) — both now doing real
 rewriting and reduction over oversized frame and state records, which is
 F7's term-size problem and the case for the certifying executor in
-[`certifying-execution.md`](certifying-execution.md).
+[`certifying-execution.md`](historical/certifying-execution.md).
 
 A further experiment is recorded because it failed. Replacing the closing's
 `simp_all` chain with one goal-directed `simp` plus a structured finisher
