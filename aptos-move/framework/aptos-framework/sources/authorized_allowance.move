@@ -19,7 +19,13 @@
 ///    recipient's primary stores.
 ///
 /// An allowance may be redeemed in several smaller pulls as long as the total stays within `amount`.
-/// The sender can invalidate an outstanding allowance early with `revoke`.
+/// What `amount` caps is the drop in the sender's balance, not just the sum of the amounts handed to
+/// the recipient, so an asset with a dispatchable withdraw hook that charges a fee cannot be used to
+/// take more out of the sender's store than they signed for. The sender can invalidate an outstanding
+/// allowance early with `revoke`.
+///
+/// Assets that register a `derived_balance` hook are not supported, because the module cannot then
+/// read the store balance it needs to enforce that cap; redemption aborts for them.
 module aptos_framework::authorized_allowance {
     use std::bcs;
     use std::error;
@@ -31,7 +37,7 @@ module aptos_framework::authorized_allowance {
     use aptos_framework::chain_id;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event;
-    use aptos_framework::fungible_asset::Metadata;
+    use aptos_framework::fungible_asset::{Self, Metadata};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::timestamp;
@@ -66,7 +72,9 @@ module aptos_framework::authorized_allowance {
         recipient: address,
         /// Address of the fungible asset `Metadata` object the allowance applies to.
         metadata: address,
-        /// The maximum total that may be pulled across all redemptions of this allowance.
+        /// The most the sender's balance may fall by across all redemptions of this allowance. A
+        /// dispatchable asset that charges a withdrawal fee counts that fee against this cap too, so
+        /// no sequence of redemptions can take more than `amount` out of the sender's store.
         amount: u64,
         /// Unix timestamp in seconds at which the allowance stops being redeemable.
         expiration_secs: u64,
@@ -85,7 +93,8 @@ module aptos_framework::authorized_allowance {
         /// SHA3-256 of the BCS-encoded `TransferAllowance` bound to this nonce. Empty for records
         /// created by `revoke`, which blocks a nonce without knowing the payload it was signed into.
         payload_hash: vector<u8>,
-        /// The total pulled so far, never more than the payload's `amount`.
+        /// The total charged so far, never more than the payload's `amount`. Each redemption is
+        /// charged the larger of the amount it transferred and the amount it debited from the sender.
         redeemed: u64,
         /// Copy of the payload's expiration, used to decide when this record can be reclaimed.
         expiration_secs: u64,
@@ -98,9 +107,11 @@ module aptos_framework::authorized_allowance {
         recipient: address,
         metadata: address,
         nonce: u64,
-        /// The amount pulled by this redemption.
+        /// The amount transferred to the recipient by this redemption.
         amount: u64,
-        /// The total pulled under this allowance so far, including this redemption.
+        /// The amount the sender's store actually lost, which a withdrawal fee can push above `amount`.
+        debited: u64,
+        /// The total charged against this allowance so far, including this redemption.
         total_redeemed: u64,
         /// The maximum the allowance permits in total.
         allowance_amount: u64,
@@ -145,6 +156,9 @@ module aptos_framework::authorized_allowance {
     /// Redeem part of a pre-signed allowance, transferring `redeem_amount` of the `amount` the payload
     /// permits. The rest stays available under the same signature until the allowance expires or is
     /// revoked.
+    ///
+    /// If the asset charges a withdrawal fee, that fee is charged against the allowance alongside
+    /// `redeem_amount`, so redeeming the payload in full requires leaving room for it.
     public entry fun redeem_with_allowance(
         sender: address,
         recipient: address,
@@ -184,11 +198,27 @@ module aptos_framework::authorized_allowance {
         );
 
         let sender_signer = create_signer(sender);
-        // The allowance is consumed before the funds move, so a dispatchable store hook that calls
-        // back into this module sees the updated balance rather than a stale one.
+        let sender_store = primary_fungible_store::ensure_primary_store_exists(sender, metadata);
+
+        // Charge the nominal amount before the funds move, so a dispatchable store hook that calls
+        // back into this module cannot spend the same budget twice.
         let total_redeemed = consume_allowance(&sender_signer, &allowance, redeem_amount);
 
+        let balance_before = fungible_asset::balance(sender_store);
         primary_fungible_store::transfer(&sender_signer, metadata, recipient, redeem_amount);
+        let balance_after = fungible_asset::balance(sender_store);
+
+        // A dispatchable withdraw hook may take more out of the store than it hands over, to charge a
+        // fee for instance. That excess is charged to the allowance as well, so the sender's balance
+        // can never fall by more than the `amount` they signed for, however many redemptions it takes.
+        // If the excess does not fit, `consume_allowance` aborts and the transfer is rolled back.
+        let debited = if (balance_before > balance_after) {
+            balance_before - balance_after
+        } else { 0 };
+        if (debited > redeem_amount) {
+            total_redeemed =
+                consume_allowance(&sender_signer, &allowance, debited - redeem_amount);
+        };
 
         event::emit(AllowanceRedeemed {
             sender,
@@ -196,6 +226,7 @@ module aptos_framework::authorized_allowance {
             metadata: metadata_address,
             nonce,
             amount: redeem_amount,
+            debited,
             total_redeemed,
             allowance_amount: amount,
         });
@@ -261,8 +292,9 @@ module aptos_framework::authorized_allowance {
     }
 
     #[view]
-    /// How much has already been pulled from the allowance `sender` issued under `nonce`. Zero if the
-    /// allowance has never been redeemed.
+    /// How much of the allowance `sender` issued under `nonce` has been used up. Zero if the allowance
+    /// has never been redeemed. A redemption uses up the larger of the amount it transferred and the
+    /// amount it debited from the sender, so this can exceed the total the recipient received.
     public fun redeemed_amount(sender: address, nonce: u64): u64 acquires AllowanceRegistry {
         if (!exists<AllowanceRegistry>(sender)) {
             return 0
@@ -285,7 +317,7 @@ module aptos_framework::authorized_allowance {
         allowances.contains(nonce) && allowances.borrow(nonce).revoked
     }
 
-    /// Charge `redeem_amount` against the allowance's nonce and return the new total redeemed. Aborts
+    /// Charge `redeem_amount` against the allowance's nonce and return the new total charged. Aborts
     /// if the nonce was revoked, was bound to a different payload, or has too little left.
     fun consume_allowance(
         sender_signer: &signer,
@@ -324,9 +356,6 @@ module aptos_framework::authorized_allowance {
             move_to(sender, AllowanceRegistry { allowances: table::new() });
         };
     }
-
-    #[test_only]
-    use aptos_framework::fungible_asset;
 
     #[test_only]
     const TEST_CHAIN_ID: u8 = 4;
