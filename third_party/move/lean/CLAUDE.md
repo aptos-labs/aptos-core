@@ -13,7 +13,7 @@ end-to-end tests around them.
 
 The current codebase is the leaner stack: `leaner-ir`, `leaner-move`,
 `leaner-rust` (with `rust-exporter`), and `leaner-e2e-tests`. The `move`,
-`move-model`, and `transpiler` packages are **deprecated**: they exist only as
+`move-model`, and `transpiler` packages under `v0/` are **deprecated**: they exist only as
 reference for solutions being rebuilt on the leaner codebase. Do not add
 functionality or tests to them, do not include their suites in test runs or
 CI, and do not root new work in them. The Move exchange frontend and LIR
@@ -61,11 +61,12 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`leaner-move/`](leaner-move/) | Move semantic profile and intrinsic registry over `leaner-ir`, plus the Move exchange frontend (`LeanerMove/Frontend`): CLI invocation, XAST decoding, and LIR encoding. |
 | [`leaner-rust/`](leaner-rust/) | Rust semantic profile, source backend, registry, Lean-owned import CLI, and Lean integration tests. |
 | [`leaner-rust/rust-exporter/`](leaner-rust/rust-exporter/) | Standalone Rust crate using the pinned Rustc Public API to export borrow-checked optimized MIR as RawUnit JSON. Fixtures and JSON baselines live under `tests/`. |
-| [`move-model/`](move-model/) | **Deprecated, reference only.** Logical model of Move stackless bytecode: IR, execution semantics, checking, interpreter, reference elimination, prover stages, XIR, and source/masm frontends. |
-| [`move/`](move/) | **Deprecated, reference only.** The original Leaner Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified LIR. |
-| [`transpiler/`](transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Leaner printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and LIR adapter were ported to `leaner-move`. |
+| [`v0/move-model/`](v0/move-model/) | **Deprecated, reference only.** Logical model of Move stackless bytecode: IR, execution semantics, checking, interpreter, reference elimination, prover stages, XIR, and source/masm frontends. |
+| [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Leaner Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified LIR. |
+| [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Leaner printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and LIR adapter were ported to `leaner-move`. |
 | [`leaner-e2e-tests/`](leaner-e2e-tests/) | Discoverable Move-to-LeanerLang and Rust-to-LeanerLang source/result baselines. Assertion-style legacy tests remain with their owning packages. |
-| [`scripts/`](scripts/) | Proof-cost benchmark and simplifier diagnostics for the `move` package. |
+| [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`). |
+| [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing current links them; they are not built in CI. |
 
 Within each package, the root `Foo.lean` is the public import, source modules
 live under `Foo/`, and tests are either under `Foo/Tests/` or exposed through a
@@ -80,7 +81,7 @@ non-goals, deferred-work registers, and testing requirements.
 ### Current designs (`designs/`)
 
 The current cross-package designs live in [`designs/`](designs/). The design
-documents kept inside `move/`, `move-model/`, and `transpiler/` describe the
+documents kept inside `v0/` (`move/`, `move-model/`, `transpiler/`) describe the
 older source-specific work those packages own.
 
 - [`designs/roadmap.md`](designs/roadmap.md): the priority ordering across the
@@ -121,45 +122,45 @@ reference only and are not updated.
 
 ### Leaner Move source and verification (deprecated packages)
 
-- [`move/Move/README.md`](move/Move/README.md): example-driven architecture
+- [`move/Move/README.md`](v0/move/Move/README.md): example-driven architecture
   and module tour.
-- [`move/Move/leaner-move.md`](move/Move/leaner-move.md): language reference,
+- [`move/Move/leaner-move.md`](v0/move/Move/leaner-move.md): language reference,
   grammar, types, expressions, functions, specifications, verification, and
   compilation.
-- [`move/Move/verification-design.md`](move/Move/verification-design.md):
+- [`move/Move/verification-design.md`](v0/move/Move/verification-design.md):
   relational source semantics, effects, references, contracts, verification
   interface, tests, and proof obligations.
-- [`move/Move/design-plan.md`](move/Move/design-plan.md): lowering from Leaner
+- [`move/Move/design-plan.md`](v0/move/Move/design-plan.md): lowering from Leaner
   Move through LIR and MoveModel IR to XIR and bytecode.
-- [`move/Move/project-plan.md`](move/Move/project-plan.md): implemented source
+- [`move/Move/project-plan.md`](v0/move/Move/project-plan.md): implemented source
   features, unsupported language coverage, diagnostics, and roadmap.
-- [`move/Move/loop-design.md`](move/Move/loop-design.md): loop syntax, lowering,
+- [`move/Move/loop-design.md`](v0/move/Move/loop-design.md): loop syntax, lowering,
   fixed-point verification, and diagnostics.
-- [`move/Move/invariant-design.md`](move/Move/invariant-design.md): data and
+- [`move/Move/invariant-design.md`](v0/move/Move/invariant-design.md): data and
   global invariants and where proof obligations arise.
-- [`move/Move/address-design.md`](move/Move/address-design.md): address surface
+- [`move/Move/address-design.md`](v0/move/Move/address-design.md): address surface
   model and compiler representation.
-- [`move/Move/unified-int-design.md`](move/Move/unified-int-design.md) and
-  [`move/Move/int-widening-design.md`](move/Move/int-widening-design.md): integer
+- [`move/Move/unified-int-design.md`](v0/move/Move/unified-int-design.md) and
+  [`move/Move/int-widening-design.md`](v0/move/Move/int-widening-design.md): integer
   representation, operations, and specification coercion policy.
-- [`move/Move/structural-equality-design.md`](move/Move/structural-equality-design.md):
+- [`move/Move/structural-equality-design.md`](v0/move/Move/structural-equality-design.md):
   runtime structural equality and the remaining verification-model gap.
-- [`move/Move/performance-analysis.md`](move/Move/performance-analysis.md) and
-  [`move/Move/proof-simplification-plan.md`](move/Move/proof-simplification-plan.md):
+- [`move/Move/performance-analysis.md`](v0/move/Move/performance-analysis.md) and
+  [`move/Move/proof-simplification-plan.md`](v0/move/Move/proof-simplification-plan.md):
   proof cost, simplifier behavior, benchmarks, and proof cleanup.
-- [`move/Move/overview.md`](move/Move/overview.md): short conceptual overview.
+- [`move/Move/overview.md`](v0/move/Move/overview.md): short conceptual overview.
 
 ### Move model and transpilation (deprecated packages)
 
-- [`move-model/MoveModel/README.md`](move-model/MoveModel/README.md): model
+- [`move-model/MoveModel/README.md`](v0/move-model/MoveModel/README.md): model
   overview and links to the detailed
-  [`IR`](move-model/MoveModel/IR/README.md),
-  [`Frontend`](move-model/MoveModel/Frontend/README.md), and
-  [`Prover`](move-model/MoveModel/Prover/README.md) guides.
-- [`transpiler/transpile-design.md`](transpiler/transpile-design.md): XAST
+  [`IR`](v0/move-model/MoveModel/IR/README.md),
+  [`Frontend`](v0/move-model/MoveModel/Frontend/README.md), and
+  [`Prover`](v0/move-model/MoveModel/Prover/README.md) guides.
+- [`transpiler/transpile-design.md`](v0/transpiler/transpile-design.md): XAST
   exchange format, export stage, decoding/printing, semantic mapping,
   validation, baselines, and feature scoreboard.
-- [`transpiler/intrinsic-design.md`](transpiler/intrinsic-design.md): generic
+- [`transpiler/intrinsic-design.md`](v0/transpiler/intrinsic-design.md): generic
   intrinsic-map representation, lowering, diagnostics, and acceptance tests.
 - [`leaner-e2e-tests/README.md`](leaner-e2e-tests/README.md): source/result
   baseline conventions for the two cross-language paths.
@@ -298,7 +299,7 @@ update expectations, inspect the semantic diff, and commit an update only when
 the format or mapped MIR is intentionally changing. The Rust and Lean suites
 both validate these artifacts.
 
-The `scripts/` proof-analysis tools and the Account XIR regeneration entry
+The `v0/scripts/` proof-analysis tools and the Account XIR regeneration entry
 point target the deprecated `move` package and are kept for reference only.
 
 ## Change discipline

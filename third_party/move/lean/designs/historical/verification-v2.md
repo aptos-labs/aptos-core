@@ -139,22 +139,22 @@ alternative concretely enough to cost.
 Throughout this document **v0** is the original Leaner Move stack, now
 deprecated and excluded from CI but still present in the tree:
 
-- [`../move/`](../../move/) — the Leaner Move surface language, its source
+- [`../move/`](../../v0/move/) — the Leaner Move surface language, its source
   semantics, contracts, `verify`, and compiler lowering. This is the stack
   whose automation rate is the benchmark below.
-  - [`../move/Move/Semantics/`](../../move/Move/Semantics/) — the shallow
-    semantics: [`Spec.lean`](../../move/Move/Semantics/Spec.lean) (the
-    relational monad), [`Global.lean`](../../move/Move/Semantics/Global.lean)
+  - [`../move/Move/Semantics/`](../../v0/move/Move/Semantics/) — the shallow
+    semantics: [`Spec.lean`](../../v0/move/Move/Semantics/Spec.lean) (the
+    relational monad), [`Global.lean`](../../v0/move/Move/Semantics/Global.lean)
     (the resource store and its laws),
-    [`Reference.lean`](../../move/Move/Semantics/Reference.lean) (prophecy
+    [`Reference.lean`](../../v0/move/Move/Semantics/Reference.lean) (prophecy
     references).
-  - [`../move/Move/Verify/`](../../move/Move/Verify/) — contracts, the
+  - [`../move/Move/Verify/`](../../v0/move/Move/Verify/) — contracts, the
     weakest-precondition rules, and the `verify` command.
-  - [`../move/Move/Tests/Verification/`](../../move/Move/Tests/Verification/)
+  - [`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/)
     — the acceptance corpus this proposal is measured against.
-- [`../move-model/`](../../move-model/) — the logical model of Move stackless
+- [`../move-model/`](../../v0/move-model/) — the logical model of Move stackless
   bytecode.
-- [`../transpiler/`](../../transpiler/) — the original Move exchange frontend.
+- [`../transpiler/`](../../v0/transpiler/) — the original Move exchange frontend.
 
 They are reference-only: do not add functionality or tests to them, and do
 not link them from current packages. Their value here is as an oracle — a
@@ -176,23 +176,23 @@ The measured consequence, as of 2026-08-29:
   whnf not descending into projections, well-founded definitions opaque to
   reduction, unrecoverable recursion-depth exceptions aborting tactic
   sweeps, simp unable to rewrite matcher discriminants.
-- The frozen v0 stack ([`../move/`](../../move/)) verifies **225 functions fully
+- The frozen v0 stack ([`../move/`](../../v0/move/)) verifies **225 functions fully
   automatically** out of 330 `verify` items — a bare `verify f` with no
   proof body. Its global-storage suites are automatic outright:
-  [`Account.lean`](../../move/Move/Tests/Verification/Account.lean) 2/2,
-  [`GlobalBorrows.lean`](../../move/Move/Tests/Verification/GlobalBorrows.lean)
-  6/6, [`GlobalInv.lean`](../../move/Move/Tests/Verification/GlobalInv.lean)
+  [`Account.lean`](../../v0/move/Move/Tests/Verification/Account.lean) 2/2,
+  [`GlobalBorrows.lean`](../../v0/move/Move/Tests/Verification/GlobalBorrows.lean)
+  6/6, [`GlobalInv.lean`](../../v0/move/Move/Tests/Verification/GlobalInv.lean)
   5/5,
-  [`GenericStorage.lean`](../../move/Move/Tests/Verification/GenericStorage.lean)
+  [`GenericStorage.lean`](../../v0/move/Move/Tests/Verification/GenericStorage.lean)
   7/7 including generic resources. Manual proofs cluster only where real
   mathematical work lives
-  ([`OrderedMap.lean`](../../move/Move/Tests/Verification/OrderedMap.lean),
-  [`Quicksort.lean`](../../move/Move/Tests/Verification/Quicksort.lean),
-  [`ReturnedMutRefs.lean`](../../move/Move/Tests/Verification/ReturnedMutRefs.lean)).
+  ([`OrderedMap.lean`](../../v0/move/Move/Tests/Verification/OrderedMap.lean),
+  [`Quicksort.lean`](../../v0/move/Move/Tests/Verification/Quicksort.lean),
+  [`ReturnedMutRefs.lean`](../../v0/move/Move/Tests/Verification/ReturnedMutRefs.lean)).
 
 Those tests still exist in the tree; the deprecated packages were removed
 from CI, not deleted.
-[`../move/Move/Tests/Verification/`](../../move/Move/Tests/Verification/) is the
+[`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/) is the
 acceptance corpus this proposal should be measured against.
 
 The gap is not a fixture-by-fixture deficit to be closed with more tactic
@@ -293,7 +293,7 @@ Two design constraints on `denote` itself:
   the call graph cannot unfold into the callee's denotation. SCCs denote
   through a mutual fixpoint combinator over the component's function
   family; v0's `fixFamily` in
-  [`Spec.lean`](../../move/Move/Semantics/Spec.lean) is the reference shape.
+  [`Spec.lean`](../../v0/move/Move/Semantics/Spec.lean) is the reference shape.
   Cross-SCC calls unfold into the callee's denotation directly (or into its
   contract, once modular verification lands).
 
@@ -415,9 +415,9 @@ every contract, every loop invariant, every arithmetic side condition.
 Staged so the premise is tested before the largest investment is made.
 
 - **DONE — V1: Combinator library and denotation for a subset.** The `Spec`
-  combinators (v0's [`Spec.lean`](../../move/Move/Semantics/Spec.lean),
-  [`Global.lean`](../../move/Move/Semantics/Global.lean), and
-  [`Reference.lean`](../../move/Move/Semantics/Reference.lean) are the
+  combinators (v0's [`Spec.lean`](../../v0/move/Move/Semantics/Spec.lean),
+  [`Global.lean`](../../v0/move/Move/Semantics/Global.lean), and
+  [`Reference.lean`](../../v0/move/Move/Semantics/Reference.lean) are the
   reference shapes), and `denote` over straight-line bodies, storage
   operations, calls (cross-SCC unfolding only), and the **whole-resource
   scoped mutable borrow** (`withBorrowMutSpec` shape) — required because
@@ -432,7 +432,7 @@ Staged so the premise is tested before the largest investment is made.
   one denotation proof, while a storage-key-dependent fixture is rejected
   for V4 specialization.
 - **DONE — V2: Automation measurement.** Ten functions from
-  [`../move/Move/Tests/Verification/`](../../move/Move/Tests/Verification/)
+  [`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/)
   (`Account`, `GlobalBorrows`, `GlobalInv`, `Callees`) — all ten automatic
   in v0 — are ported, and all ten verify with a bare `verify f`. The gate
   was a written comparison against v0 on the same functions, recorded in
@@ -674,7 +674,7 @@ translation is already shallow and already typed.
   `verify f`, compared against the v0 rate on the same functions. Automation
   rate is the metric this proposal exists to move; tactic-time
   improvements alone do not satisfy a gate.
-- [`../move/Move/Tests/Verification/`](../../move/Move/Tests/Verification/) is
+- [`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/) is
   the acceptance corpus. Port, do not
   rewrite: a ported test that needs a manual proof where v0 needed none is a
   finding to record, not a test to weaken.

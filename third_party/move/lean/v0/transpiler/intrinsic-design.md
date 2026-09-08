@@ -13,7 +13,7 @@ unconstrained specification functions.
 > **Target-architecture note.** The generic map carrier and role
 > interpretations below remain design input, but the former attribute-driven
 > prototype has been removed. The independent
-> [unified LIR project](../designs/lir-design.md) moves intrinsic declarations,
+> [unified LIR project](../../designs/lir-design.md) moves intrinsic declarations,
 > graph construction, required/optional-role checks, duplicate checks, target
 > signature checks, diagnostics, and reporting into the Move semantic profile
 > of `LeanerIR`. That validation boundary now exists and is exercised by the

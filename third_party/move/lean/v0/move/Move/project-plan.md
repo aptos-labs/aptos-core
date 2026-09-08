@@ -70,7 +70,7 @@ so mutations of that instantiation discover and re-establish the invariant.
 The sections below this one are about the *verification translator*: which
 accepted Leaner programs `spec`/`verify` can handle.  This section is about
 the *language*: which features of Move on Aptos (per
-[the Move book](../../../documentation/book/src/SUMMARY.md)) Leaner source
+[the Move book](../../../../documentation/book/src/SUMMARY.md)) Leaner source
 cannot express at all, so neither the compiler nor the verifier sees them.
 Everything listed is rejected at the compilation boundary (Lean elaboration
 or "unsupported call … while compiling Move function"); nothing is silently

@@ -13,4 +13,4 @@ vm_reserved = "0x0"
 
 [dependencies]
 AptosStdlib = { local = "../AptosStdlib" }
-MoveStdlib = { local = "../../../../../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/.MoveStdlib.intrinsics-input" }
+MoveStdlib = { local = "../../../../../../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/.MoveStdlib.intrinsics-input" }

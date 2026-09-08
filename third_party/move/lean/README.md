@@ -44,8 +44,8 @@ Three claims stay separate:
 | [`leaner-rust`](leaner-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](leaner-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. |
 | [`leaner-e2e-tests`](leaner-e2e-tests/) | Move-to-LeanerLang and Rust-to-LeanerLang baselines and the verification check ledger ([`designs/test-organization.md`](designs/test-organization.md)). |
 
-`move`, `move-model`, and `transpiler` are deprecated reference packages;
-nothing current links them. Designs live in [`designs/`](designs/), with
+[`v0/`](v0/) holds the deprecated reference packages `move`, `move-model`,
+and `transpiler`; nothing current links them. Designs live in [`designs/`](designs/), with
 executed or superseded ones under [`designs/historical/`](designs/historical/);
 [`designs/roadmap.md`](designs/roadmap.md) orders the work.
 

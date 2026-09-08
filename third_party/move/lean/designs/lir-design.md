@@ -1709,7 +1709,7 @@ Current executable gates are:
   all 158 intrinsic bindings through XAST, raw LIR, and Move-profile checking;
 - `lake test` in `leaner-e2e-tests/` for discoverable Move-to-LeanerLang and
   Rust-to-LeanerLang source/result baselines;
-- `lake test` in `transpiler/` for the XAST decoder, adapter, printer baselines,
+- `lake test` in `v0/transpiler/` for the XAST decoder, adapter, printer baselines,
   source fixtures, Leaner frontend/LIR boundary units, axiom printer unit, and
   intrinsic-source units;
 - the existing `MoveTests` build, which exercises the Leaner language and

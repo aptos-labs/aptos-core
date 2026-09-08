@@ -164,16 +164,16 @@ The same six IR targets fail; all native regression/cost gates pass. Move
    commands, and its language and negative tests pinned elaboration,
    compilation, and diagnostics.  The leaner stack must reach parity on
    that corpus and then be measured against it:
-   - [`move/Move/Tests/Verification/`](../move/Move/Tests/Verification/):
+   - [`move/Move/Tests/Verification/`](../v0/move/Move/Tests/Verification/):
      23 files, 174 `verify` commands, 99 bare (automatic) and 75 with
      proof scripts; `Quicksort.lean` (3 verifies, ~220 proof lines) and
      `OrderedMap.lean` (9 verifies, ~480 proof lines) carry the
      AI-generated proofs.
-   - [`move/Move/Tests/Language/`](../move/Move/Tests/Language/): 20
+   - [`move/Move/Tests/Language/`](../v0/move/Move/Tests/Language/): 20
      files covering the language surface (integers of every width, signed
      arithmetic, enums and their payloads and references, generics,
      loops, tuples, vectors, addresses, attributes, abilities).
-   - [`move/Move/Tests/Negative/`](../move/Move/Tests/Negative/): 9 files
+   - [`move/Move/Tests/Negative/`](../v0/move/Move/Tests/Negative/): 9 files
      pinning diagnostics (borrow errors, returned `&mut` shapes, lowering
      and surface rejections, spec-function and specification errors,
      verification failures).

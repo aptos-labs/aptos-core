@@ -70,7 +70,7 @@ specification versions of the Move functions the specifications apply
 included. -/
 
 def stdlibSourceDir : System.FilePath :=
-  "../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib"
+  "../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib"
 
 def stdlibExpectedDir : System.FilePath := "Transpiler/Tests/Programs/MoveStdlib"
 

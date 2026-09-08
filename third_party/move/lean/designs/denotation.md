@@ -133,7 +133,7 @@ established.
 v0 verified 225 functions automatically at sub-second cost each. Every
 route since was slower, and the perf audit
 ([`historical/verification-perf-audit.md`](historical/verification-perf-audit.md)) and v0's own
-analysis ([`../move/Move/performance-analysis.md`](../move/Move/performance-analysis.md))
+analysis ([`../move/Move/performance-analysis.md`](../v0/move/Move/performance-analysis.md))
 attribute the difference to the same handful of causes. The principles
 below are the inverse of those causes. Each names its evidence and how it
 is checked, and D0 fails if a principle is violated, whatever the

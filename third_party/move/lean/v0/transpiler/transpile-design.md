@@ -5,7 +5,7 @@ Status: living design document; M1–M2 implemented, M3 underway (see
 
 > **Future architecture.** This document records the current XAST-to-Leaner
 > implementation and its milestone status. The independent
-> [unified LIR design](../designs/lir-design.md) defines the target shared semantic
+> [unified LIR design](../../designs/lir-design.md) defines the target shared semantic
 > boundary for Move and the upcoming Rust MIR importer: XAST becomes a
 > temporary Move-frontend transport, and validation, capability reporting, and
 > source emission consume profile-aware LIR.
@@ -27,7 +27,7 @@ and the verifier do not yet handle), [`design-plan.md`](../move/Move/design-plan
 (Leaner-to-bytecode, XIR), [`verification-design.md`](../move/Move/verification-design.md)
 (source contracts), [`invariant-design.md`](../move/Move/invariant-design.md)
 (data and global invariants), [`loop-design.md`](../move/Move/loop-design.md)
-(structured loops), and [`lir-design.md`](../designs/lir-design.md) (the future
+(structured loops), and [`lir-design.md`](../../designs/lir-design.md) (the future
 profile-aware intermediate representation shared with Rust MIR).
 
 ## Implementation status

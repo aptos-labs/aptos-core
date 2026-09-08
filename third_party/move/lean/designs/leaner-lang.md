@@ -4,7 +4,7 @@
 
 This document is the first design of the profile-aware Leaner source language
 for the shared Leaner IR. It generalizes the Move-profile language described in
-[`../move/Move/leaner-move.md`](../move/Move/leaner-move.md) to the complete
+[`../move/Move/leaner-move.md`](../v0/move/Move/leaner-move.md) to the complete
 semantic union represented by
 [`LeanerIR.Syntax`](../leaner-ir/LeanerIR/Syntax.lean).
 
@@ -97,7 +97,7 @@ typing, capability preparation, and borrow checking.
 
 ## Relationship to Leaner Move
 
-[`leaner-move.md`](../move/Move/leaner-move.md) remains the user guide for the
+[`leaner-move.md`](../v0/move/Move/leaner-move.md) remains the user guide for the
 Move profile. Its `module M at 0x42`, Move integer names, resources, `Action`,
 `aborts_if`, and Move operators are profile-selected sugar over this language.
 Whether that guide should eventually be reduced to a short profile supplement
@@ -1493,7 +1493,7 @@ A profile guide specifies only the choices genuinely owned by that profile:
 
 It does not redefine common types, places, structured control, traits,
 conditions, or known operations. The Move guide is
-[`leaner-move.md`](../move/Move/leaner-move.md). A corresponding Rust-profile
+[`leaner-move.md`](../v0/move/Move/leaner-move.md). A corresponding Rust-profile
 guide should be written when the Leaner Rust surface is implemented; the native
 Rust source backend remains a separate standard-Rust round trip.
 
@@ -1524,9 +1524,9 @@ The intended source coverage is summarized below.
 
 ## Further reading
 
-- [`../move/Move/leaner-move.md`](../move/Move/leaner-move.md) — implemented
+- [`../move/Move/leaner-move.md`](../v0/move/Move/leaner-move.md) — implemented
   Move-profile language.
-- [`../move/Move/int-widening-design.md`](../move/Move/int-widening-design.md) —
+- [`../move/Move/int-widening-design.md`](../v0/move/Move/int-widening-design.md) —
   conversion-free `Int` arithmetic at the specification boundary.
 - [`lir-design.md`](lir-design.md) — shared IR architecture,
   profiles, frontend/backend contracts, and round-trip laws.

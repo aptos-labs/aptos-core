@@ -31,7 +31,7 @@ private def aptosFrameworkDir : System.FilePath :=
   "Transpiler/Tests/Programs/Intrinsics/AptosFramework"
 
 private def moveStdlibDir : System.FilePath :=
-  "../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib"
+  "../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib"
 
 private def moveStdlibInput (path : System.FilePath) : Bool :=
   path.fileName.any fun name =>

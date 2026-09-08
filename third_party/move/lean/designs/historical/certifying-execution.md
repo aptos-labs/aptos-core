@@ -11,7 +11,7 @@ Read it fully before changing anything, then work the milestones in order.
 Everything referenced lives under `third_party/move/lean/leaner-ir` unless
 another package is named. Follow the tree's `CLAUDE.md` discipline: no
 `sorry`, no axioms, focused changes, four suites stay green, and do not
-touch the deprecated `move/`, `move-model/`, `transpiler/` packages except
+touch the deprecated `v0/move/`, `v0/move-model/`, `v0/transpiler/` packages except
 to read them as reference.
 
 ## The goal

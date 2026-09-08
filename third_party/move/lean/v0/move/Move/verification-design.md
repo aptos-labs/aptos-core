@@ -498,7 +498,7 @@ a mutable result creates a fresh result binding and suspends all mutable
 actuals until that binding dies.
 
 This is also the executable verifier's modular call rule. Its
-[`core_call`](../../../move-bytecode-verifier/src/reference_safety/abstract_state.rs)
+[`core_call`](../../../../move-bytecode-verifier/src/reference_safety/abstract_state.rs)
 creates each returned mutable reference as a borrower of every mutable
 reference argument, then releases the transferred argument references. Leaner
 should mirror that conservative edge set, not replace it with a body-derived
@@ -547,7 +547,7 @@ language subset as a whole.
 This boundary follows RustHorn's `take_max` example directly, is justified by
 RustHornBelt's semantic model of a mutable borrow as current/final state, and
 uses Creusot's final-reborrow rule for the returned pair. The repository's
-[Move Prover prophecy design](../../../move-prover/doc/dev/prophecies/prophecy_model.md)
+[Move Prover prophecy design](../../../../move-prover/doc/dev/prophecies/prophecy_model.md)
 describes the same eager relinking, resolution, and return transfer; its legacy
 path model is explicitly a separate alternative.
 

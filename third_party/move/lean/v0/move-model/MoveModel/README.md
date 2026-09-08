@@ -50,7 +50,7 @@ compiler-v2 `spec` blocks.  Reference-bearing programs can use `masmElim%` or
 
 Elaboration shells out to `aptos move exchange`, so these forms need the Aptos
 CLI even though the core library does not — see *Build and test* in the
-[tree README](../../README.md).
+[tree README](../../../README.md).
 
 ## Status
 

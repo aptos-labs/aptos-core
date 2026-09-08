@@ -5,7 +5,7 @@ This document orders the work across the current designs; each linked design sta
 own scope, gates, and deferred-work register. Update the ordering here when a
 design's status section changes.
 
-The design documents inside `move/`, `move-model/`, and `transpiler/` describe
+The design documents inside `v0/` (`move/`, `move-model/`, `transpiler/`) describe
 the older source-specific path. Their open obligations are not scheduled from
 those documents; where they still matter (intrinsic semantics, verification,
 compiler-correctness claims) they re-emerge inside the designs below.

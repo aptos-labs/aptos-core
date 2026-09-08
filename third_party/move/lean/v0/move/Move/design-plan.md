@@ -4,7 +4,7 @@ Status: living design document
 
 > **Terminology and target architecture.** In this document,
 > `Move.Compiler.LIR` names the current compiler-facing named executable CFG.
-> The independent [unified LIR design](../../designs/lir-design.md) reserves “LIR” for a
+> The independent [unified LIR design](../../../designs/lir-design.md) reserves “LIR” for a
 > new profile-aware representation shared by Move, Leaner Move, Leaner Rust,
 > and Rust MIR frontends and source backends. During that migration, the
 > representation described here

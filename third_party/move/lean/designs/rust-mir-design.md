@@ -194,7 +194,7 @@ Leaner source (selected profile)       Rust source
 ```
 
 `LeanerIR` is the common boundary.  The existing
-[`Move.Compiler.LIR`](../move/Move/Compiler/LIR.lean) is the named stackless IR
+[`Move.Compiler.LIR`](../v0/move/Move/Compiler/LIR.lean) is the named stackless IR
 (NSIR) executable backend, not the semantic source of truth and not a
 frontend target.  A Move-profile validated unit may lower to NSIR, but source
 analysis, validation, verification, diagnostics, and source generation never
@@ -1090,8 +1090,8 @@ The current compiler already carries important pieces:
 - `MoveModel.IR.Module` has function, block, instruction, and terminator
   source maps plus user-facing local names.
 
-See [`Move.Compiler.LIR`](../move/Move/Compiler/LIR.lean) and
-[`MoveModel.IR.Module`](../move-model/MoveModel/IR/Module.lean).
+See [`Move.Compiler.LIR`](../v0/move/Move/Compiler/LIR.lean) and
+[`MoveModel.IR.Module`](../v0/move-model/MoveModel/IR/Module.lean).
 
 The current `SourceSpan` is a half-open byte range in one implicit file.  Rust
 requires a multi-file provenance table and macro/desugaring context:

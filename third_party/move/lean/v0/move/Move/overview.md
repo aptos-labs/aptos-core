@@ -116,7 +116,7 @@ Move compiler reads XIR into its model with stackless bytecode, then runs the
 normal compiler-v2 transformation, optimization, bytecode generation, and
 bytecode-verification pipeline. This preserves important compiler features
 instead of bypassing them with a custom bytecode assembler. The
-[ordered-map transactional test](../../../move-compiler-v2/transactional-tests/tests/leaner/ordered_map.lean)
+[ordered-map transactional test](../../../../move-compiler-v2/transactional-tests/tests/leaner/ordered_map.lean)
 exercises this complete path on the MoveVM.
 
 Verification does not go through XIR. It operates directly on relational

@@ -12,7 +12,7 @@ path = "../move"
 
 [[require]]
 name = "leaner-move"
-path = "../leaner-move"
+path = "../../leaner-move"
 
 [[lean_lib]]
 name = "Transpiler"

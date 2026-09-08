@@ -9,4 +9,4 @@ aptos_framework = "0x1"
 Extensions = "0x1" # For Prover to instantiate `{{Ext}}` in prelude.
 
 [dependencies]
-MoveStdlib = { local = "../../../../../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/.MoveStdlib.intrinsics-input" }
+MoveStdlib = { local = "../../../../../../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/.MoveStdlib.intrinsics-input" }
