@@ -32,31 +32,24 @@ struct DropStore has drop + store
     ret
 
 // Function definition at index 1
-#[persistent] public fun differently_declared(l0: |u64|u64 has copy + drop + store, l1: |u64|u64 has drop): bool
-    local l2: |u64|u64 has drop
-    local l3: |u64|u64 has drop
-    move_loc l1
+#[persistent] public fun inc(l0: u64): u64
     move_loc l0
-    st_loc l3
-    st_loc l2
-    move_loc l2
-    // @5
-    move_loc l3
-    eq
+    ld_u64 1
+    add
     ret
 
 // Function definition at index 2
-#[persistent] public fun differently_declared_neq(l0: |u64|u64 has copy + drop + store, l1: |u64|u64 has drop): bool
+#[persistent] public fun named_function(l0: |u64|u64 has drop): bool
+    local l1: |u64|u64 has drop
     local l2: |u64|u64 has drop
-    local l3: |u64|u64 has drop
-    move_loc l1
+    pack_closure inc, 0
     move_loc l0
-    st_loc l3
     st_loc l2
-    move_loc l2
+    st_loc l1
+    move_loc l1
     // @5
-    move_loc l3
-    neq
+    move_loc l2
+    eq
     ret
 
 // Function definition at index 3
@@ -67,48 +60,55 @@ struct DropStore has drop + store
     ret
 
 // Function definition at index 4
-#[persistent] public fun ref_compare(l0: &|u64|u64 has copy + drop + store, l1: &|u64|u64 has drop): bool
-    local l2: &|u64|u64 has drop
+#[persistent] public fun ref_compare(l0: DropStore, l1: &|u64|u64 has drop): bool
+    local l2: |u64|u64 has drop
     local l3: &|u64|u64 has drop
-    move_loc l1
+    local l4: &|u64|u64 has drop
     move_loc l0
-    st_loc l3
+    pack_closure with_capture, 1
     st_loc l2
-    move_loc l2
+    borrow_loc l2
+    move_loc l1
     // @5
+    st_loc l4
+    st_loc l3
     move_loc l3
+    move_loc l4
     eq
+    // @10
     ret
 
 // Function definition at index 5
-#[persistent] public fun reuses_scratch(l0: |u64|u64 has copy + drop + store, l1: |u64|u64 has drop, l2: |u64|u64 has drop): bool
-    local l3: |u64|u64 has drop
+#[persistent] public fun reuses_scratch(l0: DropStore, l1: CopyDropStore, l2: |u64|u64 has drop, l3: |u64|u64 has drop): bool
     local l4: |u64|u64 has drop
-    local l5: bool
-    move_loc l1
-    copy_loc l0
+    local l5: |u64|u64 has drop
+    local l6: bool
+    move_loc l0
+    pack_closure with_capture, 1
+    move_loc l2
+    st_loc l5
     st_loc l4
-    st_loc l3
-    move_loc l3
     // @5
     move_loc l4
+    move_loc l5
     eq
     br_false l0
-    move_loc l2
-    move_loc l0
+    move_loc l1
     // @10
-    st_loc l4
-    st_loc l3
+    pack_closure with_copy_capture, 1
     move_loc l3
-    move_loc l4
-    eq
-    // @15
     st_loc l5
+    st_loc l4
+    move_loc l4
+    // @15
+    move_loc l5
+    eq
+    st_loc l6
     branch l1
 l0: ld_false
-    st_loc l5
-l1: move_loc l5
     // @20
+    st_loc l6
+l1: move_loc l6
     ret
 
 // Function definition at index 6
@@ -126,6 +126,21 @@ l1: move_loc l5
     ret
 
 // Function definition at index 7
+#[persistent] public fun widened_neq(l0: DropStore, l1: |u64|u64 has drop): bool
+    local l2: |u64|u64 has drop
+    local l3: |u64|u64 has drop
+    move_loc l0
+    pack_closure with_capture, 1
+    move_loc l1
+    st_loc l3
+    st_loc l2
+    // @5
+    move_loc l2
+    move_loc l3
+    neq
+    ret
+
+// Function definition at index 8
 #[persistent] public fun widened_producer(l0: DropStore, l1: |u64|u64 has drop): bool
     local l2: |u64|u64 has drop
     local l3: |u64|u64 has drop
@@ -140,7 +155,22 @@ l1: move_loc l5
     eq
     ret
 
-// Function definition at index 8
+// Function definition at index 9
+#[persistent] public fun widened_second(l0: DropStore, l1: |u64|u64 has drop): bool
+    local l2: |u64|u64 has drop
+    local l3: |u64|u64 has drop
+    move_loc l1
+    move_loc l0
+    pack_closure with_capture, 1
+    st_loc l3
+    st_loc l2
+    // @5
+    move_loc l2
+    move_loc l3
+    eq
+    ret
+
+// Function definition at index 10
 #[persistent] public fun with_capture(l0: DropStore, l1: u64): u64
     move_loc l0
     unpack DropStore
@@ -148,7 +178,7 @@ l1: move_loc l5
     add
     ret
 
-// Function definition at index 9
+// Function definition at index 11
 #[persistent] public fun with_copy_capture(l0: CopyDropStore, l1: u64): u64
     borrow_loc l0
     borrow_field CopyDropStore, x

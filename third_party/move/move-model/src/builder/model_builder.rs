@@ -242,14 +242,16 @@ impl AnyFunEntry {
         }
     }
 
-    pub fn is_equality_on_ref(&self) -> bool {
+    pub fn is_equality(&self) -> bool {
         matches!(self.get_operation(), Operation::Eq | Operation::Neq)
-            && self.get_signature().1[0].1.is_reference()
+    }
+
+    pub fn is_equality_on_ref(&self) -> bool {
+        self.is_equality() && self.get_signature().1[0].1.is_reference()
     }
 
     pub fn is_equality_on_non_ref(&self) -> bool {
-        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
-            && !self.get_signature().1[0].1.is_reference()
+        self.is_equality() && !self.get_signature().1[0].1.is_reference()
     }
 }
 
