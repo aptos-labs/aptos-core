@@ -206,7 +206,7 @@ module aptos_framework::authorized_allowance {
     /// still take it out of circulation before it expires.
     public entry fun revoke(sender: &signer, nonce: u64) acquires AllowanceRegistry {
         let sender_address = signer::address_of(sender);
-        ensure_registry_exists(sender, sender_address);
+        ensure_registry_exists(sender);
         let allowances = &mut AllowanceRegistry[sender_address].allowances;
         if (allowances.contains(nonce)) {
             allowances.borrow_mut(nonce).revoked = true;
@@ -294,7 +294,7 @@ module aptos_framework::authorized_allowance {
     ): u64 acquires AllowanceRegistry {
         let payload_hash = hash::sha3_256(bcs::to_bytes(allowance));
         let nonce = allowance.nonce;
-        ensure_registry_exists(sender_signer, allowance.sender);
+        ensure_registry_exists(sender_signer);
         let allowances = &mut AllowanceRegistry[allowance.sender].allowances;
         if (!allowances.contains(nonce)) {
             allowances.add(nonce, AllowanceState {
@@ -319,9 +319,9 @@ module aptos_framework::authorized_allowance {
     }
 
     /// Create the sender's registry if this is the first allowance of theirs to be used or revoked.
-    fun ensure_registry_exists(sender_signer: &signer, sender: address) {
-        if (!exists<AllowanceRegistry>(sender)) {
-            move_to(sender_signer, AllowanceRegistry { allowances: table::new() });
+    fun ensure_registry_exists(sender: &signer) {
+        if (!exists<AllowanceRegistry>(signer::address_of(sender))) {
+            move_to(sender, AllowanceRegistry { allowances: table::new() });
         };
     }
 
