@@ -52,7 +52,7 @@ jobs:
 
       - name: Save unit test archive
         if: steps.archive.outputs.skip_tests != 'true'
-        uses: runs-on/cache/save@v4
+        uses: runs-on/cache/save@a5f51d6f3fece787d03b7b4e981c82538a0654ed # pin@v4
         with:
           path: unit-test-archive.tar.zst
           key: unit-test-archive-${{ github.run_id }}
@@ -76,7 +76,7 @@ jobs:
         shell: bash
 
       - name: Restore unit test archive
-        uses: runs-on/cache/restore@v4
+        uses: runs-on/cache/restore@a5f51d6f3fece787d03b7b4e981c82538a0654ed # pin@v4
         with:
           path: unit-test-archive.tar.zst
           key: unit-test-archive-${{ github.run_id }}
@@ -90,6 +90,7 @@ jobs:
             --profile ci \
             --retries 3 \
             --no-fail-fast \
+            --no-tests=warn \
             --partition count:${{ matrix.partition }}/8
         shell: bash
         env:
