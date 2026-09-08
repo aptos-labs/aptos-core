@@ -135,6 +135,33 @@ module 0x42::vectors {
         vector::rotate_slice(v, left, rot, right)
     }
 
+    // Zero- and one-element ranges perform no indexed access, even when the
+    // endpoints lie outside the vector. These exercise both WP construction
+    // and the Boogie intrinsic implementation used to verify its result.
+    fun reverse_empty_out_of_bounds(): vector<u64> {
+        let v = vector[1];
+        vector::reverse_slice(&mut v, 2, 2);
+        v
+    }
+
+    fun reverse_singleton_out_of_bounds(): vector<u64> {
+        let v = vector[1];
+        vector::reverse_slice(&mut v, 2, 3);
+        v
+    }
+
+    fun rotate_empty_out_of_bounds(): (u64, vector<u64>) {
+        let v = vector[1];
+        let split = vector::rotate_slice(&mut v, 2, 2, 2);
+        (split, v)
+    }
+
+    fun rotate_singleton_out_of_bounds(): (u64, vector<u64>) {
+        let v = vector[1];
+        let split = vector::rotate_slice(&mut v, 2, 2, 3);
+        (split, v)
+    }
+
     fun move_range<T>(
         from: &mut vector<T>,
         removal_position: u64,

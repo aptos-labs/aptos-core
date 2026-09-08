@@ -30,39 +30,49 @@ module 0x42::calculator {
     }
     spec process(s: &signer, input: Input) {
         use 0x1::signer;
-        pragma opaque = true;
+        pragma opaque = true, aborts_if_is_partial = true;
         modifies State[signer::address_of(s)];
-        let address_of_0 = signer::address_of(s);
-        ensures [inferred] ..S1 |~ remove<State>(address_of_0);
-        ensures [inferred] (old(State[address_of_0]) is Continuation) ==> {
-            let a = State::Value(S1..S6 |~ result_of<old(State[address_of_0]).Continuation.0>(input.0));
-            S6.. |~ publish<State>(address_of_0, a)
+        ensures [inferred = sathard] (old(State[signer::address_of(s)]) is Continuation) && (input is Number) ==> {
+            let a = signer::address_of(s);
+            let b = State::Value(S1.. |~ result_of<old(State[signer::address_of(s)]).Continuation.0>(input.0));
+            S1.. |~ publish<State>(a, b)
         };
-        ensures [inferred] (old(State[address_of_0]) is Value) && (input is Number) ==> (S1.. |~ publish<State>(address_of_0, State::Value(input.0)));
-        ensures [inferred] (old(State[address_of_0]) is Value) && (input is Add) ==>
-            (S1.. |~ publish<State>(address_of_0, State::Continuation({
-                let b = old(State[address_of_0]).Value.0;
-                |x| storable_add(b, x)
-            })));
-        ensures [inferred] (old(State[address_of_0]) is Value) && (input is Sub) ==>
-            (S1.. |~ publish<State>(address_of_0, State::Continuation({
-                let b = old(State[address_of_0]).Value.0;
-                |x| storable_sub(b, x)
-            })));
-        ensures [inferred] (old(State[address_of_0]) is Empty) && (input is Number) ==> (S1.. |~ publish<State>(address_of_0, State::Value(input.0)));
-        ensures [inferred] (old(State[address_of_0]) is Empty) && (input is Add | Sub) ==> {
-            let a = State::Value(S1..S6 |~ result_of<old(State[address_of_0]).Continuation.0>(input.0));
-            S6.. |~ publish<State>(address_of_0, a)
+        ensures [inferred] (old(State[signer::address_of(s)]) is Value) && (input is Number) ==> {
+            let a = signer::address_of(s);
+            S1.. |~ publish<State>(a, State::Value(input.0))
         };
-        aborts_if [inferred] !exists<State>(address_of_0);
-        aborts_if [inferred] (State[address_of_0] is Continuation) && (S1 |~ aborts_of<State[address_of_0].Continuation.0>(input.0));
-        aborts_if [inferred] (State[address_of_0] is Continuation) && (input is Add | Sub);
-        aborts_if [inferred] (State[address_of_0] is Continuation) && (S6 |~ exists<State>(address_of_0));
-        aborts_if [inferred] (State[address_of_0] is Value) && (S1 |~ (input is Number) && exists<State>(address_of_0));
-        aborts_if [inferred] (State[address_of_0] is Value) && (S1 |~ (input is Add) && exists<State>(address_of_0));
-        aborts_if [inferred] (State[address_of_0] is Value) && (S1 |~ (input is Sub) && exists<State>(address_of_0));
-        aborts_if [inferred] (State[address_of_0] is Empty) && (S1 |~ (input is Number) && exists<State>(address_of_0));
-        aborts_if [inferred] (State[address_of_0] is Empty) && (input is Add | Sub);
+        ensures [inferred] (old(State[signer::address_of(s)]) is Value) && (input is Add) ==> {
+            let a = signer::address_of(s);
+            let b = State::Continuation({
+                let c = old(State[signer::address_of(s)]).Value.0;
+                |x| storable_add(c, x)
+            });
+            S1.. |~ publish<State>(a, b)
+        };
+        ensures [inferred] (old(State[signer::address_of(s)]) is Value) && (input is Sub) ==> {
+            let a = signer::address_of(s);
+            let b = State::Continuation({
+                let c = old(State[signer::address_of(s)]).Value.0;
+                |x| storable_sub(c, x)
+            });
+            S1.. |~ publish<State>(a, b)
+        };
+        ensures [inferred] (old(State[signer::address_of(s)]) is Empty) && (input is Number) ==> {
+            let a = signer::address_of(s);
+            S1.. |~ publish<State>(a, State::Value(input.0))
+        };
+        ensures [inferred] {
+            let a = signer::address_of(s);
+            ..S1 |~ remove<State>(a)
+        };
+        aborts_if [inferred] !exists<State>(signer::address_of(s));
+        aborts_if [inferred] (State[signer::address_of(s)] is Continuation) && (input is Add | Sub);
+        aborts_if [inferred] (input is Add | Sub) && (State[signer::address_of(s)] is Empty);
+        aborts_if [inferred] (State[signer::address_of(s)] is Continuation) && (input is Number) && (S1 |~ exists<State>(signer::address_of(s)));
+        aborts_if [inferred] (State[signer::address_of(s)] is Value) && (input is Number) && (S1 |~ exists<State>(signer::address_of(s)));
+        aborts_if [inferred] (State[signer::address_of(s)] is Value) && (input is Add) && (S1 |~ exists<State>(signer::address_of(s)));
+        aborts_if [inferred] (State[signer::address_of(s)] is Value) && (input is Sub) && (S1 |~ exists<State>(signer::address_of(s)));
+        aborts_if [inferred] (State[signer::address_of(s)] is Empty) && (input is Number) && (S1 |~ exists<State>(signer::address_of(s)));
     }
 
     fun init_module(s: &signer) {
@@ -101,10 +111,9 @@ module 0x42::calculator {
     }
     spec number {
         use 0x1::signer;
-        pragma opaque = true;
+        pragma opaque = true, aborts_if_is_partial = true;
         modifies State[signer::address_of(s)];
         ensures [inferred] ensures_of<process>(s, Input::Number(x));
-        aborts_if [inferred] aborts_of<process>(s, Input::Number(x));
     } proof {
         split State[address_of(s)];
     }
@@ -114,10 +123,9 @@ module 0x42::calculator {
     }
     spec add(s: &signer) {
         use 0x1::signer;
-        pragma opaque = true;
+        pragma opaque = true, aborts_if_is_partial = true;
         modifies State[signer::address_of(s)];
         ensures [inferred] ensures_of<process>(s, Input::Add{});
-        aborts_if [inferred] aborts_of<process>(s, Input::Add{});
     }
 
     entry fun sub(s: &signer) acquires State {
@@ -125,10 +133,9 @@ module 0x42::calculator {
     }
     spec sub(s: &signer) {
         use 0x1::signer;
-        pragma opaque = true;
+        pragma opaque = true, aborts_if_is_partial = true;
         modifies State[signer::address_of(s)];
         ensures [inferred] ensures_of<process>(s, Input::Sub{});
-        aborts_if [inferred] aborts_of<process>(s, Input::Sub{});
     }
 
     fun view(s: &signer): u64 acquires State {
@@ -140,10 +147,9 @@ module 0x42::calculator {
     spec view(s: &signer): u64 {
         use 0x1::signer;
         pragma opaque = true;
-        let address_of_0 = signer::address_of(s);
-        ensures [inferred] result == State[address_of_0].Value.0;
-        aborts_if [inferred] State[address_of_0] is Empty | Continuation;
-        aborts_if [inferred] !exists<State>(address_of_0);
+        ensures [inferred] (State[signer::address_of(s)] is Value) ==> result == State[signer::address_of(s)].Value.0;
+        aborts_if [inferred] State[signer::address_of(s)] is Empty | Continuation;
+        aborts_if [inferred] !exists<State>(signer::address_of(s));
     }
 
 }

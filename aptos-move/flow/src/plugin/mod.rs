@@ -299,13 +299,10 @@ mod tests {
                     !disabled
                 );
                 assert!(skill.contains("**Check the candidate.**"));
-                assert!(skill
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" ")
-                    .contains("complete and correct by construction"));
+                let normalized_skill = skill.split_whitespace().collect::<Vec<_>>().join(" ");
+                assert!(normalized_skill.contains("complete and correct by construction"));
                 assert!(skill.contains("WP does not run the prover"));
-                assert!(skill.contains("caller cannot have total abort coverage"));
+                assert!(normalized_skill.contains("caller cannot have total abort coverage"));
                 assert!(!skill.contains("repeat on that function until its warning is gone"));
                 assert_eq!(skill.matches("### WP tool").count(), 1);
                 let manifest: serde_json::Value = serde_json::from_str(

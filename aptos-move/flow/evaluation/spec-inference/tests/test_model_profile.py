@@ -63,6 +63,23 @@ class ModelProfileTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "no API fallback"):
                 require_provider_auth(self.config.model, self.config.provider_base_url)
 
+    def test_glm_does_not_accept_a_leftover_subscription_token(self) -> None:
+        model, endpoint = PROFILES["glm"]
+        with patch.dict(
+            os.environ,
+            {"CLAUDE_CODE_OAUTH_TOKEN": "leftover-subscription-token"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ValueError, "provider credential missing"):
+                require_provider_auth(model, endpoint)
+
+    def test_glm_accepts_its_provider_token(self) -> None:
+        model, endpoint = PROFILES["glm"]
+        with patch.dict(
+            os.environ, {"ANTHROPIC_AUTH_TOKEN": "test-glm-token"}, clear=True
+        ):
+            require_provider_auth(model, endpoint)
+
     def test_token_file_and_artifact_redaction(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             token = Path(directory) / "token"

@@ -153,7 +153,9 @@ procedure {:inline 1} $1_vector_reverse_slice{{S}}(m: $Mutation (Vec ({{T}})), l
         call $ExecFailureAbort();
         return;
     }
-    if (left == right) {
+    // The Move loop performs no indexed swap for a zero- or one-element
+    // range, so these cases return before any bounds check.
+    if (right <= left + 1) {
         m' := m;
         return;
     }
@@ -196,8 +198,14 @@ procedure {:inline 1} $1_vector_rotate_slice{{S}}(m: $Mutation (Vec ({{T}})), le
         call $ExecFailureAbort();
         return;
     }
-    if (!(right >= 0 && right <= LenVec(v))) {
-        call $ExecFailureAbort();
+    if (right > left + 1) {
+        if (!(right >= 0 && right <= LenVec(v))) {
+            call $ExecFailureAbort();
+            return;
+        }
+    } else {
+        m' := m;
+        n := left + (right - rot);
         return;
     }
     v := $Dereference(m);

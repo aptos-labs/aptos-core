@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from .artifacts import sha256_file, write_json
+from .artifacts import _walk, sha256_file, write_json
 from .boogie_proxy import BoogieProxy
 from .config import ExperimentConfig, RunSpec
 from .credentials import redact_tree
@@ -697,7 +697,7 @@ def preserve_interrupted_run(staged_run: Path, artifacts: Path, reason: str) -> 
     This runs after the sandbox child has exited. Never expose sandbox-home or
     writable symlinks, and never manufacture a terminal judge for partial work.
     """
-    for path in staged_run.rglob("*"):
+    for path in _walk(staged_run):
         if path.is_symlink():
             path.unlink()
     redact_tree(staged_run)

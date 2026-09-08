@@ -327,13 +327,22 @@ class InterruptedEvidenceTest(unittest.TestCase):
             (run / 'workspace').mkdir()
             (run / 'workspace/source.move').write_text('test-secret-value')
             (run / 'unsafe-link').symlink_to('/etc/passwd')
+            outside = root / 'outside'
+            outside.mkdir()
+            (outside / 'source.move').write_text('test-secret-value')
+            (run / 'unsafe-directory-link').symlink_to(outside, target_is_directory=True)
             events = run / 'claude-events.jsonl'
             events.write_bytes(b'{"event":"sdk_query_start","received_monotonic_ns":0}\n{"unfinished":"\xe2')
             original = events.read_bytes()
-            with patch.dict(os.environ, {'CLAUDE_CODE_OAUTH_TOKEN': 'test-secret-value'}):
+            with (
+                patch.dict(os.environ, {'CLAUDE_CODE_OAUTH_TOKEN': 'test-secret-value'}),
+                patch.object(Path, 'rglob', side_effect=AssertionError('recursive glob is unsafe here')),
+            ):
                 archived = preserve_interrupted_run(run, root/'runs', 'SystemExit')
             self.assertEqual('[REDACTED]', (archived/'workspace/source.move').read_text())
             self.assertFalse((archived/'unsafe-link').exists())
+            self.assertFalse((archived/'unsafe-directory-link').exists())
+            self.assertEqual('test-secret-value', (outside/'source.move').read_text())
             self.assertEqual(original, (archived/'claude-events.jsonl').read_bytes())
             self.assertFalse((root/'runs/cell-1').exists())
             self.assertFalse((archived/'judge.json').exists())

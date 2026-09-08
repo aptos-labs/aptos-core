@@ -1,6 +1,6 @@
 """Rebuild a read-only, task-clustered report from archived Opus telemetry."""
 from __future__ import annotations
-import argparse, collections, csv, dataclasses, html, json, random, statistics
+import argparse, collections, csv, dataclasses, json, random, statistics
 from pathlib import Path
 from analysis.round_summary import collect_run
 from harness.mine import analyze_run, _tool_calls

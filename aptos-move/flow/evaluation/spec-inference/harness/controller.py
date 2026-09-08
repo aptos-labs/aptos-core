@@ -331,8 +331,7 @@ class Controller:
                 ),
             }
             controller_events.emit("run_end", **result)
-        write_sdk_metrics(self.artifact_dir / "claude-events.jsonl", self.artifact_dir / "sdk-metrics.json")
-        self._finalize(result)
+        self._finalize_with_sdk_metrics(result)
         return result
 
     async def _refute(
@@ -833,6 +832,19 @@ class Controller:
         run_record["result"] = result
         write_json(run_path, run_record)
         redact_tree(self.artifact_dir)
+
+    def _finalize_with_sdk_metrics(self, result: dict[str, Any]) -> None:
+        """Preserve a terminal result even if optional SDK telemetry is malformed."""
+        try:
+            write_sdk_metrics(
+                self.artifact_dir / "claude-events.jsonl",
+                self.artifact_dir / "sdk-metrics.json",
+            )
+        except (ValueError, UnicodeDecodeError, KeyError) as error:
+            # The raw transcript remains available. Its summary is
+            # observational and must not strand a completed run in staging.
+            result["sdk_metrics_error"] = type(error).__name__
+        self._finalize(result)
 
     def _wall_seconds(self) -> float:
         return (time.monotonic_ns() - self.started_ns) / 1_000_000_000

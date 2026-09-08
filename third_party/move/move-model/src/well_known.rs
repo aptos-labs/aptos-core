@@ -479,7 +479,10 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
             let v = arg(0)?;
             let left = arg(1)?;
             let right = arg(2)?;
-            let same = g.mk_eq(left.clone(), right.clone());
+            let trivial = g.mk_bool_call(Operation::Le, vec![
+                right.clone(),
+                g.mk_num_add(left.clone(), one()),
+            ]);
             let prefix = g.mk_slice(v.clone(), zero(), left.clone(), &vec_ty);
             let middle = g.mk_reverse_vec(
                 g.mk_slice(v.clone(), left.clone(), right.clone(), &vec_ty),
@@ -489,17 +492,20 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
             let reversed =
                 g.mk_concat_vec(prefix, g.mk_concat_vec(middle, suffix, &vec_ty), &vec_ty);
             let output = g.mk_ite(
-                same.as_ref().clone(),
+                trivial.as_ref().clone(),
                 v.as_ref().clone(),
                 reversed.as_ref().clone(),
             );
             IntrinsicWp {
-                // The prelude intentionally returns before checking bounds for
-                // an empty slice, matching the Move implementation.
+                // The implementation reaches no indexed swap for a range of
+                // zero or one element, and therefore performs no bounds check.
                 aborts: g.mk_or(
-                    g.mk_bool_call(Operation::Gt, vec![left, right.clone()]),
+                    g.mk_bool_call(Operation::Gt, vec![left.clone(), right.clone()]),
                     g.mk_and(
-                        g.mk_not(same),
+                        g.mk_bool_call(Operation::Gt, vec![
+                            right.clone(),
+                            g.mk_num_add(left, one()),
+                        ]),
                         g.mk_bool_call(Operation::Gt, vec![right, g.mk_len(v)]),
                     ),
                 ),
@@ -682,15 +688,27 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
             let suffix = g.mk_slice(v.clone(), right.clone(), g.mk_len(v.clone()), &vec_ty);
             let middle = g.mk_concat_vec(mid_right, mid_left, &vec_ty);
             let post = g.mk_concat_vec(prefix, g.mk_concat_vec(middle, suffix, &vec_ty), &vec_ty);
+            let nontrivial = g.mk_bool_call(Operation::Gt, vec![
+                right.clone(),
+                g.mk_num_add(left.clone(), one()),
+            ]);
+            let output = g.mk_ite(
+                nontrivial.as_ref().clone(),
+                post.as_ref().clone(),
+                v.as_ref().clone(),
+            );
             IntrinsicWp {
                 aborts: g.mk_or_n(vec![
                     g.mk_bool_call(Operation::Gt, vec![left.clone(), rot.clone()]),
                     g.mk_bool_call(Operation::Gt, vec![rot.clone(), right.clone()]),
-                    g.mk_bool_call(Operation::Gt, vec![right.clone(), g.mk_len(v)]),
+                    g.mk_and(
+                        nontrivial,
+                        g.mk_bool_call(Operation::Gt, vec![right.clone(), g.mk_len(v)]),
+                    ),
                 ]),
                 outputs: vec![
                     typed(0, Operation::Add, vec![left, g.mk_num_sub(right, rot)]),
-                    post,
+                    output,
                 ],
             }
         },

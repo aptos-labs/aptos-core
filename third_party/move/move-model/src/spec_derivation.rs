@@ -5569,7 +5569,13 @@ mod tests {
         let vec_mid = add_vector_module(&mut env, &["is_empty"]);
         let vec_ty = Type::Vector(Box::new(u64_ty()));
         let v = var(&env, "v", vec_ty);
-        let wp = vector_wp(&env, vec_mid, "is_empty", &[v], &[BOOL_TYPE.clone()]);
+        let wp = vector_wp(
+            &env,
+            vec_mid,
+            "is_empty",
+            &[v],
+            std::slice::from_ref(&BOOL_TYPE),
+        );
         assert_eq!(render(&env, std::slice::from_ref(&wp.aborts)), vec![
             "false"
         ]);

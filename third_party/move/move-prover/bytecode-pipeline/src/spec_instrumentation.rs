@@ -464,32 +464,54 @@ pub fn defined_state_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
 /// its intermediate state through the corresponding `ensures_of`, not through
 /// a property of the projected value (which still has to be proved).
 pub fn state_label_defining_fragment<'env>(generator: &impl ExpGenerator<'env>, exp: &Exp) -> Exp {
+    state_label_defining_fragment_in_context(generator, exp, true)
+}
+
+/// Extracts only facts which are entailed by the expression. `positive` is false
+/// in contexts where a Boolean child is merely inspected, rather than asserted.
+/// Result projections still contribute their callee relation in those contexts:
+/// using a projected result denotes the call independently of how that value is
+/// subsequently tested.
+fn state_label_defining_fragment_in_context<'env>(
+    generator: &impl ExpGenerator<'env>,
+    exp: &Exp,
+    positive: bool,
+) -> Exp {
     use ast::{BehaviorKind, Operation as Op};
     let env = generator.global_env();
     let bool_node = || env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
     let truth = || ExpData::Value(bool_node(), Value::Bool(true)).into_exp();
     let and = |a, b| ExpData::Call(bool_node(), Op::And, vec![a, b]).into_exp();
+    let or = |a, b| ExpData::Call(bool_node(), Op::Or, vec![a, b]).into_exp();
     if defined_state_labels(exp).is_empty() {
         return truth();
     }
     match exp.as_ref() {
         ExpData::Call(id, op, args) => {
-            let children = || {
+            let term_children = || {
                 args.iter()
-                    .map(|arg| state_label_defining_fragment(generator, arg))
+                    .map(|arg| state_label_defining_fragment_in_context(generator, arg, false))
                     .fold(truth(), and)
             };
             match op {
-                Op::Implies => and(
-                    state_label_defining_fragment(generator, &args[0]),
+                Op::And if positive => and(
+                    state_label_defining_fragment_in_context(generator, &args[0], true),
+                    state_label_defining_fragment_in_context(generator, &args[1], true),
+                ),
+                Op::Or if positive => or(
+                    state_label_defining_fragment_in_context(generator, &args[0], true),
+                    state_label_defining_fragment_in_context(generator, &args[1], true),
+                ),
+                Op::Implies if positive => and(
+                    state_label_defining_fragment_in_context(generator, &args[0], false),
                     ExpData::Call(bool_node(), Op::Implies, vec![
                         args[0].clone(),
-                        state_label_defining_fragment(generator, &args[1]),
+                        state_label_defining_fragment_in_context(generator, &args[1], true),
                     ])
                     .into_exp(),
                 ),
                 Op::SpecPublish(range) | Op::SpecRemove(range) | Op::SpecUpdate(range)
-                    if range.post.is_some() =>
+                    if positive && range.post.is_some() =>
                 {
                     let exists_node = bool_node();
                     env.set_node_instantiation(exists_node, env.get_node_instantiation(*id));
@@ -508,7 +530,7 @@ pub fn state_label_defining_fragment<'env>(generator: &impl ExpGenerator<'env>, 
                     } else {
                         exists
                     };
-                    and(children(), generator.mk_implies(enabled, exp.clone()))
+                    and(term_children(), generator.mk_implies(enabled, exp.clone()))
                 },
                 Op::Behavior(kind, range) if range.post.is_some() => {
                     let definition = match kind {
@@ -542,45 +564,45 @@ pub fn state_label_defining_fragment<'env>(generator: &impl ExpGenerator<'env>, 
                             )
                             .into_exp()
                         },
-                        BehaviorKind::EnsuresOf => exp.clone(),
+                        BehaviorKind::EnsuresOf if positive => exp.clone(),
                         _ => truth(),
                     };
                     // A call's postcondition is available only in its valid,
                     // non-aborting domain. In particular, an always-aborting
                     // callee may legitimately have `ensures false`; importing
                     // that as a definition would prove every abort obligation.
-                    let definition =
-                        if matches!(kind, BehaviorKind::ResultOf | BehaviorKind::EnsuresOf) {
-                            let Type::Fun(inputs, _, _) = env.get_node_type(args[0].node_id())
-                            else {
-                                return truth();
-                            };
-                            let inputs = args[..1 + inputs.flatten().len()].to_vec();
-                            let pre_range = ast::MemoryRange {
-                                pre: range.pre,
-                                post: None,
-                            };
-                            let requires = generator.mk_bool_call(
-                                Op::Behavior(BehaviorKind::RequiresOf, pre_range.clone()),
-                                inputs.clone(),
-                            );
-                            let aborts = generator.mk_bool_call(
-                                Op::Behavior(BehaviorKind::AbortsOf, pre_range),
-                                inputs,
-                            );
-                            generator
-                                .mk_implies(and(requires, generator.mk_not(aborts)), definition)
-                        } else {
-                            definition
+                    let definition = if matches!(kind, BehaviorKind::ResultOf)
+                        || positive && matches!(kind, BehaviorKind::EnsuresOf)
+                    {
+                        let Type::Fun(inputs, _, _) = env.get_node_type(args[0].node_id()) else {
+                            return truth();
                         };
-                    and(children(), definition)
+                        let inputs = args[..1 + inputs.flatten().len()].to_vec();
+                        let pre_range = ast::MemoryRange {
+                            pre: range.pre,
+                            post: None,
+                        };
+                        let requires = generator.mk_bool_call(
+                            Op::Behavior(BehaviorKind::RequiresOf, pre_range.clone()),
+                            inputs.clone(),
+                        );
+                        let aborts = generator
+                            .mk_bool_call(Op::Behavior(BehaviorKind::AbortsOf, pre_range), inputs);
+                        generator.mk_implies(and(requires, generator.mk_not(aborts)), definition)
+                    } else {
+                        definition
+                    };
+                    and(term_children(), definition)
                 },
                 Op::SpecFunction(_, _, range)
-                    if range.post.is_some() && env.get_node_type(*id) == BOOL_TYPE =>
+                    if positive && range.post.is_some() && env.get_node_type(*id) == BOOL_TYPE =>
                 {
-                    and(children(), exp.clone())
+                    and(term_children(), exp.clone())
                 },
-                _ => children(),
+                // Negation, equivalence, equality on Booleans, and other
+                // non-monotone contexts do not entail their Boolean children.
+                // Descend in term context only to retain call-result relations.
+                _ => term_children(),
             }
         },
         ExpData::Block(_, pattern, binding, body) => {
@@ -588,22 +610,25 @@ pub fn state_label_defining_fragment<'env>(generator: &impl ExpGenerator<'env>, 
                 bool_node(),
                 pattern.clone(),
                 binding.clone(),
-                state_label_defining_fragment(generator, body),
+                state_label_defining_fragment_in_context(generator, body, positive),
             )
             .into_exp();
             if let Some(binding) = binding {
-                and(state_label_defining_fragment(generator, binding), body)
+                and(
+                    state_label_defining_fragment_in_context(generator, binding, false),
+                    body,
+                )
             } else {
                 body
             }
         },
         ExpData::IfElse(_, cond, then, otherwise) => and(
-            state_label_defining_fragment(generator, cond),
+            state_label_defining_fragment_in_context(generator, cond, false),
             ExpData::IfElse(
                 bool_node(),
                 cond.clone(),
-                state_label_defining_fragment(generator, then),
-                state_label_defining_fragment(generator, otherwise),
+                state_label_defining_fragment_in_context(generator, then, positive),
+                state_label_defining_fragment_in_context(generator, otherwise, positive),
             )
             .into_exp(),
         ),

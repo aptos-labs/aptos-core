@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from harness.agent import AgentTurn
 from harness.controller import (
@@ -79,6 +80,20 @@ class ControllerErrorTest(unittest.TestCase):
                 turn(is_error=True, terminal_reason="api_error", api_error_status=429)
             ),
         )
+
+    def test_malformed_sdk_metrics_do_not_skip_finalization(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            controller = Controller.__new__(Controller)
+            controller.artifact_dir = Path(temporary)
+            (controller.artifact_dir / "claude-events.jsonl").write_text(
+                "not-json\n", encoding="utf-8"
+            )
+            result: dict[str, object] = {"terminal_status": "operational_success"}
+            with patch.object(controller, "_finalize") as finalize:
+                controller._finalize_with_sdk_metrics(result)
+
+        finalize.assert_called_once_with(result)
+        self.assertEqual("JSONDecodeError", result["sdk_metrics_error"])
 
 
 class PackageRelpathTest(unittest.TestCase):

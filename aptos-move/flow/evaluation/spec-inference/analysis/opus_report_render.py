@@ -1,7 +1,6 @@
 """Human-readable companion to opus_report's auditable datasets."""
 import collections, html, json, statistics
-from pathlib import Path
-from analysis.opus_report import table, fmt
+from analysis.opus_report import table
 
 def render(root,out,data,rows,details):
     done=[r for r in rows if 'sdk_cost_usd' in r];t=data['totals'];arms=data['arms']

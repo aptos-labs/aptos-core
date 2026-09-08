@@ -174,8 +174,8 @@ module 0x42::vectors {
     }
     spec reverse_slice<T>(v: &mut vector<T>, left: u64, right: u64) {
         pragma opaque = true;
-        ensures [inferred] v == (if (left == right) old(v) else concat(old(v)[0..left], concat(reverse_vector(old(v)[left..right]), old(v)[right..len(old(v))])));
-        aborts_if [inferred] left > right || left != right && right > len(v);
+        ensures [inferred] v == (if (right <= left + 1) old(v) else concat(old(v)[0..left], concat(reverse_vector(old(v)[left..right]), old(v)[right..len(old(v))])));
+        aborts_if [inferred] left > right || right > left + 1 && right > len(v);
     }
 
 
@@ -292,8 +292,61 @@ module 0x42::vectors {
     spec rotate_slice<T>(v: &mut vector<T>, left: u64, rot: u64, right: u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == left + (right - rot);
-        ensures [inferred] v == concat(old(v)[0..left], concat(concat(old(v)[rot..right], old(v)[left..rot]), old(v)[right..len(old(v))]));
-        aborts_if [inferred] left > rot || rot > right || right > len(v);
+        ensures [inferred] v == (if (right > left + 1) concat(old(v)[0..left], concat(concat(old(v)[rot..right], old(v)[left..rot]), old(v)[right..len(old(v))])) else old(v));
+        aborts_if [inferred] left > rot || rot > right || right > left + 1 && right > len(v);
+    }
+
+
+    // Zero- and one-element ranges perform no indexed access, even when the
+    // endpoints lie outside the vector. These exercise both WP construction
+    // and the Boogie intrinsic implementation used to verify its result.
+    fun reverse_empty_out_of_bounds(): vector<u64> {
+        let v = vector[1];
+        vector::reverse_slice(&mut v, 2, 2);
+        v
+    }
+    spec reverse_empty_out_of_bounds(): vector<u64> {
+        pragma opaque = true;
+        ensures [inferred] result == vector[1];
+        aborts_if [inferred] false;
+    }
+
+
+    fun reverse_singleton_out_of_bounds(): vector<u64> {
+        let v = vector[1];
+        vector::reverse_slice(&mut v, 2, 3);
+        v
+    }
+    spec reverse_singleton_out_of_bounds(): vector<u64> {
+        pragma opaque = true;
+        ensures [inferred] result == vector[1];
+        aborts_if [inferred] false;
+    }
+
+
+    fun rotate_empty_out_of_bounds(): (u64, vector<u64>) {
+        let v = vector[1];
+        let split = vector::rotate_slice(&mut v, 2, 2, 2);
+        (split, v)
+    }
+    spec rotate_empty_out_of_bounds(): (u64, vector<u64>) {
+        pragma opaque = true;
+        ensures [inferred] result_1 == 2;
+        ensures [inferred] result_2 == vector[1];
+        aborts_if [inferred] false;
+    }
+
+
+    fun rotate_singleton_out_of_bounds(): (u64, vector<u64>) {
+        let v = vector[1];
+        let split = vector::rotate_slice(&mut v, 2, 2, 3);
+        (split, v)
+    }
+    spec rotate_singleton_out_of_bounds(): (u64, vector<u64>) {
+        pragma opaque = true;
+        ensures [inferred] result_1 == 3;
+        ensures [inferred] result_2 == vector[1];
+        aborts_if [inferred] false;
     }
 
 

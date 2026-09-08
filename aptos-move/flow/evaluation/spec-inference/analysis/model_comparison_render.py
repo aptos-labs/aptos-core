@@ -1,6 +1,5 @@
 """Render the recorded UC comparison as Markdown, including provenance caveats."""
-import json, statistics
-from pathlib import Path
+import json
 from analysis.model_comparison import OUT
 
 def table(headers, rows):
