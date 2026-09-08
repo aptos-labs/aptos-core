@@ -304,7 +304,9 @@ impl AptosCargoCommand {
 
                 if packages_to_test.is_empty() {
                     write_github_output("skip_tests", "true");
-                    println!("Skipping targeted unit tests because no test packages were affected!");
+                    println!(
+                        "Skipping targeted unit tests because no test packages were affected!"
+                    );
                     return Ok(());
                 }
 
@@ -837,14 +839,11 @@ mod tests {
             "--archive-file".to_string(),
             "unit-test-archive.tar.zst".to_string(),
         ]);
-        assert_eq!(
-            stripped,
-            vec![
-                "--profile".to_string(),
-                "ci".to_string(),
-                "--archive-file".to_string(),
-                "unit-test-archive.tar.zst".to_string(),
-            ]
-        );
+        assert_eq!(stripped, vec![
+            "--profile".to_string(),
+            "ci".to_string(),
+            "--archive-file".to_string(),
+            "unit-test-archive.tar.zst".to_string(),
+        ]);
     }
 }
