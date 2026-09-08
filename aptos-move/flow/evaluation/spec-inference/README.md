@@ -79,8 +79,9 @@ from in-flight aborts (`started: true`). Neither is a completed evaluation.
 
 Select the model before screening and scheduling. `--model glm` selects
 GLM 5.3 through Z.ai; `--model opus` selects `claude-opus-5` through Anthropic
-with Claude subscription authentication. The selector writes a new config,
-preserves budgets and source provenance, and refuses to overwrite a config:
+with Claude subscription authentication and `xhigh` effort. GLM uses `max`
+effort. The selector writes a new config, preserves budgets and source
+provenance, and refuses to overwrite a config:
 
 ```text
 .venv/bin/python -m harness.model_profile select --model opus \

@@ -20,6 +20,7 @@ from harness.pilot_sandbox import (
     _round_directory,
     agent_landlock_paths,
     build_bwrap_command,
+    build_bwrap_environment,
     Launch,
     preflight,
 )
@@ -108,7 +109,7 @@ class PilotSandboxTest(unittest.TestCase):
         # The security property, asserted unconditionally: this is the only
         # test that runs the real `landlock-exec`, and nothing in CI runs it.
         result = preflight()
-        self.assertEqual(3, result["policy_version"])
+        self.assertEqual(4, result["policy_version"])
         self.assertTrue(result["isolation"], result["detail"])
         self.assertIn("host-path-and-agent-proc-isolation=passed", result["detail"])
 
@@ -129,7 +130,7 @@ class PilotSandboxTest(unittest.TestCase):
         self.assertTrue(result["passed"], result["detail"])
         self.assertIn("prover-pipeline-as-agent-grandchild=passed", result["detail"])
 
-    def test_wrapper_sets_sandbox_marker_inside_cleared_environment(self) -> None:
+    def test_wrapper_keeps_credentials_out_of_process_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             evaluation_root = root / "evaluation"
@@ -183,15 +184,17 @@ class PilotSandboxTest(unittest.TestCase):
                 patch.dict(os.environ, {"MOVE_INFERENCE_EVAL_SANDBOXED": "host-value", "CLAUDE_CODE_OAUTH_TOKEN": "test-subscription-token"}),
             ):
                 command = build_bwrap_command(launch, staging)
+                environment = build_bwrap_environment(launch)
 
-        clearenv = command.index("--clearenv")
-        marker = command.index("MOVE_INFERENCE_EVAL_SANDBOXED", clearenv)
-        self.assertEqual("--setenv", command[marker - 1])
-        self.assertEqual("1", command[marker + 1])
+        self.assertNotIn("--clearenv", command)
+        self.assertNotIn("--setenv", command)
+        self.assertNotIn("test-subscription-token", command)
         self.assertNotIn("host-value", command)
-        oauth = command.index("CLAUDE_CODE_OAUTH_TOKEN", clearenv)
-        self.assertEqual("--setenv", command[oauth - 1])
-        self.assertEqual("test-subscription-token", command[oauth + 1])
+        self.assertEqual("1", environment["MOVE_INFERENCE_EVAL_SANDBOXED"])
+        self.assertEqual(
+            "test-subscription-token", environment["CLAUDE_CODE_OAUTH_TOKEN"]
+        )
+        self.assertNotIn("host-value", environment.values())
 
     def test_the_agent_is_confined_more_narrowly_than_the_sandbox(self) -> None:
         launch = _example_launch(Path("/eval"))
@@ -222,6 +225,7 @@ class PilotSandboxTest(unittest.TestCase):
             patch("harness.pilot_sandbox._required_executable", return_value=Path("/usr/bin/bwrap")),
         ):
             command = build_bwrap_command(launch, Path(staging))
+            environment = build_bwrap_environment(launch)
         client = command.index(str(launch.boogie_client))
         self.assertEqual("--ro-bind", command[client - 1])
         self.assertEqual(str(AGENT_BOOGIE), command[client + 1])
@@ -231,9 +235,7 @@ class PilotSandboxTest(unittest.TestCase):
             ("MOVE_INFERENCE_BOOGIE_AGENT", str(AGENT_BOOGIE)),
             ("MOVE_INFERENCE_BOOGIE_PROXY", str(BOOGIE_PROXY_SOCKET)),
         ):
-            index = command.index(name)
-            self.assertEqual("--setenv", command[index - 1])
-            self.assertEqual(value, command[index + 1])
+            self.assertEqual(value, environment[name])
 
     def test_production_wrapper_rejects_fake_agent(self) -> None:
         with self.assertRaises(SystemExit) as raised:
