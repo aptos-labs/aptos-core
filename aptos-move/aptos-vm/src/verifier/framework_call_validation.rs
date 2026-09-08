@@ -10,7 +10,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, VMError, VMResult},
     file_format::{
-        Bytecode, CompiledScript, FunctionHandle,
+        Bytecode, CompiledScript, FunctionHandle, FunctionHandleIndex, FunctionInstantiationIndex,
         SignatureToken::{Struct, StructInstantiation},
     },
     CompiledModule,
@@ -21,6 +21,8 @@ use std::collections::HashSet;
 
 const EVENT_MODULE_NAME: &str = "event";
 const EVENT_EMIT_FUNCTION_NAME: &str = "emit";
+const INIT_MODULE_NAME: &str = "init";
+const INIT_MAYBE_INITIALIZE_FUNCTION_NAME: &str = "internal_maybe_initialize";
 
 fn metadata_validation_err(msg: &str) -> Result<(), VMError> {
     Err(metadata_validation_error(msg))
@@ -48,7 +50,7 @@ pub(crate) fn validate_module_events(
         )?;
 
         // Check all the emit calls have the correct struct with event attribute.
-        validate_emit_calls(&new_event_structs, new_module)?;
+        validate_framework_calls(&new_event_structs, new_module)?;
 
         // INVARIANT:
         //   No need to charge gas for module access: this function fetches the old version of the
@@ -97,7 +99,11 @@ pub(crate) fn validate_module_events(
 ///    0x1::event::emit<Event>();
 /// }
 /// ```
-pub(crate) fn validate_emit_calls(
+///
+/// Also rejects closures over `0x1::init::internal_maybe_initialize`: it identifies the module to
+/// initialize by its direct caller, so packed into a function value and called by another module
+/// it would initialize (and mint the signer of) that module.
+pub(crate) fn validate_framework_calls(
     event_structs: &HashSet<String>,
     module: &CompiledModule,
 ) -> VMResult<()> {
@@ -106,47 +112,19 @@ pub(crate) fn validate_emit_calls(
             for bc in &code_unit.code {
                 use Bytecode::*;
                 match bc {
-                    CallGeneric(index) | PackClosureGeneric(index, ..) => {
-                        let func_instantiation = &module.function_instantiation_at(*index);
-                        let func_handle = module.function_handle_at(func_instantiation.handle);
-
-                        if !is_event_emit_call(BinaryIndexedView::Module(module), func_handle) {
-                            continue;
-                        }
-
-                        let param = module
-                            .signature_at(func_instantiation.type_parameters)
-                            .0
-                            .first()
-                            .ok_or_else(|| {
-                                metadata_validation_error(
-                                    "Missing parameter for 0x1::event::emit function",
-                                )
-                            })?;
-                        match param {
-                            StructInstantiation(index, _) | Struct(index) => {
-                                let struct_handle = &module.struct_handle_at(*index);
-                                let struct_name = module.identifier_at(struct_handle.name);
-                                if struct_handle.module != module.self_handle_idx() {
-                                    metadata_validation_err(format!("{} passed to 0x1::event::emit function is not defined in the same module", struct_name).as_str())
-                                } else if !event_structs.contains(struct_name.as_str()) {
-                                    metadata_validation_err(format!("Missing #[event] attribute on {}. The #[event] attribute is required for all structs passed into 0x1::event::emit.", struct_name).as_str())
-                                } else {
-                                    Ok(())
-                                }
-                            },
-                            _ => metadata_validation_err(
-                                "Passed in a non-struct parameter into 0x1::event::emit.",
-                            ),
-                        }?;
+                    CallGeneric(index) => validate_emit_call(event_structs, module, *index)?,
+                    PackClosureGeneric(index, ..) => {
+                        validate_closure(module, module.function_instantiation_at(*index).handle)?;
+                        validate_emit_call(event_structs, module, *index)?;
                     },
-                    // Note: If a closure is packed, it cannot be 0x1::event::emit, but the lifted
-                    // lambda body may contain the emit function, and so will match the case above.
+                    // Note: `0x1::event::emit` is generic, so it cannot be packed here, but the
+                    // lifted lambda body may contain the emit function, and so will match the case
+                    // above.
+                    PackClosure(index, _) => validate_closure(module, *index)?,
                     // For all other instructions, no validation. We specifically do a full match
                     // here to ensure that when a new bytecode gets added, compiler complains and
                     // the validation pass is revisited.
-                    PackClosure(_, _)
-                    | VecPack(_, _)
+                    VecPack(_, _)
                     | VecLen(_)
                     | VecImmBorrow(_)
                     | VecMutBorrow(_)
@@ -254,6 +232,66 @@ pub(crate) fn validate_emit_calls(
     Ok(())
 }
 
+/// Validates a call of, or closure over, the generic function instantiation at `index` if it is
+/// `0x1::event::emit`: the event struct must be defined in `module` with the `#[event]` attribute.
+fn validate_emit_call(
+    event_structs: &HashSet<String>,
+    module: &CompiledModule,
+    index: FunctionInstantiationIndex,
+) -> VMResult<()> {
+    let func_instantiation = &module.function_instantiation_at(index);
+    let func_handle = module.function_handle_at(func_instantiation.handle);
+
+    if !is_event_emit_call(BinaryIndexedView::Module(module), func_handle) {
+        return Ok(());
+    }
+
+    let param = module
+        .signature_at(func_instantiation.type_parameters)
+        .0
+        .first()
+        .ok_or_else(|| {
+            metadata_validation_error("Missing parameter for 0x1::event::emit function")
+        })?;
+    match param {
+        StructInstantiation(index, _) | Struct(index) => {
+            let struct_handle = &module.struct_handle_at(*index);
+            let struct_name = module.identifier_at(struct_handle.name);
+            if struct_handle.module != module.self_handle_idx() {
+                metadata_validation_err(
+                    format!(
+                        "{} passed to 0x1::event::emit function is not defined in the same module",
+                        struct_name
+                    )
+                    .as_str(),
+                )
+            } else if !event_structs.contains(struct_name.as_str()) {
+                metadata_validation_err(format!("Missing #[event] attribute on {}. The #[event] attribute is required for all structs passed into 0x1::event::emit.", struct_name).as_str())
+            } else {
+                Ok(())
+            }
+        },
+        _ => metadata_validation_err("Passed in a non-struct parameter into 0x1::event::emit."),
+    }
+}
+
+/// Validates a closure over the function handle at `index`: it must not be
+/// `0x1::init::internal_maybe_initialize`.
+fn validate_closure(module: &CompiledModule, index: FunctionHandleIndex) -> VMResult<()> {
+    let func_handle = module.function_handle_at(index);
+    if is_maybe_initialize_call(BinaryIndexedView::Module(module), func_handle) {
+        return Err(
+            PartialVMError::new(StatusCode::CLOSURE_OVER_RESTRICTED_FUNCTION)
+                .with_message(
+                    "0x1::init::internal_maybe_initialize cannot be used as a function value"
+                        .to_string(),
+                )
+                .finish(Location::Module(module.self_id())),
+        );
+    }
+    Ok(())
+}
+
 /// Given a module id extract all event metadata
 pub(crate) fn extract_event_metadata(
     metadata: &RuntimeModuleMetadataV1,
@@ -288,15 +326,32 @@ pub(crate) fn extract_event_metadata(
 /// ```
 ///
 /// This is ok to fail here, as event emission should be done by the module where event is defined.
-pub(crate) fn verify_no_event_emission_in_compiled_script(script: &CompiledScript) -> VMResult<()> {
+///
+/// The same applies to `0x1::init::internal_maybe_initialize`: a script has no module to
+/// initialize, and a closure over it passed to a module would initialize that module instead.
+pub(crate) fn verify_no_restricted_functions_in_compiled_script(
+    script: &CompiledScript,
+) -> VMResult<()> {
+    let view = BinaryIndexedView::Script(script);
     for func_handle in &script.function_handles {
-        if is_event_emit_call(BinaryIndexedView::Script(script), func_handle) {
-            debug_assert!(func_handle.type_parameters.len() == 1);
+        if is_event_emit_call(view, func_handle) || is_maybe_initialize_call(view, func_handle) {
             return Err(PartialVMError::new(StatusCode::INVALID_OPERATION_IN_SCRIPT)
                 .finish(Location::Script));
         }
     }
     Ok(())
+}
+
+/// Returns true if the handle corresponds to `0x1::init::internal_maybe_initialize`.
+fn is_maybe_initialize_call(view: BinaryIndexedView, func_handle: &FunctionHandle) -> bool {
+    let module_handle = view.module_handle_at(func_handle.module);
+    let module_addr = view.address_identifier_at(module_handle.address);
+    let module_name = view.identifier_at(module_handle.name);
+    let func_name = view.identifier_at(func_handle.name);
+
+    module_addr == &AccountAddress::ONE
+        && module_name.as_str() == INIT_MODULE_NAME
+        && func_name.as_str() == INIT_MAYBE_INITIALIZE_FUNCTION_NAME
 }
 
 /// Returns true if the handle corresponds to `0x1::event::emit` function call.
