@@ -1,0 +1,6 @@
+fun {Carrier} =>
+  «0x42».verification_generics.carry.typedDenotation : {Carrier : Nat → Type} →
+  ((index : Nat) → LeanerIR.Proofs.Codec (Carrier index) LeanerIR.RuntimeValue) →
+    LeanerIR.Validation.ExecutableUnit →
+      «0x42».verification_generics.carry.Arguments Carrier →
+        LeanerIR.Proofs.Spec LeanerIR.RuntimeState LeanerIR.Proofs.Failure (Carrier 0)

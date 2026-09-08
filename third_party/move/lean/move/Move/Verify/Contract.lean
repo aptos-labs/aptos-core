@@ -16,11 +16,13 @@ namespace Move.Verify
 
 open Move.Semantics
 
-/-- A source contract.  Abort behavior has two independent components: which
-abort outcomes the contract permits, and where a declared abort excuses the
-postcondition.  They coincide for declared conditions, but not when abort
-behavior is left uninterpreted: then every code is permitted while nothing is
-excused. -/
+/-- A source contract.  Abort behavior has three components, read off the
+declared abort conditions: which abort outcomes the contract permits
+(completeness — an abort must match a declared clause), where the function
+must abort (sufficiency — a declared condition forces an abort), and where a
+declared abort excuses the postcondition.  They coincide for declared
+conditions, but not when abort behavior is left uninterpreted: then every code
+is permitted, nothing must abort, and nothing is excused. -/
 structure Contract (State Args Result : Type) where
   /-- States in which callers may invoke the function. -/
   requires : Args → State → Prop
@@ -34,16 +36,23 @@ structure Contract (State Args Result : Type) where
   condition is declared — uninterpreted aborts excuse nothing, so successful
   executions must still establish `ensures`. -/
   mayAbort : Args → State → Prop
+  /-- States in which the function must abort: the disjunction of the
+  declared abort conditions (a declared condition is sufficient for an
+  abort), and `False` when none is declared.  With `aborts_if_is_partial`
+  this is the clauses' only reading: `aborts` then permits any outcome where
+  no declared condition holds. -/
+  mustAbort : Args → State → Prop := fun _ _ => False
   /-- What a successful execution leaves unchanged.  A specification changes
   only the global memory its `modifies` clause lists, so this defaults to
   changing nothing at all and is never written by hand. -/
   frame : Args → State → State → Prop := fun _ initial final => final = initial
 
 /-- A relational source computation satisfies its contract for every
-permitted initial state.  Two things hold of every successful execution: the
-frame, unconditionally, and the postcondition wherever the declared aborts
-are ruled out.  Both readings are these semantics — not anything written in
-the clauses. -/
+permitted initial state.  Three things hold of every successful execution: the
+frame, unconditionally; the postcondition wherever the declared aborts are
+ruled out; and that no declared abort condition held (a successful execution
+refutes sufficiency).  Every abort outcome is one the contract permits.  These
+readings are the semantics — not anything written in the clauses. -/
 def Satisfies (function : Args → Spec State Result)
     (contract : Contract State Args Result) : Prop :=
   ∀ args initial,
@@ -51,10 +60,33 @@ def Satisfies (function : Args → Spec State Result)
       (∀ result final, (function args).ok initial result final →
         (¬contract.mayAbort args initial →
           contract.ensures args initial result final) ∧
-        contract.frame args initial final) ∧
+        contract.frame args initial final ∧
+        ¬contract.mustAbort args initial) ∧
       (∀ code, (function args).aborts initial code →
         contract.aborts args initial code) ∧
       ¬(function args).undefined initial
+
+/-- The computation a contract summarizes: every outcome the contract permits.
+It is the source semantics of a function whose body is not consulted — a
+native, or one specified `pragma opaque` — so callers reason through the
+contract alone: they must establish the precondition (the summary is
+undefined outside it), and receive the postcondition where no declared
+abort excuses it, the frame, and the declared aborts. -/
+def Contract.summary (contract : Contract State Args Result) (args : Args) :
+    Spec State Result where
+  ok := fun initial result final =>
+    contract.requires args initial ∧
+    (¬contract.mayAbort args initial → contract.ensures args initial result final) ∧
+    contract.frame args initial final ∧ ¬contract.mustAbort args initial
+  aborts := fun initial code => contract.requires args initial ∧ contract.aborts args initial code
+  undefined := fun initial => ¬contract.requires args initial
+
+/-- A summary satisfies the contract it summarizes. -/
+theorem satisfies_summary (contract : Contract State Args Result) :
+    Satisfies (fun args => contract.summary args) contract := by
+  intro args initial permitted
+  refine ⟨fun result final h => ⟨h.2.1, h.2.2.1, h.2.2.2⟩, fun code h => h.2, ?_⟩
+  simp [Contract.summary, permitted]
 
 /-! A prophecy is eliminated the moment its reconciliation equation appears:
 `∀ future, … → value = future → P future` is `… → P value`.  Lean's
@@ -106,6 +138,30 @@ theorem wp_total_iff {action : Spec State Result}
     wp (Spec.abort code) ensures aborts state ↔ aborts code := by
   simp [wp, Spec.abort]
 
+/-- The weakest precondition through a summary: the precondition, and the
+continuation under what the contract guarantees. -/
+@[simp, wp_norm] theorem wp_summary (contract : Contract State Args Result) (args : Args)
+    (ensures : Result → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (contract.summary args) ensures aborts initial ↔
+      contract.requires args initial ∧
+      (∀ result final,
+        (¬contract.mayAbort args initial → contract.ensures args initial result final) →
+        contract.frame args initial final → ¬contract.mustAbort args initial →
+        ensures result final) ∧
+      (∀ code, contract.aborts args initial code → aborts code) := by
+  constructor
+  · intro h
+    obtain ⟨hok, habort, hdefined⟩ := h
+    have permitted : contract.requires args initial :=
+      Classical.byContradiction fun h => hdefined h
+    exact ⟨permitted, fun result final h1 h2 h3 => hok result final ⟨permitted, h1, h2, h3⟩,
+      fun code h => habort code ⟨permitted, h⟩⟩
+  · intro h
+    obtain ⟨permitted, hok, habort⟩ := h
+    refine ⟨fun result final h => hok result final h.2.1 h.2.2.1 h.2.2.2,
+      fun code h => habort code h.2, ?_⟩
+    simp [Contract.summary, permitted]
+
 @[wp_norm] theorem wp_bind (action : Spec State α) (next : α → Spec State β)
     (ensures : β → State → Prop) (aborts : Nat → Prop) (initial : State) :
     wp (Spec.bind action next) ensures aborts initial ↔
@@ -149,7 +205,8 @@ theorem satisfies_of_wp (function : Args → Spec State Result)
         (fun result final =>
           (¬contract.mayAbort args initial →
             contract.ensures args initial result final) ∧
-          contract.frame args initial final)
+          contract.frame args initial final ∧
+          ¬contract.mustAbort args initial)
         (contract.aborts args initial)
         initial) :
     Satisfies function contract := by
@@ -237,7 +294,7 @@ theorem wp_of_satisfies
       initial :=
   ⟨fun result final execution =>
       let established := (verified args initial permitted).1 result final execution
-      ⟨established.1 noAbort, established.2⟩,
+      ⟨established.1 noAbort, established.2.1⟩,
     (verified args initial permitted).2.1,
     (verified args initial permitted).2.2⟩
 
@@ -276,7 +333,8 @@ theorem satisfies_fix_of_wp
           (fun result final =>
             (¬contract.mayAbort args initial →
               contract.ensures args initial result final) ∧
-            contract.frame args initial final)
+            contract.frame args initial final ∧
+            ¬contract.mustAbort args initial)
           (contract.aborts args initial)
           initial) :
     Satisfies (Spec.fix body) contract := by
@@ -284,6 +342,64 @@ theorem satisfies_fix_of_wp
   intro recursive recursiveVerified
   exact satisfies_of_wp (body recursive) contract
     (step recursive recursiveVerified)
+
+/-- Loop verification from a stated invariant (`Spec.withInvariant`): the
+invariant holds on entry, and every iteration that starts under it is
+correct when its recursive occurrence — the next iteration — is assumed
+correct under the invariant.  Partial correctness, like `satisfies_fix`. -/
+theorem wp_withInvariant_fix {Args Result : Type}
+    {invariant : Args → State → Prop}
+    {body : (Args → Spec State Result) → Args → Spec State Result}
+    {init : Args} {ensures : Result → State → Prop} {aborts : Nat → Prop}
+    {initial : State}
+    (entry : invariant init initial)
+    (step : ∀ recursive,
+      (∀ args store, invariant args store →
+        wp (recursive args) ensures aborts store) →
+      ∀ args store, invariant args store →
+        wp (body recursive args) ensures aborts store) :
+    wp (Spec.withInvariant body init invariant) ensures aborts initial := by
+  let contract : Contract State Args Result := {
+    requires := invariant
+    ensures := fun _ _ result final => ensures result final
+    aborts := fun _ _ code => aborts code
+    mayAbort := fun _ _ => False
+    mustAbort := fun _ _ => False
+    frame := fun _ _ _ => True }
+  have verified : Satisfies (Spec.fix body) contract := by
+    apply satisfies_fix_of_wp body contract
+    intro recursive recursiveVerified args store permitted
+    have hypothesis : ∀ args store, invariant args store →
+        wp (recursive args) ensures aborts store := fun args store holds =>
+      wp_mono (wp_of_satisfies recursiveVerified holds (noAbort := fun h => h))
+        (fun _ _ h => h.1) (fun _ h => h)
+    exact wp_mono (step recursive hypothesis args store permitted)
+      (fun _ _ h => ⟨fun _ => h, trivial, fun h' => h'⟩) (fun _ h => h)
+  show wp (Spec.fix body init) ensures aborts initial
+  exact wp_mono (wp_of_satisfies verified entry (noAbort := fun h => h))
+    (fun _ _ h => h.1) (fun _ h => h)
+
+/-- Loop verification for a loop that leaves the store as it found it: the
+invariant speaks about the loop state, and the store at every iteration is
+the store at entry.  The automatic prover's rule (source invariants range
+over locals and referents). -/
+theorem wp_withInvariant_fix_frame {Args Result : Type}
+    {invariant : Args → State → Prop}
+    {body : (Args → Spec State Result) → Args → Spec State Result}
+    {init : Args} {ensures : Result → State → Prop} {aborts : Nat → Prop}
+    {initial : State}
+    (entry : invariant init initial)
+    (step : ∀ recursive,
+      (∀ args, invariant args initial → wp (recursive args) ensures aborts initial) →
+      ∀ args, invariant args initial →
+        wp (body recursive args) ensures aborts initial) :
+    wp (Spec.withInvariant body init invariant) ensures aborts initial := by
+  show wp (Spec.fix body init) ensures aborts initial
+  refine wp_withInvariant_fix
+    (invariant := fun args store => invariant args store ∧ store = initial)
+    ⟨entry, rfl⟩ ?_
+  rintro recursive hypothesis args _ ⟨holds, rfl⟩
+  exact step recursive (fun args holds => hypothesis args _ ⟨holds, rfl⟩) args holds
 
 /-- The weakest-precondition form of mutual fixed-point induction. -/
 theorem satisfies_fixFamily_of_wp
@@ -297,7 +413,8 @@ theorem satisfies_fixFamily_of_wp
           (fun result final =>
             (¬(contracts index).mayAbort args initial →
               (contracts index).ensures args initial result final) ∧
-            (contracts index).frame args initial final)
+            (contracts index).frame args initial final ∧
+            ¬(contracts index).mustAbort args initial)
           ((contracts index).aborts args initial)
           initial) :
     ∀ index, Satisfies (Spec.fixFamily body index) (contracts index) := by
@@ -321,7 +438,8 @@ theorem satisfies_of_txnWP (function : Args → Txn State Result)
       txnWP (function args)
         (fun result final =>
           contract.ensures args initial result final ∧
-          contract.frame args initial final)
+          contract.frame args initial final ∧
+          ¬contract.mustAbort args initial)
         (contract.aborts args initial)
         initial) :
     Satisfies (fun args => Spec.ofTxn (function args)) contract := by
@@ -334,7 +452,7 @@ theorem satisfies_of_txnWP (function : Args → Txn State Result)
       · intro actual actualFinal heq
         simp [Spec.ofTxn, houtcome] at heq
         obtain ⟨rfl, rfl⟩ := heq
-        exact ⟨fun _ => h.1, h.2⟩
+        exact ⟨fun _ => h.1, h.2.1, h.2.2⟩
       · intro code
         simp [Spec.ofTxn, houtcome]
       · simp [Spec.ofTxn]

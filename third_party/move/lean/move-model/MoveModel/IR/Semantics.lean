@@ -105,10 +105,12 @@ def Oper.extendedVectorSem : Oper → List Value → Memory → Option OpOutcome
         .ok [.vector (es.take left ++ ((es.drop left).take (right - left)).reverse ++
           es.drop right)] m else .abort)
   | .vecContains, [.vector es, v], m =>
-      some (.ok [.bool (es.any (· == v))] m)
+      if v.refFree then some (.ok [.bool (es.any (· == v))] m) else none
   | .vecIndexOf, [.vector es, v], m =>
-      let i := es.findIdx (· == v)
-      some (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m)
+      if v.refFree then
+        let i := es.findIdx (· == v)
+        some (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m)
+      else none
   | .vecTrim, [.vector es, .u64 newLen], m =>
       some (if newLen ≤ es.length then
         .ok [.vector (es.take newLen), .vector (es.drop newLen)] m else .abort)
@@ -350,12 +352,14 @@ def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
 
 @[simp] theorem Oper.sem_vecContains (current) (deref) (es) (v) (m) :
     Oper.sem current deref .vecContains [.vector es, v] m =
-      some (.ok [.bool (es.any (· == v))] m) := rfl
+      if v.refFree then some (.ok [.bool (es.any (· == v))] m) else none := rfl
 
 @[simp] theorem Oper.sem_vecIndexOf (current) (deref) (es) (v) (m) :
     Oper.sem current deref .vecIndexOf [.vector es, v] m =
-      let i := es.findIdx (· == v)
-      some (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m) := rfl
+      if v.refFree then
+        let i := es.findIdx (· == v)
+        some (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m)
+      else none := rfl
 
 @[simp] theorem Oper.sem_vecTrim (current) (deref) (es) (newLen) (m) :
     Oper.sem current deref .vecTrim [.vector es, .u64 newLen] m =
@@ -515,7 +519,64 @@ inductive RunFrom (P : Program) : Cfg → List Instr → Term → MoveState →
       (hi : s.locals it = some (.u64 n))
       (hge : es.length ≤ n) :
       RunFrom P G (.call [dst] .borrowVecElem [t, it] :: rest) term s
+        (.abort s.memory Oper.borrowVecElem.abortCode)
+  -- an enum payload field through a reference: the field of the referent
+  -- when it is one of the listed variants, an abort otherwise
+  | borrowVariantFieldOk {G : Cfg} {rest : List Instr} {term : Term}
+      {s : MoveState} {dst t : LocalIndex} {variants : List Nat} {i : Nat}
+      {rt : RefTarget} {tag : Nat} {fs : List Value} {o : FrameOutcome}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = true)
+      (hi : i < fs.length)
+      (hrest : RunFrom P G rest term
+        (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [i]⟩)) o) :
+      RunFrom P G (.call [dst] (.borrowVariantField variants i) [t] :: rest) term s o
+  | borrowVariantFieldAbort {G : Cfg} {rest : List Instr} {term : Term}
+      {s : MoveState} {dst t : LocalIndex} {variants : List Nat} {i : Nat}
+      {rt : RefTarget} {tag : Nat} {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = false) :
+      RunFrom P G (.call [dst] (.borrowVariantField variants i) [t] :: rest) term s
         (.abort s.memory runtimeAbortCode)
+  | borrowVariantFieldInstOk {G : Cfg} {rest : List Instr} {term : Term}
+      {s : MoveState} {dst t : LocalIndex} {variants : List Nat} {i : Nat}
+      {args : List Ty} {rt : RefTarget} {tag : Nat} {fs : List Value}
+      {o : FrameOutcome}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = true)
+      (hi : i < fs.length)
+      (hrest : RunFrom P G rest term
+        (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [i]⟩)) o) :
+      RunFrom P G (.call [dst] (.borrowVariantFieldInst variants i args) [t] :: rest)
+        term s o
+  | borrowVariantFieldInstAbort {G : Cfg} {rest : List Instr} {term : Term}
+      {s : MoveState} {dst t : LocalIndex} {variants : List Nat} {i : Nat}
+      {args : List Ty} {rt : RefTarget} {tag : Nat} {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = false) :
+      RunFrom P G (.call [dst] (.borrowVariantFieldInst variants i args) [t] :: rest)
+        term s (.abort s.memory runtimeAbortCode)
+  -- the variant test of a referent
+  | testVariantRef {G : Cfg} {rest : List Instr} {term : Term} {s : MoveState}
+      {dst t : LocalIndex} {variant : Nat} {rt : RefTarget} {tag : Nat}
+      {fs : List Value} {o : FrameOutcome}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hrest : RunFrom P G rest term
+        (s.writeLocal dst (.bool (tag == variant))) o) :
+      RunFrom P G (.call [dst] (.testVariantRef variant) [t] :: rest) term s o
+  | testVariantRefInst {G : Cfg} {rest : List Instr} {term : Term} {s : MoveState}
+      {dst t : LocalIndex} {variant : Nat} {args : List Ty} {rt : RefTarget}
+      {tag : Nat} {fs : List Value} {o : FrameOutcome}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hrest : RunFrom P G rest term
+        (s.writeLocal dst (.bool (tag == variant))) o) :
+      RunFrom P G (.call [dst] (.testVariantRefInst variant args) [t] :: rest) term s o
   | readRef {G : Cfg} {rest : List Instr} {term : Term} {s : MoveState}
       {dst t : LocalIndex} {rt : RefTarget} {v : Value} {o : FrameOutcome}
       (ht : s.locals t = some (.ref rt))

@@ -37,6 +37,37 @@ impl IntrinsicDecl {
         self.move_type
     }
 
+    /// The intrinsic type name (`map`, currently) as declared by the struct.
+    pub fn get_intrinsic_type_name(&self, env: &GlobalEnv) -> String {
+        env.symbol_pool().string(self.intrinsic_type).to_string()
+    }
+
+    /// The resolved Move-function bindings, sorted by intrinsic role name for
+    /// deterministic exchange-format serialization.
+    pub fn get_move_fun_bindings(&self, env: &GlobalEnv) -> Vec<(String, QualifiedId<FunId>)> {
+        let pool = env.symbol_pool();
+        let mut bindings = self
+            .intrinsic_to_move_fun
+            .iter()
+            .map(|(role, target)| (pool.string(*role).to_string(), *target))
+            .collect::<Vec<_>>();
+        bindings.sort_by(|a, b| a.0.cmp(&b.0));
+        bindings
+    }
+
+    /// The resolved specification-function bindings, sorted by intrinsic role
+    /// name for deterministic exchange-format serialization.
+    pub fn get_spec_fun_bindings(&self, env: &GlobalEnv) -> Vec<(String, QualifiedId<SpecFunId>)> {
+        let pool = env.symbol_pool();
+        let mut bindings = self
+            .intrinsic_to_spec_fun
+            .iter()
+            .map(|(role, target)| (pool.string(*role).to_string(), *target))
+            .collect::<Vec<_>>();
+        bindings.sort_by(|a, b| a.0.cmp(&b.0));
+        bindings
+    }
+
     pub fn get_fun_triple(&self, env: &GlobalEnv, name: &str) -> Option<(Address, String, String)> {
         let symbol_pool = env.symbol_pool();
         let sym = symbol_pool.make(name);

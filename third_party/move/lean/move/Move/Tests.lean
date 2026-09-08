@@ -14,8 +14,10 @@ import Move.Tests.Language.Arithmetic
 import Move.Tests.Language.Attributes
 import Move.Tests.Language.BorrowChecker
 import Move.Tests.Language.ControlForms
+import Move.Tests.Language.EmptyModule
 import Move.Tests.Language.EnumPatterns
 import Move.Tests.Language.EnumPayloads
+import Move.Tests.Language.EnumRefs
 import Move.Tests.Language.Enums
 import Move.Tests.Language.Generics
 import Move.Tests.Language.Integers
@@ -29,9 +31,13 @@ import Move.Tests.Language.Vectors
 import Move.Tests.Negative.Lowering
 import Move.Tests.Negative.Borrows
 import Move.Tests.Negative.BorrowGlobals
+import Move.Tests.Negative.IntrinsicUnsupported
+import Move.Tests.Negative.SpecFunctions
 import Move.Tests.Negative.Specifications
 import Move.Tests.Negative.Surface
 import Move.Tests.Negative.Verification
+import Move.Tests.Verification.AbortDirections
+import Move.Tests.Verification.Summaries
 import Move.Tests.Verification.Account
 import Move.Tests.Verification.Callees
 import Move.Tests.Verification.BorrowCertificates
@@ -42,10 +48,17 @@ import Move.Tests.Verification.GenericStorage
 import Move.Tests.Verification.GlobalBorrows
 import Move.Tests.Verification.GlobalInv
 import Move.Tests.Verification.Invariants
+import Move.Tests.Verification.Loans
+import Move.Tests.Verification.EnumRefs
+import Move.Tests.Verification.LoopInvariants
+import Move.Tests.Verification.LooseFrame
 import Move.Tests.Verification.OrderedMap
 import Move.Tests.Verification.Quicksort
 import Move.Tests.Verification.Read
+import Move.Tests.Verification.ReturnedMutRefs
 import Move.Tests.Verification.ResourceComposition
+import Move.Tests.Verification.SpecFunctions
+import Move.Tests.Verification.SpecLogicalArithmetic
 
 /-! Aggregate root for the categorized Leaner Move regression suite. Lake
 needs a root module per test library, so every new test file is added here. -/

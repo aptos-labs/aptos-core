@@ -1,0 +1,4 @@
+-- error: LeanerE2ETests/RustToLeanerLang/generic.rs:1:1: Rust exporter failed:
+-- leaner-rust-export: M0 probe bodies=1 generic_bodies=1 blocks=3 statements=0 generic_parameters=1 traits=1 trait_methods=1 trait_predicates=1 trait_impls=0 direct_calls=1 switches=0 drops=0 cleanup_edges=0 borrows=0 raw_pointer_types=0 raw_pointer_operations=0 inline_asm=0 sources={"generic.rs"} callees={"generic::Step::step"}
+-- leaner-rust-export: stopping before codegen
+-- leaner-rust-export: cannot emit RawUnit: generic or associated callee `generic::Step::step` is not a mapped local function; function predicates and implementation-selection evidence are unavailable from the pinned Rustc Public API

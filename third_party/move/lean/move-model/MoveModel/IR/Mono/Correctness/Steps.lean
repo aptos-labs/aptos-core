@@ -55,6 +55,10 @@ theorem InstrStop.call_instantiate_of_typeArgsTagEq {lhs rhs : List Ty}
       apply InstrStop.borrowGlobal <;> assumption
     | simp only [Oper.instantiate]
       apply InstrStop.borrowVecElem <;> assumption
+    | simp only [Oper.instantiate]
+      apply InstrStop.borrowVariantField <;> assumption
+    | simp only [Oper.instantiate]
+      apply InstrStop.borrowVariantFieldInst <;> assumption
 
 /-- Any continuing non-call instruction transports across tag-equivalent
 substitutions. Calls cannot inhabit `InstrNext`, so their case is discharged

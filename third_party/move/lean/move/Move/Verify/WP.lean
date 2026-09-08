@@ -3,6 +3,7 @@
 
 import Move.Verify.Contract
 import Move.Semantics.Vector
+import Move.Semantics.Enum
 
 /-!
 # Weakest-precondition rules for source primitives
@@ -51,6 +52,21 @@ this point, and the continuation may then assume it. -/
     refine ⟨?_, fun _ absurd => absurd.elim, fun contra => contra holds⟩
     rintro result final ⟨_, rfl, rfl⟩
     exact normal holds
+
+/-- An in-body specification assumption restricts the continuing path without
+adding an obligation of its own. -/
+@[simp, wp_norm] theorem wp_assumeState (assumption : State → Prop)
+    (ensures : Unit → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (Spec.assumeState assumption) ensures aborts initial ↔
+      (assumption initial → ensures () initial) := by
+  constructor
+  · rintro ⟨normal, abnormal, defined⟩ holds
+    exact normal () initial ⟨holds, rfl, rfl⟩
+  · intro normal
+    refine ⟨?_, fun _ absurd => absurd.elim, ?_⟩
+    · rintro result final ⟨holds, rfl, rfl⟩
+      exact normal holds
+    · simp [Spec.assumeState]
 
 /-- Certifying a state update: the relation between the pre-state and the
 post-state of `op` is conjoined onto the post, so it is asserted exactly where
@@ -385,6 +401,32 @@ signed view (whose native domain already is `Int`). -/
       subst code
       exact abnormal missing
 
+@[simp, wp_norm] theorem wp_variantFieldSpec (holds : Bool) (value : α)
+    (ensures : α → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (variantFieldSpec (σ := State) holds value) ensures aborts initial ↔
+      (holds = true → ensures value initial) ∧
+      (holds = false → aborts variantMismatch) := by
+  rw [wp_total_iff (by simp [variantFieldSpec])]
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · intro held
+      apply normal value initial
+      change holds = true ∧ value = value ∧ initial = initial
+      exact ⟨held, rfl, rfl⟩
+    · intro missing
+      apply abnormal variantMismatch
+      change holds = false ∧ variantMismatch = variantMismatch
+      exact ⟨missing, rfl⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro result final ⟨held, resultEq, finalEq⟩
+      subst result final
+      exact normal held
+    · rintro code ⟨missing, codeEq⟩
+      subst code
+      exact abnormal missing
+
 @[simp, wp_norm] theorem wp_setSpec (values : Move.Vector α)
     (index : Move.U64) (value : α)
     (ensures : Move.Vector α → State → Prop) (aborts : Nat → Prop)
@@ -494,6 +536,169 @@ relational representation. -/
       exact (bodyWP firstFuture secondFuture).2.1 code execution
     · rintro ⟨firstFuture, secondFuture, obligation⟩
       exact (bodyWP firstFuture secondFuture).2.2 obligation
+
+@[wp_norm] theorem wp_withMutations3 (first : α) (second : β) (third : γ)
+    (body : Mutation α → Mutation β → Mutation γ →
+      Spec State (δ × (Mutation α × (Mutation β × Mutation γ))))
+    (ensures : (δ × (α × (β × γ))) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (withMutations3 first second third body) ensures aborts initial ↔
+      ∀ firstFuture secondFuture thirdFuture,
+        wp (body { current := first, prophecy := firstFuture }
+          { current := second, prophecy := secondFuture }
+          { current := third, prophecy := thirdFuture })
+          (fun output final =>
+            output.2.1.current = firstFuture →
+            output.2.2.1.current = secondFuture →
+            output.2.2.2.current = thirdFuture →
+            ensures (output.1, (firstFuture, (secondFuture, thirdFuture))) final)
+          aborts initial := by
+  constructor
+  · rintro ⟨normal, abnormal, defined⟩ firstFuture secondFuture thirdFuture
+    refine ⟨?_, ?_, ?_⟩
+    · intro output final execution firstCurrent secondCurrent thirdCurrent
+      apply normal (output.1, (firstFuture, (secondFuture, thirdFuture))) final
+      exact ⟨firstFuture, secondFuture, thirdFuture, output.2.1,
+        output.2.2.1, output.2.2.2, execution, firstCurrent, secondCurrent,
+        thirdCurrent, rfl⟩
+    · intro code execution
+      exact abnormal code ⟨firstFuture, secondFuture, thirdFuture, execution⟩
+    · intro obligation
+      exact defined ⟨firstFuture, secondFuture, thirdFuture, obligation⟩
+  · intro bodyWP
+    refine ⟨?_, ?_, ?_⟩
+    · rintro ⟨result, finalFirst, finalSecond, finalThird⟩ final
+        ⟨firstFuture, secondFuture, thirdFuture, firstReference,
+          secondReference, thirdReference, execution, firstCurrent,
+          secondCurrent, thirdCurrent, finals⟩
+      change (finalFirst, (finalSecond, finalThird)) =
+        (firstFuture, (secondFuture, thirdFuture)) at finals
+      cases finals
+      exact (bodyWP finalFirst finalSecond finalThird).1
+        (result, (firstReference, (secondReference, thirdReference))) final
+        execution firstCurrent secondCurrent thirdCurrent
+    · rintro code ⟨firstFuture, secondFuture, thirdFuture, execution⟩
+      exact (bodyWP firstFuture secondFuture thirdFuture).2.1 code execution
+    · rintro ⟨firstFuture, secondFuture, thirdFuture, obligation⟩
+      exact (bodyWP firstFuture secondFuture thirdFuture).2.2 obligation
+
+/-- Arity-independent mutable-parameter opening. The single reconciliation
+equation is over the heterogeneous tuple and is normally decomposed by `simp`
+after generated projections expose its components. -/
+@[wp_norm] theorem wp_withMutations {types : List Type} {Owners : Type}
+    (toTuple : Owners → Move.Semantics.Tuple types)
+    (fromTuple : Move.Semantics.Tuple types → Owners) (owners : Owners)
+    (body : Move.Semantics.MutationTuple types →
+      Spec State (β × Move.Semantics.MutationTuple types))
+    (ensures : (β × Owners) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Move.Semantics.withMutations toTuple fromTuple owners body)
+        ensures aborts initial ↔
+      ∀ futures,
+        wp (body (Move.Semantics.openMutations types (toTuple owners) futures))
+          (fun output final =>
+            Move.Semantics.mutationCurrents types output.2 = futures →
+            ensures (output.1, fromTuple futures) final)
+          aborts initial := by
+  constructor
+  · rintro ⟨normal, abnormal, defined⟩ futures
+    refine ⟨?_, ?_, ?_⟩
+    · intro output final execution currents
+      apply normal (output.1, fromTuple futures) final
+      exact ⟨futures, output.2, execution, currents, rfl⟩
+    · intro code execution
+      exact abnormal code ⟨futures, execution⟩
+    · intro obligation
+      exact defined ⟨futures, obligation⟩
+  · intro bodyWP
+    refine ⟨?_, ?_, ?_⟩
+    · rintro ⟨result, finalOwners⟩ final
+        ⟨futures, references, execution, currents, ownersEq⟩
+      change finalOwners = fromTuple futures at ownersEq
+      subst finalOwners
+      exact (bodyWP futures).1 (result, references) final execution currents
+    · rintro code ⟨futures, execution⟩
+      exact (bodyWP futures).2.1 code execution
+    · rintro ⟨futures, obligation⟩
+      exact (bodyWP futures).2.2 obligation
+
+/-- A focused final reborrow exposes its fresh prophecy to the local borrow
+site, which installs it into the enclosing owner. -/
+@[simp, wp_norm] theorem wp_reborrowMutation (current : α)
+    (ensures : (Mutation α × α) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (reborrowMutation current) ensures aborts initial ↔
+      ∀ future,
+        ensures ({ current, prophecy := future }, future) initial := by
+  constructor
+  · rintro ⟨normal, -, -⟩ future
+    exact normal _ initial ⟨rfl, rfl, rfl⟩
+  · intro continuation
+    refine ⟨?_, ?_, ?_⟩
+    · rintro ⟨returned, future⟩ final ⟨returnedCurrent, futureProphecy, rfl⟩
+      cases returned
+      simp_all
+    · intro code impossible
+      exact impossible.elim
+    · intro impossible
+      exact impossible.elim
+
+/-- Transferring a mutation chooses a fresh prophecy for the returned loan and
+suspends the lender at that value without changing the lender's outer
+prophecy. -/
+@[simp, wp_norm] theorem wp_transferMutation (reference : Mutation α)
+    (ensures : (Mutation α × Mutation α) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (transferMutation reference) ensures aborts initial ↔
+      ∀ future,
+        ensures
+          ({ current := reference.current, prophecy := future },
+            { current := future, prophecy := reference.prophecy })
+          initial := by
+  constructor
+  · rintro ⟨normal, -, -⟩ future
+    apply normal _ initial
+    exact ⟨rfl, rfl, rfl, rfl⟩
+  · intro continuation
+    refine ⟨?_, ?_, ?_⟩
+    · rintro ⟨returned, lender⟩ final ⟨returnedCurrent, lenderCurrent,
+        lenderProphecy, rfl⟩
+      cases returned
+      cases lender
+      simp_all
+    · intro code impossible
+      exact impossible.elim
+    · intro impossible
+      exact impossible.elim
+
+/-- Resolving a transferred mutation filters normal executions to the point
+where its current value equals its prophecy. -/
+@[simp, wp_norm] theorem wp_resolveMutation (reference : Mutation α)
+    (ensures : Unit → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (resolveMutation reference) ensures aborts initial ↔
+      (reference.Finished → ensures () initial) := by
+  constructor
+  · rintro ⟨normal, -, -⟩ finished
+    exact normal () initial ⟨finished, rfl, rfl⟩
+  · intro continuation
+    refine ⟨?_, ?_, ?_⟩
+    · rintro result final ⟨finished, rfl, rfl⟩
+      exact continuation finished
+    · intro code impossible
+      exact impossible.elim
+    · intro impossible
+      exact impossible.elim
+
+/-- A returned mutation keeps its existing prophecy.  The continuation may
+use the resolution equation only at the end of that mutation's live range. -/
+@[wp_norm] theorem wp_withTransferredMutation (reference : Mutation α)
+    (body : Mutation α → Spec State (β × Mutation α))
+    (ensures : β → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (withTransferredMutation reference body) ensures aborts initial ↔
+      wp (body reference)
+        (fun output final => output.2.Finished → ensures output.1 final)
+        aborts initial := by
+  simp only [withTransferredMutation, wp_bind, wp_resolveMutation, wp_pure]
 
 @[simp, wp_norm] theorem wp_withBorrowElemMutSpec (values : Move.Vector α)
     (index : Move.U64) (body : Mutation α → Spec State (β × Mutation α))

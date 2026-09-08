@@ -1,0 +1,19 @@
+step 0: 0x4b::stdlib_vector_push::built(5)
+  mono:       returned 3
+  LIR:        returned 3
+  round trip: returned 3
+
+step 1: 0x4b::stdlib_vector_push::total(5)
+  mono:       returned 18
+  LIR:        returned 18
+  round trip: returned 18
+
+step 2: 0x4b::stdlib_vector_push::element(5, 2)
+  mono:       returned 7
+  LIR:        returned 7
+  round trip: returned 7
+
+step 3: 0x4b::stdlib_vector_push::swapped_first(5)
+  mono:       returned 6
+  LIR:        returned 6
+  round trip: returned 6

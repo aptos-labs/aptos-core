@@ -153,7 +153,7 @@ module ControlForms where
 
   verify match_effect by
     contract_intro
-    cases args.1 <;> simp [wp_norm, move_norm]
+    cases args.1 <;> simp [wp_norm, move_norm] <;> omega
 
   fun match_two (left right : Bool) : Action U64 := do
     match left, right with

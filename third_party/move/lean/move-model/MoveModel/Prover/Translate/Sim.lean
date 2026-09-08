@@ -324,6 +324,22 @@ theorem compileInstr_skips (P : Program) (i : Instr) :
       intro c hc
       simp only [compileInstr, refFail, List.mem_singleton] at hc
       subst hc; exact skipCmd_assert _
+    | borrowVariantField variants field =>
+      intro c hc
+      simp only [compileInstr, refFail, List.mem_singleton] at hc
+      subst hc; exact skipCmd_assert _
+    | borrowVariantFieldInst variants field args =>
+      intro c hc
+      simp only [compileInstr, refFail, List.mem_singleton] at hc
+      subst hc; exact skipCmd_assert _
+    | testVariantRef variant =>
+      intro c hc
+      simp only [compileInstr, refFail, List.mem_singleton] at hc
+      subst hc; exact skipCmd_assert _
+    | testVariantRefInst variant args =>
+      intro c hc
+      simp only [compileInstr, refFail, List.mem_singleton] at hc
+      subst hc; exact skipCmd_assert _
     | readRef =>
       intro c hc
       simp only [compileInstr, refFail, List.mem_singleton] at hc
@@ -839,7 +855,9 @@ theorem compile_sim_instrNext (P : Program)
   | borrowLoc _ | borrowField _ _ _ | borrowFieldInst _ _ _
   | borrowGlobal _ _ | borrowGlobalInst _ _
   | borrowVecElem _ _ _ _ | readRef _ _ _ | writeRef _ _ _ _
-  | freezeRef _ _ _ =>
+  | freezeRef _ _ _
+  | borrowVariantField _ _ _ _ | borrowVariantFieldInst _ _ _ _
+  | testVariantRef _ _ | testVariantRefInst _ _ =>
     intro d hG hwfd hwfR hwfT v m₀ args₀ hcur hok hsnaps hargs hTL hTM
     exact ⟨.fail, ContRun.failPrefix (.assertFail fun h => h), .inl rfl⟩
 
@@ -875,7 +893,8 @@ theorem compile_sim_instrStop (P : Program)
       simp only [applyOper, hcur, hsrcs, hop] at hstep
       exact hstep
     · exact abortOutcomeFacts P d hsnaps hargs (by rw [hcur]) hfact
-  | borrowGlobal _ _ | borrowGlobalInst _ _ | borrowVecElem _ _ _ _ =>
+  | borrowGlobal _ _ | borrowGlobalInst _ _ | borrowVecElem _ _ _ _
+  | borrowVariantField _ _ _ | borrowVariantFieldInst _ _ _ =>
     intro d hG hwfd hwfR hwfT v m₀ args₀ hcur hok hsnaps hargs hTL hTM
     exact ⟨.fail, ContRun.failPrefix (.assertFail fun h => h), .inl rfl⟩
 

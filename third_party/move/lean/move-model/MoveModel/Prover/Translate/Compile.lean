@@ -282,6 +282,10 @@ def compileInstr (P : Program) : Instr → List (BCmd VState)
   | .call _ (.borrowGlobal _) _ => refFail
   | .call _ (.borrowGlobalInst _ _) _ => refFail
   | .call _ .borrowVecElem _ => refFail
+  | .call _ (.borrowVariantField _ _) _ => refFail
+  | .call _ (.borrowVariantFieldInst _ _ _) _ => refFail
+  | .call _ (.testVariantRef _) _ => refFail
+  | .call _ (.testVariantRefInst _ _) _ => refFail
   | .call _ .readRef _ => refFail
   | .call _ .writeRef _ => refFail
   | .call _ .freezeRef _ => refFail

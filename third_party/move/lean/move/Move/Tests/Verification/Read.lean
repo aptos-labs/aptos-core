@@ -66,7 +66,7 @@ module Read where
     subst ownerEq
     move_cases tooSmall : Move.Verify.Source.logicalLT reading.value minimum
     · simp [wp_norm, Move.Semantics.ResourceStore.get, lookup, tooSmall]
-    · simp [wp_norm, Move.Semantics.ResourceStore.get, lookup]
+    · simp [wp_norm, Move.Semantics.ResourceStore.get, lookup] <;> omega
 
   /-! ## Tests -/
 

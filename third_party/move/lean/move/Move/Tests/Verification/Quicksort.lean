@@ -89,7 +89,31 @@ module Quicksort where
   def Permutation (before after : Vector α) : Prop :=
     after.toList.Perm before.toList
 
+  /-! The contracts below use logical vectors and mathematical integers.  This
+  is the single bridge to the established `List`/`Nat` proof model; keeping it
+  here prevents every contract from spelling the same representation views. -/
+
+  abbrev PartitionPreView {T : Type} [Inhabited T]
+      (values : Vector T) (pivotIndex scan store : Int) : Prop :=
+    PartitionPre values.toList pivotIndex.toNat scan.toNat store.toNat
+
+  abbrev PartitionedView {T : Type} [Inhabited T]
+      (values : Vector T) (pivotIndex store : Int)
+      (result : Vector T) (pivot : Int) : Prop :=
+    Partitioned values.toList pivotIndex.toNat store.toNat
+      result.toList pivot.toNat
+
+  abbrev SortsView {T : Type} [Inhabited T]
+      (values : Vector T) (low high : Int) (result : Vector T) : Prop :=
+    Sorts values.toList low.toNat high.toNat result.toList
+
+  abbrev WithinLength (values : Vector T) (high : Int) : Prop :=
+    high.toNat ≤ values.toList.length
+
   end Model
+
+  attribute [local move_norm] Model.PartitionPreView Model.PartitionedView
+    Model.SortsView Model.WithinLength
 
   /-! ## Functions -/
 
@@ -126,10 +150,9 @@ module Quicksort where
   spec partition_loop {T} [Compare.Total T]
       (values : Vector T) (pivotIndex : U64) (scan : U64)
       (store : U64) where
-    requires Model.PartitionPre values.toList
-      pivotIndex.toNat scan.toNat store.toNat;
-    ensures Model.Partitioned values.toList pivotIndex.toNat store.toNat
-      result.values.toList result.pivot.toNat;
+    requires Model.PartitionPreView values pivotIndex scan store;
+    ensures Model.PartitionedView values pivotIndex store
+      result.values result.pivot;
     aborts_if False
 
   partial fun quick_sort_range {T}
@@ -148,8 +171,8 @@ module Quicksort where
 
   spec quick_sort_range {T} [Compare.Total T]
       (values : Vector T) (low : U64) (high : U64) where
-    requires high.toNat ≤ values.toList.length;
-    ensures Model.Sorts values.toList low.toNat high.toNat result.toList;
+    requires Model.WithinLength values high;
+    ensures Model.SortsView values low high result;
     aborts_if False
 
   /-- Generic in-place sort using Move's built-in lexicographic comparison. -/
@@ -761,6 +784,7 @@ module Quicksort where
         have storeEq : store.toNat = pivotIndex.toNat := by
           have := permitted.store_le_scan; omega
         refine ⟨?_, rfl⟩
+        spec_norm
         rw [storeEq]
         exact Model.Partitioned.final_self
 
@@ -812,9 +836,9 @@ module Quicksort where
             · show high.toNat ≤ left.toList.length
               omega
             · rintro result final ⟨sortsRight, rfl⟩
-              spec_norm at sortsRight
+              spec_norm at sortsRight ⊢
               exact ⟨Model.Sorts.compose permitted (by omega) part
-                sortsLeft sortsRight, rfl⟩
+                sortsLeft sortsRight, trivial⟩
             · intro code h
               exact h
           · intro code h
@@ -823,11 +847,12 @@ module Quicksort where
           exact h
       · rw [if_neg hspan]
         rw [Move.Verify.Source.logicalLT_uint] at hspan
-        spec_norm at hspan
+        spec_norm at hspan ⊢
         rw [Move.Verify.wp_pure]
         exact ⟨Model.Sorts.small (by omega), rfl⟩
     · rw [if_neg hrange]
       rw [Move.Verify.Source.logicalLT_uint] at hrange
+      spec_norm at hrange ⊢
       rw [Move.Verify.wp_pure]
       exact ⟨Model.Sorts.small (by omega), rfl⟩
 
@@ -840,8 +865,7 @@ module Quicksort where
       rw [Move.Vector.length_toNat]
       exact Nat.le_refl _
     · rintro result final ⟨sorts, rfl⟩
-      dsimp only at sorts
-      rw [Move.Vector.length_toNat] at sorts
+      spec_norm at sorts
       obtain ⟨sorted, perm⟩ := Model.Sorts.whole sorts
       exact ⟨⟨sorted, perm⟩, rfl⟩
     · intro code h

@@ -116,6 +116,18 @@ module Invariants where
   spec reading (percent : Percent) where
     ensures (result : U64).toNat ≤ 100
 
+  -- Creating a value in effectful code, from data the elaborator cannot
+  -- judge: `Percent.certify` packs the fields, and verification owes the
+  -- invariant at the creation — here from the abort guarding it.
+  fun clamp (amount : U64) : Action Percent := do
+    if amount > 100 then
+      abort 1
+    Percent.certify amount
+
+  spec clamp (amount : U64) where
+    ensures result.value = amount;
+    aborts_if 100 < amount.toNat with 1
+
   /-! ## Proofs -/
 
   verify span by
@@ -143,7 +155,9 @@ module Invariants where
 
   verify reading by
     simp only [reading.contract, reading]
-    exact fun percent => percent.invariant
+    exact fun percent => percent.dataInvariant
+
+  verify clamp
 
   /-! ## Tests -/
 
@@ -162,6 +176,9 @@ module Invariants where
   private def run := Tests.run compiled
 
   #test run "reading" [] [.struct [.u64 50]] = Tests.okRet [] [.u64 50]
+  -- The creation operation packs the fields; nothing is checked at run time.
+  #test run "clamp" [] [.u64 50] = Tests.okRet [] [.struct [.u64 50]]
+  #test run "clamp" [] [.u64 500] = Tests.abortedIn [] 1
   #test run "first_part" [] [.variant 1 [.u64 7]] = Tests.okRet [] [.u64 7]
   #test run "direct" [] [.u64 0] = Tests.okRet [] [.variant 0 []]
   private def gaugeId := compiled.resourceId "Gauge"

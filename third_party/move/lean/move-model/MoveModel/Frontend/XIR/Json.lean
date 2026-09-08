@@ -74,6 +74,8 @@ private def encodeValue : Value → JsonResult Json
   | .vector _ => throw "vector values are not valid XIR load constants"
   | .ref _ | .mut _ _ => throw "references are not valid XIR load constants"
 
+private def encodeNats (values : List Nat) : Json := arr (values.map nat)
+
 private def encodeOper : Oper → JsonResult Json
   | .add nt => pure (tag "add" (.str (numName nt)))
   | .sub nt => pure (tag "sub" (.str (numName nt)))
@@ -146,6 +148,14 @@ private def encodeOper : Oper → JsonResult Json
   | .borrowGlobalInst r args =>
       pure (tupleTag "borrow_global_inst" [nat r, arr (args.map encodeTy)])
   | .borrowVecElem => pure (.str "borrow_vec_elem")
+  | .borrowVariantField variants i =>
+      pure (tupleTag "borrow_variant_field" [encodeNats variants, nat i])
+  | .borrowVariantFieldInst variants i args =>
+      pure (tupleTag "borrow_variant_field_inst"
+        [encodeNats variants, nat i, arr (args.map encodeTy)])
+  | .testVariantRef variant => pure (tag "test_variant_ref" (nat variant))
+  | .testVariantRefInst variant args =>
+      pure (tupleTag "test_variant_ref_inst" [nat variant, arr (args.map encodeTy)])
   | .readRef => pure (.str "read_ref")
   | .writeRef => pure (.str "write_ref")
   | .freezeRef => pure (.str "freeze_ref")
@@ -153,8 +163,6 @@ private def encodeOper : Oper → JsonResult Json
   | .getMut | .setMut | .isParent _ | .mutPathIndex _ | .isMutLoc _
   | .isMutGlobal _ | .mutAddr =>
       throw "reference-elimination mutation operations are not deployable XIR"
-
-private def encodeNats (values : List Nat) : Json := arr (values.map nat)
 
 private def encodeInstr : Instr → JsonResult Json
   | .load dst value => return tupleTag "load" [nat dst, ← encodeValue value]
@@ -357,6 +365,13 @@ private def encodeExternalFun (reference : ExternalFunRef) : Json :=
     ("function", .str reference.functionName)
   ]
 
+private def encodeExternalStruct (reference : ExternalStructRef) : Json :=
+  Json.mkObj [
+    ("address", .str (encodeAddress reference.address)),
+    ("module", .str reference.moduleName),
+    ("name", .str reference.structName)
+  ]
+
 private def encodeFriend (reference : ExternalModuleRef) : Json :=
   Json.mkObj [
     ("address", .str (encodeAddress reference.address)),
@@ -377,7 +392,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 5),
+    ("version", nat 6),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -388,6 +403,8 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
   ]
   let fields := if module.externalFuns.isEmpty then fields else
     fields ++ [("external_functions", arr (module.externalFuns.map encodeExternalFun))]
+  let fields := if module.externalStructs.isEmpty then fields else
+    fields ++ [("external_structs", arr (module.externalStructs.map encodeExternalStruct))]
   return Json.mkObj <| if module.friends.isEmpty then fields else
     fields ++ [("friends", arr (module.friends.map encodeFriend))]
 
@@ -511,7 +528,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 || version = 4 || version = 5 do
+  unless version = 3 || version = 4 || version = 5 || version = 6 do
     throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
@@ -520,6 +537,9 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let structsJson ← (← json.getObjVal? "structs").getArr?
   let functionsJson ← (← json.getObjVal? "functions").getArr?
   let externalFunsJson ← match json.getObjVal? "external_functions" with
+    | .ok value => value.getArr?
+    | .error _ => pure #[]
+  let externalStructsJson ← match json.getObjVal? "external_structs" with
     | .ok value => value.getArr?
     | .error _ => pure #[]
   let friendsJson ← match json.getObjVal? "friends" with
@@ -567,6 +587,12 @@ def decodeMModule (text : String) : JsonResult MModule := do
       moduleName := ← (← functionJson.getObjVal? "module").getStr?
       functionName := ← (← functionJson.getObjVal? "function").getStr?
     } : ExternalFunRef)
+  let externalStructs ← externalStructsJson.toList.mapM fun structJson => do
+    return ({
+      address := ← decodeAddress (← (← structJson.getObjVal? "address").getStr?)
+      moduleName := ← (← structJson.getObjVal? "module").getStr?
+      structName := ← (← structJson.getObjVal? "name").getStr?
+    } : ExternalStructRef)
   let friends ← friendsJson.toList.mapM fun friendJson => do
     return ({
       address := ← decodeAddress (← (← friendJson.getObjVal? "address").getStr?)
@@ -591,6 +617,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
     funMeta := funMeta
     externalFuns := externalFuns
     friends := friends
+    externalStructs := externalStructs
   }
 
 end MoveModel.Frontend.XIR

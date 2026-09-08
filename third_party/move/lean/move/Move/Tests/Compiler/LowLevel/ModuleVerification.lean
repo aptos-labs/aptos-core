@@ -76,7 +76,8 @@ module SourceVerification where
       rw [Semantics.Checked.inRange_add, Move.UInt.toNat_one]
       exact Iff.rfl
     refine ⟨?_, ?_, ?_⟩
-    · refine fun result final execution => ⟨fun _ => ⟨bridge.mp execution.1, ?_⟩, execution.2.2⟩
+    · refine fun result final execution =>
+        ⟨fun _ => ⟨bridge.mp execution.1, ?_⟩, execution.2.2, not_false⟩
       have hv := execution.2.1
       rw [Move.UInt.ofInt_add, Move.UInt.toNat_one] at hv
       exact hv

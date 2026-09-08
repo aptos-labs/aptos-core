@@ -5167,6 +5167,12 @@ theorem Oper.sem_immOperandsSafe {op : Oper} {current : FrameId}
                 exact fun rt => Value.refFree_ne_ref (by simp_all) rt
             | exact fun v hv rt => Value.refFree_ne_ref (by simp_all) rt
             | exact fun rt => Value.refFree_ne_ref (by simp_all) rt
+            | (intro v hv rt href
+               subst v
+               unfold Oper.extendedVectorSem at hs
+               split at hs <;> simp_all
+               all_goals cases hv
+               all_goals simp at hs)
             | (split at hs <;> simp_all)
 
 /- Immutable-copy views are observationally indistinguishable to an ordinary
@@ -7642,7 +7648,7 @@ theorem ImmStackRel.simulate_borrowVecElem_abort {P P' : Program} {G : Cfg}
     (hge : es.length ≤ n)
     (hchecked : CheckedState P d s) :
     RunFrom P' G (tgt ++ rest) term s'
-      (.abort s.memory runtimeAbortCode) := by
+      (.abort s.memory Oper.borrowVecElem.abortCode) := by
   have htLive : t ∈
       liveThroughInstr (.call [dst] .borrowVecElem [t, it]) live :=
     uses_mem_liveThroughInstr (by simp [instrUses])
@@ -8032,6 +8038,15 @@ theorem elimImm_sim {P : Program} (facts : ImmCheckedFacts P)
             exact ⟨targetOutcome, hpath.run htarget, hout⟩
         | borrowFieldInst ht hs hi =>
             simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
+        -- enum payload references: not yet eliminated (the imm pass rejects them)
+        | borrowVariantField ht hv hmem hi =>
+            simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
+        | borrowVariantFieldInst ht hv hmem hi =>
+            simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
+        | testVariantRef ht hv =>
+            simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
+        | testVariantRefInst ht hv =>
+            simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
         | borrowGlobal ha hpresent =>
             have hfree := (ok f d hf hG).consistent.memory _ _ _ hpresent
             have hstate := (elimImmInstr_borrowGlobal_inv hrewrite).1
@@ -8121,6 +8136,10 @@ theorem elimImm_sim {P : Program} (facts : ImmCheckedFacts P)
               ha habsent
             exact ⟨_, htarget, .abort⟩
         | borrowGlobalInst ha habsent =>
+            simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
+        | borrowVariantField ht hv hmem =>
+            simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
+        | borrowVariantFieldInst ht hv hmem =>
             simp [elimImmInstr, throw, throwThe, MonadExceptOf.throw] at hrewrite
         | borrowVecElem ht hv hi hge =>
             have hchecked := ok f d hf hG

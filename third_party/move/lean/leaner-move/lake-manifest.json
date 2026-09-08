@@ -1,0 +1,13 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "«leaner-ir»",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../leaner-ir",
+   "configFile": "lakefile.toml"}],
+ "name": "«leaner-move»",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

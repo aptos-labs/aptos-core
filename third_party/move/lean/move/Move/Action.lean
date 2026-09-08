@@ -51,6 +51,25 @@ abbrev Action (α : Type) := StateM World α
     MutRef (Move.Vector α) → U64 → Action (MutRef α) := fun _ _ world =>
   (MutRef.default, world)
 
+/-- Borrow a payload field of an enum referent: the field at offset `field` of
+whichever of the listed variants the referent is — `variants` is the bit set
+of their indices — aborting for any other variant (`Bytecode::BorrowVariantField`).
+The field type is the listed variants' common type at that offset. -/
+@[noinline] opaque borrowVariantField {Owner FieldTy : Type} [Inhabited FieldTy]
+    (_variants _field : Nat) : Ref Owner → Action (Ref FieldTy) := fun _ world =>
+  (Ref.default, world)
+
+@[noinline] opaque borrowVariantFieldMut {Owner FieldTy : Type} [Inhabited FieldTy]
+    (_variants _field : Nat) : MutRef Owner → Action (MutRef FieldTy) := fun _ world =>
+  (MutRef.default, world)
+
+/-- Test the variant of an enum referent (`Bytecode::TestVariant`). -/
+@[noinline] opaque testVariantRef {Owner : Type} (_variant : Nat) : Ref Owner → Action Bool :=
+  fun _ world => (false, world)
+
+@[noinline] opaque testVariantMutRef {Owner : Type} (_variant : Nat) :
+    MutRef Owner → Action Bool := fun _ world => (false, world)
+
 @[noinline] opaque freeze {α : Type} : MutRef α → Action (Ref α) := fun ref world =>
   (freezeRef ref, world)
 
@@ -208,6 +227,11 @@ value. The backend lowers this receiver form directly to `vector::length`. -/
 @[noinline] def length {α : Type} (self : Ref (Move.Vector α)) : U64 :=
   Move.Vector.length self.get
 
+/-- Emptiness of a borrowed vector, observed without reading the vector into
+an owned value. -/
+@[noinline] def isEmpty {α : Type} (self : Ref (Move.Vector α)) : Bool :=
+  Move.Vector.isEmpty self.get
+
 end Ref
 
 namespace MutRef
@@ -216,6 +240,11 @@ namespace MutRef
 copying it. -/
 @[noinline] def length {α : Type} (self : MutRef (Move.Vector α)) : U64 :=
   Move.Vector.length self.get
+
+/-- Emptiness of a mutably borrowed vector, observed without consuming or
+copying it. -/
+@[noinline] def isEmpty {α : Type} (self : MutRef (Move.Vector α)) : Bool :=
+  Move.Vector.isEmpty self.get
 
 end MutRef
 

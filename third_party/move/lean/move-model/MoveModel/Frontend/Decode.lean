@@ -118,6 +118,9 @@ private partial def decodeValue (j : Json) : Dec Value := do
     pure (.vector (← (← (← payload tag p).getArr?).toList.mapM decodeValue))
   | k => throw s!"unknown value kind `{k}`"
 
+private def decodeNats (j : Json) : Dec (List Nat) := do
+  (← j.getArr?).toList.mapM decodeNat
+
 private def decodeOper (j : Json) : Dec Oper := do
   let (tag, p) ← decodeTagged j
   let arg : Dec Nat := do decodeNat (← payload tag p)
@@ -216,13 +219,20 @@ private def decodeOper (j : Json) : Dec Oper := do
     let a ← payloadArr tag 2 p
     pure (.borrowGlobalInst (← decodeNat a[0]!) (← decodeTys a[1]!))
   | "borrow_vec_elem" => pure .borrowVecElem
+  | "borrow_variant_field" =>
+    let a ← payloadArr tag 2 p
+    pure (.borrowVariantField (← decodeNats a[0]!) (← decodeNat a[1]!))
+  | "borrow_variant_field_inst" =>
+    let a ← payloadArr tag 3 p
+    pure (.borrowVariantFieldInst (← decodeNats a[0]!) (← decodeNat a[1]!) (← decodeTys a[2]!))
+  | "test_variant_ref" => pure (.testVariantRef (← arg))
+  | "test_variant_ref_inst" =>
+    let a ← payloadArr tag 2 p
+    pure (.testVariantRefInst (← decodeNat a[0]!) (← decodeTys a[1]!))
   | "read_ref" => pure .readRef
   | "write_ref" => pure .writeRef
   | "freeze_ref" => pure .freezeRef
   | k => throw s!"unknown operation `{k}`"
-
-private def decodeNats (j : Json) : Dec (List Nat) := do
-  (← j.getArr?).toList.mapM decodeNat
 
 private def decodeInstr (j : Json) : Dec Instr := do
   let (tag, p) ← decodeTagged j

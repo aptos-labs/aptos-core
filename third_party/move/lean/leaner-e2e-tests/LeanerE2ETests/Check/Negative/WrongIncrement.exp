@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Negative/WrongIncrement.lean:13:4: error: the specification clause `ensures result == value` is not established
+LeanerE2ETests/Check/Negative/WrongIncrement.lean:16:9: error: leaner verification failed

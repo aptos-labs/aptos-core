@@ -83,6 +83,10 @@ inductive Oper where
   | borrowGlobal (resource : Name) (typeArgs : Array Ty)
   | borrowField (field : Nat) (typeArgs : Array Ty)
   | borrowVecElem
+  /-- A payload field of an enum referent, for the listed variants. -/
+  | borrowVariantField (enumName : Name) (variants : Array Nat) (field : Nat) (typeArgs : Array Ty)
+  /-- The variant test of an enum referent. -/
+  | testVariantRef (enumName : Name) (variant : Nat) (typeArgs : Array Ty)
   | readRef | writeRef | freezeRef
   | existsAt (resource : Name) (typeArgs : Array Ty)
   | moveFrom (resource : Name) (typeArgs : Array Ty)
@@ -179,6 +183,16 @@ structure ExternalFunRef where
   functionName : String
   deriving BEq, Repr
 
+/-- A structure or enum owned by another Move module, mentioned by a type
+here. `leanName` is the Lean type; the remaining fields are its bytecode
+identity. -/
+structure ExternalStructRef where
+  leanName : Name
+  address : String
+  moduleName : String
+  structName : String
+  deriving BEq, Repr
+
 structure ExternalModuleRef where
   address : String
   moduleName : String
@@ -191,7 +205,60 @@ structure Module where
   functions : Array FunDecl
   externalFuns : Array ExternalFunRef := #[]
   friends : Array ExternalModuleRef := #[]
+  externalStructs : Array ExternalStructRef := #[]
   deriving BEq, Repr
+
+/-- The structure and enum names a type mentions. -/
+partial def Ty.structNames : Ty → Array Name
+  | .struct name | .enum name => #[name]
+  | .structInst name args | .enumInst name args =>
+      #[name] ++ args.flatMap Ty.structNames
+  | .vector elem | .ref elem | .mutRef elem => elem.structNames
+  | .bool | .int _ | .address | .signer | .typeParam _ => #[]
+
+/-- The type arguments of an operation (its own structure or resource, when
+it has one, is a declaration of this module). -/
+def Oper.typeArgs : Oper → Array Ty
+  | .pack _ typeArgs | .unpack _ typeArgs | .packVariant _ _ typeArgs
+  | .unpackVariant _ _ typeArgs | .testVariant _ _ typeArgs | .getField _ _ typeArgs
+  | .borrowGlobal _ typeArgs | .borrowField _ typeArgs | .existsAt _ typeArgs
+  | .borrowVariantField _ _ _ typeArgs | .testVariantRef _ _ typeArgs
+  | .moveFrom _ typeArgs | .moveTo _ typeArgs | .function _ typeArgs => typeArgs
+  | .add _ | .sub _ | .mul _ | .div _ | .mod _ | .bitAnd _ | .bitOr _ | .bitXor _
+  | .shl _ | .shr _ | .cast _ | .lt | .le | .eq | .vecPack | .vecLen | .vecGet | .vecSet
+  | .vecPush | .vecPop | .vecInsert | .vecRemove | .vecSwap | .vecSwapRemove | .vecAppend
+  | .vecReverse | .vecReverseSlice | .vecContains | .vecIndexOf | .vecTrim
+  | .vecTrimReverse | .vecRotate | .vecRotateSlice | .vecDestroyEmpty | .borrowLoc
+  | .borrowVecElem | .readRef | .writeRef | .freezeRef => #[]
+
+/-- Every structure and enum name the module's declarations mention: field
+types, signatures, locals, and the type arguments of operations. -/
+def mentionedStructNames (structs : Array StructDecl) (functions : Array FunDecl) :
+    Array Name := Id.run do
+  let mut names : Array Name := #[]
+  let add (names : Array Name) (ty : Ty) : Array Name :=
+    ty.structNames.foldl (fun names name =>
+      if names.contains name then names else names.push name) names
+  for structDecl in structs do
+    for field in structDecl.fields do
+      names := add names field.ty
+    for variants in structDecl.variants do
+      for variant in variants do
+        for field in variant.fields do
+          names := add names field.ty
+  for function in functions do
+    for param in function.params do
+      names := add names param.ty
+    for ty in function.returns do
+      names := add names ty
+    for localDecl in function.locals do
+      names := add names localDecl.ty
+    for block in function.blocks do
+      for instr in block.instrs do
+        if let .call _ op _ := instr.kind then
+          for ty in op.typeArgs do
+            names := add names ty
+  return names
 
 private def lookup (kind name : String) (names : Array String) : Except String Nat := do
   let i := names.findIdx (· == name)
@@ -308,6 +375,14 @@ private def lowerOper (structNames : Array (Name × String))
       if args.isEmpty then pure (.borrowField field)
       else return .borrowFieldInst field (← args.toList.mapM (lowerTy structNames))
   | .borrowVecElem => pure .borrowVecElem
+  | .borrowVariantField _ variants field args =>
+      if args.isEmpty then pure (.borrowVariantField variants.toList field)
+      else do
+        let lowered ← args.toList.mapM (lowerTy structNames)
+        pure (.borrowVariantFieldInst variants.toList field lowered)
+  | .testVariantRef _ variant args =>
+      if args.isEmpty then pure (.testVariantRef variant)
+      else return .testVariantRefInst variant (← args.toList.mapM (lowerTy structNames))
   | .readRef => pure .readRef
   | .writeRef => pure .writeRef
   | .freezeRef => pure .freezeRef
@@ -437,7 +512,9 @@ private def lowerFun (structNames : Array (Name × String))
 /-- Resolve names to deterministic positional identifiers and construct the
 canonical semantic Move IR module. -/
 def Module.toIR (module : Module) : Except String MoveModel.IR.Module := do
-  let structNames := module.structs.map fun s => (s.leanName, s.moveName)
+  -- Other modules' types follow the local ones: ids `numStructs + i`.
+  let structNames := module.structs.map (fun s => (s.leanName, s.moveName)) ++
+    module.externalStructs.map fun e => (e.leanName, e.structName)
   let funNames := module.functions.map fun f => (f.leanName, f.moveName)
   let externalFunNames := module.externalFuns.map (·.leanName)
   ensureUnique "struct name" (module.structs.map (·.moveName))
@@ -493,6 +570,12 @@ def Module.toIR (module : Module) : Except String MoveModel.IR.Module := do
         moduleName := reference.moduleName
       }
     dialect := .stackless
+    externalStructs := ← module.externalStructs.toList.mapM fun reference => do
+      return {
+        address := ← parseAddress reference.address
+        moduleName := reference.moduleName
+        structName := reference.structName
+      }
   }
 
 end Move.Compiler.LIR

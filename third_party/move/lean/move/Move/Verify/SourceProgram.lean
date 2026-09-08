@@ -27,10 +27,13 @@ abbrev Point := Nat
 inductive Control (Event : Type) where
   | done
   | abort
+  | stop
+  | break (label? : Option String := none)
+  | continue (label? : Option String := none)
   | event (point : Point) (event : Event) (next : Control Event)
   | branch (point : Point)
       (thenBranch elseBranch next : Control Event)
-  | loop (point : Point) (body next : Control Event)
+  | loop (point : Point) (label? : Option String) (body next : Control Event)
   deriving Repr, BEq, DecidableEq, Inhabited, Lean.ToExpr
 
 end Move.Verify.Source

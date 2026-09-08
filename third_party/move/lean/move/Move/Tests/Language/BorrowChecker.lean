@@ -85,7 +85,7 @@ def callPoisonsAlias : Program := {
 def loopCarriesMutation : Program := {
   declaration := "loopCarriesMutation"
   body := .event 0 (.borrowMut "writer" (localPlace "owner")) <|
-    .loop 1 (.event 2 (.write "writer") .done) <|
+    .loop 1 none (.event 2 (.write "writer") .done) <|
     .event 3 (.drop "writer") .done }
 
 #guard (analyze loopCarriesMutation).isOk
@@ -107,10 +107,61 @@ def poisonAcrossIteration : Program := {
   declaration := "poisonAcrossIteration"
   body := .event 0 (.borrowMut "left" (localPlace "owner")) <|
     .event 1 (.borrowMut "right" (localPlace "owner")) <|
-    .loop 2 (.event 3 (.write "left") .done) <|
+    .loop 2 none (.event 3 (.write "left") .done) <|
     .event 4 (.read "right") .done }
 
 #guard !(analyze poisonAcrossIteration).isOk
+
+/-- A break edge drops references created in the loop before its continuation
+uses the revived entry reference. -/
+def breakUnwindsLoopLoan : Program := {
+  declaration := "breakUnwindsLoopLoan"
+  parameters := #[{ name := "parent", kind := .mutable }]
+  body := .loop 0 none
+    (.event 1 (.borrowMut "child"
+      { root := .parameter 0, path := #[.field "value"] } (some "parent"))
+      (.break none))
+    (.event 2 (.write "parent") .done) }
+
+#guard (analyze breakUnwindsLoopLoan).isOk
+
+/-- A continue edge performs the same unwind before it joins the loop's
+backedge state. -/
+def continueUnwindsLoopLoan : Program := {
+  declaration := "continueUnwindsLoopLoan"
+  parameters := #[{ name := "parent", kind := .mutable }]
+  body := .loop 0 none
+    (.event 1 (.borrowMut "child"
+      { root := .parameter 0, path := #[.field "value"] } (some "parent"))
+      (.continue none))
+    (.event 2 (.write "parent") .done) }
+
+#guard (analyze continueUnwindsLoopLoan).isOk
+
+/-- A labeled exit passes through inner loops and is consumed only by the
+named target, with its child loan unwound at that boundary. -/
+def labeledBreakUnwindsLoopLoan : Program := {
+  declaration := "labeledBreakUnwindsLoopLoan"
+  parameters := #[{ name := "parent", kind := .mutable }]
+  body := .loop 0 (some "outer")
+    (.loop 1 none
+      (.event 2 (.borrowMut "child"
+        { root := .parameter 0, path := #[.field "value"] } (some "parent"))
+        (.break (some "outer")))
+      .done)
+    (.event 3 (.write "parent") .done) }
+
+#guard (analyze labeledBreakUnwindsLoopLoan).isOk
+
+/-- A terminal return edge does not enter the branch's following block. -/
+def returnStopsControlFlow : Program := {
+  declaration := "returnStopsControlFlow"
+  body := .branch 0
+    (.event 1 (.borrowMut "loan" (localPlace "first")) .stop)
+    .done
+    (.event 2 (.borrowMut "loan" (localPlace "second")) .done) }
+
+#guard (analyze returnStopsControlFlow).isOk
 
 def childReconcilesIntoParent : Program := {
   declaration := "childReconcilesIntoParent"
@@ -166,6 +217,50 @@ def returnedReferenceThroughCall : Program := {
 #guard (analyze returnedReferenceThroughCall).toOption.get!.finalState.returns == #[{
   parameter := 0, path := #[.field "value"], kind := .immutable }]
 
+/-- A mutable result has all mutable actuals as modular lenders, even when the
+callee body recorded more precise alternative derivations. -/
+def returnedMutationSuspendsEveryInput : Program := {
+  declaration := "returnedMutationSuspendsEveryInput"
+  parameters := #[
+    { name := "left", kind := .mutable },
+    { name := "right", kind := .mutable }]
+  body := sequence #[
+    .call "choose" #[
+      { reference := "left", parameter := 0, effect := .ignore },
+      { reference := "right", parameter := 1, effect := .ignore }]
+      #[] #[
+        { destination := "result", derivation := {
+          parameter := 0, kind := .mutable } },
+        { destination := "result", derivation := {
+          parameter := 1, kind := .mutable } }],
+    .read "left"] }
+
+#guard analyze returnedMutationSuspendsEveryInput == .error {
+  point := 1
+  kind := .suspendedUse
+  reference? := some "left" }
+
+/-- Dropping the returned result revives every modular lender together. -/
+def droppingReturnedMutationRevivesEveryInput : Program := {
+  declaration := "droppingReturnedMutationRevivesEveryInput"
+  parameters := #[
+    { name := "left", kind := .mutable },
+    { name := "right", kind := .mutable }]
+  body := sequence #[
+    .call "choose" #[
+      { reference := "left", parameter := 0, effect := .ignore },
+      { reference := "right", parameter := 1, effect := .ignore }]
+      #[] #[
+        { destination := "result", derivation := {
+          parameter := 0, kind := .mutable } },
+        { destination := "result", derivation := {
+          parameter := 1, kind := .mutable } }],
+    .drop "result",
+    .read "left",
+    .read "right"] }
+
+#guard (analyze droppingReturnedMutationRevivesEveryInput).isOk
+
 def returnedReferenceCertificate : Certificate :=
   (makeCertificate { returnedReferenceThroughCall with summary := {
     parameterEffects := #[.read]
@@ -195,7 +290,7 @@ def validCertificate : Certificate :=
 #guard (validCertificate.check dropPoisoned).isOk
 
 def corruptedCertificate : Certificate :=
-  { validCertificate with version := 2 }
+  { validCertificate with version := 3 }
 
 #guard corruptedCertificate.check dropPoisoned == .error {
   point := 0, kind := .certificateMismatch }

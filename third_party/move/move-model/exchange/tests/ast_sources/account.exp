@@ -1,0 +1,2294 @@
+{
+  "schema": "move-xast-module",
+  "version": 4,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "account",
+  "doc": " Balances under an address, with entry functions and contracts.",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [
+    {
+      "name": "E_INSUFFICIENT_BALANCE",
+      "doc": "",
+      "loc": 1,
+      "ty": 0,
+      "value": {
+        "number": "1"
+      }
+    }
+  ],
+  "structs": [
+    {
+      "name": "Balance",
+      "doc": " The balance resource.",
+      "loc": 2,
+      "abilities": [
+        "key"
+      ],
+      "type_params": [],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "balance",
+          "doc": "",
+          "ty": 1
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "BalanceValue",
+      "doc": "",
+      "loc": 3,
+      "abilities": [
+        "copy",
+        "drop",
+        "store"
+      ],
+      "type_params": [],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "value",
+          "doc": "",
+          "ty": 0
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "publish",
+      "doc": "",
+      "loc": 11,
+      "visibility": "public",
+      "is_entry": true,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "account",
+          "ty": 4
+        },
+        {
+          "name": "amount",
+          "ty": 0
+        }
+      ],
+      "result": 5,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 5,
+        "loc": 10,
+        "kind": "sequence",
+        "exps": [
+          {
+            "ty": 5,
+            "loc": 8,
+            "kind": "call",
+            "op": "move_to",
+            "inst": [
+              2
+            ],
+            "args": [
+              {
+                "ty": 4,
+                "loc": 4,
+                "kind": "param",
+                "index": 0
+              },
+              {
+                "ty": 2,
+                "loc": 7,
+                "kind": "call",
+                "op": {
+                  "pack": {
+                    "name": 1,
+                    "variant": null
+                  }
+                },
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 1,
+                    "loc": 6,
+                    "kind": "call",
+                    "op": {
+                      "pack": {
+                        "name": 0,
+                        "variant": null
+                      }
+                    },
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 5,
+                        "kind": "param",
+                        "index": 1
+                      }
+                    ],
+                    "surface": null
+                  }
+                ],
+                "surface": null
+              }
+            ],
+            "surface": null
+          },
+          {
+            "ty": 5,
+            "loc": 9,
+            "kind": "call",
+            "op": "tuple",
+            "inst": [],
+            "args": [],
+            "surface": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "remove",
+      "doc": "",
+      "loc": 19,
+      "visibility": "public",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "addr",
+          "ty": 6
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 18,
+        "kind": "block",
+        "pattern": {
+          "ty": 2,
+          "loc": 13,
+          "kind": "struct",
+          "name": 1,
+          "inst": [],
+          "variant": null,
+          "fields": [
+            {
+              "ty": 1,
+              "loc": 12,
+              "kind": "var",
+              "name": "balance"
+            }
+          ]
+        },
+        "binding": {
+          "ty": 2,
+          "loc": 15,
+          "kind": "call",
+          "op": "move_from",
+          "inst": [
+            2
+          ],
+          "args": [
+            {
+              "ty": 6,
+              "loc": 14,
+              "kind": "param",
+              "index": 0
+            }
+          ],
+          "surface": null
+        },
+        "body": {
+          "ty": 0,
+          "loc": 17,
+          "kind": "call",
+          "op": {
+            "select": {
+              "name": 0,
+              "field": "value"
+            }
+          },
+          "inst": [
+            1
+          ],
+          "args": [
+            {
+              "ty": 1,
+              "loc": 16,
+              "kind": "local",
+              "name": "balance"
+            }
+          ],
+          "surface": null
+        }
+      }
+    },
+    {
+      "name": "balance_of",
+      "doc": "",
+      "loc": 37,
+      "visibility": "public",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "addr",
+          "ty": 6
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": 36,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "aborts_if",
+            "loc": 25,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 28,
+              "kind": "call",
+              "op": "not",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 8,
+                  "loc": 27,
+                  "kind": "call",
+                  "op": {
+                    "exists": null
+                  },
+                  "inst": [
+                    2
+                  ],
+                  "args": [
+                    {
+                      "ty": 6,
+                      "loc": 26,
+                      "kind": "param",
+                      "index": 0
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "ensures",
+            "loc": 29,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 35,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 30,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 0,
+                  "loc": 34,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "value"
+                    }
+                  },
+                  "inst": [
+                    1
+                  ],
+                  "args": [
+                    {
+                      "ty": 1,
+                      "loc": 33,
+                      "kind": "call",
+                      "op": {
+                        "select": {
+                          "name": 1,
+                          "field": "balance"
+                        }
+                      },
+                      "inst": [
+                        2
+                      ],
+                      "args": [
+                        {
+                          "ty": 2,
+                          "loc": 32,
+                          "kind": "call",
+                          "op": {
+                            "global": null
+                          },
+                          "inst": [
+                            2
+                          ],
+                          "args": [
+                            {
+                              "ty": 6,
+                              "loc": 31,
+                              "kind": "param",
+                              "index": 0
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 24,
+        "kind": "sequence",
+        "exps": [
+          {
+            "ty": 0,
+            "loc": 23,
+            "kind": "call",
+            "op": {
+              "select": {
+                "name": 0,
+                "field": "value"
+              }
+            },
+            "inst": [
+              1
+            ],
+            "args": [
+              {
+                "ty": 1,
+                "loc": 22,
+                "kind": "call",
+                "op": {
+                  "select": {
+                    "name": 1,
+                    "field": "balance"
+                  }
+                },
+                "inst": [
+                  2
+                ],
+                "args": [
+                  {
+                    "ty": 7,
+                    "loc": 21,
+                    "kind": "call",
+                    "op": {
+                      "borrow_global": "immutable"
+                    },
+                    "inst": [
+                      2
+                    ],
+                    "args": [
+                      {
+                        "ty": 6,
+                        "loc": 20,
+                        "kind": "param",
+                        "index": 0
+                      }
+                    ],
+                    "surface": "index_notation"
+                  }
+                ],
+                "surface": null
+              }
+            ],
+            "surface": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "deposit",
+      "doc": "",
+      "loc": 80,
+      "visibility": "public",
+      "is_entry": true,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "addr",
+          "ty": 6
+        },
+        {
+          "name": "amount",
+          "ty": 0
+        }
+      ],
+      "result": 5,
+      "pragmas": [],
+      "spec": {
+        "loc": 79,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "requires",
+            "loc": 54,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 56,
+              "kind": "call",
+              "op": {
+                "exists": null
+              },
+              "inst": [
+                2
+              ],
+              "args": [
+                {
+                  "ty": 6,
+                  "loc": 55,
+                  "kind": "param",
+                  "index": 0
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "ensures",
+            "loc": 57,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 69,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 61,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "value"
+                    }
+                  },
+                  "inst": [
+                    1
+                  ],
+                  "args": [
+                    {
+                      "ty": 1,
+                      "loc": 60,
+                      "kind": "call",
+                      "op": {
+                        "select": {
+                          "name": 1,
+                          "field": "balance"
+                        }
+                      },
+                      "inst": [
+                        2
+                      ],
+                      "args": [
+                        {
+                          "ty": 2,
+                          "loc": 59,
+                          "kind": "call",
+                          "op": {
+                            "global": null
+                          },
+                          "inst": [
+                            2
+                          ],
+                          "args": [
+                            {
+                              "ty": 6,
+                              "loc": 58,
+                              "kind": "param",
+                              "index": 0
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 11,
+                  "loc": 68,
+                  "kind": "call",
+                  "op": "add",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 66,
+                      "kind": "call",
+                      "op": "old",
+                      "inst": [
+                        0
+                      ],
+                      "args": [
+                        {
+                          "ty": 0,
+                          "loc": 65,
+                          "kind": "call",
+                          "op": {
+                            "select": {
+                              "name": 0,
+                              "field": "value"
+                            }
+                          },
+                          "inst": [
+                            1
+                          ],
+                          "args": [
+                            {
+                              "ty": 1,
+                              "loc": 64,
+                              "kind": "call",
+                              "op": {
+                                "select": {
+                                  "name": 1,
+                                  "field": "balance"
+                                }
+                              },
+                              "inst": [
+                                2
+                              ],
+                              "args": [
+                                {
+                                  "ty": 2,
+                                  "loc": 63,
+                                  "kind": "call",
+                                  "op": {
+                                    "global": null
+                                  },
+                                  "inst": [
+                                    2
+                                  ],
+                                  "args": [
+                                    {
+                                      "ty": 6,
+                                      "loc": 62,
+                                      "kind": "param",
+                                      "index": 0
+                                    }
+                                  ],
+                                  "surface": null
+                                }
+                              ],
+                              "surface": null
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 67,
+                      "kind": "param",
+                      "index": 1
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "aborts_if",
+            "loc": 70,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 78,
+              "kind": "call",
+              "op": "gt",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 11,
+                  "loc": 76,
+                  "kind": "call",
+                  "op": "add",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 74,
+                      "kind": "call",
+                      "op": {
+                        "select": {
+                          "name": 0,
+                          "field": "value"
+                        }
+                      },
+                      "inst": [
+                        1
+                      ],
+                      "args": [
+                        {
+                          "ty": 1,
+                          "loc": 73,
+                          "kind": "call",
+                          "op": {
+                            "select": {
+                              "name": 1,
+                              "field": "balance"
+                            }
+                          },
+                          "inst": [
+                            2
+                          ],
+                          "args": [
+                            {
+                              "ty": 2,
+                              "loc": 72,
+                              "kind": "call",
+                              "op": {
+                                "global": null
+                              },
+                              "inst": [
+                                2
+                              ],
+                              "args": [
+                                {
+                                  "ty": 6,
+                                  "loc": 71,
+                                  "kind": "param",
+                                  "index": 0
+                                }
+                              ],
+                              "surface": null
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 75,
+                      "kind": "param",
+                      "index": 1
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 0,
+                  "loc": 77,
+                  "kind": "value",
+                  "value": {
+                    "number": "18446744073709551615"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": {
+          "modifies": [
+            {
+              "ty": 2,
+              "loc": 53,
+              "kind": "call",
+              "op": {
+                "global": null
+              },
+              "inst": [
+                2
+              ],
+              "args": [
+                {
+                  "ty": 6,
+                  "loc": 52,
+                  "kind": "param",
+                  "index": 0
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "reads": [],
+          "modifies_all": false,
+          "reads_all": false
+        }
+      },
+      "body": {
+        "ty": 5,
+        "loc": 51,
+        "kind": "block",
+        "pattern": {
+          "ty": 9,
+          "loc": 38,
+          "kind": "var",
+          "name": "value"
+        },
+        "binding": {
+          "ty": 9,
+          "loc": 43,
+          "kind": "call",
+          "op": {
+            "borrow": "mutable"
+          },
+          "inst": [],
+          "args": [
+            {
+              "ty": 0,
+              "loc": 42,
+              "kind": "call",
+              "op": {
+                "select": {
+                  "name": 0,
+                  "field": "value"
+                }
+              },
+              "inst": [
+                1
+              ],
+              "args": [
+                {
+                  "ty": 1,
+                  "loc": 41,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 1,
+                      "field": "balance"
+                    }
+                  },
+                  "inst": [
+                    2
+                  ],
+                  "args": [
+                    {
+                      "ty": 10,
+                      "loc": 40,
+                      "kind": "call",
+                      "op": {
+                        "borrow_global": "mutable"
+                      },
+                      "inst": [
+                        2
+                      ],
+                      "args": [
+                        {
+                          "ty": 6,
+                          "loc": 39,
+                          "kind": "param",
+                          "index": 0
+                        }
+                      ],
+                      "surface": "index_notation"
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        },
+        "body": {
+          "ty": 5,
+          "loc": 51,
+          "kind": "sequence",
+          "exps": [
+            {
+              "ty": 5,
+              "loc": 49,
+              "kind": "mutate",
+              "target": {
+                "ty": 9,
+                "loc": 44,
+                "kind": "local",
+                "name": "value"
+              },
+              "value": {
+                "ty": 0,
+                "loc": 48,
+                "kind": "call",
+                "op": "add",
+                "inst": [
+                  0
+                ],
+                "args": [
+                  {
+                    "ty": 0,
+                    "loc": 46,
+                    "kind": "call",
+                    "op": "deref",
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 9,
+                        "loc": 45,
+                        "kind": "local",
+                        "name": "value"
+                      }
+                    ],
+                    "surface": null
+                  },
+                  {
+                    "ty": 0,
+                    "loc": 47,
+                    "kind": "param",
+                    "index": 1
+                  }
+                ],
+                "surface": null
+              }
+            },
+            {
+              "ty": 5,
+              "loc": 50,
+              "kind": "call",
+              "op": "tuple",
+              "inst": [],
+              "args": [],
+              "surface": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "is_published",
+      "doc": "",
+      "loc": 83,
+      "visibility": "public",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "addr",
+          "ty": 6
+        }
+      ],
+      "result": 8,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 8,
+        "loc": 82,
+        "kind": "call",
+        "op": {
+          "exists": null
+        },
+        "inst": [
+          2
+        ],
+        "args": [
+          {
+            "ty": 6,
+            "loc": 81,
+            "kind": "param",
+            "index": 0
+          }
+        ],
+        "surface": null
+      }
+    },
+    {
+      "name": "withdraw",
+      "doc": "",
+      "loc": 132,
+      "visibility": "public",
+      "is_entry": true,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "addr",
+          "ty": 6
+        },
+        {
+          "name": "amount",
+          "ty": 0
+        }
+      ],
+      "result": 5,
+      "pragmas": [],
+      "spec": {
+        "loc": 131,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "requires",
+            "loc": 107,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 109,
+              "kind": "call",
+              "op": {
+                "exists": null
+              },
+              "inst": [
+                2
+              ],
+              "args": [
+                {
+                  "ty": 6,
+                  "loc": 108,
+                  "kind": "param",
+                  "index": 0
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "ensures",
+            "loc": 110,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 122,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 114,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "value"
+                    }
+                  },
+                  "inst": [
+                    1
+                  ],
+                  "args": [
+                    {
+                      "ty": 1,
+                      "loc": 113,
+                      "kind": "call",
+                      "op": {
+                        "select": {
+                          "name": 1,
+                          "field": "balance"
+                        }
+                      },
+                      "inst": [
+                        2
+                      ],
+                      "args": [
+                        {
+                          "ty": 2,
+                          "loc": 112,
+                          "kind": "call",
+                          "op": {
+                            "global": null
+                          },
+                          "inst": [
+                            2
+                          ],
+                          "args": [
+                            {
+                              "ty": 6,
+                              "loc": 111,
+                              "kind": "param",
+                              "index": 0
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 11,
+                  "loc": 121,
+                  "kind": "call",
+                  "op": "sub",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 119,
+                      "kind": "call",
+                      "op": "old",
+                      "inst": [
+                        0
+                      ],
+                      "args": [
+                        {
+                          "ty": 0,
+                          "loc": 118,
+                          "kind": "call",
+                          "op": {
+                            "select": {
+                              "name": 0,
+                              "field": "value"
+                            }
+                          },
+                          "inst": [
+                            1
+                          ],
+                          "args": [
+                            {
+                              "ty": 1,
+                              "loc": 117,
+                              "kind": "call",
+                              "op": {
+                                "select": {
+                                  "name": 1,
+                                  "field": "balance"
+                                }
+                              },
+                              "inst": [
+                                2
+                              ],
+                              "args": [
+                                {
+                                  "ty": 2,
+                                  "loc": 116,
+                                  "kind": "call",
+                                  "op": {
+                                    "global": null
+                                  },
+                                  "inst": [
+                                    2
+                                  ],
+                                  "args": [
+                                    {
+                                      "ty": 6,
+                                      "loc": 115,
+                                      "kind": "param",
+                                      "index": 0
+                                    }
+                                  ],
+                                  "surface": null
+                                }
+                              ],
+                              "surface": null
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 120,
+                      "kind": "param",
+                      "index": 1
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "aborts_if",
+            "loc": 124,
+            "properties": [],
+            "exp": {
+              "ty": 8,
+              "loc": 130,
+              "kind": "call",
+              "op": "lt",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 128,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "value"
+                    }
+                  },
+                  "inst": [
+                    1
+                  ],
+                  "args": [
+                    {
+                      "ty": 1,
+                      "loc": 127,
+                      "kind": "call",
+                      "op": {
+                        "select": {
+                          "name": 1,
+                          "field": "balance"
+                        }
+                      },
+                      "inst": [
+                        2
+                      ],
+                      "args": [
+                        {
+                          "ty": 2,
+                          "loc": 126,
+                          "kind": "call",
+                          "op": {
+                            "global": null
+                          },
+                          "inst": [
+                            2
+                          ],
+                          "args": [
+                            {
+                              "ty": 6,
+                              "loc": 125,
+                              "kind": "param",
+                              "index": 0
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 0,
+                  "loc": 129,
+                  "kind": "param",
+                  "index": 1
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": {
+              "ty": 11,
+              "loc": 123,
+              "kind": "value",
+              "value": {
+                "number": "1"
+              },
+              "constant": "E_INSUFFICIENT_BALANCE"
+            },
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null
+      },
+      "body": {
+        "ty": 5,
+        "loc": 106,
+        "kind": "block",
+        "pattern": {
+          "ty": 9,
+          "loc": 84,
+          "kind": "var",
+          "name": "value"
+        },
+        "binding": {
+          "ty": 9,
+          "loc": 89,
+          "kind": "call",
+          "op": {
+            "borrow": "mutable"
+          },
+          "inst": [],
+          "args": [
+            {
+              "ty": 0,
+              "loc": 88,
+              "kind": "call",
+              "op": {
+                "select": {
+                  "name": 0,
+                  "field": "value"
+                }
+              },
+              "inst": [
+                1
+              ],
+              "args": [
+                {
+                  "ty": 1,
+                  "loc": 87,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 1,
+                      "field": "balance"
+                    }
+                  },
+                  "inst": [
+                    2
+                  ],
+                  "args": [
+                    {
+                      "ty": 10,
+                      "loc": 86,
+                      "kind": "call",
+                      "op": {
+                        "borrow_global": "mutable"
+                      },
+                      "inst": [
+                        2
+                      ],
+                      "args": [
+                        {
+                          "ty": 6,
+                          "loc": 85,
+                          "kind": "param",
+                          "index": 0
+                        }
+                      ],
+                      "surface": "index_notation"
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        },
+        "body": {
+          "ty": 5,
+          "loc": 106,
+          "kind": "block",
+          "pattern": {
+            "ty": 0,
+            "loc": 90,
+            "kind": "var",
+            "name": "current"
+          },
+          "binding": {
+            "ty": 0,
+            "loc": 92,
+            "kind": "call",
+            "op": "deref",
+            "inst": [],
+            "args": [
+              {
+                "ty": 9,
+                "loc": 91,
+                "kind": "local",
+                "name": "value"
+              }
+            ],
+            "surface": null
+          },
+          "body": {
+            "ty": 5,
+            "loc": 106,
+            "kind": "sequence",
+            "exps": [
+              {
+                "ty": 5,
+                "loc": 98,
+                "kind": "if",
+                "cond": {
+                  "ty": 8,
+                  "loc": 95,
+                  "kind": "call",
+                  "op": "lt",
+                  "inst": [
+                    0
+                  ],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 93,
+                      "kind": "local",
+                      "name": "current"
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 94,
+                      "kind": "param",
+                      "index": 1
+                    }
+                  ],
+                  "surface": null
+                },
+                "then_branch": {
+                  "ty": 5,
+                  "loc": 97,
+                  "kind": "call",
+                  "op": {
+                    "abort": "code"
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 96,
+                      "kind": "value",
+                      "value": {
+                        "number": "1"
+                      },
+                      "constant": "E_INSUFFICIENT_BALANCE"
+                    }
+                  ],
+                  "surface": null
+                },
+                "else_branch": {
+                  "ty": 5,
+                  "loc": 98,
+                  "kind": "call",
+                  "op": "tuple",
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                }
+              },
+              {
+                "ty": 5,
+                "loc": 104,
+                "kind": "mutate",
+                "target": {
+                  "ty": 9,
+                  "loc": 99,
+                  "kind": "local",
+                  "name": "value"
+                },
+                "value": {
+                  "ty": 0,
+                  "loc": 103,
+                  "kind": "call",
+                  "op": "sub",
+                  "inst": [
+                    0
+                  ],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 101,
+                      "kind": "call",
+                      "op": "deref",
+                      "inst": [],
+                      "args": [
+                        {
+                          "ty": 9,
+                          "loc": 100,
+                          "kind": "local",
+                          "name": "value"
+                        }
+                      ],
+                      "surface": null
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 102,
+                      "kind": "param",
+                      "index": 1
+                    }
+                  ],
+                  "surface": null
+                }
+              },
+              {
+                "ty": 5,
+                "loc": 105,
+                "kind": "call",
+                "op": "tuple",
+                "inst": [],
+                "args": [],
+                "surface": null
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "spec_funs": [],
+  "spec_vars": [],
+  "invariants": [],
+  "skipped": [],
+  "comments": [],
+  "sources": [
+    "account.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 67,
+      "end": 1891
+    },
+    {
+      "file": 0,
+      "start": 266,
+      "end": 304
+    },
+    {
+      "file": 0,
+      "start": 199,
+      "end": 260
+    },
+    {
+      "file": 0,
+      "start": 94,
+      "end": 163
+    },
+    {
+      "file": 0,
+      "start": 1342,
+      "end": 1349
+    },
+    {
+      "file": 0,
+      "start": 1392,
+      "end": 1398
+    },
+    {
+      "file": 0,
+      "start": 1370,
+      "end": 1400
+    },
+    {
+      "file": 0,
+      "start": 1351,
+      "end": 1402
+    },
+    {
+      "file": 0,
+      "start": 1334,
+      "end": 1403
+    },
+    {
+      "file": 0,
+      "start": 1403,
+      "end": 1404
+    },
+    {
+      "file": 0,
+      "start": 1324,
+      "end": 1410
+    },
+    {
+      "file": 0,
+      "start": 1268,
+      "end": 1410
+    },
+    {
+      "file": 0,
+      "start": 1583,
+      "end": 1590
+    },
+    {
+      "file": 0,
+      "start": 1573,
+      "end": 1592
+    },
+    {
+      "file": 0,
+      "start": 1614,
+      "end": 1618
+    },
+    {
+      "file": 0,
+      "start": 1595,
+      "end": 1619
+    },
+    {
+      "file": 0,
+      "start": 1629,
+      "end": 1636
+    },
+    {
+      "file": 0,
+      "start": 1629,
+      "end": 1642
+    },
+    {
+      "file": 0,
+      "start": 1559,
+      "end": 1648
+    },
+    {
+      "file": 0,
+      "start": 1504,
+      "end": 1648
+    },
+    {
+      "file": 0,
+      "start": 1731,
+      "end": 1735
+    },
+    {
+      "file": 0,
+      "start": 1723,
+      "end": 1736
+    },
+    {
+      "file": 0,
+      "start": 1723,
+      "end": 1744
+    },
+    {
+      "file": 0,
+      "start": 1723,
+      "end": 1750
+    },
+    {
+      "file": 0,
+      "start": 1713,
+      "end": 1756
+    },
+    {
+      "file": 0,
+      "start": 1787,
+      "end": 1820
+    },
+    {
+      "file": 0,
+      "start": 1814,
+      "end": 1818
+    },
+    {
+      "file": 0,
+      "start": 1798,
+      "end": 1819
+    },
+    {
+      "file": 0,
+      "start": 1797,
+      "end": 1819
+    },
+    {
+      "file": 0,
+      "start": 1829,
+      "end": 1883
+    },
+    {
+      "file": 0,
+      "start": 1837,
+      "end": 1843
+    },
+    {
+      "file": 0,
+      "start": 1863,
+      "end": 1867
+    },
+    {
+      "file": 0,
+      "start": 1847,
+      "end": 1868
+    },
+    {
+      "file": 0,
+      "start": 1847,
+      "end": 1876
+    },
+    {
+      "file": 0,
+      "start": 1847,
+      "end": 1882
+    },
+    {
+      "file": 0,
+      "start": 1837,
+      "end": 1882
+    },
+    {
+      "file": 0,
+      "start": 1761,
+      "end": 1889
+    },
+    {
+      "file": 0,
+      "start": 1654,
+      "end": 1756
+    },
+    {
+      "file": 0,
+      "start": 394,
+      "end": 399
+    },
+    {
+      "file": 0,
+      "start": 415,
+      "end": 419
+    },
+    {
+      "file": 0,
+      "start": 407,
+      "end": 420
+    },
+    {
+      "file": 0,
+      "start": 407,
+      "end": 428
+    },
+    {
+      "file": 0,
+      "start": 407,
+      "end": 434
+    },
+    {
+      "file": 0,
+      "start": 402,
+      "end": 434
+    },
+    {
+      "file": 0,
+      "start": 445,
+      "end": 450
+    },
+    {
+      "file": 0,
+      "start": 454,
+      "end": 459
+    },
+    {
+      "file": 0,
+      "start": 453,
+      "end": 459
+    },
+    {
+      "file": 0,
+      "start": 462,
+      "end": 468
+    },
+    {
+      "file": 0,
+      "start": 453,
+      "end": 468
+    },
+    {
+      "file": 0,
+      "start": 444,
+      "end": 468
+    },
+    {
+      "file": 0,
+      "start": 468,
+      "end": 469
+    },
+    {
+      "file": 0,
+      "start": 380,
+      "end": 475
+    },
+    {
+      "file": 0,
+      "start": 568,
+      "end": 572
+    },
+    {
+      "file": 0,
+      "start": 552,
+      "end": 573
+    },
+    {
+      "file": 0,
+      "start": 503,
+      "end": 534
+    },
+    {
+      "file": 0,
+      "start": 528,
+      "end": 532
+    },
+    {
+      "file": 0,
+      "start": 512,
+      "end": 533
+    },
+    {
+      "file": 0,
+      "start": 583,
+      "end": 664
+    },
+    {
+      "file": 0,
+      "start": 599,
+      "end": 603
+    },
+    {
+      "file": 0,
+      "start": 591,
+      "end": 604
+    },
+    {
+      "file": 0,
+      "start": 591,
+      "end": 612
+    },
+    {
+      "file": 0,
+      "start": 591,
+      "end": 618
+    },
+    {
+      "file": 0,
+      "start": 634,
+      "end": 638
+    },
+    {
+      "file": 0,
+      "start": 626,
+      "end": 639
+    },
+    {
+      "file": 0,
+      "start": 626,
+      "end": 647
+    },
+    {
+      "file": 0,
+      "start": 626,
+      "end": 653
+    },
+    {
+      "file": 0,
+      "start": 622,
+      "end": 654
+    },
+    {
+      "file": 0,
+      "start": 657,
+      "end": 663
+    },
+    {
+      "file": 0,
+      "start": 622,
+      "end": 663
+    },
+    {
+      "file": 0,
+      "start": 591,
+      "end": 663
+    },
+    {
+      "file": 0,
+      "start": 673,
+      "end": 730
+    },
+    {
+      "file": 0,
+      "start": 691,
+      "end": 695
+    },
+    {
+      "file": 0,
+      "start": 683,
+      "end": 696
+    },
+    {
+      "file": 0,
+      "start": 683,
+      "end": 704
+    },
+    {
+      "file": 0,
+      "start": 683,
+      "end": 710
+    },
+    {
+      "file": 0,
+      "start": 713,
+      "end": 719
+    },
+    {
+      "file": 0,
+      "start": 683,
+      "end": 719
+    },
+    {
+      "file": 0,
+      "start": 722,
+      "end": 729
+    },
+    {
+      "file": 0,
+      "start": 683,
+      "end": 729
+    },
+    {
+      "file": 0,
+      "start": 480,
+      "end": 736
+    },
+    {
+      "file": 0,
+      "start": 310,
+      "end": 475
+    },
+    {
+      "file": 0,
+      "start": 1487,
+      "end": 1491
+    },
+    {
+      "file": 0,
+      "start": 1471,
+      "end": 1492
+    },
+    {
+      "file": 0,
+      "start": 1416,
+      "end": 1498
+    },
+    {
+      "file": 0,
+      "start": 827,
+      "end": 832
+    },
+    {
+      "file": 0,
+      "start": 848,
+      "end": 852
+    },
+    {
+      "file": 0,
+      "start": 840,
+      "end": 853
+    },
+    {
+      "file": 0,
+      "start": 840,
+      "end": 861
+    },
+    {
+      "file": 0,
+      "start": 840,
+      "end": 867
+    },
+    {
+      "file": 0,
+      "start": 835,
+      "end": 867
+    },
+    {
+      "file": 0,
+      "start": 881,
+      "end": 888
+    },
+    {
+      "file": 0,
+      "start": 892,
+      "end": 897
+    },
+    {
+      "file": 0,
+      "start": 891,
+      "end": 897
+    },
+    {
+      "file": 0,
+      "start": 911,
+      "end": 918
+    },
+    {
+      "file": 0,
+      "start": 921,
+      "end": 927
+    },
+    {
+      "file": 0,
+      "start": 911,
+      "end": 927
+    },
+    {
+      "file": 0,
+      "start": 949,
+      "end": 971
+    },
+    {
+      "file": 0,
+      "start": 943,
+      "end": 971
+    },
+    {
+      "file": 0,
+      "start": 907,
+      "end": 981
+    },
+    {
+      "file": 0,
+      "start": 992,
+      "end": 997
+    },
+    {
+      "file": 0,
+      "start": 1001,
+      "end": 1006
+    },
+    {
+      "file": 0,
+      "start": 1000,
+      "end": 1006
+    },
+    {
+      "file": 0,
+      "start": 1009,
+      "end": 1015
+    },
+    {
+      "file": 0,
+      "start": 1000,
+      "end": 1015
+    },
+    {
+      "file": 0,
+      "start": 991,
+      "end": 1015
+    },
+    {
+      "file": 0,
+      "start": 1015,
+      "end": 1016
+    },
+    {
+      "file": 0,
+      "start": 813,
+      "end": 1022
+    },
+    {
+      "file": 0,
+      "start": 1051,
+      "end": 1082
+    },
+    {
+      "file": 0,
+      "start": 1076,
+      "end": 1080
+    },
+    {
+      "file": 0,
+      "start": 1060,
+      "end": 1081
+    },
+    {
+      "file": 0,
+      "start": 1091,
+      "end": 1172
+    },
+    {
+      "file": 0,
+      "start": 1107,
+      "end": 1111
+    },
+    {
+      "file": 0,
+      "start": 1099,
+      "end": 1112
+    },
+    {
+      "file": 0,
+      "start": 1099,
+      "end": 1120
+    },
+    {
+      "file": 0,
+      "start": 1099,
+      "end": 1126
+    },
+    {
+      "file": 0,
+      "start": 1142,
+      "end": 1146
+    },
+    {
+      "file": 0,
+      "start": 1134,
+      "end": 1147
+    },
+    {
+      "file": 0,
+      "start": 1134,
+      "end": 1155
+    },
+    {
+      "file": 0,
+      "start": 1134,
+      "end": 1161
+    },
+    {
+      "file": 0,
+      "start": 1130,
+      "end": 1162
+    },
+    {
+      "file": 0,
+      "start": 1165,
+      "end": 1171
+    },
+    {
+      "file": 0,
+      "start": 1130,
+      "end": 1171
+    },
+    {
+      "file": 0,
+      "start": 1099,
+      "end": 1171
+    },
+    {
+      "file": 0,
+      "start": 1233,
+      "end": 1255
+    },
+    {
+      "file": 0,
+      "start": 1181,
+      "end": 1256
+    },
+    {
+      "file": 0,
+      "start": 1199,
+      "end": 1203
+    },
+    {
+      "file": 0,
+      "start": 1191,
+      "end": 1204
+    },
+    {
+      "file": 0,
+      "start": 1191,
+      "end": 1212
+    },
+    {
+      "file": 0,
+      "start": 1191,
+      "end": 1218
+    },
+    {
+      "file": 0,
+      "start": 1221,
+      "end": 1227
+    },
+    {
+      "file": 0,
+      "start": 1191,
+      "end": 1227
+    },
+    {
+      "file": 0,
+      "start": 1027,
+      "end": 1262
+    },
+    {
+      "file": 0,
+      "start": 742,
+      "end": 1022
+    }
+  ],
+  "types": [
+    "u64",
+    {
+      "struct": {
+        "name": 0,
+        "args": []
+      }
+    },
+    {
+      "struct": {
+        "name": 1,
+        "args": []
+      }
+    },
+    "signer",
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 3
+      }
+    },
+    {
+      "tuple": []
+    },
+    "address",
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 2
+      }
+    },
+    "bool",
+    {
+      "reference": {
+        "mutable": true,
+        "ty": 0
+      }
+    },
+    {
+      "reference": {
+        "mutable": true,
+        "ty": 2
+      }
+    },
+    "num"
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "account"
+    }
+  ],
+  "names": [
+    {
+      "module": 0,
+      "name": "BalanceValue"
+    },
+    {
+      "module": 0,
+      "name": "Balance"
+    }
+  ]
+}

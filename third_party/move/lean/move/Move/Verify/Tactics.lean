@@ -57,6 +57,39 @@ simproc [simp, move_norm, wp_norm] uintOfNatLit (@Move.UInt.ofNat _ _ _) := fun 
       proof? := Lean.mkApp3 (Lean.mkConst ``Move.UInt.ofNat_eq_numeral) w inst n }
 
 attribute [move_norm]
+  -- Contract clauses retain this clean logical surface.  Proof
+  -- normalization exposes the canonical `Int`/list expressions only when a
+  -- tactic asks for them, so proof authors do not repeat the projections the
+  -- transpiler deliberately omits.
+  Move.Spec.int
+  Move.Spec.intAdd
+  Move.Spec.intSub
+  Move.Spec.intMul
+  Move.Spec.intDiv
+  Move.Spec.intMod
+  Move.Spec.intNeg
+  Move.Spec.intShiftLeft
+  Move.Spec.intShiftRight
+  Move.Spec.logicalEq
+  Move.Spec.logicalLT
+  Move.Spec.logicalLE
+  Move.Spec.logicalBoolEq
+  Move.Spec.logicalBoolLT
+  Move.Spec.logicalBoolLE
+  Move.Spec.IntValue.toInt
+  Move.Spec.LogicalEq.equal
+  Move.Spec.LogicalLT.less
+  Move.Spec.LogicalLE.lessEq
+  Move.Spec.LogicalBoolEq.equal
+  Move.Spec.LogicalBoolLT.less
+  Move.Spec.LogicalBoolLE.lessEq
+  Move.Spec.vectorSet
+  Move.Spec.vectorAppend
+  Move.Spec.logicalVectorGetElem
+  Move.Spec.logicalVectorMembership
+  id_eq
+  Int.ofNat_eq_natCast
+  Int.cast_ofNat_Int
   Nat.mod_eq_of_lt
   MoveModel.IR.IntWidth.size
   MoveModel.IR.IntWidth.bits
@@ -140,6 +173,8 @@ attribute [move_norm]
   Move.Semantics.Checked.shlSpec_eq_pure
   Move.Semantics.Checked.shrSpec_eq_pure
   Move.Semantics.Vector.borrowElemSpec_eq_pure
+  Move.Semantics.variantFieldSpec_eq_pure
+  Move.Semantics.variantFieldSpec_eq_abort
   Move.Verify.withBorrowElemMutSpec_write_eq_pure
 
 -- The operations whose result cannot leave the width's range collapse without
@@ -223,6 +258,7 @@ attribute [move_spec]
   Move.Semantics.Resource.withBorrowMutSpec_aborts
   Move.Semantics.Resource.withBorrowMutSpec_undefined
   Move.Semantics.Vector.borrowElemSpec
+  Move.Semantics.variantFieldSpec
   Move.Semantics.Vector.withBorrowElemMutSpec
   Move.Semantics.Vector.insertSpec
   Move.Semantics.Vector.removeSpec
@@ -277,7 +313,8 @@ macro_rules
           | (simp (disch := omega) only [move_norm, Nat.mod_eq_of_lt,
               Nat.reducePow, Nat.reduceMod]
              assumption))
-        only [move_norm, Nat.mod_eq_of_lt, Nat.reducePow, Nat.reduceMod]
+        only [move_norm, Move.UInt.toInt_eq_toNat, Nat.mod_eq_of_lt,
+          Nat.reducePow, Nat.reduceMod]
         $[$location]?)
       `(tactic| (uint_bounds; $core))
 
@@ -462,9 +499,12 @@ private def elabMoveStep : Tactic := fun stx => withMainContext do
     -- A source conditional: split, name, normalize.
     evalTactic (← `(tactic| split <;> rename_i $firstName:ident <;>
       move_hyp $firstName:ident))
-  else if head.isConstOf ``And &&
-      !(target.appArg!.isConstOf ``True || target.appArg!.isAppOf ``Eq) then
-    -- A two-branch rule: success (named binders) and abort (discharged).
+  else if head.isConstOf ``And && target.appArg!.isForall then
+    -- A two-branch rule — success (named binders) and abort (discharged) —
+    -- recognized by its abort branch, an implication `¬c → aborts …`.  A
+    -- contract postcondition `(¬mayAbort → ensures) ∧ frame ∧ ¬mustAbort`
+    -- is not one: its second conjunct is a conjunction, an equation, `True`,
+    -- or a negation, never an implication.
     evalTactic (← `(tactic| refine ⟨?_, ?_⟩))
     match ← getGoals with
     | success :: abortObligation :: rest =>

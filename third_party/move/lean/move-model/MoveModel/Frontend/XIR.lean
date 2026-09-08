@@ -82,6 +82,7 @@ structure MModule extends MProgram where
   funMeta : List FunMeta
   externalFuns : List ExternalFunRef := []
   friends : List ExternalModuleRef := []
+  externalStructs : List ExternalStructRef := []
 
 /-- Conjunction of a clause list (empty = `true`). -/
 def andAll : List SpecExp → SpecExp
@@ -157,6 +158,7 @@ def MModule.toModule (m : MModule) : Module where
   externalFuns := m.externalFuns
   friends := m.friends
   dialect := m.dialect
+  externalStructs := m.externalStructs
 
 /-- Resolve a function name in a deployable XIR module. -/
 def MModule.funId (m : MModule) (name : String) : FunId :=

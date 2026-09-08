@@ -109,6 +109,8 @@ inductive CallEffect where
 
 /-- A returned reference expressed relative to a reference parameter. -/
 structure ReturnDerivation where
+  /-- Flattened multiple-return component receiving this reference. -/
+  result : Nat := 0
   parameter : Nat
   path : Array Step := #[]
   kind : RefKind
@@ -148,7 +150,7 @@ inductive Event where
       (results : Array CallResult := #[])
   | drop (reference : String)
   | ownerWrite (place : Place)
-  | returnRef (reference : String)
+  | returnRef (reference : String) (result : Nat := 0)
   | nop
   deriving Repr, BEq, DecidableEq, Inhabited, Lean.ToExpr
 
@@ -336,6 +338,22 @@ private def dropReference (_point : Nat) (state : State) (id : String) :
   let some info := state.findRef? id
     | pure state
   let state := state.eraseRef id
+  -- A returned reference can suspend several mutable arguments because a
+  -- Move signature carries no lifetime identifying its origin.  Its name is
+  -- recorded as a poisoner on every such argument; dropping the result
+  -- revives all of them together.
+  let refs := state.refs.map fun candidate =>
+    if candidate.poisoners.contains id then
+      let poisoners := candidate.poisoners.filter (· != id)
+      let phase := if poisoners.isEmpty &&
+          (candidate.phase == .poisoned || candidate.phase == .suspended) then
+        .activated
+      else
+        candidate.phase
+      { candidate with poisoners, phase }
+    else
+      candidate
+  let state := { state with refs }
   match info.parent? with
   | none => pure state
   | some parent =>
@@ -393,35 +411,64 @@ private def transfer (point : Nat) (event : Event) (state : State) :
         | .consume =>
             discard <| lookupUsable point state argument.reference
             state ← dropReference point state argument.reference
+      let resultInputState := state
+      let mut handledResults : Array String := #[]
       for result in results do
         let some argument := arguments.find? (·.parameter == result.derivation.parameter)
           | fail point .invalidCallEffect (some result.destination)
-        let parent ← lookupUsable point state argument.reference
-        unless parent.kind == result.derivation.kind ||
-            (parent.kind == .mutable && result.derivation.kind == .immutable) do
+        let derivedParent ← lookupUsable point resultInputState argument.reference
+        unless derivedParent.kind == result.derivation.kind ||
+            (derivedParent.kind == .mutable && result.derivation.kind == .immutable) do
           fail point .invalidCallEffect (some argument.reference)
-        let place := { parent.place with
-          path := parent.place.path ++ result.derivation.path }
-        if result.derivation.phase == .activated then
-          state := state.replaceRef { parent with phase := .suspended }
-        state ← addReference point state {
-          id := result.destination
-          kind := result.derivation.kind
-          place
-          phase := result.derivation.phase
-          parent? := some parent.id }
+        if handledResults.contains result.destination then continue
+        handledResults := handledResults.push result.destination
+        if result.derivation.kind == .mutable then
+          -- Match `reference_safety::AbstractState::core_call`: one returned
+          -- mutable reference borrows from every mutable reference argument,
+          -- independent of the callee body's more precise derivations.
+          let mut mutableParents : Array RefInfo := #[]
+          for argument in arguments do
+            let parent ← lookupUsable point resultInputState argument.reference
+            if parent.kind == .mutable then
+              mutableParents := mutableParents.push parent
+          unless derivedParent.kind == .mutable do
+            fail point .invalidCallEffect (some argument.reference)
+          for parent in mutableParents do
+            let poisoners := if parent.poisoners.contains result.destination then
+              parent.poisoners
+            else
+              parent.poisoners.push result.destination
+            state := state.replaceRef { parent with
+              phase := .suspended, poisoners }
+          let place := { derivedParent.place with
+            path := derivedParent.place.path ++ result.derivation.path }
+          state ← addReference point state {
+            id := result.destination
+            kind := .mutable
+            place
+            phase := result.derivation.phase }
+        else
+          let place := { derivedParent.place with
+            path := derivedParent.place.path ++ result.derivation.path }
+          state ← addReference point state {
+            id := result.destination
+            kind := result.derivation.kind
+            place
+            phase := result.derivation.phase
+            parent? := some derivedParent.id }
       pure state
   | .drop reference => dropReference point state reference
   | .ownerWrite place =>
       if let some conflict := state.refs.find? (·.place.sameTree place) then
         fail point .ownerInvalidation none (some conflict.id)
       pure state
-  | .returnRef reference =>
+  | .returnRef reference result =>
       let info ← lookupUsable point state reference
       match info.place.root with
       | .parameter parameter =>
           pure <| state.addReturn {
-            parameter, path := info.place.path, kind := info.kind, phase := info.phase }
+            result, parameter, path := info.place.path,
+            kind := info.kind, phase := info.phase }
       | _ => fail point .localReferenceEscape (some reference)
   | .nop => pure state
 
@@ -470,26 +517,103 @@ structure Analysis where
   loops : Array LoopFact := #[]
   deriving Repr, BEq, DecidableEq, Inhabited, Lean.ToExpr
 
+private structure Flow where
+  normal? : Option State := none
+  stopped? : Option State := none
+  breaks : Array (Option String × State) := #[]
+  continues : Array (Option String × State) := #[]
+  loops : Array LoopFact := #[]
+
+private def joinState? : Option State → Option State → Option State
+  | none, right | right, none => right
+  | some left, some right => some (left.join right)
+
+private def addEdge (edges : Array (Option String × State))
+    (label? : Option String) (state : State) :
+    Array (Option String × State) :=
+  match edges.findIdx? (·.1 == label?) with
+  | none => edges.push (label?, state)
+  | some index => edges.set! index (label?, edges[index]!.2.join state)
+
+private def mergeEdges (left right : Array (Option String × State)) :
+    Array (Option String × State) :=
+  right.foldl (fun edges (label?, state) => addEdge edges label? state) left
+
+private def Flow.merge (left right : Flow) : Flow := {
+  normal? := joinState? left.normal? right.normal?
+  stopped? := joinState? left.stopped? right.stopped?
+  breaks := mergeEdges left.breaks right.breaks
+  continues := mergeEdges left.continues right.continues
+  loops := right.loops }
+
+private def edgeTargetsLoop (loopLabel? edgeLabel? : Option String) : Bool :=
+  edgeLabel?.isNone || edgeLabel? == loopLabel?
+
+private def splitLoopEdges (loopLabel? : Option String)
+    (edges : Array (Option String × State)) :
+    Option State × Array (Option String × State) :=
+  edges.foldl (init := (none, #[])) fun (matched, remaining) (label?, state) =>
+    if edgeTargetsLoop loopLabel? label? then
+      (joinState? matched (some state), remaining)
+    else
+      (matched, remaining.push (label?, state))
+
+/-- Remove references created after entry to an exited loop, replaying their
+ordinary drop behavior so suspended entry references resume. -/
+private def unwindTo (point : Nat) (entry state : State) :
+    Except BorrowError State := do
+  let keep := entry.refs.map (·.id)
+  let mut state := state
+  for reference in state.refs.reverse do
+    unless keep.contains reference.id do
+      state ← dropReference point state reference.id
+  pure state
+
 private partial def runAnalyze (block : Block) (state : State)
-    (loops : Array LoopFact) (fuel : Nat) : Except BorrowError Analysis := do
+    (loops : Array LoopFact) (fuel : Nat) : Except BorrowError Flow := do
   if fuel == 0 then fail 0 .invalidLoopCertificate
   match block with
-  | .done | .abort => pure { finalState := state, loops }
+  | .done => pure { normal? := some state, loops }
+  | .abort | .stop => pure { stopped? := some state, loops }
+  | .break label? => pure { breaks := #[(label?, state)], loops }
+  | .continue label? => pure { continues := #[(label?, state)], loops }
   | .event point event next =>
       runAnalyze next (← transfer point event state) loops (fuel - 1)
   | .branch _ thenBranch elseBranch next =>
       let thenResult ← runAnalyze thenBranch state loops (fuel - 1)
       let elseResult ← runAnalyze elseBranch state thenResult.loops (fuel - 1)
-      runAnalyze next (thenResult.finalState.join elseResult.finalState)
-        elseResult.loops (fuel - 1)
-  | .loop point body next =>
-      let rec iterate (candidate : State) (remaining : Nat) : Except BorrowError Analysis := do
+      let branches := thenResult.merge elseResult
+      let nextResult ← match branches.normal? with
+        | none => pure { loops := branches.loops }
+        | some normal => runAnalyze next normal branches.loops (fuel - 1)
+      pure <| { branches with normal? := none }.merge nextResult
+  | .loop point label? body next =>
+      let rec iterate (candidate : State) (remaining : Nat) : Except BorrowError Flow := do
         if remaining == 0 then fail point .invalidLoopCertificate
         let bodyResult ← runAnalyze body candidate loops (fuel - 1)
-        let enlarged := state.join bodyResult.finalState
+        let (continued?, remainingContinues) :=
+          splitLoopEdges label? bodyResult.continues
+        let backedge? := joinState? bodyResult.normal? continued?
+        let backedge? ← match backedge? with
+          | none => pure none
+          | some backedge => some <$> unwindTo point state backedge
+        let enlarged := backedge?.map state.join |>.getD state
         if enlarged == candidate then
           let loops := bodyResult.loops.push { point, invariant := candidate }
-          runAnalyze next candidate loops (fuel - 1)
+          let (broken?, remainingBreaks) := splitLoopEdges label? bodyResult.breaks
+          let broken? ← match broken? with
+            | none => pure none
+            | some broken => some <$> unwindTo point state broken
+          -- The loop condition may become false after any number of normal
+          -- iterations, so its fixed-point candidate always reaches `next`.
+          -- A matching `break` contributes an additional exit edge.
+          let exitState := broken?.map candidate.join |>.getD candidate
+          let nextResult ← runAnalyze next exitState loops (fuel - 1)
+          pure <| ({ bodyResult with
+            normal? := none
+            breaks := remainingBreaks
+            continues := remainingContinues
+            loops }).merge nextResult
         else iterate enlarged (remaining - 1)
       iterate state (state.refs.size * 4 + 32)
 
@@ -503,10 +627,19 @@ def Program.initialState (program : Program) : State :=
     parameterEffects := program.parameters.map fun _ => .ignore }
 
 def analyze (program : Program) : Except BorrowError Analysis :=
-  runAnalyze program.body program.initialState #[] 100000
+  match runAnalyze program.body program.initialState #[] 100000 with
+  | .error error => .error error
+  | .ok flow =>
+      let final? := flow.breaks.foldl
+        (fun state (_, edge) => joinState? state (some edge)) flow.normal?
+      let final? := flow.continues.foldl
+        (fun state (_, edge) => joinState? state (some edge)) final?
+      let finalState := joinState? final? flow.stopped?
+        |>.getD program.initialState
+      .ok { finalState, loops := flow.loops }
 
 structure Certificate where
-  version : Nat := 1
+  version : Nat := 2
   program : Program
   analysis : Analysis
   deriving Repr, BEq, DecidableEq, Inhabited, Lean.ToExpr
@@ -518,7 +651,7 @@ def makeCertificate (program : Program) : Except BorrowError Certificate := do
 the final state are accepted on trust. -/
 def Certificate.check (certificate : Certificate) (program : Program) :
     Except BorrowError Unit :=
-  if certificate.version != 1 || certificate.program != program then
+  if certificate.version != 2 || certificate.program != program then
     fail 0 .certificateMismatch
   else
     match analyze program with
@@ -542,7 +675,7 @@ def WellBorrowed (program : Program) : Prop :=
 theorem Certificate.sound {certificate : Certificate} {program : Program}
     (checked : certificate.Checks program) : PoisonSafe program := by
   unfold Certificate.Checks Certificate.check at checked
-  cases mismatch : (certificate.version != 1 || certificate.program != program) with
+  cases mismatch : (certificate.version != 2 || certificate.program != program) with
   | true => simp [mismatch, fail] at checked
   | false =>
       simp only [mismatch, Bool.false_eq] at checked

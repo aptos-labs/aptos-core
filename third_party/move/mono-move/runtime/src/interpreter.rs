@@ -345,6 +345,25 @@ impl<'guard> InterpreterContext<'guard> {
         resource_provider: &'guard dyn ResourceProvider,
         natives: &'guard ProductionNativeRegistry,
     ) -> Self {
+        Self::new_idle_with_heap_size(
+            loader,
+            gas_meter,
+            resource_provider,
+            natives,
+            DEFAULT_HEAP_SIZE,
+        )
+    }
+
+    /// Creates an idle context with a custom heap size, bounding the bytes a
+    /// run may allocate before reporting exhaustion. Otherwise identical to
+    /// [`new_idle`](Self::new_idle).
+    pub fn new_idle_with_heap_size(
+        loader: Loader<'guard, 'guard>,
+        gas_meter: GasMeter,
+        resource_provider: &'guard dyn ResourceProvider,
+        natives: &'guard ProductionNativeRegistry,
+        heap_size: usize,
+    ) -> Self {
         let stack = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
         let base = stack.as_ptr();
 
@@ -363,7 +382,7 @@ impl<'guard> InterpreterContext<'guard> {
             resource_provider,
             registers: VMRegisters::idle(&stack),
             stack,
-            heap: Heap::new(DEFAULT_HEAP_SIZE),
+            heap: Heap::new(heap_size),
             root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
@@ -554,6 +573,23 @@ impl<'guard> InterpreterContext<'guard> {
     /// Read a u64 from the root frame at the given byte offset.
     pub fn root_result_at(&self, offset: u32) -> u64 {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
+    }
+
+    /// BCS-serializes the value a successfully completed root call returned,
+    /// by return type: the BCS inverse of
+    /// [`deserialize_root_arg`](Self::deserialize_root_arg), walking nested
+    /// heap objects through the guard's layout tables. Call only after a
+    /// successful [`run`](Self::run), with `ty` that call's return type; the
+    /// result lives at the start of the root frame's shared
+    /// parameter/return region.
+    pub fn serialize_root_result(&self, ty: InternedType) -> VMResult<Vec<u8>> {
+        // SAFETY: the caller guarantees a completed call whose return value
+        // of type `ty` sits at the region start; the context's heap still
+        // owns every reachable object, and the guard outlives the context.
+        unsafe {
+            let base = self.stack.as_ptr().add(FRAME_METADATA_SIZE);
+            value_utils::serialize(self.loader.guard(), base, ty)
+        }
     }
 
     /// Read `size` raw bytes from the root frame at the given byte offset. For

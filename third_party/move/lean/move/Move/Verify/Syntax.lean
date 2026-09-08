@@ -9,6 +9,25 @@ import Move.Semantics.Vector
 import Move.Verify.BorrowChecker
 import Move.Verify.Compare
 import Move.Verify.Contract
+import Move.Verify.Paths
+
+/-- Set by the pragma-aware `spec` forms for `pragma opaque`: the function's
+source semantics for callers is its contract's summary (`Contract.summary`),
+not a translation of its body; the body, when translatable, is still what
+`verify` checks against the contract. -/
+register_option move.specOpaque : Bool := {
+  defValue := false
+  descr := "specify the function by its contract's summary (`pragma opaque`)"
+}
+
+/-- Report why a function's source semantics could not be derived at its
+declaration (`#derive_move_source_spec`, emitted for every `fun` with a
+body).  The derivation is best effort and silent by default: the `spec` or
+the caller that needs the semantics reports the limitation. -/
+register_option move.reportDerivation : Bool := {
+  defValue := false
+  descr := "report failures to derive a function's source semantics at its declaration"
+}
 
 -- The mutually recursive source translator is intentionally syntax-directed
 -- and large; compiling its generated decision tree exceeds Lean's default
@@ -53,6 +72,218 @@ def abortCodeOf [AbortCodeValue Code] (code : Code) : Nat :=
 @[simp] theorem abortCodeOf_nat (code : Nat) : abortCodeOf code = code := rfl
 @[simp] theorem abortCodeOf_u64 (code : Move.U64) :
     abortCodeOf code = code.toNat := rfl
+
+/-! ## Mathematical integer expressions
+
+Move integers remain bounded values in executable source. Specification
+functions follow MSL and interpret their direct integers as unbounded
+mathematical integers. The clause rewriter propagates that interpretation at
+their call boundary and through clean mathematical contract/invariant
+expressions, while explicit legacy representation views remain ordinary Lean.
+Keeping this interpretation here, rather than as global coercions or
+replacement operator instances, preserves Move's executable typing and
+checked-arithmetic surface. -/
+
+/-- A value which denotes a mathematical integer in a specification. -/
+class IntValue (T : Type) where
+  toInt : T → Int
+
+instance : IntValue Int := ⟨id⟩
+instance : IntValue Nat := ⟨Int.ofNat⟩
+instance {S W : Type} [Move.Sign S] [Move.Width W] :
+    IntValue (Move.MoveInt S W) := ⟨Move.MoveInt.toInt⟩
+
+/-- Expected `Int` positions inside composite specification expressions
+(`match` branches, conditionals, and opaque Lean applications) accept a
+bounded leaf without exposing a projection in the authored term. Scoped so
+executable source elaboration does not acquire a general widening rule. -/
+scoped instance : Coe Move.U8 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.U16 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.U32 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.U64 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.U128 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.U256 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.I8 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.I16 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.I32 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.I64 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.I128 Int := ⟨Move.MoveInt.toInt⟩
+scoped instance : Coe Move.I256 Int := ⟨Move.MoveInt.toInt⟩
+
+/-- The mathematical integer denoted by a specification value. -/
+def int (value : T) [IntValue T] : Int := IntValue.toInt value
+
+@[simp] theorem int_int (value : Int) : int value = value := rfl
+@[simp] theorem int_nat (value : Nat) : int value = value := rfl
+@[simp] theorem int_moveInt {S W : Type} [Move.Sign S] [Move.Width W]
+    (value : Move.MoveInt S W) : int value = value.toInt := rfl
+
+def intAdd (left : L) (right : R) [IntValue L] [IntValue R] : Int :=
+  (int left) + (int right)
+def intSub (left : L) (right : R) [IntValue L] [IntValue R] : Int :=
+  (int left) - (int right)
+def intMul (left : L) (right : R) [IntValue L] [IntValue R] : Int :=
+  (int left) * (int right)
+def intDiv (left : L) (right : R) [IntValue L] [IntValue R] : Int :=
+  (int left) / (int right)
+def intMod (left : L) (right : R) [IntValue L] [IntValue R] : Int :=
+  (int left) % (int right)
+def intNeg (value : T) [IntValue T] : Int :=
+  -int value
+def intShiftLeft (value : T) (amount : I) [IntValue T] [IntValue I] : Int :=
+  (int value) <<< (int amount).toNat
+def intShiftRight (value : T) (amount : I) [IntValue T] [IntValue I] : Int :=
+  (int value) >>> (int amount).toNat
+
+/-- Equality in clauses is heterogeneous for mathematical integers and
+ordinary homogeneous equality for every other source type. -/
+class LogicalEq (L R : Type) where
+  equal : L → R → Prop
+
+instance (priority := high) [IntValue L] [IntValue R] : LogicalEq L R where
+  equal left right := int left = int right
+
+instance : LogicalEq T T where
+  equal := Eq
+
+/-- Lean already permits a Boolean in proposition position.  Preserve that
+reading for the common `result = predicate` contract idiom. -/
+instance : LogicalEq Bool Prop where
+  equal value proposition := (value = true) ↔ proposition
+instance : LogicalEq Prop Bool where
+  equal proposition value := proposition ↔ value = true
+
+/-- A vector and its list-shaped specification value denote the same
+sequence.  These two instances support vector update/append expressions,
+whose mathematical results are lists. -/
+instance : LogicalEq (Move.Vector T) (List T) where
+  equal values list := values.toList = list
+instance : LogicalEq (List T) (Move.Vector T) where
+  equal list values := list = values.toList
+
+def logicalEq (left : L) (right : R) [LogicalEq L R] : Prop :=
+  LogicalEq.equal left right
+
+instance (priority := high) [IntValue L] [IntValue R] (left : L) (right : R) :
+    Decidable (logicalEq left right) := by
+  change Decidable (int left = int right)
+  infer_instance
+
+instance [DecidableEq T] (left right : T) : Decidable (logicalEq left right) := by
+  change Decidable (left = right)
+  infer_instance
+
+/-- Ordering is heterogeneous for mathematical integers.  The low-priority
+homogeneous cases retain Lean's existing order for non-integer values. -/
+class LogicalLT (L R : Type) where
+  less : L → R → Prop
+
+instance (priority := high) [IntValue L] [IntValue R] : LogicalLT L R where
+  less left right := int left < int right
+
+instance [LT T] : LogicalLT T T where
+  less := LT.lt
+
+def logicalLT (left : L) (right : R) [LogicalLT L R] : Prop :=
+  LogicalLT.less left right
+
+instance (priority := high) [IntValue L] [IntValue R] (left : L) (right : R) :
+    Decidable (logicalLT left right) := by
+  change Decidable (int left < int right)
+  infer_instance
+
+instance [LT T] [DecidableRel (@LT.lt T inferInstance)] (left right : T) :
+    Decidable (logicalLT left right) := by
+  change Decidable (left < right)
+  infer_instance
+
+class LogicalLE (L R : Type) where
+  lessEq : L → R → Prop
+
+instance (priority := high) [IntValue L] [IntValue R] : LogicalLE L R where
+  lessEq left right := int left ≤ int right
+
+instance [LE T] : LogicalLE T T where
+  lessEq := LE.le
+
+def logicalLE (left : L) (right : R) [LogicalLE L R] : Prop :=
+  LogicalLE.lessEq left right
+
+instance (priority := high) [IntValue L] [IntValue R] (left : L) (right : R) :
+    Decidable (logicalLE left right) := by
+  change Decidable (int left ≤ int right)
+  infer_instance
+
+instance [LE T] [DecidableRel (@LE.le T inferInstance)] (left right : T) :
+    Decidable (logicalLE left right) := by
+  change Decidable (left ≤ right)
+  infer_instance
+
+/-! Derived Move functions retain `Bool` comparison results.  These Boolean
+companions use mathematical comparison whenever either side is an integer,
+and Move's sealed structural comparison for homogeneous non-integer values. -/
+
+class LogicalBoolEq (L R : Type) where
+  equal : L → R → Bool
+
+instance (priority := high) [IntValue L] [IntValue R] : LogicalBoolEq L R where
+  equal left right := decide (int left = int right)
+
+instance : LogicalBoolEq T T where
+  equal := Move.Compare.equal
+
+def logicalBoolEq (left : L) (right : R) [LogicalBoolEq L R] : Bool :=
+  LogicalBoolEq.equal left right
+
+class LogicalBoolLT (L R : Type) where
+  less : L → R → Bool
+
+instance (priority := high) [IntValue L] [IntValue R] : LogicalBoolLT L R where
+  less left right := decide (int left < int right)
+
+instance : LogicalBoolLT T T where
+  less := Move.Compare.less
+
+def logicalBoolLT (left : L) (right : R) [LogicalBoolLT L R] : Bool :=
+  LogicalBoolLT.less left right
+
+class LogicalBoolLE (L R : Type) where
+  lessEq : L → R → Bool
+
+instance (priority := high) [IntValue L] [IntValue R] : LogicalBoolLE L R where
+  lessEq left right := decide (int left ≤ int right)
+
+instance : LogicalBoolLE T T where
+  lessEq left right := !Move.Compare.less right left
+
+def logicalBoolLE (left : L) (right : R) [LogicalBoolLE L R] : Bool :=
+  LogicalBoolLE.lessEq left right
+
+def logicalVectorContains (values : Move.Vector T) (value : V)
+    [LogicalBoolEq T V] : Bool :=
+  values.toList.any (fun element => logicalBoolEq element value)
+
+/-- Logical indexing of a Move vector.  This is a scoped specification
+instance, so executable source still uses Move's `U64` vector primitive. -/
+scoped instance logicalVectorGetElem [IntValue I] :
+    GetElem? (Move.Vector T) I T
+      (fun values index => 0 ≤ int index ∧ (int index).toNat < values.toList.length) where
+  getElem values index inBounds :=
+    values.toList[(int index).toNat]'inBounds.2
+  getElem? values index := values.toList[(int index).toNat]?
+  getElem! values index := values.toList[(int index).toNat]!
+
+/-- Logical membership in a Move vector. -/
+scoped instance logicalVectorMembership : Membership T (Move.Vector T) where
+  mem values value := value ∈ values.toList
+
+/-- Mathematical vector update and concatenation used by the transpiler for
+MSL's value-level vector operations. -/
+def vectorSet (values : Move.Vector T) (index : I) (value : T) [IntValue I] : List T :=
+  values.toList.set (int index).toNat value
+
+def vectorAppend (left right : Move.Vector T) : List T :=
+  left.toList ++ right.toList
 
 end Move.Spec
 
@@ -118,6 +349,14 @@ axiom logicalBEq_uint {W : Type} [Move.Width W] (left right : Move.UInt W) :
 
 attribute [simp] logicalBEq_uint
 
+@[simp] theorem logicalBoolEq_uint_toInt {W : Type} [Move.Width W]
+    (left right : Move.UInt W) :
+    Move.Spec.logicalBoolEq left right.toInt = logicalBEq left right := by
+  change decide (left.toInt = right.toInt) = logicalBEq left right
+  apply Bool.eq_iff_iff.mpr
+  simp only [decide_eq_true_eq, logicalBEq_uint, Move.UInt.toInt_eq_toNat]
+  exact Int.ofNat_inj
+
 /-- The fixed generic equality marker is the source-level representation used
 by Move's compiler for a type parameter constrained by `Compare.Total`. -/
 theorem logicalBEq_move [Move.Compare.Total T] (left right : T) :
@@ -129,6 +368,12 @@ attribute [simp] logicalBEq_move
 structural equality rather than a caller-selected Lean `BEq` instance. -/
 def vectorContains (values : Move.Vector T) (value : T) : Bool :=
   values.toList.any (fun element => logicalBEq element value)
+
+@[simp] theorem logicalVectorContains_uint_int {W : Type} [Move.Width W]
+    (values : Move.Vector (Move.UInt W)) (value : Move.UInt W) :
+    Move.Spec.logicalVectorContains values value.toInt =
+      vectorContains values value := by
+  simp [Move.Spec.logicalVectorContains, vectorContains]
 
 /-- First structural-equality match, or the list length when absent. The
 propositional branch makes the sealed equality laws available to proof
@@ -261,16 +506,41 @@ elab "data_invariants" : tactic => do
         let some typeName := targetType.getAppFn.constName? | continue
         unless (Move.dataInvariant? (← Lean.getEnv) typeName).isSome do continue
         try
-          let invariant ← Lean.Meta.mkAppM (typeName ++ `invariant) #[target]
+          let dataInvariant ← Lean.Meta.mkAppM (typeName ++ `dataInvariant) #[target]
           -- Assert the condition with its generated name unfolded: this runs
           -- after the cascade's normalization, so `move_invariant_norm` would
           -- no longer see it.
-          let condition ← Lean.Meta.inferType invariant
+          let condition ← Lean.Meta.inferType dataInvariant
           let condition := (← Lean.Meta.unfoldDefinition? condition).getD condition
           goal ← (← goal.assert (Lean.Name.mkSimple "dataInvariant")
-            condition invariant).intro1P <&> (·.2)
+            condition dataInvariant).intro1P <&> (·.2)
         catch _ => pure ()
     Lean.Elab.Tactic.replaceMainGoal [goal]
+
+/-- Discharge a `Nat`/`Int` (or `UInt` (in)equality) goal that mixes source
+integer and vector-length views.  It brings in the data invariant of every
+certified value (`data_invariants`) and the width/length bounds
+(`uint_bounds`), folds vectors to their `.toList`, integers to `Nat`
+(`toInt`/`ofNat`/`mod`, and `UInt` (in)equalities to their `toNat` view),
+normalizes Boolean loop guards (`!decide (a < b) = true` and friends) to the
+underlying `Nat` comparison, and finishes with `omega`.  This is the numeric
+closer for shifted-index vector reasoning, where a raw-field length atom and a
+`.toList` length atom would otherwise stay distinct. -/
+syntax "uint_arith" : tactic
+macro_rules
+  | `(tactic| uint_arith) =>
+    `(tactic|
+      (data_invariants
+       uint_bounds
+       (try simp only [Move.Vector.elems_eq_toList, Move.UInt.toInt_eq_toNat,
+          Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le,
+          Move.UInt.eq_iff_toNat_eq, Move.UInt.toNat_zero, Move.UInt.toNat_one,
+          Bool.not_eq_true, Bool.not_eq_true', Bool.not_eq_false,
+          decide_eq_true_eq, decide_eq_false_iff_not,
+          Nat.not_lt, Nat.not_le, Classical.not_not] at *)
+       (try simp (disch := omega) only [Move.UInt.toNat_ofNat_u64,
+          Move.UInt.toNat_ofNat_numeral, Nat.mod_eq_of_lt] at *)
+       omega))
 
 /-- Source retained by the `fun` command for later specification generation.
 This is deliberately syntax, rather than LIR or Move IR: verification is
@@ -341,18 +611,57 @@ private partial def findTypeApplication? (name : Name) (stx : Syntax) : Option S
   else
     stx.getArgs.findSome? (findTypeApplication? name)
 
-private partial def eraseReferenceType (type : TSyntax `term) : TSyntax `term :=
+/-- One flattened Move result component. Products are transient multiple
+returns, so their reference components are represented independently at the
+mutation boundary and rebuilt in the same right-nested product order. -/
+private inductive ResultLeaf where
+  | value (type : TSyntax `term)
+  | immutable (referent : TSyntax `term)
+  | mutable (referent : TSyntax `term)
+  deriving Inhabited
+
+private partial def resultLeaves (type : TSyntax `term) : Array ResultLeaf :=
   match type with
-  | `(($inner:term)) => eraseReferenceType inner
-  | `(& $referent:term) => referent
-  | _ => type
+  | `(($inner:term)) => resultLeaves inner
+  | `($left:term × $right:term) => resultLeaves left ++ resultLeaves right
+  | `(Prod $left:term $right:term) => resultLeaves left ++ resultLeaves right
+  | `(& $referent:term) => #[.immutable referent]
+  | `(&mut $referent:term) => #[.mutable referent]
+  | `(Move.ImmRef $referent:term) => #[.immutable referent]
+  | `(Move.MutRef $referent:term) => #[.mutable referent]
+  | _ => #[.value type]
+
+private def ResultLeaf.logicalType : ResultLeaf → TSyntax `term
+  | .value type | .immutable type | .mutable type => type
+
+private def ResultLeaf.isMutable : ResultLeaf → Bool
+  | .mutable _ => true
+  | _ => false
+
+/-- References are erased recursively in specification results. -/
+private def erasedResultTypes (type : TSyntax `term) : Array (TSyntax `term) :=
+  (resultLeaves type).map (·.logicalType)
+
+private def packResultTypes (types : Array (TSyntax `term)) : MacroM (TSyntax `term) := do
+  match types.size with
+  | 0 => `(Unit)
+  | 1 => pure types[0]!
+  | _ =>
+      let reversed := types.toList.reverse
+      reversed.tail.foldlM (init := reversed.head!) fun result type =>
+        `($type × $result)
+
+private def declaredResultType (declaration : Declaration) : TSyntax `term :=
+  match findTypeApplication? ``Move.Action declaration.resultType with
+  | some result => ⟨result⟩
+  | none => ⟨declaration.resultType⟩
+
+private def returnsMutableReferences (declaration : Declaration) : Bool :=
+  (resultLeaves (declaredResultType declaration)).any (·.isMutable)
 
 private def actionResultType (declaration : Declaration) : CommandElabM (TSyntax `term) := do
-  match findTypeApplication? ``Move.Action declaration.resultType with
-  | some result => pure (eraseReferenceType ⟨result⟩)
-  | none =>
-      -- Pure `do` functions still retain a source body for verification.
-      pure (eraseReferenceType ⟨declaration.resultType⟩)
+  let result := declaredResultType declaration
+  liftMacroM <| packResultTypes (erasedResultTypes result)
 
 /-- Result type retained for an effectful Move source declaration.  This is
 also used when a recursive function supplies its relational source semantics
@@ -365,10 +674,39 @@ its contract observes global state rather than being a pure value predicate. -/
 def isEffectfulFunction (function : Syntax) : CommandElabM Bool := do
   return (findTypeApplication? ``Move.Action (← declarationFor function).resultType).isSome
 
-private def fieldParts : Name → List String
-  | .anonymous => []
-  | .str base part => fieldParts base ++ [part]
-  | .num _ _ => []
+/-- The components of a dotted identifier, `x.f.g` ↦ `["x", "f", "g"]`.  A
+hygienic name — a loop-freshened local, or a dotted use of one — is read
+without its macro scopes, which `sameScopes` compares. -/
+private def fieldParts (name : Name) : List String :=
+  go (extractMacroScopes name).name
+where
+  go : Name → List String
+    | .anonymous => []
+    | .str base part => go base ++ [part]
+    | .num _ _ => []
+
+/-- Whether two identifiers carry the same macro scopes: a dotted use of a
+loop-freshened local shares the scopes of its root. -/
+private def sameScopes (a b : Name) : Bool :=
+  let av := extractMacroScopes a
+  let bv := extractMacroScopes b
+  av.scopes == bv.scopes && av.ctx == bv.ctx && av.imported == bv.imported
+
+/-- The root `root` of the dotted identifier `name`, as an identifier with
+`name`'s macro scopes. -/
+private def rootIdent (ref : Syntax) (name : Name) (root : String) : TSyntax `ident :=
+  let view := extractMacroScopes name
+  mkIdentFrom ref { view with name := Name.mkSimple root }.review
+
+/-- Split a dotted identifier `receiver.field` at its last component; the
+receiver keeps the macro scopes. -/
+private def splitLastField? (name : Name) : Option (Name × Name) :=
+  let view := extractMacroScopes name
+  match view.name with
+  | .str base field =>
+      if base.isAnonymous then none
+      else some ({ view with name := base }.review, Name.mkSimple field)
+  | _ => none
 
 private partial def splitFieldPath (place : TSyntax `term) :
     (TSyntax `term × Array (TSyntax `ident)) :=
@@ -573,40 +911,47 @@ private partial def collectResources (stx : Syntax)
     resources ← collectResources child resources
   pure resources
 
+private def globalPlace? (place : TSyntax `term) :
+    CommandElabM (Option (Family × TSyntax `term × Array (TSyntax `ident))) := do
+  let (root, fields) := splitFieldPath place
+  let some (family, key) ← rootFamily? root | return none
+  return some (family, key, fields)
+
 private def globalPlace (place : TSyntax `term) :
     CommandElabM (Family × TSyntax `term × Array (TSyntax `ident)) := do
-  let (root, fields) := splitFieldPath place
-  let some (family, key) ← rootFamily? root
+  let some result ← globalPlace? place
     | throwErrorAt place
         "automatic source specifications currently expect a global place `Resource[key]`"
-  pure (family, key, fields)
+  pure result
 
 private def projectPath (owner : TSyntax `term)
     (fields : Array (TSyntax `ident)) : CommandElabM (TSyntax `term) := do
-  fields.foldlM (init := owner) fun value field => `($value.$field)
+  if fields.isEmpty then return owner
+  `(selectPath% $owner [$fields,*])
 
 private partial def replaceIdentifier (name : Name) (replacement stx : Syntax) : Syntax :=
   if stx.isIdent && stx.getId == name then replacement
+  else if stx.isIdent && stx.getId.getRoot == name && replacement.isIdent then
+    -- A dotted use of the variable (`x.push v`): the root is renamed.
+    mkIdentFrom stx (replacement.getId ++ stx.getId.replacePrefix name .anonymous)
+  else if stx.isOfKind ``Move.anchoredOldTerm then
+    -- An anchored old-value observation is a snapshot from before the loop,
+    -- not another spelling of its threaded state variable.
+    stx
+  else if stx.isOfKind ``Lean.Parser.Term.structInstField then
+    -- A structure-instance field label is not a variable.
+    stx.setArgs (stx.getArgs.mapIdx fun i arg =>
+      if i == 0 then arg else replaceIdentifier name replacement arg)
   else stx.setArgs (stx.getArgs.map (replaceIdentifier name replacement))
 
-private partial def updatePath (owner newValue : TSyntax `term)
+/-- `owner` with `newValue` written at `fields` (decided per step from the
+owner's type when elaborated: a structure update, or a variant rebuild for an
+enum payload field). -/
+private def updatePath (owner newValue : TSyntax `term)
     (fields : List (TSyntax `ident)) : CommandElabM (TSyntax `term) := do
   match fields with
   | [] => pure newValue
-  | field :: rest =>
-      let oldField ← `($owner.$field)
-      let newField ← updatePath oldField newValue rest
-      let ownerPlaceholder := `_moveSpecUpdateOwner
-      let valuePlaceholder := `_moveSpecUpdateValue
-      let source := "{ _moveSpecUpdateOwner with " ++ field.getId.toString ++
-        " := _moveSpecUpdateValue }"
-      let parsed ← match Lean.Parser.runParserCategory (← getEnv) `term source with
-        | .ok parsed => pure parsed
-        | .error message => throwErrorAt field
-            "failed to generate update for source field `{field.getId}`: {message}"
-      let parsed := replaceIdentifier ownerPlaceholder owner.raw parsed
-      let parsed := replaceIdentifier valuePlaceholder newField.raw parsed
-      pure ⟨parsed⟩
+  | _ => `(updatePath% $owner [$(fields.toArray),*] $newValue)
 
 /-- The type a mutable parameter refers to, if source translation can name
 it. -/
@@ -631,7 +976,7 @@ private def rebuildOwner (owner newValue : TSyntax `term)
   let field :: rest := fields | return none
   let env ← getEnv
   let some info := getStructureInfo? env typeName | return none
-  let dataFields := info.fieldNames.filter (· != `invariant)
+  let dataFields := info.fieldNames.filter (· != `dataInvariant)
   let arguments ← dataFields.mapM fun fieldName =>
     if fieldName == field.getId then
       if rest.isEmpty then pure newValue
@@ -682,7 +1027,7 @@ private def localPlace? (contextResources : Array ResourceBinding)
   if place.raw.isIdent then
     let parts := fieldParts place.raw.getId
     if let ownerName :: fields := parts then
-      let owner := mkIdentFrom place (Name.mkSimple ownerName)
+      let owner := rootIdent place place.raw.getId ownerName
       if !(← hasResource contextResources owner) then
         return some (owner, fields.toArray.map fun field =>
           mkIdentFrom place (Name.mkSimple field))
@@ -699,10 +1044,50 @@ private structure VerificationLoopFrame where
   assigned : List (TSyntax `ident)
   state : List (TSyntax `ident)
 
+/-- A control-flow exit selected while a mutable loan is still open.  The
+loan body returns a continuation function instead of executing the exit;
+each `roots` binder is supplied with its revived mutation after the enclosing
+loan combinator has reconciled. `normal` is the ordinary post-loan path and
+may mention `value`, which is bound to the loan body's result. -/
+private structure LoanExitFrame where
+  roots : Array (TSyntax `ident)
+  value : TSyntax `ident
+  normal : TSyntax `term
+  /-- Special mutation-returning loans do not have an ordinary continuation:
+  an enclosing control exit resolves this transferred mutation directly. -/
+  resolve? : Option (TSyntax `ident) := none
+  /-- Fixed points already active when the loan opened. Exits targeting loops
+  created inside the loan stay inside it; only these enclosing targets unwind
+  the loan. -/
+  enclosingLoops : List Name
+  resumeMutation? : Option (TSyntax `ident)
+  resumeMutationType? : Option Name
+  resumeMutationAncestors : List (TSyntax `ident × Option Name)
+  resumeMutationOwnerAliases : List (Name × TSyntax `ident × Option Name)
+  resumeMutationRefs : List (TSyntax `ident)
+  resumeRootMutations : Array (TSyntax `ident)
+  resumeTransferredReturns : Array (TSyntax `ident)
+  resumeResolveBeforeReturn : Array (TSyntax `ident)
+  resumeMutationLoans : List (Name × List Name)
+
+/-- One value captured by the compiler before an inlined fold.  The Move
+prover represents this as `with_state_anchor(label, old(value))`; generated
+Leaner keeps the label in syntax until the source translator replaces it with
+this lexical snapshot. -/
+private structure StateAnchorCapture where
+  label : Nat
+  observed : Syntax
+  snapshot : TSyntax `ident
+
 private structure TranslationContext where
   world : TSyntax `term
   resources : Array ResourceBinding
   functionName : Name
+  /-- The function's parameters: `old(p)` in a loop invariant is `p` at entry. -/
+  parameters : List Name := []
+  /-- Value snapshots installed by preceding compiler-generated fold capture
+  markers.  They remain lexical across the loop fixed point. -/
+  stateAnchors : List StateAnchorCapture := []
   recursiveSpec? : Option (TSyntax `term) := none
   /-- Recursive entry points for every member of the current mutual SCC. -/
   recursiveSpecs : Array (Name × TSyntax `term) := #[]
@@ -728,10 +1113,73 @@ private structure TranslationContext where
   order.  A nested field loan temporarily replaces `mutation?`, but the
   function result must still return every root mutation. -/
   rootMutations : Array (TSyntax `ident) := #[]
+  /-- This body is the mutation-level relation of a function returning
+  one or more `&mut` components. -/
+  returnsMutation : Bool := false
+  /-- Flattened declared result layout at a mutation boundary. -/
+  resultLeaves : Array ResultLeaf := #[]
+  /-- Mutations already transferred into this function by returned-reference
+  calls. Returning these handles forwards their existing prophecies instead of
+  allocating another final reborrow. -/
+  transferredReturns : Array (TSyntax `ident) := #[]
+  /-- Reborrowed handles used only inside a returned-reference computation.
+  Their prophecies are installed in the rebuilt owner, so they must resolve
+  before the function returns. -/
+  resolveBeforeReturn : Array (TSyntax `ident) := #[]
   /-- Field paths currently checked out from each owner. Only paths with
   distinct first fields can be borrowed as siblings. -/
   mutationLoans : List (Name × List Name) := []
+  /-- The loan whose body is being translated. Special mutation-returning
+  paths still use this marker for source-positioned loop-exit diagnostics. -/
+  loanScope? : Option (TSyntax `ident) := none
+  /-- An ordinary lexical loan returns its post-loan computation as a closure.
+  This both delays control exits until reconciliation and transports writes to
+  disjoint outer mutations captured by that closure. -/
+  loanExits : List LoanExitFrame := []
   loops : List VerificationLoopFrame := []
+
+private def mkLoanExitFrame (context : TranslationContext)
+    (roots : Array (TSyntax `ident)) (value : TSyntax `ident)
+    (normal : TSyntax `term) : LoanExitFrame := {
+  roots
+  value
+  normal
+  enclosingLoops := context.loops.map (·.recursive.raw.getId)
+  resumeMutation? := context.mutation?
+  resumeMutationType? := context.mutationType?
+  resumeMutationAncestors := context.mutationAncestors
+  resumeMutationOwnerAliases := context.mutationOwnerAliases
+  resumeMutationRefs := context.mutationRefs
+  resumeRootMutations := context.rootMutations
+  resumeTransferredReturns := context.transferredReturns
+  resumeResolveBeforeReturn := context.resolveBeforeReturn
+  resumeMutationLoans := context.mutationLoans }
+
+private def mkTransferredLoanExitFrame (context : TranslationContext)
+    (mutation : TSyntax `ident) (normal : TSyntax `term) : LoanExitFrame :=
+  { mkLoanExitFrame context #[] mutation normal with
+      resolve? := some mutation }
+
+private def resumeAfterLoan (context : TranslationContext)
+    (frame : LoanExitFrame) : TranslationContext := {
+  context with
+    mutation? := frame.resumeMutation?
+    mutationType? := frame.resumeMutationType?
+    mutationAncestors := frame.resumeMutationAncestors
+    mutationOwnerAliases := frame.resumeMutationOwnerAliases
+    mutationRefs := frame.resumeMutationRefs
+    rootMutations := frame.resumeRootMutations
+    transferredReturns := frame.resumeTransferredReturns
+    resolveBeforeReturn := frame.resumeResolveBeforeReturn
+    mutationLoans := frame.resumeMutationLoans
+    loanScope? := none
+    loanExits := context.loanExits.tail }
+
+private partial def resumeAfterAllLoans
+    (context : TranslationContext) : TranslationContext :=
+  match context.loanExits.head? with
+  | none => context
+  | some frame => resumeAfterAllLoans (resumeAfterLoan context frame)
 
 /-- The data invariant certified by the active mutation's referent, if its
 type is known and declares one. -/
@@ -761,6 +1209,19 @@ private def pathTypeName? (typeName? : Option Name) (fields : List Name) :
     let some typeName := current | return none
     current ← fieldTypeName? typeName field
   return current
+
+/-- Whether a field path selects through an enum payload at any step. Plain
+structure-only paths keep the smaller lens-based global-borrow term used by
+existing proofs; enum paths need guarded selection and reconstruction. -/
+private def pathCrossesEnum (typeName? : Option Name) (fields : List Name) :
+    CommandElabM Bool := do
+  let env ← getEnv
+  let mut current := typeName?
+  for field in fields do
+    let some typeName := current | return false
+    if Move.moveEnumAttr.hasTag env typeName then return true
+    current ← fieldTypeName? typeName field
+  return false
 
 private def mutationValue (context : TranslationContext)
     (owner : TSyntax `ident) : CommandElabM (TSyntax `term) := do
@@ -825,14 +1286,12 @@ private def projectedField? (descriptor : Syntax) : Option Name := do
     if body.isOfKind ``Lean.Parser.Term.proj && body[2].isIdent then
       return body[2].getId
     if body.isIdent then
-      match body.getId with
-      | .str _ field => return Name.mkSimple field
-      | _ => none
+      let (_, field) ← splitLastField? body.getId
+      return field
     none
   else if projection.isIdent then
-    match projection.getId with
-    | .str _ field => return Name.mkSimple field
-    | _ => none
+    let (_, field) ← splitLastField? projection.getId
+    return field
   else none
 
 /-- A place `owner[index]` as the surface borrow parsers produce it. -/
@@ -889,6 +1348,20 @@ private partial def desugarPrimitives (stx : Syntax)
             let value ← desugarPrimitives value preserveFreeze
             let reassign ← `(doElem| $(⟨reference⟩):ident := $(⟨value⟩))
             return reassign.raw
+  -- `assert!(c, e)` (and `assert_eq!`/`assert_ne!`): the surface macros over
+  -- `Move.assert`, desugared like the primitive itself.
+  if stx.isOfKind ``Move.moveAssert then
+    let condition : TSyntax `term := ⟨← desugarPrimitives stx[1]⟩
+    let code : TSyntax `term := ⟨← desugarPrimitives stx[3]⟩
+    return (← `(do if $condition then pure () else abort $code)).raw
+  if stx.isOfKind ``Move.moveAssertEq || stx.isOfKind ``Move.moveAssertNe then
+    let left : TSyntax `term := ⟨← desugarPrimitives stx[1]⟩
+    let right : TSyntax `term := ⟨← desugarPrimitives stx[3]⟩
+    let code : TSyntax `term := ⟨← desugarPrimitives stx[5]⟩
+    let condition : TSyntax `term ← if stx.isOfKind ``Move.moveAssertEq then
+        `(Move.Compare.equal $left $right)
+      else `(!Move.Compare.equal $left $right)
+    return (← `(do if $condition then pure () else abort $code)).raw
   -- borrows, reads, and `Move.abort c`, wherever they appear
   if let some borrow ← desugarBorrowPrimitive? stx then
     return borrow
@@ -914,7 +1387,13 @@ private def sourceBody (declaration : Declaration) : CommandElabM (TSyntax `term
       declaration.value[1]
     else
       declaration.value
-  return ⟨← desugarPrimitives body⟩
+  let body : TSyntax `term := ⟨← desugarPrimitives body⟩
+  match body with
+  | `(do $sequence:doSeq) =>
+      let sequence ← Lean.Elab.Command.liftCoreM <|
+        Move.freshenShadowedLocals sequence
+      `(do $sequence)
+  | _ => pure body
 
 /-- Core primitives whose executable Move behavior is not yet represented by
 the automatically generated source semantics. -/
@@ -925,6 +1404,8 @@ private def unsupportedSourceOperation (name : Name) : Bool :=
   name == ``Move.borrowElem || name == ``Move.borrowElemMut ||
   name == ``Move.freeze || name == ``Move.read || name == ``Move.readImm ||
   name == ``Move.write || name == ``Move.assert || name == ``Move.abort ||
+  name == ``Move.borrowVariantField || name == ``Move.borrowVariantFieldMut ||
+  name == ``Move.testVariantRef || name == ``Move.testVariantMutRef ||
   name == ``Move.Vector.get || name == ``Move.Vector.set
 
 private def unsupportedSourceOperation? (term : TSyntax `term) :
@@ -947,9 +1428,7 @@ private def receiverStyleVectorOperation? (term : Syntax) : CommandElabM Bool :=
     if head.isOfKind ``Lean.Parser.Term.proj && head.getNumArgs == 3 && head[2].isIdent then
       some head[2].getId
     else if head.isIdent then
-      match head.getId with
-      | .str base field => if base.isAnonymous then none else some (Name.mkSimple field)
-      | _ => none
+      (splitLastField? head.getId).map (·.2)
     else none
   let some field := field? | return false
   unless field == `get || field == `set || field == `insert || field == `remove do
@@ -970,9 +1449,8 @@ private def receiverApplication? (term : TSyntax `term) :
       head.raw[2].isIdent then
     return (⟨head.raw[0]⟩, head.raw[2].getId, arguments)
   if head.raw.isIdent then
-    if let .str receiver field := head.raw.getId then
-      unless receiver.isAnonymous do
-        return (⟨mkIdentFrom head.raw receiver⟩, Name.mkSimple field, arguments)
+    if let some (receiver, field) := splitLastField? head.raw.getId then
+      return (⟨mkIdentFrom head.raw receiver⟩, field, arguments)
   none
 
 /-- Refuse source fragments for which `Spec.pure` would erase an executable
@@ -1106,8 +1584,14 @@ private partial def rewritePure (mutations : List (TSyntax `ident))
   match term with
   | `($value:ident) =>
       let parts := fieldParts value.getId
-      if parts.length > 1 && !(← getEnv).contains value.getId then
-        let owner := mkIdentFrom value (Name.mkSimple parts.head!)
+      -- A dotted name that resolves to a global (an enum constructor, a
+      -- constant) is not a field path.
+      let isGlobal ← try
+          let _ ← resolveGlobalConstNoOverload value
+          pure true
+        catch _ => pure false
+      if parts.length > 1 && !isGlobal then
+        let owner := rootIdent value value.getId parts.head!
         let fields := parts.tail.toArray.map fun field =>
           mkIdentFrom value (Name.mkSimple field)
         let ownerTerm ← if mutations.any (·.getId == owner.getId) then
@@ -1137,7 +1621,22 @@ private partial def rewritePure (mutations : List (TSyntax `ident))
       `(logicalBEq $(← rewritePure mutations lhs) $(← rewritePure mutations rhs))
   | `($lhs:term != $rhs:term) =>
       `(!logicalBEq $(← rewritePure mutations lhs) $(← rewritePure mutations rhs))
+  | `(! $value:term) => `(! $(← rewritePure mutations value))
   | _ => pure term
+
+/-- Rewrite a specification clause's local reads through every live mutable
+reference.  `rewritePure` already knows how to turn a direct or dotted local
+read into `Mutation.read`; this traversal applies that fact below logical
+connectives, quantifiers, and other specification-only syntax as well. -/
+private partial def rewriteClauseMutations (mutations : List (TSyntax `ident))
+    (stx : Syntax) : CommandElabM Syntax := do
+  if stx.isOfKind ``Move.anchoredOldTerm then return stx
+  if stx.isIdent || stx.isOfKind ``Move.derefTerm then
+    return (← rewritePure mutations ⟨stx⟩).raw
+  if stx.isOfKind ``Lean.Parser.Term.structInstField then
+    return stx.setArgs (← stx.getArgs.mapIdxM fun index arg =>
+      if index == 0 then pure arg else rewriteClauseMutations mutations arg)
+  return stx.setArgs (← stx.getArgs.mapM (rewriteClauseMutations mutations))
 
 private inductive VectorMutationCall where
   | insert (reference index value : TSyntax `term)
@@ -1375,25 +1874,114 @@ private def globalPrimitiveSpec?
   else
     return none
 
-private def finish (context : TranslationContext) (valueSpec : TSyntax `term) :
+private def finishCore (context : TranslationContext) (valueSpec : TSyntax `term) :
     CommandElabM (TSyntax `term) := do
+  if context.returnsMutation then
+    throwError "internal error: a mutable-reference result must move a live mutation"
   match context.mutation? with
   | none => pure valueSpec
   | some mutation =>
       let finalMutations ←
         if context.rootMutations.any (·.getId == mutation.getId) then
-          match context.rootMutations.size with
-          | 1 => pure (⟨context.rootMutations[0]!.raw⟩ : TSyntax `term)
-          | 2 =>
-              let first : TSyntax `term := ⟨context.rootMutations[0]!.raw⟩
-              let second : TSyntax `term := ⟨context.rootMutations[1]!.raw⟩
-              `(($first, $second))
-          | _ => throwError
-              "automatic source specifications support at most two mutable-reference parameters"
+          packCallArguments mutation.raw <|
+            context.rootMutations.map fun root =>
+              (⟨root.raw⟩ : TSyntax `term)
         else
           pure ⟨mutation.raw⟩
       `(Move.Semantics.Spec.bind $valueSpec fun _moveSpecValue =>
           Move.Semantics.Spec.pure (_moveSpecValue, $finalMutations))
+
+/-- Abstract the mutations a control-flow exit cannot use until its enclosing
+loan has reconciled. Curried binders avoid committing the generated term to a
+particular packed-tuple arity. -/
+private def abstractLoanRoots (roots : Array (TSyntax `ident))
+    (action : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let mut deferred := action
+  for root in roots.reverse do
+    deferred ← `(fun $root => $deferred)
+  pure deferred
+
+/-- Finish a path that transfers control while a loan is live. The
+selected continuation becomes the loan's value and is executed only after all
+of this frame's roots have been revived. -/
+private def finishOneLoanExit (context : TranslationContext)
+    (action : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let some frame := context.loanExits.head?
+    | throwError "internal error: no live-loan exit frame"
+  if let some mutation := frame.resolve? then
+    let ignored := mkIdentFrom mutation `_moveSpecResolvedLoanExit
+    return ← `(Move.Semantics.Spec.bind
+      (Move.Semantics.resolveMutation $mutation)
+      (fun $ignored => $action))
+  let deferred ← abstractLoanRoots frame.roots action
+  finishCore { context with loanExits := context.loanExits.tail }
+    (← `(Move.Semantics.Spec.pure $deferred))
+
+/-- Delay `action` through every consecutive active loan selected by
+`unwind`. Recursing in the resumed context builds the outer reconciliation
+first; the current loan then returns that outer action as its deferred value. -/
+private partial def finishLoanExits (context : TranslationContext)
+    (unwind : LoanExitFrame → Bool) (action : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  let some frame := context.loanExits.head? | return action
+  unless unwind frame do return action
+  let outer ← finishLoanExits (resumeAfterLoan context frame) unwind action
+  finishOneLoanExit context outer
+
+private def finish (context : TranslationContext) (valueSpec : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  match context.loanExits.head? with
+  | none => finishCore context valueSpec
+  | some frame@{ resolve? := some mutation, .. } =>
+      let ignored := mkIdentFrom mutation `_moveSpecLoanBodyValue
+      `(Move.Semantics.Spec.bind $valueSpec (fun $ignored => $(frame.normal)))
+  | some frame =>
+      let deferred ← abstractLoanRoots frame.roots frame.normal
+      finishCore { context with loanExits := context.loanExits.tail }
+        (← `(Move.Semantics.Spec.bind $valueSpec (fun $(frame.value) =>
+          Move.Semantics.Spec.pure $deferred)))
+
+private def packUpdatedRootMutations (context : TranslationContext)
+    (root : TSyntax `ident) (updated : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  unless context.rootMutations.any (·.getId == root.getId) do
+    throwErrorAt root
+      "a returned mutable reference must reconcile into a mutable parameter"
+  let finalRoot (candidate : TSyntax `ident) : TSyntax `term :=
+    if candidate.getId == root.getId then updated else ⟨candidate.raw⟩
+  packCallArguments root.raw (context.rootMutations.map finalRoot)
+
+private def resolveMutationReturns (context : TranslationContext)
+    (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let mut result := body
+  for mutation in context.resolveBeforeReturn.reverse do
+    let ignored := mkIdentFrom mutation `_moveSpecResolvedBeforeReturn
+    result ← `(Move.Semantics.Spec.bind
+      (Move.Semantics.resolveMutation $mutation)
+      (fun $ignored => $result))
+  pure result
+
+/-- Finish a mutation-level return.  The returned loan receives a fresh
+prophecy and the selected root is suspended at that future value while
+retaining its enclosing prophecy.  Every root is returned because the caller
+cannot know which mutable parameter the result selected. -/
+private def finishMutationReturn (context : TranslationContext)
+    (returned : TSyntax `ident) : CommandElabM (TSyntax `term) := do
+  if context.transferredReturns.any (·.getId == returned.getId) then
+    let finalMutations ← packCallArguments returned.raw <|
+      context.rootMutations.map fun root => (⟨root.raw⟩ : TSyntax `term)
+    return ← resolveMutationReturns context
+      (← `(Move.Semantics.Spec.pure ($returned, $finalMutations)))
+  unless context.rootMutations.any (·.getId == returned.getId) do
+    throwErrorAt returned
+      "automatic mutation-level returns currently support only a direct mutable-reference parameter"
+  let transferred := mkIdentFrom returned `_moveSpecTransferredMutation
+  let finalMutations ← packUpdatedRootMutations context returned
+    (← `($transferred.2))
+  resolveMutationReturns context (← `(Move.Semantics.Spec.bind
+      (Move.Semantics.transferMutation $returned)
+      (fun $transferred =>
+        Move.Semantics.Spec.pure ($transferred.1, $finalMutations))))
 
 private partial def packLoopState (ids : List (TSyntax `ident)) :
     CommandElabM (TSyntax `term) := do
@@ -1407,7 +1995,8 @@ private partial def packLoopState (ids : List (TSyntax `ident)) :
 private def identifierExtends (root candidate : Name) : Bool :=
   let rootParts := fieldParts root
   let candidateParts := fieldParts candidate
-  !rootParts.isEmpty && candidateParts.take rootParts.length == rootParts
+  !rootParts.isEmpty && candidateParts.take rootParts.length == rootParts &&
+    sameScopes root candidate
 
 private partial def containsIdentifier (name : Name) (stx : Syntax) : Bool :=
   (stx.isIdent && identifierExtends name stx.getId) ||
@@ -1422,11 +2011,22 @@ private partial def containsProjectionOfIdentifier (name : Name)
     let rootParts := fieldParts name
     let candidateParts := fieldParts stx.getId
     candidateParts.length > rootParts.length &&
-      candidateParts.take rootParts.length == rootParts) ||
+      candidateParts.take rootParts.length == rootParts &&
+      sameScopes name stx.getId) ||
     stx.getArgs.any (containsProjectionOfIdentifier name)
 
-private partial def containsReturn (stx : Syntax) : Bool :=
-  stx.isOfKind ``Lean.Parser.Term.doReturn || stx.getArgs.any containsReturn
+/-- Whether a lexical loan body contains a control exit that may need to
+unwind the loan before transferring control. Inner-loop exits remain inside
+the loan; their target frame is distinguished during translation. -/
+private partial def containsLoanControlExit (stx : Syntax) : Bool :=
+  stx.isOfKind ``Lean.Parser.Term.doReturn ||
+  stx.isOfKind ``Lean.Parser.Term.doBreak ||
+  stx.isOfKind ``Lean.Parser.Term.doContinue ||
+  stx.isOfKind ``Move.moveBreakLabeledDo ||
+  stx.isOfKind ``Move.moveContinueLabeledDo ||
+  stx.isOfKind ``Move.moveBreakInternal ||
+  stx.isOfKind ``Move.moveContinueInternal ||
+  stx.getArgs.any containsLoanControlExit
 
 private def freshLoopStateIdents (ref : Syntax)
     (assigned : List (TSyntax `ident)) : List (TSyntax `ident) :=
@@ -1467,21 +2067,30 @@ private def loopContinueSpec (context : TranslationContext)
     (sourceLabel? : Option Name) (ref : Syntax) :
     CommandElabM (TSyntax `term) := do
   let some (inner, frame) := findVerificationLoop? context.loops sourceLabel?
-    | match sourceLabel? with
+    | if let some loan := context.loanScope? then
+        throwErrorAt ref "`continue` inside the scope of the mutable borrow `{loan.getId}` is not supported by automatic source specifications; end the loan first"
+      match sourceLabel? with
       | none => throwErrorAt ref "`continue` requires an enclosing `loop` or `while`"
       | some sourceLabel => throwErrorAt ref "unknown loop label `{sourceLabel}`"
   let pack ← packLoopState (resolvedLoopState inner frame)
-  `($(frame.recursive) $pack)
+  let action ← `($(frame.recursive) $pack)
+  finishLoanExits context
+    (fun exit => exit.enclosingLoops.contains frame.recursive.raw.getId) action
 
 private def loopBreakSpec (context : TranslationContext)
     (sourceLabel? : Option Name) (ref : Syntax) :
     CommandElabM (TSyntax `term) := do
   let some (inner, frame) := findVerificationLoop? context.loops sourceLabel?
-    | match sourceLabel? with
+    | if let some loan := context.loanScope? then
+        throwErrorAt ref "`break` inside the scope of the mutable borrow `{loan.getId}` is not supported by automatic source specifications; end the loan first"
+      match sourceLabel? with
       | none => throwErrorAt ref "`break` requires an enclosing `loop` or `while`"
       | some sourceLabel => throwErrorAt ref "unknown loop label `{sourceLabel}`"
   let current := resolvedLoopState inner frame
-  return ⟨replaceLoopState frame.state current frame.after.raw⟩
+  let action : TSyntax `term :=
+    ⟨replaceLoopState frame.state current frame.after.raw⟩
+  finishLoanExits context
+    (fun exit => exit.enclosingLoops.contains frame.recursive.raw.getId) action
 
 private def emptyFinish (context : TranslationContext) : CommandElabM (TSyntax `term) := do
   if !context.loops.isEmpty then
@@ -1489,6 +2098,26 @@ private def emptyFinish (context : TranslationContext) : CommandElabM (TSyntax `
   else
     finish context (← `(Move.Semantics.Spec.pure ()))
 
+/-- The implicit fallthrough from a special mutation-returning loan can only
+occur in a loop body. Resolve every structural child inside-out, then invoke
+the loop continuation (which also unwinds any loans surrounding this one). -/
+private def transferredLoanNormal (context : TranslationContext)
+    (mutations : Array (TSyntax `ident)) : CommandElabM (TSyntax `term) := do
+  if context.loops.isEmpty then
+    -- A well-typed mutation-returning function must transfer a reference on
+    -- every non-aborting terminal path, so this placeholder is never emitted.
+    return ⟨mutations[0]!.raw⟩
+  let mut result ← emptyFinish context
+  for mutation in mutations do
+    let ignored := mkIdentFrom mutation `_moveSpecResolvedLoanFallthrough
+    result ← `(Move.Semantics.Spec.bind
+      (Move.Semantics.resolveMutation $mutation)
+      (fun $ignored => $result))
+  pure result
+
+/-- Bind the loop state's components from the packed state, by projection
+(the shape of a function's arguments, and what the automatic prover
+normalizes). -/
 private partial def unpackLoopState (ids : List (TSyntax `ident)) (packed : TSyntax `term)
     (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
   match ids with
@@ -1497,7 +2126,17 @@ private partial def unpackLoopState (ids : List (TSyntax `ident)) (packed : TSyn
   | id :: rest =>
       let tail := mkIdentFrom id `_moveSpecLoopTail
       let nested ← unpackLoopState rest ⟨tail.raw⟩ body
-      `(let ($id, $tail) := $packed; $nested)
+      `(let $id := Prod.fst $packed; let $tail := Prod.snd $packed; $nested)
+
+/-- The `invariant` statements at the head of a loop body, and the body
+without them. -/
+private def splitLoopInvariants (elements : Array Lean.DoElem) :
+    Array (TSyntax `term) × Array Lean.DoElem :=
+  let count := elements.size - (elements.toList.dropWhile fun element =>
+    element.raw.isOfKind ``Move.moveInvariant).length
+  let invariants := (elements.extract 0 count).map fun element =>
+    (⟨element.raw[1]⟩ : TSyntax `term)
+  (invariants, elements.extract count elements.size)
 
 /-- The local a statement binds, and whether every use of it — rather than only
 a projection out of it — extends the loan it was bound in. Generated loan
@@ -1513,43 +2152,6 @@ private def boundIdentifier? (element : Lean.DoElem) : Option (Name × Bool) :=
   | `(doElem| let $name:ident : $_type:term := $_value:term) =>
       some (name.getId, true)
   | _ => none
-
-/-- All identifiers introduced by a `do`-local declaration.  This deliberately
-handles patterns as well as the common single-identifier forms: the retained
-source used for a contract does not carry Lean's hygienic local identity, so a
-same-spelled binding must be treated as a possible shadowing declaration. -/
-private partial def doPatternIdentifiers (stx : Syntax) : List Name :=
-  if stx.isIdent then [stx.getId]
-  else stx.getArgs.toList.flatMap doPatternIdentifiers
-
-private partial def firstDoIdentifier? (stx : Syntax) : Option Name :=
-  if stx.isIdent then some stx.getId
-  else stx.getArgs.findSome? firstDoIdentifier?
-
-private def doSyntaxBinds (name : Name) (stx : Syntax) : Bool :=
-  if !(stx.isOfKind ``Lean.Parser.Term.doLet ||
-      stx.isOfKind ``Lean.Parser.Term.doLetArrow) || stx.getNumArgs ≤ 3 then
-    false
-  else
-    let declaration := stx[3]
-    if declaration.isOfKind ``Lean.Parser.Term.letPatDecl ||
-        declaration.isOfKind ``Lean.Parser.Term.doPatDecl then
-      (doPatternIdentifiers declaration[0]!).any (· == name)
-    else
-      firstDoIdentifier? declaration == some name
-
-private partial def containsDoBinding (name : Name) (stx : Syntax) : Bool :=
-  doSyntaxBinds name stx || stx.getArgs.any (containsDoBinding name)
-
-/-- Reusing a mutable-reference name cannot be represented by the current
-source-spec prophecy encoding.  Retained syntax has no alpha-renamed local
-identity, so textual use tracking could otherwise mistake a later binding or
-its initializer for the original loan. Refuse every later same-named `do`
-binder (including a nested or pattern binder) until the encoding carries
-alpha-renamed local identities. -/
-private def mutableBorrowShadowing? (name : Name) (elements : Array Lean.DoElem) :
-    Option Lean.DoElem :=
-  elements.find? (containsDoBinding name ·.raw)
 
 private partial def closeBorrowScope (elements : Array Lean.DoElem)
     (size : Nat) : Nat :=
@@ -1570,12 +2172,79 @@ reference local. The prefix is the loan body; the suffix executes after the
 loan has been reconciled. -/
 private def mutableBorrowScope (name : Name) (elements : Array Lean.DoElem) :
     CommandElabM (Array Lean.DoElem × Array Lean.DoElem) := do
-  if let some shadow := mutableBorrowShadowing? name elements then
-    throwErrorAt shadow
-      "automatic source specifications do not support shadowing a mutable-reference local"
   let lastUse := elements.zipIdx.foldl (init := none) fun result (element, index) =>
     if containsIdentifier name element.raw then some index else result
   let size := closeBorrowScope elements (lastUse.map (· + 1) |>.getD 0)
+  pure (elements.extract 0 size, elements.extract size elements.size)
+
+private def isDirectMutationReturn (name : Name)
+    (elements : Array Lean.DoElem) : Bool :=
+  if elements.size != 1 then false
+  else
+    match elements[0]! with
+    | `(doElem| pure $value:term) =>
+        value.raw.isIdent && value.raw.getId == name
+    | `(doElem| $value:term) =>
+        value.raw.isIdent && value.raw.getId == name
+    | _ => false
+
+private partial def flattenResultTerms (term : TSyntax `term) : Array (TSyntax `term) :=
+  if term.raw.isOfKind `null then
+    let components := term.raw.getSepArgs
+    if components.size == 1 then
+      flattenResultTerms ⟨components[0]!⟩
+    else
+      components.flatMap fun component => flattenResultTerms ⟨component⟩
+  else
+    match term with
+    | `(($inner:term)) => flattenResultTerms inner
+    | _ =>
+        if term.raw.isOfKind ``Lean.Parser.Term.tuple && term.raw.getNumArgs > 1 then
+          flattenResultTerms ⟨term.raw[1]⟩
+        else
+          #[term]
+
+private def mutationResultContains (context : TranslationContext)
+    (name : Name) (value : TSyntax `term) : Bool :=
+  let values := flattenResultTerms value
+  values.zipIdx.any fun (component, index) =>
+    context.resultLeaves[index]?.any (·.isMutable) &&
+      component.raw.isIdent && component.raw.getId == name
+
+private def forwardsTransferredMutationResult (context : TranslationContext)
+    (value : TSyntax `term) : Bool :=
+  context.transferredReturns.any fun mutation =>
+    mutationResultContains context mutation.getId value
+
+private partial def containsExplicitMutationReturn
+    (context : TranslationContext) (name : Name) (stx : Syntax) : Bool :=
+  let returned := if stx.isOfKind ``Lean.Parser.Term.doReturn then
+    let element : Lean.DoElem := ⟨stx⟩
+    match element with
+    | `(doElem| return $value:term) => mutationResultContains context name value
+    | _ => false
+  else
+    false
+  returned || stx.getArgs.any (containsExplicitMutationReturn context name)
+
+/-- Whether any path returns `name` in a mutable-reference result component.
+This includes an explicit early `return`, not only the final expression. -/
+private def isMutationResultComponent (context : TranslationContext)
+    (name : Name) (elements : Array Lean.DoElem) : Bool :=
+  elements.any (containsExplicitMutationReturn context name ·.raw) ||
+  elements.back?.any fun last =>
+    let value? : Option (TSyntax `term) := match last with
+      | `(doElem| pure $value:term) => some value
+      | `(doElem| $value:term) => some value
+      | _ => none
+    value?.any (mutationResultContains context name)
+
+private def mutableResultScope (names : Array (TSyntax `ident))
+    (elements : Array Lean.DoElem) : CommandElabM (Array Lean.DoElem × Array Lean.DoElem) := do
+  let size := names.foldl (init := 0) fun size name =>
+    elements.zipIdx.foldl (init := size) fun size (element, index) =>
+      if containsIdentifier name.getId element.raw then max size (index + 1) else size
+  let size := closeBorrowScope elements size
   pure (elements.extract 0 size, elements.extract size elements.size)
 
 /-- NLL for the borrow checker follows reference derivations, but not copied
@@ -1610,6 +2279,14 @@ private def sourceBorrowScope (name : Name) (elements : Array Lean.DoElem) :
   let lastUse := elements.zipIdx.foldl (init := none) fun result (element, index) =>
     if containsIdentifier name element.raw then some index else result
   let size := closeSourceBorrowScope elements (lastUse.map (· + 1) |>.getD 0)
+  (elements.extract 0 size, elements.extract size elements.size)
+
+private def sourceBorrowScopes (names : Array Name) (elements : Array Lean.DoElem) :
+    Array Lean.DoElem × Array Lean.DoElem :=
+  let size := names.foldl (init := 0) fun size name =>
+    elements.zipIdx.foldl (init := size) fun size (element, index) =>
+      if containsIdentifier name element.raw then max size (index + 1) else size
+  let size := closeSourceBorrowScope elements size
   (elements.extract 0 size, elements.extract size elements.size)
 
 /-- `Move.Vector.get` / `Move.Vector.set`: checked element access whose abort
@@ -1867,7 +2544,8 @@ private partial def collectDerefReferences (context : BorrowExtractionContext)
 signature; mutable parameters conservatively write until SCC summary
 inference refines them below. -/
 private def sourceTermBorrowEvents (context : BorrowExtractionContext)
-    (term : TSyntax `term) (destination? : Option Name := none) :
+    (term : TSyntax `term)
+    (destinations : Array (Nat × Name) := #[]) :
     CommandElabM (Array Move.Verify.Borrow.Event) := do
   if let some family ← globalPrimitiveResource? term.raw then
     if let some (head, _) := application? term then
@@ -1903,11 +2581,12 @@ private def sourceTermBorrowEvents (context : BorrowExtractionContext)
                   parameter := referenceIndex
                   effect }
           if !callArguments.isEmpty then
-            let results := match destination?, summary? with
-              | some destination, some summary =>
-                  summary.returns.map fun derivation => {
-                    destination := destination.toString, derivation }
-              | _, _ => #[]
+            let results := match summary? with
+              | some summary => summary.returns.filterMap fun derivation =>
+                  destinations.find? (·.1 == derivation.result) |>.map
+                    fun (_, destination) => {
+                      destination := destination.toString, derivation }
+              | none => #[]
             return #[.call functionName.toString callArguments
               (summary?.map (·.requiredSeparations) |>.getD #[]) results]
   return (collectDerefReferences context term.raw).map .read
@@ -1918,7 +2597,7 @@ this binding lets extraction recognize later source uses of it. -/
 private def sourceCallResultBinding? (context : BorrowExtractionContext)
     (destination : Name) (term : TSyntax `term) :
     CommandElabM (Option BorrowRefBinding) := do
-  let events ← sourceTermBorrowEvents context term (some destination)
+  let events ← sourceTermBorrowEvents context term #[(0, destination)]
   let some event := events[0]? | return none
   let Move.Verify.Borrow.Event.call _ arguments _ results := event | return none
   let some result := results.find? (·.destination == destination.toString)
@@ -1932,6 +2611,32 @@ private def sourceCallResultBinding? (context : BorrowExtractionContext)
     place := { parent.place with path := parent.place.path ++ result.derivation.path }
     kind := result.derivation.kind }
 
+private def sourceCallResultBindings? (context : BorrowExtractionContext)
+    (pattern : TSyntax `term) (term : TSyntax `term) :
+    CommandElabM (Array BorrowRefBinding) := do
+  let components := flattenResultTerms pattern
+  let destinations := components.zipIdx.filterMap fun (component, index) =>
+    if component.raw.isIdent && !component.raw.getId.isAnonymous then
+      some (index, component.raw.getId)
+    else none
+  let events ← sourceTermBorrowEvents context term destinations
+  let some event := events[0]? | return #[]
+  let Move.Verify.Borrow.Event.call _ arguments _ results := event | return #[]
+  let mut bindings := #[]
+  for result in results do
+    if bindings.any (·.name.toString == result.destination) then continue
+    let some argument := arguments.find? (·.parameter == result.derivation.parameter)
+      | continue
+    let some parent := context.references.find? (·.name.toString == argument.reference)
+      | continue
+    let some (_, destination) := destinations.find? (·.2.toString == result.destination)
+      | continue
+    bindings := bindings.push {
+      name := destination
+      place := { parent.place with path := parent.place.path ++ result.derivation.path }
+      kind := result.derivation.kind }
+  return bindings
+
 private def sourcePureReference? (context : BorrowExtractionContext)
     (term : TSyntax `term) : Option BorrowRefBinding := do
   let (head, arguments) ← application? term
@@ -1939,6 +2644,17 @@ private def sourcePureReference? (context : BorrowExtractionContext)
   let argument ← arguments[0]?
   guard argument.raw.isIdent
   context.find? argument.raw.getId
+
+private def sourceReturnedReferenceEvents (context : BorrowExtractionContext)
+    (term : TSyntax `term) : Array Move.Verify.Borrow.Event :=
+  let value := match term with
+    | `(pure $value:term) => value
+    | _ => term
+  (flattenResultTerms value).zipIdx.filterMap fun (component, index) =>
+    if component.raw.isIdent then
+      (context.find? component.raw.getId).map fun reference =>
+        .returnRef reference.name.toString index
+    else none
 
 private def sourcePoint (sites : IO.Ref (Array Syntax)) (ref : Syntax) :
     CommandElabM Nat := do
@@ -2011,11 +2727,15 @@ private partial def sourceBorrowBlock (sites : IO.Ref (Array Syntax))
       fun branch alternative => .branch 0 branch alternative .done
     return .branch (← sourcePoint sites first.raw) combined .done continuationBlock
   if kind == ``Move.moveLoopDo || kind == ``Move.moveLoopLabeledDo then
+    let label? := if kind == ``Move.moveLoopLabeledDo then
+      some first.raw[1]!.getId.toString
+    else
+      none
     let bodyIndex := if kind == ``Move.moveLoopLabeledDo then 2 else 1
     let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨first.raw[bodyIndex]!⟩
     let bodyBlock ← sourceBorrowBlock sites context
       (Lean.Parser.Term.getDoElems body)
-    return .loop (← sourcePoint sites first.raw) bodyBlock continuationBlock
+    return .loop (← sourcePoint sites first.raw) label? bodyBlock continuationBlock
   match first with
   | `(doElem| let $name:ident ← &mut $owner:ident[$index:term]) =>
       let (loanBody, continuation) := sourceBorrowScope name.getId rest
@@ -2093,9 +2813,31 @@ private partial def sourceBorrowBlock (sites : IO.Ref (Array Syntax))
           context with references := returned :: context.references }
         let body ← sourceBorrowBlock sites nestedContext loanBody drop
         return ← prependBorrowEvents sites value.raw
-          (← sourceTermBorrowEvents context value (some name.getId)) body
+          (← sourceTermBorrowEvents context value #[(0, name.getId)]) body
       prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value)
         continuationBlock
+  | `(doElem| let $pattern:term ← $value:term) =>
+      let returned ← sourceCallResultBindings? context pattern value
+      if returned.isEmpty then
+        return ← prependBorrowEvents sites value.raw
+          (← sourceTermBorrowEvents context value) continuationBlock
+      let names := returned.map (·.name)
+      let (loanBody, continuation) := sourceBorrowScopes names rest
+      let after ← sourceBorrowBlock sites context continuation tail
+      let mut dropped := after
+      for returnedReference in returned.reverse do
+        dropped := .event (← sourcePoint sites first.raw)
+          (.drop returnedReference.name.toString) dropped
+      let nestedContext := {
+        context with references := returned.toList ++ context.references }
+      let body ← sourceBorrowBlock sites nestedContext loanBody dropped
+      let components := flattenResultTerms pattern
+      let destinations := components.zipIdx.filterMap fun (component, index) =>
+        if component.raw.isIdent && !component.raw.getId.isAnonymous then
+          some (index, component.raw.getId)
+        else none
+      return ← prependBorrowEvents sites value.raw
+        (← sourceTermBorrowEvents context value destinations) body
   | `(doElem| let mut $_name:ident ← * $reference:term) =>
       if reference.raw.isIdent && (context.find? reference.raw.getId).isSome then
         return .event (← sourcePoint sites first.raw)
@@ -2104,7 +2846,13 @@ private partial def sourceBorrowBlock (sites : IO.Ref (Array Syntax))
   | `(doElem| while $_condition:doIfCond do $body:doSeq) =>
       let bodyBlock ← sourceBorrowBlock sites context
         (Lean.Parser.Term.getDoElems body)
-      return .loop (← sourcePoint sites first.raw) bodyBlock continuationBlock
+      return .loop (← sourcePoint sites first.raw) none bodyBlock continuationBlock
+  | `(doElem| break@$label:ident) =>
+      return .break (some label.getId.toString)
+  | `(doElem| continue@$label:ident) =>
+      return .continue (some label.getId.toString)
+  | `(doElem| break) => return .break none
+  | `(doElem| continue) => return .continue none
   | `(doElem| if $_condition:doIfCond then $thenBranch:doSeq) =>
       let thenBlock ← sourceBorrowBranch
         (Lean.Parser.Term.getDoElems thenBranch) rest first.raw
@@ -2117,50 +2865,56 @@ private partial def sourceBorrowBlock (sites : IO.Ref (Array Syntax))
         (Lean.Parser.Term.getDoElems elseBranch) rest first.raw
       return .branch (← sourcePoint sites first.raw) thenBlock elseBlock continuationBlock
   | `(doElem| return $value:term) =>
+      let returned := sourceReturnedReferenceEvents context value
+      if !returned.isEmpty then
+        return ← prependBorrowEvents sites value.raw returned .stop
       if let some reference := sourcePureReference? context value then
         return .event (← sourcePoint sites value.raw)
-          (.returnRef reference.name.toString) .done
+          (.returnRef reference.name.toString) .stop
       if value.raw.isIdent then
         if let some reference := context.find? value.raw.getId then
           return .event (← sourcePoint sites value.raw)
-            (.returnRef reference.name.toString) .done
+            (.returnRef reference.name.toString) .stop
       match value with
       | `(& $place:term) =>
           let point ← sourcePoint sites value.raw
           let name := s!"_moveBorrowReturn{point}"
           let (place, parent?) ← sourceBorrowPlace context place
           return .event point (.borrowImm name place parent?) <|
-            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+            .event (← sourcePoint sites value.raw) (.returnRef name) .stop
       | `(&mut $place:term) =>
           let point ← sourcePoint sites value.raw
           let name := s!"_moveBorrowReturn{point}"
           let (place, parent?) ← sourceBorrowPlace context place
           return .event point (.borrowMut name place parent?) <|
-            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+            .event (← sourcePoint sites value.raw) (.returnRef name) .stop
       | _ => pure ()
-      prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value) .done
+      prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value) .stop
   | `(doElem| $value:term) =>
       if value.raw.isOfKind ``Move.abortTerm then return .abort
+      let returned := sourceReturnedReferenceEvents context value
+      if !returned.isEmpty then
+        return ← prependBorrowEvents sites value.raw returned .stop
       if let some reference := sourcePureReference? context value then
         return .event (← sourcePoint sites value.raw)
-          (.returnRef reference.name.toString) .done
+          (.returnRef reference.name.toString) .stop
       if value.raw.isIdent then
         if let some reference := context.find? value.raw.getId then
           return .event (← sourcePoint sites value.raw)
-            (.returnRef reference.name.toString) .done
+            (.returnRef reference.name.toString) .stop
       match value with
       | `(& $place:term) =>
           let point ← sourcePoint sites value.raw
           let name := s!"_moveBorrowReturn{point}"
           let (place, parent?) ← sourceBorrowPlace context place
           return .event point (.borrowImm name place parent?) <|
-            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+            .event (← sourcePoint sites value.raw) (.returnRef name) .stop
       | `(&mut $place:term) =>
           let point ← sourcePoint sites value.raw
           let name := s!"_moveBorrowReturn{point}"
           let (place, parent?) ← sourceBorrowPlace context place
           return .event point (.borrowMut name place parent?) <|
-            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+            .event (← sourcePoint sites value.raw) (.returnRef name) .stop
       | _ => pure ()
       prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value) continuationBlock
   | `(doElem| let $_name:ident := $value:term)
@@ -2179,6 +2933,12 @@ private def buildBorrowProgram (function : TSyntax `ident)
   let sourceBodySyntax := if declaration.value.isOfKind ``Lean.Parser.Term.paren then
       declaration.value[1] else declaration.value
   let source : TSyntax `term := ⟨← desugarPrimitives sourceBodySyntax true⟩
+  let source ← match source with
+    | `(do $sequence:doSeq) =>
+        let sequence ← Lean.Elab.Command.liftCoreM <|
+          Move.freshenShadowedLocals sequence
+        `(do $sequence)
+    | _ => pure source
   let resources ← collectResources source.raw
   let resourceBindings := (distinctHeads resources).map fun head => {
     head
@@ -2419,11 +3179,31 @@ private def sourceResultType (resultType : TSyntax `term)
     (mutableParameters : Array (TSyntax `ident × TSyntax `term)) :
     MacroM (TSyntax `term) := do
   if mutableParameters.isEmpty then return resultType
-  if mutableParameters.size > 2 then
-    Macro.throwError
-      "automatic source specifications support at most two mutable-reference parameters"
   let referents ← argumentType (mutableParameters.map (·.2))
   `($resultType × $referents)
+
+private def mutationArgumentTypes (signature : SourceSignature) :
+    MacroM (Array (TSyntax `term)) := do
+  signature.arguments.zip signature.types |>.mapM fun (argument, type) =>
+    if signature.mutableParameters.any (·.1.getId == argument.getId) then
+      `(Move.Semantics.Mutation $type)
+    else
+      pure type
+
+private def mutationResultType (declaredResult logicalResult : TSyntax `term)
+    (mutableParameters : Array (TSyntax `ident × TSyntax `term)) :
+    MacroM (TSyntax `term) := do
+  let logicalTypes := (resultLeaves logicalResult).map (·.logicalType)
+  let resultTypes ← (resultLeaves declaredResult).zipIdx.mapM fun (leaf, index) =>
+    let logicalType := logicalTypes[index]!
+    match leaf with
+    | .mutable _ => `(Move.Semantics.Mutation $logicalType)
+    | _ => pure logicalType
+  let resultType ← argumentType resultTypes
+  let rootTypes ← mutableParameters.mapM fun (_, referent) =>
+    `(Move.Semantics.Mutation $referent)
+  let roots ← argumentType rootTypes
+  `($resultType × $roots)
 
 private def argumentProjection (base : TSyntax `term) (index count : Nat) :
     MacroM (TSyntax `term) := do
@@ -2432,8 +3212,87 @@ private def argumentProjection (base : TSyntax `term) (index count : Nat) :
     projection ← `($projection.2)
   if index + 1 < count then `($projection.1) else pure projection
 
+/-- Open an arbitrary heterogeneous set of mutable parameters through the
+generic tuple combinator, rebinding the source parameter names to their
+mutation components for `body`. -/
+private def withMutableParameters
+    (parameters : Array (TSyntax `ident × TSyntax `term))
+    (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  unless !parameters.isEmpty do
+    throwError "internal error: an empty mutable-parameter scope"
+  match parameters.size with
+  | 1 =>
+      let parameter := parameters[0]!.1
+      return ← `(Move.Semantics.withMutation $parameter
+        (fun $parameter => $body))
+  | 2 =>
+      let first := parameters[0]!.1
+      let second := parameters[1]!.1
+      return ← `(Move.Semantics.withMutations2 $first $second
+        (fun $first $second => $body))
+  | 3 =>
+      let first := parameters[0]!.1
+      let second := parameters[1]!.1
+      let third := parameters[2]!.1
+      return ← `(Move.Semantics.withMutations3 $first $second $third
+        (fun $first $second $third => $body))
+  | _ => pure ()
+  let owners ← packCallArguments parameters[0]!.1.raw
+    (parameters.map fun (parameter, _) => (⟨parameter.raw⟩ : TSyntax `term))
+  let packed := mkIdentFrom parameters[0]!.1 `_moveSpecMutations
+  let packedTerm : TSyntax `term := ⟨packed.raw⟩
+  let mut unpacked := body
+  for ((parameter, _), index) in parameters.zipIdx.reverse do
+    let projection ← liftMacroM <|
+      argumentProjection packedTerm index parameters.size
+    unpacked ← `(let $parameter := $projection; $unpacked)
+  let types : TSyntaxArray `term := parameters.map (·.2)
+  `(Move.Semantics.withMutations (types := [$types,*]) (fun value => value)
+      (fun value => value) $owners
+      (fun $packed => $unpacked))
+
+/-- The same arbitrary-arity scope when the mutation types come from pattern
+binders and are therefore known to Lean's elaborator but not retained in the
+surface syntax. The holes are fixed by the packed owner and body types. -/
+private def withInferredMutableValues (values : Array (TSyntax `ident))
+    (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  unless !values.isEmpty do
+    throwError "internal error: an empty inferred mutable-value scope"
+  match values.size with
+  | 1 => return ← `(Move.Semantics.withMutation $(values[0]!)
+      (fun $(values[0]!) => $body))
+  | 2 => return ← `(Move.Semantics.withMutations2 $(values[0]!) $(values[1]!)
+      (fun $(values[0]!) $(values[1]!) => $body))
+  | 3 => return ← `(Move.Semantics.withMutations3 $(values[0]!) $(values[1]!)
+      $(values[2]!) (fun $(values[0]!) $(values[1]!) $(values[2]!) => $body))
+  | _ => pure ()
+  let owners ← packCallArguments values[0]!.raw
+    (values.map fun value => (⟨value.raw⟩ : TSyntax `term))
+  let packed := mkIdentFrom values[0]! `_moveSpecMutations
+  let packedTerm : TSyntax `term := ⟨packed.raw⟩
+  let mut unpacked := body
+  for (value, index) in values.zipIdx.reverse do
+    let projection ← liftMacroM <| argumentProjection packedTerm index values.size
+    unpacked ← `(let $value := $projection; $unpacked)
+  let mut inferredTypes : Array (TSyntax `term) := #[]
+  for _ in values do inferredTypes := inferredTypes.push (← `(_))
+  `(Move.Semantics.withMutations (types := [$inferredTypes,*])
+      (fun value => value) (fun value => value) $owners
+      (fun $packed => $unpacked))
+
+/-- The name holding a parameter's value at function entry, for `old(p)` in
+a loop invariant. -/
+def entryValueName (parameter : Name) : Name :=
+  Name.mkSimple s!"_moveSpecOld_{parameter}"
+
 private def unpackArguments (arguments : Array (TSyntax `ident))
     (body : TSyntax `term) : MacroM (TSyntax `term) := do
+  -- Every parameter's entry value stays available under its `old` name.
+  let body ← arguments.foldrM (init := body)
+      fun (argument : TSyntax `ident) (body : TSyntax `term) => do
+    let entry := mkIdentFrom argument (entryValueName argument.getId)
+    let argumentTerm : TSyntax `term := ⟨argument.raw⟩
+    `(let $entry:ident := $argumentTerm; $body)
   match arguments.size with
   | 0 => `(fun _moveSpecArgs => $body)
   | 1 => `(fun $(arguments[0]!) => $body)
@@ -2456,6 +3315,7 @@ private structure MutualFamilyInfo where
   source : Name
   members : Array Name
   constructors : Array Name
+  hasMutationMembers : Bool := false
   deriving Inhabited
 
 private initialize mutualFamilies :
@@ -2466,6 +3326,1180 @@ private initialize mutualFamilies :
       mkStateFromImportedEntries
         (fun map (name, info) => map.insert name info) {} entries
   }
+
+/-- Whether a family's head is in scope: every instantiation of a head the
+function touches has its store in scope. -/
+private def knownResource (resources : Array Family) (candidate : Family) : Bool :=
+  resources.any (·.head == candidate.head)
+
+/-- A specification function, as specification clauses apply it: `decl` is
+its Lean definition.  A *stateful* one reads global memory — `R[a]`,
+`existsAt<R>(a)`, or another stateful specification function — and its
+definition takes the store instances of the resource heads in `families` and
+then, as its first explicit argument, the state to read, which the clause
+that applies it supplies (the clause's current state; the pre-state under
+`old(…)`). -/
+structure SpecFunctionInfo where
+  decl : Name
+  stateful : Bool
+  families : Array Name
+  /-- Whether each parameter is a mathematical integer.  Every such parameter
+  has type `Int`; applications project bounded Move arguments at the contract
+  boundary. -/
+  integerArguments : Array Bool := #[]
+  /-- Whether the direct result is a mathematical integer. -/
+  integerResult : Bool := false
+  deriving Inhabited
+
+/-- Specification functions by the name a specification writes: a Move
+function `f` with a `spec fun f` (the definition is `f.specFun`), or a
+standalone specification function (the definition is the name itself).
+Persisted, so an imported module's specification functions serve the
+specifications of importing modules. -/
+private initialize specFunctions :
+    SimplePersistentEnvExtension (Name × SpecFunctionInfo) (NameMap SpecFunctionInfo) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun map (name, info) => map.insert name info
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries
+        (fun map (name, info) => map.insert name info) {} entries
+  }
+
+private def moveIntegerTypeNames : Array Name :=
+  #[``Move.U8, ``Move.U16, ``Move.U32, ``Move.U64, ``Move.U128, ``Move.U256,
+    ``Move.I8, ``Move.I16, ``Move.I32, ``Move.I64, ``Move.I128, ``Move.I256]
+
+/-- The resolved direct integer name of a surface type.  Nested Move integers
+remain part of their enclosing data type; only a spec function's direct
+integer domain and codomain are mathematical `Int`. -/
+def integerSpecTypeName? (type : TSyntax `term) : CommandElabM (Option Name) := do
+  unless type.raw.isIdent do return none
+  let some name ← (try pure (some (← resolveGlobalConstNoOverload type.raw))
+      catch _ => pure none) | return none
+  return if name == ``Int || moveIntegerTypeNames.contains name then some name else none
+
+private def logicalSpecType (type : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  if (← integerSpecTypeName? type).isSome then `(Int) else pure type
+
+
+/-- Record a specification function. -/
+def registerSpecFunction (name : Name) (info : SpecFunctionInfo) : CommandElabM Unit :=
+  modifyEnv fun env => specFunctions.addEntry env (name, info)
+
+/-- Whether `name` is a registered specification function (by the name
+specifications write). -/
+def isSpecFunction (env : Environment) (name : Name) : Bool :=
+  (specFunctions.getState env).contains name
+
+/-- The error for a Move function without a specification version: what in
+its body has no pure reading, and the way out. -/
+private def noSpecificationVersion {α : Type} (function : Name) (ref : Syntax)
+    (reason : MessageData) : CommandElabM α :=
+  throwErrorAt ref (m!"Move function `{function}` has no specification version: {reason}; " ++
+    m!"`spec fun {Name.mkSimple function.getString!} …` can declare one")
+
+private def isUnitStatement (element : Lean.DoElem) : Bool :=
+  match element with
+  | `(doElem| pure ()) | `(doElem| ()) => true
+  | _ => false
+
+private def isAbortStatement (element : Lean.DoElem) : Bool :=
+  match element with
+  | `(doElem| abort $_:term) => true
+  | _ => false
+
+/-- `assert!(c, code)` as the primitive desugaring leaves it: the statement
+`do if c then pure () else abort code`, or that conditional itself.  A pure
+reading drops it — the reading is partial, as the specification language's
+is: the book's rule for a Move function called in a specification. -/
+private def isAssertShape (element : Lean.DoElem) : Bool :=
+  let conditional? : Option Lean.DoElem :=
+    match element with
+    | `(doElem| $value:term) =>
+        match value with
+        | `(do $sequence:doSeq) =>
+            match Lean.Parser.Term.getDoElems sequence with
+            | #[single] => some single
+            | _ => none
+        | _ => none
+    | _ => some element
+  match conditional? with
+  | some conditional =>
+      match conditional with
+      | `(doElem| if $_:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) =>
+          (match Lean.Parser.Term.getDoElems thenBranch with
+            | #[unit] => isUnitStatement unit
+            | _ => false) &&
+          (match Lean.Parser.Term.getDoElems elseBranch with
+            | #[aborting] => isAbortStatement aborting
+            | _ => false)
+      | _ => false
+  | none => false
+
+/-- The vector operations that mutate their vector, by function name and by
+receiver-style field. -/
+private def vectorMutationNames : List Name :=
+  [``Move.Vector.insert, ``Move.Vector.remove, ``Move.Vector.popBack, ``Move.Vector.swap,
+   ``Move.Vector.swapRemove, ``Move.Vector.append, ``Move.Vector.reverse,
+   ``Move.Vector.reverseSlice, ``Move.Vector.trim, ``Move.Vector.trimReverse,
+   ``Move.Vector.rotate, ``Move.Vector.rotateSlice,
+   ``Move.MutRef.insert, ``Move.MutRef.remove, ``Move.MutRef.popBack, ``Move.MutRef.swap,
+   ``Move.MutRef.swapRemove, ``Move.MutRef.append, ``Move.MutRef.reverse,
+   ``Move.MutRef.reverseSlice, ``Move.MutRef.trim, ``Move.MutRef.trimReverse,
+   ``Move.MutRef.rotate, ``Move.MutRef.rotateSlice]
+
+private def vectorMutationFields : List Name :=
+  [`insert, `remove, `popBack, `swap, `swapRemove, `append, `reverse, `reverseSlice,
+   `trim, `trimReverse, `rotate, `rotateSlice]
+
+/-- A plain or dependent condition of a source `if`. -/
+private def pureCondition (function : Name) (condition : TSyntax ``Lean.Parser.Term.doIfCond) :
+    CommandElabM (Option (TSyntax `ident) × TSyntax `term) := do
+  match condition with
+  | `(doIfCond| $term:term) => pure (none, term)
+  | `(doIfCond| $binder:ident : $term:term) => pure (some binder, term)
+  | _ => noSpecificationVersion function condition "uses an `if let` condition"
+
+mutual
+/-- The *pure reading* of a Move function's retained body: the value it
+computes, read over values — the specification version the Move Prover
+derives for a pure Move function called in a specification (the rules of
+the book's *Function calls*).  References are erased (a borrow is its place,
+a read its reference), `assert!`s are dropped, a global read is the
+specification place `R[a]` and `existsAt R a` the test `existsAt<R>(a)` (the
+clause that applies the function supplies the state), `vector::contains` and
+`index_of` are the translator's value-level readings, and a call stays a call
+— to the callee's specification version, resolved by the clause rewriting.
+A body that writes, reassigns, loops, returns early, creates or moves
+resources, or aborts in a value position has no pure reading; the failure
+says why. -/
+private partial def pureReadingTerm (function : Name) (term : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  let read := pureReadingTerm function
+  -- `lhs * rhs` and `*r` share a token: the retained syntax keeps both parses
+  -- as a `choice`; multiplication is the three-child infix alternative.
+  if term.raw.isOfKind `choice then
+    if let some multiplication := term.raw.getArgs.find? fun alternative =>
+        alternative.getNumArgs == 3 && alternative[1].isAtom &&
+          alternative[1].getAtomVal == "*" then
+      let lhs ← read ⟨multiplication[0]⟩
+      let rhs ← read ⟨multiplication[2]⟩
+      return ← `(Move.Spec.intMul $lhs $rhs)
+    if term.raw.getNumArgs > 0 then return ← read ⟨term.raw[0]⟩
+  match term with
+  | `(do $sequence:doSeq) => pureReadingSeq function (Lean.Parser.Term.getDoElems sequence)
+  | `(($inner:term)) => do let inner ← read inner; `(($inner))
+  | `(* $reference:term) => read reference
+  -- `&v[i]` / `&mut v[i]` are element-borrow nodes of their own.
+  | `(& $base:ident[$index:term]) => pureReadingPlace function (← `($base[$index]))
+  | `(&mut $base:ident[$index:term]) => pureReadingPlace function (← `($base[$index]))
+  | `(& $place:term) => pureReadingPlace function place
+  | `(&mut $place:term) => pureReadingPlace function place
+  | `(pure $value:term) => read value
+  -- An abort in value position: the specification language's partial reading
+  -- gives it an unspecified value (the Move Prover's arbitrary value of the
+  -- site), as the compiler's own conversion keeps the abort expression.
+  | `(abort $_:term) =>
+      let site := Syntax.mkNumLit (toString ((term.raw.getPos?).map (·.byteIdx) |>.getD 0))
+      `(Move.Spec.arbitrary _ $site)
+  | `(if $condition:term then $thenBranch:term else $elseBranch:term) => do
+      let condition ← read condition
+      let thenBranch ← read thenBranch
+      let elseBranch ← read elseBranch
+      `(if $condition then $thenBranch else $elseBranch)
+  | `(if $binder:ident : $condition:term then $thenBranch:term else $elseBranch:term) => do
+      let condition ← read condition
+      let thenBranch ← read thenBranch
+      let elseBranch ← read elseBranch
+      `(if $binder:ident : $condition then $thenBranch else $elseBranch)
+  | `(match $discriminant:term with $alternatives:matchAlt*) => do
+      let discriminant ← read discriminant
+      let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
+      for alternative in alternatives do
+        match alternative with
+        | `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $rhs:term) =>
+            let rhs ← read rhs
+            arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $rhs))
+        | _ => noSpecificationVersion function alternative "uses a `match` alternative form without a pure reading"
+      `(match $discriminant:term with $arms:matchAlt*)
+  | `(($value:term : $type:term)) => do
+      let value ← read value
+      let type ← logicalSpecType type
+      `(($value : $type))
+  -- A derived specification version reads source integer operators in the
+  -- mathematical domain. Comparisons retain the source function's `Bool`
+  -- result, while arithmetic produces `Int`.
+  | `($left:term + $right:term) =>
+      `(Move.Spec.intAdd $(← read left) $(← read right))
+  | `($left:term - $right:term) =>
+      `(Move.Spec.intSub $(← read left) $(← read right))
+  | `($left:term * $right:term) =>
+      `(Move.Spec.intMul $(← read left) $(← read right))
+  | `($left:term / $right:term) =>
+      `(Move.Spec.intDiv $(← read left) $(← read right))
+  | `($left:term % $right:term) =>
+      `(Move.Spec.intMod $(← read left) $(← read right))
+  | `(-$value:term) => `(Move.Spec.intNeg $(← read value))
+  | `($left:term <<< $right:term) =>
+      `(Move.Spec.intShiftLeft $(← read left) $(← read right))
+  | `($left:term >>> $right:term) =>
+      `(Move.Spec.intShiftRight $(← read left) $(← read right))
+  | `($left:term < $right:term) =>
+      `(Move.Spec.logicalBoolLT $(← read left) $(← read right))
+  | `($left:term <= $right:term) =>
+      `(Move.Spec.logicalBoolLE $(← read left) $(← read right))
+  | `($left:term > $right:term) =>
+      `(Move.Spec.logicalBoolLT $(← read right) $(← read left))
+  | `($left:term >= $right:term) =>
+      `(Move.Spec.logicalBoolLE $(← read right) $(← read left))
+  | `($left:term == $right:term) =>
+      `(Move.Spec.logicalBoolEq $(← read left) $(← read right))
+  | `($left:term != $right:term) =>
+      `(!Move.Spec.logicalBoolEq $(← read left) $(← read right))
+  | _ =>
+      if let some (head, arguments) := application? term then
+        if head.raw.isIdent then
+          let name? ← try pure (some (← resolveGlobalConstNoOverload head.raw)) catch _ => pure none
+          if let some name := name? then
+            if name == ``Move.existsAt then
+              if let (some resource, some address) := (arguments[0]?, arguments[1]?) then
+                let address ← read address
+                return ← `(existsAt<$resource>($address))
+            if name == ``Move.moveFrom then
+              noSpecificationVersion function term "removes a resource (`moveFrom`)"
+            if name == ``Move.moveTo then
+              noSpecificationVersion function term "publishes a resource (`moveTo`)"
+            if name == ``Move.Vector.contains then
+              if let (some values, some value) := (arguments[0]?, arguments[1]?) then
+                let values ← read values
+                let value ← read value
+                return ← `(Move.Spec.logicalVectorContains $values $value)
+            if name == ``Move.Vector.indexOf then
+              if let (some values, some value) := (arguments[0]?, arguments[1]?) then
+                let values ← read values
+                let value ← read value
+                return ← `(vectorIndexOf $values $value)
+            if vectorMutationNames.contains name then
+              noSpecificationVersion function term m!"mutates a vector (`{name}`)"
+            if let .str typeName "certify" := name then
+              if (Move.dataInvariant? (← getEnv) typeName).isSome then
+                noSpecificationVersion function term
+                  m!"creates a certified `{typeName}` (`certify`), whose data invariant is owed by verification"
+        if let some (_, field, _) := receiverApplication? term then
+          if vectorMutationFields.contains field then
+            noSpecificationVersion function term m!"mutates a vector (`{field}`)"
+      let children ← term.raw.getArgs.mapM fun child => do
+        pure (← read ⟨child⟩).raw
+      pure ⟨term.raw.setArgs children⟩
+
+/-- The place of a borrow, read as a value: a global place stays a place
+(`R[key].f`, read by the clause's state), a vector element is the element of
+the list view, a local or field is itself. -/
+private partial def pureReadingPlace (function : Name) (place : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  let (root, fields) := splitFieldPath place
+  if root.raw.getKind == `«term__[_]» && root.raw.getNumArgs == 4 then
+    let collection : TSyntax `term := ⟨root.raw[0]⟩
+    let index : TSyntax `term := ⟨root.raw[2]⟩
+    let index ← pureReadingTerm function index
+    if (← familyOfTerm? collection.raw).isSome then
+      return ← projectPath ⟨root.raw.setArg 2 index.raw⟩ fields
+    let values ← pureReadingTerm function collection
+    -- Keep the derived definition independent of a `GetElem` instance's
+    -- proof motive. The list view is internal; authored/transpiled specs keep
+    -- the clean `values[index]!` surface handled by `logicalVectorGetElem`.
+    let element ← `(($values).toList[(Move.Spec.int $index).toNat]!)
+    return ← projectPath element fields
+  pureReadingTerm function place
+
+/-- The pure reading of a statement sequence: the value of its last statement
+under the `let`s before it.  `assert!`s, units, and aborts before the value
+are dropped (the specification language's partial reading); anything else
+before the value — a reassignment, a loop, an early `return`, a conditional
+or a call as a statement — is an effect the reading cannot express. -/
+private partial def pureReadingSeq (function : Name) (elements : Array Lean.DoElem) :
+    CommandElabM (TSyntax `term) := do
+  if elements.isEmpty then return ← `(())
+  let first := elements[0]!
+  let rest := elements.extract 1 elements.size
+  let readRest : CommandElabM (TSyntax `term) := pureReadingSeq function rest
+  let read := pureReadingTerm function
+  -- The right-hand side of `let x ← …`: a conditional with statement branches
+  -- binds the value of each branch; anything else is read as a term.
+  let readBound (value : Syntax) : CommandElabM (TSyntax `term) := do
+    let element : Lean.DoElem := ⟨value⟩
+    match element with
+    | `(doElem| if $condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) =>
+        let (binder?, condition) ← pureCondition function condition
+        let condition ← read condition
+        let thenBranch ← pureReadingSeq function (Lean.Parser.Term.getDoElems thenBranch)
+        let elseBranch ← pureReadingSeq function (Lean.Parser.Term.getDoElems elseBranch)
+        match binder? with
+        | some binder => `(if $binder:ident : $condition then $thenBranch else $elseBranch)
+        | none => `(if $condition then $thenBranch else $elseBranch)
+    | `(doElem| $term:term) => read term
+    | _ => noSpecificationVersion function value "binds a statement form without a pure reading"
+  if isAssertShape first then return ← readRest
+  let kind := first.raw.getKind
+  if kind == ``Move.moveNamedStructLet || kind == ``Move.movePositionalStructLet then
+    let fields : TSyntaxArray `term := first.raw[3].getSepArgs.map (⟨·⟩)
+    let value ← read ⟨first.raw[6]⟩
+    let body ← readRest
+    return ← `(let ⟨$fields:term,*⟩ := $value; $body)
+  if kind == ``Move.moveAddAssign || kind == ``Move.moveSubAssign ||
+      kind == ``Move.moveMulAssign || kind == ``Move.moveDivAssign ||
+      kind == ``Move.moveModAssign || first.raw.isOfKind ``Lean.Parser.Term.doReassign ||
+      first.raw.isOfKind ``Lean.Parser.Term.doReassignArrow then
+    noSpecificationVersion function first.raw "reassigns a local (or writes through a reference)"
+  if kind == ``Move.moveForRange || kind == ``Move.moveLoopDo ||
+      kind == ``Move.moveLoopLabeledDo then
+    noSpecificationVersion function first.raw "loops"
+  if first.raw.isOfKind ``Lean.Parser.Term.doMatch then
+    unless rest.isEmpty do
+      noSpecificationVersion function first.raw "has a `match` statement before its value"
+    let discriminants ← first.raw[4].getSepArgs.mapM fun discriminant =>
+      read ⟨discriminant[1]⟩
+    let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
+    for alternative in first.raw[6][0].getArgs do
+      let `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $body) := alternative
+        | noSpecificationVersion function alternative "uses a `match` alternative form without a pure reading"
+      let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨body.raw⟩
+      let armValue ← pureReadingSeq function (Lean.Parser.Term.getDoElems body)
+      arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $armValue))
+    if discriminants.size == 1 then
+      return ← `(match $(discriminants[0]!):term with $arms:matchAlt*)
+    if discriminants.size == 2 then
+      return ← `(match $(discriminants[0]!):term, $(discriminants[1]!):term with $arms:matchAlt*)
+    noSpecificationVersion function first.raw "matches on more than two discriminants"
+  match first with
+  | `(doElem| let $name:ident := $value:term) => do
+      let value ← read value; let body ← readRest
+      `(let $name := $value; $body)
+  | `(doElem| let $name:ident : $type:term := $value:term) => do
+      let value ← read value; let body ← readRest; let type ← logicalSpecType type
+      `(let $name : $type := $value; $body)
+  | `(doElem| let mut $name:ident := $value:term) => do
+      let value ← read value; let body ← readRest
+      `(let $name := $value; $body)
+  | `(doElem| let mut $name:ident : $type:term := $value:term) => do
+      let value ← read value; let body ← readRest; let type ← logicalSpecType type
+      `(let $name : $type := $value; $body)
+  | `(doElem| let $pattern:term := $value:term) => do
+      let value ← read value; let body ← readRest
+      `(let $pattern:term := $value; $body)
+  | `(doElem| let $name:ident ← if $condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) => do
+      let conditional ← `(doElem| if $condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq)
+      let value ← readBound conditional.raw; let body ← readRest
+      `(let $name := $value; $body)
+  | `(doElem| let $name:ident ← $value:term) => do
+      let value ← read value; let body ← readRest
+      `(let $name := $value; $body)
+  | `(doElem| let $name:ident : $type:term ← $value:term) => do
+      let value ← read value; let body ← readRest; let type ← logicalSpecType type
+      `(let $name : $type := $value; $body)
+  | `(doElem| let mut $name:ident ← $value:term) => do
+      let value ← read value; let body ← readRest
+      `(let $name := $value; $body)
+  | `(doElem| let mut $name:ident : $type:term ← $value:term) => do
+      let value ← read value; let body ← readRest; let type ← logicalSpecType type
+      `(let $name : $type := $value; $body)
+  | `(doElem| let $pattern:term ← $value:term) => do
+      let value ← read value; let body ← readRest
+      `(let $pattern:term := $value; $body)
+  | `(doElem| if $condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) => do
+      unless rest.isEmpty do
+        noSpecificationVersion function first.raw "has a conditional statement before its value"
+      let (binder?, condition) ← pureCondition function condition
+      let condition ← read condition
+      let thenBranch ← pureReadingSeq function (Lean.Parser.Term.getDoElems thenBranch)
+      let elseBranch ← pureReadingSeq function (Lean.Parser.Term.getDoElems elseBranch)
+      match binder? with
+      | some binder => `(if $binder:ident : $condition then $thenBranch else $elseBranch)
+      | none => `(if $condition then $thenBranch else $elseBranch)
+  | `(doElem| if $condition:doIfCond then $thenBranch:doSeq $[else if $conditions:doIfCond then $branches:doSeq]* else $elseBranch:doSeq) => do
+      -- An `else if` chain is nested conditionals.
+      let mut elseSeq := elseBranch
+      for (c, b) in (conditions.zip branches).reverse do
+        let nested ← `(doElem| if $c:doIfCond then $b:doSeq else $elseSeq:doSeq)
+        elseSeq := ⟨mkNode ``Lean.Parser.Term.doSeqIndent #[mkNullNode #[mkNullNode #[nested.raw, mkNullNode]]]⟩
+      let rebuilt ← `(doElem| if $condition:doIfCond then $thenBranch:doSeq else $elseSeq:doSeq)
+      pureReadingSeq function (#[rebuilt] ++ rest)
+  | `(doElem| if $condition:doIfCond then $thenBranch:doSeq) => do
+      unless rest.isEmpty do
+        noSpecificationVersion function first.raw "has a conditional statement before its value"
+      let (binder?, condition) ← pureCondition function condition
+      let condition ← read condition
+      let thenBranch ← pureReadingSeq function (Lean.Parser.Term.getDoElems thenBranch)
+      match binder? with
+      | some binder => `(if $binder:ident : $condition then $thenBranch else ())
+      | none => `(if $condition then $thenBranch else ())
+  | `(doElem| return $_:term) => noSpecificationVersion function first.raw "returns early"
+  | `(doElem| while $_:doIfCond do $_:doSeq) => noSpecificationVersion function first.raw "loops"
+  | `(doElem| break) | `(doElem| continue) => noSpecificationVersion function first.raw "loops"
+  | `(doElem| $value:term) =>
+      if rest.isEmpty then read value
+      else if isUnitStatement first || isAbortStatement first then readRest
+      else noSpecificationVersion function first.raw "has an effect statement before its value"
+  | _ => noSpecificationVersion function first.raw "uses a statement form without a pure reading"
+end
+
+/-- The pure reading of a Move function's body, for its specification
+version; `none` when the function has no retained source. -/
+private def pureReadingOf (functionName : Name) (ref : Syntax) : CommandElabM (Option (TSyntax `term)) := do
+  let some declaration := declarations.getState (← getEnv) |>.find? functionName | return none
+  let body ← sourceBody declaration
+  let _ := ref
+  return some (← pureReadingTerm functionName body)
+
+/-- Whether a term observes a pre-state (`old(…)`). -/
+private partial def observesOld (stx : Syntax) : Bool :=
+  stx.isOfKind ``Move.Spec.oldResourceTerm || stx.getArgs.any observesOld
+
+/-- Specification versions being derived: a recursive function's body applies
+the function itself, whose specification version is then not available. -/
+private initialize specFunctionDerivationInProgress : IO.Ref NameSet ← IO.mkRef {}
+
+/-- The first component of a (possibly dotted) identifier: `coin.value` is
+a field access on `coin`, which is what a binder shadows. -/
+private def rootName (name : Name) : Name :=
+  (name.components.head?).getD name
+
+private partial def identsOf (stx : Syntax) : Array Name :=
+  if stx.isIdent then #[stx.getId]
+  else stx.getArgs.foldl (fun acc child => acc ++ identsOf child) #[]
+
+/-- The names a syntax node binds for the rest of itself: the binders of
+`∀`, `∃`, `fun`, `let`, `have`, and the patterns of a `match` alternative
+(over-approximated to every identifier of the binder group).  A bound name is
+never read as a specification function. -/
+private def binderIdents (stx : Syntax) : Array Name :=
+  if stx.isOfKind ``Lean.Parser.Term.forall || stx.getKind == `«term∃_,_» then
+    if stx.getNumArgs > 1 then identsOf stx[1] else #[]
+  else if stx.isOfKind ``Lean.Parser.Term.fun then
+    if stx.getNumArgs > 1 && stx[1].isOfKind ``Lean.Parser.Term.basicFun &&
+        stx[1].getNumArgs > 0 then
+      identsOf stx[1][0]
+    else #[]
+  else if stx.isOfKind ``Lean.Parser.Term.let || stx.isOfKind ``Lean.Parser.Term.let_fun ||
+      stx.isOfKind ``Lean.Parser.Term.have then
+    if stx.getNumArgs > 1 && stx[1].getNumArgs > 0 then
+      let declaration := stx[1][0]
+      if declaration.getNumArgs > 1 then identsOf declaration[0] ++ identsOf declaration[1]
+      else if declaration.getNumArgs > 0 then identsOf declaration[0]
+      else #[]
+    else #[]
+  else if stx.isOfKind ``Lean.Parser.Term.matchAlt then
+    if stx.getNumArgs > 1 then identsOf stx[1] else #[]
+  else #[]
+
+/-- Whether child `index` of a syntax node is in term position: the field
+name of a projection `e.f` or of a structure-instance field `f := e` is not,
+and is never read as an application of a specification function. -/
+private def childIsTerm (stx : Syntax) (index : Nat) : Bool :=
+  if stx.isOfKind ``Lean.Parser.Term.proj then index == 0
+  else if stx.isOfKind ``Lean.Parser.Term.structInstField then index != 0
+  else true
+
+/-- The names a clause binds implicitly: its result and states. -/
+def implicitClauseBinders : Array Name :=
+  #[`result, `initial, `final, `abortCode, `_moveSpecOutput, `this]
+
+/-- Add the concrete families a specification clause names (`existsAt<R>(…)`,
+global places `R[…]`, `modifies` targets) whose heads are in scope, so that
+frames mention them: a caller reaching a generic family only through a callee
+names the instantiation in its clauses. -/
+partial def addMentionedFamilies (clause : Syntax) (resources : Array Family) :
+    CommandElabM (Array Family) := do
+  let mut resources := resources
+  let candidate? ←
+    if clause.isOfKind ``Move.Spec.resourceExistsTerm then
+      familyOfTerm? clause[1]
+    else if clause.getKind == `«term__[_]» then
+      pure ((← rootFamily? ⟨clause⟩).map (·.1))
+    else if clause.isOfKind `Move.Spec.modifiesAddress ||
+        clause.isOfKind `Move.Spec.modifiesFamily then
+      familyOfTerm? clause[0]
+    else if clause.isOfKind `Move.Spec.modifiesGenericAddress ||
+        clause.isOfKind `Move.Spec.modifiesGenericFamily then
+      familyOfTerm? clause[1]
+    else
+      pure none
+  if let some candidate := candidate? then
+    if knownResource resources candidate then
+      resources := pushResource resources candidate
+  for child in clause.getArgs do
+    resources ← addMentionedFamilies child resources
+  return resources
+
+private def rewriteGlobalPlace (resources : Array Family)
+    (state place : TSyntax `term) : CommandElabM (Option (TSyntax `term)) := do
+  let (root, fields) := splitFieldPath place
+  let some (family, key) ← rootFamily? root | return none
+  unless knownResource resources family do return none
+  let owner ← `(Move.Semantics.ResourceStore.get
+    (Value := $(family.term)) $state $key)
+  return some (← projectPath owner fields)
+
+
+mutual
+/-- The specification function an identifier names: a registered one, or —
+for a Move function — its specification version, derived on demand from its
+retained source when it is not registered yet.  A native (no source) and a
+function without a pure reading have none; the error says which and why, and
+that `spec fun` can declare one. -/
+private partial def specFunctionOfIdent? (identifier : Syntax) :
+    CommandElabM (Option (Name × SpecFunctionInfo)) := do
+  unless identifier.isIdent do return none
+  let env ← getEnv
+  let candidates ← try resolveGlobalConst identifier catch _ => pure []
+  for name in candidates do
+    if let some info := (specFunctions.getState env).find? name then
+      return some (name, info)
+  for name in candidates do
+    if Move.isMoveFunction env name then
+      return some (name, ← ensureSpecFunction name identifier)
+  return none
+
+/-- Whether a clause observes global state: a global place, `existsAt`,
+`old`, or a stateful specification function. -/
+partial def mentionsState (stx : Syntax) (bound : Array Name := #[]) : CommandElabM Bool := do
+  if stx.isOfKind ``Move.Spec.oldResourceTerm || stx.isOfKind ``Move.Spec.resourceExistsTerm then
+    return true
+  if stx.getKind == `«term__[_]» then
+    if (← rootFamily? ⟨stx⟩).isSome then return true
+  let head? := if stx.isIdent then some stx
+    else if stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs == 2 && stx[0].isIdent then
+      some stx[0]
+    else none
+  if let some head := head? then
+    unless bound.contains (rootName head.getId) do
+      if let some (_, info) ← specFunctionOfIdent? head then
+        if info.stateful then return true
+  let bound := bound ++ binderIdents stx
+  (stx.getArgs.zipIdx.filter fun (_, index) => childIsTerm stx index).anyM
+    fun (child, _) => mentionsState child bound
+
+/-- Every family a term reads: its global places and `existsAt` tests, and
+the families of the stateful specification functions it applies. -/
+partial def mentionedFamilies (stx : Syntax) (bound : Array Name := #[]) :
+    CommandElabM (Array Family) := do
+  let mut families : Array Family := #[]
+  if stx.isOfKind ``Move.Spec.resourceExistsTerm then
+    if let some family ← familyOfTerm? stx[1] then families := families.push family
+  else if stx.getKind == `«term__[_]» then
+    if let some (family, _) ← rootFamily? ⟨stx⟩ then families := families.push family
+  let head? := if stx.isIdent then some stx
+    else if stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs == 2 && stx[0].isIdent then
+      some stx[0]
+    else none
+  if let some head := head? then
+    unless bound.contains (rootName head.getId) do
+      if let some (_, info) ← specFunctionOfIdent? head then
+        for family in info.families do
+          families := families.push (familyOfName head family)
+  let bound := bound ++ binderIdents stx
+  for (child, index) in stx.getArgs.zipIdx do
+    if childIsTerm stx index then
+      families := families ++ (← mentionedFamilies child bound)
+  return families
+
+/-- Whether a term applies a registered specification function whose direct
+result is a mathematical integer. -/
+private partial def usesIntegerSpecFunction (stx : Syntax)
+    (bound : Array Name := #[]) : CommandElabM Bool := do
+  let head? := if stx.isIdent then some stx
+    else if stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs == 2 && stx[0].isIdent then
+      some stx[0]
+    else none
+  if let some head := head? then
+    unless bound.contains (rootName head.getId) do
+      if let some (_, info) ← specFunctionOfIdent? head then
+        if info.integerResult then return true
+  let bound := bound ++ binderIdents stx
+  (stx.getArgs.zipIdx.filter fun (_, index) => childIsTerm stx index).anyM
+    fun (child, _) => usesIntegerSpecFunction child bound
+
+/-- Rewrite an application of a specification function — an identifier
+applied to arguments, or a bare identifier — in a clause: the head becomes the
+function's definition and, for a stateful function, `state` is passed first.
+The families a stateful function reads must be among `resources`. -/
+private partial def rewriteSpecFunctionApplication (resources : Array Family)
+    (state : TSyntax `term) (bound : Array Name) (clause : Syntax)
+    (rewriteArgument : Bool → Syntax → CommandElabM Syntax) :
+    CommandElabM (Option Syntax) := do
+  let (head, arguments) :=
+    if clause.isOfKind ``Lean.Parser.Term.app && clause.getNumArgs == 2 then
+      (clause[0], clause[1].getArgs)
+    else if clause.isIdent then (clause, #[])
+    else (Syntax.missing, #[])
+  unless head.isIdent do return none
+  if bound.contains (rootName head.getId) then return none
+  let some (name, info) ← specFunctionOfIdent? head | return none
+  for family in info.families do
+    unless knownResource resources (familyOfName head family) do
+      throwErrorAt head (m!"specification function `{name}` reads resource `{family}`, " ++
+        m!"which the specified function does not use")
+  let arguments ← arguments.zipIdx.mapM fun (argument, index) => do
+    let integerArgument := info.integerArguments[index]?.getD false
+    let argument ← rewriteArgument integerArgument argument
+    if integerArgument then
+      let argumentTerm : TSyntax `term := ⟨argument⟩
+      pure (← `(Move.Spec.int $argumentTerm)).raw
+    else pure argument
+  let headIdent := mkCIdentFrom head info.decl
+  let arguments := if info.stateful then #[state.raw] ++ arguments else arguments
+  if arguments.isEmpty then return some headIdent.raw
+  return some (mkNode ``Lean.Parser.Term.app #[headIdent.raw, mkNullNode arguments])
+
+private partial def containsIntegerArithmeticSyntax (term : Syntax) : Bool :=
+  (term.isAtom && ["+", "-", "*", "/", "%", "<<<", ">>>"].contains term.getAtomVal) ||
+  term.getArgs.any containsIntegerArithmeticSyntax
+
+private partial def isConditionalOrMatch (term : TSyntax `term) : Bool :=
+  match term with
+  | `(($inner:term)) => isConditionalOrMatch inner
+  | `(if $_:term then $_:term else $_:term) => true
+  | `(if $_:ident : $_:term then $_:term else $_:term) => true
+  | `(match $_:term with $_:matchAlt*) => true
+  | _ => false
+
+/-- Some ordinary Lean terms rely on the relation's first operand to supply
+their type: leading-dot constructors, non-numeric conditionals/matches, and
+polymorphic integer packers are the important cases in existing contracts.
+Keep those relations homogeneous; there is no mathematical expression at
+their top level to relate heterogeneously. -/
+private partial def relationOperandNeedsExpectedType (term : TSyntax `term) : Bool :=
+  match term with
+  | `(($inner:term)) => relationOperandNeedsExpectedType inner
+  | _ =>
+      if isConditionalOrMatch term && !containsIntegerArithmeticSyntax term.raw then
+        true
+      else
+        let text := term.raw.reprint.getD term.raw.prettyPrint.pretty |>.trimAscii |>.toString
+        if text.startsWith "." then true
+        else
+          let head :=
+            if term.raw.isOfKind ``Lean.Parser.Term.app && term.raw.getNumArgs == 2 then
+              term.raw[0]
+            else term.raw
+          head.isIdent && match lastString? head.getId with
+            | some name => ["ofInt", "ofNat"].contains name
+            | none => false
+
+/-- Surface views which make a surrounding relation mathematical even when
+its other operand is still a bounded Move value. -/
+private partial def relationUsesMathematicalSurface (term : TSyntax `term) : Bool :=
+  let text := term.raw.reprint.getD term.raw.prettyPrint.pretty
+  text.contains ".length" || text.contains ".size"
+
+private partial def relationUsesExplicitRepresentation (term : TSyntax `term) : Bool :=
+  let text := term.raw.reprint.getD term.raw.prettyPrint.pretty
+  text.contains ".toList" || text.contains ".toNat" || text.contains ".toInt"
+
+private partial def isNumericLiteral (term : TSyntax `term) : Bool :=
+  match term with
+  | `(($inner:term)) => isNumericLiteral inner
+  | _ => term.raw.isNatLit?.isSome
+
+/-- Whether this node immediately introduces an explicitly mathematical
+integer binder. The body below such a binder is an integer-specification
+context even when a relation's operands are otherwise bare identifiers. -/
+private partial def introducesIntBinder (stx : Syntax) : Bool :=
+  if (binderIdents stx).isEmpty then false
+  else
+    let text := stx.reprint.getD stx.prettyPrint.pretty
+    text.contains "Int"
+
+/-- A numeric conditional or match passed to a heterogeneous relation needs
+an explicit result type so its bounded leaf branches use the scoped
+specification coercion. -/
+private partial def annotateLogicalComposite (mathematical : Bool)
+    (original rewritten : TSyntax `term) :
+    CommandElabM (TSyntax `term) :=
+  if mathematical && isConditionalOrMatch original then
+    `(($rewritten : Int))
+  else pure rewritten
+
+/-- Rewrite global-place observations in a contract clause. Bare places refer
+to `current`; `old(place)` refers to `previous`.  Applications of
+specification functions are rewritten to their definitions, a stateful one
+reading the state of its position.  `bound` are the names the clause's
+binders introduce, which no rewrite touches. -/
+partial def rewriteClause (resources : Array Family)
+    (current previous : TSyntax `term) (clause : TSyntax `term)
+    (bound : Array Name := #[]) (mathematical : Bool := false) :
+    CommandElabM (TSyntax `term) := do
+  match clause with
+  | `(old($place:term)) =>
+      if let some rewritten ← rewriteGlobalPlace resources previous place then
+        return rewritten
+      -- Any other pre-state observation is the term read over the pre-state:
+      -- a stateful specification function, or a place inside a larger term.
+      -- A term that observes no state has no pre-state to read.
+      let rewritten ← rewriteClause resources previous previous place bound mathematical
+      if rewritten.raw == place.raw then
+        throwErrorAt place "`old` expects a global resource place"
+      pure rewritten
+  | `(existsAt<$resourceType:term>($address:term)) =>
+      let some family ← familyOfTerm? resourceType.raw
+        | throwErrorAt resourceType "`existsAt<…>` expects a resource type"
+      unless knownResource resources family do
+        throwErrorAt resourceType
+          "resource `{resourceType}` is not used by the specified function"
+      let address ← rewriteClause resources current previous address bound mathematical
+      `(Move.Semantics.ResourceStore.contains
+        (Value := $(family.term)) $current $address)
+  | `($left:term + $right:term) =>
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if mathematical then `(Move.Spec.intAdd $left $right) else `($left + $right)
+  | `($left:term - $right:term) =>
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if mathematical then `(Move.Spec.intSub $left $right) else `($left - $right)
+  | `($left:term * $right:term) =>
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if mathematical then `(Move.Spec.intMul $left $right) else `($left * $right)
+  | `($left:term / $right:term) =>
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if mathematical then `(Move.Spec.intDiv $left $right) else `($left / $right)
+  | `($left:term % $right:term) =>
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if mathematical then `(Move.Spec.intMod $left $right) else `($left % $right)
+  | `(-$value:term) =>
+      let value ← rewriteClause resources current previous value bound mathematical
+      if mathematical then `(Move.Spec.intNeg $value) else `(-$value)
+  | `($value:term <<< $amount:term) =>
+      let mathematical := mathematical || (!relationUsesExplicitRepresentation value &&
+        !relationUsesExplicitRepresentation amount)
+      let value ← rewriteClause resources current previous value bound mathematical
+      let amount ← rewriteClause resources current previous amount bound mathematical
+      if mathematical then `(Move.Spec.intShiftLeft $value $amount) else `($value <<< $amount)
+  | `($value:term >>> $amount:term) =>
+      let mathematical := mathematical || (!relationUsesExplicitRepresentation value &&
+        !relationUsesExplicitRepresentation amount)
+      let value ← rewriteClause resources current previous value bound mathematical
+      let amount ← rewriteClause resources current previous amount bound mathematical
+      if mathematical then `(Move.Spec.intShiftRight $value $amount) else `($value >>> $amount)
+  | `($left:term = $right:term) =>
+      let mathematical := mathematical || ((relationUsesMathematicalSurface left ||
+        relationUsesMathematicalSurface right) && !relationUsesExplicitRepresentation left &&
+        !relationUsesExplicitRepresentation right) || (← usesIntegerSpecFunction left.raw bound) ||
+        (← usesIntegerSpecFunction right.raw bound)
+      let homogeneous :=
+        !mathematical || relationOperandNeedsExpectedType left ||
+          relationOperandNeedsExpectedType right
+      let leftOriginal := left
+      let rightOriginal := right
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if homogeneous then `($left = $right)
+      else
+        let left ← annotateLogicalComposite mathematical leftOriginal left
+        let right ← annotateLogicalComposite mathematical rightOriginal right
+        `(Move.Spec.logicalEq $left $right)
+  | `($left:term ≠ $right:term) =>
+      let mathematical := mathematical || ((relationUsesMathematicalSurface left ||
+        relationUsesMathematicalSurface right) && !relationUsesExplicitRepresentation left &&
+        !relationUsesExplicitRepresentation right) || (← usesIntegerSpecFunction left.raw bound) ||
+        (← usesIntegerSpecFunction right.raw bound)
+      let homogeneous :=
+        !mathematical || relationOperandNeedsExpectedType left ||
+          relationOperandNeedsExpectedType right
+      let leftOriginal := left
+      let rightOriginal := right
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if homogeneous then `($left ≠ $right)
+      else
+        let left ← annotateLogicalComposite mathematical leftOriginal left
+        let right ← annotateLogicalComposite mathematical rightOriginal right
+        `(¬Move.Spec.logicalEq $left $right)
+  | `($left:term < $right:term) =>
+      let mathematical := mathematical || ((relationUsesMathematicalSurface left ||
+        relationUsesMathematicalSurface right) && !relationUsesExplicitRepresentation left &&
+        !relationUsesExplicitRepresentation right) || (isNumericLiteral left &&
+        containsIntegerArithmeticSyntax right.raw && !relationUsesExplicitRepresentation right) ||
+        (← usesIntegerSpecFunction left.raw bound) ||
+        (← usesIntegerSpecFunction right.raw bound)
+      let homogeneous :=
+        !mathematical || relationOperandNeedsExpectedType left ||
+          relationOperandNeedsExpectedType right
+      let leftOriginal := left
+      let rightOriginal := right
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if homogeneous then `($left < $right)
+      else
+        let left ← annotateLogicalComposite mathematical leftOriginal left
+        let right ← annotateLogicalComposite mathematical rightOriginal right
+        `(Move.Spec.logicalLT $left $right)
+  | `($left:term > $right:term) =>
+      let mathematical := mathematical || ((relationUsesMathematicalSurface left ||
+        relationUsesMathematicalSurface right) && !relationUsesExplicitRepresentation left &&
+        !relationUsesExplicitRepresentation right) || (containsIntegerArithmeticSyntax left.raw &&
+        isNumericLiteral right && !relationUsesExplicitRepresentation left) ||
+        (← usesIntegerSpecFunction left.raw bound) ||
+        (← usesIntegerSpecFunction right.raw bound)
+      let homogeneous :=
+        !mathematical || relationOperandNeedsExpectedType left ||
+          relationOperandNeedsExpectedType right
+      let leftOriginal := left
+      let rightOriginal := right
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if homogeneous then `($left > $right)
+      else
+        let left ← annotateLogicalComposite mathematical leftOriginal left
+        let right ← annotateLogicalComposite mathematical rightOriginal right
+        `(Move.Spec.logicalLT $right $left)
+  | `($left:term ≤ $right:term) =>
+      let mathematical := mathematical || ((relationUsesMathematicalSurface left ||
+        relationUsesMathematicalSurface right) && !relationUsesExplicitRepresentation left &&
+        !relationUsesExplicitRepresentation right) || (containsIntegerArithmeticSyntax left.raw &&
+        isNumericLiteral right && !relationUsesExplicitRepresentation left) ||
+        (← usesIntegerSpecFunction left.raw bound) ||
+        (← usesIntegerSpecFunction right.raw bound)
+      let homogeneous :=
+        !mathematical || relationOperandNeedsExpectedType left ||
+          relationOperandNeedsExpectedType right
+      let leftOriginal := left
+      let rightOriginal := right
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if homogeneous then `($left ≤ $right)
+      else
+        let left ← annotateLogicalComposite mathematical leftOriginal left
+        let right ← annotateLogicalComposite mathematical rightOriginal right
+        `(Move.Spec.logicalLE $left $right)
+  | `($left:term ≥ $right:term) =>
+      let mathematical := mathematical || ((relationUsesMathematicalSurface left ||
+        relationUsesMathematicalSurface right) && !relationUsesExplicitRepresentation left &&
+        !relationUsesExplicitRepresentation right) || (isNumericLiteral left &&
+        containsIntegerArithmeticSyntax right.raw && !relationUsesExplicitRepresentation right) ||
+        (← usesIntegerSpecFunction left.raw bound) ||
+        (← usesIntegerSpecFunction right.raw bound)
+      let homogeneous :=
+        !mathematical || relationOperandNeedsExpectedType left ||
+          relationOperandNeedsExpectedType right
+      let leftOriginal := left
+      let rightOriginal := right
+      let left ← rewriteClause resources current previous left bound mathematical
+      let right ← rewriteClause resources current previous right bound mathematical
+      if homogeneous then `($left ≥ $right)
+      else
+        let left ← annotateLogicalComposite mathematical leftOriginal left
+        let right ← annotateLogicalComposite mathematical rightOriginal right
+        `(Move.Spec.logicalLE $right $left)
+  | _ =>
+      if let some rewritten ← rewriteGlobalPlace resources current clause then
+        return rewritten
+      if let some rewritten ← rewriteSpecFunctionApplication resources current bound clause.raw
+          (fun integerArgument child => do
+            pure (← rewriteClause resources current previous ⟨child⟩ bound
+              (mathematical || integerArgument)).raw) then
+        return ⟨rewritten⟩
+      let mathematical := mathematical || introducesIntBinder clause.raw
+      let bound := bound ++ binderIdents clause.raw
+      let args ← clause.raw.getArgs.zipIdx.mapM fun (child, index) => do
+        if childIsTerm clause.raw index then
+          let rewritten ← rewriteClause resources current previous ⟨child⟩ bound mathematical
+          pure rewritten.raw
+        else pure child
+      pure ⟨clause.raw.setArgs args⟩
+
+/-- Declare a specification function — the definition `f.specFun` of the
+specification version of the Move function `f` when `attached`, the
+definition `f` otherwise — from its binders and body, and register it.  The
+body is a specification term: its global places and `existsAt` tests, and
+the stateful specification functions it applies, make the function stateful,
+whose definition then takes the store instances of the families it reads and
+the state to read as its first explicit argument.  Applications of other
+specification functions (and of Move functions, through their specification
+versions) are resolved here. -/
+partial def declareSpecFunction (function : TSyntax `ident) (fullName : Name) (attached : Bool)
+    (context : Array (TSyntax ``Lean.Parser.Term.bracketedBinder))
+    (arguments : Array (TSyntax `ident)) (types : Array (TSyntax `term))
+    (resultType? : Option (TSyntax `term)) (body : TSyntax `term)
+    (doc? : Option (TSyntax ``Lean.Parser.Command.docComment) := none)
+    (derived : Bool := false) : CommandElabM Unit := do
+  if observesOld body.raw then
+    throwErrorAt body (m!"`old` cannot be used in a specification function; the specification " ++
+      m!"that applies the function chooses the state it reads (`old(f …)` reads the pre-state)")
+  let bound := arguments.map (·.getId)
+  let mut resources : Array Family := #[]
+  for family in ← mentionedFamilies body.raw bound do
+    unless resources.any (·.key == family.key) do resources := resources.push family
+  let stateful := !resources.isEmpty
+  let world := mkIdentFrom function `_moveSpecWorld
+  let state := mkIdentFrom function `_moveSpecState
+  let worldTerm : TSyntax `term := ⟨world.raw⟩
+  let stateTerm : TSyntax `term := ⟨state.raw⟩
+  let rewritten ← rewriteClause resources stateTerm stateTerm body bound true
+  let integerTypes ← types.mapM integerSpecTypeName?
+  let integerResultType? ← match resultType? with
+    | some resultType => integerSpecTypeName? resultType
+    | none => pure none
+  unless derived do
+    for (type, integerType?) in types.zip integerTypes do
+      if let some integerType := integerType? then
+        if integerType != ``Int then
+          throwErrorAt type
+            "specification functions use mathematical `Int`, not Move integer type `{integerType}`"
+    if let some integerType := integerResultType? then
+      if integerType != ``Int then
+        throwErrorAt resultType?.get!
+          "specification functions return mathematical `Int`, not Move integer type `{integerType}`"
+  let logicalTypes ← types.mapM logicalSpecType
+  let logicalResultType? ← resultType?.mapM logicalSpecType
+  let mut integerResult := integerResultType?.isSome
+  let rewritten ← if integerResult then `(($rewritten : Int)) else pure rewritten
+  let declIdent := mkIdentFrom function
+    (if attached then function.getId ++ `specFun else function.getId)
+  let declName := if attached then fullName ++ `specFun else fullName
+  let mut declBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := context
+  let heads := distinctHeads resources
+  if stateful then
+    declBinders := declBinders.push (← `(bracketedBinder| {$world : Type}))
+    for (head, index) in heads.zipIdx do
+      let storeName := mkIdentFrom function (Name.mkSimple s!"_moveSpecStore{index}")
+      declBinders := declBinders.push (← `(bracketedBinder|
+        [$storeName : $(← storeType worldTerm head)]))
+    declBinders := declBinders.push (← `(bracketedBinder| ($state : $worldTerm)))
+  for (argument, type) in arguments.zip logicalTypes do
+    declBinders := declBinders.push (← `(bracketedBinder| ($argument : $type)))
+  -- A Lean-only helper: kept out of line, as `module` keeps every `def`, so
+  -- a `fun` that wrongly calls it is rejected instead of absorbing it.
+  let command ← match logicalResultType? with
+    | some resultType =>
+        `(@[noinline] def $declIdent $declBinders* : $resultType := $rewritten)
+    | none => `(@[noinline] def $declIdent $declBinders* := $rewritten)
+  -- The doc comment goes into the declaration's modifiers.
+  let command := match doc? with
+    | some doc => command.raw.setArg 0 (command.raw[0].setArg 0 (mkNullNode #[doc.raw]))
+    | none => command.raw
+  elabCommand command
+  unless (← getEnv).contains declName do
+    throwErrorAt function m!"specification function `{declName}` could not be declared"
+  unless derived || resultType?.isSome do
+    if let some info := (← getEnv).find? declName then
+      let rec resultType (type : Lean.Expr) : Lean.Expr :=
+        match type with
+        | .forallE _ _ body _ => resultType body
+        | result => result
+      let inferredResult ← liftTermElabM <| Lean.Meta.whnfR (resultType info.type)
+      if inferredResult.isAppOf ``Move.MoveInt then
+        throwErrorAt body
+          "specification function result inferred as a Move integer; declare and return `Int`"
+      if inferredResult.isConstOf ``Int then integerResult := true
+  registerSpecFunction fullName {
+    decl := declName
+    stateful
+    families := heads
+    integerArguments := integerTypes.map (·.isSome)
+    integerResult }
+
+/-- The specification version of the Move function `functionName`, registered
+or derived now from its retained source: its pure reading, over the
+function's signature with references erased (`signatureOf`), declared in the
+function's namespace.  A native has no source, an imported function's version
+is derived in its own module, a recursive function cannot read itself, and a
+body without a pure reading says why: each is an error, pointing at
+`spec fun` as the way to declare one. -/
+partial def ensureSpecFunction (functionName : Name) (ref : Syntax) :
+    CommandElabM SpecFunctionInfo := do
+  let env ← getEnv
+  if let some info := (specFunctions.getState env).find? functionName then return info
+  let short := Name.mkSimple functionName.getString!
+  -- A native retains a placeholder body only.
+  if Move.moveNativeAttr.hasTag env functionName then
+    throwErrorAt ref (m!"Move function `{functionName}` has no specification version: it has no " ++
+      m!"body (a native); `spec fun {short} …` can declare one")
+  let some declaration := declarations.getState env |>.find? functionName
+    | throwErrorAt ref (m!"Move function `{functionName}` has no specification version: it has no " ++
+        m!"retained source; `spec fun {short} …` can declare one")
+  if (env.getModuleIdxFor? functionName).isSome then
+    -- Imported: the version is derived in its own module; say why it was not.
+    let body ← sourceBody declaration
+    let _ ← pureReadingTerm functionName body
+    throwErrorAt ref (m!"imported Move function `{functionName}` has no specification version " ++
+      m!"(it is derived at the function's declaration, in its module)")
+  if (← specFunctionDerivationInProgress.get).contains functionName then
+    throwErrorAt ref (m!"Move function `{functionName}` has no specification version: it is " ++
+      m!"recursive; `spec fun {short} …` can declare one")
+  specFunctionDerivationInProgress.modify (·.insert functionName)
+  try
+    let signature ← signatureOf functionName
+    unless signature.mutableParameters.isEmpty do
+      noSpecificationVersion functionName ref "it takes a mutable reference"
+    let body ← sourceBody declaration
+    let reading ← pureReadingTerm functionName body
+    let resultType ← actionResultType declaration
+    let .str namespace_ shortName := functionName
+      | throwErrorAt ref "cannot derive a specification version for `{functionName}`"
+    let function := mkIdentFrom ref (Name.mkSimple shortName)
+    withScope (fun scope => { scope with currNamespace := namespace_ }) do
+      declareSpecFunction function functionName (attached := true) signature.context
+        signature.arguments signature.types (some resultType) reading (derived := true)
+  finally
+    specFunctionDerivationInProgress.modify (·.erase functionName)
+  match (specFunctions.getState (← getEnv)).find? functionName with
+  | some info => return info
+  | none => throwErrorAt ref "specification version of `{functionName}` was not registered"
+end
+
+/-- The definitions of the specification functions a declaration's value
+reaches, transitively through their own bodies. -/
+partial def specFunctionDependencies (env : Environment) (declName : Name) : Array Name :=
+  let definitions : NameSet :=
+    (specFunctions.getState env).foldl (fun acc _ info => acc.insert info.decl) {}
+  let rec go (todo : List Name) (seen : NameSet) (acc : Array Name) : Array Name :=
+    match todo with
+    | [] => acc
+    | name :: rest =>
+      if seen.contains name then go rest seen acc
+      else
+        let seen := seen.insert name
+        match env.find? name >>= (·.value? (allowOpaque := true)) with
+        | some value =>
+          let found := value.getUsedConstants.filter fun constant =>
+            definitions.contains constant && !seen.contains constant
+          go (found.toList ++ rest) seen (acc ++ found.filter fun c => !acc.contains c)
+        | none => go rest seen acc
+  go [declName] {} #[]
+
+/-- `old(p)` in a loop invariant: the parameter's value at function entry. -/
+private partial def replaceEntryValues (parameters : List Name) (stx : Syntax) :
+    CommandElabM Syntax := do
+  if stx.isOfKind ``Move.Spec.oldResourceTerm && stx.getNumArgs == 3 then
+    let inner := stx[1]
+    unless inner.isIdent do
+      throwErrorAt stx "`old` in a loop invariant takes a parameter"
+    unless parameters.contains inner.getId do
+      throwErrorAt stx "`old({inner.getId})` in a loop invariant: `{inner.getId}` is not a parameter"
+    return mkIdentFrom stx (entryValueName inner.getId)
+  return stx.setArgs (← stx.getArgs.mapM (replaceEntryValues parameters))
+
+/-- The label and observed term in an internal `oldAt[label](term)`. -/
+private def anchoredOld? (stx : Syntax) : Option (Nat × Syntax) :=
+  match stx with
+  | `(oldAt[$label:num]($value:term)) =>
+      label.raw.isNatLit?.map fun label => (label, value.raw)
+  | _ => none
+
+/-- Every distinct value read through `oldAt[label]` in a syntax tree. -/
+private partial def anchoredObservations (label : Nat) (stx : Syntax)
+    (seen : Array Syntax := #[]) : Array Syntax :=
+  let seen := match anchoredOld? stx with
+    | some (found, value) =>
+      if found == label && !seen.any (fun previous => previous == value) then
+        seen.push value
+      else
+        seen
+    | _ => seen
+  stx.getArgs.foldl (fun seen child => anchoredObservations label child seen) seen
+
+/-- Replace every anchored old-value syntax node with the lexical value saved
+at its corresponding compiler-generated capture point. -/
+private partial def replaceAnchoredValues (captures : List StateAnchorCapture)
+    (stx : Syntax) : CommandElabM Syntax := do
+  if let some (label, observed) := anchoredOld? stx then
+    let some savedCapture := captures.find? fun savedCapture =>
+      savedCapture.label == label && savedCapture.observed == observed
+      | throwErrorAt stx s!"no state-anchor capture {label} value for this anchored `old` observation"
+    return savedCapture.snapshot.raw
+  return stx.setArgs (← stx.getArgs.mapM (replaceAnchoredValues captures))
+
+/-- A loop's fixed point: `Spec.fix` of its body over the packed state, or,
+with stated invariants, `Spec.withInvariant` with one proposition over the
+packed state (the store binder is unused — source invariants range over the
+loop's locals and the current referents of live mutable references, which
+travel with the state), for the automatic prover. -/
+private def loopFixpoint (context : TranslationContext)
+    (invariants : Array (TSyntax `term)) (state : List (TSyntax `ident))
+    (recName stateName : TSyntax `ident) (body pack : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  if invariants.isEmpty then
+    return ← `(Move.Semantics.Spec.fix (fun $recName $stateName => $body) $pack)
+  let invariants ← invariants.mapM fun clause => do
+    let clause : TSyntax `term := ⟨← replaceEntryValues context.parameters clause.raw⟩
+    let clause : TSyntax `term := ⟨← replaceAnchoredValues context.stateAnchors clause.raw⟩
+    -- Specification functions apply in an invariant as in a clause.  An
+    -- invariant ranges over the loop's locals, not over global state.
+    if ← mentionsState clause.raw then
+      throwErrorAt clause ("a loop invariant ranges over the loop's locals; global state " ++
+        "(`R[a]`, `existsAt<R>(a)`, a stateful specification function) is not " ++
+        "supported in a loop invariant")
+    let bound := context.parameters.toArray ++ state.map (·.getId) ++ implicitClauseBinders
+    let placeholder ← `(_moveSpecStore)
+    rewriteClause #[] placeholder placeholder clause bound
+  let mut conjunction := invariants[0]!
+  for clause in invariants[1:] do
+    conjunction ← `($conjunction ∧ $clause)
+  -- An invariant speaks about values: each live mutable reference, a
+  -- component of the state, is read.
+  let valued ← (liveMutations context).foldrM (init := conjunction) fun handle acc => do
+    let handleTerm : TSyntax `term := ⟨handle.raw⟩
+    `(let $handle:ident := Move.Semantics.Mutation.read $handleTerm; $acc)
+  let unpacked ← unpackLoopState state ⟨stateName.raw⟩ valued
+  -- The state (`pack`) precedes the invariant, so the invariant's binders
+  -- have their types when it is elaborated.
+  `(Move.Semantics.Spec.withInvariant
+      (fun $recName $stateName => $body) $pack
+      (fun $stateName _moveSpecStore => $unpacked))
+
+/-- Turn an in-body assertion or assumption into a predicate over the exact
+current store.  As in contracts, ordinary resource reads select that store;
+`old(parameter)` selects the value retained at function entry and an anchored
+old value selects its preceding capture. -/
+private def inlineSpecPredicate (context : TranslationContext)
+    (source : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let source : TSyntax `term :=
+    ⟨← replaceEntryValues context.parameters source.raw⟩
+  let source : TSyntax `term :=
+    ⟨← replaceAnchoredValues context.stateAnchors source.raw⟩
+  let state := mkIdentFrom source `_moveSpecInlineState
+  let stateTerm : TSyntax `term := ⟨state.raw⟩
+  let loopBound := context.loops.flatMap fun frame => frame.state.map (·.getId)
+  let bound := context.parameters.toArray ++ loopBound.toArray ++ implicitClauseBinders
+  let families ← mentionedFamilies source.raw bound
+  let rewritten ← rewriteClause families stateTerm stateTerm source bound
+  let rewritten : TSyntax `term :=
+    ⟨← rewriteClauseMutations (liveMutations context) rewritten.raw⟩
+  `(fun $state => $rewritten)
+
+/-- Whether a local is a live mutable reference, a retained ancestor, or the
+owner of a live loan: another mutable borrow of it must chain through that
+loan, as a nested borrow. -/
+private def isLoanedOwner (context : TranslationContext) (id : Name) : Bool :=
+  (liveMutations context).any (·.getId == id) ||
+  context.mutationAncestors.any (fun (ancestor, _) => ancestor.getId == id) ||
+  context.mutationOwnerAliases.any (fun (owner, _, _) => owner == id)
+
+/-- Whether retained source directly writes one of `mutations`. Generated
+owner-reconciliation writes must not count: those remain inside the loan and
+would otherwise spuriously turn sibling structural loans into nested closure
+boundaries. -/
+private partial def sourceWritesMutation (mutations : List Name)
+    (stx : Syntax) : Bool :=
+  let assignment := if stx.isOfKind ``Lean.Parser.Term.doReassign then
+    let assignment : TSyntax ``Lean.Parser.Term.doReassign := ⟨stx⟩
+    match assignment with
+    | `(doReassign| $name:ident $[: $_]? :=%$_ $_rhs:term) =>
+        mutations.contains name.getId
+    | _ => false
+  else if stx.isOfKind ``Move.moveAddAssign ||
+      stx.isOfKind ``Move.moveSubAssign ||
+      stx.isOfKind ``Move.moveMulAssign ||
+      stx.isOfKind ``Move.moveDivAssign ||
+      stx.isOfKind ``Move.moveModAssign then
+    stx[0]?.any fun target => target.isIdent && mutations.contains target.getId
+  else
+    false
+  assignment || stx.getArgs.any (sourceWritesMutation mutations)
 
 mutual
 /-- Translate pure positions that may embed sequenced operations.  The
@@ -2500,7 +4534,7 @@ is the prophecy-passing summary of `verification-design.md`: the caller
 suspends its owner with the callee's final value and resumes with it. -/
 private partial def moveCallSpec? (context : TranslationContext)
     (term : TSyntax `term) :
-    CommandElabM (Option (TSyntax `term × Array (TSyntax `ident))) := do
+    CommandElabM (Option (TSyntax `term × Array (TSyntax `ident) × Bool)) := do
   let (head, arguments, markedContinue) ← match term with
     | `(continue $head:term $arguments:term*) =>
         pure (head, arguments, true)
@@ -2510,9 +4544,10 @@ private partial def moveCallSpec? (context : TranslationContext)
   unless head.raw.isIdent do return none
   let identifier : TSyntax `ident := ⟨head.raw⟩
   let some functionName ← resolveMoveFunction? identifier | return none
-  unless (declarations.getState (← getEnv)).contains functionName do
-    throwErrorAt term
-      "Move callee `{functionName}` has no retained source; declare it with `fun` so its semantics can be generated"
+  let some callee := (declarations.getState (← getEnv)).find? functionName
+    | throwErrorAt term
+        "Move callee `{functionName}` has no retained source; declare it with `fun` so its semantics can be generated"
+  let returnsMutation := returnsMutableReferences callee
   -- Named arguments instantiate type parameters (`has_generic (T := U64) a`);
   -- the callee's semantics takes them under the same names.
   let isNamed (argument : TSyntax `term) :=
@@ -2534,25 +4569,106 @@ private partial def moveCallSpec? (context : TranslationContext)
         throwErrorAt argument
           "a call may pass the live mutable reference `{mutation.getId}` only once"
       passedMutations := passedMutations.push mutation
-      let current ← `(Move.Semantics.Spec.pure (Move.Semantics.Mutation.read $mutation))
-      argumentSpecs := argumentSpecs.push (current, valueName)
+      let argumentSpec ← if returnsMutation then
+        `(Move.Semantics.Spec.pure $mutation)
+      else
+        `(Move.Semantics.Spec.pure (Move.Semantics.Mutation.read $mutation))
+      argumentSpecs := argumentSpecs.push (argumentSpec, valueName)
     else
       argumentSpecs := argumentSpecs.push (← expressionSpec context argument, valueName)
   let packed ← packCallArguments term.raw valueNames
   let recursiveSpec? := match context.recursiveSpecs.find? (·.1 == functionName) with
     | some (_, recursiveSpec) => some recursiveSpec
     | none => if functionName == context.functionName then context.recursiveSpec? else none
-  let mut call ← if let some recursiveSpec := recursiveSpec? then
+  let mut call ← if returnsMutation then do
+    if let some recursiveSpec := recursiveSpec? then
+      `($recursiveSpec $packed)
+    else do
+      if markedContinue then
+        throwErrorAt term "`continue` must target the current recursive Move function"
+      let env ← getEnv
+      let mutationSpecName := functionName ++ `mutationSpec
+      if Move.moveNativeAttr.hasTag env functionName || Move.moveOpaqueAttr.hasTag env functionName then
+        unless env.contains mutationSpecName do
+          throwErrorAt term
+            "a native or body-less opaque mutable-reference result requires an explicit mutation-level summary `{mutationSpecName}`"
+      else
+        ensureSourceSpec functionName term
+      unless (← getEnv).contains mutationSpecName do
+        throwErrorAt term
+          "Move callee `{functionName}` has no mutation-level source specification"
+      let mutationSpec := mkIdentFrom head mutationSpecName
+      `($mutationSpec $namedArguments* $packed)
+  else if let some recursiveSpec := recursiveSpec? then
     `($recursiveSpec $packed)
   else do
     if markedContinue then
       throwErrorAt term "`continue` must target the current recursive Move function"
-    ensureSourceSpec functionName term
-    let sourceSpec := mkIdentFrom head (functionName ++ `sourceSpec)
-    `($sourceSpec $namedArguments* $packed)
+    let env ← getEnv
+    if Move.moveNativeAttr.hasTag env functionName || Move.moveOpaqueAttr.hasTag env functionName then
+      -- A summarized callee (native, or `pragma opaque`): its contract's
+      -- summary, declared by its `spec`.
+      let summarySpecName := functionName ++ `summarySpec
+      unless env.contains summarySpecName do
+        throwErrorAt term
+          "Move callee `{functionName}` is summarized by its contract but has no `spec`; declare one in its module"
+      let summarySpec := mkIdentFrom head summarySpecName
+      `($summarySpec $namedArguments* $packed)
+    else
+      ensureSourceSpec functionName term
+      let sourceSpec := mkIdentFrom head (functionName ++ `sourceSpec)
+      `($sourceSpec $namedArguments* $packed)
   for (argumentSpec, valueName) in argumentSpecs.reverse do
     call ← `(Move.Semantics.Spec.bind $argumentSpec fun $valueName => $call)
-  return some (call, passedMutations)
+  return some (call, passedMutations, returnsMutation)
+
+/-- Whether retained source calls a Move function with one of `mutations` in
+a mutable-reference parameter position. This is deliberately source-based:
+generated owner-reconciliation writes are implementation details of a loan,
+whereas a source call can update a disjoint outer prophecy that the loan's
+continuation must transport. -/
+private partial def sourceCallsMutation (mutations : List Name)
+    (stx : Syntax) : CommandElabM Bool := do
+  if stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs == 2 then
+    let term : TSyntax `term := ⟨stx⟩
+    if let some (head, rawArguments) := application? term then
+      if head.raw.isIdent then
+        if let some functionName ← resolveMoveFunction? ⟨head.raw⟩ then
+          let arguments := rawArguments.filter fun argument =>
+            !argument.raw.isOfKind ``Lean.Parser.Term.namedArgument
+          let mutablePositions ← mutableParameterPositions functionName
+          for (argument, index) in arguments.zipIdx do
+            if mutablePositions.contains index && argument.raw.isIdent &&
+                mutations.contains argument.raw.getId then
+              return true
+  for child in stx.getArgs do
+    if ← sourceCallsMutation mutations child then return true
+  return false
+
+private partial def sourceMutatesAny (mutations : List Name)
+    (elements : Array Lean.DoElem) : CommandElabM Bool := do
+  for element in elements do
+    if sourceWritesMutation mutations element.raw ||
+        (← sourceCallsMutation mutations element.raw) then
+      return true
+  return false
+
+/-- `T.certify a b …`, the creation of a certified value: `Spec.certified`
+builds the value from the proof of its data invariant, owed here. -/
+private partial def certifyCall? (context : TranslationContext)
+    (term : TSyntax `term) : CommandElabM (Option (TSyntax `term)) := do
+  let some (head, arguments) := application? term | return none
+  unless head.raw.isIdent do return none
+  let some name ← (try pure (some (← resolveGlobalConstNoOverload head.raw))
+    catch _ => pure none) | return none
+  let .str typeName "certify" := name | return none
+  let some invariantName := Move.dataInvariant? (← getEnv) typeName | return none
+  return some (← withHoisted context arguments fun residuals => do
+    let rawValue ← `($(mkIdent (typeName ++ `Raw ++ `mk)) $residuals*)
+    let holds := mkIdentFrom term `_moveSpecInvariant
+    let built ← `(fun $holds => $(mkIdent (typeName ++ `mk)) $residuals* $holds)
+    `(Move.Semantics.Spec.certified
+      (Invariant := $(mkIdent invariantName) $rawValue) $built))
 
 /-- Translate an expression in value position. Arithmetic is sequenced
 relationally so overflow, underflow, and division by zero remain observable;
@@ -2624,6 +4740,12 @@ private partial def expressionSpec (context : TranslationContext)
       `(Move.Semantics.Spec.bind ($lhsSpec : Move.Semantics.Spec _ Bool)
           fun (_moveSpecLhs : Bool) =>
           if _moveSpecLhs then Move.Semantics.Spec.pure true else $rhsSpec)
+  -- A comparison in value position (`let ok := a < b`) is the `Bool` of the
+  -- logical comparison the pure rewriting produces.
+  | `($_:term < $_:term) | `($_:term <= $_:term) | `($_:term > $_:term)
+  | `($_:term >= $_:term) =>
+      withHoisted context #[term] fun residuals =>
+        ``(Move.Semantics.Spec.pure (decide $(residuals[0]!)))
   | `(($value:term : $type:term)) =>
       -- An ascribed integer cast, Move's `(x as T)`. The ascription
       -- supplies the target width of the checked cast.
@@ -2688,7 +4810,12 @@ private partial def expressionSpec (context : TranslationContext)
         let valuesSpec ← expressionSpec context values
         `(Move.Semantics.Spec.bind $valuesSpec fun _moveSpecValues =>
             Move.Semantics.Vector.destroyEmptySpec _moveSpecValues)
-      else if let some (call, passedMutations) ← moveCallSpec? context term then
+      else if let some creation ← certifyCall? context term then
+        pure creation
+      else if let some (call, passedMutations, returnsMutation) ← moveCallSpec? context term then
+        if returnsMutation then
+          throwErrorAt term
+            "a call returning a mutable reference must be bound with `let`"
         if !passedMutations.isEmpty then
           throwErrorAt term
             "a call passing a mutable reference must be a `do` statement or bound with `let`"
@@ -2697,6 +4824,31 @@ private partial def expressionSpec (context : TranslationContext)
         withHoisted context #[term] fun residuals =>
           `(Move.Semantics.Spec.pure $(residuals[0]!))
 
+/-- Resolve every mutable component of a returned multiple-value and erase its
+reference representation for the value-level source relation. -/
+private partial def resolveMutationResult (anchor : Syntax)
+    (leaves : Array ResultLeaf) (packed : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  let rec go (index : Nat) (values : Array (TSyntax `term)) :
+      CommandElabM (TSyntax `term) := do
+    if index == leaves.size then
+      return ← `(Move.Semantics.Spec.pure $(← packCallArguments anchor values))
+    let component ← liftMacroM <| argumentProjection packed index leaves.size
+    match leaves[index]! with
+    | .mutable _ =>
+        let returned := mkIdentFrom anchor
+          (Name.mkSimple s!"_moveSpecReturnedMutation{index}")
+        let returnedValue := mkIdentFrom anchor
+          (Name.mkSimple s!"_moveSpecReturnedValue{index}")
+        let transferred ← `(Move.Semantics.withTransferredMutation $component
+          (fun $returned => Move.Semantics.Spec.pure
+            (Move.Semantics.Mutation.read $returned, $returned)))
+        let tail ← go (index + 1) (values.push ⟨returnedValue.raw⟩)
+        `(Move.Semantics.Spec.bind $transferred (fun $returnedValue => $tail))
+    | .value _ | .immutable _ =>
+        go (index + 1) (values.push component)
+  go 0 #[]
+
 /-- Define `f.sourceSpec` — and `f.bodySpec` for a recursive `f` — from the
 retained body of `function`, a short name in the current namespace, with
 the source signature stating its generic context and logical parameter types.
@@ -2704,7 +4856,9 @@ The semantics is state-polymorphic: it quantifies over an abstract state and
 one typed store per resource family the body (transitively) touches. -/
 private partial def generateSourceSpec (function : TSyntax `ident)
     (signature : SourceSignature) : CommandElabM Unit := do
-  if ← isRecursive function.raw then
+  let declaration ← declarationFor function.raw
+  let recursive ← isRecursive function.raw
+  if recursive then
     stabilizeBorrowSummaries #[(function, signature)] function.raw
   let borrowProgram ← buildBorrowProgram function signature
   emitBorrowCertificate function borrowProgram
@@ -2716,13 +4870,8 @@ private partial def generateSourceSpec (function : TSyntax `ident)
   let resultType ← resultTypeOf function.raw
   let sourceResultType ← liftMacroM <|
     sourceResultType resultType signature.mutableParameters
-  let recursive ← isRecursive function.raw
   let recursiveName := mkIdentFrom function `_moveSpecRecursive
   let recursiveTerm : TSyntax `term := ⟨recursiveName.raw⟩
-  let (body, _) ← translateWithStores function.raw world resourceTypes
-    (if recursive then some recursiveTerm else none)
-    signature.mutableParameters
-  let sourceLambda ← liftMacroM <| unpackArguments signature.arguments body
   let worldBinder ← `(bracketedBinder| {$world : Type})
   let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
   for (head, index) in (distinctHeads resourceTypes).zipIdx do
@@ -2731,6 +4880,57 @@ private partial def generateSourceSpec (function : TSyntax `ident)
     let storeBinder ← `(bracketedBinder|
       [$storeName : $(← storeType ⟨world⟩ head)])
     storeBinders := storeBinders.push storeBinder
+
+  if returnsMutableReferences declaration then
+    if signature.mutableParameters.isEmpty then
+      throwErrorAt function
+        "a mutable-reference result requires a mutable-reference parameter"
+    let mutationSpecName := mkIdentFrom function (function.getId ++ `mutationSpec)
+    let mutationTypes ← liftMacroM <| mutationArgumentTypes signature
+    let mutationArgsType ← liftMacroM <| argumentType mutationTypes
+    let (mutationBody, mutationResultType) ← translateWithStores function.raw world
+      resourceTypes (if recursive then some recursiveTerm else none)
+      signature.mutableParameters #[] true
+    let mutationLambda ← liftMacroM <|
+      unpackArguments signature.arguments mutationBody
+    if recursive then
+      let recursiveBinder ← `(bracketedBinder|
+        ($recursiveName : $mutationArgsType →
+          Move.Semantics.Spec $world $mutationResultType))
+      elabCommand (← `(noncomputable def $bodySpecName $signature.context* $worldBinder
+        $storeBinders* $recursiveBinder : $mutationArgsType →
+          Move.Semantics.Spec $world $mutationResultType := $mutationLambda))
+      elabCommand (← `(noncomputable def $mutationSpecName $signature.context* $worldBinder
+        $storeBinders* : $mutationArgsType →
+          Move.Semantics.Spec $world $mutationResultType :=
+          Move.Semantics.Spec.fix $bodySpecName))
+    else
+      elabCommand (← `(noncomputable def $mutationSpecName $signature.context* $worldBinder
+        $storeBinders* : $mutationArgsType →
+          Move.Semantics.Spec $world $mutationResultType := $mutationLambda))
+
+    let packed ← packCallArguments function.raw
+      (signature.arguments.map fun argument => (⟨argument.raw⟩ : TSyntax `term))
+    let mutationCall ← `($mutationSpecName $packed)
+    let mutationOutput := mkIdentFrom function `_moveSpecMutationOutput
+    let returnedValue := mkIdentFrom function `_moveSpecReturnedValue
+    let transferred ← resolveMutationResult function.raw
+      (resultLeaves (declaredResultType declaration)) (← `($mutationOutput.1))
+    let opened ← `(Move.Semantics.Spec.bind $mutationCall
+      (fun $mutationOutput =>
+        Move.Semantics.Spec.bind $transferred (fun $returnedValue =>
+          Move.Semantics.Spec.pure ($returnedValue, $mutationOutput.2))))
+    let wrapper ← withMutableParameters signature.mutableParameters opened
+    let sourceLambda ← liftMacroM <| unpackArguments signature.arguments wrapper
+    elabCommand (← `(noncomputable def $sourceSpecName $signature.context* $worldBinder
+      $storeBinders* : $argsType → Move.Semantics.Spec $world $sourceResultType :=
+      $sourceLambda))
+    return
+
+  let (body, _) ← translateWithStores function.raw world resourceTypes
+    (if recursive then some recursiveTerm else none)
+    signature.mutableParameters
+  let sourceLambda ← liftMacroM <| unpackArguments signature.arguments body
   if recursive then
     let recursiveBinder ← `(bracketedBinder|
       ($recursiveName : $argsType → Move.Semantics.Spec $world $sourceResultType))
@@ -2776,8 +4976,10 @@ private partial def recursiveComponent (functionName : Name) : CommandElabM (Arr
       component := component.push candidate
   pure component
 
-/-- Generate one dependent `Spec.fixFamily` for a mutually recursive SCC and
-thin `f.sourceSpec` projections for each member. -/
+/-- Generate one dependent `Spec.fixFamily` for a mutually recursive SCC.
+Reference-returning members occupy mutation-level entries in the family and
+receive both a raw `f.mutationSpec` projection and a value-level `f.sourceSpec`
+wrapper. Ordinary members remain direct `f.sourceSpec` projections. -/
 private partial def generateMutualSourceSpecs (members : Array Name)
     (ref : Syntax) : CommandElabM Unit := do
   let some anchor := members[0]? | return
@@ -2785,6 +4987,12 @@ private partial def generateMutualSourceSpecs (members : Array Name)
   unless members.all (·.getPrefix == namespace_) do
     throwErrorAt ref "mutually recursive Move functions must belong to one module"
   withScope (fun scope => { scope with currNamespace := namespace_ }) do
+    let mut memberDeclarations : Array Declaration := #[]
+    for member in members do
+      let some declaration := (declarations.getState (← getEnv)).find? member
+        | throwErrorAt ref "no retained Move source declaration for `{member}`"
+      memberDeclarations := memberDeclarations.push declaration
+    let mutationMembers := memberDeclarations.map returnsMutableReferences
     let mut signatures : Array SourceSignature := #[]
     for member in members do signatures := signatures.push (← signatureOf member)
     let summaryMembers := (members.zip signatures).map fun (member, signature) =>
@@ -2813,13 +5021,22 @@ private partial def generateMutualSourceSpecs (members : Array Name)
       mkIdentFrom ref (indexIdent.getId ++ constructor.getId)
     let mut argumentTypes : Array (TSyntax `term) := #[]
     let mut resultTypes : Array (TSyntax `term) := #[]
-    for (signature, member) in signatures.zip members do
-      let argumentType ← liftMacroM <| argumentType signature.types
+    for (((signature, member), declaration), mutationMember) in
+        signatures.zip members |>.zip memberDeclarations |>.zip mutationMembers do
+      let argumentTypesForMember ← if mutationMember then
+        liftMacroM <| mutationArgumentTypes signature
+      else
+        pure signature.types
+      let memberArgumentType ← liftMacroM <| argumentType argumentTypesForMember
       let short := mkIdentFrom ref (Name.mkSimple member.getString!)
-      let resultType ← resultTypeOf short.raw
-      let resultType ← liftMacroM <| sourceResultType resultType signature.mutableParameters
-      argumentTypes := argumentTypes.push argumentType
-      resultTypes := resultTypes.push resultType
+      let logicalResult ← resultTypeOf short.raw
+      let memberResultType ← if mutationMember then
+        liftMacroM <| mutationResultType (declaredResultType declaration)
+          logicalResult signature.mutableParameters
+      else
+        liftMacroM <| sourceResultType logicalResult signature.mutableParameters
+      argumentTypes := argumentTypes.push memberArgumentType
+      resultTypes := resultTypes.push memberResultType
     let recursor := mkIdentFrom ref (indexIdent.getId ++ `rec)
     let indexArg := mkIdentFrom ref `_moveSpecMutualIndex
     let typeMotive ← `(fun (_ : $indexIdent) => Type)
@@ -2854,11 +5071,11 @@ private partial def generateMutualSourceSpecs (members : Array Name)
       recursiveSpecs := recursiveSpecs.push (member, entry)
     let bodyArg := mkIdentFrom ref `_moveSpecMutualBodyArgs
     let mut bodyBranches : Array (TSyntax `term) := #[]
-    for (((member, signature), argumentType), resultType) in
-        members.zip signatures |>.zip argumentTypes |>.zip resultTypes do
+    for ((((member, signature), argumentType), resultType), mutationMember) in
+        members.zip signatures |>.zip argumentTypes |>.zip resultTypes |>.zip mutationMembers do
       let short := mkIdentFrom ref (Name.mkSimple member.getString!)
       let (translated, _) ← translateWithStores short.raw world resourceTypes none
-        signature.mutableParameters recursiveSpecs
+        signature.mutableParameters recursiveSpecs mutationMember
       let sourceLambda ← liftMacroM <| unpackArguments signature.arguments translated
       let branch ← `(($sourceLambda : $argumentType →
         Move.Semantics.Spec $world $resultType))
@@ -2876,14 +5093,52 @@ private partial def generateMutualSourceSpecs (members : Array Name)
       fun $bodyIndex $bodyArg => $bodyFamily))
     elabCommand (← `(noncomputable def $sourceIdent $commonContext* $worldBinder
       $storeBinders* : $familyType := Move.Semantics.Spec.fixFamily $bodyIdent))
-    for ((((member, signature), constructor), argumentType), resultType) in
-        members.zip signatures |>.zip constructorTerms |>.zip argumentTypes |>.zip resultTypes do
-      let memberSource := mkIdentFrom ref
-        (Name.mkSimple member.getString! ++ `sourceSpec)
+    for ((((((member, signature), declaration), constructor), familyArgumentType),
+        familyResultType), mutationMember) in
+        members.zip signatures |>.zip memberDeclarations |>.zip constructorTerms
+          |>.zip argumentTypes |>.zip resultTypes |>.zip mutationMembers do
       let memberArgs := mkIdentFrom ref `_moveSpecArgs
-      elabCommand (← `(noncomputable def $memberSource $signature.context* $worldBinder
-        $storeBinders* : $argumentType → Move.Semantics.Spec $world $resultType :=
-        fun $memberArgs => $sourceIdent $constructor $memberArgs))
+      if mutationMember then
+        let memberMutation := mkIdentFrom ref
+          (Name.mkSimple member.getString! ++ `mutationSpec)
+        elabCommand (← `(noncomputable def $memberMutation $signature.context*
+          $worldBinder $storeBinders* : $familyArgumentType →
+            Move.Semantics.Spec $world $familyResultType :=
+          fun $memberArgs => $sourceIdent $constructor $memberArgs))
+
+        let memberSource := mkIdentFrom ref
+          (Name.mkSimple member.getString! ++ `sourceSpec)
+        let sourceArgumentType ← liftMacroM <| argumentType signature.types
+        let logicalResult ← resultTypeOf
+          (mkIdentFrom ref (Name.mkSimple member.getString!)).raw
+        let sourceMemberResultType ← liftMacroM <|
+          sourceResultType logicalResult signature.mutableParameters
+        let packed ← packCallArguments ref
+          (signature.arguments.map fun argument =>
+            (⟨argument.raw⟩ : TSyntax `term))
+        let mutationCall ← `($memberMutation $packed)
+        let mutationOutput := mkIdentFrom ref `_moveSpecMutationOutput
+        let returnedValue := mkIdentFrom ref `_moveSpecReturnedValue
+        let transferred ← resolveMutationResult ref
+          (resultLeaves (declaredResultType declaration))
+          (← `($mutationOutput.1))
+        let opened ← `(Move.Semantics.Spec.bind $mutationCall
+          (fun $mutationOutput =>
+            Move.Semantics.Spec.bind $transferred (fun $returnedValue =>
+              Move.Semantics.Spec.pure ($returnedValue, $mutationOutput.2))))
+        let wrapper ← withMutableParameters signature.mutableParameters opened
+        let sourceLambda ← liftMacroM <|
+          unpackArguments signature.arguments wrapper
+        elabCommand (← `(noncomputable def $memberSource $signature.context*
+          $worldBinder $storeBinders* : $sourceArgumentType →
+            Move.Semantics.Spec $world $sourceMemberResultType := $sourceLambda))
+      else
+        let memberSource := mkIdentFrom ref
+          (Name.mkSimple member.getString! ++ `sourceSpec)
+        elabCommand (← `(noncomputable def $memberSource $signature.context*
+          $worldBinder $storeBinders* : $familyArgumentType →
+            Move.Semantics.Spec $world $familyResultType :=
+          fun $memberArgs => $sourceIdent $constructor $memberArgs))
     let info : MutualFamilyInfo := {
       anchor
       indexType := namespace_ ++ indexIdent.getId
@@ -2893,7 +5148,8 @@ private partial def generateMutualSourceSpecs (members : Array Name)
       source := namespace_ ++ sourceIdent.getId
       members
       constructors := constructorTerms.map fun constructor =>
-        namespace_ ++ constructor.getId }
+        namespace_ ++ constructor.getId
+      hasMutationMembers := mutationMembers.any id }
     modifyEnv fun env => members.foldl (fun env member =>
       mutualFamilies.addEntry env (member, info)) env
 /-- Make sure a Move callee has its relational semantics `f.sourceSpec`,
@@ -2942,15 +5198,22 @@ private partial def ensureSourceSpec (functionName : Name) (ref : Syntax) :
 private partial def translate (function world : Syntax) (resources : Array ResourceBinding)
     (recursiveSpec? : Option (TSyntax `term) := none)
     (mutableParameters : Array (TSyntax `ident × TSyntax `term) := #[])
-    (recursiveSpecs : Array (Name × TSyntax `term) := #[]) :
+    (recursiveSpecs : Array (Name × TSyntax `term) := #[])
+    (mutationBoundary : Bool := false) :
     CommandElabM (TSyntax `term × TSyntax `term) := do
   let declaration ← declarationFor function
   let resultType ← actionResultType declaration
+  let declaredResult := declaredResultType declaration
+  let resultLeaves := resultLeaves declaredResult
+  if returnsMutableReferences declaration && !mutationBoundary then
+    throwErrorAt function
+      "automatic source specifications do not yet model a function returning a mutable reference"
+  if mutationBoundary && !returnsMutableReferences declaration then
+    throwErrorAt function
+      "internal error: mutation-level result generation requires a mutable-reference result"
   let body ← sourceBody declaration
   let functionName := (← getCurrNamespace) ++ function.getId
-  if mutableParameters.size > 2 then
-    throwErrorAt function
-      "automatic source specifications support at most two mutable-reference parameters"
+  let parameters := (← signatureOf functionName).arguments.toList.map (·.getId)
   let mutationTypes ← mutableParameters.mapM fun (_, referent) =>
     referentTypeName? referent
   let mutation? := mutableParameters[0]?.map (·.1)
@@ -2963,6 +5226,7 @@ private partial def translate (function world : Syntax) (resources : Array Resou
     world := ⟨world⟩
     resources
     functionName
+    parameters
     recursiveSpec?
     recursiveSpecs
     mutation?
@@ -2970,29 +5234,25 @@ private partial def translate (function world : Syntax) (resources : Array Resou
     mutationAncestors
     mutationRefs
     rootMutations := mutableParameters.map (·.1)
+    returnsMutation := mutationBoundary
+    resultLeaves
   } body
-  match mutableParameters.size with
-  | 0 => pure (spec, resultType)
-  | 1 =>
-      let (parameter, referent) := mutableParameters[0]!
-      let wrapped ← `(Move.Semantics.withMutation $parameter
-        (fun $parameter => $spec))
-      pure (wrapped, ← `($resultType × $referent))
-  | 2 =>
-      let (first, firstType) := mutableParameters[0]!
-      let (second, secondType) := mutableParameters[1]!
-      let wrapped ← `(Move.Semantics.withMutations2 $first $second
-        (fun $first $second => $spec))
-      pure (wrapped, ← `($resultType × ($firstType × $secondType)))
-  | _ => throwErrorAt function
-      "automatic source specifications support at most two mutable-reference parameters"
+  if mutationBoundary then
+    return (spec, ← liftMacroM <|
+      mutationResultType declaredResult resultType mutableParameters)
+  if mutableParameters.isEmpty then
+    pure (spec, resultType)
+  else
+    let wrapped ← withMutableParameters mutableParameters spec
+    pure (wrapped, ← liftMacroM <| sourceResultType resultType mutableParameters)
 
 /-- Translate against the abstract compositional resource-store interface. -/
 private partial def translateWithStores (function : Syntax) (world : TSyntax `ident)
     (families : Array Family)
     (recursiveSpec? : Option (TSyntax `term) := none)
     (mutableParameters : Array (TSyntax `ident × TSyntax `term) := #[])
-    (recursiveSpecs : Array (Name × TSyntax `term) := #[]) :
+    (recursiveSpecs : Array (Name × TSyntax `term) := #[])
+    (mutationBoundary : Bool := false) :
     CommandElabM (TSyntax `term × TSyntax `term) := do
   let mut resources : Array ResourceBinding := #[]
   for head in distinctHeads families do
@@ -3001,6 +5261,7 @@ private partial def translateWithStores (function : Syntax) (world : TSyntax `id
       descriptorFor := fun family => `(Move.Semantics.ResourceStore.descriptor
         (State := $world) (Value := $(family.term))) }
   translate function world.raw resources recursiveSpec? mutableParameters recursiveSpecs
+    mutationBoundary
 
 /-- A mutable borrow of a global resource at `key`, focused through `fields`
 — none for the whole resource.  The resource is checked out by ownership for
@@ -3017,9 +5278,23 @@ private partial def globalMutableBorrow (context : TranslationContext)
   let resourceName := family.head
   let referentType? ← pathTypeName? (some resourceName)
     (fields.toList.map (·.getId))
-  let nested ← translateDo
-    { context with mutation? := some name, mutationType? := referentType? }
+  let outer := liveMutations context
+  let delaysControlExit := loanBody.any fun element =>
+    containsLoanControlExit element.raw
+  let normalValue := mkIdentFrom name `_moveSpecLoanValue
+  let normal ← afterLoan context continuation ⟨normalValue.raw⟩
+  let loanExit := mkLoanExitFrame context #[] normalValue normal
+  let translateNested (deferContinuation : Bool) := translateDo
+    { context with
+        mutation? := some name, mutationType? := referentType?
+        mutationRefs := outer
+        loops := if deferContinuation then context.loops else []
+        loanScope? := some name
+        loanExits := if deferContinuation then loanExit :: context.loanExits else [] }
     loanBody
+  let deferContinuation := delaysControlExit || !context.loanExits.isEmpty ||
+    (← sourceMutatesAny (outer.map (·.getId)) loanBody)
+  let nested ← translateNested deferContinuation
   let owner := mkIdentFrom place `_moveSpecOwner
   let replacement := mkIdentFrom place `_moveSpecReplacement
   let ownerTerm : TSyntax `term := ⟨owner.raw⟩
@@ -3035,21 +5310,40 @@ private partial def globalMutableBorrow (context : TranslationContext)
         -- certified.
         let output := mkIdentFrom place `_moveSpecFocusOutput
         let rebuilt := mkIdentFrom place `_moveSpecRebuilt
-        `(Move.Semantics.Resource.withBorrowMutSpec $descriptor $key
-            (fun $owner =>
-              Move.Semantics.Spec.bind
+        let loan ← `(Move.Semantics.Spec.bind
                 (Move.Semantics.withMutation $focused (fun $name => $nested))
                 (fun $output =>
                   let $replacement := $output.2
                   Move.Semantics.Spec.bind $creation
                     (fun $rebuilt =>
-                      Move.Semantics.Spec.pure ($output.1, $rebuilt)))))
+                      Move.Semantics.Spec.pure ($output.1, $rebuilt))))
+        let guarded ← if fields.isEmpty then pure loan
+          else `(guardPath% $ownerTerm [$fields,*] $loan)
+        `(Move.Semantics.Resource.withBorrowMutSpec $descriptor $key
+            (fun $owner => $guarded))
     | none =>
-        let updated ← updatePath ownerTerm replacementTerm fields.toList
-        `(Move.Semantics.Resource.withBorrowMutFocusSpec $descriptor $key
-            (fun $owner => $focused)
-            (fun $owner $replacement => $updated)
-            (fun $name => $nested))
+        if ← pathCrossesEnum (some resourceName) (fields.toList.map (·.getId)) then
+          -- Enum payload selection is partial, so guard it and rebuild the
+          -- complete owner before restoring the resource.
+          let focus ← projectPath ownerTerm fields
+          let updated ← updatePath ownerTerm replacementTerm fields.toList
+          let output := mkIdentFrom place `_moveSpecFocusOutput
+          let loan ← `(Move.Semantics.Spec.bind
+            (Move.Semantics.withMutation $focus (fun $name => $nested))
+            (fun $output =>
+              let $replacement := $output.2
+              Move.Semantics.Spec.pure ($output.1, $updated)))
+          let guarded ← `(guardPath% $ownerTerm [$fields,*] $loan)
+          `(Move.Semantics.Resource.withBorrowMutSpec $descriptor $key
+              (fun $owner => $guarded))
+        else
+          let focus ← if fields.isEmpty then pure ownerTerm
+            else `(focusPath% $ownerTerm [$fields,*])
+          let updated ← updatePath ownerTerm replacementTerm fields.toList
+          `(Move.Semantics.Resource.withBorrowMutFocusSpec $descriptor $key
+              (fun $owner => $focus)
+              (fun $owner $replacement => $updated)
+              (fun $name => $nested))
   -- Global invariants re-certify the store at this write: an `update`
   -- invariant wraps the write (relating pre/post state); a regular
   -- invariant is asserted immediately after it.
@@ -3068,7 +5362,11 @@ private partial def globalMutableBorrow (context : TranslationContext)
         (Move.Semantics.Spec.certifyState $bodyId)
         (fun _moveSpecCertify => $tail))
     pure tail
-  if continuation.isEmpty then
+  if deferContinuation then
+    let tail ← assertGlobal (← `(_moveSpecBorrowResult))
+    `(Move.Semantics.Spec.bind $borrow
+      (fun _moveSpecBorrowResult => $tail))
+  else if continuation.isEmpty && context.loops.isEmpty then
     if regulars.isEmpty then pure borrow
     else
       let tail ← assertGlobal
@@ -3076,7 +5374,9 @@ private partial def globalMutableBorrow (context : TranslationContext)
       `(Move.Semantics.Spec.bind $borrow
           (fun _moveSpecBorrowResult => $tail))
   else
-    let after ← translateDo context continuation
+    -- Inside a loop, an empty continuation carries the iteration on.
+    let after ← if continuation.isEmpty then emptyFinish context
+      else translateDo context continuation
     let tail ← assertGlobal after
     `(Move.Semantics.Spec.bind $borrow (fun _moveSpecBorrowResult => $tail))
 
@@ -3090,10 +5390,11 @@ private partial def globalImmutableBorrow (context : TranslationContext)
   let descriptor ← resourceFor context.resources family
   let owner := mkIdentFrom place `_moveSpecOwner
   let ownerTerm : TSyntax `term := ⟨owner.raw⟩
-  let focused ← projectPath ownerTerm fields
+  let body ← if fields.isEmpty then `(let $name := $ownerTerm; $nested)
+    else `(bindSelectPath% $ownerTerm [$fields,*] $name => $nested)
   `(Move.Semantics.Spec.bind
       (Move.Semantics.Resource.borrowSpec $descriptor $key)
-      (fun $owner => let $name := $focused; $nested))
+      (fun $owner => $body))
 
 /-- A mutable borrow of an element of a local vector, or of the active vector
 mutation, focused through `fields` — none for the element itself.  The
@@ -3109,8 +5410,60 @@ private partial def elementMutableBorrow (context : TranslationContext)
   let (loanBody, continuation) ← mutableBorrowScope name.getId rest
   withHoisted context #[index] fun residuals => do
   let index := residuals[0]!
-  let nested ← translateDo
-    { context with mutation? := some name, mutationType? := none } loanBody
+  if context.returnsMutation && ownerIsMutation && continuation.isEmpty &&
+      isMutationResultComponent context name.getId loanBody then
+    let current ← `(Move.Semantics.Mutation.read $vector)
+    let element := mkIdentFrom place `_moveSpecReturnedElement
+    let elementTerm : TSyntax `term := ⟨element.raw⟩
+    let focused ← projectPath elementTerm fields
+    let transfer := mkIdentFrom place `_moveSpecReturnedElementFocus
+    let transferTerm : TSyntax `term := ⟨transfer.raw⟩
+    let loanNormal ← transferredLoanNormal context #[name]
+    let loanExit := mkTransferredLoanExitFrame context name loanNormal
+    let nested ← translateDo
+      { context with
+          mutation? := some name
+          mutationType? := none
+          mutationAncestors :=
+            (vector, context.mutationType?) :: context.mutationAncestors
+          mutationOwnerAliases :=
+            (vector.getId, name, none) :: context.mutationOwnerAliases
+          mutationRefs := context.mutation?.toList ++ context.mutationRefs
+          transferredReturns := context.transferredReturns.push name
+          loanExits := loanExit :: context.loanExits
+          loanScope? := some name }
+      loanBody
+    let updatedElement ← updatePath elementTerm (← `($transferTerm.2)) fields.toList
+    let updatedVector ← `(Move.Vector.set $current $index $updatedElement)
+    let updatedMutation ← `(Move.Semantics.Mutation.write $vector $updatedVector)
+    let reborrow ← `(Move.Semantics.Spec.bind
+      (Move.Semantics.reborrowMutation $focused)
+      (fun $transfer =>
+        let $name := $transferTerm.1
+        let $vector := $updatedMutation
+        $nested))
+    let reborrow ← if fields.isEmpty then pure reborrow
+      else `(guardPath% $elementTerm [$fields,*] $reborrow)
+    return ← `(Move.Semantics.Spec.bind
+      (Move.Semantics.Vector.borrowElemSpec $current $index)
+      (fun $element => $reborrow))
+  let outer := liveMutations context
+  let delaysControlExit := loanBody.any fun element =>
+    containsLoanControlExit element.raw
+  let normalValue := mkIdentFrom name `_moveSpecLoanValue
+  let normal ← afterLoan context continuation ⟨normalValue.raw⟩
+  let loanExit := mkLoanExitFrame context #[vector] normalValue normal
+  let translateNested (deferContinuation : Bool) := translateDo
+    { context with
+        mutation? := some name, mutationType? := none
+        mutationRefs := if ownerIsMutation then context.mutationRefs else outer
+        loops := if deferContinuation then context.loops else []
+        loanScope? := some name
+        loanExits := if deferContinuation then loanExit :: context.loanExits else [] }
+    loanBody
+  let deferContinuation := delaysControlExit || !context.loanExits.isEmpty ||
+    (← sourceMutatesAny (outer.map (·.getId)) loanBody)
+  let nested ← translateNested deferContinuation
   let body ← if fields.isEmpty then
       `(fun $name => $nested)
     else
@@ -3121,12 +5474,13 @@ private partial def elementMutableBorrow (context : TranslationContext)
       let fieldOutputTerm : TSyntax `term := ⟨fieldOutput.raw⟩
       let updated ← updatePath elementValue (← `($fieldOutputTerm.2)) fields.toList
       `(fun $element =>
-          Move.Semantics.Spec.bind
-            (Move.Semantics.withMutation $focused (fun $name => $nested))
-            (fun $fieldOutput =>
-              Move.Semantics.Spec.pure
-                ($fieldOutputTerm.1,
-                  Move.Semantics.Mutation.write $element $updated)))
+          guardPath% $elementValue [$fields,*]
+            (Move.Semantics.Spec.bind
+              (Move.Semantics.withMutation $focused (fun $name => $nested))
+              (fun $fieldOutput =>
+                Move.Semantics.Spec.pure
+                  ($fieldOutputTerm.1,
+                    Move.Semantics.Mutation.write $element $updated))))
   let output := mkIdentFrom place `_moveSpecVectorOutput
   let outputTerm : TSyntax `term := ⟨output.raw⟩
   if ownerIsMutation then
@@ -3134,20 +5488,26 @@ private partial def elementMutableBorrow (context : TranslationContext)
     -- and the updated vector is written back into it.
     let current ← `(Move.Semantics.Mutation.read $vector)
     let borrow ← `(Move.Semantics.Vector.withBorrowElemMutSpec $current $index $body)
-    let after ← if continuation.isEmpty then
-        finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
-      else
-        translateDo context continuation
+    let updated ← `(Move.Semantics.Mutation.write $vector $outputTerm.2)
+    let after ← if deferContinuation then
+      `($outputTerm.1 $vector)
+    else
+      afterLoan context continuation (← `($outputTerm.1))
     `(Move.Semantics.Spec.bind $borrow (fun $output =>
-        let $vector := Move.Semantics.Mutation.write $vector $outputTerm.2
+        let $vector := $updated
         $after))
   else
     let borrow ← `(Move.Semantics.Vector.withBorrowElemMutSpec $vector $index $body)
-    let after ← if continuation.isEmpty then
-        finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
-      else
-        let continuationSpec ← translateDo context continuation
-        `(let $vector := $outputTerm.2; $continuationSpec)
+    let after ← if deferContinuation then
+      `($outputTerm.1 $outputTerm.2)
+    else if continuation.isEmpty && context.loops.isEmpty then
+      finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
+    else
+      -- The owner is refreshed before the continuation -- or, inside a
+      -- loop, before the iteration carries it on.
+      let continuationSpec ← if continuation.isEmpty then emptyFinish context
+        else translateDo context continuation
+      `(let $vector := $outputTerm.2; $continuationSpec)
     `(Move.Semantics.Spec.bind $borrow (fun $output => $after))
 
 /-- The relational semantics of a call that passes the live mutable
@@ -3157,9 +5517,29 @@ private partial def mutableCallSpec? (context : TranslationContext)
     (term : TSyntax `term) :
     CommandElabM (Option (TSyntax `term × Array (TSyntax `ident))) := do
   match ← moveCallSpec? context term with
-  | some (call, mutations) =>
-      if mutations.isEmpty then return none
+  | some (call, mutations, returnsMutation) =>
+      if mutations.isEmpty || returnsMutation then return none
       return some (call, mutations)
+  | _ => return none
+
+private partial def returnedMutationCallSpec? (context : TranslationContext)
+    (term : TSyntax `term) :
+    CommandElabM (Option
+      (TSyntax `term × Array (TSyntax `ident) × Array ResultLeaf)) := do
+  match ← moveCallSpec? context term with
+  | some (call, mutations, true) =>
+      let (head, _) ← match term with
+        | `(continue $head:term $_arguments:term*) => pure (head, true)
+        | _ =>
+            let some (head, _) := application? term | return none
+            pure (head, false)
+      unless head.raw.isIdent do return none
+      let identifier : TSyntax `ident := ⟨head.raw⟩
+      let some functionName ← resolveMoveFunction? identifier | return none
+      let some declaration := (declarations.getState (← getEnv)).find? functionName
+        | return none
+      return some (call, mutations,
+        resultLeaves (declaredResultType declaration))
   | _ => return none
 
 private partial def writeMutableCallOutputs (mutations : Array (TSyntax `ident))
@@ -3190,6 +5570,210 @@ private partial def bindMutableCall
   let continuation ← writeMutableCallOutputs mutations outputTerm continuation
   match name? with
   | some _ | none => `(Move.Semantics.Spec.bind $call (fun $output => $continuation))
+
+/-- Bind a mutable reference returned by a call. All mutable actuals are
+unavailable for the result's live range, matching the bytecode verifier's
+signature-only call rule. Once the result resolves, the caller continues with
+the updated lender carriers supplied by the callee. -/
+private partial def bindReturnedMutationCall (context : TranslationContext)
+    (call : TSyntax `term) (mutations : Array (TSyntax `ident))
+    (name : TSyntax `ident) (rest : Array Lean.DoElem) :
+    CommandElabM (TSyntax `term) := do
+  let (loanBody, continuation) ← mutableBorrowScope name.getId rest
+  if context.returnsMutation then
+    unless continuation.isEmpty do
+      throwErrorAt name
+        "a forwarded mutable-reference result must remain live through the function return"
+    for mutation in mutations do
+      unless context.rootMutations.any (·.getId == mutation.getId) do
+        throwErrorAt mutation
+          "a forwarded mutable-reference result must derive directly from mutable-reference parameters"
+      if loanBody.any (containsIdentifier mutation.getId ·.raw) then
+        throwErrorAt name
+          "every mutable argument is unavailable while a returned mutable reference is live"
+    let callOutput := mkIdentFrom name `_moveSpecForwardedCallOutput
+    let callOutputTerm : TSyntax `term := ⟨callOutput.raw⟩
+    let poisoned (candidate : Name) := mutations.any (·.getId == candidate)
+    let remaining := (liveMutations context).filter fun mutation =>
+      !poisoned mutation.getId
+    let nested ← translateDo
+      { context with
+          mutation? := some name
+          mutationType? := none
+          mutationAncestors := context.mutationAncestors.filter fun (mutation, _) =>
+            !poisoned mutation.getId
+          mutationOwnerAliases := context.mutationOwnerAliases.filter
+            fun (_, mutation, _) => !poisoned mutation.getId
+          mutationRefs := remaining
+          transferredReturns := #[name]
+          loanScope? := some name }
+      loanBody
+    let mut nested := nested
+    nested ← `(let $name := $callOutputTerm.1; $nested)
+    for (mutation, index) in mutations.zipIdx.reverse do
+      let updated ← if mutations.size == 1 then
+        `($callOutputTerm.2)
+      else
+        liftMacroM <| argumentProjection (← `($callOutputTerm.2)) index mutations.size
+      nested ← `(let $mutation := $updated; $nested)
+    return ← `(Move.Semantics.Spec.bind $call (fun $callOutput => $nested))
+  for mutation in mutations do
+    if loanBody.any (containsIdentifier mutation.getId ·.raw) then
+      throwErrorAt name
+        "every mutable argument is unavailable while a returned mutable reference is live"
+  let poisoned (candidate : Name) :=
+    mutations.any (·.getId == candidate)
+  let remaining := (liveMutations context).filter fun mutation =>
+    !poisoned mutation.getId
+  let normalValue := mkIdentFrom name `_moveSpecLoanValue
+  let normal ← afterLoan context continuation ⟨normalValue.raw⟩
+  let loanExit := mkLoanExitFrame context mutations normalValue normal
+  let nested ← translateDo
+    { context with
+        mutation? := some name
+        mutationType? := none
+        mutationAncestors := context.mutationAncestors.filter fun (mutation, _) =>
+          !poisoned mutation.getId
+        mutationOwnerAliases := context.mutationOwnerAliases.filter
+          fun (_, mutation, _) => !poisoned mutation.getId
+        mutationRefs := remaining
+        loanScope? := some name
+        loanExits := loanExit :: context.loanExits }
+    loanBody
+  let callOutput := mkIdentFrom name `_moveSpecReturnedCallOutput
+  let callOutputTerm : TSyntax `term := ⟨callOutput.raw⟩
+  let scopeOutput := mkIdentFrom name `_moveSpecReturnedScopeOutput
+  let scopeOutputTerm : TSyntax `term := ⟨scopeOutput.raw⟩
+  let transferred ← `(Move.Semantics.withTransferredMutation $callOutput.1
+    (fun $name => $nested))
+  let mut selected : TSyntax `term := scopeOutputTerm
+  for (_, index) in mutations.zipIdx do
+    let updated ← if mutations.size == 1 then
+      `($callOutputTerm.2)
+    else
+      liftMacroM <| argumentProjection (← `($callOutputTerm.2))
+        index mutations.size
+    selected ← `($selected $updated)
+  `(Move.Semantics.Spec.bind $call (fun $callOutput =>
+    Move.Semantics.Spec.bind $transferred (fun $scopeOutput => $selected)))
+
+/-- Bind a flattened multiple return containing mutable-reference components.
+All returned mutations share one conservative live range; this keeps every
+possible lender suspended until all components have resolved. -/
+private partial def bindReturnedMutationPatternCall (context : TranslationContext)
+    (call : TSyntax `term) (mutations : Array (TSyntax `ident))
+    (leaves : Array ResultLeaf) (pattern : TSyntax `term)
+    (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
+  let components := flattenResultTerms pattern
+  unless components.size == leaves.size do
+    throwErrorAt pattern
+      "a multiple-return binding must match the flattened result shape"
+  let mut names : Array (Option (TSyntax `ident)) := #[]
+  let mut mutableNames : Array (TSyntax `ident) := #[]
+  for (leaf, index) in leaves.zipIdx do
+    let component := components[index]!
+    let authored? : Option (TSyntax `ident) :=
+      if component.raw.isIdent && !component.raw.getId.isAnonymous then
+        some ⟨component.raw⟩
+      else none
+    match leaf with
+    | .mutable _ =>
+        let name := authored?.getD <| mkIdentFrom component
+          (Name.mkSimple s!"_moveSpecDiscardedReturnedMutation{index}")
+        names := names.push (some name)
+        mutableNames := mutableNames.push name
+    | .value _ | .immutable _ => names := names.push authored?
+  let (loanBody, continuation) ← mutableResultScope mutableNames rest
+  if context.returnsMutation then
+    unless continuation.isEmpty do
+      throwErrorAt pattern
+        "forwarded mutable-reference results must remain live through the function return"
+    for mutation in mutations do
+      unless context.rootMutations.any (·.getId == mutation.getId) do
+        throwErrorAt mutation
+          "forwarded mutable-reference results must derive directly from mutable-reference parameters"
+      if loanBody.any (containsIdentifier mutation.getId ·.raw) then
+        throwErrorAt pattern
+          "every mutable argument is unavailable while returned mutable references are live"
+    let poisoned (candidate : Name) := mutations.any (·.getId == candidate)
+    let remaining := (liveMutations context).filter fun mutation =>
+      !poisoned mutation.getId
+    let firstMutation := mutableNames[0]!
+    let nested ← translateDo
+      { context with
+          mutation? := some firstMutation
+          mutationType? := none
+          mutationAncestors := context.mutationAncestors.filter fun (mutation, _) =>
+            !poisoned mutation.getId
+          mutationOwnerAliases := context.mutationOwnerAliases.filter
+            fun (_, mutation, _) => !poisoned mutation.getId
+          mutationRefs :=
+            (mutableNames.extract 1 mutableNames.size).toList ++ remaining
+          transferredReturns := mutableNames
+          loanScope? := some firstMutation }
+      loanBody
+    let callOutput := mkIdentFrom pattern `_moveSpecForwardedCallOutput
+    let callOutputTerm : TSyntax `term := ⟨callOutput.raw⟩
+    let mut body := nested
+    for (name?, index) in names.zipIdx.reverse do
+      if let some name := name? then
+        let component ← liftMacroM <|
+          argumentProjection (← `($callOutputTerm.1)) index leaves.size
+        body ← `(let $name := $component; $body)
+    for (mutation, index) in mutations.zipIdx.reverse do
+      let updated ← if mutations.size == 1 then
+        `($callOutputTerm.2)
+      else
+        liftMacroM <| argumentProjection (← `($callOutputTerm.2)) index mutations.size
+      body ← `(let $mutation := $updated; $body)
+    return ← `(Move.Semantics.Spec.bind $call (fun $callOutput => $body))
+  for mutation in mutations do
+    if loanBody.any (containsIdentifier mutation.getId ·.raw) then
+      throwErrorAt pattern
+        "every mutable argument is unavailable while returned mutable references are live"
+  let poisoned (candidate : Name) := mutations.any (·.getId == candidate)
+  let remaining := (liveMutations context).filter fun mutation =>
+    !poisoned mutation.getId
+  let firstMutation := mutableNames[0]!
+  let normalValue := mkIdentFrom pattern `_moveSpecLoanValue
+  let normal ← afterLoan context continuation ⟨normalValue.raw⟩
+  let loanExit := mkLoanExitFrame context mutations normalValue normal
+  let nested ← translateDo
+    { context with
+        mutation? := some firstMutation
+        mutationType? := none
+        mutationAncestors := context.mutationAncestors.filter fun (mutation, _) =>
+          !poisoned mutation.getId
+        mutationOwnerAliases := context.mutationOwnerAliases.filter
+          fun (_, mutation, _) => !poisoned mutation.getId
+        mutationRefs :=
+          (mutableNames.extract 1 mutableNames.size).toList ++ remaining
+        rootMutations := mutableNames
+        loanScope? := some firstMutation
+        loanExits := loanExit :: context.loanExits }
+    loanBody
+  let callOutput := mkIdentFrom pattern `_moveSpecReturnedCallOutput
+  let callOutputTerm : TSyntax `term := ⟨callOutput.raw⟩
+  let scopeOutput := mkIdentFrom pattern `_moveSpecReturnedScopeOutput
+  let scopeOutputTerm : TSyntax `term := ⟨scopeOutput.raw⟩
+  let mut after ← `($scopeOutputTerm.1)
+  for (_, index) in mutations.zipIdx do
+    let updated ← liftMacroM <|
+      argumentProjection (← `($callOutputTerm.2)) index mutations.size
+    after ← `($after $updated)
+  for index in (List.range mutableNames.size).reverse do
+    let finalMutation ← liftMacroM <|
+      argumentProjection (← `($scopeOutputTerm.2)) index mutableNames.size
+    after ← `(Move.Semantics.Spec.bind
+      (Move.Semantics.resolveMutation $finalMutation)
+      (fun _moveSpecResolved => $after))
+  let mut body ← `(Move.Semantics.Spec.bind $nested (fun $scopeOutput => $after))
+  for (name?, index) in names.zipIdx.reverse do
+    if let some name := name? then
+      let component ← liftMacroM <|
+        argumentProjection (← `($callOutputTerm.1)) index leaves.size
+      body ← `(let $name := $component; $body)
+  `(Move.Semantics.Spec.bind $call (fun $callOutput => $body))
 
 private partial def vectorMutationSpec (context : TranslationContext)
     (mutation : TSyntax `ident) (call : VectorMutationCall) :
@@ -3241,6 +5825,146 @@ private partial def vectorMutationSpec (context : TranslationContext)
       withHoisted context #[left, rot, right] fun args =>
         `(Move.Semantics.Vector.rotateSliceSpec $mutation $(args[0]!) $(args[1]!) $(args[2]!))
 
+/-- A `do`-level `match` through the live mutable reference `mutation`: the
+dispatch is on the current referent; an alternative's payload binders are
+loans of the selected variant's fields — prophecy mutations whose reconciled
+values rebuild the variant, written back when the alternative's statements
+end — and the statements after the match then continue with the reference,
+as in `matchSpec`.  A wildcard payload position is not loaned.  The reference
+itself stays readable inside an alternative but cannot be written while its
+payload is borrowed (Move's borrow rules). -/
+private partial def refMatchSpec (context : TranslationContext)
+    (mutation : TSyntax `ident) (alternatives : Array Syntax)
+    (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
+  let current ← `(Move.Semantics.Mutation.read $mutation)
+  let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
+  for alternative in alternatives do
+    let `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $body) := alternative
+      | throwErrorAt alternative
+          "unsupported `match` alternative in automatic source specification"
+    let patternList := patterns.getElems
+    unless patternList.size == 1 do
+      throwErrorAt alternative
+        "a `match` through a mutable reference takes one pattern per alternative"
+    let pattern := patternList[0]!
+    let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨body.raw⟩
+    let elements := Lean.Parser.Term.getDoElems body
+    let (head, binders) : Syntax × Array Syntax :=
+      if pattern.raw.isOfKind ``Lean.Parser.Term.app && pattern.raw.getNumArgs == 2 then
+        (pattern.raw[0], pattern.raw[1].getArgs)
+      else (pattern.raw, #[])
+    let loans : Array (TSyntax `ident) := binders.filterMap fun binder =>
+      if binder.isIdent then some ⟨binder⟩ else none
+    if loans.isEmpty then
+      -- No payload reference: the alternative is a plain continuation.
+      let armSpec ← translateDo context (elements ++ rest)
+      arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $pattern:term => $armSpec))
+    else
+      -- Every payload position is named, so the variant can be rebuilt.
+      let mut positions : Array (TSyntax `term) := #[]
+      for (binder, index) in binders.zipIdx do
+        if binder.isIdent then positions := positions.push ⟨binder⟩
+        else
+          let fresh : TSyntax `term :=
+            ⟨mkIdentFrom binder (Name.mkSimple s!"_moveSpecPayload{index}")⟩
+          positions := positions.push fresh
+      let headTerm : TSyntax `term := ⟨head⟩
+      let fullPattern ← `($headTerm $positions*)
+      if context.returnsMutation && rest.isEmpty then
+        let returnedLoans := loans.filter fun loan =>
+          isMutationResultComponent context loan.getId elements
+        if !returnedLoans.isEmpty then
+          let isReturned (loan : TSyntax `ident) :=
+            returnedLoans.any (·.getId == loan.getId)
+          let scopedLoans := loans.filter fun loan => !isReturned loan
+          let loanNormal ← transferredLoanNormal context loans
+          let loanExits := loans.reverse.toList.map fun loan =>
+            mkTransferredLoanExitFrame context loan loanNormal
+          let nested ← translateDo
+            { context with
+                mutation? := some loans[0]!
+                mutationType? := none
+                mutationAncestors :=
+                  (mutation, context.mutationType?) :: context.mutationAncestors
+                mutationRefs :=
+                  (loans.extract 1 loans.size).toList ++
+                    context.mutation?.toList ++ context.mutationRefs
+                transferredReturns :=
+                  context.transferredReturns ++ returnedLoans
+                resolveBeforeReturn :=
+                  context.resolveBeforeReturn ++ scopedLoans
+                loanExits := loanExits ++ context.loanExits
+                loanScope? := some loans[0]! }
+            elements
+          let mut transfers : Array (TSyntax `ident × TSyntax `ident) := #[]
+          for (loan, index) in loans.zipIdx do
+            let transfer := mkIdentFrom pattern
+              (Name.mkSimple s!"_moveSpecReturnedPayload{index}")
+            transfers := transfers.push (loan, transfer)
+          let mut rebuiltArguments : Array (TSyntax `term) := #[]
+          for position in positions do
+            let transfer? := transfers.find? fun (loan, _) =>
+              position.raw.isIdent && position.raw.getId == loan.getId
+            match transfer? with
+            | some (_, transfer) =>
+                let transferTerm : TSyntax `term := ⟨transfer.raw⟩
+                rebuiltArguments := rebuiltArguments.push (← `($transferTerm.2))
+            | none => rebuiltArguments := rebuiltArguments.push position
+          let rebuilt ← `($headTerm $rebuiltArguments*)
+          let updatedMutation ← `(Move.Semantics.Mutation.write $mutation $rebuilt)
+          let mut armSpec ← `(let $mutation := $updatedMutation; $nested)
+          for (loan, transfer) in transfers.reverse do
+            let transferTerm : TSyntax `term := ⟨transfer.raw⟩
+            armSpec ← `(Move.Semantics.Spec.bind
+              (Move.Semantics.reborrowMutation $loan)
+              (fun $transfer =>
+                let $loan := $transferTerm.1
+                $armSpec))
+          arms := arms.push
+            (← `(Lean.Parser.Term.matchAltExpr| | $fullPattern:term => $armSpec))
+          continue
+      let outer := liveMutations context
+      let delaysControlExit := elements.any fun element =>
+        containsLoanControlExit element.raw
+      let normalValue := mkIdentFrom pattern `_moveSpecLoanValue
+      let normal ← afterLoan context rest ⟨normalValue.raw⟩
+      let loanExit := mkLoanExitFrame context #[mutation] normalValue normal
+      let translateNested (deferContinuation : Bool) := translateDo
+        { context with
+            mutation? := some loans[0]!
+            mutationType? := none
+            mutationRefs := (loans.extract 1 loans.size).toList ++ outer
+            rootMutations := loans
+            loops := if deferContinuation then context.loops else []
+            loanScope? := some loans[0]!
+            loanExits := if deferContinuation then loanExit :: context.loanExits else [] }
+        elements
+      let deferContinuation := delaysControlExit || !context.loanExits.isEmpty ||
+        (← sourceMutatesAny (outer.map (·.getId)) elements)
+      let nested ← translateNested deferContinuation
+      let output := mkIdentFrom pattern `_moveSpecPayloadOutput
+      let outputTerm : TSyntax `term := ⟨output.raw⟩
+      let finalOf (loanIndex : Nat) : CommandElabM (TSyntax `term) := do
+        let finalOwners ← `($outputTerm.2)
+        liftMacroM <| argumentProjection finalOwners loanIndex loans.size
+      let mut rebuiltArguments : Array (TSyntax `term) := #[]
+      for position in positions do
+        match loans.findIdx? (·.getId == position.raw.getId) with
+        | some loanIndex => rebuiltArguments := rebuiltArguments.push (← finalOf loanIndex)
+        | none => rebuiltArguments := rebuiltArguments.push position
+      let rebuilt ← `($headTerm $rebuiltArguments*)
+      let borrow ← withInferredMutableValues loans nested
+      let after ← if deferContinuation then
+        `($outputTerm.1 $mutation)
+      else
+        afterLoan context rest (← `($outputTerm.1))
+      let armSpec ← `(Move.Semantics.Spec.bind $borrow (fun $output =>
+          let $mutation := Move.Semantics.Mutation.write $mutation $rebuilt
+          $after))
+      arms := arms.push
+        (← `(Lean.Parser.Term.matchAltExpr| | $fullPattern:term => $armSpec))
+  `(match $current:term with $arms:matchAlt*)
+
 /-- A `do`-level `match`: each arm continues with the statements after the
 match, as the then-branch of a statement `if` does. -/
 private partial def matchSpec (context : TranslationContext)
@@ -3263,6 +5987,60 @@ private partial def matchSpec (context : TranslationContext)
     else
       throwError "automatic source specifications support at most two match discriminants"
 
+/-- A mutable borrow of an owned local that is not a loaned owner: a loan of
+the local's value. The loan body returns its continuation as a closure, so the
+owner is reconciled before the continuation runs and writes to disjoint outer
+mutations are retained in the closure. -/
+private partial def ownedLocalMutableBorrow (context : TranslationContext)
+    (name : TSyntax `ident) (place : TSyntax `term) (rest : Array Lean.DoElem) :
+    CommandElabM (TSyntax `term) := do
+  let (loanBody, continuation) ← mutableBorrowScope name.getId rest
+  let localIdent : TSyntax `ident := ⟨place.raw⟩
+  let output := mkIdentFrom place `_moveSpecLocalOutput
+  let outputTerm : TSyntax `term := ⟨output.raw⟩
+  let outer := liveMutations context
+  let delaysControlExit := loanBody.any fun element =>
+    containsLoanControlExit element.raw
+  let normalValue := mkIdentFrom name `_moveSpecLoanValue
+  let normal ← afterLoan context continuation ⟨normalValue.raw⟩
+  let loanExit := mkLoanExitFrame context #[localIdent] normalValue normal
+  let translateNested (deferContinuation : Bool) := translateDo
+    { context with
+        mutation? := some name
+        mutationType? := none
+        mutationOwnerAliases :=
+          (localIdent.getId, name, none) :: context.mutationOwnerAliases
+        mutationRefs := outer
+        loops := if deferContinuation then context.loops else []
+        loanScope? := some name
+        loanExits := if deferContinuation then loanExit :: context.loanExits else [] }
+    loanBody
+  let deferContinuation := delaysControlExit || !context.loanExits.isEmpty ||
+    (← sourceMutatesAny (outer.map (·.getId)) loanBody)
+  let nested ← translateNested deferContinuation
+  let borrow ← `(Move.Semantics.withMutation $localIdent (fun $name => $nested))
+  let after ← if deferContinuation then
+    `($outputTerm.1 $outputTerm.2)
+  else
+    afterLoan context continuation (← `($outputTerm.1))
+  `(Move.Semantics.Spec.bind $borrow (fun $output =>
+      let $localIdent := $outputTerm.2
+      $after))
+
+/-- The code after a loan, translated outside it: the continuation; when
+there is none, the loan body's value ends the block -- or, inside a loop,
+the iteration. -/
+private partial def afterLoan (context : TranslationContext)
+    (continuation : Array Lean.DoElem) (value : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  if continuation.isEmpty then
+    if context.loops.isEmpty then
+      finish context (← `(Move.Semantics.Spec.pure $value))
+    else
+      emptyFinish context
+  else
+    translateDo context continuation
+
 private partial def translateDo (context : TranslationContext)
     (elements : Array Lean.DoElem) :
     CommandElabM (TSyntax `term) := do
@@ -3270,7 +6048,7 @@ private partial def translateDo (context : TranslationContext)
     if rest.isEmpty then emptyFinish context else translateDo context rest
   if elements.isEmpty then return ← emptyFinish context
   let first : Lean.DoElem := elements[0]!
-  let rest := elements.extract 1 elements.size
+  let mut rest := elements.extract 1 elements.size
   let kind := first.raw.getKind
   if kind == ``Move.moveNamedStructLet then
     let fields : TSyntaxArray `term := first.raw[3].getSepArgs.map (⟨·⟩)
@@ -3282,6 +6060,63 @@ private partial def translateDo (context : TranslationContext)
     let value : TSyntax `term := ⟨first.raw[6]⟩
     let expanded ← `(doElem| let ⟨$fields:term,*⟩ := $value)
     return ← translateDo context (#[expanded] ++ rest)
+  if kind == ``Move.moveSpecAssert then
+    match first with
+    | `(doElem| assert $clause:term) =>
+        let mut predicate ← inlineSpecPredicate context clause
+        -- Consecutive assertions observe the same state.  Combining them
+        -- avoids building a deeply nested chain of unit binds while retaining
+        -- the exact conjunction of their proof obligations.
+        let mut consumed := 0
+        let mut collecting := true
+        for next in rest do
+          if collecting && next.raw.getKind == ``Move.moveSpecAssert then
+            match next with
+            | `(doElem| assert $nextClause:term) =>
+                let nextPredicate ← inlineSpecPredicate context nextClause
+                let state := mkIdentFrom next `_moveSpecAssertState
+                predicate ← `(fun $state => $predicate $state ∧ $nextPredicate $state)
+                consumed := consumed + 1
+            | _ => throwErrorAt next "invalid in-body `assert`"
+          else
+            collecting := false
+        rest := rest.extract consumed rest.size
+        let nested ← translateRest rest
+        let ignored := mkIdentFrom first `_moveSpecAssert
+        return ← `(Move.Semantics.Spec.bind
+          (Move.Semantics.Spec.certifyState $predicate) (fun $ignored => $nested))
+    | _ => throwErrorAt first "invalid in-body `spec assert`"
+  if kind == ``Move.moveSpecAssume then
+    match first with
+    | `(doElem| assume $clause:term) =>
+        let predicate ← inlineSpecPredicate context clause
+        let nested ← translateRest rest
+        let ignored := mkIdentFrom first `_moveSpecAssume
+        return ← `(Move.Semantics.Spec.bind
+          (Move.Semantics.Spec.assumeState $predicate) (fun $ignored => $nested))
+    | _ => throwErrorAt first "invalid in-body `spec assume`"
+  if kind == ``Move.moveSpecCapture then
+    match first with
+    | `(doElem| __moveSpecCapture $label:num) =>
+        let some labelValue := label.raw.isNatLit?
+          | throwErrorAt label "expected a numeric state-anchor label"
+        let observed := rest.foldl (fun observed element =>
+          anchoredObservations labelValue element.raw observed) #[]
+        let mut saved : Array (StateAnchorCapture × TSyntax `term) := #[]
+        for (observedValue, index) in observed.zipIdx do
+          let snapshot := mkIdentFrom first
+            (Name.mkSimple s!"_moveSpecAnchor{labelValue}_{index}")
+          let value ← rewritePure (liveMutations context) ⟨observedValue⟩
+          saved := saved.push ({ label := labelValue, observed := observedValue, snapshot }, value)
+        let captures := saved.map (·.1)
+        let nested ← if rest.isEmpty then emptyFinish context else
+          translateDo ({ context with stateAnchors := captures.toList ++ context.stateAnchors }) rest
+        let mut nested := nested
+        for (savedCapture, value) in saved.reverse do
+          let snapshot := savedCapture.snapshot
+          nested ← `(let $snapshot:ident := $value; $nested)
+        return nested
+    | _ => throwErrorAt first "invalid compiler-generated `spec capture`"
   if kind == ``Move.moveForRange then
     let index : TSyntax `ident := ⟨first.raw[2]⟩
     let lower : TSyntax `term := ⟨first.raw[4]⟩
@@ -3329,14 +6164,16 @@ private partial def translateDo (context : TranslationContext)
     unless declaration.isOfKind ``Lean.Parser.Term.doIdDecl do
       throwErrorAt first "unsupported assignment in automatic source specification"
     let name : TSyntax `ident := ⟨declaration[0]⟩
-    let value : TSyntax `term := ⟨declaration[3]⟩
+    -- The right-hand side is a `doElem`; a plain expression is wrapped.
+    let rhs := declaration[3]
+    let value : TSyntax `term :=
+      if rhs.isOfKind ``Lean.Parser.Term.doExpr then ⟨rhs[0]⟩ else ⟨rhs⟩
     if (liveMutations context).any (·.getId == name.getId) then
       throwErrorAt first "a mutable reference cannot be rebound; write through it with `:=`"
-    if let some (call, mutations) ← mutableCallSpec? context value then
-      return ← bindMutableCall call mutations (some name) (← translateRest rest)
-    let valueSpec ← expressionSpec context value
-    let nested ← translateRest rest
-    return ← `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+    -- The same bind as `let x ← e` (reads, borrows, calls): translate it as
+    -- that `let`.
+    let bind ← `(doElem| let $name:ident ← $value:term)
+    return ← translateDo context (#[bind] ++ rest)
   if first.raw.isOfKind ``Lean.Parser.Term.doMatch then
     -- `match e, f with | p, q => …`. Motives/generalization remain Lean's
     -- own elaboration concern; source translation preserves ordinary arms.
@@ -3344,7 +6181,12 @@ private partial def translateDo (context : TranslationContext)
     let terms : Array (TSyntax `term) := discriminants.map fun discriminant =>
       ⟨discriminant[1]⟩
     let alternatives := first.raw[6][0].getArgs
+    if terms.size == 1 && terms[0]!.raw.isIdent &&
+        (liveMutations context).any (·.getId == terms[0]!.raw.getId) then
+      return ← refMatchSpec context ⟨terms[0]!.raw⟩ alternatives rest
     return ← matchSpec context terms alternatives rest
+  if first.raw.isOfKind ``Move.moveInvariant then
+    throwErrorAt first "`invariant` belongs at the head of a `loop` or `while` body"
   if first.raw.isOfKind ``Move.moveLoopDo ||
       first.raw.isOfKind ``Move.moveLoopLabeledDo then
     let sourceLabel? :=
@@ -3367,25 +6209,32 @@ private partial def translateDo (context : TranslationContext)
       !liveMutationNames.any fun mutation =>
         mutation.getString! == name.getId.getString!
     let state := freshLoopStateIdents first.raw assigned
-    let pack ← packLoopState assigned
+    let bodyElements := (Lean.Parser.Term.getDoElems body).map fun element =>
+      (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
+    let (invariants, bodyElements) := splitLoopInvariants bodyElements
+    -- The live mutable references the body mentions travel with the state
+    -- under their own names: a write through one inside the body is what
+    -- the next iteration sees (and what the code after the loop resumes
+    -- with).  One the body leaves alone keeps its value from the loop's entry.
+    let handles := (liveMutations context).filter fun handle =>
+      bodyElements.any fun element => containsIdentifier handle.getId element.raw
+    let pack ← packLoopState (assigned ++ handles)
     let recName := mkIdentFrom first `_moveSpecLoop
     let recTerm : TSyntax `term := ⟨recName.raw⟩
     let afterElements := rest.map fun element =>
       (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
     let after ← translateRest afterElements
-    let bodyElements := (Lean.Parser.Term.getDoElems body).map fun element =>
-      (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
     let frame : VerificationLoopFrame := {
-      sourceLabel?, recursive := recTerm, after, assigned, state }
+      sourceLabel?, recursive := recTerm, after
+      assigned := assigned ++ handles, state := state ++ handles }
     let bodySpec ← translateDo
       { context with
         loops := frame :: context.loops }
       bodyElements
     let stateName := mkIdentFrom first `_moveSpecLoopState
     let stateTerm : TSyntax `term := ⟨stateName.raw⟩
-    let unpacked ← unpackLoopState state stateTerm bodySpec
-    return ← `(Move.Semantics.Spec.fix
-        (fun $recName $stateName => $unpacked) $pack)
+    let unpacked ← unpackLoopState (state ++ handles) stateTerm bodySpec
+    return ← loopFixpoint context invariants (state ++ handles) recName stateName unpacked pack
   -- An unactivated mutable handle with no source use has no prophecy.  Erase
   -- it before the eager `withMutation` cases below.  In particular, creating
   -- overlapping handles and discarding all but one must not constrain the
@@ -3405,8 +6254,6 @@ private partial def translateDo (context : TranslationContext)
         -- An element of the active vector mutation.
         elementMutableBorrow context name first.raw vector index #[] rest
       else
-        unless context.mutation?.isNone do
-          throwErrorAt first "nested mutable borrows are not yet supported by source specification generation"
         elementMutableBorrow context name first.raw vector index #[] rest
   | `(doElem| let $name:ident ← & $vector:ident[$index:term]) =>
       if let some family ← familyOfTerm? vector then
@@ -3421,10 +6268,14 @@ private partial def translateDo (context : TranslationContext)
   | `(doElem| let $name:ident ← &mut $place:term) =>
       if let some (vector, index, fields) ←
           localVectorPlace? context.resources place then
-        if let some mutation := context.mutation? then
-          unless mutation.getId == vector.getId do
-            throwErrorAt first "nested mutable borrows are not yet supported by source specification generation"
         elementMutableBorrow context name first.raw vector index fields rest
+      else if let some (family, key, fields) ← globalPlace? place then
+        globalMutableBorrow context name first.raw family key fields rest
+      else if place.raw.isIdent && place.raw.getId.isAtomic &&
+          !(← hasResource context.resources ⟨place.raw⟩) &&
+          !isLoanedOwner context place.raw.getId then
+        -- A whole local (a dotted identifier is a field place).
+        ownedLocalMutableBorrow context name place rest
       else if let some parent := context.mutation? then
         let (loanBody, continuation) ← mutableBorrowScope name.getId rest
         let some (owner, fields) ← localPlace? context.resources place
@@ -3451,7 +6302,58 @@ private partial def translateDo (context : TranslationContext)
             "overlapping nested mutable borrows are not supported; sibling borrows must select distinct fields"
         let childType? ← pathTypeName? parentType?
           (fields.toList.map (·.getId))
-        let nested ← translateDo
+        if context.returnsMutation && continuation.isEmpty &&
+            isMutationResultComponent context name.getId loanBody then
+          let parentValue ← `(Move.Semantics.Mutation.read $parent)
+          let focused ← projectPath parentValue fields
+          let transfer := mkIdentFrom place `_moveSpecReturnedFocus
+          let transferTerm : TSyntax `term := ⟨transfer.raw⟩
+          let loanNormal ← transferredLoanNormal context #[name]
+          let loanExit := mkTransferredLoanExitFrame context name loanNormal
+          let nested ← translateDo
+            { context with
+                mutation? := some name
+                mutationType? := childType?
+                mutationAncestors := (parent, parentType?) :: context.mutationAncestors
+                mutationOwnerAliases :=
+                  (owner.getId, name, childType?) :: context.mutationOwnerAliases
+                mutationRefs := context.mutation?.toList ++ context.mutationRefs
+                transferredReturns := context.transferredReturns.push name
+                mutationLoans := (owner.getId, fieldNames) :: context.mutationLoans
+                loanExits := loanExit :: context.loanExits
+                loanScope? := some name }
+            loanBody
+          let certified? ← match parentType? with
+            | none => pure none
+            | some typeName =>
+                pure <| (Move.dataInvariant? (← getEnv) typeName).map (typeName, ·)
+          let body ← match ← rebuildOwner parentValue (← `($transferTerm.2))
+              fields.toList certified? with
+            | some creation =>
+                let rebuilt := mkIdentFrom place `_moveSpecReturnedOwner
+                let updatedParent ← `(Move.Semantics.Mutation.write $parent $rebuilt)
+                `(Move.Semantics.Spec.bind $creation (fun $rebuilt =>
+                    let $name := $transferTerm.1
+                    let $parent := $updatedParent
+                    $nested))
+            | none =>
+                let updated ← updatePath parentValue (← `($transferTerm.2)) fields.toList
+                let updatedParent ← `(Move.Semantics.Mutation.write $parent $updated)
+                `(let $name := $transferTerm.1
+                  let $parent := $updatedParent
+                  $nested)
+          let returned ← `(Move.Semantics.Spec.bind
+            (Move.Semantics.reborrowMutation $focused)
+            (fun $transfer => $body))
+          if fields.isEmpty then return returned
+          return ← `(guardPath% $parentValue [$fields,*] $returned)
+        let outer := liveMutations context
+        let delaysControlExit := loanBody.any fun element =>
+          containsLoanControlExit element.raw
+        let normalValue := mkIdentFrom name `_moveSpecLoanValue
+        let normal ← afterLoan context continuation ⟨normalValue.raw⟩
+        let loanExit := mkLoanExitFrame context #[parent] normalValue normal
+        let translateNested (deferContinuation : Bool) := translateDo
           { context with
               mutation? := some name
               mutationType? := childType?
@@ -3459,18 +6361,22 @@ private partial def translateDo (context : TranslationContext)
               mutationOwnerAliases :=
                 (owner.getId, name, childType?) :: context.mutationOwnerAliases
               mutationRefs := context.mutation?.toList ++ context.mutationRefs
-              mutationLoans := (owner.getId, fieldNames) :: context.mutationLoans }
+              mutationLoans := (owner.getId, fieldNames) :: context.mutationLoans
+              loops := if deferContinuation then context.loops else []
+              loanScope? := some name
+              loanExits := if deferContinuation then loanExit :: context.loanExits else [] }
           loanBody
+        let deferContinuation := delaysControlExit || !context.loanExits.isEmpty ||
+          (← sourceMutatesAny (outer.map (·.getId)) loanBody)
+        let nested ← translateNested deferContinuation
         let parentValue ← `(Move.Semantics.Mutation.read $parent)
         let focused ← projectPath parentValue fields
         let output := mkIdentFrom place `_moveSpecFieldOutput
         let outputTerm : TSyntax `term := ⟨output.raw⟩
         let finalField ← `($outputTerm.2)
-        let borrow ← `(Move.Semantics.withMutation $focused (fun $name => $nested))
-        let after ← if continuation.isEmpty then
-          finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
-        else
-          translateDo context continuation
+        let loan ← `(Move.Semantics.withMutation $focused (fun $name => $nested))
+        let borrow ← if fields.isEmpty then pure loan
+          else `(guardPath% $parentValue [$fields,*] $loan)
         -- Re-creating a certified owner is a creation site: its data
         -- invariant is owed here, when the loan dies, and nowhere else.
         let certified? ← match parentType? with
@@ -3480,39 +6386,23 @@ private partial def translateDo (context : TranslationContext)
         match ← rebuildOwner parentValue finalField fields.toList certified? with
         | some creation =>
             let rebuilt := mkIdentFrom place `_moveSpecRebuilt
+            let resumed ← if deferContinuation then
+              `($outputTerm.1 $parent)
+            else
+              afterLoan context continuation (← `($outputTerm.1))
             `(Move.Semantics.Spec.bind $borrow (fun $output =>
                 Move.Semantics.Spec.bind $creation (fun $rebuilt =>
                   let $parent := Move.Semantics.Mutation.write $parent $rebuilt
-                  $after)))
+                  $resumed)))
         | none =>
             let updated ← updatePath parentValue finalField fields.toList
+            let resumed ← if deferContinuation then
+              `($outputTerm.1 $parent)
+            else
+              afterLoan context continuation (← `($outputTerm.1))
             `(Move.Semantics.Spec.bind $borrow (fun $output =>
                 let $parent := Move.Semantics.Mutation.write $parent $updated
-                $after))
-      else if place.raw.isIdent && !(← hasResource context.resources ⟨place.raw⟩) then
-        let (loanBody, continuation) ← mutableBorrowScope name.getId rest
-        let localIdent : TSyntax `ident := ⟨place.raw⟩
-        -- Keep values produced in the loan body in lexical scope, but refresh
-        -- the owner from the prophecy before translating code after the
-        -- reference's last use.  Such code observes the reconciled value under
-        -- Move's non-lexical borrow semantics.
-        let scopedRest ← if continuation.isEmpty then
-          pure rest
-        else do
-          let refresh ← `(doElem|
-            let $localIdent := Move.Semantics.Mutation.read $name)
-          pure (loanBody ++ #[refresh] ++ continuation)
-        let nested ← translateDo
-          { context with
-              mutation? := some name
-              mutationType? := none
-              mutationOwnerAliases :=
-                (localIdent.getId, name, none) :: context.mutationOwnerAliases }
-          scopedRest
-        let borrow ← `(Move.Semantics.withMutation $localIdent (fun $name => $nested))
-        let output := mkIdentFrom place `_moveSpecLocalOutput
-        `(Move.Semantics.Spec.bind $borrow
-            (fun $output => Move.Semantics.Spec.pure $output.1))
+                $resumed))
       else
         let (family, key, fields) ← globalPlace place
         globalMutableBorrow context name first.raw family key fields rest
@@ -3524,24 +6414,35 @@ private partial def translateDo (context : TranslationContext)
           let owner ← mutationValue context vector
           let element := mkIdentFrom place `_moveSpecVectorElement
           let elementTerm : TSyntax `term := ⟨element.raw⟩
-          let focused ← projectPath elementTerm fields
+          let body ← if fields.isEmpty then `(let $name := $elementTerm; $nested)
+            else `(bindSelectPath% $elementTerm [$fields,*] $name => $nested)
           `(Move.Semantics.Spec.bind
               (Move.Semantics.Vector.borrowElemSpec $owner $(residuals[0]!))
-              (fun $element => let $name := $focused; $nested))
+              (fun $element => $body))
       else if let some (owner, fields) ←
           localPlace? context.resources place then
         let nested ← translateRest rest
         let ownerTerm ← mutationValue context owner
-        let focused ← projectPath ownerTerm fields
-        `(let $name := $focused; $nested)
+        if fields.isEmpty then `(let $name := $ownerTerm; $nested)
+        else `(bindSelectPath% $ownerTerm [$fields,*] $name => $nested)
       else
         let (family, key, fields) ← globalPlace place
         globalImmutableBorrow context name first.raw family key fields rest
   | `(doElem| let $name:ident ← * $reference:term) =>
       let nested ← translateRest rest
       `(let $name := $(← dereferenceValue context reference); $nested)
+  | `(doElem| let _ ← $value:term) =>
+      -- A discarded result is a bind to a fresh name.
+      let name := mkIdentFrom first `_moveSpecDiscarded
+      let bind ← `(doElem| let $name:ident ← $value:term)
+      translateDo context (#[bind] ++ rest)
   | `(doElem| let $name:ident ← $value:term) =>
-      if let some (call, mutations) ← mutableCallSpec? context value then
+      if let some (call, mutations, leaves) ← returnedMutationCallSpec? context value then
+        if leaves.size == 1 then
+          bindReturnedMutationCall context call mutations name rest
+        else
+          throwErrorAt name "a reference-containing multiple return must be destructured at its call site"
+      else if let some (call, mutations) ← mutableCallSpec? context value then
         bindMutableCall call mutations (some name) (← translateRest rest)
       else if let some call ← vectorMutationCall? value then
         let some mutation := context.mutation?
@@ -3603,7 +6504,12 @@ private partial def translateDo (context : TranslationContext)
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
   | `(doElem| let $name:ident : $type:term ← $value:term) =>
-      if let some (call, mutations) ← mutableCallSpec? context value then
+      if let some (call, mutations, leaves) ← returnedMutationCallSpec? context value then
+        if leaves.size == 1 then
+          bindReturnedMutationCall context call mutations name rest
+        else
+          throwErrorAt name "a reference-containing multiple return must be destructured at its call site"
+      else if let some (call, mutations) ← mutableCallSpec? context value then
         bindMutableCall call mutations (some name) (← translateRest rest)
       else
         let valueSpec ← expressionSpec context value
@@ -3618,7 +6524,12 @@ private partial def translateDo (context : TranslationContext)
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
   | `(doElem| let mut $name:ident : $type:term ← $value:term) =>
-      if let some (call, mutations) ← mutableCallSpec? context value then
+      if let some (call, mutations, leaves) ← returnedMutationCallSpec? context value then
+        if leaves.size == 1 then
+          bindReturnedMutationCall context call mutations name rest
+        else
+          throwErrorAt name "a reference-containing multiple return must be destructured at its call site"
+      else if let some (call, mutations) ← mutableCallSpec? context value then
         bindMutableCall call mutations (some name) (← translateRest rest)
       else
         let valueSpec ← expressionSpec context value
@@ -3628,7 +6539,12 @@ private partial def translateDo (context : TranslationContext)
       let nested ← translateRest rest
       `(let $name := $(← dereferenceValue context reference); $nested)
   | `(doElem| let mut $name:ident ← $value:term) =>
-      if let some (call, mutations) ← mutableCallSpec? context value then
+      if let some (call, mutations, leaves) ← returnedMutationCallSpec? context value then
+        if leaves.size == 1 then
+          bindReturnedMutationCall context call mutations name rest
+        else
+          throwErrorAt name "a reference-containing multiple return must be destructured at its call site"
+      else if let some (call, mutations) ← mutableCallSpec? context value then
         bindMutableCall call mutations (some name) (← translateRest rest)
       else
         let valueSpec ← expressionSpec context value
@@ -3642,17 +6558,26 @@ private partial def translateDo (context : TranslationContext)
       let matched ← `(match $packedTerm:term with | $pattern:term => $nested)
       `(Move.Semantics.Spec.bind $valueSpec (fun $packed => $matched))
   | `(doElem| let $pattern:term ← $value:term) =>
-      let valueSpec ← expressionSpec context value
-      let nested ← translateRest rest
-      let packed := mkIdentFrom pattern `_moveSpecTuple
-      let packedTerm : TSyntax `term := ⟨packed.raw⟩
-      let matched ← `(match $packedTerm:term with | $pattern:term => $nested)
-      `(Move.Semantics.Spec.bind $valueSpec (fun $packed => $matched))
+      if let some (call, mutations, leaves) ← returnedMutationCallSpec? context value then
+        bindReturnedMutationPatternCall context call mutations leaves pattern rest
+      else
+        let valueSpec ← expressionSpec context value
+        let nested ← translateRest rest
+        let packed := mkIdentFrom pattern `_moveSpecTuple
+        let packedTerm : TSyntax `term := ⟨packed.raw⟩
+        let matched ← `(match $packedTerm:term with | $pattern:term => $nested)
+        `(Move.Semantics.Spec.bind $valueSpec (fun $packed => $matched))
   | `(doElem| return $value:term) =>
       -- `return` ends the function: inside a loop too, since the loop's
       -- fixed point already produces the function's result (its `break`
       -- continuation is the rest of the function).
-      translateTerm context value
+      if forwardsTransferredMutationResult context value then
+        translateTerm context value
+      else if !context.loanExits.isEmpty then
+        let action ← translateTerm (resumeAfterAllLoans context) value
+        finishLoanExits context (fun _ => true) action
+      else
+        translateTerm context value
   | `(doElem| break@$sourceLabel:ident) =>
       loopBreakSpec context (some sourceLabel.getId) first.raw
   | `(doElem| continue@$sourceLabel:ident) =>
@@ -3673,20 +6598,26 @@ private partial def translateDo (context : TranslationContext)
           mutation.getString! == name.getId.getString!
       let state := freshLoopStateIdents first.raw assigned
       let condition : TSyntax `term := ⟨replaceLoopState assigned state condition.raw⟩
-      let pack ← packLoopState assigned
+      let bodyElements := (Lean.Parser.Term.getDoElems body).map fun element =>
+        (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
+      -- Invariants at the head of a `while` body hold before the condition.
+      let (invariants, bodyElements) := splitLoopInvariants bodyElements
+      -- The live mutable references the body mentions travel with the state
+      -- (see `loop`).
+      let handles := (liveMutations context).filter fun handle =>
+        bodyElements.any fun element => containsIdentifier handle.getId element.raw
+      let pack ← packLoopState (assigned ++ handles)
       let recName := mkIdentFrom first `_moveSpecLoop
       let recTerm : TSyntax `term := ⟨recName.raw⟩
       let afterElements := rest.map fun element =>
         (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
       let after ← translateRest afterElements
-      let bodyElements := (Lean.Parser.Term.getDoElems body).map fun element =>
-        (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
       let frame : VerificationLoopFrame := {
         sourceLabel? := none
         recursive := recTerm
         after
-        assigned
-        state }
+        assigned := assigned ++ handles
+        state := state ++ handles }
       let bodySpec ← translateDo
         { context with loops := frame :: context.loops }
         bodyElements
@@ -3697,9 +6628,8 @@ private partial def translateDo (context : TranslationContext)
         | none => `(if $(residuals[0]!) then $bodySpec else $after)
       let stateName := mkIdentFrom first `_moveSpecLoopState
       let stateTerm : TSyntax `term := ⟨stateName.raw⟩
-      let unpacked ← unpackLoopState state stateTerm step
-      `(Move.Semantics.Spec.fix
-          (fun $recName $stateName => $unpacked) $pack)
+      let unpacked ← unpackLoopState (state ++ handles) stateTerm step
+      loopFixpoint context invariants (state ++ handles) recName stateName unpacked pack
   | `(doElem| if $condition:doIfCond then $thenBranch:doSeq) =>
       conditionalSpec context condition
         (Lean.Parser.Term.getDoElems thenBranch ++ rest) rest
@@ -3708,6 +6638,41 @@ private partial def translateDo (context : TranslationContext)
       conditionalSpec context condition
         (Lean.Parser.Term.getDoElems thenBranch ++ rest)
         (Lean.Parser.Term.getDoElems elseBranch ++ rest)
+  | `(doElem| if $condition:doIfCond then $thenBranch:doSeq $[else if $conditions:doIfCond then $branches:doSeq]* else $elseBranch:doSeq) =>
+      -- An `else if` chain is nested conditionals.
+      let mut elseSeq := elseBranch
+      for (c, b) in (conditions.zip branches).reverse do
+        let nested ← `(doElem| if $c:doIfCond then $b:doSeq else $elseSeq:doSeq)
+        elseSeq := ⟨mkNode ``Lean.Parser.Term.doSeqIndent #[mkNullNode #[mkNullNode #[nested.raw, mkNullNode]]]⟩
+      let rebuilt ← `(doElem| if $condition:doIfCond then $thenBranch:doSeq else $elseSeq:doSeq)
+      translateDo context (#[rebuilt] ++ rest)
+  | `(doElem| let $name:ident ← if $condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) =>
+      -- The value of each branch binds the name; the rest follows in both.
+      -- A branch ending in another conditional binds the name in each of
+      -- its branches in turn.
+      let rec bindLast (branch : TSyntax ``Lean.Parser.Term.doSeq) :
+          CommandElabM (Array Lean.DoElem) := do
+        let elems := Lean.Parser.Term.getDoElems branch
+        let some last := elems.back? | throwErrorAt branch "empty conditional branch"
+        match last with
+        | `(doElem| if $innerCondition:doIfCond then $innerThen:doSeq else $innerElse:doSeq) =>
+            let innerThen' ← bindLast innerThen
+            let innerElse' ← bindLast innerElse
+            let thenSeq : TSyntax ``Lean.Parser.Term.doSeq := ⟨mkNode ``Lean.Parser.Term.doSeqIndent
+              #[mkNullNode (innerThen'.map fun e => mkNullNode #[e.raw, mkNullNode])]⟩
+            let elseSeq : TSyntax ``Lean.Parser.Term.doSeq := ⟨mkNode ``Lean.Parser.Term.doSeqIndent
+              #[mkNullNode (innerElse'.map fun e => mkNullNode #[e.raw, mkNullNode])]⟩
+            let rebuilt ← `(doElem| if $innerCondition:doIfCond then $thenSeq:doSeq else $elseSeq:doSeq)
+            pure (elems.pop.push rebuilt)
+        | _ =>
+            unless last.raw.isOfKind ``Lean.Parser.Term.doExpr do
+              throwErrorAt last "a conditional bound to a name must end each branch in its value"
+            let value : TSyntax `term := ⟨last.raw[0]⟩
+            let bind ← `(doElem| let $name:ident ← $value:term)
+            pure (elems.pop.push bind)
+      conditionalSpec context condition
+        ((← bindLast thenBranch) ++ rest)
+        ((← bindLast elseBranch) ++ rest)
   | `(doElem| $value:term) =>
       if value.raw.isOfKind ``Lean.Parser.Term.do then
         let effect ← translateTerm { context with mutation? := none, mutationType? := none } value
@@ -3770,11 +6735,13 @@ private partial def translateDo (context : TranslationContext)
       else if value.raw.isOfKind ``Move.abortTerm then
         -- Abort is terminal, so this branch never executes its syntactic rest.
         translateTerm context value
-      else
-        unless rest.isEmpty do
-          throwErrorAt first
-            "unsupported effectful statement in automatic source specification: {first.raw}"
+      else if rest.isEmpty then
         translateTerm context value
+      else
+        -- An effectful statement followed by more: its result is discarded.
+        let effect ← translateTerm context value
+        let nested ← translateRest rest
+        `(Move.Semantics.Spec.bind $effect (fun _moveSpecIgnored => $nested))
   | _ => throwErrorAt first
       "unsupported `do` statement in automatic source specification: {first.raw}"
 
@@ -3812,8 +6779,93 @@ private partial def conditionalSpec (context : TranslationContext)
     | some binder => `(if $binder:ident : $condition then $thenSpec else $elseSpec)
     | none => `(if $condition then $thenSpec else $elseSpec)
 
+/-- Translate a multiple-return value containing mutable references. Mutable
+components are transferred left-to-right, threading the updated lender tuple;
+ordinary and immutable-reference components retain their value semantics. -/
+private partial def finishMutationResult (context : TranslationContext)
+    (value : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let values := flattenResultTerms value
+  unless values.size == context.resultLeaves.size do
+    throwErrorAt value
+      "a reference-containing result must have the same flattened tuple shape as its declared type"
+  let initialRoots := context.rootMutations.map fun root =>
+    (⟨root.raw⟩ : TSyntax `term)
+  let rec go (index : Nat) (roots results : Array (TSyntax `term)) :
+      CommandElabM (TSyntax `term) := do
+    if index == context.resultLeaves.size then
+      let packedResult ← packCallArguments value.raw results
+      let packedRoots ← packCallArguments value.raw roots
+      return ← resolveMutationReturns context
+        (← `(Move.Semantics.Spec.pure ($packedResult, $packedRoots)))
+    let leaf := context.resultLeaves[index]!
+    let component := values[index]!
+    match leaf with
+    | .mutable _ =>
+        unless component.raw.isIdent do
+          throwErrorAt component
+            "a mutable-reference result component must be a live reference local"
+        if context.transferredReturns.any (·.getId == component.raw.getId) then
+          return ← go (index + 1) roots (results.push component)
+        let some rootIndex := context.rootMutations.findIdx?
+            (·.getId == component.raw.getId) | throwErrorAt component
+          "a mutable-reference result component must derive from a live mutable-reference parameter"
+        let output := mkIdentFrom component
+          (Name.mkSimple s!"_moveSpecTransferredMutation{index}")
+        let outputTerm : TSyntax `term := ⟨output.raw⟩
+        let nextRoots := roots.set! rootIndex (← `($outputTerm.2))
+        let tail ← go (index + 1) nextRoots (results.push (← `($outputTerm.1)))
+        `(Move.Semantics.Spec.bind
+            (Move.Semantics.transferMutation $(roots[rootIndex]!))
+            (fun $output => $tail))
+    | .value _ | .immutable _ =>
+        let output := mkIdentFrom component
+          (Name.mkSimple s!"_moveSpecResultComponent{index}")
+        let tail ← go (index + 1) roots (results.push ⟨output.raw⟩)
+        `(Move.Semantics.Spec.bind $(← expressionSpec context component)
+            (fun $output => $tail))
+  go 0 initialRoots #[]
+
 private partial def translateTerm (context : TranslationContext)
     (term : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  if context.returnsMutation then
+    match term with
+    | `(($inner:term)) => return ← translateTerm context inner
+    | `(pure $value:term) =>
+        if context.resultLeaves.size == 1 && value.raw.isIdent then
+          return ← finishMutationReturn context ⟨value.raw⟩
+        if context.resultLeaves.size > 1 then
+          return ← finishMutationResult context value
+    | _ =>
+        if context.resultLeaves.size == 1 && term.raw.isIdent then
+          return ← finishMutationReturn context ⟨term.raw⟩
+        if let some (call, mutations, true) ← moveCallSpec? context term then
+          -- A reference-returning tail call is already in mutation form.
+          -- Forward its returned loan unchanged and splice the callee's
+          -- updated lender carriers back into this function's complete root
+          -- tuple. This is the expression-form equivalent of
+          -- `let returned ← call; pure returned`.
+          for mutation in mutations do
+            unless context.rootMutations.any (·.getId == mutation.getId) do
+              throwErrorAt mutation
+                "a forwarded mutable-reference result must derive directly from mutable-reference parameters"
+          let output := mkIdentFrom term `_moveSpecTailCallOutput
+          let outputTerm : TSyntax `term := ⟨output.raw⟩
+          let mut roots : Array (TSyntax `term) := #[]
+          for root in context.rootMutations do
+            if let some mutationIndex := mutations.findIdx?
+                (·.getId == root.getId) then
+              let updated ← if mutations.size == 1 then
+                `($outputTerm.2)
+              else
+                liftMacroM <| argumentProjection (← `($outputTerm.2))
+                  mutationIndex mutations.size
+              roots := roots.push updated
+            else
+              roots := roots.push ⟨root.raw⟩
+          let packedRoots ← packCallArguments term.raw roots
+          return ← resolveMutationReturns context
+            (← `(Move.Semantics.Spec.bind $call (fun $output =>
+              Move.Semantics.Spec.pure ($outputTerm.1, $packedRoots))))
   match term with
   | `(do $sequence:doSeq) =>
       translateDo context (Lean.Parser.Term.getDoElems sequence)
@@ -3872,73 +6924,6 @@ private partial def plainCondition (condition : TSyntax ``Lean.Parser.Term.doIfC
 end
 
 
-/-- Whether a family's head is in scope: every instantiation of a head the
-function touches has its store in scope. -/
-private def knownResource (resources : Array Family) (candidate : Family) : Bool :=
-  resources.any (·.head == candidate.head)
-
-/-- Add the concrete families a specification clause names (`existsAt<R>(…)`,
-global places `R[…]`, `modifies` targets) whose heads are in scope, so that
-frames mention them: a caller reaching a generic family only through a callee
-names the instantiation in its clauses. -/
-partial def addMentionedFamilies (clause : Syntax) (resources : Array Family) :
-    CommandElabM (Array Family) := do
-  let mut resources := resources
-  let candidate? ←
-    if clause.isOfKind ``Move.Spec.resourceExistsTerm then
-      familyOfTerm? clause[1]
-    else if clause.getKind == `«term__[_]» then
-      pure ((← rootFamily? ⟨clause⟩).map (·.1))
-    else if clause.isOfKind `Move.Spec.modifiesAddress ||
-        clause.isOfKind `Move.Spec.modifiesFamily then
-      familyOfTerm? clause[0]
-    else if clause.isOfKind `Move.Spec.modifiesGenericAddress ||
-        clause.isOfKind `Move.Spec.modifiesGenericFamily then
-      familyOfTerm? clause[1]
-    else
-      pure none
-  if let some candidate := candidate? then
-    if knownResource resources candidate then
-      resources := pushResource resources candidate
-  for child in clause.getArgs do
-    resources ← addMentionedFamilies child resources
-  return resources
-
-private def rewriteGlobalPlace (resources : Array Family)
-    (state place : TSyntax `term) : CommandElabM (Option (TSyntax `term)) := do
-  let (root, fields) := splitFieldPath place
-  let some (family, key) ← rootFamily? root | return none
-  unless knownResource resources family do return none
-  let owner ← `(Move.Semantics.ResourceStore.get
-    (Value := $(family.term)) $state $key)
-  return some (← projectPath owner fields)
-
-/-- Rewrite global-place observations in a contract clause. Bare places refer
-to `current`; `old(place)` refers to `previous`. -/
-partial def rewriteClause (resources : Array Family)
-    (current previous : TSyntax `term) (clause : TSyntax `term) :
-    CommandElabM (TSyntax `term) := do
-  match clause with
-  | `(old($place:term)) =>
-      let some rewritten ← rewriteGlobalPlace resources previous place
-        | throwErrorAt place "`old` expects a global resource place"
-      pure rewritten
-  | `(existsAt<$resourceType:term>($address:term)) =>
-      let some family ← familyOfTerm? resourceType.raw
-        | throwErrorAt resourceType "`existsAt<…>` expects a resource type"
-      unless knownResource resources family do
-        throwErrorAt resourceType
-          "resource `{resourceType}` is not used by the specified function"
-      `(Move.Semantics.ResourceStore.contains
-        (Value := $(family.term)) $current $address)
-  | _ =>
-      if let some rewritten ← rewriteGlobalPlace resources current clause then
-        return rewritten
-      let args ← clause.raw.getArgs.mapM fun child => do
-        let rewritten ← rewriteClause resources current previous ⟨child⟩
-        pure rewritten.raw
-      pure ⟨clause.raw.setArgs args⟩
-
 end Move.Verify.Source
 
 namespace Move.Spec
@@ -3957,6 +6942,7 @@ private def isRecursiveSourceSpec (env : Environment) (name : Name) : Bool :=
       | some value =>
           let constants := value.getUsedConstants
           constants.contains ``Move.Semantics.Spec.fix ||
+            constants.contains ``Move.Semantics.Spec.withInvariant ||
             constants.contains ``Move.Semantics.Spec.fixFamily
       | none => false
     | none => false
@@ -4009,9 +6995,6 @@ private def unpackSpecParameters
         if let some referent := mutableReferent? type then
           logicalType := referent
           mutableParameters := mutableParameters.push (argument, referent)
-          if mutableParameters.size > 2 then
-            Macro.throwErrorAt binder
-              "source contracts support at most two mutable-reference parameters"
         result := { result with
           arguments := result.arguments.push argument
           types := result.types.push logicalType
@@ -4125,7 +7108,12 @@ private def frameCondition (resourceTypes : Array Move.Verify.Source.Family)
   let some clause := clause?
     | return some (← `($final = $initial))
   let mut targets : Array (String × Array (TSyntax `term)) := #[]
+  -- `*`: the families the clause does not list are unconstrained.
+  let mut loose := false
   for target in clause[1].getSepArgs do
+    if target.isOfKind `Move.Spec.modifiesAny then
+      loose := true
+      continue
     let (typeStx, address?) : Syntax × Option (TSyntax `term) :=
       -- The target kinds are declared below, with the `spec` syntax.
       if target.isOfKind `Move.Spec.modifiesAddress then (target[0], some ⟨target[2]⟩)
@@ -4151,6 +7139,9 @@ private def frameCondition (resourceTypes : Array Move.Verify.Source.Family)
     if let some addresses := addresses? then
       if addresses.isEmpty then
         continue
+    else if loose then
+      -- Not listed, and the frame is loose: unconstrained.
+      continue
     let resourceType := family.term
     let address := mkIdentFrom resourceType `_moveSpecAddress
     let addressTerm : TSyntax `term := ⟨address.raw⟩
@@ -4181,6 +7172,14 @@ private def mayAbortLambdaFor (arguments : Array (TSyntax `ident))
       `(fun _moveSpecArgs _moveSpecInitial =>
           ∃ _moveSpecAbortCode,
             $abortsLambda _moveSpecArgs _moveSpecInitial _moveSpecAbortCode)
+
+/-- Where a contract requires an abort: a written `must_abort` component, or
+`False` (no declared condition is sufficient). -/
+private def mustAbortLambdaFor (arguments : Array (TSyntax `ident))
+    (initial : TSyntax `ident) (written? : Option (TSyntax `term)) : MacroM (TSyntax `term) := do
+  match written? with
+  | some condition => clauseLambda arguments #[( `initial, initial)] condition
+  | none => `(fun _moveSpecArgs _moveSpecInitial => False)
 
 /-- Further invariant clauses of a data specification; they are conjoined. -/
 declare_syntax_cat moveExtraInvariant
@@ -4367,6 +7366,8 @@ private def totalPrimitiveLemma : Name → Option Name
       some ``Move.Semantics.Resource.total_moveToSpec
   | ``Move.Semantics.Vector.borrowElemSpec =>
       some ``Move.Semantics.Vector.total_borrowElemSpec
+  | ``Move.Semantics.variantFieldSpec =>
+      some ``Move.Semantics.total_variantFieldSpec
   | ``Move.Semantics.Vector.setSpec => some ``Move.Semantics.Vector.total_setSpec
   | ``Move.Semantics.Vector.insertSpec =>
       some ``Move.Semantics.Vector.insertSpec_undefined
@@ -4507,15 +7508,28 @@ macro_rules
         | assumption
         -- Every alternative must close the goal, or `first` would stop at
         -- a partial simplification and report it as the failure.
-        | (simp [move_invariant_norm, move_norm, Nat.reducePow, Nat.reduceMod]
+        | (simp [move_invariant_norm, move_norm, Move.UInt.toInt_eq_toNat,
+            Nat.reducePow, Nat.reduceMod]
            done)
-        | (simp [move_invariant_norm, move_norm, Nat.reducePow, Nat.reduceMod]
+        | (simp [move_invariant_norm, move_norm, Move.UInt.toInt_eq_toNat,
+            Nat.reducePow, Nat.reduceMod]
            omega)
-        | (simp_all [move_invariant_norm, move_norm, Nat.reducePow,
+        | (simp_all [move_invariant_norm, move_norm, Move.UInt.toInt_eq_toNat, Nat.reducePow,
             Nat.reduceMod]
            done)
-        | (simp_all [move_invariant_norm, move_norm, Nat.reducePow,
+        | (simp_all [move_invariant_norm, move_norm, Move.UInt.toInt_eq_toNat, Nat.reducePow,
             Nat.reduceMod]
+           omega)
+        -- Quantified invariants (`∀ i j, i < len → …`): introduce, then
+        -- arithmetic over the simplified bounds.
+        | (simp [move_invariant_norm, move_norm, Move.UInt.toInt_eq_toNat,
+            Nat.reducePow, Nat.reduceMod]
+           intros
+           simp_all [move_invariant_norm, move_norm, Move.UInt.toInt_eq_toNat]
+           omega)
+        | (intros
+           simp_all [move_invariant_norm, move_norm, Move.UInt.toInt_eq_toNat,
+             Nat.reducePow, Nat.reduceMod]
            omega)
         | fail "cannot establish the data invariant of this value here (if this is a pattern of a certified enum, bind the proof with a trailing `_`)")
 
@@ -4532,6 +7546,100 @@ partial def bindInvariantValue (this : TSyntax `ident) (condition : Syntax) :
     condition.setArg last (bindInvariantValue this condition[last])
   else
     condition.setArgs (condition.getArgs.map (bindInvariantValue this))
+
+/-- Data invariants are assembled by the enclosing-module macro rather than
+the command elaborator. Clean length/size expressions use mathematical
+integers, while legacy invariants which explicitly select `toNat`/`toInt`
+retain their ordinary Lean relation and arithmetic. -/
+partial def rewriteInvariantClause (condition : Syntax)
+    (mathematical : Bool := false) : MacroM Syntax := do
+  let mathematicalSurface (term : TSyntax `term) : Bool :=
+    let text := term.raw.reprint.getD term.raw.prettyPrint.pretty
+    (text.contains ".length" || text.contains ".size") && !text.contains ".toList" &&
+      !text.contains ".toNat" && !text.contains ".toInt"
+  let rewrite (term : TSyntax `term) (mathematical := mathematical) :
+      MacroM (TSyntax `term) := do
+    pure ⟨← rewriteInvariantClause term.raw mathematical⟩
+  let term : TSyntax `term := ⟨condition⟩
+  match term with
+  | `($left:term + $right:term) =>
+      let left ← rewrite left
+      let right ← rewrite right
+      if mathematical then return (← `(Move.Spec.intAdd $left $right)).raw
+      else return (← `($left + $right)).raw
+  | `($left:term - $right:term) =>
+      let left ← rewrite left
+      let right ← rewrite right
+      if mathematical then return (← `(Move.Spec.intSub $left $right)).raw
+      else return (← `($left - $right)).raw
+  | `($left:term * $right:term) =>
+      let left ← rewrite left
+      let right ← rewrite right
+      if mathematical then return (← `(Move.Spec.intMul $left $right)).raw
+      else return (← `($left * $right)).raw
+  | `($left:term / $right:term) =>
+      let left ← rewrite left
+      let right ← rewrite right
+      if mathematical then return (← `(Move.Spec.intDiv $left $right)).raw
+      else return (← `($left / $right)).raw
+  | `($left:term % $right:term) =>
+      let left ← rewrite left
+      let right ← rewrite right
+      if mathematical then return (← `(Move.Spec.intMod $left $right)).raw
+      else return (← `($left % $right)).raw
+  | `(-$value:term) =>
+      let value ← rewrite value
+      if mathematical then return (← `(Move.Spec.intNeg $value)).raw
+      else return (← `(-$value)).raw
+  | `($value:term <<< $amount:term) =>
+      let value ← rewrite value
+      let amount ← rewrite amount
+      if mathematical then return (← `(Move.Spec.intShiftLeft $value $amount)).raw
+      else return (← `($value <<< $amount)).raw
+  | `($value:term >>> $amount:term) =>
+      let value ← rewrite value
+      let amount ← rewrite amount
+      if mathematical then return (← `(Move.Spec.intShiftRight $value $amount)).raw
+      else return (← `($value >>> $amount)).raw
+  | `($left:term = $right:term) =>
+      let mathematical := mathematical || mathematicalSurface left || mathematicalSurface right
+      let left ← rewrite left mathematical
+      let right ← rewrite right mathematical
+      if mathematical then return (← `(Move.Spec.logicalEq $left $right)).raw
+      else return (← `($left = $right)).raw
+  | `($left:term ≠ $right:term) =>
+      let mathematical := mathematical || mathematicalSurface left || mathematicalSurface right
+      let left ← rewrite left mathematical
+      let right ← rewrite right mathematical
+      if mathematical then return (← `(¬Move.Spec.logicalEq $left $right)).raw
+      else return (← `($left ≠ $right)).raw
+  | `($left:term < $right:term) =>
+      let mathematical := mathematical || mathematicalSurface left || mathematicalSurface right
+      let left ← rewrite left mathematical
+      let right ← rewrite right mathematical
+      if mathematical then return (← `(Move.Spec.logicalLT $left $right)).raw
+      else return (← `($left < $right)).raw
+  | `($left:term > $right:term) =>
+      let mathematical := mathematical || mathematicalSurface left || mathematicalSurface right
+      let left ← rewrite left mathematical
+      let right ← rewrite right mathematical
+      if mathematical then return (← `(Move.Spec.logicalLT $right $left)).raw
+      else return (← `($left > $right)).raw
+  | `($left:term ≤ $right:term) =>
+      let mathematical := mathematical || mathematicalSurface left || mathematicalSurface right
+      let left ← rewrite left mathematical
+      let right ← rewrite right mathematical
+      if mathematical then return (← `(Move.Spec.logicalLE $left $right)).raw
+      else return (← `($left ≤ $right)).raw
+  | `($left:term ≥ $right:term) =>
+      let mathematical := mathematical || mathematicalSurface left || mathematicalSurface right
+      let left ← rewrite left mathematical
+      let right ← rewrite right mathematical
+      if mathematical then return (← `(Move.Spec.logicalLE $right $left)).raw
+      else return (← `($left ≥ $right)).raw
+  | _ =>
+      return condition.setArgs (← condition.getArgs.mapM fun child =>
+        rewriteInvariantClause child mathematical)
 
 /-- A contract stating only a postcondition.  For a *pure* function it is a
 value predicate over the function applied to its arguments.  For an *effectful*
@@ -4565,10 +7673,16 @@ scoped syntax (name := modifiesFamily) ident : moveModifiesTarget
 /-- A generic family, written with its type arguments: `(Vault T)[addr]`. -/
 scoped syntax (name := modifiesGenericAddress) "(" term ")" "[" term "]" : moveModifiesTarget
 scoped syntax (name := modifiesGenericFamily) "(" term ")" : moveModifiesTarget
+/-- The loose frame: every family the clause does not list is unconstrained.
+`modifies R[a], *` closes `R` at `a` and leaves the rest open; `modifies *`
+alone states no frame at all — the reading the Move Prover gives a
+specification without `modifies` clauses. -/
+scoped syntax (name := modifiesAny) "*" : moveModifiesTarget
 
 /-- The global memory a function may change.  Everything else is unchanged,
 so contracts never state a frame condition explicitly.  An omitted clause
-means the function changes no global memory at all. -/
+means the function changes no global memory at all; the `*` target makes the
+frame loose for the families the clause does not list. -/
 declare_syntax_cat moveModifiesClause
 scoped syntax "modifies " moveModifiesTarget,+ ";" : moveModifiesClause
 
@@ -4583,7 +7697,7 @@ scoped syntax (name := effectfulSourceSpec)
     "requires " term ";"
     (moveModifiesClause)?
     "ensures " term ";"
-    "aborts " term (";" "may_abort " term)? : command
+    "aborts " term (";" "may_abort " term)? (";" "must_abort " term)? : command
 
 /-- User-facing effectful contract. The global state and one typed store
 instance per borrowed resource are implicit and universally quantified. -/
@@ -4592,7 +7706,7 @@ scoped syntax (name := inferredEffectfulSourceSpec)
     "requires " term ";"
     (moveModifiesClause)?
     "ensures " term ";"
-    "aborts " term (";" "may_abort " term)? : command
+    "aborts " term (";" "may_abort " term)? (";" "must_abort " term)? : command
 
 /-- Omitted effectful preconditions mean `True`. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " on " world:term
@@ -4617,19 +7731,116 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " where "
       ensures $postcondition;
       aborts $abortCondition)
 
+/-- A Move-style pragma clause.  Leaner interprets the two pragmas that bear
+on abort semantics: `aborts_if_is_partial` — the `aborts_if` clauses state
+only where the function *must* abort (with the written code), and where no
+declared condition holds any outcome is permitted — and
+`aborts_if_is_strict` — an empty clause list means the function never aborts
+(`aborts_if False`) instead of leaving abort behavior uninterpreted.  Any
+other pragma is rejected. -/
+declare_syntax_cat movePragma
+scoped syntax "pragma " (ident <|> "opaque") ";" : movePragma
+
+/-- The abort-semantics pragmas of a clause list: (partial, strict). -/
+private def readPragmas (pragmas : Array Syntax) : MacroM (Bool × Bool × Bool) := do
+  let mut isPartial := false
+  let mut isStrict := false
+  let mut isOpaque := false
+  for clause in pragmas do
+    -- `opaque` is a Lean keyword, so the clause admits it as an atom.
+    let rec leaf (stx : Syntax) (fuel : Nat) : String :=
+      match fuel with
+      | 0 => ""
+      | fuel + 1 =>
+        if stx.isIdent then stx.getId.toString
+        else if stx.isAtom then stx.getAtomVal
+        else if stx.getNumArgs > 0 then leaf stx[0] fuel
+        else ""
+    let name := leaf clause[1] 4
+    match name with
+    | "aborts_if_is_partial" => isPartial := true
+    | "aborts_if_is_strict" => isStrict := true
+    | "opaque" => isOpaque := true
+    | name =>
+      Macro.throwErrorAt clause s!"unknown pragma `{name}`; Leaner interprets `aborts_if_is_partial`, `aborts_if_is_strict`, and `opaque`"
+  return (isPartial, isStrict, isOpaque)
+
+/-- Under `pragma opaque` the canonical specification is elaborated with the
+summary option set. -/
+private def opaqueWrap (isOpaque : Bool) (command : TSyntax `command) :
+    MacroM (TSyntax `command) :=
+  if isOpaque then `(command| set_option move.specOpaque true in $command:command) else pure command
+
+/-- The three abort components of a Move-style clause list `aborts_if Pᵢ
+[with Cᵢ]`: the permitted abort outcomes (`aborts`), the states excusing the
+postcondition (`may_abort`), and the states forcing an abort (`must_abort`).
+Without clauses the behavior is uninterpreted (strict: never aborts).  With
+clauses, every Pᵢ forces an abort; a non-partial list also permits only
+outcomes matching a clause (with its code), while a partial list permits any
+outcome where no Pᵢ holds. -/
+private def abortComponents (isPartial isStrict : Bool)
+    (conditions : Array (TSyntax `term)) (codes : Array (Option (TSyntax `term)))
+    (abortCode : TSyntax `ident) :
+    MacroM (TSyntax `term × TSyntax `term × TSyntax `term) := do
+  if conditions.isEmpty then
+    if isStrict then return (← `(False), ← `(False), ← `(False))
+    else return (← `(True), ← `(False), ← `(False))
+  let clause (i : Nat) : MacroM (TSyntax `term) := do
+    match codes[i]! with
+    | some code => `($(conditions[i]!) ∧ $abortCode = Move.Spec.abortCodeOf $code)
+    | none => pure conditions[i]!
+  let mut matched ← clause 0
+  let mut any := conditions[0]!
+  for i in [1:conditions.size] do
+    matched ← `($matched ∨ $(← clause i))
+    any ← `($any ∨ $(conditions[i]!))
+  let permitted ← if isPartial then `($matched ∨ ¬$any) else pure matched
+  return (permitted, any, any)
+
 /-- An effectful contract that declares no abort condition. Abort behavior is
-then uninterpreted: every abort code is permitted, and no state excuses the
-postcondition, so every successful execution must still establish `ensures`. -/
+then uninterpreted: every abort code is permitted, no state excuses the
+postcondition, and no state forces an abort, so every successful execution
+must still establish `ensures`.  Under `pragma aborts_if_is_strict` the
+function never aborts instead. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    pragmas:movePragma*
     "requires " precondition:term ";"
     modifiesClause:(moveModifiesClause)?
-    "ensures " postcondition:term : command =>
-  `(spec $function $binder* where
+    "ensures " postcondition:term : command => do
+  let (isPartial, isStrict, isOpaque) ← readPragmas (pragmas.map (·.raw))
+  let abortCode := mkIdentFrom postcondition `abortCode
+  let (abortsTerm, mayAbortTerm, mustAbortTerm) ←
+    abortComponents isPartial isStrict #[] #[] abortCode
+  opaqueWrap isOpaque (← `(spec $function $binder* where
       requires $precondition;
       $[$modifiesClause]?
       ensures $postcondition;
-      aborts True;
-      may_abort False)
+      aborts $abortsTerm;
+      may_abort $mayAbortTerm;
+      must_abort $mustAbortTerm))
+
+/-- A frame and a postcondition without precondition or abort clauses: the
+loose or closed frame with uninterpreted abort behavior. -/
+scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    modifiesClause:moveModifiesClause
+    "ensures " postcondition:term : command =>
+  `(spec $function $binder* where
+      requires True;
+      $modifiesClause:moveModifiesClause
+      ensures $postcondition)
+
+/-- A pragma-led contract with only a postcondition: the pragmas select the
+relational reading (uninterpreted or never-aborting abort behavior) even for
+a pure function, whose plain `ensures` would be a value contract. -/
+scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    pragmas:movePragma+
+    modifiesClause:(moveModifiesClause)?
+    "ensures " postcondition:term : command =>
+  `(spec $function $binder* where
+      $pragmas:movePragma*
+      requires True;
+      $[$modifiesClause]?
+      ensures $postcondition)
 
 /-- An explicit-resource contract that declares no abort condition. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " on " world:term
@@ -4644,77 +7855,161 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " on " world:term
       aborts True;
       may_abort False)
 
-/-- Further Move-style abort clauses of a specification: each disjoins its
-condition and exact code into the abort predicate. -/
+/-- Further Move-style abort clauses of a specification, each with an optional
+exact code. -/
 declare_syntax_cat moveExtraAbortsIf
-scoped syntax ";" "aborts_if " term " with " term : moveExtraAbortsIf
+scoped syntax ";" "aborts_if " term (" with " term)? : moveExtraAbortsIf
 
-/-- Move-style abort clauses with exact abort codes, one or more. The abort
-predicate is their disjunction.  That the postcondition needs to hold only
-where the declared aborts are ruled out is the semantics of the contract
-(`Move.Verify.Satisfies`), not anything written into the clauses. -/
-scoped macro "spec " function:ident binder:moveSpecBinder* " where "
-    "requires " precondition:term ";"
-    modifiesClause:(moveModifiesClause)?
-    "ensures " postcondition:term ";"
-    "aborts_if " condition:term " with " code:term
-    more:moveExtraAbortsIf* : command => do
+/-- The canonical expansion of a Move-style clause list: pragmas, an optional
+precondition, and one or more `aborts_if` clauses with optional codes. -/
+private def abortsIfSpec (function : TSyntax `ident) (binders : Array (TSyntax `moveSpecBinder))
+    (pragmas : Array Syntax) (precondition : TSyntax `term) (modifiesClause? : Option Syntax)
+    (postcondition condition : TSyntax `term) (withCode : Option (TSyntax `term))
+    (more : Array Syntax) : MacroM (TSyntax `command) := do
+  let (isPartial, isStrict, isOpaque) ← readPragmas pragmas
+  -- The optional `with code` group arrives as `[" with ", code]`, possibly
+  -- wrapped in a singleton null node.
+  let codeOf (optional : Syntax) : Option (TSyntax `term) :=
+    let node := if optional.getNumArgs == 1 then optional[0] else optional
+    if node.getNumArgs == 2 then some ⟨node[1]⟩ else none
   let mut conditions := #[condition]
-  let mut codes := #[code]
+  let mut codes := #[withCode]
   for clause in more do
-    conditions := conditions.push ⟨clause.raw[2]⟩
-    codes := codes.push ⟨clause.raw[4]⟩
+    conditions := conditions.push ⟨clause[2]⟩
+    codes := codes.push (codeOf clause[3])
   let abortCode := mkIdentFrom condition `abortCode
-  let mut abortsTerm ←
-    `($(conditions[0]!) ∧ $abortCode = Move.Spec.abortCodeOf $(codes[0]!))
-  let mut mayAbortTerm := conditions[0]!
-  for i in [1:conditions.size] do
-    let clauseTerm ←
-      `($(conditions[i]!) ∧ $abortCode = Move.Spec.abortCodeOf $(codes[i]!))
-    abortsTerm ← `($abortsTerm ∨ $clauseTerm)
-    mayAbortTerm ← `($mayAbortTerm ∨ $(conditions[i]!))
-  `(spec $function $binder* where
+  let (abortsTerm, mayAbortTerm, mustAbortTerm) ←
+    abortComponents isPartial isStrict conditions codes abortCode
+  let modifiesSyntax : Option (TSyntax `moveModifiesClause) := modifiesClause?.map (⟨·⟩)
+  opaqueWrap isOpaque (← `(spec $function $binders* where
       requires $precondition;
-      $[$modifiesClause]?
+      $[$modifiesSyntax]?
       ensures $postcondition;
       aborts $abortsTerm;
-      may_abort $mayAbortTerm)
+      may_abort $mayAbortTerm;
+      must_abort $mustAbortTerm))
 
-scoped macro "spec " function:ident binder:moveSpecBinder* " where "
-    modifiesClause:(moveModifiesClause)?
-    "ensures " postcondition:term ";"
-    "aborts_if " condition:term " with " code:term
-    more:moveExtraAbortsIf* : command =>
-  `(spec $function $binder* where
-      requires True;
-      $[$modifiesClause]?
-      ensures $postcondition;
-      aborts_if $condition with $code
-      $more:moveExtraAbortsIf*)
+/-- Move-style abort clauses, one or more, each with an optional exact code,
+optionally led by abort-semantics pragmas and a precondition (omitted: `True`).
+Every declared condition forces an abort; without `pragma
+aborts_if_is_partial` the declared conditions are also the only permitted
+aborts, each with its code.  That the postcondition needs to hold only where
+the declared aborts are ruled out is the semantics of the contract
+(`Move.Verify.Satisfies`), not anything written into the clauses. -/
+scoped syntax (name := abortsIfSourceSpec)
+  "spec " ident moveSpecBinder* " where "
+    movePragma* ("requires " term ";")? (moveModifiesClause)?
+    "ensures " term ";"
+    "aborts_if " term (" with " term)? moveExtraAbortsIf* : command
 
-/-- Move-style abort clause which constrains the abort condition but permits
-any abort code. -/
-scoped macro "spec " function:ident binder:moveSpecBinder* " where "
-    "requires " precondition:term ";"
-    modifiesClause:(moveModifiesClause)?
-    "ensures " postcondition:term ";"
-    "aborts_if " condition:term : command =>
-  `(spec $function $binder* where
-      requires $precondition;
-      $[$modifiesClause]?
-      ensures $postcondition;
-      aborts $condition;
-      may_abort $condition)
+macro_rules
+  | `(spec $function $binder* where $[$pragmas]* $[requires $precondition;]? $[$modifiesClause]?
+        ensures $postcondition;
+        aborts_if $condition $[with $code]? $[$more]*) => do
+    let precondition ← match precondition with
+      | some precondition => pure precondition
+      | none => `(True)
+    abortsIfSpec function binder (pragmas.map (·.raw)) precondition
+      (modifiesClause.map (·.raw)) postcondition condition code (more.map (·.raw))
 
-scoped macro "spec " function:ident binder:moveSpecBinder* " where "
-    modifiesClause:(moveModifiesClause)?
-    "ensures " postcondition:term ";"
-    "aborts_if " condition:term : command =>
-  `(spec $function $binder* where
-      requires True;
-      $[$modifiesClause]?
-      ensures $postcondition;
-      aborts_if $condition)
+/-- A specification function.  `spec fun f binders := body` gives `f` a
+meaning in specification expressions.  When `f` is a Move function of this
+module, the declaration is its *specification version* — the value-level
+reading under which the Move Prover lets a pure Move function be called in a
+specification; Move derives it, Leaner asks for it to be written (and the
+transpiler writes it) — and `f args` in a `spec` clause denotes the
+definition `f.specFun args`.  Otherwise it declares a new specification
+function under its own name.  Binders are those of `spec`: values (a Move
+function's reference parameters are written as the values they observe),
+`{T}` type parameters, and `[C]` instance assumptions; the optional result
+type is Lean's.  The body is a specification term: it may read global memory
+through `R[a]` and `existsAt<R>(a)`, which makes the function *stateful* —
+its definition takes the store instances of the families it reads and the
+state to read, and a clause that applies it passes its own state (the
+pre-state under `old(…)`) — but it cannot use `old` itself. -/
+scoped syntax (name := specFunctionDecl)
+  (docComment)? "spec " "fun " ident moveSpecBinder* (" : " term)? " := " term : command
+
+/-- An uninterpreted specification function. Like `spec fun`, its direct
+integer domain and codomain are `Int`; unlike `spec fun`, it has no defining
+body. Applications are still registered for clean argument projection. -/
+scoped syntax (name := opaqueSpecFunctionDecl)
+  (docComment)? "spec " "opaque " ident moveSpecBinder* " : " term : command
+
+@[command_elab specFunctionDecl]
+private def elabSpecFunctionDecl : CommandElab := fun stx => do
+  let doc? : Option (TSyntax ``Lean.Parser.Command.docComment) :=
+    if stx[0].getNumArgs == 1 then some ⟨stx[0][0]⟩ else none
+  let function : TSyntax `ident := ⟨stx[3]⟩
+  let binders : Array (TSyntax `moveSpecBinder) := stx[4].getArgs.map (⟨·⟩)
+  let resultType? : Option (TSyntax `term) :=
+    if stx[5].getNumArgs == 2 then some ⟨stx[5][1]⟩ else none
+  let body : TSyntax `term := ⟨stx[7]⟩
+  let env ← getEnv
+  let fullName := (← getCurrNamespace) ++ function.getId
+  let attached := Move.isMoveFunction env fullName
+  if attached && env.contains (fullName ++ `specFun) then
+    throwErrorAt function (m!"Move function `{fullName}` has a derived specification version; " ++
+      m!"`spec fun` declares one only for a Move function without (a native, or a body with " ++
+      m!"no pure reading)")
+  if Move.Verify.Source.isSpecFunction env fullName then
+    throwErrorAt function "specification function `{fullName}` is already declared"
+  if !attached && env.contains fullName then
+    throwErrorAt function (m!"`{fullName}` is already declared; a specification function takes " ++
+      m!"a name of its own, or the name of the Move function it is the specification version of")
+  let parameters ← liftMacroM <| unpackSpecParameters binders
+  unless parameters.mutableParameters.isEmpty do
+    throwErrorAt stx[4] "a specification function takes values; write `(x : T)` for a reference"
+  Move.Verify.Source.declareSpecFunction function fullName attached parameters.context
+    parameters.arguments parameters.types resultType? body doc?
+
+@[command_elab opaqueSpecFunctionDecl]
+private def elabOpaqueSpecFunctionDecl : CommandElab := fun stx => do
+  let doc? : Option (TSyntax ``Lean.Parser.Command.docComment) :=
+    if stx[0].getNumArgs == 1 then some ⟨stx[0][0]⟩ else none
+  let function : TSyntax `ident := ⟨stx[3]⟩
+  let binders : Array (TSyntax `moveSpecBinder) := stx[4].getArgs.map (⟨·⟩)
+  let resultType : TSyntax `term := ⟨stx[6]⟩
+  let env ← getEnv
+  let fullName := (← getCurrNamespace) ++ function.getId
+  let attached := Move.isMoveFunction env fullName
+  if Move.Verify.Source.isSpecFunction env fullName then
+    throwErrorAt function "specification function `{fullName}` is already declared"
+  if !attached && env.contains fullName then
+    throwErrorAt function m!"`{fullName}` is already declared"
+  let parameters ← liftMacroM <| unpackSpecParameters binders
+  unless parameters.mutableParameters.isEmpty do
+    throwErrorAt stx[4] "a specification function takes values; write `(x : T)` for a reference"
+  let integerTypes ← parameters.types.mapM Move.Verify.Source.integerSpecTypeName?
+  for (type, integerType?) in parameters.types.zip integerTypes do
+    if let some integerType := integerType? then
+      if integerType != ``Int then
+        throwErrorAt type
+          "specification functions use mathematical `Int`, not Move integer type `{integerType}`"
+  let integerResultType? ← Move.Verify.Source.integerSpecTypeName? resultType
+  if let some integerType := integerResultType? then
+    if integerType != ``Int then
+      throwErrorAt resultType
+        "specification functions return mathematical `Int`, not Move integer type `{integerType}`"
+  let declIdent := mkIdentFrom function
+    (if attached then function.getId ++ `specFun else function.getId)
+  let declName := if attached then fullName ++ `specFun else fullName
+  let mut declBinders := parameters.context
+  for (argument, type) in parameters.arguments.zip parameters.types do
+    declBinders := declBinders.push (← `(bracketedBinder| ($argument : $type)))
+  let command ← `(opaque $declIdent $declBinders* : $resultType)
+  let command := match doc? with
+    | some doc => command.raw.setArg 0 (command.raw[0].setArg 0 (mkNullNode #[doc.raw]))
+    | none => command.raw
+  elabCommand command
+  unless (← getEnv).contains declName do
+    throwErrorAt function m!"opaque specification function `{declName}` could not be declared"
+  Move.Verify.Source.registerSpecFunction fullName {
+    decl := declName
+    stateful := false
+    families := #[]
+    integerArguments := integerTypes.map (·.isSome)
+    integerResult := integerResultType?.isSome }
 
 /-- The registered global-invariant body for each resource family that has
 one, among the families a function uses. -/
@@ -4748,14 +8043,16 @@ def buildEffectfulContract (function : TSyntax `ident)
     (binders : Array (TSyntax `moveSpecBinder))
     (precondition : TSyntax `term) (modifiesClause? : Option Syntax)
     (postcondition abortCondition : TSyntax `term)
-    (mayAbortCondition? : Option (TSyntax `term)) : CommandElabM Unit := do
+    (mayAbortCondition? : Option (TSyntax `term))
+    (mustAbortCondition? : Option (TSyntax `term) := none) : CommandElabM Unit := do
   let parameters ← liftMacroM <| unpackSpecParameters binders
   let arguments := parameters.arguments
   let argsType ← liftMacroM <| Move.Verify.Source.argumentType parameters.types
   let world := mkIdentFrom function `_moveSpecState
   let mut resourceTypes ← Move.Verify.Source.inferredResources function.raw
   for clause in #[precondition.raw, postcondition.raw, abortCondition.raw] ++
-      (mayAbortCondition?.map (·.raw)).toArray ++ modifiesClause?.toArray do
+      (mayAbortCondition?.map (·.raw)).toArray ++
+      (mustAbortCondition?.map (·.raw)).toArray ++ modifiesClause?.toArray do
     resourceTypes ← Move.Verify.Source.addMentionedFamilies clause resourceTypes
   let sourceSpecName := associatedName function `sourceSpec
   let sourceSpecFullName := (← getCurrNamespace) ++ sourceSpecName.getId
@@ -4763,8 +8060,36 @@ def buildEffectfulContract (function : TSyntax `ident)
   let resultType ← Move.Verify.Source.resultTypeOf function.raw
   let sourceResultType ← liftMacroM <|
     Move.Verify.Source.sourceResultType resultType parameters.mutableParameters
-  unless hasSourceSpec do
-    Move.Verify.Source.ensureSourceSpec sourceSpecFullName.getPrefix function
+  -- A native, or a function specified `pragma opaque`, is *summarized*: its
+  -- callers reason through the contract (`f.summarySpec`, the computation
+  -- of every outcome the contract permits), not through its body.  The body
+  -- of an opaque function is still what `verify` checks, when its source
+  -- semantics can be generated; a native has none.
+  let functionFullName := (← getCurrNamespace) ++ function.getId
+  let isNative := Move.moveNativeAttr.hasTag (← getEnv) functionFullName
+  let summarize := isNative || (← getOptions).getBool `move.specOpaque false
+  if summarize && !isNative then
+    liftCoreM (Move.moveOpaqueAttr.setTag functionFullName)
+  let mut sourceAvailable := hasSourceSpec
+  if !hasSourceSpec then
+    if summarize then
+      unless isNative do
+        -- Best effort: a body the translator cannot follow leaves the
+        -- contract assumed (warned), not the module broken.
+        let saved := (← get).messages
+        try
+          Move.Verify.Source.ensureSourceSpec sourceSpecFullName.getPrefix function
+          if (← get).messages.hasErrors && !saved.hasErrors then
+            modify fun st => { st with messages := saved }
+            logWarning m!"opaque function `{functionFullName}`: its source semantics could not be generated, so its contract is assumed by callers and cannot be verified here"
+          else
+            sourceAvailable := true
+        catch e =>
+          modify fun st => { st with messages := saved }
+          logWarning m!"opaque function `{functionFullName}`: its source semantics could not be generated, so its contract is assumed by callers and cannot be verified here: {e.toMessageData}"
+    else
+      Move.Verify.Source.ensureSourceSpec sourceSpecFullName.getPrefix function
+      sourceAvailable := true
   let contractName := associatedName function `contract
   let initial := mkIdentFrom precondition `_moveSpecInitial
   let final := mkIdentFrom postcondition `_moveSpecFinal
@@ -4773,8 +8098,9 @@ def buildEffectfulContract (function : TSyntax `ident)
   let initialTerm : TSyntax `term := ⟨initial.raw⟩
   let finalTerm : TSyntax `term := ⟨final.raw⟩
   let globalInvariants ← globalInvariantsFor resourceTypes
+  let bound := arguments.map (·.getId) ++ Move.Verify.Source.implicitClauseBinders
   let precondition ← Move.Verify.Source.rewriteClause
-    resourceTypes initialTerm initialTerm precondition
+    resourceTypes initialTerm initialTerm precondition bound
   let precondition ← assumeGlobalInvariants initialTerm globalInvariants precondition
   let output := mkIdentFrom postcondition `_moveSpecOutput
   let outputTerm : TSyntax `term := ⟨output.raw⟩
@@ -4791,11 +8117,11 @@ def buildEffectfulContract (function : TSyntax `ident)
       postconditionRaw ← liftMacroM <|
         rewriteMutablePost parameter finalReferent postconditionRaw
   let postcondition ← Move.Verify.Source.rewriteClause
-    resourceTypes finalTerm initialTerm ⟨postconditionRaw⟩
+    resourceTypes finalTerm initialTerm ⟨postconditionRaw⟩ bound
   let frame? ← frameCondition resourceTypes ⟨world.raw⟩ initialTerm finalTerm
     modifiesClause?
   let abortCondition ← Move.Verify.Source.rewriteClause
-    resourceTypes initialTerm initialTerm abortCondition
+    resourceTypes initialTerm initialTerm abortCondition bound
   let requiresLambda ← liftMacroM <| clauseLambda arguments
     #[( `initial, initial)] precondition
   let ensuresLambda ← liftMacroM <| if parameters.mutableParameters.isEmpty then
@@ -4809,19 +8135,42 @@ def buildEffectfulContract (function : TSyntax `ident)
     | none => pure none
     | some condition => do
         let rewritten ← Move.Verify.Source.rewriteClause
-          resourceTypes initialTerm initialTerm condition
+          resourceTypes initialTerm initialTerm condition bound
         pure (some rewritten)
   let mayAbortLambda ← liftMacroM <|
     mayAbortLambdaFor arguments initial abortsLambda mayAbortCondition?
+  let mustAbortCondition? ← match mustAbortCondition? with
+    | none => pure none
+    | some condition => do
+        let rewritten ← Move.Verify.Source.rewriteClause
+          resourceTypes initialTerm initialTerm condition bound
+        pure (some rewritten)
+  let mustAbortLambda ← liftMacroM <| mustAbortLambdaFor arguments initial mustAbortCondition?
   let frameLambda ← liftMacroM <| match frame? with
     | none => `(fun _moveSpecArgs _moveSpecInitial _moveSpecFinal => True)
     | some frame => clauseLambda arguments
         #[( `initial, initial), (`final, final)] frame
   let contractRecord ← `(@Move.Verify.Contract.mk $world $argsType $sourceResultType
-    $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda $frameLambda)
+    $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda $mustAbortLambda $frameLambda)
+  let heads := Move.Verify.Source.distinctHeads resourceTypes
+  if summarize then
+    -- The summary callers use, over the same world and stores as the
+    -- contract it is drawn from.
+    let summarySpecName := associatedName function `summarySpec
+    let worldBinder ← `(bracketedBinder| {$world : Type})
+    let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
+    for (head, index) in heads.zipIdx do
+      let storeName := mkIdentFrom function
+        (Name.mkSimple s!"_moveSpecStore{index}")
+      storeBinders := storeBinders.push (← `(bracketedBinder|
+        [$storeName : $(← Move.Verify.Source.storeType ⟨world⟩ head)]))
+    elabCommand (← `(noncomputable def $summarySpecName $parameters.context* $worldBinder
+      $storeBinders* : $argsType → Move.Semantics.Spec $world $sourceResultType :=
+      fun _moveSpecArgs => Move.Verify.Contract.summary $contractRecord _moveSpecArgs))
+    -- Nothing to verify without the body's semantics.
+    unless sourceAvailable do return
   let sourceSpecApplied ← liftMacroM <| applyTypeParameters sourceSpecName parameters.context
   let mut contractBody ← `(Move.Verify.Satisfies $sourceSpecApplied $contractRecord)
-  let heads := Move.Verify.Source.distinctHeads resourceTypes
   let mut resourcePairs : Array (Name × Name) := #[]
   for leftIndex in [:heads.size] do
     for rightIndex in [leftIndex + 1:heads.size] do
@@ -4873,20 +8222,29 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
     if stx[7].getNumArgs == 1 then some stx[7][0] else none
   let mayAbortCondition? : Option (TSyntax `term) :=
     if stx[13].getNumArgs == 3 then some ⟨stx[13][2]⟩ else none
+  let mustAbortCondition? : Option (TSyntax `term) :=
+    if stx[14].getNumArgs == 3 then some ⟨stx[14][2]⟩ else none
   buildEffectfulContract ⟨stx[1]⟩ (stx[2].getArgs.map (⟨·⟩)) ⟨stx[5]⟩
-    modifiesClause? ⟨stx[9]⟩ ⟨stx[12]⟩ mayAbortCondition?
+    modifiesClause? ⟨stx[9]⟩ ⟨stx[12]⟩ mayAbortCondition? mustAbortCondition?
 
 @[command_elab ensuresOnlySpec]
 private def elabEnsuresOnlySpec : CommandElab := fun stx => do
   let function : TSyntax `ident := ⟨stx[1]⟩
   let postcondition : TSyntax `term := ⟨stx[5]⟩
   let binders : Array (TSyntax `moveSpecBinder) := stx[2].getArgs.map (⟨·⟩)
-  if ← Move.Verify.Source.isEffectfulFunction function.raw then
-    -- Effectful: a trivial precondition and uninterpreted aborts, routed so
-    -- the postcondition observes global state.
+  -- Effectful, or a postcondition that observes global state (a place, or a
+  -- stateful specification function): a trivial precondition and
+  -- uninterpreted aborts, routed so the postcondition observes global state.
+  if (← Move.Verify.Source.isEffectfulFunction function.raw) ||
+      (← Move.Verify.Source.mentionsState postcondition.raw) then
     buildEffectfulContract function binders (← `(True)) none postcondition
       (← `(True)) (some (← `(False)))
   else
+    -- A value contract still applies specification functions by their
+    -- definitions (no state to pass).
+    let parameters ← liftMacroM <| unpackSpecParameters binders
+    let postcondition ← Move.Verify.Source.rewriteClause #[] (← `(True)) (← `(True))
+      postcondition (parameters.arguments.map (·.getId) ++ Move.Verify.Source.implicitClauseBinders)
     elabCommand (← liftMacroM (pureEnsuresContract function binders postcondition))
     -- A pure function's relational semantics serves its callers' automatic
     -- specifications.  Its generation is best-effort here: the value contract
@@ -4919,6 +8277,8 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
   let abortCondition : TSyntax `term := ⟨stx[18]⟩
   let mayAbortCondition? : Option (TSyntax `term) :=
     if stx[19].getNumArgs == 3 then some ⟨stx[19][2]⟩ else none
+  let mustAbortCondition? : Option (TSyntax `term) :=
+    if stx[20].getNumArgs == 3 then some ⟨stx[20][2]⟩ else none
   let parameters ← liftMacroM <| unpackSpecParameters binders
   let arguments := parameters.arguments
   let argsType ← liftMacroM <| Move.Verify.Source.argumentType parameters.types
@@ -4945,10 +8305,14 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
     #[( `initial, initial), (`abortCode, abortCode)] abortCondition
   let mayAbortLambda ← liftMacroM <|
     mayAbortLambdaFor arguments initial abortsLambda mayAbortCondition?
+  let mustAbortLambda ← liftMacroM <| mustAbortLambdaFor arguments initial mustAbortCondition?
   let frameLambda ← liftMacroM <| match frame? with
     | none => `(fun _moveSpecArgs _moveSpecInitial _moveSpecFinal => True)
     | some frame => clauseLambda arguments
         #[( `initial, initial), (`final, final)] frame
+  let contractStruct ← `(@Move.Verify.Contract.mk $world $argsType $resultType
+        $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda
+        $mustAbortLambda $frameLambda)
   let sourceLambda ← liftMacroM <| Move.Verify.Source.unpackArguments arguments body
   if recursive then
     let bodySpecName := associatedName function `bodySpec
@@ -4966,10 +8330,7 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
         Move.Semantics.Spec $world $resultType := $sourceLambda)
     elabCommand sourceCommand
   let sourceSpecApplied ← liftMacroM <| applyTypeParameters sourceSpecName parameters.context
-  let contractBody ← `(Move.Verify.Satisfies $sourceSpecApplied
-      (@Move.Verify.Contract.mk $world $argsType $resultType
-        $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda
-        $frameLambda))
+  let contractBody ← `(Move.Verify.Satisfies $sourceSpecApplied $contractStruct)
   let contractBody ← liftMacroM <| quantifyContext parameters.context contractBody
   let contractCommand ← `(def $contractName : Prop := $contractBody)
   elabCommand contractCommand
@@ -5047,6 +8408,134 @@ syntax (name := contractIntro) "contract_intro" : tactic
 private def normalizeMayAbort : Lean.Elab.Tactic.TacticM Unit := do
   Lean.Elab.Tactic.evalTactic (← `(tactic| abort_norm))
 
+/-- Verify the loops of a body from their stated invariants: at every
+`wp (Spec.withInvariant I (Spec.fix body init)) …` goal, the invariant is
+established on entry and preserved by each iteration, whose body is opened
+by the weakest-precondition rules with the next iteration as
+`recursiveVerified` (closed by `loop_continue`).  Repeats for nested loops
+and loops in sequence. -/
+syntax (name := loopInvariants) "loop_invariants" : tactic
+
+/-- Case-split a conditional the goal is, when an annotated loop
+(`Spec.withInvariant`) lies beneath it: the way to the loop's own goal. -/
+syntax (name := splitTowardLoop) "split_toward_loop" : tactic
+
+@[tactic splitTowardLoop]
+private def elabSplitTowardLoop : Lean.Elab.Tactic.Tactic := fun _ =>
+    Lean.Elab.Tactic.withMainContext do
+  Lean.Elab.Tactic.evalTactic (← `(tactic| intros))
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  unless (target.find? fun e => e.isConstOf ``Move.Semantics.Spec.withInvariant).isSome do
+    throwError "`split_toward_loop`: no annotated loop beneath"
+  unless target.isAppOf ``ite || target.isAppOf ``dite do
+    throwError "`split_toward_loop`: the goal is not a conditional"
+  Lean.Elab.Tactic.evalTactic (← `(tactic| split))
+
+macro_rules
+  | `(tactic| loop_invariants) => do
+    -- The iteration's names are accessible to the tactics that follow.
+    let recursive := mkIdent `recursive
+    let recursiveVerified := mkIdent `recursiveVerified
+    let state := mkIdent `_moveSpecLoopState
+    let invariantHyp := mkIdent `_moveSpecInvariant
+    `(tactic| repeat' (first | (intros; refine Move.Verify.wp_withInvariant_fix_frame ?_ (fun $recursive $recursiveVerified $state $invariantHyp => ?_); all_goals try simp only [wp_norm, move_norm, move_data, Nat.reducePow, Nat.reduceMod,
+          and_imp, forall_eq, forall_eq', Classical.not_not,
+          exists_eq_left, exists_eq_left', exists_eq_right, exists_and_left,
+          exists_and_right, and_true, true_and, true_implies, implies_true,
+          and_self, Prod.mk.injEq, not_false_eq_true, not_true_eq_false,
+          ite_true, ite_false, dite_true, dite_false] at $invariantHyp:ident ⊢) | split_toward_loop))
+
+/-- The next iteration of a loop under verification: `recursiveVerified`
+closes its `wp` goal, leaving the invariant to be re-established. -/
+syntax (name := loopContinue) "loop_continue" : tactic
+macro_rules
+  | `(tactic| loop_continue) => do
+    let recursiveVerified := mkIdent `recursiveVerified
+    `(tactic| (intros; apply $recursiveVerified))
+
+/-- Split a goal that is syntactically a conjunction — not a definition
+that unfolds to one, such as `wp`, which `constructor` would open. -/
+syntax (name := splitConjunction) "split_conjunction" : tactic
+
+@[tactic splitConjunction]
+private def elabSplitConjunction : Lean.Elab.Tactic.Tactic := fun stx =>
+    Lean.Elab.Tactic.withMainContext do
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  unless target.isAppOfArity ``And 2 do
+    throwErrorAt stx "`split_conjunction` expects a conjunction"
+  Lean.Elab.Tactic.evalTactic (← `(tactic| refine And.intro ?_ ?_))
+
+/-- Case-split the `match`es (an enum `match` at the head of a body) the goal
+contains, and nothing else: conditionals are the weakest-precondition rules'
+business. -/
+syntax (name := splitMatches) "split_matches" : tactic
+
+@[tactic splitMatches]
+private def elabSplitMatches : Lean.Elab.Tactic.Tactic := fun _ =>
+    Lean.Elab.Tactic.withMainContext do
+  let env ← getEnv
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  let hasMatch := (target.find? fun e =>
+    match e.getAppFn.constName? with
+    | some name => (Lean.Meta.getMatcherInfoCore? env name).isSome
+    | none => false).isSome
+  unless hasMatch do throwError "`split_matches`: no match to split"
+  Lean.Elab.Tactic.evalTactic (← `(tactic| split))
+
+/-- A `match` on a Move enum value in `e` whose discriminants are closed
+(not under a binder), if any. -/
+private partial def enumMatch? (e : Expr) : MetaM (Option Expr) := do
+  let env ← getEnv
+  if let some info := e.getAppFn.constName?.bind (Lean.Meta.getMatcherInfoCore? env) then
+    let arguments := e.getAppArgs
+    let discriminants := arguments.extract info.getFirstDiscrPos
+      (info.getFirstDiscrPos + info.numDiscrs)
+    if discriminants.size == info.numDiscrs && discriminants.all (!·.hasLooseBVars) then
+      for discriminant in discriminants do
+        let type ← Lean.Meta.whnf (← Lean.Meta.inferType discriminant)
+        if let .const typeName _ := type.getAppFn then
+          if Move.moveEnumAttr.hasTag env typeName then return some e
+  match e with
+  | .app f a => do
+      if let some found ← enumMatch? f then return some found
+      enumMatch? a
+  | .lam _ _ b _ | .forallE _ _ b _ => enumMatch? b
+  | .letE _ _ v b _ => do
+      if let some found ← enumMatch? v then return some found
+      enumMatch? b
+  | .mdata _ b | .proj _ _ b => enumMatch? b
+  | _ => return none
+
+/-- Case-split a `match` on a Move enum value the goal contains — the
+dispatch of a `match` through a reference, exposed under the mutation's
+prophecy quantifier by the wp rules — and nothing else: a `match` on an
+optional result (an element borrow's) is the simplifier's. -/
+syntax (name := splitEnumMatches) "split_enum_matches" : tactic
+
+@[tactic splitEnumMatches]
+private def elabSplitEnumMatches : Lean.Elab.Tactic.Tactic := fun _ =>
+    Lean.Elab.Tactic.withMainContext do
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  let some application ← enumMatch? target
+    | throwError "`split_enum_matches`: no enum match to split"
+  let goals ← Lean.Meta.Split.splitMatch (← Lean.Elab.Tactic.getMainGoal) application
+  Lean.Elab.Tactic.replaceMainGoal goals
+
+/-- Inside a loop iteration under verification (`recursiveVerified` is in
+the context): the exit test is a case split, a conjunction its parts, the
+next iteration `recursiveVerified`. -/
+syntax (name := loopIterationCases) "loop_iteration_cases" : tactic
+
+@[tactic loopIterationCases]
+private def elabLoopIterationCases : Lean.Elab.Tactic.Tactic := fun _ =>
+    Lean.Elab.Tactic.withMainContext do
+  unless (← getLCtx).any (fun decl => !decl.isImplementationDetail &&
+      decl.userName == `recursiveVerified) do
+    throwError "`loop_iteration_cases`: not inside a loop iteration"
+  Lean.Elab.Tactic.evalTactic (← `(tactic| (repeat' split)))
+  Lean.Elab.Tactic.evalTactic
+    (← `(tactic| all_goals try (repeat' (first | split_conjunction | loop_continue))))
+
 /-- Discharge a concrete `wp (callee.sourceSpec args) …` goal from the
 callee's generated `callee.verified` theorem.  Automatic verification keeps
 verified recursive callees opaque and invokes this bridge instead of trying
@@ -5102,6 +8591,8 @@ private def elabContractIntro : Lean.Elab.Tactic.Tactic := fun stx => Lean.Elab.
     throwErrorAt stx
       "`contract_intro` supports effectful source contracts, but `{sourceSpecName}` is not defined"
   let mutualInfo? := Move.Verify.Source.mutualFamilies.getState env |>.find? functionName
+  let mutationFamily := mutualInfo?.map (·.hasMutationMembers) |>.getD false
+  let mutualInfo? := mutualInfo?.filter fun info => !info.hasMutationMembers
   let contract := mkIdentFrom stx contractName
   let sourceSpec := mkIdentFrom stx sourceSpecName
   Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $contract))
@@ -5158,6 +8649,16 @@ private def elabContractIntro : Lean.Elab.Tactic.Tactic := fun stx => Lean.Elab.
           normalizeMayAbort
         remaining := remaining ++ (← Lean.Elab.Tactic.getGoals)
       Lean.Elab.Tactic.setGoals remaining
+    else if mutationFamily then
+      -- A public value contract does not describe the prophecy carriers
+      -- needed as induction hypotheses for mutation-level SCC entries. As
+      -- with direct reference-returning recursion, expose the wrapper WP so
+      -- the proof can establish and apply an explicit mutation invariant.
+      Lean.Elab.Tactic.evalTactic (← `(tactic| apply Move.Verify.satisfies_of_wp))
+      introNamed `args
+      introNamed `initial
+      introNamed `permitted
+      normalizeMayAbort
     else if ← targetUsesFix then
       let bodySpec := mkIdentFrom stx bodySpecName
       Lean.Elab.Tactic.evalTactic (← `(tactic| apply Move.Verify.satisfies_fix_of_wp))
@@ -5212,6 +8713,83 @@ scoped macro "verify " function:ident " by " proof:tacticSeq : command => do
 its declarative contract using the typed store laws and arithmetic solver. -/
 scoped syntax (name := automaticSourceVerify) "verify " ident : command
 
+/-- Derive a `fun`'s relational semantics `f.sourceSpec` from its retained
+source at its declaration.  The function items emit this command for every
+function with a body, so a function without a `spec` block carries its
+semantics with its module: its callers, in this module or in importing ones,
+reason through its body.  The derivation is best effort: a body outside the
+translator's coverage derives nothing and reports nothing here -- the `spec`
+or the caller that needs the semantics reports the limitation where it
+matters, and a `spec` block, when there is one, is the declared semantics
+regardless. -/
+syntax (name := deriveSourceSpec) "#derive_move_source_spec " ident : command
+
+@[command_elab deriveSourceSpec]
+private def elabDeriveSourceSpec : CommandElab := fun stx => do
+  let function : TSyntax `ident := ⟨stx[1]⟩
+  let functionName := (← getCurrNamespace) ++ function.getId
+  let env ← getEnv
+  if env.contains (functionName ++ `sourceSpec) then return
+  -- Translate against an empty message log: errors mean the derivation is
+  -- abandoned, with the environment (a partially generated mutual component)
+  -- restored; otherwise the messages are kept.
+  let saved := (← get).messages
+  modify fun st => { st with messages := {} }
+  let report := (← getOptions).getBool `move.reportDerivation false
+  let abandon (reason : MessageData) : CommandElabM Unit := do
+    setEnv env
+    modify fun st => { st with messages := saved }
+    if report then
+      logWarningAt function m!"source semantics of `{functionName}` not derived: {reason}"
+  try
+    Move.Verify.Source.ensureSourceSpec functionName function
+    if (← get).messages.hasErrors then
+      let errors ← (← get).messages.toList.filterM fun message =>
+        pure (message.severity == .error)
+      let reasons ← errors.mapM (·.data.toString)
+      abandon m!"{String.intercalate "; " reasons}"
+    else
+      modify fun st => { st with messages := saved ++ st.messages }
+  catch e =>
+    abandon e.toMessageData
+
+/-- Derive a `fun`'s specification version `f.specFun` from its retained
+source at its declaration (`Move.Verify.Source.ensureSpecFunction`): the
+pure reading of its body, what `f args` denotes in a specification clause.
+The function items emit this command for every function with a body, so the
+version travels with its module and serves the specifications of importing
+modules.  Best effort and silent, like `#derive_move_source_spec`: a body
+without a pure reading derives nothing here — a specification that applies
+the function reports why, and `spec fun f …` can declare a version by hand
+(`set_option move.reportDerivation true` reports the failures here). -/
+syntax (name := deriveSpecFunction) "#derive_move_spec_function " ident : command
+
+@[command_elab deriveSpecFunction]
+private def elabDeriveSpecFunction : CommandElab := fun stx => do
+  let function : TSyntax `ident := ⟨stx[1]⟩
+  let functionName := (← getCurrNamespace) ++ function.getId
+  let env ← getEnv
+  if Move.Verify.Source.isSpecFunction env functionName then return
+  let saved := (← get).messages
+  modify fun st => { st with messages := {} }
+  let report := (← getOptions).getBool `move.reportDerivation false
+  let abandon (reason : MessageData) : CommandElabM Unit := do
+    setEnv env
+    modify fun st => { st with messages := saved }
+    if report then
+      logWarningAt function m!"specification version of `{functionName}` not derived: {reason}"
+  try
+    let _ ← Move.Verify.Source.ensureSpecFunction functionName function
+    if (← get).messages.hasErrors then
+      let errors ← (← get).messages.toList.filterM fun message =>
+        pure (message.severity == .error)
+      let reasons ← errors.mapM (·.data.toString)
+      abandon m!"{String.intercalate "; " reasons}"
+    else
+      modify fun st => { st with messages := saved ++ st.messages }
+  catch e =>
+    abandon e.toMessageData
+
 /-- End an automatic verification attempt with a concise, source-oriented
 diagnostic instead of exposing the automation tactic's internal search state. -/
 scoped syntax (name := reportVerificationFailure)
@@ -5221,6 +8799,26 @@ scoped syntax (name := reportVerificationFailure)
 private def elabReportVerificationFailure : Lean.Elab.Tactic.Tactic := fun stx => do
   throwErrorAt stx[1]
     "verification failed for `{stx[1].getId}`: the implementation does not prove its contract; use `verify {stx[1].getId} by` to inspect and prove the remaining obligation"
+
+/-- A Move named integer constant: a definition of a bounded integer type.
+The automatic proofs unfold the ones a function or its contract mentions, so
+their values reach the arithmetic. -/
+private def isMoveIntConstant (env : Environment) (name : Name) : Bool :=
+  match env.find? name with
+  | some (.defnInfo info) =>
+      match info.type.getAppFn.constName? with
+      | some head =>
+          [``Move.U8, ``Move.U16, ``Move.U32, ``Move.U64, ``Move.U128, ``Move.U256,
+            ``Move.I8, ``Move.I16, ``Move.I32, ``Move.I64, ``Move.I128, ``Move.I256,
+            ``Move.MoveInt, ``Move.UInt, ``Move.SInt].contains head
+      | none => false
+  | _ => false
+
+/-- The Move named integer constants a declaration's value mentions. -/
+private def moveIntConstantsOf (env : Environment) (declName : Name) : Array Name :=
+  match env.find? declName >>= (·.value? (allowOpaque := true)) with
+  | some value => value.getUsedConstants.filter (isMoveIntConstant env)
+  | none => #[]
 
 @[command_elab automaticSourceVerify]
 private def elabAutomaticSourceVerify : CommandElab := fun stx => do
@@ -5255,27 +8853,52 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
       if let some value := info.value? (allowOpaque := true) then
         for dependency in value.getUsedConstants do
           if dependency != functionName &&
-              Move.isMoveFunction env dependency then
+              (Move.isMoveFunction env dependency || isMoveIntConstant env dependency) then
             let dependencyTerm ← parseTerm dependency
             let dependencyLemma ←
               `(Lean.Parser.Tactic.simpLemma| $dependencyTerm:term)
             unfoldLemmas := unfoldLemmas.push dependencyLemma
+    -- Named constants the contract mentions.
+    for constant in moveIntConstantsOf env (functionName ++ `contract) do
+      let constantTerm ← parseTerm constant
+      unfoldLemmas := unfoldLemmas.push (← `(Lean.Parser.Tactic.simpLemma| $constantTerm:term))
+    -- Specification functions the contract applies, transitively: unfolded,
+    -- as the Move Prover inlines non-recursive specification functions.
+    for definition in Move.Verify.Source.specFunctionDependencies env (functionName ++ `contract) do
+      let definitionTerm ← parseTerm definition
+      unfoldLemmas := unfoldLemmas.push (← `(Lean.Parser.Tactic.simpLemma| $definitionTerm:term))
     let command ← `(theorem $verifiedName : $contractName := by
       move_bench
       unfold $contractName
       simp_all [$unfoldLemmas,*, move_spec, move_invariant_norm, move_norm,
         Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
+        Move.Vector.toList_length_lt_size, Move.Vector.elems_length_lt_size,
         exists_const] <;>
+      -- An enum `match` or a conditional the unfolding exposes is a case
+      -- split, each branch normalized again.
+      (try (repeat' split) <;> simp_all [$unfoldLemmas,*, move_spec,
+        move_invariant_norm, move_norm, Nat.reducePow, Nat.reduceMod,
+        Move.UInt.numeral_eq_ofNat, and_assoc, exists_const]) <;>
+      -- A second pass for `Int`-valued specifications over unsigned values
+      -- (subtraction, signed or `num` operands): the `toInt` view becomes the
+      -- `Nat` view once the checked-operation lemmas have fired.
+      (try simp_all (config := { contextual := true })
+        [Move.UInt.toInt_eq_toNat, ← Int.ofNat_sub, Int.ofNat_inj, move_norm,
+          Nat.reducePow, Nat.reduceMod, and_assoc]) <;>
       (try uint_bounds) <;>
       try (grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
         Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
         Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
         Move.UInt.toNat_zero, Move.UInt.toNat_one,
-        Move.UInt.toNat_cast,
+        Move.UInt.toNat_cast, Move.UInt.toInt_eq_toNat,
+        Move.UInt.toNat_ofNat_sub, Move.UInt.toNat_ofNat_div,
+        Move.UInt.toNat_ofNat_mod,
         Move.UInt.toNat_lt,
         Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
         Move.Semantics.ResourceStore.get_insert_same,
-        Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le])
+        Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le,
+        List.getElem!_of_getElem?,
+        Move.Vector.toList_length_lt_size, Move.Vector.elems_length_lt_size])
       all_goals report_verification_failure $qualifiedFunction)
     elabCommand command
     return
@@ -5294,12 +8917,24 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
             | _ => false
           if dependency != sourceSpecName && !verifiedSource &&
               (Move.isMoveFunction env dependency ||
+                isMoveIntConstant env dependency ||
                 nameSuffix? dependency == some "sourceSpec" ||
+                nameSuffix? dependency == some "mutationSpec" ||
+                nameSuffix? dependency == some "summarySpec" ||
                 nameSuffix? dependency == some "bodySpec") then
           let dependencyTerm ← parseTerm dependency
           let dependencyLemma ←
             `(Lean.Parser.Tactic.simpLemma| $dependencyTerm:term)
           sourceUnfoldLemmas := sourceUnfoldLemmas.push dependencyLemma
+  -- Named constants the contract mentions, and those callee summaries mention.
+  for constant in moveIntConstantsOf env (functionName ++ `contract) do
+    let constantTerm ← parseTerm constant
+    sourceUnfoldLemmas := sourceUnfoldLemmas.push (← `(Lean.Parser.Tactic.simpLemma| $constantTerm:term))
+  -- Specification functions the contract applies, transitively: unfolded, as
+  -- the Move Prover inlines non-recursive specification functions.
+  for definition in Move.Verify.Source.specFunctionDependencies env (functionName ++ `contract) do
+    let definitionTerm ← parseTerm definition
+    sourceUnfoldLemmas := sourceUnfoldLemmas.push (← `(Lean.Parser.Tactic.simpLemma| $definitionTerm:term))
   -- Callees are inlined: their `sourceSpec`s are unfolded into the caller's
   -- body before symbolic execution (the function's own `sourceSpec` and
   -- `bodySpec` are already opened by `contract_intro`).
@@ -5310,6 +8945,13 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
           env.contains (callee ++ `verified) && isRecursiveSourceSpec env name
       | _ => false
     name != sourceSpecName && name != functionName ++ `bodySpec && !verifiedCallee
+  let wpNormalize ← `(tactic| simp only [$calleeUnfoldLemmas,*, wp_norm, move_norm, move_data,
+        Nat.reducePow, Nat.reduceMod, and_imp, forall_eq, forall_eq',
+        Classical.not_not,
+        exists_eq_left, exists_eq_left', exists_eq_right, exists_and_left,
+        exists_and_right, and_true, true_and, true_implies, implies_true,
+        and_self, Prod.mk.injEq, not_false_eq_true, not_true_eq_false,
+        ite_true, ite_false, dite_true, dite_false])
   let command ← `(set_option maxHeartbeats 800000 in
     theorem $verifiedName : $contractName := by
       move_bench
@@ -5318,29 +8960,92 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
       -- existentials, well-definedness discharged per primitive, the only
       -- residue being a created value's data invariant.
       contract_intro
-      try simp only [$calleeUnfoldLemmas,*, wp_norm, move_norm, move_data,
-        Nat.reducePow, Nat.reduceMod, and_imp, forall_eq, forall_eq',
-        Classical.not_not,
-        exists_eq_left, exists_eq_left', exists_eq_right, exists_and_left,
-        exists_and_right, and_true, true_and, true_implies, implies_true,
-        and_self, Prod.mk.injEq, not_false_eq_true, not_true_eq_false,
-        ite_true, ite_false, dite_true, dite_false]
+      -- An enum `match` at the head of the body is a case split: the wp
+      -- rules then apply to each branch.
+      all_goals try (repeat' split_matches)
+      all_goals try $wpNormalize:tactic
+      -- A `match` through a mutable reference dispatches on the referent,
+      -- which the prophecy rule exposes under its quantifier: introduce,
+      -- split, and normalize each branch again (nothing is introduced when
+      -- there is no enum match to split).
+      all_goals try (intros; split_enum_matches; repeat' split_enum_matches)
+      all_goals try $wpNormalize:tactic
       all_goals try verified_call
+      -- Loops with stated invariants: each iteration's exit test is a case
+      -- split, a conjunction its parts, the next iteration `recursiveVerified`.
+      all_goals try loop_invariants
+      all_goals try loop_iteration_cases
       all_goals
         simp_all (config := { maxSteps := 1000000 })
           [$calleeUnfoldLemmas,*, move_spec, move_data, move_invariant_norm,
             move_norm, Nat.reducePow, Nat.reduceMod,
+            Move.Vector.toList_length_lt_size, Move.Vector.elems_length_lt_size,
             and_assoc, exists_const] <;>
+        -- A second pass for `Int`-valued specifications over unsigned values
+        -- (subtraction, signed or `num` operands): the `toInt` view becomes
+        -- the `Nat` view once the checked-operation lemmas have fired.
+        (try simp_all (config := { maxSteps := 1000000, contextual := true })
+          [Move.UInt.toInt_eq_toNat, ← Int.ofNat_sub, Int.ofNat_inj, move_norm,
+            Nat.reducePow, Nat.reduceMod, and_assoc]) <;>
         (try uint_bounds) <;>
         try (grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
           Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
           Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
           Move.UInt.toNat_zero, Move.UInt.toNat_one,
-          Move.UInt.toNat_cast,
+          -- `Int`-valued specifications (subtraction, signed or `num`
+          -- operands) over unsigned values reduce to the `Nat` view; the
+          -- range-preserving operations keep their exposed value.
+          Move.UInt.toNat_cast, Move.UInt.toInt_eq_toNat,
+          Move.UInt.toNat_ofNat_sub, Move.UInt.toNat_ofNat_div,
+          Move.UInt.toNat_ofNat_mod,
           Move.UInt.toNat_lt, Nat.shiftRight_le,
           Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
           Move.Semantics.ResourceStore.get_insert_same,
-          Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le])
+          Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le,
+          List.getElem!_of_getElem?,
+          Move.Vector.toList_length_lt_size, Move.Vector.elems_length_lt_size])
+      -- Loop goals the normalization uncovers (an element borrow's match,
+      -- say): the loop passes and the normalization once more.
+      all_goals try loop_iteration_cases
+      all_goals try
+        simp_all (config := { maxSteps := 1000000 })
+          [$calleeUnfoldLemmas,*, move_spec, move_data, move_invariant_norm,
+            move_norm, Nat.reducePow, Nat.reduceMod,
+            Move.Vector.toList_length_lt_size, Move.Vector.elems_length_lt_size,
+            and_assoc, exists_const] <;>
+        -- A second pass for `Int`-valued specifications over unsigned values
+        -- (subtraction, signed or `num` operands): the `toInt` view becomes
+        -- the `Nat` view once the checked-operation lemmas have fired.
+        (try simp_all (config := { maxSteps := 1000000, contextual := true })
+          [Move.UInt.toInt_eq_toNat, ← Int.ofNat_sub, Int.ofNat_inj, move_norm,
+            Nat.reducePow, Nat.reduceMod, and_assoc]) <;>
+        (try uint_bounds) <;>
+        try (grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
+          Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
+          Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
+          Move.UInt.toNat_zero, Move.UInt.toNat_one,
+          -- `Int`-valued specifications (subtraction, signed or `num`
+          -- operands) over unsigned values reduce to the `Nat` view; the
+          -- range-preserving operations keep their exposed value.
+          Move.UInt.toNat_cast, Move.UInt.toInt_eq_toNat,
+          Move.UInt.toNat_ofNat_sub, Move.UInt.toNat_ofNat_div,
+          Move.UInt.toNat_ofNat_mod,
+          Move.UInt.toNat_lt, Nat.shiftRight_le,
+          Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
+          Move.Semantics.ResourceStore.get_insert_same,
+          Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le,
+          List.getElem!_of_getElem?,
+          Move.Vector.toList_length_lt_size, Move.Vector.elems_length_lt_size])
+      -- What arithmetic leaves: a loop iteration whose invariant is the
+      -- function's own contract closes by the induction hypothesis; an
+      -- equality of bounded integers is decided by their values.
+      all_goals try first
+        | (intros; exact Move.Verify.wp_of_satisfies $(mkIdent `recursiveVerified) trivial)
+        | (apply Move.UInt.ext
+           (try simp_all [Move.UInt.toNat_zero, Move.UInt.toNat_one,
+             Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16, Move.UInt.toNat_ofNat_u32,
+             Move.UInt.toNat_ofNat_u64, Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256])
+           <;> omega)
       all_goals report_verification_failure $qualifiedFunction)
   elabCommand command
 

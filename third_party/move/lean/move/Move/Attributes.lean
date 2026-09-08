@@ -319,6 +319,10 @@ initialize moveEntryAttr : Lean.TagAttribute ←
 initialize moveNativeAttr : Lean.TagAttribute ←
   Lean.registerTagAttribute `move_native "Move native function declaration"
 
+initialize moveOpaqueAttr : Lean.TagAttribute ←
+  Lean.registerTagAttribute `move_opaque
+    "Move function specified `pragma opaque`: callers reason through its contract's summary"
+
 initialize moveInlineAttr : Lean.TagAttribute ←
   Lean.registerTagAttribute `move_inline "Move inline function declaration"
 
@@ -328,9 +332,10 @@ initialize movePackageAttr : Lean.TagAttribute ←
 
 /-- Whether a declaration is a Move function of any visibility. -/
 def isMoveFunction (env : Environment) (name : Name) : Bool :=
-  moveFunAttr.hasTag env name || movePublicAttr.hasTag env name ||
-    moveFriendAttr.hasTag env name || movePackageAttr.hasTag env name ||
-    moveEntryAttr.hasTag env name || moveNativeAttr.hasTag env name
+  !moveInlineAttr.hasTag env name &&
+    (moveFunAttr.hasTag env name || movePublicAttr.hasTag env name ||
+      moveFriendAttr.hasTag env name || movePackageAttr.hasTag env name ||
+      moveEntryAttr.hasTag env name || moveNativeAttr.hasTag env name)
 
 private def deriveAbility (tag : Lean.TagAttribute) : Lean.Elab.DerivingHandler :=
   fun typeNames => do

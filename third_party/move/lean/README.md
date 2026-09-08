@@ -51,9 +51,14 @@ compiler exchange format, not a proof artifact.
 |---|---|---|
 | `move` | [`Move`](move/Move/README.md) | The Leaner Move source language: surface, source contracts, the `verify` proof engine, and lowering to XIR, with its regressions under `Move/Tests`.  **Start here.** |
 | `move-model` | [`MoveModel`](move-model/MoveModel/README.md) | A logical model of Move bytecode: stackless IR, execution semantics, prover stages, and masm/Move source embedding, with its regressions under `MoveModel/Tests`.  What `Move` compiles into, and usable on its own. |
+| `transpiler` | [`Transpiler`](transpiler/transpile-design.md) | The Move-to-Leaner transpiler: runs `aptos move exchange --format ast` on Move sources and prints Leaner Move (`lake exe transpile`), with baselines (`Tests/Programs/<name>.move` beside its generated `<Name>.lean`) and an elaboration gate.  Requires `move` for its tests. |
+| `leaner-rust` | [`LeanerRust`](designs/rust-mir-design.md) | The initial Rust semantic profile plus the project-owned Rustc Public exporter spike. It imports into the shared `leaner-ir` boundary and stops rustc before code generation. |
+| `leaner-e2e-tests` | [end-to-end baselines](leaner-e2e-tests/README.md) | Discoverable Move→LeanerLang and Rust→LeanerLang source/result baselines. It temporarily depends on `transpiler` while the compatibility adapters are migrated. |
 
-Two Lake packages, each holding the library of the same name; `move` depends on
-`move-model`.  A downstream project requires whichever it needs:
+Each production Lake package holds the library of the same name;
+`leaner-e2e-tests` is deliberately test-only and may depend on all layers it
+exercises. `move` depends on `move-model`, while `leaner-rust` depends on
+`leaner-ir`. A downstream project requires whichever it needs:
 
 ```toml
 [[require]]
@@ -61,12 +66,22 @@ name = "move"
 path = "<checkout>/third_party/move/lean/move"
 ```
 
-The language is defined in [`leaner-move.md`](move/Move/leaner-move.md), the
-verification design in
-[`verification-design.md`](move/Move/verification-design.md), and what the
-surface does *not* yet handle in
+The current cross-package design documents live in [`designs/`](designs/);
+executed or superseded ones are kept under
+[`designs/historical/`](designs/historical/). The
+profile-general Leaner source language is being designed in
+[`designs/leaner-lang.md`](designs/leaner-lang.md). Its implemented Move profile is
+defined in [`leaner-move.md`](move/Move/leaner-move.md), the verification
+architecture in [`verification-design.md`](move/Move/verification-design.md),
+and current surface coverage and gaps in
 [`project-plan.md`](move/Move/project-plan.md).  Each library README owns its
 architecture, module index, and roadmap.
+
+The `leaner-rust` package uses a project-owned Rustc Public exporter to
+import borrow-checked MIR into validated Leaner IR, then reproduce readable
+Rust source from that IR. Charon remains a differential-testing aid, and
+raw-pointer support is staged. The full decision is described in
+[`designs/rust-mir-design.md`](designs/rust-mir-design.md).
 
 ## Build and test
 
@@ -82,23 +97,26 @@ source "$HOME/.profile"
 ```bash
 cd move-model && lake build     # the logical model
 cd move       && lake build     # Leaner Move (builds move-model first)
+cd transpiler && lake build     # the Move-to-Leaner transpiler and `transpile`
 ```
 
 The core libraries do not require the Aptos CLI. The regression suites do
-require the exchange frontend. Build its lightweight single-file entrypoint and
-set `APTOS_MOVE_EXCHANGE` in your shell profile; this is **highly recommended**
-for normal Leaner development because it avoids rebuilding the full Aptos CLI
-and greatly improves edit/test turnaround. Then run each package's suite:
+require the exchange frontend. Build the standalone Move CLI and set
+`APTOS_MOVE_CLI` in your shell profile; this is **highly recommended** for
+normal Leaner development because it avoids the full Aptos CLI and greatly
+improves edit/test turnaround. Then run each package's suite:
 
 ```bash
-cargo build -p aptos-move-cli --bin aptos-move-exchange
-export APTOS_MOVE_EXCHANGE="$PWD/../../../target/debug/aptos-move-exchange"
+cargo build -p aptos-move-cli --features binary --bin move
+export APTOS_MOVE_CLI="$PWD/../../../target/debug/move"
 cd move-model && lake test
 cd move       && lake test
+cd transpiler && lake test
 ```
 
 `APTOS_CLI=<path-to-aptos>` remains supported for the full `aptos move
-exchange` command.
+exchange` command. The standalone Move CLI receives `exchange` directly, so
+its equivalent command is `move exchange`.
 
 Proof cost is tracked with `scripts/bench-proofs.sh`; the encoding's cost
 analysis is in

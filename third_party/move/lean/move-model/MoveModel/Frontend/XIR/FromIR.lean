@@ -97,6 +97,7 @@ def MModule.ofIR (module : MoveModel.IR.Module) : Except String MModule := do
     funMeta := funMeta
     externalFuns := module.externalFuns
     friends := module.friends
+    externalStructs := module.externalStructs
   }
 
 end MoveModel.Frontend.XIR

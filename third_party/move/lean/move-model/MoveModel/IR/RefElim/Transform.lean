@@ -391,6 +391,9 @@ def elimImmInstr (d : FunDecl) (st : ElimSt) :
   | .call _ (.borrowFieldInst _ _) _
   | .call _ (.borrowGlobalInst _ _) _ =>
       throw "generic reference operations are not yet supported by reference elimination"
+  | .call _ (.borrowVariantField _ _) _ | .call _ (.borrowVariantFieldInst _ _ _) _
+  | .call _ (.testVariantRef _) _ | .call _ (.testVariantRefInst _ _) _ =>
+      throw "enum payload references are not yet supported by reference elimination"
   | .load dst v =>
       if v.refFree then pure (st, [.load dst v])
       else throw "a reference literal is not source-level"

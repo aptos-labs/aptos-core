@@ -14,6 +14,7 @@ import MoveModel.Tests.Interp.Mutations
 import MoveModel.Tests.Interp.RefElimAgree
 import MoveModel.Tests.Interp.References
 import MoveModel.Tests.Interp.Structs
+import MoveModel.Tests.Interp.Variants
 import MoveModel.Tests.Interp.Vectors
 import MoveModel.Tests.Prover.Account
 import MoveModel.Tests.Prover.Adequacy

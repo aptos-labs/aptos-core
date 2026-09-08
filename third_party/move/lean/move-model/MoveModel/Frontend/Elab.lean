@@ -20,9 +20,9 @@ Masm input goes through the real assembler.  Move input goes through compiler
 v2, including genuine `spec` blocks.  Compiler and frontend failures are
 reported at the source string.
 
-`APTOS_MOVE_EXCHANGE` may name the lightweight, direct exchange frontend.
-For backward compatibility, `APTOS_CLI` may name the full Aptos CLI. Otherwise
-the elaborators use `aptos` on `PATH`.
+`APTOS_MOVE_CLI` may name the lightweight standalone Move CLI. For backward
+compatibility, `APTOS_CLI` may name the full Aptos CLI. Otherwise the
+elaborators use `aptos` on `PATH`.
 
 This is the only module of the library that imports `Lean`; the theory
 itself stays independent of the metaprogramming framework.
@@ -64,6 +64,7 @@ deriving instance ToExpr for StructMeta
 deriving instance ToExpr for FunMeta
 deriving instance ToExpr for ExternalFunRef
 deriving instance ToExpr for ExternalModuleRef
+deriving instance ToExpr for ExternalStructRef
 deriving instance ToExpr for MLoop
 deriving instance ToExpr for MContract
 deriving instance ToExpr for MFun
@@ -73,12 +74,12 @@ deriving instance ToExpr for MModule
 
 /-! ## Running the frontend -/
 
-/-- Locates the exchange frontend. `APTOS_MOVE_EXCHANGE` takes precedence and
-names a binary whose arguments are the exchange flags directly. `APTOS_CLI`
-selects the backward-compatible `aptos move exchange` frontend. -/
+/-- Locates the exchange frontend. `APTOS_MOVE_CLI` takes precedence and
+names the standalone `move` CLI, whose exchange subcommand is invoked directly.
+`APTOS_CLI` selects the backward-compatible `aptos move exchange` frontend. -/
 def findFrontend : IO (String × Array String) := do
-  if let some p ← IO.getEnv "APTOS_MOVE_EXCHANGE" then
-    return (p, #[])
+  if let some p ← IO.getEnv "APTOS_MOVE_CLI" then
+    return (p, #["exchange"])
   if let some p ← IO.getEnv "APTOS_CLI" then
     return (p, #["move", "exchange"])
   return ("aptos", #["move", "exchange"])
@@ -115,7 +116,7 @@ def decodeFrontend (s : Syntax) (fileArg suffix : String) :
     try
       runFrontend fileArg suffix input
     catch e =>
-      throwErrorAt s "Move exchange frontend failed (set APTOS_MOVE_EXCHANGE \
+      throwErrorAt s "Move exchange frontend failed (set APTOS_MOVE_CLI \
         for the lightweight frontend, or set APTOS_CLI):\n{e.toMessageData}"
   match decodeMProgram (← run) with
   | .ok p => return p

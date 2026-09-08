@@ -87,6 +87,13 @@ def fix (body : (Args → Spec σ Result) → Args → Spec σ Result) :
     ∃ fuel, (fixApprox body fuel args).undefined initial
 }
 
+/-- A loop's fixed point with its stated invariant — a proposition over the
+loop state and the store at the start of each iteration.  Semantically
+`fix body init`; the annotation is what loop verification uses
+(`Move.Verify.wp_withInvariant_fix`). -/
+def withInvariant (body : (Args → Spec σ Result) → Args → Spec σ Result)
+    (init : Args) (_invariant : Args → σ → Prop) : Spec σ Result := fix body init
+
 /-- One heterogeneous family of mutually recursive source functions.  The
 index selects both the argument and result type, so an SCC is not forced to
 give every member the same signature. -/
@@ -304,6 +311,13 @@ def certifyState (invariant : State → Prop) : Spec State Unit where
   aborts := fun _ _ => False
   undefined := fun initial => ¬ invariant initial
 
+/-- Assume a predicate over the current global state.  Unlike
+`certifyState`, this creates no verification obligation: executions for which
+the assumption is false simply do not continue. -/
+def assumeState (assumption : State → Prop) : Spec State Unit where
+  ok := fun initial result final => assumption initial ∧ result = () ∧ final = initial
+  aborts := fun _ _ => False
+
 @[simp] theorem certifyState_ok (invariant : State → Prop) :
     (certifyState invariant).ok initial result final ↔
       invariant initial ∧ result = () ∧ final = initial := Iff.rfl
@@ -313,6 +327,13 @@ def certifyState (invariant : State → Prop) : Spec State Unit where
 
 @[simp] theorem certifyState_undefined (invariant : State → Prop) :
     (certifyState invariant).undefined initial ↔ ¬ invariant initial := Iff.rfl
+
+@[simp] theorem assumeState_ok (assumption : State → Prop) :
+    (assumeState assumption).ok initial result final ↔
+      assumption initial ∧ result = () ∧ final = initial := Iff.rfl
+
+@[simp] theorem assumeState_aborts (assumption : State → Prop) :
+    ¬(assumeState assumption).aborts initial code := fun h => h
 
 /-- Assert a relation between the state before and after an operation.  This
 certifies an *update* global invariant, which — unlike a regular invariant —

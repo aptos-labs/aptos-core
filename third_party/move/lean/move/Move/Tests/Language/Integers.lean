@@ -176,7 +176,7 @@ module Integers where
 
   verify primitive_match_effect by
     contract_intro
-    cases h : (args.1 == 0) <;> simp [wp_norm, move_norm]
+    cases h : (args.1 == 0) <;> simp [wp_norm, move_norm] <;> omega
 
   verify classify_open_range
 

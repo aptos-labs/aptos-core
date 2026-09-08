@@ -317,6 +317,40 @@ syntax (name := moveWhileInternal) "__moveWhile " term " do " doSeq : doElem
 syntax (name := moveWhileDependentInternal)
   "__moveWhile " ident " : " term " do " doSeq : doElem
 syntax (name := moveLoopDo) "loop " doSeq : doElem
+/-- `invariant P` at the head of a `loop`/`while` body: the loop invariant, a
+proposition over the loop's state — its locals and the current referents of
+live mutable references, as values — that holds at the start of every
+iteration.  A verification statement: the executable program ignores it (the
+proposition is in the specification vocabulary, elaborated with the
+function's relational semantics), and the compiler never sees it. -/
+scoped syntax (name := moveInvariant) "invariant " term : doElem
+macro_rules
+  | `(doElem| invariant $_:term) => `(doElem| pure ())
+
+/-- An assertion available only to the source-specification generator.  It has
+the same non-executable status as a loop invariant, but applies at its exact
+program point rather than at a loop header.  It is distinct from executable
+Move `assert!(condition, code)`. -/
+scoped syntax (name := moveSpecAssert) "assert " term : doElem
+
+/-- An assumption available only to the source-specification generator. -/
+scoped syntax (name := moveSpecAssume) "assume " term : doElem
+
+/-- A compiler-inserted capture point for the values an anchored `old` term
+observes.  It is deliberately internal syntax: Move source has no equivalent
+statement. -/
+scoped syntax (name := moveSpecCapture) "__moveSpecCapture " num : doElem
+
+macro_rules
+  | `(doElem| assert $_:term) => `(doElem| let _ := ())
+  | `(doElem| assume $_:term) => `(doElem| let _ := ())
+  | `(doElem| __moveSpecCapture $_:num) => `(doElem| let _ := ())
+
+/-- A compiler-inserted old-value observation tied to a preceding `spec
+capture`.  The source-specification generator replaces it with that capture
+before elaborating the invariant. -/
+scoped syntax (name := anchoredOldTerm) "oldAt[" num "](" term ")" : term
+
 syntax (name := moveLoopLabeledDo) "loop@" ident ppSpace doSeq : doElem
 syntax (name := moveLoopNestedDo) "__moveLoopNested " ident ppSpace doSeq : doElem
 syntax (name := moveLoopLabeledNestedDo)
@@ -453,6 +487,9 @@ def loopAssignedIdents (body : TSyntax ``Lean.Parser.Term.doSeq) : List Ident :=
 
 private partial def replaceIdent (name : Name) (replacement stx : Syntax) : Syntax :=
   if stx.isIdent && stx.getId == name then replacement
+  else if stx.isIdent && stx.getId.getRoot == name && replacement.isIdent then
+    -- A dotted use of the variable (`x.push v`): the root is renamed.
+    mkIdentFrom stx (replacement.getId ++ stx.getId.replacePrefix name .anonymous)
   else stx.setArgs (stx.getArgs.map (replaceIdent name replacement))
 
 private def mkLoopDoSeq (elems : Array Syntax) : Syntax :=
@@ -467,6 +504,9 @@ mutual
     if stx.isIdent then
       if let some (_, replacement) := renames.find? (·.1 == stx.getId) then
         return replacement.raw
+      -- A dotted use of a renamed local (`x.push v`): the root is renamed.
+      if let some (name, replacement) := renames.find? (·.1 == stx.getId.getRoot) then
+        return (mkIdentFrom stx (replacement.getId ++ stx.getId.replacePrefix name .anonymous)).raw
       return stx
     let rewritten := stx.setArgs
       (← stx.getArgs.mapM (freshenLoopSyntax renames))
@@ -508,6 +548,89 @@ def freshenLoopLocals (body : TSyntax ``Lean.Parser.Term.doSeq) :
     CoreM (TSyntax ``Lean.Parser.Term.doSeq) :=
   freshenLoopSeq [] body
 
+private partial def replaceFirstExactIdent (name : Name)
+    (replacement stx : Syntax) : Syntax × Bool :=
+  if stx.isIdent && stx.getId == name then
+    (replacement, true)
+  else
+    let rec visit (remaining : List Syntax) (rewritten : Array Syntax) :
+        Array Syntax × Bool :=
+      match remaining with
+      | [] => (rewritten, false)
+      | child :: rest =>
+          let (child, found) := replaceFirstExactIdent name replacement child
+          if found then (rewritten.push child ++ rest.toArray, true)
+          else visit rest (rewritten.push child)
+    let (args, found) := visit stx.getArgs.toList #[]
+    (stx.setArgs args, found)
+
+private def shadowBoundDoIdents (element : Lean.DoElem) : List Ident :=
+  match element with
+  | `(doElem| let $pattern:term := $_value:term) => patternIdents pattern.raw
+  | `(doElem| let $pattern:term ← $_value:term) => patternIdents pattern.raw
+  | _ => loopBoundDoIdents element.raw
+
+mutual
+  /-- Rewrite uses according to the current lexical shadow map. Nested `do`
+  sequences receive the map but do not leak their bindings back out. -/
+  private partial def freshenShadowSyntax (renames : List (Name × Ident))
+      (bound : List Name) (stx : Syntax) : CoreM Syntax := do
+    if isDoSeqSyntax stx then
+      return (← freshenShadowSeq renames bound ⟨stx⟩).raw
+    if stx.isIdent then
+      if let some (_, replacement) := renames.find? (·.1 == stx.getId) then
+        return replacement.raw
+      if let some (name, replacement) := renames.find? (·.1 == stx.getId.getRoot) then
+        return (mkIdentFrom stx
+          (replacement.getId ++ stx.getId.replacePrefix name .anonymous)).raw
+      return stx
+    let rewritten := stx.setArgs
+      (← stx.getArgs.mapM (freshenShadowSyntax renames bound))
+    if stx.isOfKind ``moveLoopLabeledDo ||
+        stx.isOfKind ``moveLoopLabeledNestedDo ||
+        stx.isOfKind ``moveBreakLabeledDo ||
+        stx.isOfKind ``moveContinueLabeledDo then
+      return rewritten.setArgs (rewritten.getArgs.set! 1 stx[1])
+    if stx.isOfKind ``Lean.Parser.Term.proj && stx.getNumArgs > 2 then
+      return rewritten.setArgs (rewritten.getArgs.set! 2 stx[2])
+    return rewritten
+
+  private partial def freshenShadowSeq (renames : List (Name × Ident))
+      (bound : List Name) (seq : TSyntax ``Lean.Parser.Term.doSeq) :
+      CoreM (TSyntax ``Lean.Parser.Term.doSeq) := do
+    let (elems, _, _) ← (Lean.Parser.Term.getDoElems seq).foldlM
+      (init := (#[], renames, bound)) fun (elems, renames, bound) element => do
+        let bindings := shadowBoundDoIdents element
+        let rewritten ← freshenShadowSyntax renames bound element.raw
+        if bindings.isEmpty then
+          pure (elems.push rewritten, renames, bound)
+        else
+          let mut declaration := rewritten[3]
+          let mut nextRenames := renames
+          for binding in bindings do
+            if bound.contains binding.getId then
+              let oldName := renames.find? (·.1 == binding.getId)
+                |>.map (fun (_, replacement) => replacement.getId)
+                |>.getD binding.getId
+              let unique ← mkFreshUserName `moveShadow
+              let fresh := mkIdentFrom binding (Name.mkSimple unique.toString)
+              declaration :=
+                (replaceFirstExactIdent oldName fresh.raw declaration).1
+              nextRenames := (binding.getId, fresh) ::
+                nextRenames.filter (·.1 != binding.getId)
+          let rewritten := rewritten.setArgs
+            (rewritten.getArgs.set! 3 declaration)
+          pure (elems.push rewritten, nextRenames,
+            bindings.map (·.getId) ++ bound)
+    return ⟨mkLoopDoSeq elems⟩
+end
+
+/-- Give only lexically shadowing `do` locals distinct retained-source names.
+Ordinary source names stay unchanged for diagnostics and proof stability. -/
+def freshenShadowedLocals (body : TSyntax ``Lean.Parser.Term.doSeq) :
+    CoreM (TSyntax ``Lean.Parser.Term.doSeq) :=
+  freshenShadowSeq [] [] body
+
 macro_rules (kind := abortTerm)
   | stx => do
       let diagnostic : TSyntax `term := ⟨stx[1]⟩
@@ -539,6 +662,44 @@ private def projectionName? (owner : Expr) (field : Ident) : MetaM (Option Name)
   let candidate := ownerName ++ field.getId
   return if (← getEnv).contains candidate then some candidate else none
 
+/-- The payload field `field` of a Move enum type `owner` (an applied enum
+constant): the bit set of the variants that have it, its offset — one for all
+of them — and its type at `owner`'s instantiation.  A field of the same name
+at different offsets or types across variants is not one field. -/
+def variantField? (owner : Expr) (field : Name) :
+    MetaM (Option (Nat × Nat × Expr)) := do
+  let owner ← whnf owner
+  let .const enumName levels := owner.getAppFn | return none
+  let env ← getEnv
+  unless moveEnumAttr.hasTag env enumName do return none
+  let some (.inductInfo info) := env.find? enumName | return none
+  let args := owner.getAppArgs
+  let mut variants := 0
+  let mut offset? : Option Nat := none
+  let mut fieldType? : Option Expr := none
+  for (ctor, index) in info.ctors.zipIdx do
+    let ctorType ← instantiateForall (← inferType (mkConst ctor levels)) args
+    let found ← forallTelescope ctorType fun fields _ => do
+      let mut result : Option (Nat × Expr) := none
+      for (fieldVar, position) in fields.zipIdx do
+        let declaration ← fieldVar.fvarId!.getDecl
+        if declaration.userName == field && result.isNone then
+          result := some (position, ← instantiateMVars declaration.type)
+      pure result
+    if let some (position, type) := found then
+      if let some offset := offset? then
+        unless offset == position do
+          throwError "field `{field}` of `{enumName}` is at different offsets in different variants; Move borrows one offset"
+      offset? := some position
+      if let some fieldType := fieldType? then
+        unless ← isDefEq fieldType type do
+          throwError "field `{field}` of `{enumName}` has different types in different variants; Move borrows one type"
+      fieldType? := some type
+      variants := variants ||| (1 <<< index)
+  match offset?, fieldType? with
+  | some offset, some fieldType => return some (variants, offset, fieldType)
+  | _, _ => return none
+
 private def elabFieldBorrow (mutable : Bool) (refStx : Term)
     (field : Ident) (expectedType? : Option Expr) : TermElabM Expr := do
   let refExpr ← elabTerm refStx none
@@ -555,6 +716,14 @@ private def elabFieldBorrow (mutable : Bool) (refStx : Term)
       pure (owner, ← mkAppM ``freezeRef #[refExpr])
     else
       throwErrorAt refStx "expected a Move reference"
+  -- A payload field of an enum referent: the variant field borrow of the
+  -- variants that have it.
+  if let some (variants, offset, fieldType) ← variantField? owner field.getId then
+    let primitive := if mutable then ``borrowVariantFieldMut else ``borrowVariantField
+    let result ← mkAppOptM primitive
+      #[some owner, some fieldType, none, some (mkNatLit variants), some (mkNatLit offset),
+        some refExpr]
+    return ← ensureHasType expectedType? result
   let some projectionName ← projectionName? owner field
     | throwErrorAt field "`{field.getId}` is not a field of {owner}"
   -- Structure projections carry the structure's type parameters before the
@@ -639,9 +808,10 @@ private partial def chainBorrowSyntax (mutable : Bool) (origin : Syntax)
   | [] => pure effect
   | fieldName :: rest => do
       let ref := mkIdentFrom origin (Name.mkSimple "_leanerRef")
-      let field := mkIdentFrom origin (Name.mkSimple fieldName)
-      let primitive := mkIdent (if mutable then ``borrowFieldMut else ``borrowField)
-      let next ← `($primitive $ref (fieldOfProjection (fun owner => owner.$field)))
+      -- The next edge is a surface field borrow through the bound reference,
+      -- so a structure field and an enum payload field are borrowed alike.
+      let place := mkIdentFrom origin (Name.str (Name.mkSimple "_leanerRef") fieldName)
+      let next ← if mutable then `(&mut $place) else `(& $place)
       let tail ← chainBorrowSyntax mutable origin next rest
       `($effect >>= fun $ref => $tail)
 
@@ -712,6 +882,12 @@ private partial def elabBorrow (mutable : Bool) (place : Term)
             return ← elabTerm chained expectedType?
       if place.raw.isIdent then
         match place.raw.getId with
+        | .str baseName@(.str (.str _ _) _) fieldName =>
+            -- `r.f.g`: the borrow of `r.f`, chained through the last field.
+            let inner := baseIdent place baseName
+            let root ← if mutable then `(&mut $inner) else `(& $inner)
+            let chained ← chainBorrowSyntax mutable place.raw root [fieldName]
+            return ← elabTerm chained expectedType?
         | .str baseName fieldName =>
             let ref := baseIdent place baseName
             let field := mkIdentFrom place (Name.mkSimple fieldName)

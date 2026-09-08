@@ -77,6 +77,12 @@ def contains [store : ResourceStore State Value]
     (state : State) (address : Move.Address) : Prop :=
   (store.lookup state address).isSome
 
+/-- Existence is decidable: the specification version of a Move function
+testing `existsAt` is `Bool`-valued, as the function is. -/
+instance [store : ResourceStore State Value] (state : State) (address : Move.Address) :
+    Decidable (contains (Value := Value) state address) :=
+  inferInstanceAs (Decidable ((store.lookup state address).isSome = true))
+
 /-- Typed observation used by global-place contract syntax. Contracts normally
 guard it with `existsAt<Resource>(address)`; the default only totalizes the term
 on states outside that precondition. -/

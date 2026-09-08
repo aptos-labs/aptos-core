@@ -1,0 +1,13 @@
+name = "leaner-ir"
+defaultTargets = ["LeanerIR", "LeanerLang"]
+testDriver = "LeanerIRTests"
+
+[[lean_lib]]
+name = "LeanerIR"
+
+[[lean_lib]]
+name = "LeanerLang"
+
+[[lean_lib]]
+name = "LeanerIRTests"
+roots = ["LeanerIR.Tests.Validation", "LeanerIR.Tests.Json", "LeanerIR.Tests.Interpreter", "LeanerIR.Tests.Primitives", "LeanerIR.Tests.References", "LeanerIR.Tests.Closures", "LeanerIR.Tests.Finalization", "LeanerIR.Tests.Globals", "LeanerIR.Tests.Data", "LeanerIR.Tests.NominalPlaces", "LeanerIR.Tests.Generics", "LeanerIR.Tests.Abilities", "LeanerIR.Tests.Control", "LeanerIR.Tests.Declarations", "LeanerIR.Tests.Intrinsics", "LeanerIR.Tests.Representation", "LeanerLang.Tests.Frontend", "LeanerLang.Tests.SpecTypes", "LeanerLang.Tests.NativeRow", "LeanerLang.Tests.NativeCallRow", "LeanerLang.Tests.NativeStoreRow", "LeanerLang.Tests.Performance"]

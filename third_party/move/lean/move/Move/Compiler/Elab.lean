@@ -49,6 +49,7 @@ deriving instance ToExpr for StructMeta
 deriving instance ToExpr for FunMeta
 deriving instance ToExpr for ExternalFunRef
 deriving instance ToExpr for ExternalModuleRef
+deriving instance ToExpr for ExternalStructRef
 
 private def materialize (kind : String) (count : Nat) (get : Nat → Option α) :
     TermElabM (List α) :=
@@ -95,7 +96,8 @@ private def quoteModule (module : MoveModel.IR.Module) : TermElabM Expr := do
     toExpr funMeta,
     toExpr module.externalFuns,
     toExpr module.dialect,
-    toExpr module.friends]
+    toExpr module.friends,
+    toExpr module.externalStructs]
 
 private def resolveNames (idents : Array Syntax) : TermElabM (Array Name) :=
   idents.mapM resolveGlobalConstNoOverload
@@ -103,33 +105,8 @@ private def resolveNames (idents : Array Syntax) : TermElabM (Array Name) :=
 private def identifiers (listNode : Syntax) : Array Syntax :=
   listNode.getArgs.filter (·.isIdent)
 
-private def taggedNamesInNamespace (ns : Name) (attrs : Array TagAttribute) :
-    TermElabM (Array Name) := do
-  let env ← getEnv
-  let mut names : NameSet := {}
-  for attr in attrs do
-    let entries := (attr.ext.exportEntriesFn env (attr.ext.getState env)).private
-    for name in entries do
-      if ns.isPrefixOf name then
-        names := names.insert name
-  -- A tag extension's current state only records declarations elaborated in
-  -- this module. Imported entries remain queryable through `hasTag`, so scan
-  -- the environment to discover the tagged declarations of an imported Move
-  -- namespace as well.
-  for (name, _) in env.constants do
-    if ns.isPrefixOf name && attrs.any (·.hasTag env name) then
-      names := names.insert name
-  let mut result := #[]
-  for name in names do
-    result := result.push name
-  return result
-
 private def discoverModuleDecls (ns : Name) : TermElabM (Array Name × Array Name) := do
-  let structs ← taggedNamesInNamespace ns #[moveStructAttr, moveEnumAttr]
-  let functions ← taggedNamesInNamespace ns
-    #[moveFunAttr, movePublicAttr, moveFriendAttr, movePackageAttr, moveEntryAttr,
-      moveNativeAttr]
-  return (structs, functions)
+  return declarationsInNamespace (← getEnv) ns
 
 scoped syntax (name := moveModuleTerm)
   "module%" str " structs " "[" ident,* "]" " functions " "[" ident,* "]" : term

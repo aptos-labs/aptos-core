@@ -454,6 +454,21 @@ private def structConstructor? (env : Environment) (name : Name) : Option (Name 
       else none
   | _ => none
 
+/-- `T.certify`, the creation operation of a certified Move structure `T`
+(one with a data invariant): the structure, its type-parameter count, and its
+runtime field count.  The compiler packs the field arguments; the invariant
+is verification's obligation at the creation site. -/
+private def certifyCreation? (env : Environment) (name : Name) : Option (Name × Nat × Nat) :=
+  match name with
+  | .str structName "certify" =>
+      if moveStructAttr.hasTag env structName && (dataInvariant? env structName).isSome then
+        match env.find? (structName ++ `mk) with
+        | some (.ctorInfo ctor) =>
+            some (structName, ctor.numParams, runtimeFields env structName ctor.numFields)
+        | _ => none
+      else none
+  | _ => none
+
 private partial def intConstant? (name : Name) :
     CoreM (Option (MoveModel.IR.NumType × Int)) := do
   let decl ← match (← Lean.Compiler.LCNF.getBaseDecl? name) with
@@ -462,6 +477,8 @@ private partial def intConstant? (name : Name) :
         Lean.compileDecls #[name]
         let some decl ← Lean.Compiler.LCNF.getBaseDecl? name | return none
         pure decl
+  unless decl.params.isEmpty do return none
+  if Move.isMoveFunction (← getEnv) name then return none
   let .code code := decl.value | return none
   let rec scan (nats : List (FVarId × Nat)) (ints : List (FVarId × Int))
       (results : List (FVarId × (MoveModel.IR.NumType × Int))) :
@@ -564,6 +581,97 @@ private partial def intConstant? (name : Name) :
     | .return result => pure (assocFind? result results)
     | _ => pure none
   scan [] [] [] code
+
+/-- A folded constant of a non-integer primitive type: the value of a `def`
+whose compiled body is a literal.  (Integer constants fold through
+`intConstant?`, which also evaluates constant arithmetic.) -/
+private inductive LiteralConstant where
+  | bool (value : Bool)
+  | address (value : Nat)
+  /-- A vector literal of integer literals (`vector![…]`, `b"…"`, `x"…"`), with
+  its Lean element type. -/
+  | vector (elemType : Expr) (elems : List (MoveModel.IR.NumType × Int))
+
+private inductive FoldedLiteral where
+  | nat (value : Nat)
+  | int (nt : MoveModel.IR.NumType) (value : Int)
+  | constant (value : LiteralConstant)
+
+private partial def literalConstant? (name : Name) : CoreM (Option LiteralConstant) := do
+  let decl ← match (← Lean.Compiler.LCNF.getBaseDecl? name) with
+    | some decl => pure decl
+    | none =>
+        Lean.compileDecls #[name]
+        let some decl ← Lean.Compiler.LCNF.getBaseDecl? name | return none
+        pure decl
+  -- A constant is a zero-parameter definition that is not a Move function; a
+  -- function whose body happens to be a literal (an opaque primitive stub, or
+  -- a `fun` returning a literal, which stays a call) is not one.
+  unless decl.params.isEmpty do return none
+  let env ← getEnv
+  if Move.isMoveFunction env name then return none
+  let .code code := decl.value | return none
+  let rec scan (results : List (FVarId × FoldedLiteral)) :
+      Code .pure → CoreM (Option LiteralConstant)
+    | .let letDecl next =>
+        let bind (value : FoldedLiteral) := scan ((letDecl.fvarId, value) :: results) next
+        let natOf (id : FVarId) : Option Nat := match assocFind? id results with
+          | some (.nat n) => some n
+          | _ => none
+        let intOf (id : FVarId) : Option (MoveModel.IR.NumType × Int) :=
+          match assocFind? id results with
+          | some (.int nt value) => some (nt, value)
+          | _ => none
+        match letDecl.value with
+        | .lit (.nat n) => bind (.nat n)
+        | .fvar id _ =>
+            match assocFind? id results with
+            | some value => bind value
+            | none => scan results next
+        | .const fn _ args _ =>
+            let vars := fvarArgs args
+            let types := typeArgs args
+            if fn == ``Int.ofNat || fn == ``NatCast.natCast || fn == ``Nat.cast then
+              match vars.back? >>= natOf with
+              | some n => bind (.nat n)
+              | none => scan results next
+            else if fn == ``UInt.ofNat then
+              match types[0]? >>= widthOfExpr?, vars.back? >>= natOf with
+              | some width, some n => bind (.int ⟨width, false⟩ n)
+              | _, _ => scan results next
+            else if fn == ``MoveInt.ofInt then
+              match types[0]? >>= signOfExpr?, types[1]? >>= widthOfExpr?, vars.back? >>= natOf with
+              | some signed, some width, some n => bind (.int ⟨width, signed⟩ n)
+              | _, _, _ => scan results next
+            else if fn == ``Bool.true then bind (.constant (.bool true))
+            else if fn == ``Bool.false then bind (.constant (.bool false))
+            else if fn == ``Move.Address.ofNat then
+              match vars.back? >>= natOf with
+              | some n => bind (.constant (.address n))
+              | none => scan results next
+            else if let some alias := Move.addressAliasByDeclaration? env fn then
+              bind (.constant (.address alias.value))
+            else if fn == ``Move.Vector.empty then
+              match types[0]? with
+              | some elemType => bind (.constant (.vector elemType []))
+              | none => scan results next
+            else if fn == ``Move.Vector.singleton then
+              match types[0]?, vars.back? >>= intOf with
+              | some elemType, some elem => bind (.constant (.vector elemType [elem]))
+              | _, _ => scan results next
+            else if fn == ``Move.Vector.push then
+              match vars[0]? >>= fun id => assocFind? id results, vars[1]? >>= intOf with
+              | some (.constant (.vector elemType elems)), some elem =>
+                  bind (.constant (.vector elemType (elems ++ [elem])))
+              | _, _ => scan results next
+            else scan results next
+        | _ => scan results next
+    | .return result =>
+        pure (match assocFind? result results with
+          | some (.constant value) => some value
+          | _ => none)
+    | _ => pure none
+  scan [] code
 
 private structure PendingCall where
   op : LIR.Oper
@@ -1091,6 +1199,16 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         addLocalTy decl.fvarId resultTy
         return instrs.push (.call #[srcName decl.fvarId]
           (.pack structName typeArgs) (vars.map srcName))
+      if let some (structName, numParams, numFields) := certifyCreation? (← getEnv) fn then
+        -- The `Inhabited` dictionaries of the type parameters are erased.
+        let fieldVars ← vars.filterM fun var => do pure (← localTy? var).isSome
+        unless fieldVars.size == numFields do
+          throwError "certified creation `{fn}` has {fieldVars.size} field arguments; expected {numFields}"
+        let typeArgs ← translateTypeArgs (← getEnv) types numParams
+        let resultTy := if typeArgs.isEmpty then .struct structName else .structInst structName typeArgs
+        addLocalTy decl.fvarId resultTy
+        return instrs.push (.call #[srcName decl.fvarId]
+          (.pack structName typeArgs) (fieldVars.map srcName))
       if let some (enumName, variant, numParams, numFields) := enumConstructor? (← getEnv) fn then
         unless vars.size == numFields do
           throwError "enum constructor `{fn}` has {vars.size} runtime fields; expected {numFields}"
@@ -1154,6 +1272,51 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           | throwError "cannot freeze a reference to a compiler-erased type"
         addLocalTy decl.fvarId (.ref ty)
         return instrs.push (.call #[srcName decl.fvarId] .freezeRef #[srcName ref])
+      if fn == ``borrowVariantField || fn == ``borrowVariantFieldMut then
+        -- `borrowVariantField {Owner FieldTy} [Inhabited FieldTy] variants field ref world`:
+        -- the explicit arguments precede the world, the instance (if passed)
+        -- precedes them.
+        let some owner := beforeWorld? vars
+          | throwError "variant field borrow is missing its reference"
+        let some fieldVar := vars[vars.size - 3]?
+          | throwError "variant field borrow is missing its field"
+        let some variantsVar := vars[vars.size - 4]?
+          | throwError "variant field borrow is missing its variants"
+        let some field ← natLiteral? fieldVar
+          | throwError "variant field borrow: the field offset is not a literal"
+        let some variantBits ← natLiteral? variantsVar
+          | throwError "variant field borrow: the variants are not a literal"
+        let some fieldType := types[1]?
+          | throwError "variant field borrow is missing its field type"
+        let some ty ← translateCurrentTy (← getEnv) fieldType
+          | throwError "cannot borrow a compiler-erased variant field"
+        let (enumName, typeArgs) ← match ← localTy? owner with
+          | some (.ref (.enum name)) | some (.mutRef (.enum name)) => pure (name, #[])
+          | some (.ref (.enumInst name args)) | some (.mutRef (.enumInst name args)) =>
+              pure (name, args)
+          | _ => throwError "variant field borrow of a non-enum reference"
+        let variants := (List.range 64).filter (fun v => (variantBits >>> v) % 2 == 1) |>.toArray
+        let resultTy := some <| if fn == ``borrowVariantFieldMut then .mutRef ty else .ref ty
+        modify fun s => { s with pending :=
+          (decl.fvarId, .call { op := .borrowVariantField enumName variants field typeArgs,
+                                srcs := #[owner], resultTy }) :: s.pending }
+        return instrs
+      if fn == ``testVariantRef || fn == ``testVariantMutRef then
+        let some owner := beforeWorld? vars
+          | throwError "variant test is missing its reference"
+        let some variantVar := vars[vars.size - 3]?
+          | throwError "variant test is missing its variant"
+        let some variant ← natLiteral? variantVar
+          | throwError "variant test: the variant is not a literal"
+        let (enumName, typeArgs) ← match ← localTy? owner with
+          | some (.ref (.enum name)) | some (.mutRef (.enum name)) => pure (name, #[])
+          | some (.ref (.enumInst name args)) | some (.mutRef (.enumInst name args)) =>
+              pure (name, args)
+          | _ => throwError "variant test of a non-enum reference"
+        modify fun s => { s with pending :=
+          (decl.fvarId, .call { op := .testVariantRef enumName variant typeArgs,
+                                srcs := #[owner], resultTy := some .bool }) :: s.pending }
+        return instrs
       if fn == ``borrowElem || fn == ``borrowElemMut then
         let some owner := vars[vars.size - 3]? | throwError "vector borrow is missing its reference"
         let some index := beforeWorld? vars | throwError "vector borrow is missing its index"
@@ -1471,6 +1634,25 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
       if let some (nt, value) ← intConstant? fn then
         addLocalTy decl.fvarId (.int nt)
         return instrs.push (.loadInt nt (localName decl.fvarId) value)
+      if let some constant ← literalConstant? fn then
+        match constant with
+        | .bool value =>
+            addLocalTy decl.fvarId .bool
+            return instrs.push (.loadBool (localName decl.fvarId) value)
+        | .address value =>
+            addLocalTy decl.fvarId .address
+            return instrs.push (.loadAddress (localName decl.fvarId) value)
+        | .vector elemType elems =>
+            let some elemTy ← translateCurrentTy (← getEnv) elemType
+              | throwError "vector constant `{fn}` has a compiler-erased element type"
+            let mut instrs := instrs
+            let mut elemNames := #[]
+            for (nt, value) in elems do
+              let temp ← freshTemp (.int nt)
+              instrs := instrs.push (.loadInt nt temp value)
+              elemNames := elemNames.push temp
+            addLocalTy decl.fvarId (.vector elemTy)
+            return instrs.push (.call #[srcName decl.fvarId] .vecPack elemNames)
       if fn == ``Move.Vector.empty then
         let some elemType := types[0]? | throwError "empty vector is missing its element type"
         let some elemTy ← translateCurrentTy (← getEnv) elemType
@@ -1540,6 +1722,20 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         return instrs
           |>.push (.call #[vector] .readRef #[srcName reference])
           |>.push (.call #[srcName decl.fvarId] .vecLen #[vector])
+      if fn == ``Move.Ref.isEmpty || fn == ``Move.MutRef.isEmpty then
+        let some reference := vars[0]? | throwError "vector emptiness test is missing its reference"
+        let some elemType := types[0]? | throwError "vector emptiness test is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType
+          | throwError "vector emptiness test has a compiler-erased element type"
+        let vector ← freshTemp (.vector elemTy)
+        let length ← freshTemp .u64
+        let zero ← freshTemp .u64
+        addLocalTy decl.fvarId .bool
+        return instrs
+          |>.push (.call #[vector] .readRef #[srcName reference])
+          |>.push (.call #[length] .vecLen #[vector])
+          |>.push (.loadInt .u64 zero 0)
+          |>.push (.call #[srcName decl.fvarId] .eq #[length, zero])
       if fn == ``Move.Vector.get then
         let runtimeVars := vars.extract (vars.size - 2) vars.size
         let some vector := runtimeVars[0]? | throwError "vector get is missing its vector"
@@ -2228,6 +2424,42 @@ private def validateAbilities (structs : Array LIR.StructDecl) : Except String U
       if decl.abilities.key then
         validateFieldAbility structs decl .key .store field
 
+/-- Discover declarations carrying any of `attrs` below `ns`, including
+declarations imported from another Lean module. -/
+private def taggedNamesInNamespace (env : Environment) (ns : Name)
+    (attrs : Array TagAttribute) : Array Name := Id.run do
+  let mut names : NameSet := {}
+  for attr in attrs do
+    let entries := (attr.ext.exportEntriesFn env (attr.ext.getState env)).private
+    for name in entries do
+      if ns.isPrefixOf name then
+        names := names.insert name
+  -- A tag extension's current state only records declarations elaborated in
+  -- this module. Imported entries remain queryable through `hasTag`, so scan
+  -- the environment as well.
+  for (name, _) in env.constants do
+    if ns.isPrefixOf name && attrs.any (·.hasTag env name) then
+      names := names.insert name
+  let mut result := #[]
+  for name in names do
+    result := result.push name
+  return result
+
+/-- Discover the deployable declarations owned by a registered Move namespace.
+This is the common selection rule used by source lowering and by frontends
+which consume an elaborated Leaner module as a whole. -/
+def declarationsInNamespace (env : Environment) (ns : Name) : Array Name × Array Name :=
+  let structNames := taggedNamesInNamespace env ns #[moveStructAttr, moveEnumAttr]
+  let functionNames := taggedNamesInNamespace env ns
+    #[moveFunAttr, movePublicAttr, moveFriendAttr, movePackageAttr, moveEntryAttr,
+      moveNativeAttr]
+  -- A public inline helper also carries `move_public` for source visibility,
+  -- but it is compile-time-only just like a private inline helper. Its body is
+  -- forced into deployable callers by `always_inline`; never select the
+  -- declaration itself for Move output.
+  let functionNames := functionNames.filter fun name => !moveInlineAttr.hasTag env name
+  (structNames, functionNames)
+
 /-- Compile selected attributed Lean declarations to Leaner's named LIR. -/
 def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array Name) :
     CoreM LIR.Module := do
@@ -2291,12 +2523,29 @@ def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array 
           moduleName := owner.name
           functionName := callee.getString!
         }
+  -- Types of other modules' structures and enums: fields, signatures,
+  -- locals, and the type arguments of operations mention them; the module
+  -- links to them by identity.
+  let mut externalStructs : Array LIR.ExternalStructRef := #[]
+  for name in LIR.mentionedStructNames structs functions do
+    unless structs.any (·.leanName == name) do
+      let some owner := Move.moduleForDeclaration? env name
+        | throwError "Move type `{name}` of another module has no enclosing module identity"
+      if owner == module then
+        throwError "type `{name}` is not selected in this `module%`"
+      externalStructs := externalStructs.push {
+        leanName := name
+        address := owner.address
+        moduleName := owner.name
+        structName := name.getString!
+      }
   return {
     address := module.address
     name := outputModule.name
     structs := structs
     functions := functions
     externalFuns := externalFuns
+    externalStructs := externalStructs
     friends := representative?.map (Move.moduleFriendsForDeclaration env) |>.getD []
       |>.toArray.map fun friend => {
         address := friend.address

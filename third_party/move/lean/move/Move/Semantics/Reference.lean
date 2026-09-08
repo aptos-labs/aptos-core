@@ -56,6 +56,49 @@ def Finished (reference : Mutation α) : Prop :=
 
 end Mutation
 
+/-- Create a fresh returned loan for a focused value. The second result is the
+fresh future which the borrow site installs into its enclosing owner. Keeping
+that installation local is what prevents a field or index path from crossing
+the function boundary. -/
+def reborrowMutation (current : α) : Spec σ (Mutation α × α) where
+  ok := fun initial output final =>
+    output.1.current = current ∧
+    output.2 = output.1.prophecy ∧
+    final = initial
+  aborts := fun _ _ => False
+
+/-- Move a mutation across a returned-reference boundary.  The returned loan
+gets a fresh prophecy, while the poisoned lender keeps its enclosing prophecy
+and is suspended at the returned loan's future value.  Resolving the returned
+loan therefore revives the lender without prematurely fixing the lender's
+eventual value at its enclosing scope. -/
+def transferMutation (reference : Mutation α) :
+    Spec σ (Mutation α × Mutation α) where
+  ok := fun initial output final =>
+    output.1.current = reference.current ∧
+    output.2.current = output.1.prophecy ∧
+    output.2.prophecy = reference.prophecy ∧
+    final = initial
+  aborts := fun _ _ => False
+
+/-- Resolve an existing mutation without allocating a fresh prophecy.  This
+is the operation used when a mutation returned by a function reaches its last
+use in the caller. -/
+def resolveMutation (reference : Mutation α) : Spec σ Unit where
+  ok := fun initial result final =>
+    reference.Finished ∧ result = () ∧ final = initial
+  aborts := fun _ _ => False
+
+/-- Scope a mutation whose prophecy was chosen before this scope, notably a
+mutable reference returned by a call.  In contrast with `withMutation`, this
+does not mint a prophecy and does not return an owner value: it only requires
+the transferred mutation to resolve when its caller-side live range ends. -/
+def withTransferredMutation (reference : Mutation α)
+    (body : Mutation α → Spec σ (β × Mutation α)) : Spec σ β :=
+  Spec.bind (body reference) fun output =>
+    Spec.bind (resolveMutation output.2) fun _ =>
+      Spec.pure output.1
+
 /-- A scoped mutable computation written against the prophecy representation. -/
 abbrev MutationBody (Owner Result : Type) :=
   Mutation Owner → Result × Mutation Owner
@@ -135,6 +178,85 @@ def withMutations2 (first : α) (second : β)
     ∃ (firstFuture : α) (secondFuture : β),
       (body { current := first, prophecy := firstFuture }
         { current := second, prophecy := secondFuture }).undefined initialState
+
+/-- Three independent mutable parameters opened together.  Products use the
+same right-nested order as source argument and result tuples. -/
+def withMutations3 (first : α) (second : β) (third : γ)
+    (body : Mutation α → Mutation β → Mutation γ →
+      Spec σ (δ × (Mutation α × (Mutation β × Mutation γ)))) :
+    Spec σ (δ × (α × (β × γ))) where
+  ok := fun initialState output finalState =>
+    ∃ (firstFuture : α) (secondFuture : β) (thirdFuture : γ)
+      (firstReference : Mutation α) (secondReference : Mutation β)
+      (thirdReference : Mutation γ),
+      (body { current := first, prophecy := firstFuture }
+        { current := second, prophecy := secondFuture }
+        { current := third, prophecy := thirdFuture }).ok initialState
+          (output.1, (firstReference, (secondReference, thirdReference))) finalState ∧
+      firstReference.current = firstFuture ∧
+      secondReference.current = secondFuture ∧
+      thirdReference.current = thirdFuture ∧
+      output.2 = (firstFuture, (secondFuture, thirdFuture))
+  aborts := fun initialState code =>
+    ∃ (firstFuture : α) (secondFuture : β) (thirdFuture : γ),
+      (body { current := first, prophecy := firstFuture }
+        { current := second, prophecy := secondFuture }
+        { current := third, prophecy := thirdFuture }).aborts initialState code
+  undefined := fun initialState =>
+    ∃ (firstFuture : α) (secondFuture : β) (thirdFuture : γ),
+      (body { current := first, prophecy := firstFuture }
+        { current := second, prophecy := secondFuture }
+        { current := third, prophecy := thirdFuture }).undefined initialState
+
+/-! Arbitrary heterogeneous mutable-parameter bundles. `Tuple` deliberately
+reduces to the source translator's existing right-nested product convention,
+including the singleton case without a wrapper. -/
+
+abbrev Tuple : List Type → Type
+  | [] => Unit
+  | [type] => type
+  | type :: next :: rest => type × Tuple (next :: rest)
+
+abbrev MutationTuple : List Type → Type
+  | [] => Unit
+  | [type] => Mutation type
+  | type :: next :: rest => Mutation type × MutationTuple (next :: rest)
+
+@[simp] def openMutations : (types : List Type) →
+    Tuple types → Tuple types → MutationTuple types
+  | [], (), () => ()
+  | [_], current, future => { current, prophecy := future }
+  | _ :: next :: rest, (current, currents), (future, futures) =>
+      ({ current, prophecy := future }, openMutations (next :: rest) currents futures)
+
+@[simp] def mutationCurrents : (types : List Type) → MutationTuple types → Tuple types
+  | [], () => ()
+  | [_], reference => reference.current
+  | _ :: next :: rest, (reference, references) =>
+      (reference.current, mutationCurrents (next :: rest) references)
+
+/-- Open any number of heterogeneous mutable parameters together. The two
+layout maps keep the externally visible owner product independent of the
+recursive type family. Besides preserving the source tuple convention, this
+lets WP theorem matching instantiate `Owners` without unfolding `Tuple` at a
+restricted transparency level. Generated uses supply the identity maps. -/
+def withMutations {types : List Type} {Owners : Type}
+    (toTuple : Owners → Tuple types) (fromTuple : Tuple types → Owners)
+    (owners : Owners)
+    (body : MutationTuple types → Spec σ (β × MutationTuple types)) :
+    Spec σ (β × Owners) where
+  ok := fun initialState output finalState =>
+    ∃ futures references,
+      (body (openMutations types (toTuple owners) futures)).ok initialState
+        (output.1, references) finalState ∧
+      mutationCurrents types references = futures ∧
+      output.2 = fromTuple futures
+  aborts := fun initialState code =>
+    ∃ futures,
+      (body (openMutations types (toTuple owners) futures)).aborts initialState code
+  undefined := fun initialState =>
+    ∃ futures,
+      (body (openMutations types (toTuple owners) futures)).undefined initialState
 
 @[simp] theorem withMutation_ok (initial : α)
     (body : Mutation α → Spec σ (β × Mutation α)) :

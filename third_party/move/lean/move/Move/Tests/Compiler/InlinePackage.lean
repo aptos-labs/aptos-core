@@ -16,7 +16,7 @@ module InlinePackage where
 
   native fun host_hash (x : U64) : U64
 
-  inline fun increment (x : U64) : U64 :=
+  public inline fun increment (x : U64) : U64 :=
     x + 1
 
   package fun package_value : U64 :=

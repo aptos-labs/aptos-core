@@ -79,7 +79,9 @@ element borrows, alongside `updateField`/`writeGlobal`.
 The reference operations (`borrowLoc` … `freezeRef`, mirroring
 `Operation::BorrowLoc/BorrowField/BorrowGlobal/ReadRef/WriteRef/FreezeRef`,
 plus `borrowVecElem` for `vector::borrow(_mut)` with its dynamic element
-index) **execute** (references are runtime values, `RefTarget`) but do
+index, and `borrowVariantField`/`testVariantRef` for an enum payload through
+a reference, `Bytecode::BorrowVariantField` and `TestVariant` on a
+reference) **execute** (references are runtime values, `RefTarget`) but do
 **not verify**: they compile to a failing assertion.  As in the real
 prover, verification requires the bytecode-level *reference elimination*
 (`RefElim.lean`), which rewrites them into the value-level operations. -/
@@ -159,6 +161,13 @@ inductive Oper where
   | borrowGlobal (r : ResourceId)
   | borrowGlobalInst (r : ResourceId) (args : List Ty)
   | borrowVecElem
+  -- enum payloads through references (`Bytecode::BorrowVariantField`,
+  -- `TestVariant` on a reference): a field of whichever listed variant the
+  -- referent is (aborting otherwise), and the variant test of a referent
+  | borrowVariantField (variants : List Nat) (field : Nat)
+  | borrowVariantFieldInst (variants : List Nat) (field : Nat) (args : List Ty)
+  | testVariantRef (variant : Nat)
+  | testVariantRefInst (variant : Nat) (args : List Ty)
   | readRef
   | writeRef
   | freezeRef

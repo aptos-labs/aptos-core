@@ -546,6 +546,13 @@ theorem val_eq_toNat (value : UInt W) : value.val = (value.toNat : Int) :=
     left = right :=
   MoveInt.ext (by rw [toInt_eq_toNat, toInt_eq_toNat, equal])
 
+/-- A `UInt` equality as an equality of exposed `Nat` values.  Numeric
+closers rewrite with this so a `ensures`/invariant length equality over
+`UInt` reaches `omega`. -/
+theorem eq_iff_toNat_eq {left right : UInt W} :
+    (left = right) ↔ (left.toNat = right.toNat) :=
+  ⟨fun h => h ▸ rfl, ext⟩
+
 /-- The natural-number view is bounded by the width's range. -/
 theorem toNat_lt (value : UInt W) : value.toNat < (widthOf W).size := by
   have hlt := value.isLt
@@ -1199,6 +1206,13 @@ instance : Inhabited (Vector α) := ⟨empty⟩
 is never selected for Move lowering. -/
 def toList (values : Vector α) : List α := values.elems
 
+/-- The private `elems` field is exactly the canonical `.toList` view.  Not a
+`simp` lemma (it would loop against `toList`'s own unfolding in the shared
+simp sets); numeric closers fold a goal's raw-field reads back to the
+nameable `.toList` so lengths from `uint_bounds`/`length_toNat` and the goal
+share one atom. -/
+theorem elems_eq_toList (values : Vector α) : values.elems = values.toList := rfl
+
 /-- Vectors are specified as lists of their elements' logical domains. -/
 instance [ModelDomain α β] : ModelDomain (Vector α) (List β) where
   project values := values.toList.map (fun value => model value)
@@ -1218,6 +1232,16 @@ def ofList (values : List α)
 theorem toList_length_lt (values : Vector α) :
     values.toList.length < U64.size := values.bounded
 
+/-- The bound as the automatic proofs see it: the `u64` domain is a numeral
+once the arithmetic is normalized, so the lemma states it that way (the
+automatic scripts cite it; it is not a simp lemma, so a proof that
+establishes the bound by hand keeps its statement). -/
+theorem toList_length_lt_size (values : Vector α) :
+    values.toList.length < 18446744073709551616 := values.bounded
+
+theorem elems_length_lt_size (values : Vector α) :
+    values.elems.length < 18446744073709551616 := values.bounded
+
 /-- Source vectors are determined by their logical contents. -/
 @[ext] theorem ext {left right : Vector α}
     (equal : left.toList = right.toList) : left = right := by
@@ -1232,6 +1256,7 @@ theorem toList_length_lt (values : Vector α) :
     (⟨values, bounded⟩ : Vector α).toList = values := rfl
 
 @[simp] theorem toList_empty : (empty : Vector α).toList = [] := rfl
+@[simp] theorem toList_default : (default : Vector α).toList = [] := rfl
 
 @[simp] theorem toList_singleton (value : α) :
     (singleton value).toList = [value] := rfl
@@ -1256,6 +1281,16 @@ theorem toList_length_lt (values : Vector α) :
 @[simp] theorem toList_set (values : Vector α) (index : U64) (value : α) :
     (set values index value).toList = values.toList.set index.toNat value := rfl
 
+/-- Reading `List.set l s v` at `j`, over `getElem!`: the written value at the
+set index (when in range), the original element elsewhere.  Numeric closers
+resolve a source vector's element read after a write with this. -/
+theorem _root_.List.getElem!_set {α} [Inhabited α] (l : List α) (s j : Nat) (v : α) :
+    ((l.set s v)[j]! : α) = if j = s ∧ s < l.length then v else l[j]! := by
+  simp only [List.getElem!_eq_getElem?_getD, List.getElem?_set]
+  by_cases h : s = j
+  · subst h; by_cases hb : s < l.length <;> simp [hb]
+  · simp [h, Ne.symm h]
+
 @[simp] theorem toList_ofList (values : List α)
     (bounded : values.length < MoveModel.IR.IntWidth.size .w64) :
     (ofList values bounded).toList = values := rfl
@@ -1263,3 +1298,15 @@ theorem toList_length_lt (values : Vector α) :
 end Vector
 
 end Move
+
+namespace Move.Spec
+
+/-- The value of an aborting expression read in a specification: the
+specification language's partial reading gives an `abort` in value position
+— and the payload of an enum variant that is not the one selected — an
+*unspecified* value, fixed per site (the Move Prover's per-location
+`$Arbitrary_value_of` function).  `site` distinguishes the sites; nothing
+is known about the value. -/
+opaque arbitrary (T : Type) [Inhabited T] (_site : Nat) : T
+
+end Move.Spec

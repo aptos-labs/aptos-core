@@ -414,37 +414,49 @@ fn wrap_shift(kind: ShiftKind, op: IntShiftOp) -> MicroOp {
 }
 
 fn unspec_binary_op<T: IntTypeOperand>(kind: BinKind) -> MicroOp {
-    wrap_binary(kind, IntBinaryOp {
-        dst: FO(SLOT_DST),
-        lhs: FO(SLOT_LHS),
-        rhs: T::reg_operand(FO(SLOT_RHS)),
-    })
+    wrap_binary(
+        kind,
+        IntBinaryOp {
+            dst: FO(SLOT_DST),
+            lhs: FO(SLOT_LHS),
+            rhs: T::reg_operand(FO(SLOT_RHS)),
+        },
+    )
 }
 
 fn unspec_shift_op<T: UnsignedTypeTag>(kind: ShiftKind) -> MicroOp {
-    wrap_shift(kind, IntShiftOp {
-        ty: T::UNSIGNED_TY,
-        dst: FO(SLOT_DST),
-        lhs: FO(SLOT_LHS),
-        rhs: ShiftOperand::SlotU8(FO(SLOT_RHS)),
-    })
+    wrap_shift(
+        kind,
+        IntShiftOp {
+            ty: T::UNSIGNED_TY,
+            dst: FO(SLOT_DST),
+            lhs: FO(SLOT_LHS),
+            rhs: ShiftOperand::SlotU8(FO(SLOT_RHS)),
+        },
+    )
 }
 
 fn unspec_binary_imm_op<T: IntTypeOperand>(kind: BinKind, imm_val: T) -> MicroOp {
-    wrap_binary(kind, IntBinaryOp {
-        dst: FO(SLOT_DST),
-        lhs: FO(SLOT_LHS),
-        rhs: imm_val.imm_operand(),
-    })
+    wrap_binary(
+        kind,
+        IntBinaryOp {
+            dst: FO(SLOT_DST),
+            lhs: FO(SLOT_LHS),
+            rhs: imm_val.imm_operand(),
+        },
+    )
 }
 
 fn unspec_shift_imm_op<T: UnsignedTypeTag>(kind: ShiftKind, imm: u8) -> MicroOp {
-    wrap_shift(kind, IntShiftOp {
-        ty: T::UNSIGNED_TY,
-        dst: FO(SLOT_DST),
-        lhs: FO(SLOT_LHS),
-        rhs: ShiftOperand::ImmU8(imm),
-    })
+    wrap_shift(
+        kind,
+        IntShiftOp {
+            ty: T::UNSIGNED_TY,
+            dst: FO(SLOT_DST),
+            lhs: FO(SLOT_LHS),
+            rhs: ShiftOperand::ImmU8(imm),
+        },
+    )
 }
 
 /// Builds an [`MicroOp::IntNegate`] for any signed integer type

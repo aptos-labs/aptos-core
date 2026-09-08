@@ -24,6 +24,17 @@ structure ExternalFunRef where
   functionName : String
   deriving BEq, Repr
 
+/-- A structure or enum declared by another Move module.  Types in
+`program` use ids `numStructs + i` to refer to `externalStructs[i]`; local
+struct ids retain their positional meaning.  Only the type is known here:
+its declaration belongs to the other module, and Move restricts packing,
+unpacking, and field access to the declaring module. -/
+structure ExternalStructRef where
+  address : Address
+  moduleName : String
+  structName : String
+  deriving BEq, Repr
+
 /-- An explicitly trusted module from this module's friend list. -/
 structure ExternalModuleRef where
   address : Address
@@ -113,6 +124,7 @@ structure Module where
   externalFuns : List ExternalFunRef := []
   friends : List ExternalModuleRef := []
   dialect : Dialect := .stackless
+  externalStructs : List ExternalStructRef := []
 
 /-- Construct finite semantic IR directly from compiler-produced lists.
 This is intentionally an IR constructor, rather than an XIR conversion: the
@@ -122,7 +134,8 @@ def Module.ofLists (address : Address) (name : String)
     (structMeta : List StructMeta) (funMeta : List FunMeta)
     (externalFuns : List ExternalFunRef := [])
     (dialect : Dialect := .stackless)
-    (friends : List ExternalModuleRef := []) : Module where
+    (friends : List ExternalModuleRef := [])
+    (externalStructs : List ExternalStructRef := []) : Module where
   address := address
   name := name
   program := {
@@ -136,6 +149,7 @@ def Module.ofLists (address : Address) (name : String)
   externalFuns := externalFuns
   friends := friends
   dialect := dialect
+  externalStructs := externalStructs
 
 /-- The positional identifier of a named function, or `numFuns` when absent.
 The sentinel is outside the declared bounds and therefore has no declaration. -/

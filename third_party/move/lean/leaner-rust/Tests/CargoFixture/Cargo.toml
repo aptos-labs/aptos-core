@@ -1,0 +1,14 @@
+[package]
+name = "leaner-rust-cargo-fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = ["extra"]
+extra = []
+
+[dependencies]
+leaner-rust-cargo-fixture-dependency = { path = "dependency" }
+
+[workspace]

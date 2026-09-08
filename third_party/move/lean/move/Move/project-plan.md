@@ -87,19 +87,25 @@ loops; assertions; and compound assignments. Explicit `acquires` remains
 inferred by design. Literal/range patterns outside `match` are intentionally
 rejected, matching Move 2.4's irrefutable-pattern rule.
 
-The one deliberately deferred language family is **function values** (Move
-2.2): function types, lambdas/closures and captures, storable function values,
-dynamic dispatch, and the reentrancy discipline.
+The one deliberately deferred language family is **general function values**
+(Move 2.2): lambdas/closures and captures, storable function values, general
+dynamic dispatch, and the reentrancy discipline. One compile-time-only slice
+is supported: `inline fun` helpers may take function-typed parameters and
+invoke them. Their Lean callbacks return `Action`, the helper is forced into
+its caller, and the helper declaration itself is excluded from Move output.
 
 ### Specification language (deferred)
 
 Leaner contracts are their own surface (`spec f … where requires / modifies /
 ensures / aborts_if`, data and global invariants), not the Move Prover's
 MSL.  MSL constructs without a Leaner counterpart: `spec fun` / `spec
-schema` / `include` / `apply`, `pragma` (`opaque`, `verify`, `aborts_if_is_
-partial`, `intrinsic`), `aborts_with`, `emits`, `let post`, `global` spec
-variables, and the Prover's quantifier/choice helpers (`forall`/`exists`
-are Lean's binders).
+schema` / `include` / `apply`, `pragma` other than the abort-semantics
+and summary pragmas (`aborts_if_is_partial`, `aborts_if_is_strict`, and
+`opaque` are Leaner clauses; `verify`, `intrinsic` are not), `aborts_with`, `emits`,
+`let post`, `global` spec variables, and the Prover's quantifier/choice
+helpers (`forall`/`exists` are Lean's binders).  The Move-to-Leaner
+transpiler (`third_party/move/lean/transpiler`) maps the rest of MSL onto
+this surface.
 
 MSL is outside the current scope. Function values are the only deferred Move
 language feature tracked here.
@@ -147,6 +153,31 @@ be accepted as a successful regression baseline.
 - A callee must be a `fun` (retained source); a Lean `def` has no semantics to
   generate.
   - *"Move callee `{f}` has no retained source; declare it with `fun` …"*
+- **Returned mutable references, including multiple returns, are implemented.** The mutation-level
+  relation passes complete `(current, prophecy)` values, gives the returned
+  mutation a fresh prophecy, carries updated input mutations, and keeps
+  `sourceSpec` as the value-level contract wrapper. At a call it conservatively
+  poisons every mutable actual until the result dies, then continues from those
+  updated carriers. Move has no lifetime annotation telling a
+  modular caller which input supplied the result, so even a body-local exact
+  derivation cannot narrow that rule. No origin path crosses the boundary, and
+  the implemented slice includes identity, dynamic choice among arbitrarily
+  many direct inputs, field and enum-payload returns, dynamically indexed
+  element returns, structural references in multiple-result tuples, returned
+  loans live across loops, path-free forwarding
+  through another function after local use (including field-derived and
+  multiple-reference results), direct self-recursion, and transient result
+  tuples containing several mutable references mixed with ordinary values.
+  Multiple returned loans share
+  a conservative live range and revive all possible lenders only after every
+  component resolves. Native/body-less functions may export an explicit
+  trusted or proved `mutationSpec`; absence of that relation is a
+  regression-tested rejection boundary. Mutually recursive returned-reference
+  SCCs use one heterogeneous mutation-level fixed point.
+  Function-value invocation remains deferred for the retained-source language
+  generally. See
+  `verification-design.md`, *Returning a mutable reference* and
+  *Implementation plan for mutable-reference results*.
 
 ### Types
 

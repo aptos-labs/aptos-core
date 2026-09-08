@@ -1,0 +1,4 @@
+step 0: 0x44::burning::burn(10000)
+  mono:       inconclusive (the adapter ran out of gas)
+  LIR:        returned 10000
+  round trip: returned 10000

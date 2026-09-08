@@ -621,7 +621,7 @@ module OrderedMap where
         map.entries.toList.length := by
       rw [Move.Vector.length_toNat]
     have window : Model.Search.Window map.entries key 0 map.entries.length := by
-      refine ⟨map.invariant, by simp, ?_, ?_, map.entries.toList_length_lt⟩
+      refine ⟨map.dataInvariant, by simp, ?_, ?_, map.entries.toList_length_lt⟩
       · rw [lengthToNat]
         exact Model.Search.lowerBoundList_le _ _
       · rw [lengthToNat]
@@ -648,7 +648,7 @@ module OrderedMap where
     rw [Move.Verify.wp_bind, Move.Verify.wp_borrowElemSpec]
     refine ⟨fun entry atIndex => ?_, fun missing => ⟨missing, rfl⟩⟩
     rw [Move.Verify.wp_pure]
-    exact ⟨fun _ => ⟨entry, atIndex, rfl⟩, rfl⟩
+    exact ⟨fun _ => ⟨entry, atIndex, rfl⟩, rfl, by simp [atIndex]⟩
 
   verify contains by
     contract_intro
@@ -672,7 +672,7 @@ module OrderedMap where
         rw [Move.Verify.Source.logicalBEq_move,
           Compare.equal_eq_true_iff]
         show _ ↔ ∃ candidate ∈ map.entries.toList, candidate.key = key
-        rw [Model.Search.contains_iff_lowerBound _ _ map.invariant]
+        rw [Model.Search.contains_iff_lowerBound _ _ map.dataInvariant]
         constructor
         · exact fun same => ⟨entry, atTarget, same⟩
         · rintro ⟨candidate, atCandidate, same⟩
@@ -686,7 +686,7 @@ module OrderedMap where
         simp only [Bool.false_eq_true, false_iff]
         intro present
         obtain ⟨entry, atTarget, _⟩ :=
-          (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp present
+          (Model.Search.contains_iff_lowerBound _ _ map.dataInvariant).mp present
         exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
     · exact fun code h => h.elim
 
@@ -714,12 +714,14 @@ module OrderedMap where
           move_step
           have same := (Compare.equal_eq_true_iff entry.key key).mp
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
-          exact fun _ => ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩
+          -- Sufficiency: the key is present, so the declared abort is ruled out.
+          exact ⟨fun _ => ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩,
+            ⟨entry, List.mem_of_getElem? atTarget, same⟩⟩
         · -- Another key at the lower bound: the key is absent.
           abort_clause
           intro present
           obtain ⟨candidate, atCandidate, same⟩ :=
-            (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
+            (Model.Search.contains_iff_lowerBound _ _ map.dataInvariant).mp
               present
           rw [atTarget] at atCandidate
           cases atCandidate
@@ -730,7 +732,7 @@ module OrderedMap where
         abort_clause
         intro present
         obtain ⟨entry, atTarget, _⟩ :=
-          (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp present
+          (Model.Search.contains_iff_lowerBound _ _ map.dataInvariant).mp present
         exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
     · exact fun code h => h.elim
 
@@ -784,7 +786,7 @@ module OrderedMap where
           have fresh : ¬Model.Contains map key := by
             intro present
             obtain ⟨candidate, atCandidate, same⟩ :=
-              (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
+              (Model.Search.contains_iff_lowerBound _ _ map.dataInvariant).mp
                 present
             rw [atTarget] at atCandidate
             cases atCandidate
@@ -804,13 +806,16 @@ module OrderedMap where
           · simp only [Map.Invariant, Move.Vector.toList_ofList,
               ← Model.Insertion.insert_eq_take_lowerBound
                 map.entries.toList key value]
-            exact Model.Insertion.add_sorted map key value map.invariant fresh
+            exact Model.Insertion.add_sorted map key value map.dataInvariant fresh
           · rintro holds rfl
-            refine ⟨?_, trivial⟩
-            intro _noContains _hasRoom
-            simp only [Move.Vector.toList_ofList, Model.add,
-              ← Model.Insertion.insert_eq_take_lowerBound
-                map.entries.toList key value]
+            refine ⟨?_, trivial, fresh, ?_⟩
+            · intro _noContains _hasRoom
+              simp only [Move.Vector.toList_ofList, Model.add,
+                ← Model.Insertion.insert_eq_take_lowerBound
+                  map.entries.toList key value]
+            · have hasRoom := room.2
+              simp only [move_norm, Nat.reducePow] at hasRoom
+              omega
       · rw [if_neg inBounds]
         have bounded : map.entries.toList.length < 18446744073709551616 := by
           have := map.entries.toList_length_lt
@@ -823,7 +828,7 @@ module OrderedMap where
         have fresh : ¬Model.Contains map key := by
           intro present
           obtain ⟨entry, atTarget, _⟩ :=
-            (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
+            (Model.Search.contains_iff_lowerBound _ _ map.dataInvariant).mp
               present
           exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
         checked_cases room
@@ -838,13 +843,16 @@ module OrderedMap where
         · simp only [Map.Invariant, Move.Vector.toList_ofList,
             ← Model.Insertion.insert_eq_take_lowerBound
               map.entries.toList key value]
-          exact Model.Insertion.add_sorted map key value map.invariant fresh
+          exact Model.Insertion.add_sorted map key value map.dataInvariant fresh
         · rintro holds rfl
-          refine ⟨?_, trivial⟩
-          intro _noContains _hasRoom
-          simp only [Move.Vector.toList_ofList, Model.add,
-            ← Model.Insertion.insert_eq_take_lowerBound
-              map.entries.toList key value]
+          refine ⟨?_, trivial, fresh, ?_⟩
+          · intro _noContains _hasRoom
+            simp only [Move.Vector.toList_ofList, Model.add,
+              ← Model.Insertion.insert_eq_take_lowerBound
+                map.entries.toList key value]
+          · have hasRoom := room.2
+            simp only [move_norm, Nat.reducePow] at hasRoom
+            omega
     · exact fun code h => h.elim
 
   verify remove by
@@ -883,7 +891,7 @@ module OrderedMap where
           have same := (Compare.equal_eq_true_iff entry.key key).mp
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
           have erased := Model.Removal.erase_eq_take_lowerBound
-            map.entries.toList key entry map.invariant atTarget same
+            map.entries.toList key entry map.dataInvariant atTarget same
           checked_cases removed
           simp only [Move.UInt.toNat_ofNat_of_lt
               (W := Move.W64) (n := Model.lowerBoundList map.entries.toList key)
@@ -898,9 +906,9 @@ module OrderedMap where
           refine ⟨?_, ?_⟩
           · simp only [Map.Invariant, Move.Vector.toList_ofList]
             exact Model.Removal.erase_sorted map.entries.toList key _
-              entry.value map.invariant (by simpa using erased)
+              entry.value map.dataInvariant (by simpa using erased)
           · rintro holds rfl
-            refine ⟨?_, trivial⟩
+            refine ⟨?_, trivial, fun absent => absent ⟨entry, List.mem_of_getElem? atTarget, same⟩⟩
             intro _present
             simpa using erased
         · rw [if_neg equal]
@@ -908,7 +916,7 @@ module OrderedMap where
           refine ⟨?_, trivial⟩
           intro present
           obtain ⟨candidate, atCandidate, same⟩ :=
-            (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
+            (Model.Search.contains_iff_lowerBound _ _ map.dataInvariant).mp
               present
           rw [atTarget] at atCandidate
           cases atCandidate
@@ -928,7 +936,7 @@ module OrderedMap where
         refine ⟨?_, trivial⟩
         intro present
         obtain ⟨entry, atTarget, _⟩ :=
-          (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp present
+          (Model.Search.contains_iff_lowerBound _ _ map.dataInvariant).mp present
         exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
     · exact fun code h => h.elim
 

@@ -5,7 +5,7 @@
 import Move.Compiler.Export
 import Move.Tests.Verification.Account
 
-/-! Manual regeneration entry point for the Account XIR golden file. -/
+/-! Manual regeneration entry point for the Account XIR baseline file. -/
 
 open scoped Move.Compiler
 

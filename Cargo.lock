@@ -12995,6 +12995,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-lean-link"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-move-stdlib",
+ "bcs 0.1.4",
+ "bytes",
+ "codespan-reporting",
+ "legacy-move-compiler",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-model",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "mono-move-loader"
 version = "0.1.0"
 dependencies = [

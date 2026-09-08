@@ -2,6 +2,16 @@
 
 Status: living design document
 
+> **Terminology and target architecture.** In this document,
+> `Move.Compiler.LIR` names the current compiler-facing named executable CFG.
+> The independent [unified LIR design](../../designs/lir-design.md) reserves “LIR” for a
+> new profile-aware representation shared by Move, Leaner Move, Leaner Rust,
+> and Rust MIR frontends and source backends. During that migration, the
+> representation described here
+> is called **named stackless IR (NSIR)**. This document remains authoritative
+> for the currently implemented bytecode path; it is not the design of the
+> new LIR.
+
 This document describes the intended compiler pipeline from Lean-authored
 contracts to official Move bytecode. It is deliberately editable: settled
 decisions are recorded separately from open questions, and implementation
@@ -399,7 +409,7 @@ Encoding rules:
 decoder.
 
 Export is an explicit build action, not an incidental elaboration-time write.
-Golden files use:
+Baseline files use:
 
 ```text
 #export_leaner_xir compiled to "Account.xir.json"
@@ -552,13 +562,13 @@ checker is not a substitute for passing the production verifier.
 - IR interpreter execution for Arithmetic, Account, Read, and Calls.
 - IR-to-XIR materialization and XIR JSON tests at the explicit export/import
   boundaries.
-- Golden JSON files for representative modules.
+- Baseline JSON files for representative modules.
 - Negative tests for unresolved names, invalid addresses, malformed finite IR,
   unsupported operations, and recursive structures.
 
 ### Rust tests
 
-- Deserialize and validate every Lean-generated golden JSON file.
+- Deserialize and validate every Lean-generated baseline JSON file.
 - XIR-to-`CompiledModule` unit tests for each opcode family.
 - Serialize/deserialize bytecode round trips.
 - Official verifier acceptance tests.
@@ -601,8 +611,8 @@ table indices and byte offsets need not match.
 
 - Freeze `move-xir-module` schema version 2.
 - Implement explicit Lean encoder and decoder.
-- Add explicit golden-file and compiler-handoff export commands.
-- Add golden files and deterministic encoding tests.
+- Add explicit baseline-file and compiler-handoff export commands.
+- Add baseline files and deterministic encoding tests.
 
 ### Milestone 4: XIR model and stackless loader — implemented
 

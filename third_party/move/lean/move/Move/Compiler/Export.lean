@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Move.Compiler.Elab
+import Move.SourceArtifact
 import Move.Verify.Syntax
 import MoveModel.Frontend.XIR.Json
 import MoveModel.Frontend.XIR.FromIR
@@ -65,7 +66,8 @@ def moveAttributeInstance := leading_parser
     Lean.Parser.many (Lean.Parser.categoryParser `moveAttrArg 0)
 
 /-- A source attribute list, written before the leading keyword of a
-`struct`, `enum`, or `fun` declaration inside a `module`. -/
+`struct`, `enum`, `fun`, or specification-function declaration inside a
+`module`. -/
 def moveAttributes := leading_parser
   ("@[" <|> "#[") >>
     Lean.Parser.withoutPosition
@@ -230,6 +232,30 @@ def moveFunItem := leading_parser
     (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
   Lean.Parser.Command.optDefDeriving
 
+/-- An attributed specification-function definition inside `module`.  The
+ordinary command parser treats a leading `@[...]` as Lean declaration
+modifiers, so this module-item form must win first and desugar the attributes
+to persistent Move metadata before elaborating the specification function. -/
+def moveAttributedSpecFunctionItem := leading_parser
+  Lean.Parser.atomic (Lean.Parser.lookahead
+    (Lean.Parser.optional (Lean.Parser.Command.docComment) >>
+      moveAttributes >> Lean.Parser.nonReservedSymbol "spec " >> "fun ")) >>
+  Lean.Parser.optional (Lean.Parser.Command.docComment) >> moveAttributes >>
+  Lean.Parser.nonReservedSymbol "spec " >> "fun " >> Lean.Parser.ident >>
+  Lean.Parser.many (Lean.Parser.categoryParser `moveSpecBinder 0) >>
+  Lean.Parser.optional (" : " >> Lean.Parser.withPosition Lean.Parser.termParser) >>
+  " := " >> Lean.Parser.withPosition Lean.Parser.termParser
+
+/-- An attributed uninterpreted specification function inside `module`. -/
+def moveAttributedOpaqueSpecFunctionItem := leading_parser
+  Lean.Parser.atomic (Lean.Parser.lookahead
+    (Lean.Parser.optional (Lean.Parser.Command.docComment) >>
+      moveAttributes >> Lean.Parser.nonReservedSymbol "spec " >> "opaque ")) >>
+  Lean.Parser.optional (Lean.Parser.Command.docComment) >> moveAttributes >>
+  Lean.Parser.nonReservedSymbol "spec " >> "opaque " >> Lean.Parser.ident >>
+  Lean.Parser.many (Lean.Parser.categoryParser `moveSpecBinder 0) >>
+  " : " >> Lean.Parser.withPosition Lean.Parser.termParser
+
 /-- Defines a Lean namespace and exports it as a Move module with the same
 name. `fun` declarations are private Move functions, while ordinary `def`s
 remain Lean-only helpers. Compilation remains deferred until end of input.
@@ -240,13 +266,19 @@ term. -/
   Lean.Parser.withPosition
     ("module " >> ident >>
       Lean.Parser.optional (" at " >> moveAddressSpec) >> " where" >>
-      Lean.Parser.many1 (Lean.Parser.ppLine >> Lean.Parser.checkColGt >>
+      Lean.Parser.many (Lean.Parser.ppLine >> Lean.Parser.checkColGt >>
         Lean.Parser.withPosition
           (Lean.Parser.atomic moveStructItem <|>
             Lean.Parser.atomic movePositionalStructItem <|> moveEnumItem <|> moveEntryFunItem <|>
             moveFriendFunItem <|> movePackageFunItem <|> moveInlineFunItem <|>
-            moveNativeFunItem <|> moveFriendDeclItem <|> moveFunItem <|>
+            moveNativeFunItem <|> moveFriendDeclItem <|>
+            moveAttributedSpecFunctionItem <|> moveAttributedOpaqueSpecFunctionItem <|>
+            moveFunItem <|>
             Lean.Parser.commandParser)))
+
+/-- Whether the modifiers carry the attribute `name`. -/
+private partial def hasAttributeNamed (stx : Syntax) (name : Name) : Bool :=
+  (stx.isIdent && stx.getId == name) || stx.getArgs.any (hasAttributeNamed · name)
 
 private partial def hasMoveDeclarationAttribute (stx : Syntax) : Bool :=
   if stx.isIdent then
@@ -604,6 +636,27 @@ private def structFieldNames (fields : Syntax) : Array (TSyntax `ident) :=
     else
       none
 
+/-- The fields a `structFields` node declares, as explicit binders
+`(name : type)`: the signature of a certified structure's creation
+operation. -/
+private def structFieldBinders (fields : Syntax) :
+    MacroM (Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) := do
+  let args := if fields.getNumArgs == 1 && fields[0].isOfKind nullKind then
+      fields[0].getArgs
+    else
+      fields.getArgs
+  args.filterMapM fun field => do
+    unless field.isOfKind ``Lean.Parser.Command.structSimpleBinder do return none
+    let name : TSyntax `ident := ⟨field[1]⟩
+    -- `structSimpleBinder`: modifiers, name, `optDeclSig` (binders, then
+    -- the optional `typeSpec`).
+    let optType := field[2][1]
+    unless optType.getNumArgs == 1 &&
+        optType[0].isOfKind ``Lean.Parser.Term.typeSpec do
+      Macro.throwErrorAt field "a certified structure's field needs an explicit type"
+    let type : TSyntax `term := ⟨optType[0][1]⟩
+    return some (← `(bracketedBinder| ($name:ident : $type)))
+
 /-- The names a binder introduces, so a generated declaration can apply the
 type it belongs to. -/
 private def binderNames (binder : Syntax) : Array (TSyntax `ident) :=
@@ -623,7 +676,10 @@ private def appendInvariantField (item : Syntax) (fields : Syntax)
   let assignments ← fieldNames.mapM fun field =>
     `(Lean.Parser.Term.structInstField| $field:ident := $field:ident)
   let value ← `({ $assignments,* : _ })
-  let invariantField := mkIdentFrom item[8] `invariant
+  -- `dataInvariant`, not `invariant`: the latter is the loop-invariant
+  -- statement keyword, which a field named `invariant` would shadow in
+  -- `{ … invariant := … }` structure-instance syntax.
+  let invariantField := mkIdentFrom item[8] `dataInvariant
   let field ← `(Lean.Parser.Command.structSimpleBinder|
     $invariantField:ident : $invariantName $value := by move_invariant)
   -- `structFields` wraps its binders in a single null node.
@@ -661,8 +717,9 @@ private def certifiedStructDeclarations (item : Syntax)
         pure ⟨binder⟩
   let parameters := signature[0].getArgs.flatMap binderNames
   let this := mkIdentFrom item[8] `this
-  let bound := conditions.map fun condition =>
-    (⟨Move.Spec.bindInvariantValue this condition⟩ : TSyntax `term)
+  let bound ← conditions.mapM fun condition => do
+    let bound := Move.Spec.bindInvariantValue this condition
+    pure (⟨← Move.Spec.rewriteInvariantClause bound⟩ : TSyntax `term)
   let mut condition := bound[0]!
   for index in [1:bound.size] do
     condition ← `($condition ∧ $(bound[index]!))
@@ -695,11 +752,23 @@ private def certifiedStructDeclarations (item : Syntax)
     `(instance $inhabitedBinders:bracketedBinder* :
         Inhabited $certifiedType :=
           ⟨({ $defaults,* : $certifiedType })⟩)
+  -- The creation operation: compiled code creates a certified value through
+  -- it (`let v ← T.certify a b`), where verification owes the invariant --
+  -- the compiler packs the fields, and the relational semantics creates the
+  -- value through `Spec.certified`.  A literal `{ a, b }` stays what it is
+  -- in Lean: a value carrying its proof, by `move_invariant` at elaboration.
+  let certifyName := mkIdentFrom name (name.getId ++ `certify)
+  let fieldBinders ← structFieldBinders item[8]
+  let certifyCommand ←
+    `(def $certifyName $inhabitedBinders:bracketedBinder*
+        $fieldBinders:bracketedBinder* : Move.Action $certifiedType :=
+      Move.nativeUnavailable)
   let registration ←
     `(#register_move_invariant $name $invariantName)
-  -- The twin and the condition precede the type; its inhabitant follows it.
+  -- The twin and the condition precede the type; its inhabitant and its
+  -- creation operation follow it.
   return (#[rawDeclaration, invariantCommand.raw],
-    #[inhabitedCommand.raw, registration.raw], invariantName)
+    #[inhabitedCommand.raw, certifyCommand.raw, registration.raw], invariantName)
 
 /-- The binders of a constructor's signature, with the names they bind. -/
 private def constructorBinders (ctor : Syntax) : Syntax × Nat := Id.run do
@@ -736,8 +805,9 @@ private def certifiedEnumDeclarations (item : Syntax)
         pure ⟨binder⟩
   let parameters := signature[0].getArgs.flatMap binderNames
   let this := mkIdentFrom item[8] `this
-  let bound := conditions.map fun condition =>
-    (⟨Move.Spec.bindInvariantValue this condition⟩ : TSyntax `term)
+  let bound ← conditions.mapM fun condition => do
+    let bound := Move.Spec.bindInvariantValue this condition
+    pure (⟨← Move.Spec.rewriteInvariantClause bound⟩ : TSyntax `term)
   let mut condition := bound[0]!
   for index in [1:bound.size] do
     condition ← `($condition ∧ $(bound[index]!))
@@ -755,8 +825,9 @@ private def certifiedEnumDeclarations (item : Syntax)
   let invariantCommand ←
     `(@[move_invariant_norm] def $invariantName $binders*
         ($this : $rawType) : Prop := $condition)
-  -- The certified constructors: each carries the proof of its own variant.
-  let invariantField := mkIdentFrom item[8] `invariant
+  -- The certified constructors: each carries the proof of its own variant
+  -- (`dataInvariant`, not the loop keyword `invariant`).
+  let invariantField := mkIdentFrom item[8] `dataInvariant
   let mut certifiedCtors : Array Syntax := #[]
   let mut firstCtor : Option (TSyntax `ident × Nat) := none
   for ctor in item[8].getArgs do
@@ -855,6 +926,28 @@ private def desugarPositionalStruct (stx : Syntax) : MacroM (Array Syntax) := do
   return withAttributeRegistration declaration.raw stx[4] user ++
     (← abilityCommands stx[4] stx[8])
 
+private def desugarAttributedSpecFunction (stx : Syntax) : MacroM (Array Syntax) := do
+  let (_, user) ← splitAttributeInstances stx[1]
+  let declId := mkNode ``Lean.Parser.Command.declId #[stx[4], mkNullNode]
+  let registration := buildAttributeRegistration declId user
+  let declaration : Syntax := if stx.isOfKind ``moveAttributedSpecFunctionItem then
+      (mkNode ``Move.Spec.specFunctionDecl #[
+        stx[0], stx[2], stx[3], stx[4], stx[5], stx[6], stx[7], stx[8]]).raw
+    else
+      (mkNode ``Move.Spec.opaqueSpecFunctionDecl #[
+        stx[0], stx[2], stx[3], stx[4], stx[5], stx[6], stx[7]]).raw
+  return #[registration, declaration]
+
+/-- Intrinsic attributes are transported by XAST, but their semantic graph is
+not interpreted by the current compiler. Reject them instead of exporting or
+silently treating them as ordinary bytecode metadata. -/
+private partial def suspendedIntrinsicAttribute? (stx : Syntax) : Option Syntax :=
+  if stx.isOfKind ``moveAttributeInstance && stx.getNumArgs > 0 && stx[0].isIdent then
+    let name := stx[0].getId.toString
+    if name == "intrinsic_map" || name.startsWith "map_" then some stx[0] else none
+  else
+    stx.getArgs.findSome? suspendedIntrinsicAttribute?
+
 /-- Rewrite one module-scoped keyword item to its attributed core
 declaration, followed by a registration command when the item carries
 user-provided attributes. Ordinary commands pass through unchanged. -/
@@ -868,13 +961,21 @@ private partial def globalInvariantFamilyHead
     return ← globalInvariantFamilyHead ⟨stx[0]⟩
   Macro.throwErrorAt family "a global invariant resource family must have a named type head"
 
+set_option maxHeartbeats 400000 in
 private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     (stx : Syntax) : MacroM (Array Syntax) := do
+  if let some attrStx := suspendedIntrinsicAttribute? stx then
+    Macro.throwErrorAt attrStx
+      "intrinsic declarations are temporarily unsupported; support is suspended until intrinsic validation is implemented on the unified LIR"
   if stx.isOfKind ``moveFriendDeclItem then
     let address : TSyntax `term := ⟨stx[1]⟩
     let moduleName : TSyntax `ident := ⟨stx[3]⟩
     return #[mkNode ``registerMoveFriend #[
       mkAtom "#register_move_friend ", address.raw, mkAtom "::", moduleName.raw]]
+  if stx.isOfKind ``moveAttributedSpecFunctionItem then
+    return ← desugarAttributedSpecFunction stx
+  if stx.isOfKind ``moveAttributedOpaqueSpecFunctionItem then
+    return ← desugarAttributedSpecFunction stx
   if stx.isOfKind ``Move.Spec.dataInvariantSpec then
     -- Consumed by the type it names.
     return #[]
@@ -1112,6 +1213,33 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     return withAttributeRegistration declaration stx[4] user
   return #[stx]
 
+/-- The function a `fun` command declares, when it has a body: a native
+(`@[move_native]`, the body-less item) has none. -/
+private def bodiedFunction? (command : Syntax) : Option (TSyntax `ident) :=
+  if command.isOfKind ``moveFunctionCommand &&
+      !hasAttributeNamed command[0] `move_native &&
+      !hasAttributeNamed command[0] `move_inline then
+    some ⟨command[2][0]⟩
+  else
+    none
+
+/-- The derivations a module item owes: after each `fun f` with a body —
+after the whole block for the members of a `mutual` block — one
+`#derive_move_source_spec f`, so callers in this and other modules reason
+through the body of a function without a `spec` block, and one
+`#derive_move_spec_function f`, the specification version `f args` denotes
+in a specification clause.  Both are best effort (see the commands). -/
+private def sourceSemanticsDerivations (command : Syntax) : MacroM (Array Syntax) := do
+  let declared :=
+    if command.isOfKind ``Lean.Parser.Command.mutual then
+      command[1].getArgs.filterMap bodiedFunction?
+    else
+      (bodiedFunction? command).toArray
+  declared.flatMapM fun name => do
+    let deriveSemantics ← `(#derive_move_source_spec $name)
+    let deriveSpecFunction ← `(#derive_move_spec_function $name)
+    pure #[deriveSemantics.raw, deriveSpecFunction.raw]
+
 /-- Expand a `module` to its command sequence: the namespace, identity and
 export registration, the Move scope, the desugared items, and the closing
 `end`. -/
@@ -1153,7 +1281,8 @@ def expandMoveModuleCommand : Macro := fun stx => do
   let body ← stx[4].getArgs.foldlM (init := #[]) fun result item => do
     (← desugarModuleItem invariants item).foldlM (init := result) fun result command => do
       let command := expandLeanerCommandAliases command
-      return result.push (← preserveLeanHelperBoundaries command)
+      let command ← preserveLeanHelperBoundaries command
+      return result.push command ++ (← sourceSemanticsDerivations command)
   return mkNullNode <|
     #[namespaceCommand.raw, identityCommand.raw, exportCommand.raw,
       openLeanerCommand.raw, openLeanerScopeCommand.raw] ++
@@ -1168,11 +1297,25 @@ items produced (their errors included) and attribute earlier items' pending
 proofs to the guard.  Flushing those three after every item keeps each item's
 output, and keeps a guard's view limited to its own command. -/
 @[command_elab moveModuleCommand] def elabMoveModuleCommand : CommandElab := fun stx => do
+  let namespaceName := (← getCurrNamespace) ++ stx[1].getId
+  modifyEnv fun env => Move.registerSourceModuleArtifact env namespaceName {
+    items := stx[4].getArgs }
   let expanded ← liftMacroM (expandMoveModuleCommand stx)
   withMacroExpansion stx expanded do
     let mut messages : MessageLog := {}
     let mut trees : PersistentArray InfoTree := {}
     let mut snapshotTasks : Array (Language.SnapshotTask Language.SnapshotTree) := #[]
+    -- Ownership lowering can erase the Lean-level occurrence of a mutable
+    -- owner even though the authored Move body borrows and uses it. Lean's
+    -- unused-variable linter then reports a false positive at the source
+    -- binder. Move has its own unused-variable diagnostics, so keep this
+    -- Lean implementation detail out of authored Move diagnostics. Set the
+    -- option before opening the generated namespace so every module item,
+    -- including a whole `mutual` block, inherits it.
+    let outerOptions := (← Lean.Elab.Command.getScope).opts
+    Lean.Elab.Command.modifyScope fun scope =>
+      { scope with
+        opts := scope.opts.setBool `linter.unusedVariables false }
     for command in expanded.getArgs do
       elabCommand command
       let state ← get
@@ -1183,6 +1326,8 @@ output, and keeps a guard's view limited to its own command. -/
         messages := {}
         infoState := { state.infoState with trees := {} }
         snapshotTasks := #[] }
+    Lean.Elab.Command.modifyScope fun scope =>
+      { scope with opts := outerOptions }
     modify fun state => { state with
       messages := messages ++ state.messages
       infoState := { state.infoState with trees := trees ++ state.infoState.trees }

@@ -1,0 +1,521 @@
+{
+  "schema": "move-xast-module",
+  "version": 4,
+  "address": "0x1",
+  "address_alias": null,
+  "name": "intrinsics",
+  "doc": "",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [
+    {
+      "name": "Map",
+      "doc": "",
+      "loc": 1,
+      "abilities": [],
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": true
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": true
+        }
+      ],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "dummy_field",
+          "doc": "",
+          "ty": 0
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": 2,
+        "pragmas": [
+          {
+            "name": "intrinsic",
+            "value": {
+              "name": "map"
+            }
+          }
+        ],
+        "conditions": [],
+        "frame": null
+      },
+      "intrinsic": {
+        "name": "map",
+        "move_functions": [
+          {
+            "role": "map_borrow_mut",
+            "target": 0
+          },
+          {
+            "role": "map_destroy_empty",
+            "target": 1
+          },
+          {
+            "role": "map_len",
+            "target": 2
+          },
+          {
+            "role": "map_new",
+            "target": 3
+          }
+        ],
+        "spec_functions": [
+          {
+            "role": "map_spec_get",
+            "target": 4
+          },
+          {
+            "role": "map_spec_len",
+            "target": 5
+          },
+          {
+            "role": "map_spec_set",
+            "target": 6
+          }
+        ]
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "borrow_mut",
+      "doc": "",
+      "loc": 3,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "native",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "map",
+          "ty": 4
+        },
+        {
+          "name": "key",
+          "ty": 1
+        }
+      ],
+      "result": 5,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": null
+    },
+    {
+      "name": "destroy_empty",
+      "doc": "",
+      "loc": 4,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "native",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "map",
+          "ty": 3
+        }
+      ],
+      "result": 6,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": null
+    },
+    {
+      "name": "length",
+      "doc": "",
+      "loc": 5,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "native",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "map",
+          "ty": 7
+        }
+      ],
+      "result": 8,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": null
+    },
+    {
+      "name": "new",
+      "doc": "",
+      "loc": 6,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "native",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [],
+      "result": 3,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": null
+    }
+  ],
+  "spec_funs": [
+    {
+      "name": "spec_len",
+      "doc": "",
+      "loc": 7,
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "map",
+          "ty": 3
+        }
+      ],
+      "result": 9,
+      "uninterpreted": false,
+      "is_native": true,
+      "is_move_fun": false,
+      "uses_old": false,
+      "body": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "spec_set",
+      "doc": "",
+      "loc": 8,
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "map",
+          "ty": 3
+        },
+        {
+          "name": "key",
+          "ty": 1
+        },
+        {
+          "name": "value",
+          "ty": 2
+        }
+      ],
+      "result": 3,
+      "uninterpreted": false,
+      "is_native": true,
+      "is_move_fun": false,
+      "uses_old": false,
+      "body": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "spec_get",
+      "doc": "",
+      "loc": 9,
+      "type_params": [
+        {
+          "name": "K",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "V",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "map",
+          "ty": 3
+        },
+        {
+          "name": "key",
+          "ty": 1
+        }
+      ],
+      "result": 2,
+      "uninterpreted": false,
+      "is_native": true,
+      "is_move_fun": false,
+      "uses_old": false,
+      "body": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    }
+  ],
+  "spec_vars": [],
+  "invariants": [],
+  "skipped": [],
+  "comments": [],
+  "sources": [
+    "intrinsics.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 0,
+      "end": 791
+    },
+    {
+      "file": 0,
+      "start": 29,
+      "end": 64
+    },
+    {
+      "file": 0,
+      "start": 485,
+      "end": 789
+    },
+    {
+      "file": 0,
+      "start": 161,
+      "end": 226
+    },
+    {
+      "file": 0,
+      "start": 109,
+      "end": 156
+    },
+    {
+      "file": 0,
+      "start": 231,
+      "end": 277
+    },
+    {
+      "file": 0,
+      "start": 70,
+      "end": 104
+    },
+    {
+      "file": 0,
+      "start": 288,
+      "end": 335
+    },
+    {
+      "file": 0,
+      "start": 345,
+      "end": 416
+    },
+    {
+      "file": 0,
+      "start": 426,
+      "end": 479
+    }
+  ],
+  "types": [
+    "bool",
+    {
+      "type_param": 0
+    },
+    {
+      "type_param": 1
+    },
+    {
+      "struct": {
+        "name": 7,
+        "args": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "reference": {
+        "mutable": true,
+        "ty": 3
+      }
+    },
+    {
+      "reference": {
+        "mutable": true,
+        "ty": 2
+      }
+    },
+    {
+      "tuple": []
+    },
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 3
+      }
+    },
+    "u64",
+    "num"
+  ],
+  "modules": [
+    {
+      "address": "0x1",
+      "address_alias": null,
+      "name": "intrinsics"
+    }
+  ],
+  "names": [
+    {
+      "module": 0,
+      "name": "borrow_mut"
+    },
+    {
+      "module": 0,
+      "name": "destroy_empty"
+    },
+    {
+      "module": 0,
+      "name": "length"
+    },
+    {
+      "module": 0,
+      "name": "new"
+    },
+    {
+      "module": 0,
+      "name": "spec_get"
+    },
+    {
+      "module": 0,
+      "name": "spec_len"
+    },
+    {
+      "module": 0,
+      "name": "spec_set"
+    },
+    {
+      "module": 0,
+      "name": "Map"
+    }
+  ]
+}

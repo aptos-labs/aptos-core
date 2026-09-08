@@ -70,12 +70,11 @@ resources, fields, results, and typed quantifiers.
 
 ## Setup
 
-Build the lightweight exchange frontend and select it explicitly with
-`APTOS_MOVE_EXCHANGE`:
+Build the standalone Move CLI and select it explicitly with `APTOS_MOVE_CLI`:
 
 ```bash
-cargo build -p aptos-move-cli --bin aptos-move-exchange
-APTOS_MOVE_EXCHANGE=<path-to-aptos-move-exchange> lake test
+cargo build -p aptos-move-cli --features binary --bin move
+APTOS_MOVE_CLI=<path-to-move> lake test
 ```
 
 `APTOS_CLI=<path-to-aptos>` remains a backward-compatible fallback for the
@@ -88,7 +87,7 @@ are reported as Lean elaboration errors.
 The CLI also supports package export:
 
 ```bash
-aptos move exchange --package-dir <pkg>
+move exchange --package-dir <pkg>
 ```
 
 It emits one `<module>.exchange.json` per supported target module.  The

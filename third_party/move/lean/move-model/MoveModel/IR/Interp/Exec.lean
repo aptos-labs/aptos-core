@@ -462,13 +462,17 @@ def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper
     | _ => throw (.stuck "ill-typed operands")
   | .vecContains =>
     match vs with
-    | [.vector es, v] => pure (.ok [.bool (es.any (· == v))] m)
+    | [.vector es, v] =>
+      if v.refFree then pure (.ok [.bool (es.any (· == v))] m)
+      else throw (.stuck "reference-bearing vector search operand")
     | _ => throw (.stuck "ill-typed operands")
   | .vecIndexOf =>
     match vs with
     | [.vector es, v] =>
-      let i := es.findIdx (· == v)
-      pure (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m)
+      if v.refFree then
+        let i := es.findIdx (· == v)
+        pure (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m)
+      else throw (.stuck "reference-bearing vector search operand")
     | _ => throw (.stuck "ill-typed operands")
   | .vecTrim =>
     match vs with
@@ -582,6 +586,10 @@ def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper
   | .borrowGlobal _ => throw (.stuck "internal: reference op in interpOp")
   | .borrowGlobalInst _ _ => throw (.stuck "internal: reference op in interpOp")
   | .borrowVecElem => throw (.stuck "internal: reference op in interpOp")
+  | .borrowVariantField _ _ => throw (.stuck "internal: reference op in interpOp")
+  | .borrowVariantFieldInst _ _ _ => throw (.stuck "internal: reference op in interpOp")
+  | .testVariantRef _ => throw (.stuck "internal: reference op in interpOp")
+  | .testVariantRefInst _ _ => throw (.stuck "internal: reference op in interpOp")
   | .readRef => throw (.stuck "internal: reference op in interpOp")
   | .writeRef => throw (.stuck "internal: reference op in interpOp")
   | .freezeRef => throw (.stuck "internal: reference op in interpOp")
@@ -726,6 +734,52 @@ def interpInstrs (P : Program) : Nat → List Instr → IState →
         | none => throw (.stuck "read through a dangling reference")
       | _, _ =>
         throw (.stuck "vector element borrow of a non-reference or bad index")
+    | .call [dst] (.borrowVariantField variants i) [t] =>
+      match s.getLocal t with
+      | some (.ref rt) =>
+        match readTargetI s rt with
+        | some (.variant tag fs) =>
+          if variants.contains tag then
+            if i < fs.length then
+              interpInstrs P fuel rest
+                (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [i]⟩))
+            else throw (.stuck "variant field borrow out of range")
+          else pure (.abort s.memory runtimeAbortCode)
+        | some _ => throw (.stuck "variant field borrow of a non-enum")
+        | none => throw (.stuck "variant field borrow of a dangling reference")
+      | _ => throw (.stuck "borrow_variant_field of a non-reference")
+    | .call [dst] (.borrowVariantFieldInst variants i _) [t] =>
+      match s.getLocal t with
+      | some (.ref rt) =>
+        match readTargetI s rt with
+        | some (.variant tag fs) =>
+          if variants.contains tag then
+            if i < fs.length then
+              interpInstrs P fuel rest
+                (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [i]⟩))
+            else throw (.stuck "variant field borrow out of range")
+          else pure (.abort s.memory runtimeAbortCode)
+        | some _ => throw (.stuck "variant field borrow of a non-enum")
+        | none => throw (.stuck "variant field borrow of a dangling reference")
+      | _ => throw (.stuck "borrow_variant_field of a non-reference")
+    | .call [dst] (.testVariantRef variant) [t] =>
+      match s.getLocal t with
+      | some (.ref rt) =>
+        match readTargetI s rt with
+        | some (.variant tag _) =>
+          interpInstrs P fuel rest (s.writeLocal dst (.bool (tag == variant)))
+        | some _ => throw (.stuck "variant test of a non-enum")
+        | none => throw (.stuck "variant test of a dangling reference")
+      | _ => throw (.stuck "test_variant_ref of a non-reference")
+    | .call [dst] (.testVariantRefInst variant _) [t] =>
+      match s.getLocal t with
+      | some (.ref rt) =>
+        match readTargetI s rt with
+        | some (.variant tag _) =>
+          interpInstrs P fuel rest (s.writeLocal dst (.bool (tag == variant)))
+        | some _ => throw (.stuck "variant test of a non-enum")
+        | none => throw (.stuck "variant test of a dangling reference")
+      | _ => throw (.stuck "test_variant_ref of a non-reference")
     | .call [dst] .readRef [t] =>
       match s.getLocal t with
       | some (.ref rt) =>

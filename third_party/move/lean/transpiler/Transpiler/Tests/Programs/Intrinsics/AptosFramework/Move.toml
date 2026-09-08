@@ -1,0 +1,16 @@
+[package]
+name = "AptosFramework"
+version = "1.0.0"
+
+[addresses]
+std = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"
+aptos_fungible_asset = "0xA"
+aptos_token = "0x3"
+core_resources = "0xA550C18"
+vm_reserved = "0x0"
+
+[dependencies]
+AptosStdlib = { local = "../AptosStdlib" }
+MoveStdlib = { local = "../../../../../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/.MoveStdlib.intrinsics-input" }

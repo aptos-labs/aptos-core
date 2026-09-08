@@ -88,6 +88,36 @@ inductive InstrNext : Instr → MoveState → MoveState → Prop where
       (hlt : n < es.length) :
       InstrNext (.call [dst] .borrowVecElem [t, it]) s
         (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [n]⟩))
+  | borrowVariantField {s : MoveState} {dst t : LocalIndex}
+      {variants : List Nat} {i : Nat} {rt : RefTarget} {tag : Nat}
+      {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = true)
+      (hi : i < fs.length) :
+      InstrNext (.call [dst] (.borrowVariantField variants i) [t]) s
+        (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [i]⟩))
+  | borrowVariantFieldInst {s : MoveState} {dst t : LocalIndex}
+      {variants : List Nat} {i : Nat} {args : List Ty} {rt : RefTarget}
+      {tag : Nat} {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = true)
+      (hi : i < fs.length) :
+      InstrNext (.call [dst] (.borrowVariantFieldInst variants i args) [t]) s
+        (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [i]⟩))
+  | testVariantRef {s : MoveState} {dst t : LocalIndex} {variant : Nat}
+      {rt : RefTarget} {tag : Nat} {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs)) :
+      InstrNext (.call [dst] (.testVariantRef variant) [t]) s
+        (s.writeLocal dst (.bool (tag == variant)))
+  | testVariantRefInst {s : MoveState} {dst t : LocalIndex} {variant : Nat}
+      {args : List Ty} {rt : RefTarget} {tag : Nat} {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs)) :
+      InstrNext (.call [dst] (.testVariantRefInst variant args) [t]) s
+        (s.writeLocal dst (.bool (tag == variant)))
   | readRef {s : MoveState} {dst t : LocalIndex} {rt : RefTarget}
       {v : Value}
       (ht : s.locals t = some (.ref rt))
@@ -136,6 +166,22 @@ inductive InstrStop : Instr → MoveState → FrameOutcome → Prop where
       (hi : s.locals it = some (.u64 n))
       (hge : es.length ≤ n) :
       InstrStop (.call [dst] .borrowVecElem [t, it]) s
+        (.abort s.memory Oper.borrowVecElem.abortCode)
+  | borrowVariantField {s : MoveState} {dst t : LocalIndex}
+      {variants : List Nat} {i : Nat} {rt : RefTarget} {tag : Nat}
+      {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = false) :
+      InstrStop (.call [dst] (.borrowVariantField variants i) [t]) s
+        (.abort s.memory runtimeAbortCode)
+  | borrowVariantFieldInst {s : MoveState} {dst t : LocalIndex}
+      {variants : List Nat} {i : Nat} {args : List Ty} {rt : RefTarget}
+      {tag : Nat} {fs : List Value}
+      (ht : s.locals t = some (.ref rt))
+      (hv : s.readTarget rt = some (.variant tag fs))
+      (hmem : variants.contains tag = false) :
+      InstrStop (.call [dst] (.borrowVariantFieldInst variants i args) [t]) s
         (.abort s.memory runtimeAbortCode)
 
 /-- A terminator which selects another block. -/
@@ -170,6 +216,10 @@ theorem run {P : Program} {G : Cfg} {i : Instr} {s : MoveState}
   | borrowGlobalInst ha habsent => exact .borrowGlobalInstAbort ha habsent
   | borrowVecElem ht hv hi hge =>
       exact .borrowVecElemAbort ht hv hi hge
+  | borrowVariantField ht hv hmem =>
+      exact .borrowVariantFieldAbort ht hv hmem
+  | borrowVariantFieldInst ht hv hmem =>
+      exact .borrowVariantFieldInstAbort ht hv hmem
 
 end InstrStop
 
@@ -199,6 +249,12 @@ theorem run {P : Program} {G : Cfg} {i : Instr} {s s' : MoveState}
   | borrowGlobal ha hpresent => exact .borrowGlobalOk ha hpresent hrest
   | borrowGlobalInst ha hpresent => exact .borrowGlobalInstOk ha hpresent hrest
   | borrowVecElem ht hv hi hlt => exact .borrowVecElemOk ht hv hi hlt hrest
+  | borrowVariantField ht hv hmem hi =>
+      exact .borrowVariantFieldOk ht hv hmem hi hrest
+  | borrowVariantFieldInst ht hv hmem hi =>
+      exact .borrowVariantFieldInstOk ht hv hmem hi hrest
+  | testVariantRef ht hv => exact .testVariantRef ht hv hrest
+  | testVariantRefInst ht hv => exact .testVariantRefInst ht hv hrest
   | readRef ht hv hfree => exact .readRef ht hv hfree hrest
   | writeRef ht hv hfree hs' => exact .writeRef ht hv hfree hs' hrest
   | freezeRef ht hv hfree => exact .freezeRef ht hv hfree hrest
@@ -611,6 +667,18 @@ theorem inductGrouped {P : Program}
       exact instrNext (.borrowVecElem ht hv hi hlt) hrest ih
   | borrowVecElemAbort ht hv hi hge =>
       exact instrStop (.borrowVecElem ht hv hi hge)
+  | borrowVariantFieldOk ht hv hmem hi hrest ih =>
+      exact instrNext (.borrowVariantField ht hv hmem hi) hrest ih
+  | borrowVariantFieldAbort ht hv hmem =>
+      exact instrStop (.borrowVariantField ht hv hmem)
+  | borrowVariantFieldInstOk ht hv hmem hi hrest ih =>
+      exact instrNext (.borrowVariantFieldInst ht hv hmem hi) hrest ih
+  | borrowVariantFieldInstAbort ht hv hmem =>
+      exact instrStop (.borrowVariantFieldInst ht hv hmem)
+  | testVariantRef ht hv hrest ih =>
+      exact instrNext (.testVariantRef ht hv) hrest ih
+  | testVariantRefInst ht hv hrest ih =>
+      exact instrNext (.testVariantRefInst ht hv) hrest ih
   | readRef ht hv hfree hrest ih =>
       exact instrNext (.readRef ht hv hfree) hrest ih
   | writeRef ht hv hfree hs' hrest ih =>

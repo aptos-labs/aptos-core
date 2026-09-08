@@ -5,7 +5,7 @@
 import Move
 import MoveModel.Tests.Common
 
-/-! Source attributes before `struct`, `enum`, and `fun` keywords: user
+/-! Source attributes before `struct`, `enum`, `fun`, and specification-function keywords: user
 provided instances are recorded as structured metadata, well-known internal
 names keep desugaring to the persistent tag attributes. -/
 
@@ -28,6 +28,12 @@ module Attributes where
 
   @[view]
   fun peek (x : U64) : U64 := x + 0
+
+  @[semantic_marker (Registry)]
+  spec opaque modeled_value (value : Registry) : Int
+
+  @[defined_spec_marker]
+  spec fun modeled_flag (value : Registry) : Prop := value.value = 0
 
   @[randomness 7, lint.skip]
   entry fun act (addr : Address) : Action Unit := do

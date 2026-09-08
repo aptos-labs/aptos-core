@@ -460,6 +460,10 @@ def Module.monomorphize (m : Module) (plan : MonoPlan) : Module where
     let info ← m.funMeta key.funId
     pure { info with name := s!"{info.name}$mono{generated}" }
   dialect := m.dialect
+  -- The link metadata is untouched: types and calls keep their ids.
+  externalFuns := m.externalFuns
+  friends := m.friends
+  externalStructs := m.externalStructs
 
 /-- Discover and materialize the monomorphic verification module. -/
 def Module.monomorphizeForVerification (m : Module) : Except String (MonoPlan × Module) := do

@@ -131,7 +131,8 @@ module          = "module" ident [ "at" address-spec ] "where" { item } ;
 
 item            = struct-decl | enum-decl | fun-decl
                 | "mutual" { fun-decl } "end"
-                | spec-decl | data-invariant | global-invariant | verify-decl
+                | spec-decl | spec-fun-decl
+                | data-invariant | global-invariant | verify-decl
                 | lean-command                  (* def, theorem, namespace, ... *)
                 | compile-directive ;
 
@@ -246,15 +247,24 @@ spec-binder     = "{" ident [ ":" "Type" ] "}"
                 | "[" term "]"                  (* instance assumption *)
                 | "(" ident ":" param-type ")" ;
 spec-clauses    = "ensures" term                (* only a postcondition *)
-                | [ "requires" term ";" ] [ modifies-clause ]
+                | { pragma-clause }
+                  [ "requires" term ";" ] [ modifies-clause ]
                   "ensures" term
                   [ ";" aborts-clause ] ;       (* omitted: uninterpreted *)
+pragma-clause   = "pragma" ( "aborts_if_is_partial" | "aborts_if_is_strict" | "opaque" ) ";" ;
 modifies-clause = "modifies" modifies-target { "," modifies-target } ";" ;
-modifies-target = family [ "[" expr "]" ] ;     (* family, or one address *)
+modifies-target = family [ "[" expr "]" ]       (* family, or one address *)
+                | "*" ;                         (* every unlisted family unconstrained *)
 family          = ident | "(" ident { type-atom } ")" ;   (* `(Vault T)` *)
-aborts-clause   = "aborts_if" term "with" term
-                  { ";" "aborts_if" term "with" term }
-                | "aborts_if" term ;            (* any code *)
+aborts-clause   = "aborts_if" term [ "with" term ]        (* no code: any code *)
+                  { ";" "aborts_if" term [ "with" term ] } ;
+
+spec-fun-decl   = [ doc-comment ] "spec" "fun" ident { spec-binder }
+                  [ ":" term ] ":=" term ;
+                  (* the specification version of the Move function `ident`
+                     when none is derived (a native), or a standalone
+                     specification function; the body may read `R[a]` and
+                     `existsAt<R>(a)` but not `old` *)
 
 data-invariant  = "spec" ident { spec-binder } "where"
                   "invariant" term { ";" "invariant" term } ;
@@ -279,7 +289,9 @@ verify-decl     = "verify" ident [ "by" tactic-seq ] ;
 spec-term       = "result" | "initial" | "final" | "abortCode" | "this"
                 | "old(" term ")"
                 | "existsAt<" type ">(" term ")"
-                | family "[" term "]" { "." ident } ;  (* global place *)
+                | family "[" term "]" { "." ident }    (* global place *)
+                | ident { term } ;                     (* specification function,
+                                                          or pure Move function *)
 
 (* ---- compilation directives ---- *)
 
@@ -474,8 +486,7 @@ parameters receive no bounds. Every Move structure implicitly derives Lean's
 
 `enum Name ... where` declares a native Move enum with constructor payloads in
 either named-binder or arrow form. Recursive, indexed, and empty enums are
-rejected; non-recursive generic enums are supported. Borrowing a field
-directly out of an enum variant is not supported.
+rejected; non-recursive generic enums are supported.
 
 ```lean
 enum Op has Copy, Drop, Store where
@@ -501,6 +512,47 @@ fun nested_total (envelope : Envelope) : U64 :=
   | .One (.Number value) => value
   | .Two (.Number left) (.Number right) => left + right
   | _ => 0
+```
+
+The payload of an enum is reached through its variants, as in Move:
+
+- `&r.f` / `&mut r.f` with `r` a reference to an enum borrows the payload
+  field `f` of the variants that have it (one offset and one type across
+  them); the VM fails when the referent is any other variant. The core
+  operations are `borrowVariantField` / `borrowVariantFieldMut`.
+- `match r with | .V x y => … | _ => …` with `r` a local of type `&E` /
+  `&mut E` dispatches on the referent and binds the payload *by reference*
+  (`x : &T` or `&mut T`, so `*x` reads it and `x := v` writes through it).
+  The alternatives are the plain forms `| .V x _ => …`, `| E.V x => …`,
+  `| _ => …`, one pattern each, covering every variant or ending in `_`.
+  Inside `do` the right-hand sides are `do` sequences (`break`, `continue`,
+  `return` in them are the enclosing block's); as a term they are `Action`
+  terms. A variable-free match on `*r` is the ordinary value match.
+- In specifications, `x.f` on an enum *value* is the field of whichever
+  listed variant `x` is, and an unspecified value
+  (`Move.Spec.arbitrary`) otherwise — Move's `SelectVariants` read partially
+  — for `x` a local (or a parenthesized term) of the enum type.
+
+```lean
+fun scale (shape : &mut Shape) (factor : U64) : Action Unit := do
+  match shape with
+  | .Circle radius =>
+      let r ← *radius
+      radius := r * factor
+  | .Rectangle width height =>
+      let w ← *width
+      width := w * factor
+      let h ← *height
+      height := h * factor
+
+fun peek (self : &Slot) : Action U64 := do
+  let value ← &self.value   -- aborts unless `self` is `.Filled`
+  let v ← *value
+  pure v
+
+spec peek (self : Slot) where
+  ensures result = self.value;
+  aborts_if ¬(self is Slot.Filled) with Move.Semantics.variantMismatch
 ```
 
 ### References
@@ -563,13 +615,17 @@ can be used as `@name` in a function body and as `module M at name where` in a
 module identity. `Move.ConventionalAddresses`, imported by `Move`, registers
 the conventional Aptos framework names in the `Move` namespace.
 
-A named integer constant is a module-level Lean `def` of a compile-time
-expression, referenced by name inside Move functions. Arithmetic, bit
+A named constant is a module-level Lean `def` referenced by name inside Move
+functions: an integer constant is a compile-time expression — arithmetic, bit
 operations, shifts, negation, and casts are evaluated with checked Move
-constant semantics:
+constant semantics — and a `Bool`, `Address`, or integer-vector constant is a
+literal:
 
 ```lean
 def E_TOO_SMALL : U64 := 1 + 2 * 3
+def ENABLED : Bool := true
+def OWNER : Address := @0x42
+def NAME : Vector U8 := b"constants"
 ```
 
 ## Expressions and statements
@@ -612,7 +668,8 @@ expansions:
 | `&x` / `&mut x` (local) | `borrowLocal x` / `borrowLocalMut x` |
 | `&R[addr]` / `&mut R[addr]` | `borrowGlobal R addr` / `borrowGlobalMut R addr` |
 | `&r.field` / `&mut r.field` | `borrowField(Mut) r (fieldOfProjection T.field)` |
-| `&mut R[addr].a.b` | global borrow, then one checked field borrow per edge |
+| `&r.field` / `&mut r.field` (`r` a reference to an enum) | `borrowVariantField(Mut) variants offset r` (the variants that have `field`; fails on any other) |
+| `&mut R[addr].a.b`, `&mut r.a.b` | global borrow (or the reference variable), then one checked field borrow per edge |
 | `&v[i]` / `&mut v[i]` | local vector borrow, then `borrowElem(Mut)` (bounds-checked) |
 | `&mut v` | whole-vector borrow for `insert`/`remove` |
 
@@ -724,7 +781,9 @@ deployable and proof code is never blurred by inlining.
   condition in scope; it is used where creating a value owes a
   [data invariant](#data-invariants).
 - `match e with | pat => e ...` performs exhaustive enum matching with
-  variable and wildcard payload patterns, including nested patterns.
+  variable and wildcard payload patterns, including nested patterns. With
+  `e` a reference local to an enum, the payload is bound by reference
+  ([Enums](#enums)).
 - `while c do s` and `loop s` are in-function loops compiled to CFG back
   edges. `loop@l s` names a loop; `break`/`continue` target the innermost
   loop, `break@l`/`continue@l` a named enclosing loop. Loop labels must be
@@ -847,6 +906,15 @@ either. A `fun` needs neither `@[noinline]` nor `@[move_fun]` — the macro
 inserts the attribute, retains the source body for specification generation,
 and preserves the call boundary in Lean's compiler IR.
 
+`inline fun` and `public inline fun` are compile-time-only helpers. The macro
+forces their Lean bodies through the inliner and excludes the declarations
+themselves from source-spec derivation and Move output. This also admits the
+narrow higher-order form used by Move's standard library: an inline helper may
+take a Lean function parameter returning `Action` and invoke it; the callback
+is gone after the helper is inlined into a deployable caller. General stored
+function values and closure construction remain outside the executable
+boundary.
+
 ### Attributes
 
 A `struct`, `enum`, or `fun` keyword (including the `entry` and `friend`
@@ -883,8 +951,11 @@ the same file, in the same language, as the contract it constrains.
 
 `def`, `abbrev`, `theorem`, `instance`, `namespace`, `section`, `open`, and
 the diagnostic commands are ordinary Lean and are never selected for Move
-lowering. Only declarations carrying the Move tags (`struct`, `enum`, `fun`,
-and their `entry`/`friend` forms) become part of the module.
+lowering; so are a `spec fun` declaration and a `fun`'s derived specification
+version (Lean definitions for specifications, see [Specification
+functions](#specification-functions)).
+Only declarations carrying the Move tags (`struct`, `enum`, `fun`, and their
+`entry`/`friend` forms) become part of the module.
 
 The boundary is enforced in one direction only:
 
@@ -925,6 +996,9 @@ section, ordered by dependency, because a proof may cite the theorem another
 | `spec f` with only `ensures`, on a non-`Action` function | `f.contract : Prop` |
 | `spec f` with `requires`/`modifies`/`aborts_if`, or on an `Action` function | `f.sourceSpec` (and `f.bodySpec` when recursive), `f.contract : Prop` |
 | `verify f` | `f.verified : f.contract` |
+| `fun f` with a body | `f.specFun`, its specification version (derived, best effort); `f args` in a clause denotes it |
+| `spec fun f …` on a Move function `f` without a derived version | `f.specFun`, declared by hand |
+| `spec fun g …` on no Move function | `g`, a specification function |
 | `struct T` with `spec T where invariant` | `T.Raw`, `T.Invariant`, and the `invariant` proof field of `T` |
 | `spec module where invariant` | `GlobalInvariant_<R>[_i]`, `..._at`, and one reestablishment lemma per family and write shape (`GlobalUpdate_...` for `update` clauses) |
 
@@ -1015,6 +1089,7 @@ spec narrow (value : U64) where
 | `I8.halfSize` ... | half the value count of a signed width; the range is `[-halfSize, halfSize)` |
 | `initial`, `final`, `abortCode` | the implicit state and code binders |
 | `this` | the constrained value, inside a data invariant |
+| `Move.Spec.arbitrary T site` | the unspecified value of an aborting specification expression (an `abort` in value position, the payload of a variant an enum value is not), fixed per site — the Move Prover's arbitrary value |
 
 Integers compare as their unbounded value directly — `0 < v`,
 `old(R[a]).value ≤ R[a].value`, with no `.toNat`. Write `.toNat` only where
@@ -1141,6 +1216,66 @@ and universally quantified; a contract never declares a `World` record or a
 resource descriptor. Global state therefore stays compositional: adding a
 resource in another module never forces a shared state type.
 
+### Specification functions
+
+A Move function applied in a specification clause denotes its *specification
+version*: the pure reading of its body — references erased (a borrow is its
+place, a read its reference), `assert!`s dropped and an `abort` in value
+position read as `Move.Spec.arbitrary` (the specification language's partial
+reading), global reads as places `R[a]` and `existsAt R a` as
+`existsAt<R>(a)`, calls to other Move functions as their versions — the
+reading under which the Move Prover lets a pure Move function be called in a
+specification (the book's *Function calls*).  Leaner derives it at the
+function's declaration, best effort and silently (like the source
+semantics), as the definition `f.specFun`; `f args` in a clause is rewritten
+to it.  A body without a pure reading — one that writes or reassigns, loops,
+returns early, creates or moves resources, or takes a mutable reference — has
+no version, and a specification that applies
+the function says why; so has a native, which has no body.
+
+`spec fun f binders [: type] := body` declares a specification function by
+hand:
+
+- for a Move function `f` *without* a derived version (a native, or a body
+  with no pure reading), it declares the version — the intrinsic models of
+  the standard library's natives do this (`spec fun borrow_address (self :
+  &Signer) : Address := self.address`);
+- otherwise it declares a new specification function `f`: the predicates and
+  functions a contract is written against (`spec_contains` in the standard
+  library's `acl`), beside the hand-written `Model` namespace.
+
+Binders are values (a `&T` parameter is written as `T`); the body is a
+specification term.  A body that reads global memory — `R[a]`,
+`existsAt<R>(a)`, or another stateful specification function — makes the
+function *stateful* (derived versions included): its definition takes the
+store instances of the families it reads and the state to read, and a clause
+applying it passes its own state, `old(f args)` the pre-state.  A clause may
+apply a stateful function only for families the specified function uses, and
+`old` is not available inside a body.  The automatic prover unfolds
+specification functions (as the Move Prover inlines non-recursive ones); a
+loop invariant may apply stateless ones.
+
+```lean
+public fun is_big (coin : &Coin) : Action Bool := do
+  let current ← *coin
+  pure (current.value > LIMIT)
+-- derived: is_big.specFun (coin : Coin) : Bool := let current := coin; current.value > LIMIT
+
+spec check (coin : Coin) where
+  ensures result = is_big coin;        -- is_big.specFun coin
+  aborts_if False
+
+spec fun balance (addr : Address) : U64 := Coin[addr].value
+
+spec deposit (addr : Address) (amount : U64) where
+  modifies Coin[addr];
+  ensures balance addr = old(balance addr) + amount;
+  aborts_if ¬existsAt<Coin>(addr)
+```
+
+`Tests/Verification/SpecFunctions.lean` verifies these forms;
+`Tests/Negative/SpecFunctions.lean` shows the diagnostics.
+
 ### Framing with `modifies`
 
 A function changes only the global memory its `modifies` clause lists, so a
@@ -1155,6 +1290,8 @@ a declared abort may happen.
 | `modifies R;` | family `R` is unconstrained; the others are still framed |
 | `modifies R[a], S[a];` | both narrowed families, the rest framed |
 | `modifies (R T)[addr];` | a generic family at an instantiation, like `R[addr]`; an instantiation neither the body nor the clauses name is left unconstrained |
+| `modifies R[addr], *;` | `R` closed at `addr`; every family the clause does not list is unconstrained (the Move Prover's per-family reading) |
+| `modifies *;` | no frame at all |
 
 ```lean
 spec shift (addr : Address) (amount : U64) where
@@ -1183,6 +1320,55 @@ inherits), and where a declared abort *excuses* the postcondition.
   a function whose arithmetic is provably in range.
 - *Omitted* — abort behaviour is **uninterpreted**: any code is permitted, and
   nothing is excused, so `ensures` must hold for every successful execution.
+
+A declared clause is read in both directions. It is *sufficient*: where `P`
+holds the function must abort (`Contract.mustAbort`); and, unless the spec
+says otherwise, the clauses together are *necessary*: every abort matches a
+clause, with its code. Two pragma clauses, written first in the spec, adjust
+the second direction, as in the Move Prover:
+
+- `pragma aborts_if_is_partial;` — the clauses are sufficient only;
+  completeness is uninterpreted (other aborts are permitted, with any code).
+- `pragma aborts_if_is_strict;` — an empty clause list means "never aborts".
+
+```lean
+spec bump_checked (value : U64) (limit : U64) where
+  pragma aborts_if_is_partial;
+  ensures result = value + 1;
+  aborts_if limit ≤ value with E_LARGE
+```
+
+A pragma-led spec on a pure function selects the relational reading (the
+postcondition is owed on successful executions; abort behaviour as the
+pragma says) instead of the pure value contract.
+
+### Summaries: natives and opaque functions
+
+A `native fun` has no body, so its `spec` is all its callers know: its source
+semantics for callers is the contract's *summary* — the computation of every
+outcome the contract permits (`Contract.summary`; callers must establish the
+precondition and receive the postcondition, frame, and declared aborts).
+`pragma opaque;` gives a function with a body the same treatment for its
+callers; the body is still what `verify` checks against the contract, when
+its source semantics can be generated, and is assumed — with a warning —
+when the verifier's translator cannot follow it.
+
+```lean
+native fun host_double (value : U64) : U64
+
+spec host_double (value : U64) where
+  pragma aborts_if_is_partial;
+  ensures result.toNat = 2 * value.toNat
+
+fun quadruple (value : U64) : U64 :=
+  host_double (host_double value)
+
+spec quadruple (value : U64) where
+  pragma aborts_if_is_partial;
+  ensures result.toNat = 4 * value.toNat
+
+verify quadruple               -- through host_double's summary
+```
 
 ```lean
 fun increment_unspecified (value : U64) : Action U64 := do
@@ -1228,6 +1414,37 @@ the place the caller borrowed:
 entry fun bump_counter (addr : Address) : Action Unit := do
   let value ← &mut Counter[addr].value
   bump value
+```
+
+While a `&mut` parameter is live, a mutable borrow of an owned local is a
+loan *independent* of it. The nested loan body returns its continuation as a
+closure; after the local owner is reconciled, the closure runs with that
+owner's final value. Reads and writes of disjoint live mutable parameters in
+the loan body are retained by the closure. The same continuation mechanism
+reconciles every active loan before `break`, `continue`, or early `return`
+transfers control.
+
+A field, vector element, or enum payload that is itself selected as a mutable
+reference result uses a transferred prophecy instead of the ordinary closure.
+If a loop path returns that child, the prophecy crosses the function boundary.
+If the path breaks, continues, or returns a different result, Leaner resolves
+the child first and rebuilds its owner before invoking the target continuation.
+Labeled loop exits unwind exactly the loans opened inside the named target.
+
+Shadowing follows ordinary lexical scope. The retained source alpha-renames
+only a binding that reuses an existing local name, including binders in nested
+branches and tuple patterns, so a later value local cannot be confused with an
+earlier mutable reference.
+
+```lean
+fun splice (self : &mut Buffer) (a : U8) (b : U8) : Action Unit := do
+  let mut front : Vector U8 := Move.Vector.empty
+  let r ← &mut front          -- independent of `self`
+  extend r a
+  front ← *r
+  extend r b
+  front ← *r
+  self := { bytes := front }  -- after the loan
 ```
 
 ### Data invariants
@@ -1300,6 +1517,22 @@ The obligation lands only where a value is created, in one of three shapes:
 - **A mutation** is unconstrained while the borrow is live; the obligation
   lands where the value is rebuilt, when the loan dies. This is the same for a
   local value and for a resource behind `&mut R[addr].field`.
+- **A creation in effectful code**, from data the elaborator cannot judge,
+  goes through the type's creation operation `T.certify f₁ … fₙ` (the fields
+  in declaration order, an `Action`): the compiler packs the fields, nothing
+  is checked at run time, and verification owes the invariant at that
+  creation — from the abort guarding it, say.
+
+```lean
+fun clamp (amount : U64) : Action Percent := do
+  if amount > 100 then
+    abort 1
+  Percent.certify amount
+
+spec clamp (amount : U64) where
+  ensures result.value = amount;
+  aborts_if 100 < amount.toNat with 1
+```
 
 The proof field is erased before Move sees the type.
 
@@ -1474,20 +1707,63 @@ verify count_down by
 ```
 
 When it is not — a function with two sequential loops, or a loop carrying a
-stronger invariant than the postcondition — the loop's invariant is stated as
-a separate `Move.Verify.Satisfies` lemma about its fixed point, proved with
-`satisfies_fix_of_wp`, and cited through `wp_of_satisfies`.
-`Tests/Language/Loops.lean` shows both shapes (`upToThreeLoop`,
-`countToZeroLoop`, `drainLoop`); `Tests/Verification/OrderedMap.lean` proves a
-recursive binary search against a `Model.Search.Window` invariant; and
-`Tests/Verification/Quicksort.lean` verifies a generic in-place sort.
+stronger invariant than the postcondition — the loop states its invariant at
+the head of its body: `invariant P`, one or more, before the first statement
+(for a `while`, it holds before the condition is tested).  `P` is a
+proposition in the specification vocabulary over the loop's state: the
+locals in scope and the current referents of live mutable references, as
+values; `old(p)` is a parameter's value at function entry.  A verification
+statement only — the executable program ignores it.  The automatic proof
+establishes the invariant on entry, preserves it per iteration (the next
+iteration is the induction hypothesis), and continues after the loop from the
+invariant and the exit condition.  Loops leave the global store as they found
+it; an invariant over storage is not expressible yet.
+
+```lean
+fun clear (self : &mut Bits) : Action Unit := do
+  let field ← &self.bit_field
+  let len := field.length
+  let mut i : U64 := 0
+  loop
+    invariant i ≤ len ∧ self.bit_field.toList.length = len.toNat ∧
+      self.length = old(self).length
+    if !(i < len) then break
+    let bits ← &mut self.bit_field
+    let bit ← &mut bits[i]
+    bit := false
+    i := i + 1
+
+spec clear (self : &mut Bits) where
+  ensures self.length = old(self).length ∧
+    self.bit_field.toList.length = old(self).bit_field.toList.length;
+  aborts_if False
+
+verify clear
+```
+
+A live mutable reference the loop body mentions travels with the loop's
+state, so a write through it inside the body is what the next iteration and
+the code after the loop see.  Without source invariants the fixed point can
+still be reasoned about by hand: a separate `Move.Verify.Satisfies` lemma
+about it, proved with `satisfies_fix_of_wp` and cited through
+`wp_of_satisfies`.  `Tests/Language/Loops.lean` shows both shapes
+(`upToThreeLoop`, `countToZeroLoop`, `drainLoop`);
+`Tests/Verification/LoopInvariants.lean` the source invariants;
+`Tests/Verification/OrderedMap.lean` proves a recursive binary search against
+a `Model.Search.Window` invariant; and `Tests/Verification/Quicksort.lean`
+verifies a generic in-place sort.
 
 ### Calls
 
 A call to a Move callee is verified from the callee's relational semantics,
-`f.sourceSpec`, which is generated from its retained `fun` body — by its own
-`spec`, or on demand for a callee (pure or effectful) that has none. In an
-automatic proof the callee's `sourceSpec` is unfolded into the caller; a
+`f.sourceSpec`, which is generated from its retained `fun` body: at the
+callee's declaration (every `fun` with a body derives it, best effort — a
+body outside the translator's coverage derives nothing, silently; `set_option
+move.reportDerivation true` reports why), by its own `spec`, or on demand for
+a callee of the current module that has neither.  A callee of an imported
+module therefore needs no `spec` block for its callers to reason through its
+body; when its semantics could not be derived, the caller's `spec` reports
+it.  In an automatic proof the callee's `sourceSpec` is unfolded into the caller; a
 callee with a `&mut` parameter is called with the caller's live mutable
 reference (`bump value` after `let value ← &mut Counter[addr].value`) and its
 final referent is written back. Calls with two mutable parameters carry two
@@ -1521,8 +1797,10 @@ executed; it simply has no `spec`/`verify` yet. The current boundary:
 | receiver-style `values.get i` / `r.insert i e` / `r.remove i` | write `Move.Vector.get` / `Move.Vector.insert` / `Move.Vector.remove` |
 | a core primitive in a form the surface cannot express (`borrowField` with a computed descriptor, `assert`) | use the surface syntax (`&r.f`, `abort c`) |
 | an overlapping sibling mutable borrow of the same field path | borrow disjoint fields or close the first loan |
+| `invariant` anywhere but at the head of a `loop`/`while` body; `old(e)` in one with `e` not a parameter | move the invariant to the loop head; snapshot the value before the loop |
 | a Lean-only `match` motive or `generalizing` clause | use Move's ordinary match form |
 | a clause naming a resource family the function does not touch | name only families the function uses |
+| a clause applying a Move function without a pure reading (an imperative body, a `&mut` parameter, a native) | declare its specification version, `spec fun f …` |
 
 Mutually recursive functions are represented by one heterogeneous
 `Spec.fixFamily`. Their generated member projections have ordinary

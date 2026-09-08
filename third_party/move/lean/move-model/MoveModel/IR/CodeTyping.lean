@@ -216,6 +216,8 @@ therefore need no typing). -/
 def Oper.isRefOp : Oper → Bool
   | .borrowLoc | .borrowField _ | .borrowFieldInst _ _
   | .borrowGlobal _ | .borrowGlobalInst _ _ | .borrowVecElem
+  | .borrowVariantField _ _ | .borrowVariantFieldInst _ _ _
+  | .testVariantRef _ | .testVariantRefInst _ _
   | .readRef | .writeRef | .freezeRef => true
   | .add _ | .sub _ | .mul _ | .div _ | .mod _
   | .bitAnd _ | .bitOr _ | .bitXor _ | .shl _ | .shr _ | .cast _
@@ -305,6 +307,61 @@ inductive WfRefInstr (Δ : StructDecls) (decl : LocalIndex → Option Ty) :
       decl src = some (.mutRef (.vector t)) → decl idx = some .u64 →
       decl dst = some (.mutRef t) →
       WfRefInstr Δ decl (.call [dst] .borrowVecElem [src, idx])
+  -- an enum payload field through a reference: every listed variant has
+  -- the field at the offset, at one type
+  | borrowVariantFieldImm {dst src : LocalIndex} {r : ResourceId}
+      {sd : StructDecl} {vs : List (List Ty)} {variants : List Nat} {i : Nat} {t : Ty} :
+      Δ r = some sd → sd.variants = some vs →
+      (∀ v ∈ variants, ∃ fields, vs[v]? = some fields ∧ fields[i]? = some t) →
+      decl src = some (.ref (.enum r)) →
+      decl dst = some (.ref t) →
+      WfRefInstr Δ decl (.call [dst] (.borrowVariantField variants i) [src])
+  | borrowVariantFieldMut {dst src : LocalIndex} {r : ResourceId}
+      {sd : StructDecl} {vs : List (List Ty)} {variants : List Nat} {i : Nat} {t : Ty} :
+      Δ r = some sd → sd.variants = some vs →
+      (∀ v ∈ variants, ∃ fields, vs[v]? = some fields ∧ fields[i]? = some t) →
+      decl src = some (.mutRef (.enum r)) →
+      decl dst = some (.mutRef t) →
+      WfRefInstr Δ decl (.call [dst] (.borrowVariantField variants i) [src])
+  | borrowVariantFieldInstImm {dst src : LocalIndex} {r : ResourceId}
+      {sd : StructDecl} {vs : List (List Ty)} {variants : List Nat} {i : Nat} {t : Ty}
+      {args : List Ty} :
+      Δ r = some sd → args.length = sd.typeParams.length → sd.variants = some vs →
+      (∀ v ∈ variants, ∃ fields, vs[v]? = some fields ∧ fields[i]? = some t) →
+      decl src = some (.ref (.enumInst r args)) →
+      decl dst = some (.ref (t.instantiate args)) →
+      WfRefInstr Δ decl (.call [dst] (.borrowVariantFieldInst variants i args) [src])
+  | borrowVariantFieldInstMut {dst src : LocalIndex} {r : ResourceId}
+      {sd : StructDecl} {vs : List (List Ty)} {variants : List Nat} {i : Nat} {t : Ty}
+      {args : List Ty} :
+      Δ r = some sd → args.length = sd.typeParams.length → sd.variants = some vs →
+      (∀ v ∈ variants, ∃ fields, vs[v]? = some fields ∧ fields[i]? = some t) →
+      decl src = some (.mutRef (.enumInst r args)) →
+      decl dst = some (.mutRef (t.instantiate args)) →
+      WfRefInstr Δ decl (.call [dst] (.borrowVariantFieldInst variants i args) [src])
+  -- the variant test of a referent, through either kind of reference
+  | testVariantRefImm {dst src : LocalIndex} {r : ResourceId} {sd : StructDecl}
+      {vs : List (List Ty)} {variant : Nat} {fields : List Ty} :
+      Δ r = some sd → sd.variants = some vs → vs[variant]? = some fields →
+      decl src = some (.ref (.enum r)) → decl dst = some .bool →
+      WfRefInstr Δ decl (.call [dst] (.testVariantRef variant) [src])
+  | testVariantRefMut {dst src : LocalIndex} {r : ResourceId} {sd : StructDecl}
+      {vs : List (List Ty)} {variant : Nat} {fields : List Ty} :
+      Δ r = some sd → sd.variants = some vs → vs[variant]? = some fields →
+      decl src = some (.mutRef (.enum r)) → decl dst = some .bool →
+      WfRefInstr Δ decl (.call [dst] (.testVariantRef variant) [src])
+  | testVariantRefInstImm {dst src : LocalIndex} {r : ResourceId} {sd : StructDecl}
+      {vs : List (List Ty)} {variant : Nat} {fields args : List Ty} :
+      Δ r = some sd → args.length = sd.typeParams.length →
+      sd.variants = some vs → vs[variant]? = some fields →
+      decl src = some (.ref (.enumInst r args)) → decl dst = some .bool →
+      WfRefInstr Δ decl (.call [dst] (.testVariantRefInst variant args) [src])
+  | testVariantRefInstMut {dst src : LocalIndex} {r : ResourceId} {sd : StructDecl}
+      {vs : List (List Ty)} {variant : Nat} {fields args : List Ty} :
+      Δ r = some sd → args.length = sd.typeParams.length →
+      sd.variants = some vs → vs[variant]? = some fields →
+      decl src = some (.mutRef (.enumInst r args)) → decl dst = some .bool →
+      WfRefInstr Δ decl (.call [dst] (.testVariantRefInst variant args) [src])
   | readImm {dst src : LocalIndex} {t : Ty} :
       decl src = some (.ref t) → decl dst = some t →
       WfRefInstr Δ decl (.call [dst] .readRef [src])
@@ -1283,8 +1340,10 @@ theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
     rw [isValid_vector_iff] at hv₁
     obtain ⟨es, rfl, hlen, hes⟩ := hv₁
     rw [Oper.sem_vecContains] at hsem
-    cases hsem
-    exact ⟨.cons (.bool _) .nil, hm⟩
+    split at hsem
+    · cases hsem
+      exact ⟨.cons (.bool _) .nil, hm⟩
+    · contradiction
   | vecIndexOf =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
@@ -1292,11 +1351,13 @@ theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
     rw [isValid_vector_iff] at hv₁
     obtain ⟨es, rfl, hlen, hes⟩ := hv₁
     rw [Oper.sem_vecIndexOf] at hsem
-    cases hsem
-    refine ⟨.cons (.bool _) (.cons ?_ .nil), hm⟩
-    split
-    · exact .u64 (Nat.lt_trans (by assumption) hlen)
-    · exact .u64 (by simp [U64_SIZE])
+    split at hsem
+    · cases hsem
+      refine ⟨.cons (.bool _) (.cons ?_ .nil), hm⟩
+      split
+      · exact .u64 (Nat.lt_trans (by assumption) hlen)
+      · exact .u64 (by simp [U64_SIZE])
+    · contradiction
   | vecTrim =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>

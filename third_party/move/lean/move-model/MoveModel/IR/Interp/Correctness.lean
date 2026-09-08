@@ -324,7 +324,8 @@ theorem interpOp_sound {s : IState} {op : Oper}
   all_goals try simp only [Except.ok.injEq] at h
   all_goals try subst r
   all_goals
-    simp_all [NumType.checked, NumType.bitwise, IMem.denote_set, IMem.denote_remove]
+    simp_all [Oper.extendedVectorSem, NumType.checked, NumType.bitwise,
+      IMem.denote_set, IMem.denote_remove]
 
 /-- The one-source/one-destination fallback preserves instruction soundness. -/
 theorem interp_oneOne_fallback (P : Program) (fuel : Nat)
@@ -336,6 +337,22 @@ theorem interp_oneOne_fallback (P : Program) (fuel : Nat)
     interpInstrs P (fuel + 1) (.call dsts op srcs :: rest) s =
       interpGeneric P fuel rest s dsts op srcs := by
   rcases hop with rfl | ⟨i, rfl⟩ | ⟨r, rfl⟩ | rfl | rfl <;>
+    unfold interpInstrs <;> split <;> (try simp_all) <;> rfl
+
+/-- The enum-payload reference operations use the generic path when
+malformed. -/
+theorem interp_oneOneVariant_fallback (P : Program) (fuel : Nat)
+    (rest : List Instr) (s : IState) (dsts srcs : List Nat)
+    (op : Oper)
+    (hop : (∃ variants i, op = .borrowVariantField variants i) ∨
+      (∃ variants i args, op = .borrowVariantFieldInst variants i args) ∨
+      (∃ variant, op = .testVariantRef variant) ∨
+      (∃ variant args, op = .testVariantRefInst variant args))
+    (hshape : ¬ ∃ dst src, dsts = [dst] ∧ srcs = [src]) :
+    interpInstrs P (fuel + 1) (.call dsts op srcs :: rest) s =
+      interpGeneric P fuel rest s dsts op srcs := by
+  rcases hop with ⟨variants, i, rfl⟩ | ⟨variants, i, args, rfl⟩ | ⟨variant, rfl⟩ |
+      ⟨variant, args, rfl⟩ <;>
     unfold interpInstrs <;> split <;> (try simp_all) <;> rfl
 
 /-- Instantiated field/global borrows use the generic path when malformed. -/
@@ -524,65 +541,18 @@ theorem interp_sound_at (fuel : Nat) :
                 cases hd : P.funs f with
                 | none => simp [hargs, hd] at hexec
                 | some d =>
-                  by_cases hnargs : args.length = d.numParams
-                  · simp [hargs, hd, hnargs] at hexec
-                    cases hcall : interpBlock P d.body n d.body.entry
-                        (s.enterCall args) with
-                    | error e =>
-                      simp only [hcall, bind, Except.bind] at hexec
-                      contradiction
-                    | ok io =>
-                      obtain ⟨blk, hentry, hcallee⟩ :=
-                        (ih n (by omega)).2.1 P d.body d.body.entry
-                          (s.enterCall args) io hcall
-                      have hargsSem : srcs.mapM s.denote.locals = some args := by
-                        rw [← s.mapM_getLocal]
-                        exact hargs
-                      cases io with
-                      | abort m' code =>
-                        simp only [hcall, bind, Except.bind] at hexec
-                        change Except.ok (.abort m' code) = Except.ok r at hexec
-                        injection hexec with hexec
-                        subst r
-                        simp only [InstrResultAgrees] at hcont
-                        subst o
-                        exact RunFrom.callAbort hd hargsSem hnargs hentry
-                          (by simpa [IOutcome.denote] using hcallee)
-                      | ret world rets =>
-                        simp only [hcall, bind, Except.bind] at hexec
-                        by_cases hlen : dsts.length = rets.length
-                        · simp only [hlen, ↓reduceIte] at hexec
-                          refine RunFrom.callOk hd hargsSem hnargs hentry
-                            (by simpa [IOutcome.denote] using hcallee) hlen ?_
-                          rw [← IWorld.denote_resume,
-                            ← IState.denote_writeLocals]
-                          exact prev P G rest term
-                            ((world.resume s.current).writeLocals dsts rets)
-                            r o hexec hcont
-                        · simp [hlen] at hexec
-                  · simp [hargs, hd, hnargs] at hexec
-            · -- functionInst
-              rename_i f typeArgs
-              simp only [interpInstrs] at hexec
-              cases hargs : srcs.mapM s.getLocal with
-              | none => simp [hargs] at hexec
-              | some args =>
-                cases hd : P.funs f with
-                | none => simp [hargs, hd] at hexec
-                | some d =>
-                  by_cases htyargs : typeArgs.length = d.typeParams.length
+                  by_cases hnative : d.native
+                  · simp [hargs, hd, hnative] at hexec
                   · by_cases hnargs : args.length = d.numParams
-                    · simp [hargs, hd, htyargs, hnargs] at hexec
-                      cases hcall : interpBlock P (d.body.instantiate typeArgs) n
-                          (d.body.instantiate typeArgs).entry
+                    · simp [hargs, hd, hnative, hnargs] at hexec
+                      cases hcall : interpBlock P d.body n d.body.entry
                           (s.enterCall args) with
                       | error e =>
                         simp only [hcall, bind, Except.bind] at hexec
                         contradiction
                       | ok io =>
                         obtain ⟨blk, hentry, hcallee⟩ :=
-                          (ih n (by omega)).2.1 P (d.body.instantiate typeArgs)
-                            (d.body.instantiate typeArgs).entry
+                          (ih n (by omega)).2.1 P d.body d.body.entry
                             (s.enterCall args) io hcall
                         have hargsSem : srcs.mapM s.denote.locals = some args := by
                           rw [← s.mapM_getLocal]
@@ -595,23 +565,74 @@ theorem interp_sound_at (fuel : Nat) :
                           subst r
                           simp only [InstrResultAgrees] at hcont
                           subst o
-                          exact RunFrom.callInstAbort hd htyargs hargsSem hnargs
-                            hentry (by simpa [IOutcome.denote] using hcallee)
+                          exact RunFrom.callAbort hd hargsSem hnargs hentry
+                            (by simpa [IOutcome.denote] using hcallee)
                         | ret world rets =>
                           simp only [hcall, bind, Except.bind] at hexec
                           by_cases hlen : dsts.length = rets.length
                           · simp only [hlen, ↓reduceIte] at hexec
-                            refine RunFrom.callInstOk hd htyargs hargsSem hnargs
-                              hentry (by simpa [IOutcome.denote] using hcallee)
-                              hlen ?_
+                            refine RunFrom.callOk hd hargsSem hnargs hentry
+                              (by simpa [IOutcome.denote] using hcallee) hlen ?_
                             rw [← IWorld.denote_resume,
                               ← IState.denote_writeLocals]
                             exact prev P G rest term
                               ((world.resume s.current).writeLocals dsts rets)
                               r o hexec hcont
                           · simp [hlen] at hexec
-                    · simp [hargs, hd, htyargs, hnargs] at hexec
-                  · simp [hargs, hd, htyargs] at hexec
+                    · simp [hargs, hd, hnative, hnargs] at hexec
+            · -- functionInst
+              rename_i f typeArgs
+              simp only [interpInstrs] at hexec
+              cases hargs : srcs.mapM s.getLocal with
+              | none => simp [hargs] at hexec
+              | some args =>
+                cases hd : P.funs f with
+                | none => simp [hargs, hd] at hexec
+                | some d =>
+                  by_cases hnative : d.native
+                  · simp [hargs, hd, hnative] at hexec
+                  · by_cases htyargs : typeArgs.length = d.typeParams.length
+                    · by_cases hnargs : args.length = d.numParams
+                      · simp [hargs, hd, hnative, htyargs, hnargs] at hexec
+                        cases hcall : interpBlock P (d.body.instantiate typeArgs) n
+                            (d.body.instantiate typeArgs).entry
+                            (s.enterCall args) with
+                        | error e =>
+                          simp only [hcall, bind, Except.bind] at hexec
+                          contradiction
+                        | ok io =>
+                          obtain ⟨blk, hentry, hcallee⟩ :=
+                            (ih n (by omega)).2.1 P (d.body.instantiate typeArgs)
+                              (d.body.instantiate typeArgs).entry
+                              (s.enterCall args) io hcall
+                          have hargsSem : srcs.mapM s.denote.locals = some args := by
+                            rw [← s.mapM_getLocal]
+                            exact hargs
+                          cases io with
+                          | abort m' code =>
+                            simp only [hcall, bind, Except.bind] at hexec
+                            change Except.ok (.abort m' code) = Except.ok r at hexec
+                            injection hexec with hexec
+                            subst r
+                            simp only [InstrResultAgrees] at hcont
+                            subst o
+                            exact RunFrom.callInstAbort hd htyargs hargsSem hnargs
+                              hentry (by simpa [IOutcome.denote] using hcallee)
+                          | ret world rets =>
+                            simp only [hcall, bind, Except.bind] at hexec
+                            by_cases hlen : dsts.length = rets.length
+                            · simp only [hlen, ↓reduceIte] at hexec
+                              refine RunFrom.callInstOk hd htyargs hargsSem hnargs
+                                hentry (by simpa [IOutcome.denote] using hcallee)
+                                hlen ?_
+                              rw [← IWorld.denote_resume,
+                                ← IState.denote_writeLocals]
+                              exact prev P G rest term
+                                ((world.resume s.current).writeLocals dsts rets)
+                                r o hexec hcont
+                            · simp [hlen] at hexec
+                      · simp [hargs, hd, hnative, htyargs, hnargs] at hexec
+                    · simp [hargs, hd, hnative, htyargs] at hexec
             · -- borrowLoc
               by_cases hs : ∃ dst x, dsts = [dst] ∧ srcs = [x]
               · obtain ⟨dst, x, rfl, rfl⟩ := hs
@@ -798,7 +819,7 @@ theorem interp_sound_at (fuel : Nat) :
                                 r o hexec hcont
                             · simp [ht, hi, hv, hlt] at hexec
                               change Except.ok
-                                (.abort s.memory runtimeAbortCode) =
+                                (.abort s.memory Oper.borrowVecElem.abortCode) =
                                   Except.ok r at hexec
                               injection hexec with hexec
                               subst r
@@ -811,6 +832,150 @@ theorem interp_sound_at (fuel : Nat) :
               · apply generic
                 rw [← interp_oneTwo_fallback P n rest s dsts srcs
                   .borrowVecElem rfl hs]
+                exact hexec
+            · -- borrowVariantField
+              rename_i variants field
+              by_cases hs : ∃ dst t, dsts = [dst] ∧ srcs = [t]
+              · obtain ⟨dst, t, rfl, rfl⟩ := hs
+                simp only [interpInstrs] at hexec
+                cases ht : s.getLocal t with
+                | none => simp [ht] at hexec
+                | some tv =>
+                  cases tv <;> try { simp [ht] at hexec }
+                  case ref rt =>
+                    cases hv : readTargetI s rt with
+                    | none => simp [ht, hv] at hexec
+                    | some rv =>
+                      cases rv <;> try { simp [ht, hv] at hexec }
+                      case variant tag fs =>
+                        by_cases hmem : tag ∈ variants
+                        · have hc : variants.contains tag = true := by simpa using hmem
+                          by_cases hfield : field < fs.length
+                          · simp [ht, hv, hmem, hfield] at hexec
+                            refine RunFrom.borrowVariantFieldOk
+                              (IState.getLocal_some_denote ht)
+                              (readTargetI_some_denote hv) hc hfield ?_
+                            rw [← IState.denote_writeLocal]
+                            exact prev P G rest term
+                              (s.writeLocal dst
+                                (.ref ⟨rt.root, rt.path ++ [field]⟩))
+                              r o hexec hcont
+                          · simp [ht, hv, hmem, hfield] at hexec
+                        · have hc : variants.contains tag = false := by simpa using hmem
+                          simp [ht, hv, hmem] at hexec
+                          change Except.ok
+                            (.abort s.memory runtimeAbortCode) =
+                              Except.ok r at hexec
+                          injection hexec with hexec
+                          subst r
+                          simp only [InstrResultAgrees] at hcont
+                          subst o
+                          exact RunFrom.borrowVariantFieldAbort
+                            (IState.getLocal_some_denote ht)
+                            (readTargetI_some_denote hv) hc
+              · apply generic
+                rw [← interp_oneOneVariant_fallback P n rest s dsts srcs
+                  (.borrowVariantField variants field) (Or.inl ⟨variants, field, rfl⟩) hs]
+                exact hexec
+            · -- borrowVariantFieldInst
+              rename_i variants field args
+              by_cases hs : ∃ dst t, dsts = [dst] ∧ srcs = [t]
+              · obtain ⟨dst, t, rfl, rfl⟩ := hs
+                simp only [interpInstrs] at hexec
+                cases ht : s.getLocal t with
+                | none => simp [ht] at hexec
+                | some tv =>
+                  cases tv <;> try { simp [ht] at hexec }
+                  case ref rt =>
+                    cases hv : readTargetI s rt with
+                    | none => simp [ht, hv] at hexec
+                    | some rv =>
+                      cases rv <;> try { simp [ht, hv] at hexec }
+                      case variant tag fs =>
+                        by_cases hmem : tag ∈ variants
+                        · have hc : variants.contains tag = true := by simpa using hmem
+                          by_cases hfield : field < fs.length
+                          · simp [ht, hv, hmem, hfield] at hexec
+                            refine RunFrom.borrowVariantFieldInstOk
+                              (IState.getLocal_some_denote ht)
+                              (readTargetI_some_denote hv) hc hfield ?_
+                            rw [← IState.denote_writeLocal]
+                            exact prev P G rest term
+                              (s.writeLocal dst
+                                (.ref ⟨rt.root, rt.path ++ [field]⟩))
+                              r o hexec hcont
+                          · simp [ht, hv, hmem, hfield] at hexec
+                        · have hc : variants.contains tag = false := by simpa using hmem
+                          simp [ht, hv, hmem] at hexec
+                          change Except.ok
+                            (.abort s.memory runtimeAbortCode) =
+                              Except.ok r at hexec
+                          injection hexec with hexec
+                          subst r
+                          simp only [InstrResultAgrees] at hcont
+                          subst o
+                          exact RunFrom.borrowVariantFieldInstAbort
+                            (IState.getLocal_some_denote ht)
+                            (readTargetI_some_denote hv) hc
+              · apply generic
+                rw [← interp_oneOneVariant_fallback P n rest s dsts srcs
+                  (.borrowVariantFieldInst variants field args)
+                  (Or.inr (Or.inl ⟨variants, field, args, rfl⟩)) hs]
+                exact hexec
+            · -- testVariantRef
+              rename_i variant
+              by_cases hs : ∃ dst t, dsts = [dst] ∧ srcs = [t]
+              · obtain ⟨dst, t, rfl, rfl⟩ := hs
+                simp only [interpInstrs] at hexec
+                cases ht : s.getLocal t with
+                | none => simp [ht] at hexec
+                | some tv =>
+                  cases tv <;> try { simp [ht] at hexec }
+                  case ref rt =>
+                    cases hv : readTargetI s rt with
+                    | none => simp [ht, hv] at hexec
+                    | some rv =>
+                      cases rv <;> try { simp [ht, hv] at hexec }
+                      case variant tag fs =>
+                        simp [ht, hv] at hexec
+                        refine RunFrom.testVariantRef
+                          (IState.getLocal_some_denote ht)
+                          (readTargetI_some_denote hv) ?_
+                        rw [← IState.denote_writeLocal]
+                        exact prev P G rest term
+                          (s.writeLocal dst (.bool (tag == variant)))
+                          r o hexec hcont
+              · apply generic
+                rw [← interp_oneOneVariant_fallback P n rest s dsts srcs
+                  (.testVariantRef variant) (Or.inr (Or.inr (Or.inl ⟨variant, rfl⟩))) hs]
+                exact hexec
+            · -- testVariantRefInst
+              rename_i variant args
+              by_cases hs : ∃ dst t, dsts = [dst] ∧ srcs = [t]
+              · obtain ⟨dst, t, rfl, rfl⟩ := hs
+                simp only [interpInstrs] at hexec
+                cases ht : s.getLocal t with
+                | none => simp [ht] at hexec
+                | some tv =>
+                  cases tv <;> try { simp [ht] at hexec }
+                  case ref rt =>
+                    cases hv : readTargetI s rt with
+                    | none => simp [ht, hv] at hexec
+                    | some rv =>
+                      cases rv <;> try { simp [ht, hv] at hexec }
+                      case variant tag fs =>
+                        simp [ht, hv] at hexec
+                        refine RunFrom.testVariantRefInst
+                          (IState.getLocal_some_denote ht)
+                          (readTargetI_some_denote hv) ?_
+                        rw [← IState.denote_writeLocal]
+                        exact prev P G rest term
+                          (s.writeLocal dst (.bool (tag == variant)))
+                          r o hexec hcont
+              · apply generic
+                rw [← interp_oneOneVariant_fallback P n rest s dsts srcs
+                  (.testVariantRefInst variant args)
+                  (Or.inr (Or.inr (Or.inr ⟨variant, args, rfl⟩))) hs]
                 exact hexec
             · -- readRef
               by_cases hs : ∃ dst t, dsts = [dst] ∧ srcs = [t]
@@ -985,11 +1150,13 @@ theorem interp_sound_at (fuel : Nat) :
         | some d =>
           simp only [hd] at hexec
           split at hexec
-          · rename_i harity
-            refine ⟨d, hd, harity, ?_⟩
-            simpa using (ih n (by omega)).2.1 P d.body d.body.entry
-              (IState.initial args m) o hexec
-          · simp at hexec
+          · contradiction
+          · split at hexec
+            · rename_i harity
+              refine ⟨d, hd, harity, ?_⟩
+              simpa using (ih n (by omega)).2.1 P d.body d.body.entry
+                (IState.initial args m) o hexec
+            · simp at hexec
     exact ⟨his, hblock, hfun⟩
 
 /-- Every successful interpreter result is a relational execution. -/

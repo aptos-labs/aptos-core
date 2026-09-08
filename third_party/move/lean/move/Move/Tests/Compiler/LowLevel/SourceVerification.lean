@@ -51,6 +51,43 @@ example (parent : Mutation Pair) (future : Nat) :
   apply Mutation.closeChild_eq_suspended
   rfl
 
+example :
+    (transferMutation ({ current := 3, prophecy := 10 } : Mutation Nat)).ok
+      ()
+      (({ current := 3, prophecy := 7 } : Mutation Nat),
+        ({ current := 7, prophecy := 10 } : Mutation Nat))
+      () := by
+  exact ⟨rfl, rfl, rfl, rfl⟩
+
+example :
+    (reborrowMutation (3 : Nat)).ok ()
+      (({ current := 3, prophecy := 7 } : Mutation Nat), 7) () := by
+  exact ⟨rfl, rfl, rfl⟩
+
+example :
+    (resolveMutation
+      ({ current := 7, prophecy := 7 } : Mutation Nat)).ok () () () := by
+  exact ⟨rfl, rfl, rfl⟩
+
+example :
+    (withTransferredMutation
+      ({ current := 3, prophecy := 9 } : Mutation Nat)
+      (fun reference => Spec.pure (reference.current, reference.write 9))).ok
+        () 3 () := by
+  exact ⟨(3, ({ current := 9, prophecy := 9 } : Mutation Nat)), (),
+    ⟨rfl, rfl⟩, ⟨(), (), ⟨rfl, rfl, rfl⟩, ⟨rfl, rfl⟩⟩⟩
+
+/-- A field prophecy installed before transfer is enough to recover the whole
+parent after the returned child resolves; no field path is carried through the
+transfer operation. -/
+example (parentFuture childFuture finalChild right : Nat)
+    (rootEquation : Pair.mk childFuture right =
+      (Pair.mk parentFuture right : Pair))
+    (childEquation : finalChild = childFuture) :
+    (Pair.mk finalChild right : Pair) = Pair.mk parentFuture right := by
+  cases childEquation
+  exact rootEquation
+
 private def setStateAndAbort : Txn Nat Unit := do
   Txn.set 99
   Txn.abort 7
@@ -125,7 +162,7 @@ example : Satisfies addFiveSpec relationalAddContract := by
         simpa [relationalAddContract, move_norm, Move.UInt.ofInt_intLit,
             Nat.reducePow, Nat.reduceMod]
           using hresult,
-      hfinal⟩
+      hfinal, not_false⟩
   · intro code h
     exact h.2 (by native_decide)
   · simp [addFiveSpec, Checked.addSpec]
@@ -226,7 +263,7 @@ example : Satisfies (fun _ => Spec.ofTxn (addToCounter (U64.ofNat 5)))
   unfold txnWP
   rw [show addToCounter (U64.ofNat 5) (some (U64.ofNat 10), 0) =
     .ok () (some (U64.ofNat 15), 1) by native_decide]
-  exact ⟨⟨rfl, rfl⟩, trivial⟩
+  exact ⟨⟨rfl, rfl⟩, trivial, not_false⟩
 
 private def alwaysAbortContract : Contract Nat Unit Unit where
   requires := fun _ _ => True

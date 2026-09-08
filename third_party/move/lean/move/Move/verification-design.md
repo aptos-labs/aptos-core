@@ -58,8 +58,12 @@ The first proof-facing semantic slice is implemented:
   calls through an Action-returning callee's `sourceSpec`; finite relational
   recursion, including generic recursive functions over vectors; returns; and
   aborts. Calls to pure compiled helpers are rejected until they have an
-  equivalent relational summary. Unsupported source forms are rejected at the
-  `spec` command;
+  equivalent relational summary. Mutable-reference parameters cross ordinary
+  calls by value/final-referent pairs; mutable-reference results have checked
+  provenance and cross the relational call boundary as path-free `Mutation`
+  values. Loan reconciliation is performed before `break`, `continue`, or an
+  early function `return` transfers control.
+  Unsupported source forms are rejected at the `spec` command;
 - ordinary Lean imports make another Lean-authored module's definitions,
   `sourceSpec`s, contracts, and theorems available to the caller proof. The
   executable compiler independently records the cross-module call in XIR.
@@ -98,11 +102,10 @@ relational core directly. The ordered-map benchmark verifies generated
 recursive binary search by fixed-point induction, `Tests.Move.Loops` verifies
 structured loops, and `Tests.Move.Quicksort` verifies a generic in-place sort
 against the semantics derived from its authored body — no example states a
-relational `sourceSpec` manually. Automatic global publication/removal,
-mutual-recursion SCC semantics, invariant annotations for `continue`-lowered
-loops, and some nested-loan shapes remain incomplete. Most importantly, the
-compiler-correctness theorem connecting generated `Spec` behavior to LIR
-lowering has not yet been proved.
+relational `sourceSpec` manually. Automatic global publication/removal and
+invariant annotations for `continue`-lowered loops remain incomplete. Most
+importantly, the compiler-correctness theorem connecting generated `Spec`
+behavior to LIR lowering has not yet been proved.
 
 ## Goals
 
@@ -282,18 +285,26 @@ reference and reference-elimination semantics determine the runtime behavior.
 
 ### Borrow scopes
 
-Move surface syntax does not mark the end of each loan. The current source
-translator places the remaining `do` continuation inside a scoped
-ownership-passing operation, conceptually:
+Move surface syntax does not mark the end of each loan. The source translator
+computes the last reference use and makes the loan body return the remaining
+`do` continuation as a closure, conceptually:
 
 ```lean
 withMutBorrow place fun reference =>
-  body
+  bodyReturning (fun revivedOwner => continuation)
 ```
 
-The scope owns the suspended place, introduces the prophecy, and reconciles
-the final value. This is compiler-generated core syntax; users retain the
-existing `let r <- &mut place` notation.
+The scope owns the suspended place, introduces the prophecy, reconciles the
+final value, and only then invokes the closure with the revived owner. Writes
+to disjoint outer mutations are captured by the closure, so they survive the
+nested scope. The same mechanism unwinds nested loans before `break`,
+`continue`, or early `return`. This is compiler-generated core syntax; users
+retain the existing `let r <- &mut place` notation.
+
+Before borrow checking and prophecy translation, lexically shadowing `do`
+locals receive distinct retained-source identities. A value or pattern binder
+may therefore reuse a mutable-reference name without extending or capturing
+the older loan; its initializer still sees the preceding binding.
 
 For the full language, this syntactic scope must be checked against the
 compiler's reference liveness and borrow graph (or a shared certificate). A
@@ -349,28 +360,252 @@ to the generic `World` representation.
 
 ## Mutable references at function boundaries
 
-A function taking `&mut T` is interpreted as a relation between its current
-input and its future output. Prophecies make this relation compositional:
+A function taking `&mut T` has an internal relation over the whole mutation:
 
 ```text
-callee input:   current value
-callee output:  value named by the argument prophecy
+callee input:            Mutation(current, prophecy)
+ordinary return:         resolve current = prophecy
+mutable-reference return: create a fresh returned mutation and carry updated lenders
 ```
 
-A caller suspends its owner using the same prophecy, invokes the callee, and
-resumes with the callee's final value. Multiple mutable-reference parameters
-must have distinct or provably disjoint origins. Returned references retain
-their derivation relationship and are accepted only where the borrow
-certificate can represent that lifetime.
+A caller passes that logical value while making the source handle unavailable.
+After an ordinary return it writes the callee's final referent into the
+caller's still-enclosing mutation. After a mutable-reference return it waits
+until the returned mutation dies, then continues with the updated lender
+mutations returned by the callee. Multiple mutable-reference parameters must
+have distinct or provably disjoint origins.
 
 Function contracts should expose value relations rather than internal
 reference identities. For example, a contract for `increment : &mut U64 ->
-Action Unit` relates the pre-state current value to the post-state prophecy.
+Action Unit` relates the pre-state current value to the post-state prophecy;
+the value-level `sourceSpec` wrapper provides that view.
 
 Mutual and ordinary calls are verified modularly from these relations.
 Explicit `continue f ...` tail calls share the finite-unfolding recursion
 semantics of ordinary self-calls; they do not require reference state in
 `World`.
+
+### Returning a mutable reference
+
+Status: the path-free boundary, direct and structural borrows returned singly
+or in tuples from structure fields, enum payloads, and vector elements, dynamic selection across
+arbitrarily many inputs, all-input poisoning, caller-side resolution, revival,
+loop-carried returned loans, forwarding single and multiple returned references
+through another function after local use, and direct self-recursion are
+implemented. Unsupported interface extensions fail
+at `spec` with exact negative tests rather than in generated Lean code.
+
+A returned mutable reference cannot be represented by its referent alone, but
+it also does not need a caller-visible origin path.  The prophecy pair is the
+inter-procedural value. This follows the RustHorn-style prophecy rule and the
+Move Prover's relaxed reference interface: pass mutable references as
+`(current, prophecy)` pairs, create a fresh prophecy for a returned loan, and
+carry enough updated lender state to resume after that loan resolves.
+
+For example,
+
+```text
+borrow_mut : &mut Option T -> Action (&mut T)
+```
+
+returns a loan into its argument. A later write through that result must update
+the caller's `Option`, and the caller must not resume the parent mutation while
+the returned child loan is live. Putting a reference identity or a reference
+heap in `World` would solve the wrong problem and contradict the representation
+chosen above.
+
+The boundary has two views of one semantics:
+
+1. A new mutation-level relation, tentatively `f.mutationSpec`, is used by Move
+   callers. Mutable parameters have type `Mutation A`, not `A`, and a mutable
+   result is paired with the updated mutable-input carriers. The relation is
+   still first-order and reference-store-free.
+2. The existing `f.sourceSpec` remains the value-level, user-contract view.
+   For a mutable result it wraps `mutationSpec`, immediately resolves the
+   returned mutation (the Move Prover's standalone `ResolveReturn` case), and
+   exposes only the result's current value and the mutable parameters' final
+   values. Calls must not use this lossy wrapper.
+
+The caller copies each mutable argument's complete `Mutation` value into
+`mutationSpec`. This is a copy of an immutable logical record, not a second
+source-language reference: the original source handle is simultaneously
+poisoned. Unlike Rust, Move has no lifetime parameters in a function signature
+which identify the input lifetime inherited by a returned reference. A modular
+caller therefore cannot know which mutable input supplied the result, even if
+inspection of one current body would reveal it. The caller must poison **every**
+mutable input for the returned result's live range.
+
+Crucially, the result is a **new** mutation. If the selected input is
+`lender = (current, outerFuture)`, transfer chooses a fresh `returnFuture` and
+produces:
+
+```text
+returned       = (current,      returnFuture)
+updated lender = (returnFuture, outerFuture)
+```
+
+Unselected lenders are returned unchanged. Thus the mutation-level result is
+conceptually `(returned, updatedLenders)`. When the returned mutation dies,
+the caller proves `returned.current = returnFuture` and continues with all the
+updated lenders. The selected lender has thereby received the returned loan's
+final value but still retains its enclosing `outerFuture`, so it may be written
+again before the enclosing loan ends. No caller needs to know which input was
+selected or what field/index path was used.
+
+This poisoning is live-range scoped, not permanent. If a returned reference is
+discarded or reaches its last use inside a loop iteration, it resolves there
+and the updated outer mutations are available for the next iteration. Thus a
+pattern such as creating `r`, repeatedly passing `r` through a call, and using
+`r` again after each call remains valid. Only a returned mutation actually
+carried across the iteration boundary keeps every possible lender suspended.
+
+For `borrow_mut`, with root mutation
+
+```text
+parent = (some current, parentFuture)
+```
+
+the payload borrow site chooses `childFuture` and eagerly relinks the parent:
+
+```text
+child  = (current, childFuture)
+parent = (some childFuture, parentFuture)
+```
+
+Returning `child` creates a fresh `returnFuture`. Its updated child lender has
+`current = returnFuture` while retaining `childFuture`; reconciling that child
+lender locally into the suspended parent replaces the payload with
+`returnFuture` and keeps `parentFuture`. The caller sees only the returned
+mutation plus the updated root carrier. This carries the update without
+exporting `.e` or any other path.
+
+The same rule handles a dynamic choice among arguments. On a branch returning
+the first input, its updated lender is suspended at the fresh return prophecy
+and the second lender is unchanged; the other branch does the converse. This
+is the shape of RustHorn's `take_max` encoding. A vector element will use the
+same local reconciliation rule: its dynamic index is consumed at the borrow
+site and does not cross the function boundary.
+
+Paths may still exist in the static borrow certificate, just as RustHorn relies
+on Rust's borrow checker and the Move Prover consumes `BorrowAnnotation`. They
+check that a returned reference cannot escape a local/global owner and help
+diagnose illegal source uses. Even if that analysis computes the exact origin
+for a particular body, it must not narrow the function's modular interface:
+Move has no lifetime annotation making that origin part of the signature. Paths
+are not semantic payload, are not instantiated at a call, and are not needed
+to propagate a mutation. For call safety the summary is deliberately coarser:
+a mutable result creates a fresh result binding and suspends all mutable
+actuals until that binding dies.
+
+This is also the executable verifier's modular call rule. Its
+[`core_call`](../../../move-bytecode-verifier/src/reference_safety/abstract_state.rs)
+creates each returned mutable reference as a borrower of every mutable
+reference argument, then releases the transferred argument references. Leaner
+should mirror that conservative edge set, not replace it with a body-derived
+single path.
+
+Consequently the prophecy reference domain is intentionally more relaxed than
+executable Move. It can represent a free mutation or a result whose origin is
+not named by the interface. The retained-source borrow certificate, compiler,
+and bytecode verifier decide which such relations real Move code may produce;
+the logical representation itself does not recover that restriction with
+locations or paths.
+
+On abort there is no caller continuation and hence no returned mutation or
+revival obligation. A native or body-less opaque function cannot obtain a
+sound mutation-level summary from an ordinary value contract alone. It is
+accepted only when it explicitly defines the exact `f.mutationSpec` relation;
+otherwise the call is rejected. That declaration is part of the trusted or
+proved Lean interface. An imported bodied function exports its generated
+`mutationSpec` normally.
+
+The implemented slice admits direct `&mut B` results and transient multiple
+returns containing several mutable references (including mixed value/reference
+tuples), arbitrarily many mutable inputs, identity or dynamic selection among
+direct inputs, structure fields, enum payloads, dynamically indexed vector
+elements, structural references mixed within result tuples, returned loans
+live across loops, path-free forwarding of direct call
+results after local use (including field-derived and multiple-reference
+results), tail-position forwarding without an administrative `let`, loan
+unwinding across `break`, `continue`, and early `return` (including nested
+returned loans, multiple results, locals, fields, vector elements, and global
+resources), a self-recursive mutation relation defined by `Spec.fix`, and
+mutually recursive reference-returning SCCs defined by one heterogeneous
+`Spec.fixFamily`.
+Disjoint outer mutable references remain usable inside local, structural,
+vector-element, global, enum-payload, and returned-reference loans; their
+updated carriers are captured until the loan reconciles.
+Multiple returned loans conservatively share a
+caller-side live range; every possible lender resumes only after all of them
+resolve. Native/body-less functions can supply explicit mutation summaries;
+missing summaries have an exact, regression-tested diagnostic. As for direct
+self-recursion, verification of a reference-returning SCC states an explicit
+mutation-level family invariant and then discharges each public value-level
+wrapper from it. Function-value invocation remains outside the retained-source
+language subset as a whole.
+
+This boundary follows RustHorn's `take_max` example directly, is justified by
+RustHornBelt's semantic model of a mutable borrow as current/final state, and
+uses Creusot's final-reborrow rule for the returned pair. The repository's
+[Move Prover prophecy design](../../../move-prover/doc/dev/prophecies/prophecy_model.md)
+describes the same eager relinking, resolution, and return transfer; its legacy
+path model is explicitly a separate alternative.
+
+### Implementation plan for mutable-reference results
+
+The following plan is complete for the supported one-direct-result interface;
+the tested extension boundaries are recorded in steps 6 and 7.
+
+1. Add path-free lifecycle primitives in `Move.Semantics.Reference`: resolve a
+   mutation and transfer a final reborrow to a fresh prophecy while preserving
+   the lender's enclosing prophecy. Carry the updated input mutations and prove
+   that field, enum, and vector borrow-site prophecy equations survive local
+   reconciliation; no boundary lens is an argument to any primitive.
+2. Split generated semantics into an internal mutation-level body relation and
+   the existing value-level wrapper. For every function with mutable
+   parameters, generate `f.mutationSpec` with full `Mutation` values at mutable
+   parameter positions and return the result mutation together with updated
+   input mutations. Define
+   `f.sourceSpec` from it by opening value inputs; ordinary returns expose the
+   input prophecies as final referents, while standalone contract checking of a
+   mutable result resolves that result immediately before erasing references.
+3. Change return translation so a returned live mutation is final-reborrowed
+   with a fresh prophecy instead of read and closed. Return every updated root
+   mutation. Structural borrows continue to install and reconcile prophecies
+   in their parent locally, where the field name or vector index is available.
+4. Replace the call-result path instantiation with a conservative returned-loan
+   scope. Pass copies of the full mutable arguments to `mutationSpec`, poison
+   all mutable actuals, bind the returned mutation, and at its last use resolve
+   it and continue with the updated mutation carriers. The static result binding is
+   a fresh call-result root, not the selected argument plus a path. Ordinary
+   calls use the same relation but revive all inputs immediately after the
+   callee resolves them.
+5. Keep `WellBorrowed` as the safety authority but decouple its detailed
+   `ReturnDerivation` from semantics. It must still prove that each return is a
+   mutable reference derived from a mutable parameter and never a local or
+   global escape. An exact origin it discovers is body-local evidence, not an
+   exported lifetime promise. At a caller it need record only the returned
+   binding; the signature rule poisons all mutable arguments unconditionally.
+6. Keep contracts reference-free and forbid `summarySpec` from standing in for
+   `mutationSpec`. Generate and export the mutation relation for bodied
+   functions. Require native/body-less opaque mutable-reference results to
+   export an explicit `f.mutationSpec`, with a precise diagnostic when absent.
+7. Add semantic and source tests for identity return; dynamic choice between
+   two parameters (the `take_max` pattern); structure field; enum payload
+   (`Option.borrow_mut`); vector element with a dynamic index; read/write
+   through the result; revival of every input after result death; abort before
+   return; forwarding single and multiple results through another function
+   after local use; multiple mutable-reference returns; mixed value/reference
+   tuples; revival after all returned tuple components die; and abrupt control
+   exits which reconcile live loans before their target continuation. Retain
+   negative tests for local/global escape, using any
+   input during a returned result's live range and missing native/body-less
+   summaries. Direct self-recursion and mutually recursive returned-reference
+   SCCs are positive fixed-point tests.
+8. Remove the transpiler's mutable-result-spec guard only after these tests
+   pass. Regenerate the stdlib: `spec borrow_mut` should then be verified rather
+   than hidden by `pragma opaque`, and `std::option` should become clean for a
+   semantic reason rather than a reporting exception.
 
 `aborts_if` clauses may be repeated; their conditions and exact codes are
 disjoined into one abort predicate. The postcondition follows the standard
@@ -478,16 +713,29 @@ minimal relational contract type is:
 
 ```lean
 structure Contract (State Args Result : Type) where
-  requires : Args -> State -> Prop
-  ensures  : Args -> State -> Result -> State -> Prop
-  aborts   : Args -> State -> U64 -> Prop
+  requires  : Args -> State -> Prop
+  ensures   : Args -> State -> Result -> State -> Prop
+  aborts    : Args -> State -> U64 -> Prop
+  mayAbort  : Args -> State -> Prop
+  mustAbort : Args -> State -> Prop
 ```
+
+A contract also *summarizes*: `Contract.summary contract args` is the
+computation of every outcome the contract permits (undefined outside the
+precondition), which satisfies the contract (`satisfies_summary`) and is the
+source semantics callers get for a native or a `pragma opaque` function
+(`f.summarySpec`); `wp_summary` is its weakest-precondition rule.
 
 `Satisfies f contract` states:
 
 - if `requires args initial` holds and `f args` returns normally, `ensures`
-  relates the initial and final worlds and return value;
-- if it aborts, `aborts` permits the code;
+  relates the initial and final worlds and return value where no declared
+  abort excuses it (`¬mayAbort`), and `¬mustAbort` holds — a declared
+  `aborts_if` condition is *sufficient*, so the function cannot succeed where
+  it holds;
+- if it aborts, `aborts` permits the code — the declared conditions are also
+  *necessary* unless `pragma aborts_if_is_partial` leaves completeness
+  uninterpreted;
 - committed state is still the initial state on abort.
 
 Effectful source verification uses the same associated notation. The state
@@ -564,8 +812,11 @@ simplifies typed resource lookup and prophecy equalities, and leaves
 domain-specific arithmetic or data-structure obligations to ordinary Lean
 tactics. `Move.Verify.satisfies_fix` — with its wp form `satisfies_fix_of_wp`,
 packaged as the `contract_intro` tactic — supplies fixed-point induction for
-direct recursion and structured loops. More advanced automation for mutually
-recursive SCCs and invariant-driven `continue` loops remains future work.
+direct recursion and structured loops. Ordinary mutually recursive SCCs use
+family-wide fixed-point induction; reference-returning SCCs expose an explicit
+mutation-family invariant because their value-level contracts intentionally
+hide prophecy carriers. More advanced invariant inference and
+invariant-driven `continue` loops remain future work.
 
 Every checked operation has the same two-branch weakest precondition — a
 success condition and an abort with a fixed code — so one tactic splits them
@@ -748,18 +999,27 @@ theorem.
 - A generic retained-source control topology is shared with the poison-aware
   borrow-effect projection.
 - A small `WellBorrowed` checker replays access-path transfers, loop facts,
-  call effects, separations, and returned-reference derivations.
+  call effects, separations, returned-reference derivations, and terminal
+  control edges. `break` and `continue` retain their optional loop labels;
+  loop exits drop loans created inside the target loop before joining the
+  target entry state, while an explicit function return does not flow into
+  the following source statements.
 - Each generated source specification exports `borrowProgram`,
   `borrowCertificate`, and `wellBorrowed` declarations before proof
   generation.
 - Compiler-correctness transport of this source certificate to `MoveModel.IR`
   remains phase 7, not part of the source proof's trusted premise.
 
-### 6. Calls and loops — partial
+### 6. Calls and loops — implemented for the retained-source subset
 
-- Add prophecy-passing summaries for `&mut` parameters and results.
-- Support Lean-authored calls through generated summaries; imported-Move
-  summaries remain future work.
+- Prophecy-passing value/final-referent summaries for `&mut` parameters,
+  path-free mutation-level results, conservative all-input poisoning, result
+  resolution, and lender revival are implemented.
+- Bodied mutable-reference-returning functions generate mutation relations;
+  a direct self-recursive relation uses `Spec.fix`, while an SCC uses one
+  heterogeneous `Spec.fixFamily` whose reference-returning entries have
+  mutation arguments/results. Native/body-less functions require explicit
+  mutation summaries.
 - Generate direct-call semantics by composing the callee's generated
   `sourceSpec`.
 - Interpret direct self-recursion by existential finite unfolding and expose
@@ -790,6 +1050,14 @@ Each semantic feature needs Lean proofs plus compiled execution comparisons:
 - disjoint sibling borrows;
 - rejected overlapping aliases and use of suspended owners;
 - normal and aborting function calls with `&mut` arguments;
+- returning a `&mut` parameter, structure field, enum payload, and dynamically
+  indexed vector element, then reading and writing through it in the caller;
+- dynamically selecting which of two mutable parameters to return and reviving
+  both inputs after the result dies;
+- forwarding single and multiple returned mutable references through a second
+  function after reading or writing them locally;
+- rejected local-rooted and global-rooted mutable reference results, live-range
+  use of any poisoned input, tuples of references, and body-less summaries;
 - a live global loan followed by abort and transaction rollback;
 - branches where loans die on different edges;
 - tail-recursive loops carrying mutable values;
@@ -810,11 +1078,19 @@ The implementation is incomplete until the following properties are proved:
 
 - immutable-reference erasure preserves observable reads;
 - nested prophecy reconciliation reconstructs the owner value correctly;
+- transferring a returned mutation preserves its current value, chooses a
+  fresh return prophecy, and preserves each lender's enclosing prophecy;
+- resolving it makes every conservatively poisoned input safe to continue from
+  the updated mutation carriers returned by the callee;
+- borrow-site eager updates plus local carrier reconciliation communicate identity,
+  field, enum, vector-index, and dynamically selected origins without a path at
+  the call boundary;
 - global checkout/restoration preserves unrelated resources;
 - abort hides all tentative write-back;
 - borrow certificates imply the assumptions of the source reference rules;
 - source checked operations agree with IR arithmetic and abort codes;
-- source calls agree with their summaries and compiled callees;
+- source calls, including returned mutations, agree with their mutation-level
+  relations, value-level contract wrappers, and compiled callees;
 - accepted source control flow lowers to behaviorally equivalent LIR/IR;
 - source contracts transfer across compilation.
 
@@ -830,6 +1106,16 @@ The implementation is incomplete until the following properties are proved:
   annotations, and source proof generation is gated by a checked borrow
   certificate.
 - Prophecies and reference identities are absent from user-facing contracts.
+- Mutable references cross a reference-returning call as complete
+  `(current, prophecy)` values; callers poison every mutable actual until the
+  result dies, because Move signatures have no lifetime annotation identifying
+  its origin, and no origin path crosses the boundary.
+- A structural loan selected for return remains transferred on the function
+  return edge. On `break`, `continue`, or a non-forwarding early return it is
+  instead resolved inside-out, rebuilding its field, vector, or enum owner
+  before the enclosing loop/root continuation resumes. This uses the same
+  control-exit stack as ordinary lexical loans and requires no origin path at
+  a call boundary.
 - The source proof layer complements, rather than replaces, IR semantics and
   bytecode verification.
 
@@ -842,8 +1128,11 @@ The implementation is incomplete until the following properties are proved:
   recursive SCCs.
 - How much `verify` should elaborate into generated simplification versus a
   tactic over explicit WP terms.
-- Which reference-returning function signatures are admitted in the first
-  source-verification milestone.
+- Whether `contract_intro` should synthesize common mutation-family invariant
+  templates for recursive reference-returning functions. The semantics and
+  fixed-point rule are implemented, but the invariant is deliberately explicit
+  because a value-level public contract does not specify the prophecy carriers
+  needed by recursive mutation calls.
 - How an imported Move module exposes a proved or explicitly assumed summary
   to source-level Lean verification.
 - Which preservation theorem and certificate boundary best insulate the
