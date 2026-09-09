@@ -23,6 +23,7 @@ permissions:
 
 env:
   CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
   CI_BENCHMARK_PACKAGES: ${{ inputs.suite == 'large' && 'move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || 'aptos-cargo-cli' }}
   INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
   RUST_MIN_STACK: "4297152"
@@ -68,6 +69,8 @@ jobs:
           SCCACHE_GHA_RW_MODE: READ_WRITE
       - uses: ./.github/actions/ci-metrics-report
         if: always()
+        env:
+          SCCACHE_GHA_RW_MODE: READ_WRITE
         with:
           name: benchmark-seed
 

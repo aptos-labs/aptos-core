@@ -30,6 +30,8 @@ failure can fail a job; our statistics collection is best-effort instead.
 The single GHA backend uses synchronous `l0` writes. The `ignore` multilevel
 policy starts detached writes, which can be lost when an ephemeral runner exits;
 its top-level write count is not evidence that those entries reached GitHub.
+Benchmark seed and reader jobs also use the same `CARGO_TERM_COLOR`: sccache
+hashes this environment variable even though it normalizes rustc's color flags.
 
 Targeted and smoke build outputs are **artifacts**, not shared caches. Consumers
 download exact artifact IDs from their build jobs in the same workflow run.
