@@ -5,8 +5,17 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      cache-enabled:
+        description: Enable the branch-scoped compilation cache
+        type: boolean
+        default: true
   workflow_call:
     inputs:
+      cache-enabled:
+        description: Enable the branch-scoped compilation cache
+        type: boolean
+        default: true
       only_docs_changed:
         description: "Whether only docs changed (skip smoke tests if true)"
         required: true
@@ -26,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/sccache-setup
+        if: inputs.cache-enabled
       - name: Build aptos-node
         run: python3 .github/scripts/ci_metrics.py run smoke-node-build -- cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
         shell: bash
@@ -53,6 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/sccache-setup
+        if: inputs.cache-enabled
       - name: Build smoke test archive and helper binaries
         run: |
           # Build helper binaries needed by smoke tests
