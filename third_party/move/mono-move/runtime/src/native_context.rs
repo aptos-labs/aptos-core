@@ -10,8 +10,8 @@ use crate::{
     error::RuntimeError,
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr,
-        realloc_vec, Heap, TopFrame,
+        alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
+        heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
     memory::{
         read_descriptor, read_obj_size, read_ptr, read_vec_len, write_enum_tag, write_ptr,
@@ -29,8 +29,8 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
     DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
-    ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
-    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    ObjectDescriptorInner, ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE,
+    OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
 use shared_dsa::UnorderedMap;
@@ -438,6 +438,185 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    fn new_vector<'a>(
+        &'a self,
+        descriptor: DescriptorId,
+        elem_size: u32,
+        count: u64,
+    ) -> VMResult<Vector<'a, Opaque>> {
+        if self.returns_started.get() {
+            return Err(native_invariant_violation(
+                "new_vector called after a return value was written".into(),
+            ));
+        }
+        // The descriptor is what the GC traces the object by, so anything but a
+        // matching vector descriptor would walk the payload at the wrong
+        // offsets. `Trivial` is the pointer-free element case.
+        let desc = self
+            .desc_provider
+            .descriptor(descriptor)
+            .ok_or_else(|| native_invariant_violation("new_vector: unknown descriptor".into()))?;
+        match desc.inner() {
+            ObjectDescriptorInner::Trivial => {},
+            ObjectDescriptorInner::Vector {
+                elem_size: stride, ..
+            } if *stride == elem_size => {},
+            ObjectDescriptorInner::Vector { .. }
+            | ObjectDescriptorInner::Struct { .. }
+            | ObjectDescriptorInner::Enum { .. }
+            | ObjectDescriptorInner::Closure
+            | ObjectDescriptorInner::CapturedData { .. } => {
+                return Err(native_invariant_violation(
+                    "new_vector: not a vector descriptor of this element size".into(),
+                ))
+            },
+        }
+        if count == 0 {
+            // TODO(correctness): audit empty <=> null vector invariant
+            // SAFETY: passing `null` is always safe.
+            let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
+            return Ok(Vector::from_handle(handle));
+        }
+
+        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
+        // through `&self` at once is sound — at most one `&mut` per field is
+        // live (see the type-level aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = alloc_vec(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            descriptor,
+            elem_size,
+            count,
+        )?;
+        // `heap_alloc` zeroes the whole object, so every element slot holds a
+        // null pointer: the vector is traceable at its full length before a
+        // single element has been written.
+        // SAFETY: `ptr` is a fresh vector with room for `count` elements.
+        unsafe { write_u64(ptr, VEC_LENGTH_OFFSET, count) };
+        // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
+        Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    unsafe fn vector_write_elements(
+        &self,
+        vector: &Vector<'_, Opaque>,
+        elem_size: u32,
+        data: &[u8],
+    ) -> VMResult<()> {
+        if self.returns_started.get() {
+            return Err(native_invariant_violation(
+                "vector_write_elements called after a return value was written".into(),
+            ));
+        }
+        if (vector.len() as usize).checked_mul(elem_size as usize) != Some(data.len()) {
+            return Err(native_invariant_violation(
+                "vector_write_elements: data length must equal len * elem_size".into(),
+            ));
+        }
+        let ptr = vector.ptr();
+        if ptr.is_null() {
+            return Ok(());
+        }
+
+        // SAFETY: `ptr` is a live object, so its header names its descriptor.
+        let descriptor = DescriptorId(unsafe { read_descriptor(ptr) });
+        let desc = self.desc_provider.descriptor(descriptor).ok_or_else(|| {
+            native_invariant_violation("vector_write_elements: unknown descriptor".into())
+        })?;
+        let offsets = match desc.inner() {
+            // A pointer-free element type publishes as the trivial descriptor:
+            // nothing to patch, so the copy alone makes the value independent.
+            ObjectDescriptorInner::Trivial => &[][..],
+            ObjectDescriptorInner::Vector {
+                elem_size: stride,
+                elem_pointer_offsets,
+            } => {
+                if *stride != elem_size {
+                    return Err(native_invariant_violation(
+                        "vector_write_elements: descriptor element size does not match".into(),
+                    ));
+                }
+                elem_pointer_offsets.as_slice()
+            },
+            ObjectDescriptorInner::Struct { .. }
+            | ObjectDescriptorInner::Enum { .. }
+            | ObjectDescriptorInner::Closure
+            | ObjectDescriptorInner::CapturedData { .. } => {
+                return Err(native_invariant_violation(
+                    "vector_write_elements: not a vector descriptor".into(),
+                ))
+            },
+        };
+
+        // SAFETY: as above; the header records the object's total size.
+        let capacity = (unsafe { read_obj_size(ptr) } as usize)
+            .saturating_sub(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET);
+        if data.len() > capacity {
+            return Err(native_invariant_violation(
+                "vector_write_elements: data does not fit the vector".into(),
+            ));
+        }
+
+        // SAFETY: `heap` and `rws` are distinct fields (see the aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        // A heap-aliasing `data` would be invalidated by the GC the deep copies
+        // below may trigger.
+        if is_heap_ptr(heap, data.as_ptr()) {
+            return Err(native_invariant_violation(
+                "vector_write_elements: data must not alias the VM heap".into(),
+            ));
+        }
+        // SAFETY: bounded by `capacity` above, and `data` does not alias the
+        // heap.
+        unsafe {
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(VEC_DATA_OFFSET), data.len())
+        };
+
+        // The elements now share whatever objects `data` pointed at. Replace
+        // each shared pointer with a deep copy, as `MicroOp::DeepCopyHeapPtrs`
+        // does for a frame.
+        let mut slots = vec![];
+        let mut sources = vec![];
+        for index in 0..vector.len() as usize {
+            for &offset in offsets {
+                let at = VEC_DATA_OFFSET + index * elem_size as usize + offset as usize;
+                // SAFETY: the descriptor says this slot holds a heap pointer.
+                if let Some(src) = NonNull::new(unsafe { read_ptr(ptr, at) }) {
+                    slots.push(at);
+                    sources.push(src);
+                }
+            }
+        }
+        // SAFETY: by this function's contract every pointer in `data` is a live
+        // object, and the copy above did not change that.
+        let copies = unsafe {
+            deep_copy_batch_or_gc(
+                heap,
+                self.desc_provider,
+                rws,
+                &self.pool,
+                self.extensions,
+                self.frame_ptr,
+                TopFrame::Native(self.abi),
+                &sources,
+            )
+        }?;
+        for (at, copy) in slots.into_iter().zip(copies) {
+            // SAFETY: the vector is rooted, so re-reading its base picks up any
+            // relocation the batch caused.
+            unsafe { write_ptr(vector.ptr(), at, copy.as_ptr()) };
+        }
+        Ok(())
     }
 
     unsafe fn vector_move_range(

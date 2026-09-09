@@ -97,13 +97,12 @@ pub struct CallSiteInfo {
     pub required_descriptors: Vec<DescriptorId>,
 }
 
-/// The global-storage resource types a native reads or writes — the types for
-/// which the specializer must publish a layout (to deserialize upon a map
-/// miss) and a struct descriptor (so the deserialized value is GC-traceable),
-/// just as it does for resource micro-ops.
+/// The types a native needs a published layout and descriptor for, so it can
+/// build or deserialize a value of that type at runtime — a global-storage
+/// resource in most cases, just as for the resource micro-ops.
 ///
-/// These are conceptually the native's resource types -- fetching them from
-/// the callee's arguments is merely a convenience.
+/// These are conceptually the native's own types -- fetching them from the
+/// callee's arguments is merely a convenience.
 //
 // TODO(completeness): Instead of hard-coding them here, figure out a way to allow natives to declare them.
 fn resource_types_for_native(
@@ -118,9 +117,23 @@ fn resource_types_for_native(
     // interned module ids / identifiers once.
     let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
     let object = interner.module_id_of(&AccountAddress::ONE, ident_str!("object"));
+    let event = interner.module_id_of(&AccountAddress::ONE, ident_str!("event"));
 
     if module_id == object && func_name == interner.identifier_of(ident_str!("exists_at")) {
         return callee_ty_args.first().copied().into_iter().collect();
+    }
+
+    // The test-only event queries return `vector<T>`, which they allocate
+    // themselves.
+    if module_id == event
+        && (func_name == interner.identifier_of(ident_str!("emitted_events"))
+            || func_name == interner.identifier_of(ident_str!("emitted_events_by_handle")))
+    {
+        return callee_ty_args
+            .first()
+            .map(|elem| interner.vector_of(*elem))
+            .into_iter()
+            .collect();
     }
 
     if module_id == table {

@@ -57,6 +57,8 @@ pub use consensus_config::make_all_consensus_config_natives;
 pub use ed25519::make_all_ed25519_natives;
 #[cfg(feature = "testing")]
 pub use ed25519::make_all_ed25519_test_natives;
+#[cfg(feature = "testing")]
+pub use event::make_all_event_test_natives;
 pub use event::{make_all_event_natives, EventEntry, EventKind, EventStore};
 pub use from_bytes::make_all_from_bytes_natives;
 pub use function_info::make_all_function_info_natives;
