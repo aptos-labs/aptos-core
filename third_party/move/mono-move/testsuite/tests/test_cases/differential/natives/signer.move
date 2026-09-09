@@ -8,6 +8,11 @@ module 0x1::create_signer {
     public native fun create_signer(addr: address): signer;
 }
 module 0x1::main {
+    struct Wrap has drop {
+        s: signer,
+        n: u64,
+    }
+
     public fun roundtrip(addr: address): address {
         let s = 0x1::create_signer::create_signer(addr);
         *std::signer::borrow_address(&s)
@@ -29,6 +34,16 @@ module 0x1::main {
         let s = 0x1::create_signer::create_signer(a);
         let t = 0x1::create_signer::create_signer(b);
         if (&s == &t) { 10 } else { 20 }
+    }
+
+    public fun bytes_wrap(addr: address): vector<u8> {
+        let s = 0x1::create_signer::create_signer(addr);
+        std::bcs::to_bytes(&Wrap { s, n: 1 })
+    }
+
+    public fun size_wrap(addr: address): u64 {
+        let s = 0x1::create_signer::create_signer(addr);
+        std::bcs::serialized_size(&Wrap { s, n: 1 })
     }
 }
 
@@ -58,3 +73,11 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::sel --args 0x9, 0xa
 // CHECK: results: 20
+
+// A struct holding a signer serializes as the address bytes then the `u64`.
+
+// RUN: execute 0x1::main::bytes_wrap --args 0xcafe
+// CHECK: results: 0x000000000000000000000000000000000000000000000000000000000000cafe0100000000000000
+
+// RUN: execute 0x1::main::size_wrap --args 0xcafe
+// CHECK: results: 40
