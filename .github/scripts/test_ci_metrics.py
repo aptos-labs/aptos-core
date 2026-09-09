@@ -5,11 +5,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ci_metrics import cgroup_peak, check_partitions, execution_mode, inventory, measure
+from ci_metrics import cgroup_peak, check_partitions, execution_mode, host_memory_used, inventory, measure
 from targeted_tests import package_args
 
 
 class MetricsTests(unittest.TestCase):
+    def test_host_memory_sample(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "meminfo"
+            self.assertIsNone(host_memory_used(path))
+            path.write_text("MemTotal: 1000 kB\nMemFree: 100 kB\nMemAvailable: 600 kB\n")
+            self.assertEqual(host_memory_used(path), 400 * 1024)
+            path.write_text("MemTotal: 1000 kB\n")
+            self.assertIsNone(host_memory_used(path))
+
     def test_cgroup_peak_versions_and_missing_counter(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

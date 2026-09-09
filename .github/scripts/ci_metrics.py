@@ -51,13 +51,31 @@ def cgroup_peak(root=Path("/sys/fs/cgroup")):
     return {}
 
 
+def host_memory_used(path=Path("/proc/meminfo")):
+    try:
+        fields = {line.split()[0]: int(line.split()[1]) for line in path.read_text().splitlines()}
+        return (fields["MemTotal:"] - fields["MemAvailable:"]) * 1024
+    except (OSError, KeyError, ValueError):
+        return None
+
+
 def measure(phase, command, output_dir):
     output_dir.mkdir(parents=True, exist_ok=True)
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
     started_at = datetime.now(timezone.utc).isoformat()
     start = time.monotonic()
+    sampled_memory = []
     try:
-        result = subprocess.run(command, check=False).returncode
+        with subprocess.Popen(command) as process:
+            while True:
+                used = host_memory_used()
+                if used is not None:
+                    sampled_memory.append(used)
+                try:
+                    result = process.wait(timeout=1)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
     except OSError as error:
         print(error, file=sys.stderr)
         result = 127
@@ -78,6 +96,10 @@ def measure(phase, command, output_dir):
     }
     # Keep the counter's scope explicit; this is not a per-phase memory peak.
     row.update(cgroup_peak())
+    if sampled_memory:
+        # Host-wide MemTotal - MemAvailable includes other runner processes.
+        row["sampled_host_used_peak_bytes"] = max(sampled_memory)
+        row["host_memory_samples"] = len(sampled_memory)
     with (output_dir / "phases.jsonl").open("a") as output:
         output.write(json.dumps(row) + "\n")
     print(json.dumps(row), file=sys.stderr)

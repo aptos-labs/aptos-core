@@ -41,6 +41,11 @@ jobs:
         with:
           ref: ${{ inputs.GIT_SHA }}
 
+      - name: Sample host memory
+        run: |
+          nohup bash -c 'while true; do awk '\''/MemTotal:/ {total=$2} /MemAvailable:/ {print total-$2}'\'' /proc/meminfo; sleep 1; done' \
+            > "$RUNNER_TEMP/cli-memory-kib.txt" 2>/dev/null < /dev/null &
+
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -71,6 +76,7 @@ jobs:
         run: |
           nproc
           free -b
+          awk 'BEGIN {peak=0} {if ($1>peak) peak=$1} END {printf "Sampled host used peak bytes (1s): %.0f\n", peak*1024}' "$RUNNER_TEMP/cli-memory-kib.txt"
           for counter in /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory/memory.max_usage_in_bytes; do
             if [[ -r "$counter" ]]; then
               echo "Cgroup peak bytes ($counter): $(<"$counter")"

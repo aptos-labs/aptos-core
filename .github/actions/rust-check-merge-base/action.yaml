@@ -24,6 +24,7 @@ runs:
       continue-on-error: true
       with:
         cache-bin: false
+        shared-key: merge-base-v1
         save-if: ${{ env.CI_CACHE_WRITE }}
 
     - name: Setup git credentials
