@@ -1221,7 +1221,8 @@ impl UpdatePolicy {
     fn cannot_create_hint(self) -> &'static str {
         match self {
             UpdatePolicy::Forbidden => {
-                "\nThis baseline is owned by another test suite and cannot be updated from here."
+                "\nThis baseline is owned by another test suite and cannot be created from here; \
+                 add the test to the owning suite first."
             },
             UpdatePolicy::ExistingOnly => {
                 "\nThis baseline overrides another suite's, so it must be declared in the \
@@ -1328,7 +1329,10 @@ fn handle_expected_output(
                 anyhow::bail!(add_update_baseline_fix(msg))
             },
             UpdatePolicy::Forbidden => anyhow::bail!(
-                "{msg}\nThis baseline is owned by another test suite and cannot be updated from here."
+                "{msg}\nThis baseline is owned by another test suite, so the output above is a \
+                 divergence between the two suites' implementations. Either make this suite \
+                 produce the recorded output, or record the divergence in this suite's own \
+                 override baseline; the shared baseline cannot be updated from here."
             ),
         }
     } else {
