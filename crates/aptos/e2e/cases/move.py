@@ -3,6 +3,7 @@
 
 import json
 
+from aptos_sdk.account_address import AccountAddress
 from common import TestError
 from test_helpers import RunHelper
 from test_results import test_case
@@ -50,8 +51,8 @@ def test_move_publish(run_helper: RunHelper, test_name=None):
     response = json.loads(response.stdout)
     for module in response["Result"]:
         if (
-            module["abi"]["address"]
-            == str(run_helper.get_account_info().account_address)
+            AccountAddress.from_str_relaxed(module["abi"]["address"])
+            == run_helper.get_account_info().account_address
             and module["abi"]["name"] == "cli_e2e_tests"
         ):
             return
@@ -114,14 +115,7 @@ def test_move_compile_fetch_deps_only(run_helper: RunHelper, test_name=None):
     # Compile the module. Compilation should not be invoked, and return should be [].
     response = run_helper.run_command(
         test_name,
-        [
-            "aptos",
-            "move",
-            "compile",
-            "--package-dir",
-            package_dir,
-            "--fetch-deps-only"
-        ],
+        ["aptos", "move", "compile", "--package-dir", package_dir, "--fetch-deps-only"],
     )
 
     if f"{account_info.account_address}::cli_e2e_tests" in response.stdout:

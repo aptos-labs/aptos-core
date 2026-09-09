@@ -11,6 +11,11 @@ on:
         required: true
         type: string
         description: Use this to override the git SHA1, branch name (e.g. devnet) or tag
+      TEST_SOURCE_REF:
+        required: false
+        default: ""
+        type: string
+        description: Optional test-source ref for validating test-only changes against an existing image
       SKIP_JOB:
         required: false
         default: false
@@ -39,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.GIT_SHA }}
+          ref: ${{ inputs.TEST_SOURCE_REF || inputs.GIT_SHA }}
 
       - name: Sample host memory
         run: |
@@ -59,6 +64,10 @@ jobs:
         with:
           pyproject_directory: crates/aptos/e2e
           poetry_version: 2.1.2
+
+      - name: Test E2E assertions
+        working-directory: crates/aptos/e2e
+        run: poetry run python -m unittest discover -s tests
 
       - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
         name: ${{ matrix.network }}-tests

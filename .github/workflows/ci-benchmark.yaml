@@ -112,9 +112,10 @@ jobs:
       run-name: candidate-${{ matrix.sample }}
       cache-enabled: ${{ inputs.cache != 'disabled' }}
       cache-namespace: benchmark-${{ github.run_id }}
+      exercise-rerun: ${{ inputs.suite == 'large' && inputs.cache == 'disabled' && matrix.sample == 1 }}
 
-  # Both versions use the same source/image SHA, while the candidate workflow
-  # definitions come from this branch rather than the production @main caller.
+  # Both versions use the same prebuilt image. The candidate CLI tests also
+  # include this branch's assertion fixes; API test sources remain unchanged.
   cli-baseline:
     if: inputs.include-e2e
     permissions:
@@ -134,6 +135,7 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: 893d1ffea49dcfa933f0421b19fc6e31a9c808ab
+      TEST_SOURCE_REF: ${{ github.sha }}
 
   api-baseline:
     if: inputs.include-e2e

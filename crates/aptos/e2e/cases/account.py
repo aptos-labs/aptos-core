@@ -5,6 +5,7 @@ import json
 import secrets
 import time
 
+from aptos_sdk.account_address import AccountAddress
 from common import OTHER_ACCOUNT_ONE, TestError
 from test_helpers import RunHelper
 from test_results import test_case
@@ -133,7 +134,9 @@ def test_account_lookup_address(run_helper: RunHelper, test_name=None):
             "account",
             "lookup-address",
             "--auth-key",
-            str(run_helper.get_account_info().account_address),  # initially the account address is the auth key
+            str(
+                run_helper.get_account_info().account_address
+            ),  # initially the account address is the auth key
         ],
     )
 
@@ -235,6 +238,8 @@ def test_account_resource_account(run_helper: RunHelper, test_name=None):
     if resource_account_address == None or sender == None:
         raise TestError("Resource account creation failed")
 
+    expected_address = AccountAddress.from_str_relaxed(resource_account_address)
+
     # Derive the resource account
     result = run_helper.run_command(
         test_name,
@@ -249,7 +254,10 @@ def test_account_resource_account(run_helper: RunHelper, test_name=None):
         ],
     )
 
-    if resource_account_address not in result.stdout:
+    if (
+        AccountAddress.from_str_relaxed(json.loads(result.stdout)["Result"])
+        != expected_address
+    ):
         raise TestError(
             f"derive-resource-account-address result does not match expected: {resource_account_address}"
         )
@@ -274,7 +282,7 @@ def test_account_resource_account(run_helper: RunHelper, test_name=None):
         if module.get("0x1::resource_account::Container") != None:
             data = module["0x1::resource_account::Container"]["store"]["data"]
             for resource in data:
-                if resource.get("key") == f"0x{resource_account_address}":
+                if AccountAddress.from_str_relaxed(resource["key"]) == expected_address:
                     found_resource = True
                     break
 

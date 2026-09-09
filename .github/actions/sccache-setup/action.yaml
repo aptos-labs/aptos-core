@@ -34,7 +34,8 @@ runs:
           echo "SCCACHE_GHA_VERSION=$CACHE_NAMESPACE"
           echo "SCCACHE_GHA_RW_MODE=$mode"
           echo "SCCACHE_MULTILEVEL_CHAIN=gha"
-          echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=ignore"
+          # Await the sole backend's writes; detached writes can be lost at job exit.
+          echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=l0"
           echo "SCCACHE_IDLE_TIMEOUT=0"
           echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1"
         } >> "$GITHUB_ENV"

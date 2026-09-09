@@ -27,6 +27,9 @@ caching rather than bypassing tests. The explicit startup check is necessary:
 `SCCACHE_IGNORE_SERVER_IO_ERROR` alone does not cover initialization failures.
 The upstream sccache post-job annotation hook is disabled because its statistics
 failure can fail a job; our statistics collection is best-effort instead.
+The single GHA backend uses synchronous `l0` writes. The `ignore` multilevel
+policy starts detached writes, which can be lost when an ephemeral runner exits;
+its top-level write count is not evidence that those entries reached GitHub.
 
 Targeted and smoke build outputs are **artifacts**, not shared caches. Consumers
 download exact artifact IDs from their build jobs in the same workflow run.
@@ -81,10 +84,17 @@ of a PR-only change can still miss because ordinary PRs do not publish results.
 No benchmark writes to the production compilation-cache namespace.
 
 With `benchmark-e2e=true`, both old and new CLI/API workflows use the prebuilt
-image and source at `893d1ffea49dcfa933f0421b19fc6e31a9c808ab`. The candidate
-workflow definitions come from this PR. Confirm the image still exists and record
-the resolved network-image digests; moving network tags can confound comparisons.
-Repeat this comparison at least three times.
+image at `893d1ffea49dcfa933f0421b19fc6e31a9c808ab`. The candidate CLI checks out
+the dispatch SHA for its Python assertion fixes; the baseline CLI and both API
+jobs keep the reference source. The first three runner-size comparisons were
+dispatched before those fixes and use reference test sources on both sides.
+Record resolved network-image digests; moving tags can confound comparisons.
+
+The large, cache-disabled experiment intentionally fails the last shard of the
+first candidate after its tests finish. Run `gh run rerun RUN_ID --failed` to
+verify that the rerun downloads the successful original build's exact artifact
+ID. Keep first-attempt test timings and rerun-validation overhead separate.
+The report retains all attempts without counting reused job IDs twice.
 
 After each completed run:
 

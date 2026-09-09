@@ -20,6 +20,10 @@ on:
       cache-namespace:
         type: string
         default: aptos-ci-v1
+      exercise-rerun:
+        description: Fail the last benchmark shard after testing to verify artifact reuse on rerun
+        type: boolean
+        default: false
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -154,6 +158,12 @@ jobs:
         run: |
           cargo nextest list --archive-file "$TEST_ARCHIVE" --workspace-remap . -T json \
             --partition count:${{ matrix.partition }}/${{ strategy.job-total }} > ci-metrics/inventory.json
+
+      - name: Exercise a failed-job rerun
+        if: inputs.benchmark-packages != '' && inputs.exercise-rerun && matrix.partition == 8 && github.run_attempt == '1'
+        run: |
+          echo "Intentional benchmark failure after tests. Rerun failed jobs to verify the original artifact remains usable."
+          exit 1
 
       - uses: ./.github/actions/ci-metrics-report
         if: always()

@@ -4,12 +4,25 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from ci_metrics import cgroup_peak, check_partitions, execution_mode, host_memory_used, inventory, measure
+from ci_metrics import cgroup_peak, check_partitions, execution_mode, host_memory_used, inventory, measure, run_report
 from targeted_tests import package_args
 
 
 class MetricsTests(unittest.TestCase):
+    def test_report_retains_attempts_without_double_counting_reused_jobs(self):
+        def job(identifier):
+            return {"id": identifier, "started_at": "2026-09-09T00:00:00Z",
+                    "completed_at": "2026-09-09T00:01:00Z", "labels": ["runs-on,cpu=32"]}
+        with patch("ci_metrics.gh_json", side_effect=[
+            {"run_attempt": 2}, {"jobs": [job(1), job(2)]},
+            {"jobs": [job(2), job(3)]}, {}, {},
+        ]):
+            report = run_report("owner/repo", 1)
+        self.assertEqual([job["measurement_run_attempt"] for job in report["jobs"]], [1, 1, 2])
+        self.assertEqual(sum(job["allocated_vcpu_minutes"] for job in report["jobs"]), 96)
+
     def test_host_memory_sample(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "meminfo"

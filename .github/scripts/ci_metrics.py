@@ -112,17 +112,21 @@ def gh_json(endpoint):
 
 def run_report(repo, run_id):
     run = gh_json(f"repos/{repo}/actions/runs/{run_id}")
-    attempt = run["run_attempt"]
-    jobs = []
-    page = 1
-    while True:
-        batch = gh_json(
-            f"repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100&page={page}"
-        )["jobs"]
-        jobs.extend(batch)
-        if len(batch) < 100:
-            break
-        page += 1
+    by_id = {}
+    for attempt in range(1, run["run_attempt"] + 1):
+        page = 1
+        while True:
+            batch = gh_json(
+                f"repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100&page={page}"
+            )["jobs"]
+            for job in batch:
+                # Reused successful jobs must not be billed twice in the report.
+                if job["id"] not in by_id:
+                    by_id[job["id"]] = {**job, "measurement_run_attempt": attempt}
+            if len(batch) < 100:
+                break
+            page += 1
+    jobs = list(by_id.values())
     for job in jobs:
         if job["started_at"] and job["completed_at"]:
             job["runner_minutes"] = (
