@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import re
 import resource
 import subprocess
 import sys
@@ -66,7 +67,6 @@ def cache_error_counts(log):
     # Export counts only: backend logs can contain signed service URLs.
     lines = log.lower().splitlines()
     patterns = {
-        "rate_limited_lines": ("ratelimited", "rate limit", "too many requests", "429"),
         "write_probe_failure_lines": ("storage write check failed",),
         "read_probe_failure_lines": (
             "cache storage read check",
@@ -74,10 +74,17 @@ def cache_error_counts(log):
         ),
         "backend_read_error_lines": ("got unexpected error",),
     }
-    return {
+    counts = {
         name: sum(any(term in line for term in terms) for line in lines)
         for name, terms in patterns.items()
     }
+    # Bare digits can occur inside compiler hashes, timestamps, or signed URLs.
+    rate_limit = re.compile(
+        r"ratelimited|rate limit|too many requests|"
+        r"\b(?:status|code|error)(?: code)?[\s:=]+429\b|\bhttp(?:/[\d.]+)?\s+429\b"
+    )
+    counts["rate_limited_lines"] = sum(bool(rate_limit.search(line)) for line in lines)
+    return counts
 
 
 def measure(phase, command, output_dir):

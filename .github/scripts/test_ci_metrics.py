@@ -28,6 +28,15 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(counts["write_probe_failure_lines"], 1)
         self.assertEqual(counts["backend_read_error_lines"], 1)
         self.assertNotIn("SECRET", json.dumps(counts))
+        self.assertEqual(
+            cache_error_counts("compiler hash ab429cd; timestamp 12:00:01.429Z")[
+                "rate_limited_lines"
+            ],
+            0,
+        )
+        self.assertEqual(
+            cache_error_counts("HTTP/2 429\nstatus: 429")["rate_limited_lines"], 2
+        )
 
     def test_report_retains_attempts_without_double_counting_reused_jobs(self):
         def job(identifier, name=None, start="2026-09-09T00:00:00Z"):
