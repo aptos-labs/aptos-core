@@ -3,11 +3,13 @@ description: Start PostgreSQL and wait until it accepts connections
 runs:
   using: composite
   steps:
-    - shell: bash
+    - name: Start database and wait for TCP readiness
+      shell: bash
       run: |
         container=$(docker run --detach -p 5432:5432 cimg/postgres:14.2)
         for attempt in {1..30}; do
-          if docker exec "$container" pg_isready -U postgres -t 1; then
+          # Tests connect over TCP, not the initialization server's Unix socket.
+          if docker exec "$container" pg_isready -h 127.0.0.1 -U postgres -t 1; then
             exit 0
           fi
           sleep 2

@@ -39,7 +39,7 @@ env:
 
 jobs:
   lightweight-checks:
-    if: inputs.suite == 'small' && inputs.cache == 'seeded'
+    if: inputs.suite == 'small'
     runs-on: 2cpu-gh-ubuntu24-x64
     timeout-minutes: 15
     steps:

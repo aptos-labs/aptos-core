@@ -208,13 +208,32 @@ transfer, runner provisioning, and the Runs-On fee have not been measured.
   identical inventories. Baseline median job execution was **127 seconds**;
   candidate **152 seconds**. Each candidate recorded 350 cache misses and no
   hits. Cold caching did not improve this small workload.
+- Corrected cache-disabled run
+  [34413315139](https://github.com/aptos-labs/aptos-core/actions/runs/34413315139):
+  all samples and inventories passed. Median baseline/candidate compilation
+  phases were **63.08 / 62.02 seconds**, but full job execution was **124 / 155
+  seconds**. Two candidates spent about a minute in database setup, mostly
+  Docker-image transfer; the third completed in 120 seconds. Host CPU counters
+  worked on Linux. There is no consistent tiny-job speedup in these samples.
 - Seeded run 34408401763 was not genuinely warm: seed/readers had different
   `CARGO_TERM_COLOR`, and detached writes did not all finish. Run 34409394605
   fixed the environment and used synchronous `l0` writes, but persisted only
   105 compilation entries. Readers each obtained **107 hits / 243 misses**;
   baseline/candidate medians were **125 / 133 seconds**, excluding the seed's
   103-second execution. This is partial reuse, not evidence of a warm-cache win.
-  The final `all` write policy is being measured separately.
+  These intermediate configurations are not the final implementation.
+- Final `all` policy in
+  [34412173055](https://github.com/aptos-labs/aptos-core/actions/runs/34412173055):
+  the first seed persisted 201 compilation entries before upload throttling;
+  readers got 203 hits / 147 misses. Rerunning only the seed and its dependents
+  added the remaining 147 entries. All three second-pass readers then got
+  **350 hits / zero misses**. Median build/archive time was **51.99 seconds**
+  versus baseline build/run **63.03 seconds**; full job execution was
+  **121 versus 126 seconds**. The two seed jobs took **99 + 100 seconds**
+  (212.3 allocated vCPU-minutes) separately. The populated cache contained 349
+  entries including the service check, totaling **266,333,880 bytes**. This is
+  a modest small-job improvement after full population, not evidence of a
+  large-workspace warm-cache gain or cheap first-time population.
 - The original 2,341-test suite (now `medium`) passed in all three baselines and
   all 24 candidate partitions in run 34410026272. Baseline median check elapsed
   was **270 seconds**, versus **370 seconds** with eight-way sharding; allocated
@@ -222,6 +241,13 @@ transfer, runner provisioning, and the Runs-On fee have not been measured.
   These fast compiler tests did not justify fan-out, so the inline cutoff was
   raised from 1,000 to 3,000. The expanded `large` suite exercises actual slow
   E2E/API/prover tests; its result must justify retaining the sharded path.
+- The corrected inline path passed all three 2,341-test samples and exact
+  inventories in
+  [34412913212](https://github.com/aptos-labs/aptos-core/actions/runs/34412913212).
+  Baseline/candidate median check elapsed was **276 / 273 seconds** and
+  allocation **258.1 / 256.0 vCPU-minutes**: essentially neutral, without the
+  earlier sharding regression. Candidate execution ranged 219–248 seconds;
+  baseline execution ranged 237–260 seconds.
 - That run deliberately failed one shard **after its tests passed**. A
   failed-jobs rerun successfully downloaded original artifact **10126978793**
   (`candidate-1-tests-1`) without rebuilding. The rerun added 57 seconds on one
@@ -232,18 +258,21 @@ transfer, runner provisioning, and the Runs-On fee have not been measured.
   The lightweight merge-base/helper checks passed on 2-vCPU Linux runners in
   runs 34408401763 and 34409394605 (201 / 181 seconds total).
 
-Both completed experimental cache populations were removed by verified branch
+All three completed experimental cache populations were removed by verified branch
 entry IDs: 99 entries / 31,916,863 bytes from run 34408401763 and 106 entries /
-46,987,893 bytes from run 34409394605. No production cache entries were deleted.
+46,987,893 bytes from run 34409394605, plus 349 entries / 266,333,880 bytes from
+run 34412173055. No production cache entries were deleted.
 Repository usage reached about 9.69 GB from other writers; querying its configured
 storage limit requires administrator permission (HTTP 403). Capacity and a real
 main-to-PR restore/write-denial exercise remain external pre-merge checks.
+The real missing-artifact download failed as expected in run 34412173055;
+the following assertion required that failure, and the Linux helper tests passed.
 
 ### Local validation
 
 - `cargo check`, all nine `aptos-cargo-cli` unit tests, package Clippy with
   warnings denied, and package formatting pass.
-- Eight Node and thirteen Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
+- Nine Node and thirteen Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
   shell bodies, cache preflight fallback, threshold boundaries, partition
   completeness, explicit package selection, fail-closed dependency checks,
   missing/invalid artifact IDs, and correct rerun allocation accounting.

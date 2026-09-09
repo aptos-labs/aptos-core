@@ -22,6 +22,8 @@ runs:
           echo "Cache mode: ${SCCACHE_GHA_RW_MODE:-disabled}"
           echo "CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-unset}"
           echo "CARGO_TERM_COLOR: ${CARGO_TERM_COLOR:-unset}"
+          echo "Instance type: ${RUNS_ON_INSTANCE_TYPE:-unknown}"
+          echo "Runner OS/architecture: ${RUNNER_OS:-unknown}/${RUNNER_ARCH:-unknown}"
           git rev-parse HEAD
           rustc -Vv
           cargo nextest --version

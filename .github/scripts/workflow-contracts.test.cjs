@@ -77,6 +77,27 @@ test('an empty affected-package selection completes without scheduling shards', 
   }
 });
 
+test('PostgreSQL checks TCP readiness and fails after bounded retries', () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-postgres-'));
+  try {
+    const trace = path.join(temporary, 'trace');
+    fs.writeFileSync(path.join(temporary, 'docker'), '#!/bin/sh\nprintf "%s\\n" "$*" >> "$PROBE_TRACE"\ncase "$1" in run) echo test-postgres;; exec) exit "$PROBE_EXIT";; logs) exit 0;; esac\n', { mode: 0o700 });
+    fs.writeFileSync(path.join(temporary, 'sleep'), '#!/bin/sh\nexit 0\n', { mode: 0o700 });
+    for (const code of ['0', '1']) {
+      fs.writeFileSync(trace, '');
+      const result = shell(stepRun('.github/actions/postgres-start/action.yaml', 'Start database and wait for TCP readiness'), {
+        PATH: `${temporary}:${process.env.PATH}`, PROBE_EXIT: code, PROBE_TRACE: trace,
+      });
+      assert.equal(result.status === 0, code === '0', result.stderr);
+      const probes = fs.readFileSync(trace, 'utf8').split('\n').filter(line => line.startsWith('exec '));
+      assert.equal(probes.length, code === '0' ? 1 : 30);
+      assert.ok(probes.every(line => line === 'exec test-postgres pg_isready -h 127.0.0.1 -U postgres -t 1'));
+    }
+  } finally {
+    fs.rmSync(temporary, { recursive: true });
+  }
+});
+
 test('cache initialization failure disables the wrapper without failing the job', () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-cache-preflight-'));
   try {
