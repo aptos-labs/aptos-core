@@ -477,4 +477,54 @@ module bench::clob_market_tests {
         assert!(clob_market::best_price(market_id, ASK) == 1016, 0);
         assert!(clob_market::resting_size(market_id, ASK, ALL) == 48, 0);
     }
+
+    // The recipe a transaction harness follows: seed the book once as admin,
+    // onboard each account with one transaction, then run the mix. Every step
+    // after onboarding must succeed from a plain signer.
+    #[test(admin = @bench, alice = @0xa11ce, bob = @0xb0b)]
+    fun test_harness_onboard_then_mix(
+        admin: &signer, alice: &signer, bob: &signer
+    ) {
+        let (market_id, base, quote) = make_market(admin);
+        fund(admin, admin, market_id, base, quote);
+        clob_market::seed_book(admin, market_id, 64, 64, 100000, 5, 7);
+
+        clob_market::bench_onboard(alice, market_id, FUNDING, FUNDING);
+        clob_market::bench_onboard(bob, market_id, FUNDING, FUNDING);
+        let (base_available, _, quote_available, _) =
+            clob_market::account_state(signer::address_of(alice), market_id);
+        assert!(base_available == FUNDING && quote_available == FUNDING, 0);
+
+        clob_market::bench_topup(alice, market_id, FUNDING, FUNDING);
+        clob_market::bench_place_and_cancel(alice, market_id, BID, 99000, 3);
+        clob_market::bench_place_and_cancel(bob, market_id, ASK, 101000, 3);
+        clob_market::place_limit_order(alice, market_id, BID, 99500, 2);
+        clob_market::place_market_order(bob, market_id, ASK, 2);
+        clob_market::bench_index(alice, market_id, BID, 32);
+
+        // Placing and cancelling is net-neutral, so the top-up is all that
+        // moved the balance.
+        let (base_after, _, quote_after, _) =
+            clob_market::account_state(signer::address_of(alice), market_id);
+        assert!(base_after == 2 * FUNDING, 0);
+        assert!(quote_after > 0, 0);
+        // The seeded bids plus alice's resting one, less whatever bob's market
+        // sell cleared outright.
+        assert!(clob_market::n_orders(market_id, BID, ALL) >= 64, 0);
+    }
+
+    // A crossing placement fills instead of resting, so there is nothing left
+    // to cancel and the wrapper must not abort.
+    #[test(admin = @bench, alice = @0xa11ce, bob = @0xb0b)]
+    fun test_bench_place_and_cancel_tolerates_a_full_fill(
+        admin: &signer, alice: &signer, bob: &signer
+    ) {
+        let (market_id, base, quote) = make_market(admin);
+        fund(admin, alice, market_id, base, quote);
+        clob_market::bench_onboard(bob, market_id, FUNDING, FUNDING);
+        clob_market::place_limit_order(alice, market_id, ASK, 1000, 5);
+        clob_market::bench_place_and_cancel(bob, market_id, BID, 1000, 5);
+        assert!(clob_market::n_orders(market_id, ASK, ALL) == 0, 0);
+        assert!(clob_market::n_orders(market_id, BID, ALL) == 0, 0);
+    }
 }

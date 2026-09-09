@@ -58,9 +58,17 @@ module bench::clmm_mock_fa {
     public entry fun mint(
         admin: &signer, asset: Object<Metadata>, to: address, amount: u64
     ) acquires AssetRefs {
-        let asset_address = object::object_address(&asset);
         assert!(object::is_owner(asset, signer::address_of(admin)), ENOT_ASSET_OWNER);
-        let refs = borrow_global<AssetRefs>(asset_address);
+        faucet(asset, to, amount);
+    }
+
+    /// Unpermissioned mint. A harness drives thousands of independent accounts
+    /// that each need funding, and routing every one through the admin would
+    /// serialize them on the admin's sequence number.
+    public fun faucet(
+        asset: Object<Metadata>, to: address, amount: u64
+    ) acquires AssetRefs {
+        let refs = borrow_global<AssetRefs>(object::object_address(&asset));
         primary_fungible_store::mint(&refs.mint_ref, to, amount);
     }
 

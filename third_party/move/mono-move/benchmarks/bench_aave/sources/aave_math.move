@@ -22,7 +22,12 @@ module bench::aave_math {
     const HALF_PERCENTAGE_FACTOR: u256 = 5_000;
 
     /// Leap years are ignored, matching the upstream rate model.
-    const SECONDS_PER_YEAR: u256 = 31_536_000;
+    ///
+    /// Upstream denominates rates per second. We use microseconds, the unit the
+    /// chain clock actually carries, so that a reserve accrues on consecutive
+    /// blocks under the benchmark harness, which advances the block timestamp by
+    /// one microsecond. Same annual rate, finer granularity.
+    const MICROSECONDS_PER_YEAR: u256 = 31_536_000_000_000;
 
     const EOVERFLOW: u64 = 1;
     const EDIVISION_BY_ZERO: u64 = 2;
@@ -43,8 +48,8 @@ module bench::aave_math {
         PERCENTAGE_FACTOR
     }
 
-    public fun seconds_per_year(): u256 {
-        SECONDS_PER_YEAR
+    public fun microseconds_per_year(): u256 {
+        MICROSECONDS_PER_YEAR
     }
 
     public fun wad_mul(a: u256, b: u256): u256 {
@@ -170,8 +175,8 @@ module bench::aave_math {
     public fun calculate_linear_interest(
         rate: u256, last_update_timestamp: u64
     ): u256 {
-        let time_passed = timestamp::now_seconds() - last_update_timestamp;
-        RAY + (rate * (time_passed as u256)) / SECONDS_PER_YEAR
+        let time_passed = timestamp::now_microseconds() - last_update_timestamp;
+        RAY + (rate * (time_passed as u256)) / MICROSECONDS_PER_YEAR
     }
 
     /// Third-order Taylor expansion of e^(r*t). Exact exponentiation is too
@@ -187,7 +192,7 @@ module bench::aave_math {
         if (s == 0) {
             return RAY
         };
-        let x = s * rate / SECONDS_PER_YEAR;
+        let x = s * rate / MICROSECONDS_PER_YEAR;
         RAY + x + ray_mul(x, (x / 2 + ray_mul(x, x / 6)))
     }
 
@@ -195,7 +200,7 @@ module bench::aave_math {
         rate: u256, last_update_timestamp: u64
     ): u256 {
         calculate_compounded_interest(
-            rate, last_update_timestamp, timestamp::now_seconds()
+            rate, last_update_timestamp, timestamp::now_microseconds()
         )
     }
 
