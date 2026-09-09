@@ -12,5 +12,6 @@ move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-model = { workspace = true }
+move-transactional-test-runner = { workspace = true }
 move-vm-runtime = { workspace = true }
 walkdir = { workspace = true }

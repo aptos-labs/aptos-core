@@ -173,6 +173,15 @@ pub struct Resolution<'corpus, P: 'static> {
     pub canonical_exp_suffix: Option<String>,
 }
 
+/// The workspace root, which [`Corpus::root`] is relative to.
+pub fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(4)
+        .expect("the matrix crate lives four levels below the workspace root")
+        .to_path_buf()
+}
+
 /// Where a MonoMove-owned override baseline for this cell lives:
 /// `<root>/<corpus>/<identity without the `tests/` prefix>.<config>.exp`.
 ///

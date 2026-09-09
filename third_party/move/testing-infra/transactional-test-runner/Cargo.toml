@@ -16,6 +16,7 @@ fuzzing = ["arbitrary", "dearbitrary", "aptos-framework", "bcs"]
 [dependencies]
 anyhow = { workspace = true }
 aptos-framework = { workspace = true, optional = true }
+bytes = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 either = { workspace = true }
 legacy-move-compiler = { workspace = true }
