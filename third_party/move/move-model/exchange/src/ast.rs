@@ -913,6 +913,7 @@ pub enum Operation {
     SingleVec,
     UpdateVec,
     ConcatVec,
+    ReverseVec,
     IndexOfVec,
     ContainsVec,
     InRangeRange,

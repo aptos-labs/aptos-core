@@ -1,4 +1,8 @@
 [profile.ci]
+# Lean integration CI is disabled during the verification rebuild, including
+# when these tests are discovered by the repository-wide Rust test jobs.
+# Keep the default/local profile unchanged.
+default-filter = 'not (package(=move-compiler-v2) & test(/^leaner::tests::/)) & not (package(=move-compiler-v2-transactional-tests) & test(/leaner/))'
 # Show skipped tests in the CI output.
 status-level = "skip"
 # Show output for all tests as soon as they fail and at the end of the test run.

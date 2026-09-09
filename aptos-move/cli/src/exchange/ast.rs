@@ -1356,6 +1356,7 @@ impl<'a> Ctx<'a> {
             Operation::SingleVec => X::SingleVec,
             Operation::UpdateVec => X::UpdateVec,
             Operation::ConcatVec => X::ConcatVec,
+            Operation::ReverseVec => X::ReverseVec,
             Operation::IndexOfVec => X::IndexOfVec,
             Operation::ContainsVec => X::ContainsVec,
             Operation::InRangeRange => X::InRangeRange,
@@ -1476,6 +1477,31 @@ pub fn scan_comments(text: &str) -> Vec<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reverse_vector_operation_roundtrips() {
+        let env = GlobalEnv::new();
+        let ctx = Ctx {
+            env: &env,
+            constants: BTreeMap::new(),
+            files: RefCell::default(),
+            model_modules: RefCell::default(),
+            locs: RefCell::default(),
+            types: RefCell::default(),
+            modules: RefCell::default(),
+            names: RefCell::default(),
+            scopes: RefCell::default(),
+            params: RefCell::default(),
+        };
+        let exported = ctx.operation(&Operation::ReverseVec).unwrap();
+        assert_eq!(exported, xast::Operation::ReverseVec);
+        let json = serde_json::to_string(&exported).unwrap();
+        assert_eq!(json, r#""reverse_vec""#);
+        assert_eq!(
+            serde_json::from_str::<xast::Operation>(&json).unwrap(),
+            exported
+        );
+    }
 
     #[test]
     fn header_alias_is_recognized() {
