@@ -1071,20 +1071,21 @@ impl<'a> Ctx<'a> {
                     QuantKind::Choose => xast::QuantKind::Choose,
                     QuantKind::ChooseMin => xast::QuantKind::ChooseMin,
                 };
-                let xranges = ranges
-                    .iter()
-                    .map(|(pat, domain)| {
-                        Ok(xast::QuantRange {
+                self.with_scope(vec![], || {
+                    let mut xranges = Vec::with_capacity(ranges.len());
+                    for (pat, domain) in ranges {
+                        xranges.push(xast::QuantRange {
                             pattern: self.pattern(pat)?,
                             domain: self.exp(domain.as_ref())?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                let vars = ranges
-                    .iter()
-                    .flat_map(|(pat, _)| self.pattern_vars(pat))
-                    .collect();
-                self.with_scope(vars, || {
+                        });
+                        // Match the model's sequential binding visibility: a
+                        // pattern is in scope for later domains, not its own.
+                        self.scopes
+                            .borrow_mut()
+                            .last_mut()
+                            .expect("quantifier scope")
+                            .extend(self.pattern_vars(pat));
+                    }
                     Ok(xast::ExpNode::Quant {
                         quant,
                         ranges: xranges,
@@ -1479,10 +1480,128 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reverse_vector_operation_roundtrips() {
+    fn quantifier_ranges_use_sequential_bindings() {
+        // Model-level regression: source inference can retain bounded local
+        // types, so construct the widened reads this exporter must support.
         let env = GlobalEnv::new();
-        let ctx = Ctx {
-            env: &env,
+        let ctx = test_ctx(&env);
+        let x = env.symbol_pool().make("x");
+        let y = env.symbol_pool().make("y");
+        let node = |ty| env.new_node(env.unknown_loc(), ty);
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let u8_ty = Type::Primitive(PrimitiveType::U8);
+        let num_ty = Type::Primitive(PrimitiveType::Num);
+        let read_x = || ExpData::LocalVar(node(num_ty.clone()), x).into_exp();
+        let range = || {
+            ExpData::Call(
+                node(Type::Primitive(PrimitiveType::Range)),
+                Operation::Range,
+                vec![
+                    ExpData::Value(node(num_ty.clone()), Value::Number(0.into())).into_exp(),
+                    read_x(),
+                ],
+            )
+            .into_exp()
+        };
+        let type_domain = node(Type::TypeDomain(Box::new(u64_ty.clone())));
+        env.set_node_instantiation(type_domain, vec![u64_ty.clone()]);
+        // The second domain reads the newly bound x:u64, not outer x:u8.
+        // The quantifier body, condition and trigger see both binders.
+        let quant = ExpData::Quant(
+            node(Type::Primitive(PrimitiveType::Bool)),
+            QuantKind::Forall,
+            vec![
+                (
+                    Pattern::Var(node(u64_ty.clone()), x),
+                    ExpData::Call(type_domain, Operation::TypeDomain, vec![]).into_exp(),
+                ),
+                (Pattern::Var(node(num_ty.clone()), y), range()),
+            ],
+            vec![vec![read_x()]],
+            Some(
+                ExpData::Call(
+                    node(Type::Primitive(PrimitiveType::Bool)),
+                    Operation::Eq,
+                    vec![read_x(), read_x()],
+                )
+                .into_exp(),
+            ),
+            ExpData::Call(
+                node(Type::Primitive(PrimitiveType::Bool)),
+                Operation::Eq,
+                vec![read_x(), read_x()],
+            )
+            .into_exp(),
+        );
+        let assert_widened = |exp: &xast::Exp, declared: &Type| {
+            assert_eq!(exp.ty, ctx.ty(&num_ty).unwrap());
+            let xast::ExpNode::Call {
+                op: xast::Operation::Cast,
+                args,
+                ..
+            } = &exp.node
+            else {
+                panic!("expected explicit widening, got {exp:?}");
+            };
+            assert_eq!(args[0].ty, ctx.ty(declared).unwrap());
+            assert!(matches!(&args[0].node, xast::ExpNode::Local { name } if name == "x"));
+        };
+        ctx.with_scope(vec![(x, u8_ty.clone())], || {
+            let exported = ctx.exp(&quant)?;
+            let xast::ExpNode::Quant {
+                ranges,
+                triggers,
+                condition,
+                body,
+                ..
+            } = &exported.node
+            else {
+                panic!("expected quantifier");
+            };
+            let xast::ExpNode::Call { args, .. } = &ranges[1].domain.node else {
+                panic!("expected range");
+            };
+            assert_widened(&args[1], &u64_ty);
+            assert_widened(&triggers[0][0], &u64_ty);
+            for exp in [condition.as_ref().unwrap(), body] {
+                let xast::ExpNode::Call { args, .. } = &exp.node else {
+                    panic!("expected comparison");
+                };
+                assert_widened(&args[0], &u64_ty);
+            }
+            assert_eq!(ctx.declared_type(x), Some(u8_ty.clone()));
+            assert_eq!(ctx.declared_type(y), None);
+            // A binding is not visible in its own domain, even if it shadows
+            // an outer variable with a different declared type.
+            let shadow = ExpData::Quant(
+                node(Type::Primitive(PrimitiveType::Bool)),
+                QuantKind::Forall,
+                vec![(Pattern::Var(node(num_ty.clone()), x), range())],
+                vec![],
+                None,
+                ExpData::Value(
+                    node(Type::Primitive(PrimitiveType::Bool)),
+                    Value::Bool(true),
+                )
+                .into_exp(),
+            );
+            let exported = ctx.exp(&shadow)?;
+            let xast::ExpNode::Quant { ranges, .. } = &exported.node else {
+                panic!("expected quantifier");
+            };
+            let xast::ExpNode::Call { args, .. } = &ranges[0].domain.node else {
+                panic!("expected range");
+            };
+            assert_widened(&args[1], &u8_ty);
+            Ok(())
+        })
+        .unwrap();
+        assert!(ctx.scopes.borrow().is_empty());
+    }
+
+    fn test_ctx(env: &GlobalEnv) -> Ctx<'_> {
+        Ctx {
+            env,
             constants: BTreeMap::new(),
             files: RefCell::default(),
             model_modules: RefCell::default(),
@@ -1492,7 +1611,13 @@ mod tests {
             names: RefCell::default(),
             scopes: RefCell::default(),
             params: RefCell::default(),
-        };
+        }
+    }
+
+    #[test]
+    fn reverse_vector_operation_roundtrips() {
+        let env = GlobalEnv::new();
+        let ctx = test_ctx(&env);
         let exported = ctx.operation(&Operation::ReverseVec).unwrap();
         assert_eq!(exported, xast::Operation::ReverseVec);
         let json = serde_json::to_string(&exported).unwrap();

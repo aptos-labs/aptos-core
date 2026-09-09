@@ -736,6 +736,38 @@ private def argumentPattern (unit : ValidatedUnit)
     | .ok pattern => pure ⟨pattern⟩
     | .error message => throwError m!"internal: argument pattern `{text}`: {message}"
 
+/-- The no-fallback audit of one verified function: its theorem is over
+the denotation of a kernel-certified compilation, and nothing it depends
+on is admitted or from a retired route. -/
+def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
+  let function := base.getString!
+  let artifacts := base.replacePrefix (← getCurrNamespace) .anonymous
+  let env ← getEnv
+  let some theoremInfo := env.find? (base ++ `typedVerified)
+    | throwError m!"`{function}` is not verified"
+  unless theoremInfo.type.getUsedConstants.contains ``Term.denote do
+    throwError m!"`{function}` was verified by a retired route"
+  unless env.contains (artifacts ++ `compiled_eq) do
+    throwError m!"missing compilation certificate for `{function}`"
+  let mut pending := #[base ++ `typedVerified, artifacts ++ `compiled_eq, artifacts ++ `compiled]
+  let mut visited : NameSet := {}
+  while let some name := pending.back? do
+    pending := pending.pop
+    if visited.contains name then continue
+    visited := visited.insert name
+    let some declaration := env.find? name
+      | throwError m!"missing artifact `{name}`"
+    let constants := declaration.type.getUsedConstants ++
+      ((declaration.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[]
+    for dependency in constants do
+      if dependency == ``sorryAx || dependency == ``LeanerIR.RuntimeFrame ||
+          (`LeanerIR.Proofs.Denotation).isPrefixOf dependency ||
+          (`LeanerIR.Proofs.ComputationAgreement).isPrefixOf dependency ||
+          (`LeanerIR.Proofs.NativeBoundary).isPrefixOf dependency then
+        throwError m!"artifact `{name}` retains forbidden dependency `{dependency}`"
+      if base.isPrefixOf dependency || artifacts.isPrefixOf dependency then
+        pending := pending.push dependency
+
 /-- Verify one function through its denotation. -/
 def verifyFunction (reference : Syntax) (segments : Array String) (function : String)
     (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none) :
@@ -763,7 +795,10 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
   let artifacts := Name.str namespaceName function
   let base := (← getCurrNamespace) ++ artifacts
   let typedVerified := typedVerifiedName segments function
-  if (← getEnv).contains (base ++ `typedVerified) then return
+  if (← getEnv).contains (base ++ `typedVerified) then
+    -- A colliding name alone is not evidence of a denotation proof.
+    withRef reference <| requireNativeArtifacts base
+    return
   let compiledIdent := rootIdent (compiledName segments function)
   let bodyIdent := rootIdent (Name.str (Name.str namespaceName function) "body")
   let row := rootIdent (Name.str (Name.str namespaceName function) "row")
@@ -887,38 +922,6 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
   catch failure =>
     modify fun state => { saved with messages := state.messages }
     throw failure
-
-/-- The no-fallback audit of one verified function: its theorem is over
-the denotation of a kernel-certified compilation, and nothing it depends
-on is admitted or from a retired route. -/
-def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
-  let function := base.getString!
-  let artifacts := base.replacePrefix (← getCurrNamespace) .anonymous
-  let env ← getEnv
-  let some theoremInfo := env.find? (base ++ `typedVerified)
-    | throwError m!"`{function}` is not verified"
-  unless theoremInfo.type.getUsedConstants.contains ``Term.denote do
-    throwError m!"`{function}` was verified by a retired route"
-  unless env.contains (artifacts ++ `compiled_eq) do
-    throwError m!"missing compilation certificate for `{function}`"
-  let mut pending := #[base ++ `typedVerified, artifacts ++ `compiled_eq, artifacts ++ `compiled]
-  let mut visited : NameSet := {}
-  while let some name := pending.back? do
-    pending := pending.pop
-    if visited.contains name then continue
-    visited := visited.insert name
-    let some declaration := env.find? name
-      | throwError m!"missing artifact `{name}`"
-    let constants := declaration.type.getUsedConstants ++
-      ((declaration.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[]
-    for dependency in constants do
-      if dependency == ``sorryAx || dependency == ``LeanerIR.RuntimeFrame ||
-          (`LeanerIR.Proofs.Denotation).isPrefixOf dependency ||
-          (`LeanerIR.Proofs.ComputationAgreement).isPrefixOf dependency ||
-          (`LeanerIR.Proofs.NativeBoundary).isPrefixOf dependency then
-        throwError m!"artifact `{name}` retains forbidden dependency `{dependency}`"
-      if base.isPrefixOf dependency || artifacts.isPrefixOf dependency then
-        pending := pending.push dependency
 
 /-! ## Commands -/
 
