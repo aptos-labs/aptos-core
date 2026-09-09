@@ -1,0 +1,1693 @@
+{
+  "schema": "move-xast-module",
+  "version": 4,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "vectors",
+  "doc": "",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [],
+  "functions": [
+    {
+      "name": "bytes",
+      "doc": "",
+      "loc": 2,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [],
+      "result": 1,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 1,
+        "loc": 1,
+        "kind": "value",
+        "value": {
+          "vector": [
+            {
+              "number": "77"
+            },
+            {
+              "number": "111"
+            },
+            {
+              "number": "118"
+            },
+            {
+              "number": "101"
+            }
+          ]
+        },
+        "constant": null
+      }
+    },
+    {
+      "name": "contains_value",
+      "doc": "",
+      "loc": 14,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [],
+      "result": 6,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 6,
+        "loc": 13,
+        "kind": "block",
+        "pattern": {
+          "ty": 3,
+          "loc": 3,
+          "kind": "var",
+          "name": "v"
+        },
+        "binding": {
+          "ty": 3,
+          "loc": 7,
+          "kind": "call",
+          "op": "vector",
+          "inst": [
+            2
+          ],
+          "args": [
+            {
+              "ty": 2,
+              "loc": 4,
+              "kind": "value",
+              "value": {
+                "number": "1"
+              },
+              "constant": null
+            },
+            {
+              "ty": 2,
+              "loc": 5,
+              "kind": "value",
+              "value": {
+                "number": "2"
+              },
+              "constant": null
+            },
+            {
+              "ty": 2,
+              "loc": 6,
+              "kind": "value",
+              "value": {
+                "number": "3"
+              },
+              "constant": null
+            }
+          ],
+          "surface": null
+        },
+        "body": {
+          "ty": 6,
+          "loc": 12,
+          "kind": "call",
+          "op": {
+            "move_function": 0
+          },
+          "inst": [
+            2
+          ],
+          "args": [
+            {
+              "ty": 4,
+              "loc": 9,
+              "kind": "call",
+              "op": {
+                "borrow": "immutable"
+              },
+              "inst": [],
+              "args": [
+                {
+                  "ty": 3,
+                  "loc": 8,
+                  "kind": "local",
+                  "name": "v"
+                }
+              ],
+              "surface": null
+            },
+            {
+              "ty": 5,
+              "loc": 11,
+              "kind": "call",
+              "op": {
+                "borrow": "immutable"
+              },
+              "inst": [],
+              "args": [
+                {
+                  "ty": 2,
+                  "loc": 10,
+                  "kind": "value",
+                  "value": {
+                    "number": "2"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        }
+      }
+    },
+    {
+      "name": "push_pop",
+      "doc": "",
+      "loc": 35,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [],
+      "result": 2,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 2,
+        "loc": 34,
+        "kind": "block",
+        "pattern": {
+          "ty": 3,
+          "loc": 15,
+          "kind": "var",
+          "name": "v"
+        },
+        "binding": {
+          "ty": 3,
+          "loc": 16,
+          "kind": "call",
+          "op": {
+            "move_function": 1
+          },
+          "inst": [
+            2
+          ],
+          "args": [],
+          "surface": null
+        },
+        "body": {
+          "ty": 2,
+          "loc": 34,
+          "kind": "sequence",
+          "exps": [
+            {
+              "ty": 8,
+              "loc": 20,
+              "kind": "call",
+              "op": {
+                "move_function": 2
+              },
+              "inst": [
+                2
+              ],
+              "args": [
+                {
+                  "ty": 7,
+                  "loc": 18,
+                  "kind": "call",
+                  "op": {
+                    "borrow": "mutable"
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 17,
+                      "kind": "local",
+                      "name": "v"
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 19,
+                  "kind": "value",
+                  "value": {
+                    "number": "1"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            },
+            {
+              "ty": 8,
+              "loc": 24,
+              "kind": "call",
+              "op": {
+                "move_function": 2
+              },
+              "inst": [
+                2
+              ],
+              "args": [
+                {
+                  "ty": 7,
+                  "loc": 22,
+                  "kind": "call",
+                  "op": {
+                    "borrow": "mutable"
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 21,
+                      "kind": "local",
+                      "name": "v"
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 23,
+                  "kind": "value",
+                  "value": {
+                    "number": "2"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            },
+            {
+              "ty": 2,
+              "loc": 34,
+              "kind": "block",
+              "pattern": {
+                "ty": 2,
+                "loc": 25,
+                "kind": "var",
+                "name": "x"
+              },
+              "binding": {
+                "ty": 2,
+                "loc": 28,
+                "kind": "call",
+                "op": {
+                  "move_function": 3
+                },
+                "inst": [
+                  2
+                ],
+                "args": [
+                  {
+                    "ty": 7,
+                    "loc": 27,
+                    "kind": "call",
+                    "op": {
+                      "borrow": "mutable"
+                    },
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 3,
+                        "loc": 26,
+                        "kind": "local",
+                        "name": "v"
+                      }
+                    ],
+                    "surface": null
+                  }
+                ],
+                "surface": null
+              },
+              "body": {
+                "ty": 2,
+                "loc": 33,
+                "kind": "call",
+                "op": "add",
+                "inst": [
+                  2
+                ],
+                "args": [
+                  {
+                    "ty": 2,
+                    "loc": 29,
+                    "kind": "local",
+                    "name": "x"
+                  },
+                  {
+                    "ty": 2,
+                    "loc": 32,
+                    "kind": "call",
+                    "op": {
+                      "move_function": 4
+                    },
+                    "inst": [
+                      2
+                    ],
+                    "args": [
+                      {
+                        "ty": 4,
+                        "loc": 31,
+                        "kind": "call",
+                        "op": {
+                          "borrow": "immutable"
+                        },
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 3,
+                            "loc": 30,
+                            "kind": "local",
+                            "name": "v"
+                          }
+                        ],
+                        "surface": null
+                      }
+                    ],
+                    "surface": null
+                  }
+                ],
+                "surface": null
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "set_middle",
+      "doc": "",
+      "loc": 55,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [],
+      "result": 2,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 2,
+        "loc": 54,
+        "kind": "block",
+        "pattern": {
+          "ty": 3,
+          "loc": 36,
+          "kind": "var",
+          "name": "values"
+        },
+        "binding": {
+          "ty": 3,
+          "loc": 40,
+          "kind": "call",
+          "op": "vector",
+          "inst": [
+            2
+          ],
+          "args": [
+            {
+              "ty": 2,
+              "loc": 37,
+              "kind": "value",
+              "value": {
+                "number": "10"
+              },
+              "constant": null
+            },
+            {
+              "ty": 2,
+              "loc": 38,
+              "kind": "value",
+              "value": {
+                "number": "20"
+              },
+              "constant": null
+            },
+            {
+              "ty": 2,
+              "loc": 39,
+              "kind": "value",
+              "value": {
+                "number": "30"
+              },
+              "constant": null
+            }
+          ],
+          "surface": null
+        },
+        "body": {
+          "ty": 2,
+          "loc": 54,
+          "kind": "block",
+          "pattern": {
+            "ty": 9,
+            "loc": 41,
+            "kind": "var",
+            "name": "middle"
+          },
+          "binding": {
+            "ty": 9,
+            "loc": 45,
+            "kind": "call",
+            "op": {
+              "move_function": 5
+            },
+            "inst": [
+              2
+            ],
+            "args": [
+              {
+                "ty": 7,
+                "loc": 43,
+                "kind": "call",
+                "op": {
+                  "borrow": "mutable"
+                },
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 3,
+                    "loc": 42,
+                    "kind": "local",
+                    "name": "values"
+                  }
+                ],
+                "surface": null
+              },
+              {
+                "ty": 2,
+                "loc": 44,
+                "kind": "value",
+                "value": {
+                  "number": "1"
+                },
+                "constant": null
+              }
+            ],
+            "surface": null
+          },
+          "body": {
+            "ty": 2,
+            "loc": 54,
+            "kind": "sequence",
+            "exps": [
+              {
+                "ty": 8,
+                "loc": 48,
+                "kind": "mutate",
+                "target": {
+                  "ty": 9,
+                  "loc": 46,
+                  "kind": "local",
+                  "name": "middle"
+                },
+                "value": {
+                  "ty": 2,
+                  "loc": 47,
+                  "kind": "value",
+                  "value": {
+                    "number": "42"
+                  },
+                  "constant": null
+                }
+              },
+              {
+                "ty": 2,
+                "loc": 53,
+                "kind": "call",
+                "op": "deref",
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 5,
+                    "loc": 52,
+                    "kind": "call",
+                    "op": {
+                      "move_function": 6
+                    },
+                    "inst": [
+                      2
+                    ],
+                    "args": [
+                      {
+                        "ty": 4,
+                        "loc": 50,
+                        "kind": "call",
+                        "op": {
+                          "borrow": "immutable"
+                        },
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 3,
+                            "loc": 49,
+                            "kind": "local",
+                            "name": "values"
+                          }
+                        ],
+                        "surface": null
+                      },
+                      {
+                        "ty": 2,
+                        "loc": 51,
+                        "kind": "value",
+                        "value": {
+                          "number": "1"
+                        },
+                        "constant": null
+                      }
+                    ],
+                    "surface": null
+                  }
+                ],
+                "surface": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "sum",
+      "doc": "",
+      "loc": 82,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "v",
+          "ty": 4
+        }
+      ],
+      "result": 2,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 2,
+        "loc": 81,
+        "kind": "block",
+        "pattern": {
+          "ty": 2,
+          "loc": 56,
+          "kind": "var",
+          "name": "total"
+        },
+        "binding": {
+          "ty": 2,
+          "loc": 57,
+          "kind": "value",
+          "value": {
+            "number": "0"
+          },
+          "constant": null
+        },
+        "body": {
+          "ty": 2,
+          "loc": 81,
+          "kind": "block",
+          "pattern": {
+            "ty": 2,
+            "loc": 58,
+            "kind": "var",
+            "name": "i"
+          },
+          "binding": {
+            "ty": 2,
+            "loc": 59,
+            "kind": "value",
+            "value": {
+              "number": "0"
+            },
+            "constant": null
+          },
+          "body": {
+            "ty": 2,
+            "loc": 81,
+            "kind": "sequence",
+            "exps": [
+              {
+                "ty": 8,
+                "loc": 79,
+                "kind": "loop",
+                "body": {
+                  "ty": 8,
+                  "loc": 79,
+                  "kind": "if",
+                  "cond": {
+                    "ty": 6,
+                    "loc": 63,
+                    "kind": "call",
+                    "op": "lt",
+                    "inst": [
+                      2
+                    ],
+                    "args": [
+                      {
+                        "ty": 2,
+                        "loc": 60,
+                        "kind": "local",
+                        "name": "i"
+                      },
+                      {
+                        "ty": 2,
+                        "loc": 62,
+                        "kind": "call",
+                        "op": {
+                          "move_function": 4
+                        },
+                        "inst": [
+                          2
+                        ],
+                        "args": [
+                          {
+                            "ty": 4,
+                            "loc": 61,
+                            "kind": "param",
+                            "index": 0
+                          }
+                        ],
+                        "surface": null
+                      }
+                    ],
+                    "surface": null
+                  },
+                  "then_branch": {
+                    "ty": 8,
+                    "loc": 78,
+                    "kind": "sequence",
+                    "exps": [
+                      {
+                        "ty": 8,
+                        "loc": 71,
+                        "kind": "assign",
+                        "pattern": {
+                          "ty": 2,
+                          "loc": 64,
+                          "kind": "var",
+                          "name": "total"
+                        },
+                        "value": {
+                          "ty": 2,
+                          "loc": 70,
+                          "kind": "call",
+                          "op": "add",
+                          "inst": [
+                            2
+                          ],
+                          "args": [
+                            {
+                              "ty": 2,
+                              "loc": 65,
+                              "kind": "local",
+                              "name": "total"
+                            },
+                            {
+                              "ty": 2,
+                              "loc": 69,
+                              "kind": "call",
+                              "op": "deref",
+                              "inst": [],
+                              "args": [
+                                {
+                                  "ty": 5,
+                                  "loc": 68,
+                                  "kind": "call",
+                                  "op": {
+                                    "move_function": 6
+                                  },
+                                  "inst": [
+                                    2
+                                  ],
+                                  "args": [
+                                    {
+                                      "ty": 4,
+                                      "loc": 66,
+                                      "kind": "param",
+                                      "index": 0
+                                    },
+                                    {
+                                      "ty": 2,
+                                      "loc": 67,
+                                      "kind": "local",
+                                      "name": "i"
+                                    }
+                                  ],
+                                  "surface": null
+                                }
+                              ],
+                              "surface": null
+                            }
+                          ],
+                          "surface": null
+                        }
+                      },
+                      {
+                        "ty": 8,
+                        "loc": 76,
+                        "kind": "assign",
+                        "pattern": {
+                          "ty": 2,
+                          "loc": 72,
+                          "kind": "var",
+                          "name": "i"
+                        },
+                        "value": {
+                          "ty": 2,
+                          "loc": 75,
+                          "kind": "call",
+                          "op": "add",
+                          "inst": [
+                            2
+                          ],
+                          "args": [
+                            {
+                              "ty": 2,
+                              "loc": 73,
+                              "kind": "local",
+                              "name": "i"
+                            },
+                            {
+                              "ty": 2,
+                              "loc": 74,
+                              "kind": "value",
+                              "value": {
+                                "number": "1"
+                              },
+                              "constant": null
+                            }
+                          ],
+                          "surface": null
+                        }
+                      },
+                      {
+                        "ty": 8,
+                        "loc": 77,
+                        "kind": "call",
+                        "op": "tuple",
+                        "inst": [],
+                        "args": [],
+                        "surface": null
+                      }
+                    ]
+                  },
+                  "else_branch": {
+                    "ty": 8,
+                    "loc": 79,
+                    "kind": "loop_cont",
+                    "nest": 0,
+                    "is_continue": false
+                  }
+                }
+              },
+              {
+                "ty": 2,
+                "loc": 80,
+                "kind": "local",
+                "name": "total"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "swap_values",
+      "doc": "",
+      "loc": 99,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [],
+      "result": 2,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 2,
+        "loc": 98,
+        "kind": "block",
+        "pattern": {
+          "ty": 3,
+          "loc": 83,
+          "kind": "var",
+          "name": "v"
+        },
+        "binding": {
+          "ty": 3,
+          "loc": 87,
+          "kind": "call",
+          "op": "vector",
+          "inst": [
+            2
+          ],
+          "args": [
+            {
+              "ty": 2,
+              "loc": 84,
+              "kind": "value",
+              "value": {
+                "number": "1"
+              },
+              "constant": null
+            },
+            {
+              "ty": 2,
+              "loc": 85,
+              "kind": "value",
+              "value": {
+                "number": "2"
+              },
+              "constant": null
+            },
+            {
+              "ty": 2,
+              "loc": 86,
+              "kind": "value",
+              "value": {
+                "number": "3"
+              },
+              "constant": null
+            }
+          ],
+          "surface": null
+        },
+        "body": {
+          "ty": 2,
+          "loc": 98,
+          "kind": "sequence",
+          "exps": [
+            {
+              "ty": 8,
+              "loc": 92,
+              "kind": "call",
+              "op": {
+                "move_function": 7
+              },
+              "inst": [
+                2
+              ],
+              "args": [
+                {
+                  "ty": 7,
+                  "loc": 89,
+                  "kind": "call",
+                  "op": {
+                    "borrow": "mutable"
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 88,
+                      "kind": "local",
+                      "name": "v"
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 90,
+                  "kind": "value",
+                  "value": {
+                    "number": "0"
+                  },
+                  "constant": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 91,
+                  "kind": "value",
+                  "value": {
+                    "number": "2"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            },
+            {
+              "ty": 2,
+              "loc": 97,
+              "kind": "call",
+              "op": "deref",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 5,
+                  "loc": 96,
+                  "kind": "call",
+                  "op": {
+                    "move_function": 6
+                  },
+                  "inst": [
+                    2
+                  ],
+                  "args": [
+                    {
+                      "ty": 4,
+                      "loc": 94,
+                      "kind": "call",
+                      "op": {
+                        "borrow": "immutable"
+                      },
+                      "inst": [],
+                      "args": [
+                        {
+                          "ty": 3,
+                          "loc": 93,
+                          "kind": "local",
+                          "name": "v"
+                        }
+                      ],
+                      "surface": null
+                    },
+                    {
+                      "ty": 2,
+                      "loc": 95,
+                      "kind": "value",
+                      "value": {
+                        "number": "0"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "spec_funs": [
+    {
+      "name": "$bytes",
+      "doc": "",
+      "loc": 2,
+      "type_params": [],
+      "params": [],
+      "result": 1,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 1,
+        "loc": 1,
+        "kind": "value",
+        "value": {
+          "vector": [
+            {
+              "number": "77"
+            },
+            {
+              "number": "111"
+            },
+            {
+              "number": "118"
+            },
+            {
+              "number": "101"
+            }
+          ]
+        },
+        "constant": null
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    }
+  ],
+  "spec_vars": [],
+  "invariants": [],
+  "skipped": [],
+  "comments": [],
+  "sources": [
+    "vectors.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 0,
+      "end": 975
+    },
+    {
+      "file": 0,
+      "start": 960,
+      "end": 967
+    },
+    {
+      "file": 0,
+      "start": 926,
+      "end": 973
+    },
+    {
+      "file": 0,
+      "start": 310,
+      "end": 311
+    },
+    {
+      "file": 0,
+      "start": 321,
+      "end": 322
+    },
+    {
+      "file": 0,
+      "start": 324,
+      "end": 325
+    },
+    {
+      "file": 0,
+      "start": 327,
+      "end": 328
+    },
+    {
+      "file": 0,
+      "start": 314,
+      "end": 320
+    },
+    {
+      "file": 0,
+      "start": 357,
+      "end": 358
+    },
+    {
+      "file": 0,
+      "start": 356,
+      "end": 358
+    },
+    {
+      "file": 0,
+      "start": 361,
+      "end": 362
+    },
+    {
+      "file": 0,
+      "start": 360,
+      "end": 362
+    },
+    {
+      "file": 0,
+      "start": 339,
+      "end": 363
+    },
+    {
+      "file": 0,
+      "start": 296,
+      "end": 369
+    },
+    {
+      "file": 0,
+      "start": 269,
+      "end": 369
+    },
+    {
+      "file": 0,
+      "start": 83,
+      "end": 84
+    },
+    {
+      "file": 0,
+      "start": 87,
+      "end": 107
+    },
+    {
+      "file": 0,
+      "start": 140,
+      "end": 141
+    },
+    {
+      "file": 0,
+      "start": 135,
+      "end": 141
+    },
+    {
+      "file": 0,
+      "start": 143,
+      "end": 144
+    },
+    {
+      "file": 0,
+      "start": 117,
+      "end": 145
+    },
+    {
+      "file": 0,
+      "start": 178,
+      "end": 179
+    },
+    {
+      "file": 0,
+      "start": 173,
+      "end": 179
+    },
+    {
+      "file": 0,
+      "start": 181,
+      "end": 182
+    },
+    {
+      "file": 0,
+      "start": 155,
+      "end": 183
+    },
+    {
+      "file": 0,
+      "start": 197,
+      "end": 198
+    },
+    {
+      "file": 0,
+      "start": 223,
+      "end": 224
+    },
+    {
+      "file": 0,
+      "start": 218,
+      "end": 224
+    },
+    {
+      "file": 0,
+      "start": 201,
+      "end": 225
+    },
+    {
+      "file": 0,
+      "start": 235,
+      "end": 236
+    },
+    {
+      "file": 0,
+      "start": 255,
+      "end": 256
+    },
+    {
+      "file": 0,
+      "start": 254,
+      "end": 256
+    },
+    {
+      "file": 0,
+      "start": 239,
+      "end": 257
+    },
+    {
+      "file": 0,
+      "start": 235,
+      "end": 257
+    },
+    {
+      "file": 0,
+      "start": 69,
+      "end": 263
+    },
+    {
+      "file": 0,
+      "start": 49,
+      "end": 263
+    },
+    {
+      "file": 0,
+      "start": 547,
+      "end": 553
+    },
+    {
+      "file": 0,
+      "start": 563,
+      "end": 565
+    },
+    {
+      "file": 0,
+      "start": 567,
+      "end": 569
+    },
+    {
+      "file": 0,
+      "start": 571,
+      "end": 573
+    },
+    {
+      "file": 0,
+      "start": 556,
+      "end": 562
+    },
+    {
+      "file": 0,
+      "start": 588,
+      "end": 594
+    },
+    {
+      "file": 0,
+      "start": 621,
+      "end": 627
+    },
+    {
+      "file": 0,
+      "start": 616,
+      "end": 627
+    },
+    {
+      "file": 0,
+      "start": 629,
+      "end": 630
+    },
+    {
+      "file": 0,
+      "start": 597,
+      "end": 631
+    },
+    {
+      "file": 0,
+      "start": 642,
+      "end": 648
+    },
+    {
+      "file": 0,
+      "start": 651,
+      "end": 653
+    },
+    {
+      "file": 0,
+      "start": 641,
+      "end": 653
+    },
+    {
+      "file": 0,
+      "start": 680,
+      "end": 686
+    },
+    {
+      "file": 0,
+      "start": 679,
+      "end": 686
+    },
+    {
+      "file": 0,
+      "start": 688,
+      "end": 689
+    },
+    {
+      "file": 0,
+      "start": 664,
+      "end": 690
+    },
+    {
+      "file": 0,
+      "start": 663,
+      "end": 690
+    },
+    {
+      "file": 0,
+      "start": 533,
+      "end": 696
+    },
+    {
+      "file": 0,
+      "start": 511,
+      "end": 696
+    },
+    {
+      "file": 0,
+      "start": 746,
+      "end": 751
+    },
+    {
+      "file": 0,
+      "start": 754,
+      "end": 755
+    },
+    {
+      "file": 0,
+      "start": 769,
+      "end": 770
+    },
+    {
+      "file": 0,
+      "start": 773,
+      "end": 774
+    },
+    {
+      "file": 0,
+      "start": 791,
+      "end": 792
+    },
+    {
+      "file": 0,
+      "start": 810,
+      "end": 811
+    },
+    {
+      "file": 0,
+      "start": 795,
+      "end": 812
+    },
+    {
+      "file": 0,
+      "start": 791,
+      "end": 812
+    },
+    {
+      "file": 0,
+      "start": 828,
+      "end": 833
+    },
+    {
+      "file": 0,
+      "start": 836,
+      "end": 841
+    },
+    {
+      "file": 0,
+      "start": 860,
+      "end": 861
+    },
+    {
+      "file": 0,
+      "start": 863,
+      "end": 864
+    },
+    {
+      "file": 0,
+      "start": 845,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 844,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 836,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 828,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 879,
+      "end": 880
+    },
+    {
+      "file": 0,
+      "start": 883,
+      "end": 884
+    },
+    {
+      "file": 0,
+      "start": 887,
+      "end": 888
+    },
+    {
+      "file": 0,
+      "start": 883,
+      "end": 888
+    },
+    {
+      "file": 0,
+      "start": 879,
+      "end": 888
+    },
+    {
+      "file": 0,
+      "start": 888,
+      "end": 889
+    },
+    {
+      "file": 0,
+      "start": 814,
+      "end": 899
+    },
+    {
+      "file": 0,
+      "start": 784,
+      "end": 899
+    },
+    {
+      "file": 0,
+      "start": 909,
+      "end": 914
+    },
+    {
+      "file": 0,
+      "start": 732,
+      "end": 920
+    },
+    {
+      "file": 0,
+      "start": 702,
+      "end": 920
+    },
+    {
+      "file": 0,
+      "start": 412,
+      "end": 413
+    },
+    {
+      "file": 0,
+      "start": 423,
+      "end": 424
+    },
+    {
+      "file": 0,
+      "start": 426,
+      "end": 427
+    },
+    {
+      "file": 0,
+      "start": 429,
+      "end": 430
+    },
+    {
+      "file": 0,
+      "start": 416,
+      "end": 422
+    },
+    {
+      "file": 0,
+      "start": 459,
+      "end": 460
+    },
+    {
+      "file": 0,
+      "start": 454,
+      "end": 460
+    },
+    {
+      "file": 0,
+      "start": 462,
+      "end": 463
+    },
+    {
+      "file": 0,
+      "start": 465,
+      "end": 466
+    },
+    {
+      "file": 0,
+      "start": 441,
+      "end": 467
+    },
+    {
+      "file": 0,
+      "start": 494,
+      "end": 495
+    },
+    {
+      "file": 0,
+      "start": 493,
+      "end": 495
+    },
+    {
+      "file": 0,
+      "start": 497,
+      "end": 498
+    },
+    {
+      "file": 0,
+      "start": 478,
+      "end": 499
+    },
+    {
+      "file": 0,
+      "start": 477,
+      "end": 499
+    },
+    {
+      "file": 0,
+      "start": 398,
+      "end": 505
+    },
+    {
+      "file": 0,
+      "start": 375,
+      "end": 505
+    }
+  ],
+  "types": [
+    "u8",
+    {
+      "vector": 0
+    },
+    "u64",
+    {
+      "vector": 2
+    },
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 3
+      }
+    },
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 2
+      }
+    },
+    "bool",
+    {
+      "reference": {
+        "mutable": true,
+        "ty": 3
+      }
+    },
+    {
+      "tuple": []
+    },
+    {
+      "reference": {
+        "mutable": true,
+        "ty": 2
+      }
+    }
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "vectors"
+    },
+    {
+      "address": "0x1",
+      "address_alias": "std",
+      "name": "vector"
+    }
+  ],
+  "names": [
+    {
+      "module": 1,
+      "name": "contains"
+    },
+    {
+      "module": 1,
+      "name": "empty"
+    },
+    {
+      "module": 1,
+      "name": "push_back"
+    },
+    {
+      "module": 1,
+      "name": "pop_back"
+    },
+    {
+      "module": 1,
+      "name": "length"
+    },
+    {
+      "module": 1,
+      "name": "borrow_mut"
+    },
+    {
+      "module": 1,
+      "name": "borrow"
+    },
+    {
+      "module": 1,
+      "name": "swap"
+    }
+  ]
+}

@@ -24,7 +24,7 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 // TODO(perf, cleanup): `Function` does not carry its signature, so this
 // re-derives the parameters from the module IR on every call -- which is also
 // the only reason callers need the `LoadedModule`.
-fn param_types(
+pub fn param_types(
     guard: &ExecutionGuard,
     loaded: &LoadedModule,
     function: InternedIdentifier,
@@ -41,6 +41,25 @@ fn param_types(
     Ok(view_type_list(guard.subst_type_list(params, ty_args)?).to_vec())
 }
 
+/// The return types of a loaded module's function, instantiated with
+/// `ty_args`.
+pub fn return_types(
+    guard: &ExecutionGuard,
+    loaded: &LoadedModule,
+    function: InternedIdentifier,
+    ty_args: InternedTypeList,
+) -> Result<Vec<InternedType>> {
+    let FunctionIrLookup::Ir(ir) = loaded.get_function_ir(function) else {
+        bail!("function has no IR in its loaded module");
+    };
+    let returns = loaded
+        .ir()
+        .module
+        .function_signature_at(ir.handle_idx)
+        .returns;
+    Ok(view_type_list(guard.subst_type_list(returns, ty_args)?).to_vec())
+}
+
 /// Fills the root frame of `func` from the signer and BCS-argument lists, in
 /// parameter order: `signer`/`&signer` parameters from the signer list,
 /// everything else deserialized from BCS.
@@ -51,7 +70,7 @@ fn param_types(
 // TODO(perf): don't mandate BCS-encoded arguments: a caller that already holds
 // the values (e.g. system function inputs) should be able to place them
 // directly, without the BCS round trip.
-pub(crate) fn place_args(
+pub fn place_args(
     interp: &mut InterpreterContext<'_>,
     func: &Function,
     params: &[InternedType],
@@ -153,7 +172,7 @@ pub(crate) fn place_args(
 /// Loads `module::function<ty_args>`, places arguments, and runs it in the
 /// transaction's interpreter context, metered against the context's gas
 /// budget.
-pub(crate) fn call_function(
+pub fn call_function(
     guard: &ExecutionGuard<'_>,
     interp: &mut InterpreterContext<'_>,
     address: &AccountAddress,

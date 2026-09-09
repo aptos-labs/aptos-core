@@ -64,6 +64,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use move_binary_format::file_format_common::{write_u64_as_uleb128, BinaryData};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
+use move_compiler_v2::Experiment;
 use move_core_types::{
     identifier::Identifier,
     int256::{I256, U256},
@@ -748,6 +749,15 @@ impl CliCommand<&'static str> for ProvePackage {
 /// `masm%`/`move%` elaborators): processes one masm file resp. one
 /// self-contained Move module and writes the JSON to `--out-file` (or
 /// stdout is not used to keep it free for the CLI result).
+/// The exchange format produced by [`ExchangePackage`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum ExchangeFormat {
+    /// Stackless bytecode CFGs with contracts (`*.exchange.json`).
+    Xir,
+    /// The typed AST with specifications (`*.xast.json`).
+    Ast,
+}
+
 #[derive(Parser)]
 #[clap(group(clap::ArgGroup::new("single_file")
     .multiple(false)
@@ -761,6 +771,17 @@ pub struct ExchangePackage {
     /// to `exchange-json` under the package path)
     #[clap(long, value_parser, conflicts_with = "single_file")]
     export_dir: Option<PathBuf>,
+
+    /// The exchange format to produce: `xir` (stackless bytecode with
+    /// contracts, the default) or `ast` (the typed AST with specifications,
+    /// for source-level consumers such as the Lean transpiler)
+    #[clap(long, value_enum, default_value_t = ExchangeFormat::Xir)]
+    format: ExchangeFormat,
+
+    /// In package mode, also export the dependency modules (with source),
+    /// so the export is closed under imports
+    #[clap(long, conflicts_with = "single_file")]
+    include_deps: bool,
 
     /// A single masm file to export (instead of a package)
     #[clap(long, value_parser)]
@@ -826,6 +847,8 @@ impl CliCommand<&'static str> for ExchangePackage {
         let ExchangePackage {
             move_options,
             export_dir,
+            format,
+            include_deps,
             masm_file,
             move_file,
             out_file,
@@ -841,15 +864,27 @@ impl CliCommand<&'static str> for ExchangePackage {
                     (None, Some(p)) => (p, true),
                     _ => unreachable!("clap enforces exclusivity"),
                 };
-                let module = if is_move {
-                    exchange::move_file_to_module(path)
-                } else {
-                    let input = std::fs::read_to_string(path)
-                        .map_err(|e| CliError::IO(path.display().to_string(), e))?;
-                    exchange::masm_to_module(&input)
+                let text = match (format, is_move) {
+                    (ExchangeFormat::Ast, true) => exchange::move_file_to_ast(path).map(|module| {
+                        serde_json::to_string(&module).expect("serialization succeeds")
+                    }),
+                    (ExchangeFormat::Ast, false) => Err(anyhow::anyhow!(
+                        "the `ast` format exports Move source, not masm (use --move-file)"
+                    )),
+                    (ExchangeFormat::Xir, true) => {
+                        exchange::move_file_to_module(path).map(|module| {
+                            serde_json::to_string(&module).expect("serialization succeeds")
+                        })
+                    },
+                    (ExchangeFormat::Xir, false) => {
+                        let input = std::fs::read_to_string(path)
+                            .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                        exchange::masm_to_module(&input).map(|module| {
+                            serde_json::to_string(&module).expect("serialization succeeds")
+                        })
+                    },
                 }
                 .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
-                let text = serde_json::to_string(&module).expect("serialization succeeds");
                 std::fs::write(&out_file, text)
                     .map_err(|e| CliError::IO(out_file.display().to_string(), e))?;
                 Ok("Success")
@@ -866,6 +901,15 @@ impl CliCommand<&'static str> for ExchangePackage {
         task::spawn_blocking(move || {
             let package_path = move_options.get_package_path()?;
             let out_dir = export_dir.unwrap_or_else(|| package_path.join("exchange-json"));
+            // The XIR export needs the full pipeline (it lifts bytecode to
+            // stackless form); the AST export stops after the checker and
+            // rewriters, before AST optimization, so the exported AST keeps
+            // its source shape.
+            let with_bytecode = format == ExchangeFormat::Xir;
+            // The specification rewriter resolves Move functions called in
+            // specifications to their derived spec-function companions; the
+            // full pipeline runs it anyway, the AST export needs it asked for.
+            let experiments = vec![format!("{}=on", Experiment::SPEC_REWRITE)];
             let model = build_model(
                 move_options.dev,
                 false, // test_mode
@@ -878,8 +922,8 @@ impl CliCommand<&'static str> for ExchangePackage {
                 language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names().clone(),
-                vec![],
-                true,  // with_bytecode
+                experiments,
+                with_bytecode,
                 false, // all_files_as_targets
             )
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
@@ -888,6 +932,10 @@ impl CliCommand<&'static str> for ExchangePackage {
                 .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
             std::fs::create_dir_all(&out_dir)
                 .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
+            let suffix = match format {
+                ExchangeFormat::Xir => ".exchange.json",
+                ExchangeFormat::Ast => ".xast.json",
+            };
             // Remove the artifacts of previous runs, so that renamed or
             // removed modules do not leave stale exports behind.
             for entry in std::fs::read_dir(&out_dir)
@@ -896,21 +944,31 @@ impl CliCommand<&'static str> for ExchangePackage {
                 let path = entry
                     .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?
                     .path();
-                if path.to_string_lossy().ends_with(".exchange.json") {
+                if path.to_string_lossy().ends_with(suffix) {
                     std::fs::remove_file(&path)
                         .map_err(|e| CliError::IO(path.display().to_string(), e))?;
                 }
             }
             let mut exported = 0usize;
             for module in model.get_modules() {
-                if !module.is_target() {
+                // Dependencies are exported on request, and only when their
+                // source is available (a bytecode-only dependency has no AST).
+                let exported_dependency = include_deps && !module.get_source_path().is_empty();
+                if !module.is_target() && !exported_dependency {
                     continue;
                 }
                 let name = module.get_full_name_str().replace("::", "_");
-                match exchange::dump_module_from_model(&model, module.get_id()) {
-                    Ok(module) => {
-                        let path = out_dir.join(format!("{}.exchange.json", name));
-                        let text = module.to_pretty_json();
+                let dumped = match format {
+                    ExchangeFormat::Xir => {
+                        exchange::dump_module_from_model(&model, module.get_id())
+                            .map(|m| m.to_pretty_json())
+                    },
+                    ExchangeFormat::Ast => exchange::dump_ast_module(&model, module.get_id())
+                        .map(|m| m.to_pretty_json()),
+                };
+                match dumped {
+                    Ok(text) => {
+                        let path = out_dir.join(format!("{}{}", name, suffix));
                         let mut tmp = tempfile::NamedTempFile::new_in(&out_dir)
                             .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
                         tmp.write_all((text + "\n").as_bytes())

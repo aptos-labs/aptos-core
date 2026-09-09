@@ -1,0 +1,9 @@
+step 0: 0x43::aborting::abort_if_large(5)
+  mono:       returned 5
+  LIR:        returned 5
+  round trip: returned 5
+
+step 1: 0x43::aborting::abort_if_large(200)
+  mono:       aborted 42
+  LIR:        aborted 42
+  round trip: aborted 42

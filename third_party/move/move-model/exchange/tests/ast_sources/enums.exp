@@ -1,0 +1,1956 @@
+{
+  "schema": "move-xast-module",
+  "version": 4,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "enums",
+  "doc": "",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [
+    {
+      "name": "Action",
+      "doc": "",
+      "loc": 4,
+      "abilities": [
+        "copy",
+        "drop",
+        "store"
+      ],
+      "type_params": [],
+      "attributes": [],
+      "is_native": false,
+      "fields": [],
+      "variants": [
+        {
+          "name": "Idle",
+          "loc": 1,
+          "fields": []
+        },
+        {
+          "name": "Transfer",
+          "loc": 2,
+          "fields": [
+            {
+              "name": "amount",
+              "doc": "",
+              "ty": 0
+            }
+          ]
+        },
+        {
+          "name": "Split",
+          "loc": 3,
+          "fields": [
+            {
+              "name": "left",
+              "doc": "",
+              "ty": 0
+            },
+            {
+              "name": "right",
+              "doc": "",
+              "ty": 0
+            }
+          ]
+        }
+      ],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "classify",
+      "doc": "",
+      "loc": 18,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "action",
+          "ty": 1
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 17,
+        "kind": "match",
+        "scrutinee": {
+          "ty": 1,
+          "loc": 5,
+          "kind": "param",
+          "index": 0
+        },
+        "arms": [
+          {
+            "loc": 7,
+            "pattern": {
+              "ty": 1,
+              "loc": 6,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Idle",
+              "fields": []
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 8,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          },
+          {
+            "loc": 11,
+            "pattern": {
+              "ty": 1,
+              "loc": 10,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Transfer",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 9,
+                  "kind": "wildcard"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 12,
+              "kind": "value",
+              "value": {
+                "number": "1"
+              },
+              "constant": null
+            }
+          },
+          {
+            "loc": 15,
+            "pattern": {
+              "ty": 1,
+              "loc": 14,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Split",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 13,
+                  "kind": "wildcard"
+                },
+                {
+                  "ty": 0,
+                  "loc": 13,
+                  "kind": "wildcard"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 16,
+              "kind": "value",
+              "value": {
+                "number": "2"
+              },
+              "constant": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "guarded",
+      "doc": "",
+      "loc": 28,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "value",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 27,
+        "kind": "block",
+        "pattern": {
+          "ty": 0,
+          "loc": 19,
+          "kind": "var",
+          "name": "_$disc"
+        },
+        "binding": {
+          "ty": 0,
+          "loc": 19,
+          "kind": "param",
+          "index": 0
+        },
+        "body": {
+          "ty": 0,
+          "loc": 27,
+          "kind": "if",
+          "cond": {
+            "ty": 2,
+            "loc": 19,
+            "kind": "call",
+            "op": "eq",
+            "inst": [],
+            "args": [
+              {
+                "ty": 0,
+                "loc": 19,
+                "kind": "local",
+                "name": "_$disc"
+              },
+              {
+                "ty": 0,
+                "loc": 19,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              }
+            ],
+            "surface": null
+          },
+          "then_branch": {
+            "ty": 0,
+            "loc": 20,
+            "kind": "value",
+            "value": {
+              "number": "10"
+            },
+            "constant": null
+          },
+          "else_branch": {
+            "ty": 0,
+            "loc": 27,
+            "kind": "if",
+            "cond": {
+              "ty": 2,
+              "loc": 19,
+              "kind": "call",
+              "op": "and",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 2,
+                  "loc": 19,
+                  "kind": "call",
+                  "op": "and",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 2,
+                      "loc": 19,
+                      "kind": "call",
+                      "op": "ge",
+                      "inst": [],
+                      "args": [
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "local",
+                          "name": "_$disc"
+                        },
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "value",
+                          "value": {
+                            "number": "1"
+                          },
+                          "constant": null
+                        }
+                      ],
+                      "surface": null
+                    },
+                    {
+                      "ty": 2,
+                      "loc": 19,
+                      "kind": "call",
+                      "op": "lt",
+                      "inst": [],
+                      "args": [
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "local",
+                          "name": "_$disc"
+                        },
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "value",
+                          "value": {
+                            "number": "4"
+                          },
+                          "constant": null
+                        }
+                      ],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 23,
+                  "kind": "call",
+                  "op": "neq",
+                  "inst": [
+                    0
+                  ],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 21,
+                      "kind": "param",
+                      "index": 0
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 22,
+                      "kind": "value",
+                      "value": {
+                        "number": "2"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "then_branch": {
+              "ty": 0,
+              "loc": 24,
+              "kind": "value",
+              "value": {
+                "number": "20"
+              },
+              "constant": null
+            },
+            "else_branch": {
+              "ty": 0,
+              "loc": 27,
+              "kind": "if",
+              "cond": {
+                "ty": 2,
+                "loc": 19,
+                "kind": "call",
+                "op": "and",
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 2,
+                    "loc": 19,
+                    "kind": "call",
+                    "op": "ge",
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "local",
+                        "name": "_$disc"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "value",
+                        "value": {
+                          "number": "4"
+                        },
+                        "constant": null
+                      }
+                    ],
+                    "surface": null
+                  },
+                  {
+                    "ty": 2,
+                    "loc": 19,
+                    "kind": "call",
+                    "op": "le",
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "local",
+                        "name": "_$disc"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "value",
+                        "value": {
+                          "number": "6"
+                        },
+                        "constant": null
+                      }
+                    ],
+                    "surface": null
+                  }
+                ],
+                "surface": null
+              },
+              "then_branch": {
+                "ty": 0,
+                "loc": 25,
+                "kind": "value",
+                "value": {
+                  "number": "30"
+                },
+                "constant": null
+              },
+              "else_branch": {
+                "ty": 0,
+                "loc": 26,
+                "kind": "value",
+                "value": {
+                  "number": "40"
+                },
+                "constant": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "is_transfer",
+      "doc": "",
+      "loc": 31,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "action",
+          "ty": 1
+        }
+      ],
+      "result": 2,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 2,
+        "loc": 30,
+        "kind": "call",
+        "op": {
+          "test_variants": {
+            "name": 0,
+            "variants": [
+              "Transfer"
+            ]
+          }
+        },
+        "inst": [],
+        "args": [
+          {
+            "ty": 1,
+            "loc": 29,
+            "kind": "param",
+            "index": 0
+          }
+        ],
+        "surface": null
+      }
+    },
+    {
+      "name": "make",
+      "doc": "",
+      "loc": 37,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "flag",
+          "ty": 2
+        },
+        {
+          "name": "amount",
+          "ty": 0
+        }
+      ],
+      "result": 1,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 1,
+        "loc": 36,
+        "kind": "if",
+        "cond": {
+          "ty": 2,
+          "loc": 32,
+          "kind": "param",
+          "index": 0
+        },
+        "then_branch": {
+          "ty": 1,
+          "loc": 34,
+          "kind": "call",
+          "op": {
+            "pack": {
+              "name": 0,
+              "variant": "Transfer"
+            }
+          },
+          "inst": [],
+          "args": [
+            {
+              "ty": 0,
+              "loc": 33,
+              "kind": "param",
+              "index": 1
+            }
+          ],
+          "surface": null
+        },
+        "else_branch": {
+          "ty": 1,
+          "loc": 35,
+          "kind": "call",
+          "op": {
+            "pack": {
+              "name": 0,
+              "variant": "Idle"
+            }
+          },
+          "inst": [],
+          "args": [],
+          "surface": null
+        }
+      }
+    },
+    {
+      "name": "total",
+      "doc": "",
+      "loc": 74,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "action",
+          "ty": 1
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": 73,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "ensures",
+            "loc": 54,
+            "properties": [],
+            "exp": {
+              "ty": 2,
+              "loc": 72,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 55,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 3,
+                  "loc": 71,
+                  "kind": "match",
+                  "scrutinee": {
+                    "ty": 1,
+                    "loc": 56,
+                    "kind": "param",
+                    "index": 0
+                  },
+                  "arms": [
+                    {
+                      "loc": 58,
+                      "pattern": {
+                        "ty": 1,
+                        "loc": 57,
+                        "kind": "struct",
+                        "name": 0,
+                        "inst": [],
+                        "variant": "Idle",
+                        "fields": []
+                      },
+                      "guard": null,
+                      "body": {
+                        "ty": 3,
+                        "loc": 59,
+                        "kind": "value",
+                        "value": {
+                          "number": "0"
+                        },
+                        "constant": null
+                      }
+                    },
+                    {
+                      "loc": 62,
+                      "pattern": {
+                        "ty": 1,
+                        "loc": 61,
+                        "kind": "struct",
+                        "name": 0,
+                        "inst": [],
+                        "variant": "Transfer",
+                        "fields": [
+                          {
+                            "ty": 0,
+                            "loc": 60,
+                            "kind": "var",
+                            "name": "amount"
+                          }
+                        ]
+                      },
+                      "guard": null,
+                      "body": {
+                        "ty": 4,
+                        "loc": 63,
+                        "kind": "call",
+                        "op": "cast",
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 0,
+                            "loc": 63,
+                            "kind": "local",
+                            "name": "amount"
+                          }
+                        ],
+                        "surface": null
+                      }
+                    },
+                    {
+                      "loc": 67,
+                      "pattern": {
+                        "ty": 1,
+                        "loc": 66,
+                        "kind": "struct",
+                        "name": 0,
+                        "inst": [],
+                        "variant": "Split",
+                        "fields": [
+                          {
+                            "ty": 0,
+                            "loc": 64,
+                            "kind": "var",
+                            "name": "left"
+                          },
+                          {
+                            "ty": 0,
+                            "loc": 65,
+                            "kind": "var",
+                            "name": "right"
+                          }
+                        ]
+                      },
+                      "guard": null,
+                      "body": {
+                        "ty": 4,
+                        "loc": 70,
+                        "kind": "call",
+                        "op": "add",
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 0,
+                            "loc": 68,
+                            "kind": "local",
+                            "name": "left"
+                          },
+                          {
+                            "ty": 0,
+                            "loc": 69,
+                            "kind": "local",
+                            "name": "right"
+                          }
+                        ],
+                        "surface": null
+                      }
+                    }
+                  ]
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 53,
+        "kind": "match",
+        "scrutinee": {
+          "ty": 1,
+          "loc": 38,
+          "kind": "param",
+          "index": 0
+        },
+        "arms": [
+          {
+            "loc": 40,
+            "pattern": {
+              "ty": 1,
+              "loc": 39,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Idle",
+              "fields": []
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 41,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          },
+          {
+            "loc": 44,
+            "pattern": {
+              "ty": 1,
+              "loc": 43,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Transfer",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 42,
+                  "kind": "var",
+                  "name": "amount"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 45,
+              "kind": "local",
+              "name": "amount"
+            }
+          },
+          {
+            "loc": 49,
+            "pattern": {
+              "ty": 1,
+              "loc": 48,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Split",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 46,
+                  "kind": "var",
+                  "name": "left"
+                },
+                {
+                  "ty": 0,
+                  "loc": 47,
+                  "kind": "var",
+                  "name": "right"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 52,
+              "kind": "call",
+              "op": "add",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 50,
+                  "kind": "local",
+                  "name": "left"
+                },
+                {
+                  "ty": 0,
+                  "loc": 51,
+                  "kind": "local",
+                  "name": "right"
+                }
+              ],
+              "surface": null
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "spec_funs": [
+    {
+      "name": "$classify",
+      "doc": "",
+      "loc": 18,
+      "type_params": [],
+      "params": [
+        {
+          "name": "action",
+          "ty": 1
+        }
+      ],
+      "result": 0,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 0,
+        "loc": 17,
+        "kind": "match",
+        "scrutinee": {
+          "ty": 1,
+          "loc": 5,
+          "kind": "local",
+          "name": "action"
+        },
+        "arms": [
+          {
+            "loc": 7,
+            "pattern": {
+              "ty": 1,
+              "loc": 6,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Idle",
+              "fields": []
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 8,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          },
+          {
+            "loc": 11,
+            "pattern": {
+              "ty": 1,
+              "loc": 10,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Transfer",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 9,
+                  "kind": "wildcard"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 12,
+              "kind": "value",
+              "value": {
+                "number": "1"
+              },
+              "constant": null
+            }
+          },
+          {
+            "loc": 15,
+            "pattern": {
+              "ty": 1,
+              "loc": 14,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Split",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 13,
+                  "kind": "wildcard"
+                },
+                {
+                  "ty": 0,
+                  "loc": 13,
+                  "kind": "wildcard"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 16,
+              "kind": "value",
+              "value": {
+                "number": "2"
+              },
+              "constant": null
+            }
+          }
+        ]
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "$guarded",
+      "doc": "",
+      "loc": 28,
+      "type_params": [],
+      "params": [
+        {
+          "name": "value",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 0,
+        "loc": 27,
+        "kind": "block",
+        "pattern": {
+          "ty": 0,
+          "loc": 19,
+          "kind": "var",
+          "name": "_$disc"
+        },
+        "binding": {
+          "ty": 0,
+          "loc": 19,
+          "kind": "local",
+          "name": "value"
+        },
+        "body": {
+          "ty": 0,
+          "loc": 27,
+          "kind": "if",
+          "cond": {
+            "ty": 2,
+            "loc": 19,
+            "kind": "call",
+            "op": "eq",
+            "inst": [],
+            "args": [
+              {
+                "ty": 0,
+                "loc": 19,
+                "kind": "local",
+                "name": "_$disc"
+              },
+              {
+                "ty": 0,
+                "loc": 19,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              }
+            ],
+            "surface": null
+          },
+          "then_branch": {
+            "ty": 0,
+            "loc": 20,
+            "kind": "value",
+            "value": {
+              "number": "10"
+            },
+            "constant": null
+          },
+          "else_branch": {
+            "ty": 0,
+            "loc": 27,
+            "kind": "if",
+            "cond": {
+              "ty": 2,
+              "loc": 19,
+              "kind": "call",
+              "op": "and",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 2,
+                  "loc": 19,
+                  "kind": "call",
+                  "op": "and",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 2,
+                      "loc": 19,
+                      "kind": "call",
+                      "op": "ge",
+                      "inst": [],
+                      "args": [
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "local",
+                          "name": "_$disc"
+                        },
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "value",
+                          "value": {
+                            "number": "1"
+                          },
+                          "constant": null
+                        }
+                      ],
+                      "surface": null
+                    },
+                    {
+                      "ty": 2,
+                      "loc": 19,
+                      "kind": "call",
+                      "op": "lt",
+                      "inst": [],
+                      "args": [
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "local",
+                          "name": "_$disc"
+                        },
+                        {
+                          "ty": 0,
+                          "loc": 19,
+                          "kind": "value",
+                          "value": {
+                            "number": "4"
+                          },
+                          "constant": null
+                        }
+                      ],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 23,
+                  "kind": "call",
+                  "op": "neq",
+                  "inst": [
+                    0
+                  ],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 21,
+                      "kind": "local",
+                      "name": "value"
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 22,
+                      "kind": "value",
+                      "value": {
+                        "number": "2"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "then_branch": {
+              "ty": 0,
+              "loc": 24,
+              "kind": "value",
+              "value": {
+                "number": "20"
+              },
+              "constant": null
+            },
+            "else_branch": {
+              "ty": 0,
+              "loc": 27,
+              "kind": "if",
+              "cond": {
+                "ty": 2,
+                "loc": 19,
+                "kind": "call",
+                "op": "and",
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 2,
+                    "loc": 19,
+                    "kind": "call",
+                    "op": "ge",
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "local",
+                        "name": "_$disc"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "value",
+                        "value": {
+                          "number": "4"
+                        },
+                        "constant": null
+                      }
+                    ],
+                    "surface": null
+                  },
+                  {
+                    "ty": 2,
+                    "loc": 19,
+                    "kind": "call",
+                    "op": "le",
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "local",
+                        "name": "_$disc"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 19,
+                        "kind": "value",
+                        "value": {
+                          "number": "6"
+                        },
+                        "constant": null
+                      }
+                    ],
+                    "surface": null
+                  }
+                ],
+                "surface": null
+              },
+              "then_branch": {
+                "ty": 0,
+                "loc": 25,
+                "kind": "value",
+                "value": {
+                  "number": "30"
+                },
+                "constant": null
+              },
+              "else_branch": {
+                "ty": 0,
+                "loc": 26,
+                "kind": "value",
+                "value": {
+                  "number": "40"
+                },
+                "constant": null
+              }
+            }
+          }
+        }
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "$is_transfer",
+      "doc": "",
+      "loc": 31,
+      "type_params": [],
+      "params": [
+        {
+          "name": "action",
+          "ty": 1
+        }
+      ],
+      "result": 2,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 2,
+        "loc": 30,
+        "kind": "call",
+        "op": {
+          "test_variants": {
+            "name": 0,
+            "variants": [
+              "Transfer"
+            ]
+          }
+        },
+        "inst": [],
+        "args": [
+          {
+            "ty": 1,
+            "loc": 29,
+            "kind": "local",
+            "name": "action"
+          }
+        ],
+        "surface": null
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "$make",
+      "doc": "",
+      "loc": 37,
+      "type_params": [],
+      "params": [
+        {
+          "name": "flag",
+          "ty": 2
+        },
+        {
+          "name": "amount",
+          "ty": 0
+        }
+      ],
+      "result": 1,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 1,
+        "loc": 36,
+        "kind": "if",
+        "cond": {
+          "ty": 2,
+          "loc": 32,
+          "kind": "local",
+          "name": "flag"
+        },
+        "then_branch": {
+          "ty": 1,
+          "loc": 34,
+          "kind": "call",
+          "op": {
+            "pack": {
+              "name": 0,
+              "variant": "Transfer"
+            }
+          },
+          "inst": [],
+          "args": [
+            {
+              "ty": 0,
+              "loc": 33,
+              "kind": "local",
+              "name": "amount"
+            }
+          ],
+          "surface": null
+        },
+        "else_branch": {
+          "ty": 1,
+          "loc": 35,
+          "kind": "call",
+          "op": {
+            "pack": {
+              "name": 0,
+              "variant": "Idle"
+            }
+          },
+          "inst": [],
+          "args": [],
+          "surface": null
+        }
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "$total",
+      "doc": "",
+      "loc": 74,
+      "type_params": [],
+      "params": [
+        {
+          "name": "action",
+          "ty": 1
+        }
+      ],
+      "result": 0,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 0,
+        "loc": 53,
+        "kind": "match",
+        "scrutinee": {
+          "ty": 1,
+          "loc": 38,
+          "kind": "local",
+          "name": "action"
+        },
+        "arms": [
+          {
+            "loc": 40,
+            "pattern": {
+              "ty": 1,
+              "loc": 39,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Idle",
+              "fields": []
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 41,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          },
+          {
+            "loc": 44,
+            "pattern": {
+              "ty": 1,
+              "loc": 43,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Transfer",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 42,
+                  "kind": "var",
+                  "name": "amount"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 45,
+              "kind": "local",
+              "name": "amount"
+            }
+          },
+          {
+            "loc": 49,
+            "pattern": {
+              "ty": 1,
+              "loc": 48,
+              "kind": "struct",
+              "name": 0,
+              "inst": [],
+              "variant": "Split",
+              "fields": [
+                {
+                  "ty": 0,
+                  "loc": 46,
+                  "kind": "var",
+                  "name": "left"
+                },
+                {
+                  "ty": 0,
+                  "loc": 47,
+                  "kind": "var",
+                  "name": "right"
+                }
+              ]
+            },
+            "guard": null,
+            "body": {
+              "ty": 0,
+              "loc": 52,
+              "kind": "call",
+              "op": "add",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 50,
+                  "kind": "local",
+                  "name": "left"
+                },
+                {
+                  "ty": 0,
+                  "loc": 51,
+                  "kind": "local",
+                  "name": "right"
+                }
+              ],
+              "surface": null
+            }
+          }
+        ]
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    }
+  ],
+  "spec_vars": [],
+  "invariants": [],
+  "skipped": [],
+  "comments": [],
+  "sources": [
+    "enums.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 0,
+      "end": 1175
+    },
+    {
+      "file": 0,
+      "start": 69,
+      "end": 73
+    },
+    {
+      "file": 0,
+      "start": 83,
+      "end": 107
+    },
+    {
+      "file": 0,
+      "start": 117,
+      "end": 148
+    },
+    {
+      "file": 0,
+      "start": 25,
+      "end": 155
+    },
+    {
+      "file": 0,
+      "start": 650,
+      "end": 656
+    },
+    {
+      "file": 0,
+      "start": 672,
+      "end": 684
+    },
+    {
+      "file": 0,
+      "start": 672,
+      "end": 690
+    },
+    {
+      "file": 0,
+      "start": 688,
+      "end": 689
+    },
+    {
+      "file": 0,
+      "start": 722,
+      "end": 724
+    },
+    {
+      "file": 0,
+      "start": 703,
+      "end": 726
+    },
+    {
+      "file": 0,
+      "start": 703,
+      "end": 732
+    },
+    {
+      "file": 0,
+      "start": 730,
+      "end": 731
+    },
+    {
+      "file": 0,
+      "start": 761,
+      "end": 763
+    },
+    {
+      "file": 0,
+      "start": 745,
+      "end": 765
+    },
+    {
+      "file": 0,
+      "start": 745,
+      "end": 771
+    },
+    {
+      "file": 0,
+      "start": 769,
+      "end": 770
+    },
+    {
+      "file": 0,
+      "start": 643,
+      "end": 781
+    },
+    {
+      "file": 0,
+      "start": 599,
+      "end": 787
+    },
+    {
+      "file": 0,
+      "start": 925,
+      "end": 930
+    },
+    {
+      "file": 0,
+      "start": 951,
+      "end": 953
+    },
+    {
+      "file": 0,
+      "start": 975,
+      "end": 980
+    },
+    {
+      "file": 0,
+      "start": 984,
+      "end": 985
+    },
+    {
+      "file": 0,
+      "start": 975,
+      "end": 985
+    },
+    {
+      "file": 0,
+      "start": 989,
+      "end": 991
+    },
+    {
+      "file": 0,
+      "start": 1014,
+      "end": 1016
+    },
+    {
+      "file": 0,
+      "start": 1035,
+      "end": 1037
+    },
+    {
+      "file": 0,
+      "start": 925,
+      "end": 1037
+    },
+    {
+      "file": 0,
+      "start": 879,
+      "end": 1054
+    },
+    {
+      "file": 0,
+      "start": 841,
+      "end": 847
+    },
+    {
+      "file": 0,
+      "start": 841,
+      "end": 867
+    },
+    {
+      "file": 0,
+      "start": 793,
+      "end": 873
+    },
+    {
+      "file": 0,
+      "start": 1116,
+      "end": 1120
+    },
+    {
+      "file": 0,
+      "start": 1141,
+      "end": 1147
+    },
+    {
+      "file": 0,
+      "start": 1122,
+      "end": 1149
+    },
+    {
+      "file": 0,
+      "start": 1155,
+      "end": 1167
+    },
+    {
+      "file": 0,
+      "start": 1112,
+      "end": 1167
+    },
+    {
+      "file": 0,
+      "start": 1060,
+      "end": 1173
+    },
+    {
+      "file": 0,
+      "start": 209,
+      "end": 215
+    },
+    {
+      "file": 0,
+      "start": 231,
+      "end": 243
+    },
+    {
+      "file": 0,
+      "start": 231,
+      "end": 249
+    },
+    {
+      "file": 0,
+      "start": 247,
+      "end": 248
+    },
+    {
+      "file": 0,
+      "start": 281,
+      "end": 287
+    },
+    {
+      "file": 0,
+      "start": 262,
+      "end": 289
+    },
+    {
+      "file": 0,
+      "start": 262,
+      "end": 300
+    },
+    {
+      "file": 0,
+      "start": 293,
+      "end": 299
+    },
+    {
+      "file": 0,
+      "start": 329,
+      "end": 333
+    },
+    {
+      "file": 0,
+      "start": 335,
+      "end": 340
+    },
+    {
+      "file": 0,
+      "start": 313,
+      "end": 342
+    },
+    {
+      "file": 0,
+      "start": 313,
+      "end": 359
+    },
+    {
+      "file": 0,
+      "start": 346,
+      "end": 350
+    },
+    {
+      "file": 0,
+      "start": 353,
+      "end": 358
+    },
+    {
+      "file": 0,
+      "start": 346,
+      "end": 358
+    },
+    {
+      "file": 0,
+      "start": 202,
+      "end": 369
+    },
+    {
+      "file": 0,
+      "start": 401,
+      "end": 587
+    },
+    {
+      "file": 0,
+      "start": 409,
+      "end": 415
+    },
+    {
+      "file": 0,
+      "start": 426,
+      "end": 432
+    },
+    {
+      "file": 0,
+      "start": 448,
+      "end": 460
+    },
+    {
+      "file": 0,
+      "start": 448,
+      "end": 466
+    },
+    {
+      "file": 0,
+      "start": 464,
+      "end": 465
+    },
+    {
+      "file": 0,
+      "start": 498,
+      "end": 504
+    },
+    {
+      "file": 0,
+      "start": 479,
+      "end": 506
+    },
+    {
+      "file": 0,
+      "start": 479,
+      "end": 517
+    },
+    {
+      "file": 0,
+      "start": 510,
+      "end": 516
+    },
+    {
+      "file": 0,
+      "start": 546,
+      "end": 550
+    },
+    {
+      "file": 0,
+      "start": 552,
+      "end": 557
+    },
+    {
+      "file": 0,
+      "start": 530,
+      "end": 559
+    },
+    {
+      "file": 0,
+      "start": 530,
+      "end": 576
+    },
+    {
+      "file": 0,
+      "start": 563,
+      "end": 567
+    },
+    {
+      "file": 0,
+      "start": 570,
+      "end": 575
+    },
+    {
+      "file": 0,
+      "start": 563,
+      "end": 575
+    },
+    {
+      "file": 0,
+      "start": 419,
+      "end": 586
+    },
+    {
+      "file": 0,
+      "start": 409,
+      "end": 586
+    },
+    {
+      "file": 0,
+      "start": 380,
+      "end": 593
+    },
+    {
+      "file": 0,
+      "start": 161,
+      "end": 375
+    }
+  ],
+  "types": [
+    "u64",
+    {
+      "struct": {
+        "name": 0,
+        "args": []
+      }
+    },
+    "bool",
+    "u256",
+    "num"
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "enums"
+    }
+  ],
+  "names": [
+    {
+      "module": 0,
+      "name": "Action"
+    }
+  ]
+}

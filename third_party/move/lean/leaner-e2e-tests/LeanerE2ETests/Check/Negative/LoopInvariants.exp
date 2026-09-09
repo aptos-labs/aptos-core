@@ -1,0 +1,9 @@
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:9:0: error: a loop invariant at entry is not established
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:9:0: error: a loop invariant at an iteration is not established
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:21:9: error: leaner verification failed
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:31:4: error: the specification clause `ensures result == n` is not established
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:33:9: error: leaner verification failed
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:9:0: error: a loop invariant at an iteration is not established
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:46:9: error: leaner verification failed
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:55:4: error: the specification clause `ensures result == 1` is not established
+LeanerE2ETests/Check/Negative/LoopInvariants.lean:57:9: error: leaner verification failed

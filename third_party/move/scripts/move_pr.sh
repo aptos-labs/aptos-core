@@ -34,7 +34,7 @@ Usage:
 Flags:
     -h   Print this help
     -t   Run the selected Move tests and both Lean verification projects.
-         Lean tests build only aptos-move-exchange, never the full aptos CLI.
+         Lean tests build the standalone Move CLI, never the full aptos CLI.
     -i   In addition to -t, run the selected integration tests
          (Aptos framework, e2e, and related Move tests).
     -c   Run xclippy and fmt +nightly
@@ -219,12 +219,12 @@ if [ ! -z "$LEAN_TEST" ]; then
   echo "*************** [move-pr] Running Lean verification tests"
   (
     cd $BASE
-    cargo build $CARGO_OP_PARAMS -p aptos-move-cli --bin aptos-move-exchange
+    cargo build $CARGO_OP_PARAMS -p aptos-move-cli --features binary --bin move
   )
   for project in $LEAN_TEST_PROJECTS; do
     (
       cd "$project"
-      APTOS_MOVE_EXCHANGE="$BASE/target/$MOVE_PR_PROFILE/aptos-move-exchange" lake test
+      APTOS_MOVE_CLI="$BASE/target/$MOVE_PR_PROFILE/move" lake test
     )
   done
 fi
