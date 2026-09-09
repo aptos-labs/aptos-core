@@ -304,6 +304,10 @@ point target the deprecated `move` package and are kept for reference only.
 
 ## Change discipline
 
+- Lean source metaprograms are trusted. We do not defend against adversarial
+  `run_cmd` code tampering with verifier registries or environments. Preserve
+  proof correctness and the explicit assumption ledger, but do not expand CI
+  fixes into sandboxing or authenticating inputs against hostile metaprograms.
 - Read existing tests and the relevant design's status/deferred-work sections
   before changing behavior. Preserve explicit unsupported-feature diagnostics;
   do not silently give Rust constructs Move semantics or erase unsupported MIR.

@@ -740,6 +740,15 @@ private def argumentPattern (unit : ValidatedUnit)
     | .ok pattern => pure ⟨pattern⟩
     | .error message => throwError m!"internal: argument pattern `{text}`: {message}"
 
+/-- Compare certificate types without treating holes as proof obligations. -/
+def certificateTypesMatch (actual expected : Lean.Expr) : MetaM Bool := do
+  let actual ← instantiateMVars actual
+  let expected ← instantiateMVars expected
+  if actual.hasMVar || actual.hasFVar || actual.hasLooseBVars ||
+      expected.hasMVar || expected.hasFVar || expected.hasLooseBVars then
+    return false
+  isDefEq actual expected
+
 /-- The no-fallback audit of one verified function, including the transitive
 axiom closure. The agreement axiom is the sole project-specific exception,
 explicitly deferred to D4 in `designs/denotation.md`. -/
@@ -815,7 +824,7 @@ def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
         let conclusion ← mkAppM ``LeanerIR.Proofs.SatisfiesFunction
           #[executable, toExpr handle, publicContract]
         mkForallFVars #[registry, executable] (← mkArrow preparation conclusion)
-    isDefEq publicInfo.type expected
+    certificateTypesMatch publicInfo.type expected
   unless valid do
     throwError m!"`{function}` has an invalid public verification certificate"
 

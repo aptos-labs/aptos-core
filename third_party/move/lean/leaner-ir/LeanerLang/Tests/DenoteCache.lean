@@ -10,6 +10,25 @@ namespace LeanerLang.Tests.DenoteCache
 
 set_option Elab.async false
 
+open Lean Meta Elab Command in
+run_cmd liftTermElabM do
+  let expected ← mkFreshExprMVar (mkSort .zero)
+  if ← LeanerLang.Verify.certificateTypesMatch (mkConst ``True) expected then
+    throwError "an open expected certificate type was accepted"
+  unless (← instantiateMVars expected).hasMVar do
+    throwError "certificate checking assigned an expected-type metavariable"
+  let actual ← mkFreshExprMVar (mkSort .zero)
+  if ← LeanerLang.Verify.certificateTypesMatch actual (mkConst ``True) then
+    throwError "an open actual certificate type was accepted"
+  withLocalDeclD `p (mkSort .zero) fun p => do
+    if ← LeanerLang.Verify.certificateTypesMatch p p then
+      throwError "a free variable was accepted as a closed certificate type"
+  expected.mvarId!.assign (mkConst ``True)
+  unless ← LeanerLang.Verify.certificateTypesMatch (mkConst ``True) expected do
+    throwError "a resolved certificate type was rejected"
+  if ← LeanerLang.Verify.certificateTypesMatch (mkConst ``True) (mkConst ``False) then
+    throwError "different closed certificate types were accepted"
+
 leaner module 0x42::denote_cache where
   fun valid(value : u64) -> u64 := value
   spec valid where
