@@ -1,0 +1,51 @@
+name: sccache setup
+description: Reuse compilation results through GitHub's branch-scoped cache service
+inputs:
+  namespace:
+    description: Cache namespace; benchmarks use a separate namespace from production
+    default: aptos-ci-v1
+  read-only:
+    description: Prevent benchmark samples from warming each other's cache
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/github-cache-setup
+    - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # pin@v0.0.11
+      id: install
+      if: env.CI_CACHE_ENABLED == 'true'
+      continue-on-error: true
+      with:
+        version: v0.17.0
+        # The upstream post action fails if the cache server is unavailable.
+        # ci-metrics-report collects statistics without making caching mandatory.
+        disable_annotations: "true"
+    - name: Configure compilation cache
+      if: env.CI_CACHE_ENABLED == 'true' && steps.install.outcome == 'success'
+      shell: bash
+      run: |
+        mode=READ_ONLY
+        if [[ "$CI_CACHE_WRITE" == true && "$CACHE_READ_ONLY" != true ]]; then
+          mode=READ_WRITE
+        fi
+        {
+          echo "RUSTC_WRAPPER=sccache"
+          echo "SCCACHE_GHA_ENABLED=true"
+          echo "SCCACHE_GHA_VERSION=$CACHE_NAMESPACE"
+          echo "SCCACHE_GHA_RW_MODE=$mode"
+          echo "SCCACHE_MULTILEVEL_CHAIN=gha"
+          echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=ignore"
+          echo "SCCACHE_IDLE_TIMEOUT=0"
+          echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1"
+        } >> "$GITHUB_ENV"
+      env:
+        CACHE_NAMESPACE: ${{ inputs.namespace }}
+        CACHE_READ_ONLY: ${{ inputs.read-only }}
+    - name: Check cache availability
+      if: env.CI_CACHE_ENABLED == 'true' && steps.install.outcome == 'success'
+      shell: bash
+      run: |
+        if ! sccache --start-server; then
+          echo "::warning::Compilation cache unavailable; building without sccache."
+          echo "RUSTC_WRAPPER=" >> "$GITHUB_ENV"
+        fi

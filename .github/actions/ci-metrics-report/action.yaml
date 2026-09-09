@@ -1,0 +1,35 @@
+name: CI measurements
+description: Preserve phase timings, compiler-cache statistics and runner configuration
+inputs:
+  name:
+    description: Unique measurement name within this workflow run
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Collect measurements
+      shell: bash
+      run: |
+        mkdir -p ci-metrics
+        if [[ "${RUSTC_WRAPPER:-}" == sccache ]] && command -v sccache >/dev/null; then
+          sccache --show-stats --stats-format json > ci-metrics/sccache.json || true
+        fi
+        {
+          echo "Compiler wrapper: ${RUSTC_WRAPPER:-none}"
+          echo "Cache mode: ${SCCACHE_GHA_RW_MODE:-disabled}"
+          git rev-parse HEAD
+          rustc -Vv
+          cargo nextest --version
+          nproc
+          free -b
+          if [[ -r /sys/fs/cgroup/memory.peak ]]; then
+            echo "Runner cgroup peak bytes: $(</sys/fs/cgroup/memory.peak)"
+          fi
+          df -B1 .
+        } > ci-metrics/runner.txt
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ci-metrics-${{ inputs.name }}-${{ github.run_attempt }}
+        path: ci-metrics/
+        retention-days: 7
+        if-no-files-found: error

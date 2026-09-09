@@ -1,0 +1,175 @@
+name: CI Benchmark
+
+# Called by Lint+Test's benchmark-only dispatch on the candidate branch.
+# All samples check out that same commit.
+on:
+  workflow_call:
+    inputs:
+      suite:
+        type: string
+        default: small
+        description: Fixed package selection shared by baseline and candidate
+      cache:
+        type: string
+        default: disabled
+        description: Seeded uses a benchmark-only branch cache, not a main cache
+      include-e2e:
+        type: boolean
+        default: false
+        description: Also compare CLI/API runners using the prebuilt reference image
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CI_BENCHMARK_PACKAGES: ${{ inputs.suite == 'large' && 'move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || 'aptos-cargo-cli' }}
+  INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+  RUST_MIN_STACK: "4297152"
+  MVP_TEST_ON_CI: "true"
+  Z3_EXE: /home/runner/bin/z3
+  CVC5_EXE: /home/runner/bin/cvc5
+  DOTNET_ROOT: /home/runner/.dotnet
+  BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+jobs:
+  seed:
+    if: inputs.cache == 'seeded'
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/sccache-setup
+        with:
+          namespace: benchmark-${{ github.run_id }}
+      - uses: ./.github/actions/prover-tools-setup
+      - name: Seed only this workflow's benchmark namespace
+        run: |
+          test "$RUSTC_WRAPPER" = sccache
+          # Restart the preflight server with this step's branch-scoped write mode.
+          sccache --stop-server
+          python3 .github/scripts/ci_metrics.py run seed -- python3 .github/scripts/targeted_tests.py archive --locked --cargo-profile ci --archive-file seed.tar.zst
+        env:
+          # GitHub still enforces the dispatching branch's token scope.
+          SCCACHE_GHA_RW_MODE: READ_WRITE
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: benchmark-seed
+
+  baseline:
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original tool setup
+        run: python3 .github/scripts/ci_metrics.py run setup -- scripts/dev_setup.sh -b -p -r -y -P -t
+      - name: Run postgres database
+        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - name: Original build-and-run path
+        run: python3 .github/scripts/ci_metrics.py run baseline -- python3 .github/scripts/targeted_tests.py run --profile ci --cargo-profile ci --locked --no-fail-fast --retries 3
+      - name: Record inventory after the timed baseline
+        run: |
+          read -ra packages <<< "$CI_BENCHMARK_PACKAGES"
+          args=()
+          for package in "${packages[@]}"; do args+=(-p "$package"); done
+          cargo nextest list --locked --cargo-profile ci "${args[@]}" -T json > ci-metrics/inventory.json
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: baseline-${{ matrix.sample }}
+
+  candidate:
+    needs: seed
+    if: ${{ !cancelled() && (needs.seed.result == 'success' || needs.seed.result == 'skipped') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [1, 2, 3]
+    uses: ./.github/workflows/targeted-unit-tests.yaml
+    with:
+      benchmark-packages: ${{ inputs.suite == 'large' && 'move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || 'aptos-cargo-cli' }}
+      run-name: candidate-${{ matrix.sample }}
+      cache-enabled: ${{ inputs.cache != 'disabled' }}
+      cache-namespace: benchmark-${{ github.run_id }}
+
+  # Both versions use the same source/image SHA, while the candidate workflow
+  # definitions come from this branch rather than the production @main caller.
+  cli-baseline:
+    if: inputs.include-e2e
+    permissions:
+      contents: read
+      id-token: write
+    uses: aptos-labs/aptos-core/.github/workflows/cli-e2e-tests.yaml@893d1ffea49dcfa933f0421b19fc6e31a9c808ab
+    secrets: inherit
+    with:
+      GIT_SHA: 893d1ffea49dcfa933f0421b19fc6e31a9c808ab
+
+  cli-candidate:
+    if: inputs.include-e2e
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/cli-e2e-tests.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: 893d1ffea49dcfa933f0421b19fc6e31a9c808ab
+
+  api-baseline:
+    if: inputs.include-e2e
+    permissions:
+      contents: read
+      id-token: write
+    uses: aptos-labs/aptos-core/.github/workflows/node-api-compatibility-tests.yaml@893d1ffea49dcfa933f0421b19fc6e31a9c808ab
+    secrets: inherit
+    with:
+      GIT_SHA: 893d1ffea49dcfa933f0421b19fc6e31a9c808ab
+
+  api-candidate:
+    if: inputs.include-e2e
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/node-api-compatibility-tests.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: 893d1ffea49dcfa933f0421b19fc6e31a9c808ab
+
+  verify-inventories:
+    needs: [baseline, candidate]
+    if: ${{ !cancelled() }}
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
+        with:
+          pattern: ci-metrics-*
+          path: metrics
+      - name: Require identical inventories and complete disjoint partitions
+        env:
+          PYTHONPATH: .github/scripts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from ci_metrics import check_partitions, execution_mode, inventory
+          root = Path('metrics')
+          def latest(prefix):
+              # A failed-jobs rerun can retain successful artifacts from an earlier attempt.
+              candidates = list(root.glob(f'ci-metrics-{prefix}-*'))
+              artifact = max(candidates, key=lambda path: int(path.name.rsplit('-', 1)[1]))
+              return json.loads((artifact / 'inventory.json').read_text())
+          for sample in (1, 2, 3):
+              baseline = latest(f'baseline-{sample}')
+              candidate = latest(f'candidate-{sample}-build')
+              expected = inventory(baseline)
+              check_partitions(expected, [inventory(candidate)])
+              if execution_mode(candidate['test-count'], 1000) == 'shard':
+                  shards = [latest(f'candidate-{sample}-shard-{partition}') for partition in range(1, 9)]
+                  check_partitions(expected, [inventory(shard) for shard in shards])
+              print(f'Sample {sample}: {len(expected)} tests, exact inventory and partition match')
+          PY

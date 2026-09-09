@@ -9,9 +9,31 @@ runs:
   using: composite
   steps:
     # The source code must be checked out by the workflow that invokes this action.
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+
+    # Do not use rust-setup here: the check only builds aptos-cargo-cli, so it needs
+    # neither the test toolchain nor the general workspace target cache.
+    - name: Set up Rust toolchain
+      uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # pin@v1
+
+    # Caches the aptos-cargo-cli dependency build (workspace crates are pruned by the
+    # action). Pushes to main save it; pull requests restore the main cache.
+    - uses: ./.github/actions/github-cache-setup
+    - name: Restore the Cargo cache
+      if: env.CI_CACHE_ENABLED == 'true'
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
+      continue-on-error: true
       with:
-        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+        cache-bin: false
+        save-if: ${{ env.CI_CACHE_WRITE }}
+
+    - name: Setup git credentials
+      if: inputs.GIT_CREDENTIALS != ''
+      shell: bash
+      env:
+        MERGE_BASE_GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+      run: |
+        git config --global credential.helper store
+        printf '%s\n' "$MERGE_BASE_GIT_CREDENTIALS" > ~/.git-credentials
 
     # Check the freshness of the merge base
     - name: Check the freshness of the merge base

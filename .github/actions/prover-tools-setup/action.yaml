@@ -1,0 +1,31 @@
+name: Move Prover tools
+description: Restore trusted prover tools or install the versions requested by dev_setup.sh
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/github-cache-setup
+    - name: Restore Move Prover tools
+      id: cache
+      uses: actions/cache/restore@v4
+      if: env.CI_CACHE_ENABLED == 'true'
+      continue-on-error: true
+      with:
+        path: |
+          ~/bin/z3
+          ~/bin/cvc5
+          ~/.dotnet
+        key: prover-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/dev_setup.sh') }}
+    # Even on a hit, check the requested tool versions using the normal installer.
+    - name: Install Move Prover tools
+      shell: bash
+      run: python3 .github/scripts/ci_metrics.py run prover-tools -- scripts/dev_setup.sh -b -y -k
+    - name: Save Move Prover tools
+      if: env.CI_CACHE_WRITE == 'true' && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      continue-on-error: true
+      with:
+        path: |
+          ~/bin/z3
+          ~/bin/cvc5
+          ~/.dotnet
+        key: ${{ steps.cache.outputs.cache-primary-key }}

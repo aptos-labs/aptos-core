@@ -1,0 +1,17 @@
+name: Start test database
+description: Start PostgreSQL and wait until it accepts connections
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        container=$(docker run --detach -p 5432:5432 cimg/postgres:14.2)
+        for attempt in {1..30}; do
+          if docker exec "$container" pg_isready -U postgres -t 1; then
+            exit 0
+          fi
+          sleep 2
+        done
+        docker logs "$container"
+        echo "::error::PostgreSQL did not become ready after 30 checks."
+        exit 1

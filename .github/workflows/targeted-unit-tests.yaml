@@ -1,0 +1,161 @@
+name: "Targeted Unit Tests"
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      benchmark-packages:
+        description: Space-separated package names; empty uses the production change detector
+        type: string
+        default: ""
+      run-name:
+        description: Unique artifact prefix when benchmarking several samples in one run
+        type: string
+        default: targeted
+      cache-enabled:
+        type: boolean
+        default: true
+      cache-namespace:
+        type: string
+        default: aptos-ci-v1
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  TEST_ARCHIVE: targeted-tests.tar.zst
+  # Runs with at most this many tests execute inline in the build job.
+  # Larger runs fan out to the shard matrix below.
+  INLINE_TEST_COUNT_MAX: "1000"
+  CI_BENCHMARK_PACKAGES: ${{ inputs.benchmark-packages }}
+  # Test runtime environment, shared by the inline run and the shards.
+  INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+  RUST_MIN_STACK: "4297152"
+  MVP_TEST_ON_CI: "true"
+  Z3_EXE: /home/runner/bin/z3
+  CVC5_EXE: /home/runner/bin/cvc5
+  DOTNET_ROOT: /home/runner/.dotnet
+  BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+jobs:
+  # Determine the affected packages and build their tests once. Small runs execute
+  # here directly; large runs are archived and fanned out to the shards below.
+  build:
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 90
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      artifact-id: ${{ steps.archive.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # Fetch all git history for accurate target determination
+
+      - uses: ./.github/actions/sccache-setup
+        if: inputs.cache-enabled
+        with:
+          namespace: ${{ inputs.cache-namespace }}
+          read-only: ${{ inputs.benchmark-packages != '' }}
+
+      # The runner image already has the Rust toolchain, cargo-nextest and the build
+      # dependencies (rust-unit-tests builds the whole workspace with the same flags).
+      - uses: ./.github/actions/prover-tools-setup
+
+      - name: Output the changed files
+        if: inputs.benchmark-packages == ''
+        run: cargo x changed-files -vvv
+
+      - name: Output the affected packages
+        if: inputs.benchmark-packages == ''
+        run: cargo x affected-packages -vvv
+
+      # Writes no archive when no test packages are affected.
+      - name: Build and archive the targeted unit tests
+        run: python3 .github/scripts/ci_metrics.py run build-archive -- python3 .github/scripts/targeted_tests.py archive --cargo-profile ci --locked --archive-file "$TEST_ARCHIVE"
+
+      - name: Choose between an inline run and shards
+        id: plan
+        run: |
+          if [[ ! -f "$TEST_ARCHIVE" ]]; then
+            echo "No affected test packages; nothing to run."
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 .github/scripts/ci_metrics.py run list-archive -- \
+            cargo nextest list --archive-file "$TEST_ARCHIVE" --workspace-remap . -T json > ci-metrics/inventory.json
+          python3 .github/scripts/ci_metrics.py plan ci-metrics/inventory.json --threshold "$INLINE_TEST_COUNT_MAX"
+          stat --printf='Archive bytes: %s\n' "$TEST_ARCHIVE"
+
+      - name: Run postgres database
+        if: steps.plan.outputs.mode == 'inline'
+        uses: ./.github/actions/postgres-start
+
+      - name: Run the targeted unit tests inline
+        if: steps.plan.outputs.mode == 'inline'
+        run: |
+          python3 .github/scripts/ci_metrics.py run tests-inline -- \
+            cargo nextest run --archive-file "$TEST_ARCHIVE" --workspace-remap . \
+            --profile ci --no-fail-fast --retries 3 --no-tests=warn
+
+      - name: Save the test archive for the shards
+        id: archive
+        if: steps.plan.outputs.mode == 'shard'
+        uses: actions/upload-artifact@v4
+        with:
+          path: ${{ env.TEST_ARCHIVE }}
+          name: ${{ inputs.run-name }}-tests-${{ github.run_attempt }}
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: ${{ inputs.run-name }}-build
+
+  # Run the archived tests in parallel partitions.
+  shard:
+    needs: build
+    if: needs.build.outputs.mode == 'shard'
+    runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run postgres database
+        uses: ./.github/actions/postgres-start
+
+      # The archive carries the test binaries but not the prover tools some tests shell out to.
+      - uses: ./.github/actions/prover-tools-setup
+
+      - name: Restore the test archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          merge-multiple: true
+
+      - name: Run partition ${{ matrix.partition }}/${{ strategy.job-total }}
+        run: |
+          python3 .github/scripts/ci_metrics.py run tests-shard -- \
+            cargo nextest run --archive-file "$TEST_ARCHIVE" --workspace-remap . \
+            --profile ci --no-fail-fast --retries 3 --no-tests=warn \
+            --partition count:${{ matrix.partition }}/${{ strategy.job-total }}
+
+      - name: Record the benchmark partition inventory
+        if: inputs.benchmark-packages != ''
+        run: |
+          cargo nextest list --archive-file "$TEST_ARCHIVE" --workspace-remap . -T json \
+            --partition count:${{ matrix.partition }}/${{ strategy.job-total }} > ci-metrics/inventory.json
+
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: ${{ inputs.run-name }}-shard-${{ matrix.partition }}

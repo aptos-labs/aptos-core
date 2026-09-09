@@ -62,8 +62,6 @@ FROM tools-builder
    - `target`: Name of the target. This should be the same as the name of the Dockerfile.
    - `dockerfile`: Path to the Dockerfile.
    - `tags`: Create a unique tag for the image using `generate_tags` function.
-   - `cache-from`: Create a unique cache key using `generate_cache_from` function.
-   - `cache-to`: Create a unique cache key using `generate_cache_to` function.
 
 6. Optionally, you can create a `group` definition to build multiple tagets at once.
 
@@ -71,7 +69,7 @@ FROM tools-builder
 
 The `aptos-node-builder`, `indexer-builder`, `tools-builder` targets build the `aptos-node` binary and the remaining rust binaries, respectively, and is the most expensive. Its output is used by all the other targets that follow.
 
-The `*-builder` itself takes in a few build arguments. Most are build metadata, such as `GIT_SHA` and `GIT_BRANCH`, but others change the build entirely, such as cargo flags `PROFILE` and `FEATURES`. Arguments like these necessitate a different cache to prevent clobbering. The general strategy is to use image tags and cache keys that use these variables. An example image tag might be:
+The `*-builder` itself takes in a few build arguments. Most are build metadata, such as `GIT_SHA` and `GIT_BRANCH`, but others change the build entirely, such as cargo flags `PROFILE` and `FEATURES`. Arguments like these necessitate distinct tags to prevent clobbering. The general strategy is to use image tags that encode these variables. An example image tag might be:
 
 - `performance_failpoints_<GIT_SHA>` -- `performance` profile with `failpoints` feature
 - `<GIT_SHA>` -- default `release` profile with no additional features

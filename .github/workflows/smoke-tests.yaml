@@ -20,23 +20,38 @@ jobs:
   build-smoke-aptos-node:
     if: inputs.only_docs_changed != 'true'
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    outputs:
+      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/sccache-setup
       - name: Build aptos-node
         run: cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
         shell: bash
-      - name: Save aptos-node binary to cache
-        uses: runs-on/cache/save@v4
+      - name: Upload aptos-node binary
+        id: artifact
+        uses: actions/upload-artifact@v4
         with:
           path: target/release/aptos-node
-          key: smoke-aptos-node-${{ github.run_id }}
+          name: smoke-aptos-node-${{ github.run_attempt }}
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: smoke-node-build
 
   # Build test archive + helper binaries in parallel with aptos-node.
   build-smoke-tests:
     if: inputs.only_docs_changed != 'true'
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    outputs:
+      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/sccache-setup
       - name: Build smoke test archive and helper binaries
         run: |
           # Build helper binaries needed by smoke tests
@@ -46,14 +61,23 @@ jobs:
           # test binary uses the release aptos-node binary instead of building a debug one.
           LOCAL_SWARM_NODE_RELEASE=1 cargo nextest archive --locked --release --package smoke-test --archive-file smoke-test-archive.tar.zst
         shell: bash
-      - name: Save smoke test artifacts to cache
-        uses: runs-on/cache/save@v4
+      - name: Upload smoke test archive and helper binaries
+        id: artifact
+        uses: actions/upload-artifact@v4
         with:
           path: |
             target/release/aptos
             target/release/aptos-debugger
             smoke-test-archive.tar.zst
-          key: smoke-test-archive-${{ github.run_id }}
+          name: smoke-test-archive-${{ github.run_attempt }}
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: smoke-tests-build
 
   # Run smoke tests in parallel partitions. This is a PR required job.
   rust-smoke-tests:
@@ -68,26 +92,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run postgres database
-        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-        shell: bash
+        uses: ./.github/actions/postgres-start
 
-      # Restore pre-built artifacts from both parallel build jobs
-      - name: Restore aptos-node binary from cache
-        uses: runs-on/cache/restore@v4
+      # Exact artifact IDs also work when only failed shard jobs are rerun.
+      - name: Download aptos-node binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
         with:
-          path: target/release/aptos-node
-          key: smoke-aptos-node-${{ github.run_id }}
-          fail-on-cache-miss: true
+          path: target/release
+          artifact-ids: ${{ needs.build-smoke-aptos-node.outputs.artifact-id }}
+          merge-multiple: true
 
-      - name: Restore smoke test archive and helper binaries from cache
-        uses: runs-on/cache/restore@v4
+      - name: Download smoke test archive and helper binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
         with:
-          path: |
-            target/release/aptos
-            target/release/aptos-debugger
-            smoke-test-archive.tar.zst
-          key: smoke-test-archive-${{ github.run_id }}
-          fail-on-cache-miss: true
+          artifact-ids: ${{ needs.build-smoke-tests.outputs.artifact-id }}
+          merge-multiple: true
 
       - name: Run smoke tests partition ${{ matrix.partition }}/8
         run: |
@@ -107,7 +126,7 @@ jobs:
         if: ${{ failure() || success() }}
         uses: actions/upload-artifact@v4
         with:
-          name: failed-smoke-test-logs-${{ matrix.partition }}
+          name: failed-smoke-test-logs-${{ github.run_attempt }}-${{ matrix.partition }}
           include-hidden-files: true
           path: |
             /tmp/.tmp*
