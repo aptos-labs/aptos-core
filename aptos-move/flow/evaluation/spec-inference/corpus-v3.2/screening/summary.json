@@ -15,7 +15,7 @@
       "target": "decibel_dex::extracted_base_math::compute_base_needed",
       "task_id": "BA-base-012",
       "threshold_seconds": 20,
-      "wall_seconds": 4.9,
+      "wall_seconds": 3.6,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -31,7 +31,7 @@
       "target": "decibel_dex::extracted_bucket_index::get_bucket_index",
       "task_id": "BK-bucket-016",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 2.6,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -47,7 +47,7 @@
       "target": "decibel_dex::extracted_liquidation_price::get_liquidation_price",
       "task_id": "LP-price-021",
       "threshold_seconds": 20,
-      "wall_seconds": 5.2,
+      "wall_seconds": 3.2,
       "well_formed": true,
       "wp_failure_kind": "untrusted_inferred_contract",
       "wp_hard": true
@@ -63,7 +63,7 @@
       "target": "decibel_dex::extracted_median::get_median_price",
       "task_id": "MD-median-015",
       "threshold_seconds": 20,
-      "wall_seconds": 5.5,
+      "wall_seconds": 3.4,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -79,7 +79,7 @@
       "target": "decibel_dex::extracted_minmax::find_min_value",
       "task_id": "MM-min-013",
       "threshold_seconds": 20,
-      "wall_seconds": 5.3,
+      "wall_seconds": 3.3,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -95,7 +95,7 @@
       "target": "decibel_dex::extracted_order_validation::validate_order_input",
       "task_id": "OV-order-006",
       "threshold_seconds": 20,
-      "wall_seconds": 5.5,
+      "wall_seconds": 3.4,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -111,7 +111,7 @@
       "target": "decibel_campaign::extracted_payout_math::compute",
       "task_id": "PM-curve-027",
       "threshold_seconds": 20,
-      "wall_seconds": 5.6,
+      "wall_seconds": 3.6,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -127,7 +127,7 @@
       "target": "decibel_dex::lomuto_partition::partition",
       "task_id": "QP-part-025",
       "threshold_seconds": 20,
-      "wall_seconds": 5.5,
+      "wall_seconds": 3.2,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -143,7 +143,7 @@
       "target": "decibel_dex::selection_machine::select",
       "task_id": "SM-select-022",
       "threshold_seconds": 20,
-      "wall_seconds": 4.9,
+      "wall_seconds": 2.4,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -159,7 +159,7 @@
       "target": "decibel_campaign::extracted_tier_leverage::checked_max_tier_leverage",
       "task_id": "TL-lev-020",
       "threshold_seconds": 20,
-      "wall_seconds": 6.7,
+      "wall_seconds": 4.2,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -175,7 +175,7 @@
       "target": "aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level",
       "task_id": "TR-cancel-026",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 2.4,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -191,7 +191,7 @@
       "target": "aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels",
       "task_id": "TR-discard-011",
       "threshold_seconds": 20,
-      "wall_seconds": 4.7,
+      "wall_seconds": 2.4,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -207,7 +207,7 @@
       "target": "aptos_experimental::extracted_bulk_order_utils::validate_price_ordering",
       "task_id": "TR-order-010",
       "threshold_seconds": 20,
-      "wall_seconds": 5.1,
+      "wall_seconds": 2.7,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -223,7 +223,7 @@
       "target": "decibel_dex::extracted_trial_size::trial_size_for",
       "task_id": "TS-trial-019",
       "threshold_seconds": 20,
-      "wall_seconds": 7.1,
+      "wall_seconds": 5.0,
       "well_formed": true,
       "wp_failure_kind": "untrusted_inferred_contract",
       "wp_hard": true
@@ -239,7 +239,7 @@
       "target": "decibel_campaign::extracted_tier_lookup::credits_for_duration_days",
       "task_id": "UC-credits-008",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 2.4,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -255,7 +255,7 @@
       "target": "decibel_vault::vault_share_math::convert_new_assets_to_share_count",
       "task_id": "VS-contrib-003",
       "threshold_seconds": 20,
-      "wall_seconds": 5.6,
+      "wall_seconds": 3.4,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -271,7 +271,7 @@
       "target": "decibel_vault::vault_share_math::calculate_unrealized_fees",
       "task_id": "VS-fees-001",
       "threshold_seconds": 20,
-      "wall_seconds": 6.0,
+      "wall_seconds": 3.7,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -287,7 +287,7 @@
       "target": "decibel_vault::vault_share_math::calculate_redemption_funds_and_fee",
       "task_id": "VS-redeem-004",
       "threshold_seconds": 20,
-      "wall_seconds": 5.4,
+      "wall_seconds": 3.1,
       "well_formed": true,
       "wp_failure_kind": "untrusted_inferred_contract",
       "wp_hard": true
@@ -303,7 +303,7 @@
       "target": "decibel_vault::vault_share_math::convert_existing_shares_to_asset_amount",
       "task_id": "VS-shares-002",
       "threshold_seconds": 20,
-      "wall_seconds": 5.1,
+      "wall_seconds": 3.0,
       "well_formed": true,
       "wp_failure_kind": "untrusted_inferred_contract",
       "wp_hard": true
@@ -319,7 +319,7 @@
       "target": "decibel_dex::extracted_work_units::consume_order_match_work_units",
       "task_id": "WU-consume-023",
       "threshold_seconds": 20,
-      "wall_seconds": 5.5,
+      "wall_seconds": 3.5,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -330,30 +330,30 @@
   "source_commit": "e3e44eee90802fc83a003360fe9913b8507a563d",
   "threshold_seconds": 20,
   "tools": {
-    "experiment_config_sha256": "11cc9b1119a8abce1c3849387ef9592848449214e4c8a851cf799ea43d67e4d0",
+    "experiment_config_sha256": "9ec0b52ea1c069e81911639494d940130c864dd9fd780234c4e463a9c9d8cc80",
     "model_independent": true,
     "move_flow": [
       "move-flow"
     ],
-    "move_flow_sha256": "2ffe9d544473b7bc89b847e598c3507fc1c3f6e8e8eaa9df64b71167195998c2",
+    "move_flow_sha256": "4ae84a08734e0acd9cc0b7a6f4ec6e028d32d53d1e75498e7cdab0cb7de40c07",
     "stage_executables": {
       "boogie": {
         "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
       },
       "check_candidate": {
-        "sha256": "2ffe9d544473b7bc89b847e598c3507fc1c3f6e8e8eaa9df64b71167195998c2"
+        "sha256": "4ae84a08734e0acd9cc0b7a6f4ec6e028d32d53d1e75498e7cdab0cb7de40c07"
       },
       "compile": {
-        "sha256": "2ffe9d544473b7bc89b847e598c3507fc1c3f6e8e8eaa9df64b71167195998c2"
+        "sha256": "4ae84a08734e0acd9cc0b7a6f4ec6e028d32d53d1e75498e7cdab0cb7de40c07"
       },
       "enriched_compile": {
-        "sha256": "2ffe9d544473b7bc89b847e598c3507fc1c3f6e8e8eaa9df64b71167195998c2"
+        "sha256": "4ae84a08734e0acd9cc0b7a6f4ec6e028d32d53d1e75498e7cdab0cb7de40c07"
       },
       "prover": {
-        "sha256": "2ffe9d544473b7bc89b847e598c3507fc1c3f6e8e8eaa9df64b71167195998c2"
+        "sha256": "4ae84a08734e0acd9cc0b7a6f4ec6e028d32d53d1e75498e7cdab0cb7de40c07"
       },
       "wp_inference": {
-        "sha256": "2ffe9d544473b7bc89b847e598c3507fc1c3f6e8e8eaa9df64b71167195998c2"
+        "sha256": "4ae84a08734e0acd9cc0b7a6f4ec6e028d32d53d1e75498e7cdab0cb7de40c07"
       },
       "z3": {
         "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"

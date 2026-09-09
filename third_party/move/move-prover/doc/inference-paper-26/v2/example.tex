@@ -1,0 +1,127 @@
+% !TEX root = main.tex
+\Section{Inference Session Example}
+\label{sec:example}
+
+We illustrate the workflow of specification inference in our system by examples.
+The examples are written in Move, but should be understandable without knowing details about the language.
+For a reference, see the Move Book \cite{MoveOnAptosBook}.
+
+Consider a coding agent like Claude Code. 
+The Move Prover is connected to the agent via an MCP service. 
+The service offers (a) a tool for launching verification and (b) a tool for running \WP-based spec inference. The agent has a set of skills which describe language, verification techniques, and the MCP tools in detail.
+
+\label{sec:pow}
+The example we look at is an iterative computation of the exponential, $b^{e}$:
+
+\begin{MoveBoxUser}
+  fun pow(base: u64, exp: u64): u64 {
+    let result = 1;
+    let i = 0;
+    while (i < exp) {
+      result = result * base;
+      i = i + 1;
+    }
+    result
+  }
+\end{MoveBoxUser}
+
+Based on the instructions, the first thing the agent does is call \WP. The answer points to the missing loop invariant, including unrolling the loop symbolically and showing the values of the affected loop variables at each entry: 
+
+\begin{MoveBoxTool}{wp}
+WP inferred `vacuous` conditions after this loop without an invariant. ..
+  --> sources/pow.move:5:14
+  |
+5 |       while (i < exp) {
+  |              ^
+  |
+  = loop-invariant evidence 
+  = bounded loop-head facts :
+      head[0]: head[0].i == 0
+               head[0].result == 1
+      head[1]: 0 < exp ==> head[1].i == 1
+               0 < exp ==> head[1].result == base
+      head[2]: 1 < exp ==> head[2].i == 2
+               1 < exp ==> head[2].result == base * base
+      ..
+\end{MoveBoxTool}
+
+Based on the diagnosis, the agent next derives the loop invariant.
+A recursive specification helper function is introduced for accumulating the result.
+Before returning the result, the agent uses the verification tool to check whether its solution verifies:
+
+\begin{MoveBoxAgent}
+  fun pow(base: u64, exp: u64): u64 {
+    ..
+    while (i < exp) {
+      result = result * base;
+      i = i + 1;
+    } spec {
+      invariant [inferred] i <= exp;
+      invariant [inferred] result == math_pow(base, i);
+    }
+    ..   
+  }
+  // specification helper function
+  spec fun math_pow(base: num, exp: num): num {
+    if (exp <= 0) { 1 } else { math_pow(base, exp - 1) * base }
+  }
+\end{MoveBoxAgent}
+
+In the next turn the agent runs the \WP MCP tool again. 
+With the loop invariant present, the complete specification is derived. 
+However, the aborts condition is marked as |sathard| by the \WP tool. The marker is set when a derived condition is exact but its satisfiability is expected to be hard for the solver --- here because of the existential quantification, which says that the computation will abort if for some |y| the exponent multiplication overflows. 
+Note that the Move Prover uses unbounded integers, |num|, in the specification language, making it possible to reason about overflow in the programming language's |u64|:
+
+\begin{MoveBoxTool}{wp}
+  spec pow { // post and aborts condition for pow
+      ensures [inferred] result == math_pow(base, exp);
+      aborts_if [inferred = sathard] exists y: u64:
+        math_pow(base, y) * base > MAX_U64
+        && (forall x: num: 0 <= x && x <= y ==> math_pow(base, x) <= MAX_U64)
+        && y < exp 
+  }     
+\end{MoveBoxTool}
+
+The agent tries to verify this specification, but it times out with the following diagnosis:
+
+\begin{MoveBoxTool}{verify}
+  verification failed:
+  error: verification out of resources/timeout (timeout set to 5s)
+   = timeout analysis replay: mixed quantifier and nonlinear arithmetic 
+   = top quantifier activity:
+       quantifier at sources/pow.move:24 -- 55,793+ observed instantiations
+\end{MoveBoxTool}
+
+The quantifier the diagnosis is pointing to is the defining recursive axiom of the specification helper function |math_pow|, which is apparently endlessly unfolded in order to prove the |sathard| aborts condition. In the next turn, the agent introduces lemmas to characterize the monotonicity of multiplication, which allows them to rewrite the aborts condition:
+
+\begin{MoveBoxAgent}
+  spec pow {
+    pragma opaque;
+      ensures [inferred] result == math_pow(base, exp);
+      /// The partial products are non-decreasing, so the loop
+      /// overflows exactly when its last multiplication does.
+      aborts_if [inferred] exp > 0 && math_pow(base, exp - 1) * base > MAX_U64;
+  } proof {
+      // Bounds the multiplication of every iteration by the last one; the
+      // trigger fires on the `math_pow(base, i)` of the loop invariant.
+      forall k: num {math_pow(base, k)} apply math_pow_last_is_max(base, k, exp);
+  } 
+  spec lemma math_pow_last_is_max(base: num, k: num, n: num) {
+    requires base >= 0 && 0 <= k && k < n;
+    ensures math_pow(base, k) * base <= math_pow(base, n - 1) * base;
+  } proof {
+    apply math_pow_mono(base, k + 1, n);
+  }
+  spec lemma math_pow_mono ...  // left out for brevity
+\end{MoveBoxAgent}
+
+
+
+
+
+
+
+
+
+
+\endinput

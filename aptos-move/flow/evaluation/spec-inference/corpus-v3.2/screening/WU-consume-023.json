@@ -9,7 +9,7 @@
   "target": "decibel_dex::extracted_work_units::consume_order_match_work_units",
   "task_id": "WU-consume-023",
   "threshold_seconds": 20,
-  "wall_seconds": 5.5,
+  "wall_seconds": 3.5,
   "well_formed": true,
   "wp_failure_kind": null,
   "wp_hard": false

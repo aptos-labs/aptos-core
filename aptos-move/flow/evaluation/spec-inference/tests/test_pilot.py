@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from harness.artifacts import sha256_file
 from harness.config import ExperimentConfig, RunSpec
@@ -1015,7 +1017,19 @@ class SourceCommitProvenanceTest(unittest.TestCase):
         # that has not landed.
         result = _source_commit_durability("0" * 40)
         self.assertFalse(result["durable"])
+        self.assertFalse(result["resolvable"])
         self.assertEqual([], result["landed_on"])
+
+    def test_a_remote_preservation_branch_is_resolvable_but_not_landed(self) -> None:
+        probes = [SimpleNamespace(returncode=1)] * 3 + [
+            SimpleNamespace(returncode=0, stdout="origin/provenance/run-3\n")
+        ]
+        with patch("harness.pilot.subprocess.run", side_effect=probes):
+            result = _source_commit_durability("1" * 40)
+        self.assertFalse(result["durable"])
+        self.assertTrue(result["resolvable"])
+        self.assertEqual([], result["landed_on"])
+        self.assertEqual(["origin/provenance/run-3"], result["preserved_on"])
 
     def test_the_probe_reports_which_refs_contain_it(self) -> None:
         result = _source_commit_durability("893d1ffea49dcfa933f0421b19fc6e31a9c808ab")

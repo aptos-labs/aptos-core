@@ -181,16 +181,20 @@ module aptos_framework::code {
         // was published (see `init::internal_maybe_initialize`). Objects only; feature-gated.
         if (features::is_lazy_module_initialization_enabled() && object::is_object(addr)) {
             let owner = object::address_to_object<object::ObjectCore>(addr).root_owner();
-            module_names.for_each_ref(|name| {
+            let module_index = 0;
+            while (module_index < module_names.length()) {
+                let name = module_names.borrow(module_index);
                 init::record_deploy_owner(addr, *name.bytes(), owner);
-            });
+                module_index = module_index + 1;
+            };
         };
         let package_immutable = &borrow_global<PackageRegistry>(addr).packages;
         let len = package_immutable.length();
         let index = len;
         let upgrade_number = 0;
-        package_immutable.enumerate_ref(|i, old| {
-            let old: &PackageMetadata = old;
+        let i = 0;
+        while (i < len) {
+            let old = package_immutable.borrow(i);
             if (old.name == pack.name) {
                 upgrade_number = old.upgrade_number + 1;
                 check_upgradability(old, &pack, &module_names);
@@ -198,7 +202,8 @@ module aptos_framework::code {
             } else {
                 check_coexistence(old, &module_names)
             };
-        });
+            i = i + 1;
+        };
 
         // Assign the upgrade counter.
         pack.upgrade_number = upgrade_number;
@@ -207,10 +212,12 @@ module aptos_framework::code {
         // Update registry
         let policy = pack.upgrade_policy;
         if (index < len) {
-            pack.modules.for_each_ref(|m| {
-                let m: &ModuleMetadata = m;
+            let module_index = 0;
+            while (module_index < pack.modules.length()) {
+                let m = pack.modules.borrow(module_index);
                 init::reset_initialized(addr, *m.name.bytes());
-            });
+                module_index = module_index + 1;
+            };
             *packages.borrow_mut(index) = pack
         } else {
             packages.push_back(pack)
@@ -295,12 +302,15 @@ module aptos_framework::code {
             error::invalid_argument(EUPGRADE_WEAKER_POLICY));
         let old_modules = get_module_names(old_pack);
 
-        old_modules.for_each_ref(|old_module| {
+        let module_index = 0;
+        while (module_index < old_modules.length()) {
+            let old_module = old_modules.borrow(module_index);
             assert!(
                 vector::contains(new_modules, old_module),
                 EMODULE_MISSING
             );
-        });
+            module_index = module_index + 1;
+        };
     }
 
     /// Checks whether a new package with given names can co-exist with old package.

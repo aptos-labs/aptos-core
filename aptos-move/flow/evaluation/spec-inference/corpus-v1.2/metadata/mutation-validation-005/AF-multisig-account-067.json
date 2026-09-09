@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-multisig-account-067/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-dqwyd3lw/package",
+            "--output",
+            "/tmp/move-inference-mutant-dqwyd3lw/unused.json"
+          ],
+          "duration_ms": 4857,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-067-self-owner-allowed",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-dqwyd3lw/package",
+            "--target",
+            "0x1::multisig_account::validate_owners",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-dqwyd3lw/prover-report.json"
+          ],
+          "duration_ms": 6914,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: induction case of the loop invariant does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-8jei0i1b/package",
+            "--output",
+            "/tmp/move-inference-mutant-8jei0i1b/unused.json"
+          ],
+          "duration_ms": 3475,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-067-duplicates-allowed",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-8jei0i1b/package",
+            "--target",
+            "0x1::multisig_account::validate_owners",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-8jei0i1b/prover-report.json"
+          ],
+          "duration_ms": 6118,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: induction case of the loop invariant does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-8y3pftk3/package",
+            "--output",
+            "/tmp/move-inference-mutant-8y3pftk3/unused.json"
+          ],
+          "duration_ms": 3701,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-067-never-finds-duplicates",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-8y3pftk3/package",
+            "--target",
+            "0x1::multisig_account::validate_owners",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-8y3pftk3/prover-report.json"
+          ],
+          "duration_ms": 6099,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: induction case of the loop invariant does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::multisig_account::validate_owners"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-multisig-account-067/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-8pgb9qup/package",
+            "--output",
+            "/tmp/move-inference-mutant-8pgb9qup/unused.json"
+          ],
+          "duration_ms": 4306,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-067-checks-half",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-8pgb9qup/package",
+            "--target",
+            "0x1::multisig_account::validate_owners",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-8pgb9qup/prover-report.json"
+          ],
+          "duration_ms": 6011,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: base case of the loop invariant does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-hi23zvjq/package",
+            "--output",
+            "/tmp/move-inference-mutant-hi23zvjq/unused.json"
+          ],
+          "duration_ms": 3295,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-067-self-owner-required",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-hi23zvjq/package",
+            "--target",
+            "0x1::multisig_account::validate_owners",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-hi23zvjq/prover-report.json"
+          ],
+          "duration_ms": 5746,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: induction case of the loop invariant does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-mytvd30c/package",
+            "--output",
+            "/tmp/move-inference-mutant-mytvd30c/unused.json"
+          ],
+          "duration_ms": 3556,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-067-skips-last-owner",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-mytvd30c/package",
+            "--target",
+            "0x1::multisig_account::validate_owners",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-mytvd30c/prover-report.json"
+          ],
+          "duration_ms": 5705,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::multisig_account::validate_owners"
+  }
+}

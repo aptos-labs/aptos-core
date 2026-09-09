@@ -1,6 +1,6 @@
 diff --git a/.move-inference-task.json b/.move-inference-task.json
 new file mode 100644
-index 0000000000..225ea8f198
+index 0000000000..0a58576044
 --- /dev/null
 +++ b/.move-inference-task.json
 @@ -0,0 +1,172 @@
@@ -12,7 +12,7 @@ index 0000000000..225ea8f198
 +  "granularity": "function",
 +  "package_module_target": "0x1::aptos_governance::update_governance_config",
 +  "schema_version": 3,
-+  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
 +  "source_path": "sources/AptosFramework/aptos_governance.move",
 +  "spec_function_dependencies": [
 +    "0x1::signer::$address_of",

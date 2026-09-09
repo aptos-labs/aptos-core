@@ -1,6 +1,6 @@
 diff --git a/.move-inference-task.json b/.move-inference-task.json
 new file mode 100644
-index 0000000000..e683242d7a
+index 0000000000..fae88d0781
 --- /dev/null
 +++ b/.move-inference-task.json
 @@ -0,0 +1,221 @@
@@ -22,7 +22,7 @@ index 0000000000..e683242d7a
 +  "granularity": "function",
 +  "package_module_target": "0x1::multisig_account::can_execute",
 +  "schema_version": 3,
-+  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
 +  "source_path": "sources/AptosFramework/multisig_account.move",
 +  "spec_function_dependencies": [
 +    "0x1::option::$is_none",

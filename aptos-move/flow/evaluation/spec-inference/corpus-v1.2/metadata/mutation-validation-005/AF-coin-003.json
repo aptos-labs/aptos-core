@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-coin-003/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-ncqyo140/package",
+            "--output",
+            "/tmp/move-inference-mutant-ncqyo140/unused.json"
+          ],
+          "duration_ms": 2580,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-coin-003-drops-coin-part",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-ncqyo140/package",
+            "--target",
+            "0x1::coin::balance",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-ncqyo140/prover-report.json"
+          ],
+          "duration_ms": 4170,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-6fuzyrh2/package",
+            "--output",
+            "/tmp/move-inference-mutant-6fuzyrh2/unused.json"
+          ],
+          "duration_ms": 2566,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-coin-003-unpaired-adds-one",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-6fuzyrh2/package",
+            "--target",
+            "0x1::coin::balance",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-6fuzyrh2/prover-report.json"
+          ],
+          "duration_ms": 6054,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-af3tiexj/package",
+            "--output",
+            "/tmp/move-inference-mutant-af3tiexj/unused.json"
+          ],
+          "duration_ms": 2822,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-coin-003-drops-fa-part",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-af3tiexj/package",
+            "--target",
+            "0x1::coin::balance",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-af3tiexj/prover-report.json"
+          ],
+          "duration_ms": 6189,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::coin::balance"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-coin-003/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-awmb1w9h/package",
+            "--output",
+            "/tmp/move-inference-mutant-awmb1w9h/unused.json"
+          ],
+          "duration_ms": 2449,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-coin-003-halves-coin-part",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-awmb1w9h/package",
+            "--target",
+            "0x1::coin::balance",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-awmb1w9h/prover-report.json"
+          ],
+          "duration_ms": 3769,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-rbcd7jml/package",
+            "--output",
+            "/tmp/move-inference-mutant-rbcd7jml/unused.json"
+          ],
+          "duration_ms": 2815,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-coin-003-wrong-owner-store",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-rbcd7jml/package",
+            "--target",
+            "0x1::coin::balance",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-rbcd7jml/prover-report.json"
+          ],
+          "duration_ms": 3894,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-zf1md109/package",
+            "--output",
+            "/tmp/move-inference-mutant-zf1md109/unused.json"
+          ],
+          "duration_ms": 2492,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-coin-003-coin-part-plus-one",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-zf1md109/package",
+            "--target",
+            "0x1::coin::balance",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-zf1md109/prover-report.json"
+          ],
+          "duration_ms": 3887,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::coin::balance"
+  }
+}

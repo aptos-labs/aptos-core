@@ -9,7 +9,7 @@
   "target": "decibel_dex::lomuto_partition::partition",
   "task_id": "QP-part-025",
   "threshold_seconds": 20,
-  "wall_seconds": 5.5,
+  "wall_seconds": 3.2,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true

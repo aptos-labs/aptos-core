@@ -9,7 +9,7 @@
   "target": "aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels",
   "task_id": "TR-discard-011",
   "threshold_seconds": 20,
-  "wall_seconds": 4.7,
+  "wall_seconds": 2.4,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true

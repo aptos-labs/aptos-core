@@ -9,7 +9,7 @@
   "target": "decibel_dex::extracted_minmax::find_min_value",
   "task_id": "MM-min-013",
   "threshold_seconds": 20,
-  "wall_seconds": 5.3,
+  "wall_seconds": 3.3,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true

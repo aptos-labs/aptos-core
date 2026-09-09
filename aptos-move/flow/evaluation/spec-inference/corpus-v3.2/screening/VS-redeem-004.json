@@ -9,7 +9,7 @@
   "target": "decibel_vault::vault_share_math::calculate_redemption_funds_and_fee",
   "task_id": "VS-redeem-004",
   "threshold_seconds": 20,
-  "wall_seconds": 5.4,
+  "wall_seconds": 3.1,
   "well_formed": true,
   "wp_failure_kind": "untrusted_inferred_contract",
   "wp_hard": true

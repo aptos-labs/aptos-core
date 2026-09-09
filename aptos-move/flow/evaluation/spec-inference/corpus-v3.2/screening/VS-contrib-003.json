@@ -9,7 +9,7 @@
   "target": "decibel_vault::vault_share_math::convert_new_assets_to_share_count",
   "task_id": "VS-contrib-003",
   "threshold_seconds": 20,
-  "wall_seconds": 5.6,
+  "wall_seconds": 3.4,
   "well_formed": true,
   "wp_failure_kind": null,
   "wp_hard": false
