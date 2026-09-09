@@ -93,6 +93,29 @@ class MetricsTests(unittest.TestCase):
             report = run_report("owner/repo", 1)
         self.assertEqual(sum(j["allocated_vcpu_minutes"] for j in report["jobs"]), 64)
 
+    def test_report_does_not_bill_skipped_jobs_with_reversed_timestamps(self):
+        job = {
+            "id": 1,
+            "name": "skipped",
+            "runner_id": 0,
+            "conclusion": "skipped",
+            "started_at": "2026-09-09T01:00:00Z",
+            "completed_at": "2026-09-09T00:00:00Z",
+            "labels": ["cpu=64"],
+        }
+        with patch(
+            "ci_metrics.gh_json",
+            side_effect=[
+                {"run_attempt": 1},
+                {"jobs": [job]},
+                {},
+                {},
+            ],
+        ):
+            report = run_report("owner/repo", 1)
+        self.assertEqual(report["jobs"][0]["runner_minutes"], 0)
+        self.assertNotIn("allocated_vcpu_minutes", report["jobs"][0])
+
     def test_host_memory_sample(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "meminfo"

@@ -167,11 +167,18 @@ def run_report(repo, run_id):
             page += 1
     jobs = list(executions.values())
     for job in jobs:
+        if job.get("conclusion") == "skipped":
+            job["runner_minutes"] = 0
+            continue
         if job["started_at"] and job["completed_at"]:
-            job["runner_minutes"] = (
+            duration = (
                 datetime.fromisoformat(job["completed_at"].replace("Z", "+00:00"))
                 - datetime.fromisoformat(job["started_at"].replace("Z", "+00:00"))
             ).total_seconds() / 60
+            if duration < 0:
+                job["timing_warning"] = "Completion precedes start; allocation unknown"
+            else:
+                job["runner_minutes"] = duration
         # Only count an allocation when its CPU size is explicit in runner labels.
         cpus = [
             int(part.removeprefix("cpu="))
