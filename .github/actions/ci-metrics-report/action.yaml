@@ -14,6 +14,9 @@ runs:
         if [[ "${RUSTC_WRAPPER:-}" == sccache ]] && command -v sccache >/dev/null; then
           sccache --show-stats --stats-format json > ci-metrics/sccache.json || true
         fi
+        if [[ -r "${SCCACHE_ERROR_LOG:-}" ]]; then
+          python3 .github/scripts/ci_metrics.py cache-errors "$SCCACHE_ERROR_LOG" > ci-metrics/cache-errors.json
+        fi
         {
           echo "Compiler wrapper: ${RUSTC_WRAPPER:-none}"
           echo "Cache mode: ${SCCACHE_GHA_RW_MODE:-disabled}"

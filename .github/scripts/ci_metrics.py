@@ -53,10 +53,31 @@ def cgroup_peak(root=Path("/sys/fs/cgroup")):
 
 def host_memory_used(path=Path("/proc/meminfo")):
     try:
-        fields = {line.split()[0]: int(line.split()[1]) for line in path.read_text().splitlines()}
+        fields = {
+            line.split()[0]: int(line.split()[1])
+            for line in path.read_text().splitlines()
+        }
         return (fields["MemTotal:"] - fields["MemAvailable:"]) * 1024
     except (OSError, KeyError, ValueError):
         return None
+
+
+def cache_error_counts(log):
+    # Export counts only: backend logs can contain signed service URLs.
+    lines = log.lower().splitlines()
+    patterns = {
+        "rate_limited_lines": ("ratelimited", "rate limit", "too many requests", "429"),
+        "write_probe_failure_lines": ("storage write check failed",),
+        "read_probe_failure_lines": (
+            "cache storage read check",
+            "cache storage failed to read",
+        ),
+        "backend_read_error_lines": ("got unexpected error",),
+    }
+    return {
+        name: sum(any(term in line for term in terms) for line in lines)
+        for name, terms in patterns.items()
+    }
 
 
 def measure(phase, command, output_dir):
@@ -87,7 +108,8 @@ def measure(phase, command, output_dir):
         "user_cpu_seconds": after.ru_utime - before.ru_utime,
         "system_cpu_seconds": after.ru_stime - before.ru_stime,
         # This is the largest child process, not aggregate parallel-job memory.
-        "largest_child_rss_bytes": after.ru_maxrss * (1 if sys.platform == "darwin" else 1024),
+        "largest_child_rss_bytes": after.ru_maxrss
+        * (1 if sys.platform == "darwin" else 1024),
         "exit_code": result,
         "run_id": os.environ.get("GITHUB_RUN_ID"),
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
@@ -140,12 +162,19 @@ def run_report(repo, run_id):
             for part in label.split(",")
             if part.startswith("cpu=") and part.removeprefix("cpu=").isdecimal()
         ]
+        cpus.extend(
+            int(label.split("cpu-gh-", 1)[0])
+            for label in job["labels"]
+            if "cpu-gh-" in label and label.split("cpu-gh-", 1)[0].isdecimal()
+        )
         if cpus and "runner_minutes" in job:
             job["allocated_vcpu_minutes"] = cpus[0] * job["runner_minutes"]
     return {
         "run": run,
         "jobs": jobs,
-        "artifacts": gh_json(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100"),
+        "artifacts": gh_json(
+            f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100"
+        ),
         "cache_usage_at_collection": gh_json(f"repos/{repo}/actions/cache/usage"),
         "cost_note": (
             "Runner time excludes provisioning. "
@@ -169,12 +198,16 @@ def main():
     report = commands.add_parser("report")
     report.add_argument("run_id", type=int)
     report.add_argument("--repo", default="aptos-labs/aptos-core")
+    cache_errors = commands.add_parser("cache-errors")
+    cache_errors.add_argument("log", type=Path)
     args = parser.parse_args()
     if args.command == "run":
         argv = args.argv[1:] if args.argv[:1] == ["--"] else args.argv
         if not argv:
             parser.error("run requires a command")
-        return measure(args.phase, argv, Path(os.environ.get("CI_METRICS_DIR", "ci-metrics")))
+        return measure(
+            args.phase, argv, Path(os.environ.get("CI_METRICS_DIR", "ci-metrics"))
+        )
     if args.command == "plan":
         listing = json.loads(args.listing.read_text())
         mode = execution_mode(listing["test-count"], args.threshold)
@@ -183,9 +216,15 @@ def main():
             output.write(f"mode={mode}\n")
     elif args.command == "compare":
         expected = inventory(json.loads(args.expected.read_text()))
-        partitions = [inventory(json.loads(path.read_text())) for path in args.partitions]
+        partitions = [
+            inventory(json.loads(path.read_text())) for path in args.partitions
+        ]
         check_partitions(expected, partitions)
-        print(f"Exact inventory match: {len(expected)} tests across {len(partitions)} inputs")
+        print(
+            f"Exact inventory match: {len(expected)} tests across {len(partitions)} inputs"
+        )
+    elif args.command == "cache-errors":
+        print(json.dumps(cache_error_counts(args.log.read_text(errors="replace"))))
     else:
         print(json.dumps(run_report(args.repo, args.run_id), indent=2))
     return 0

@@ -35,9 +35,11 @@ runs:
           echo "SCCACHE_GHA_RW_MODE=$mode"
           echo "SCCACHE_MULTILEVEL_CHAIN=gha"
           # Await the sole backend's writes; detached writes can be lost at job exit.
-          echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=l0"
+          echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=all"
           echo "SCCACHE_IDLE_TIMEOUT=0"
           echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1"
+          echo "SCCACHE_LOG=warn"
+          echo "SCCACHE_ERROR_LOG=$RUNNER_TEMP/sccache-errors.log"
         } >> "$GITHUB_ENV"
       env:
         CACHE_NAMESPACE: ${{ inputs.namespace }}

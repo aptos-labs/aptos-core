@@ -92,7 +92,7 @@ test('compiler cache uses only GHA and benchmark readers cannot populate it', ()
         assert.equal(result.status, 0, result.stderr);
         const configuration = fs.readFileSync(output, 'utf8');
         assert.ok(configuration.includes('SCCACHE_MULTILEVEL_CHAIN=gha\n'));
-        assert.ok(configuration.includes('SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=l0\n'));
+        assert.ok(configuration.includes('SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=all\n'));
         const mode = write === 'true' && readOnly !== 'true' ? 'READ_WRITE' : 'READ_ONLY';
         assert.ok(configuration.includes(`SCCACHE_GHA_RW_MODE=${mode}\n`));
       }

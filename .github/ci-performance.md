@@ -27,11 +27,13 @@ caching rather than bypassing tests. The explicit startup check is necessary:
 `SCCACHE_IGNORE_SERVER_IO_ERROR` alone does not cover initialization failures.
 The upstream sccache post-job annotation hook is disabled because its statistics
 failure can fail a job; our statistics collection is best-effort instead.
-The single GHA backend uses synchronous `l0` writes. The `ignore` multilevel
+The single GHA backend uses synchronous `all` writes. The `ignore` multilevel
 policy starts detached writes, which can be lost when an ephemeral runner exits;
 its top-level write count is not evidence that those entries reached GitHub.
 Benchmark seed and reader jobs also use the same `CARGO_TERM_COLOR`: sccache
 hashes this environment variable even though it normalizes rustc's color flags.
+The `all` policy also avoids `l0`'s extra permission probe before every write.
+Cache diagnostics export error counts, never raw backend logs or signed URLs.
 
 Targeted and smoke build outputs are **artifacts**, not shared caches. Consumers
 download exact artifact IDs from their build jobs in the same workflow run.
