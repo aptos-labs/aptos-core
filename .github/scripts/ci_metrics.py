@@ -39,6 +39,18 @@ def execution_mode(count, threshold):
     return "inline" if count <= threshold else "shard"
 
 
+def cgroup_peak(root=Path("/sys/fs/cgroup")):
+    for relative in ("memory.peak", "memory/memory.max_usage_in_bytes"):
+        path = root / relative
+        try:
+            value = path.read_text().strip()
+        except OSError:
+            continue
+        if value.isdecimal():
+            return {"cgroup_peak_bytes": int(value), "cgroup_peak_source": str(path)}
+    return {}
+
+
 def measure(phase, command, output_dir):
     output_dir.mkdir(parents=True, exist_ok=True)
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -64,12 +76,8 @@ def measure(phase, command, output_dir):
         "job": os.environ.get("GITHUB_JOB"),
         "logical_cpus": os.cpu_count(),
     }
-    # cgroup v2 reports the entire runner's high-water mark when available.
-    peak = Path("/sys/fs/cgroup/memory.peak")
-    if peak.exists():
-        value = peak.read_text().strip()
-        if value.isdecimal():
-            row["cgroup_peak_bytes"] = int(value)
+    # Keep the counter's scope explicit; this is not a per-phase memory peak.
+    row.update(cgroup_peak())
     with (output_dir / "phases.jsonl").open("a") as output:
         output.write(json.dumps(row) + "\n")
     print(json.dumps(row), file=sys.stderr)

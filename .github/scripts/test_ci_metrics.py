@@ -5,11 +5,27 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ci_metrics import check_partitions, execution_mode, inventory, measure
+from ci_metrics import cgroup_peak, check_partitions, execution_mode, inventory, measure
 from targeted_tests import package_args
 
 
 class MetricsTests(unittest.TestCase):
+    def test_cgroup_peak_versions_and_missing_counter(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(cgroup_peak(root), {})
+            legacy = root / "memory" / "memory.max_usage_in_bytes"
+            legacy.parent.mkdir()
+            legacy.write_text("123\n")
+            self.assertEqual(cgroup_peak(root), {
+                "cgroup_peak_bytes": 123, "cgroup_peak_source": str(legacy),
+            })
+            current = root / "memory.peak"
+            current.write_text("456\n")
+            self.assertEqual(cgroup_peak(root)["cgroup_peak_bytes"], 456)
+            current.write_text("max\n")
+            self.assertEqual(cgroup_peak(root)["cgroup_peak_bytes"], 123)
+
     def test_benchmark_selection_uses_names_not_versions(self):
         metadata = {"packages": [{"name": "test", "manifest_path": "/repo/crate/Cargo.toml"}]}
         self.assertEqual(package_args(["test"], metadata), ["-p", "file:///repo/crate#test"])

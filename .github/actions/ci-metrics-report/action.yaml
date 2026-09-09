@@ -22,9 +22,11 @@ runs:
           cargo nextest --version
           nproc
           free -b
-          if [[ -r /sys/fs/cgroup/memory.peak ]]; then
-            echo "Runner cgroup peak bytes: $(</sys/fs/cgroup/memory.peak)"
-          fi
+          for counter in /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory/memory.max_usage_in_bytes; do
+            if [[ -r "$counter" ]]; then
+              echo "Cgroup peak bytes ($counter): $(<"$counter")"
+            fi
+          done
           df -B1 .
         } > ci-metrics/runner.txt
     - uses: actions/upload-artifact@v4

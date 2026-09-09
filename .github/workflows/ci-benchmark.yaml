@@ -66,6 +66,8 @@ jobs:
         sample: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Original tool setup
         run: python3 .github/scripts/ci_metrics.py run setup -- scripts/dev_setup.sh -b -p -r -y -P -t
       - name: Run postgres database

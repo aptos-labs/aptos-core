@@ -118,7 +118,9 @@ jobs:
         run: |
           nproc
           free -b
-          if [[ -r /sys/fs/cgroup/memory.peak ]]; then
-            echo "Runner cgroup peak bytes: $(</sys/fs/cgroup/memory.peak)"
-          fi
+          for counter in /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory/memory.max_usage_in_bytes; do
+            if [[ -r "$counter" ]]; then
+              echo "Cgroup peak bytes ($counter): $(<"$counter")"
+            fi
+          done
           docker images --digests || true
