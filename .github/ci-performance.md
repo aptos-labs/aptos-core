@@ -149,17 +149,103 @@ the smaller CLI/API and merge-base runners only after Linux runs pass without
 material timeout or memory regressions. Delete only benchmark artifact/cache IDs
 whose ownership has been verified; never clear repository caches globally.
 
-## Results recorded on 2026-09-08
+## Results recorded on 2026-09-09
 
-Local validation is complete for the checks below. Remote A/B execution, genuine
-main-to-PR cache tests, runner-size tuning, and dollar-cost measurement are still
-pending; no speedup or cost-saving percentage is established by these results.
+The branch is published and the comparisons below ran on fresh Linux runners.
+Allocated vCPU-minutes are a compute-allocation proxy, **not billed dollars**.
+Job execution excludes provisioning; check elapsed time below includes scheduling
+and the candidate CLI result gate. Samples include retries and slow image pulls.
+Independent smoke validation and some small experiments overlapped long-running
+builds, each on fresh EC2 instances. Shared service or provider contention is
+therefore part of the observed variation, not a controlled-away factor.
+
+### CLI and API runner sizing
+
+The first three CLI comparisons use identical reference images and test sources.
+The fourth also includes the candidate's address-comparison fixes; it is a
+combined-change validation, not a runner-only comparison.
+
+| Run | CLI check elapsed, old / new | CLI vCPU-minutes, old / new | API execution, old / new | API vCPU-minutes, old / new |
+| --- | ---: | ---: | ---: | ---: |
+| [34406079480](https://github.com/aptos-labs/aptos-core/actions/runs/34406079480) | 818 / 448 s | 833.1 / 116.9 | 84 / 64 s | 89.6 / 8.5 |
+| [34407408453](https://github.com/aptos-labs/aptos-core/actions/runs/34407408453) | 600 / 441 s | 599.5 / 115.7 | 92 / 75 s | 98.1 / 10.0 |
+| [34408401763](https://github.com/aptos-labs/aptos-core/actions/runs/34408401763) | 706 / 660 s | 721.1 / 169.6 | 73 / 73 s | 77.9 / 9.7 |
+| [34410026272](https://github.com/aptos-labs/aptos-core/actions/runs/34410026272) | 543 / 289 s | 546.1 / 100.4 | 77 / 192 s | 82.1 / 25.6 |
+
+- CLI runner-only medians: **706 to 448 seconds (36.5% shorter)** and **721.1
+  to 116.9 allocated vCPU-minutes (83.8% less)**. The small GitHub-hosted result
+  gate has no explicit CPU label and is excluded from the allocation proxy.
+- API, including all four samples: median execution **80.5 to 74 seconds**;
+  median allocated compute **85.9 to 9.9 vCPU-minutes (88.5% less)**. Check
+  elapsed medians are 114 / 104.5 seconds. The fourth candidate spent about
+  122 seconds pulling the same tools-image digest; both spec checks passed on
+  their first attempt. Do not promise a consistent API latency improvement.
+- The fixed CLI suite passed on its first attempt on all three networks. Six
+  regression tests also passed on each runner. Two earlier false failures
+  compared equivalent short/padded account-address strings; comparisons now use
+  the existing SDK's parsed account-address type. Existing retries still cover
+  transient epoch-transition errors; production execution logic is unchanged.
+- Sampled host used-memory peaks were about **3.23 GB for CLI** and **1.46 GB
+  for API**, on 16-GB runners. These are one-second host samples, not process RSS
+  or a guarantee about unobserved peaks. Neither runner cgroup peak counter was
+  exposed. No out-of-memory failure occurred.
+
+The observed 8-vCPU machines were c7a.2xlarge spot instances; the 64-vCPU
+machines were generally c7i-flex.16xlarge on-demand. That pricing difference
+makes a vCPU-only dollar conversion inappropriate. Actual AWS billing, storage,
+transfer, runner provisioning, and the Runs-On fee have not been measured.
+
+### Unit-test and cache experiments
+
+- The first small disabled-cache run used shallow baseline checkout and is not
+  a fair total-time comparison. Subsequent baselines fetch full history, matching
+  the candidate. Inventory and correctness evidence from the first run remains
+  valid.
+- Small cold-cache run 34407408453: all three nine-test samples passed, with
+  identical inventories. Baseline median job execution was **127 seconds**;
+  candidate **152 seconds**. Each candidate recorded 350 cache misses and no
+  hits. Cold caching did not improve this small workload.
+- Seeded run 34408401763 was not genuinely warm: seed/readers had different
+  `CARGO_TERM_COLOR`, and detached writes did not all finish. Run 34409394605
+  fixed the environment and used synchronous `l0` writes, but persisted only
+  105 compilation entries. Readers each obtained **107 hits / 243 misses**;
+  baseline/candidate medians were **125 / 133 seconds**, excluding the seed's
+  103-second execution. This is partial reuse, not evidence of a warm-cache win.
+  The final `all` write policy is being measured separately.
+- The original 2,341-test suite (now `medium`) passed in all three baselines and
+  all 24 candidate partitions in run 34410026272. Baseline median check elapsed
+  was **270 seconds**, versus **370 seconds** with eight-way sharding; allocated
+  compute was **256 / 475.2 vCPU-minutes**. Archives were about 126.6 MB each.
+  These fast compiler tests did not justify fan-out, so the inline cutoff was
+  raised from 1,000 to 3,000. The expanded `large` suite exercises actual slow
+  E2E/API/prover tests; its result must justify retaining the sharded path.
+- That run deliberately failed one shard **after its tests passed**. A
+  failed-jobs rerun successfully downloaded original artifact **10126978793**
+  (`candidate-1-tests-1`) without rebuilding. The rerun added 57 seconds on one
+  32-vCPU runner, plus inventory verification; it is excluded from the
+  first-attempt comparison. Exact inventory and partition checks passed again.
+- The Linux Apple-target dependency check passed in run
+  [34407180664](https://github.com/aptos-labs/aptos-core/actions/runs/34407180664).
+  The lightweight merge-base/helper checks passed on 2-vCPU Linux runners in
+  runs 34408401763 and 34409394605 (201 / 181 seconds total).
+
+Both completed experimental cache populations were removed by verified branch
+entry IDs: 99 entries / 31,916,863 bytes from run 34408401763 and 106 entries /
+46,987,893 bytes from run 34409394605. No production cache entries were deleted.
+Repository usage reached about 9.69 GB from other writers; querying its configured
+storage limit requires administrator permission (HTTP 403). Capacity and a real
+main-to-PR restore/write-denial exercise remain external pre-merge checks.
+
+### Local validation
 
 - `cargo check`, all nine `aptos-cargo-cli` unit tests, package Clippy with
   warnings denied, and package formatting pass.
-- CI-helper tests cover cache endpoint/write policy, the checked-in required-check
+- Eight Node and twelve Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
   shell bodies, cache preflight fallback, threshold boundaries, partition
-  completeness, explicit package selection, and fail-closed dependency checks.
+  completeness, explicit package selection, fail-closed dependency checks,
+  missing/invalid artifact IDs, and correct rerun allocation accounting.
+  Actionlint passes for the changed workflows; a whole-repository run also
+  reports unrelated pre-existing workflow errors, which were left untouched.
 - The actual CLI creates a 1,631,443-byte archive. Normal and archived inventories
   contain the same nine tests; all eight partitions pass with exact disjoint
   coverage. An empty sixteenth partition succeeds with a warning.
@@ -175,8 +261,8 @@ pending; no speedup or cost-saving percentage is established by these results.
   disabled the wrapper and the same Rust probe compiled successfully. GHA was
   selected even with an S3 bucket environment variable present.
 - The dependency check passes against the real Apple-target Cargo graph on this
-  checkout. Live Linux runner provisioning, Docker, and prover installation have
-  not been exercised locally.
+  checkout and on Linux. Remote targeted samples exercised provisioning, Docker,
+  PostgreSQL readiness, prover installation, archive transport, and all shards.
 
 Historical GitHub job durations were re-read from the API. These are context,
 **not matched before/after comparisons**:
