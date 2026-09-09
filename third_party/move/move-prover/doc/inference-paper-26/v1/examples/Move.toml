@@ -12,6 +12,6 @@ defi = "0x100"
 std = "0x1"
 
 [dependencies]
-MoveStdlib = { local = "../../../../move-stdlib" }
+MoveStdlib = { local = "../../../../../move-stdlib" }
 
 [dev-dependencies]
