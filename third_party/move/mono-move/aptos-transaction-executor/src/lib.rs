@@ -19,7 +19,6 @@ mod providers;
 mod system_txns;
 mod user_txn;
 
-pub use calls::{call_function, param_types, place_args, return_types};
 pub use errors::{
     DiscardReason, ExecutionStage, ExecutionStatus, MaterializationError, MoveExecutionFailure,
     NoEffectsReason, PreExecutionCheckFailure, SystemTxnFailure,

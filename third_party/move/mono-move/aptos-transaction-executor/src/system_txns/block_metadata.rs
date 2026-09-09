@@ -1,21 +1,20 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::{call_block_function, serialize, system_txn_outcome, SystemTxnMetadata};
+use super::common::{call_block_function, system_txn_outcome, SystemTxnMetadata};
 use crate::{
-    calls::invariant_violation,
-    errors::{MoveExecutionFailure, SystemTxnFailure},
+    errors::{invariant_violation, MoveExecutionFailure, SystemTxnFailure},
     executor::AptosTransactionExecutor,
     outcome::TxnOutcome,
 };
-use anyhow::anyhow;
 use aptos_types::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt, randomness::Randomness,
     transaction::AuxiliaryInfo,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::InterpreterContext;
+use mono_move_runtime::{CallBuilder, InterpreterContext};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
+use move_value_view::IterAsMoveVector;
 
 const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
 const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
@@ -64,103 +63,79 @@ impl<'guard> AptosTransactionExecutor<'guard> {
     }
 }
 
-/// Arguments shared by every block-prologue variant.
-//
-// TODO(perf): place the arguments directly into the interpreter's heap,
-// avoiding the BCS round trip.
-#[allow(clippy::too_many_arguments)]
-fn block_prologue_common_args(
-    id: Vec<u8>,
-    epoch: u64,
-    round: u64,
-    proposer: AccountAddress,
-    failed_proposer_indices: &[u32],
-    previous_block_votes_bitvec: &[u8],
-    timestamp_usecs: u64,
-) -> Result<Vec<Vec<u8>>, MoveExecutionFailure> {
-    let hash = AccountAddress::from_bytes(&id)
-        .map_err(|e| invariant_violation(anyhow!("block id is not 32 bytes: {e}")))
-        .map_err(MoveExecutionFailure::RuntimeError)?;
-    let failed_proposer_indices: Vec<u64> = failed_proposer_indices
-        .iter()
-        .map(|index| u64::from(*index))
-        .collect();
-    Ok(vec![
-        serialize(&hash)?,
-        serialize(&epoch)?,
-        serialize(&round)?,
-        serialize(&proposer)?,
-        serialize(&failed_proposer_indices)?,
-        serialize(&previous_block_votes_bitvec)?,
-        serialize(&timestamp_usecs)?,
-    ])
+/// Places the arguments every block-prologue variant takes, after the VM
+/// signer `call_block_function` fills. A macro because the two metadata types
+/// share these accessors but no trait.
+macro_rules! place_prologue_common_args {
+    ($call:expr, $metadata:expr) => {{
+        let call: &mut CallBuilder<'_, '_> = $call;
+        let metadata = $metadata;
+        let hash = AccountAddress::from_bytes(metadata.id().as_slice())
+            .map_err(|e| invariant_violation(format!("block id is not 32 bytes: {e}")))?;
+        call.arg(&hash)?;
+        call.arg(&metadata.epoch())?;
+        call.arg(&metadata.round())?;
+        call.arg(&metadata.proposer())?;
+        call.arg(&IterAsMoveVector(
+            metadata
+                .failed_proposer_indices()
+                .iter()
+                .map(|index| u64::from(*index)),
+        ))?;
+        call.arg(&metadata.previous_block_votes_bitvec())?;
+        call.arg(&metadata.timestamp_usecs())
+    }};
 }
 
 /// Calls `0x1::block::block_prologue` with the block's consensus metadata.
-fn run_block_prologue(
-    interp: &mut InterpreterContext<'_>,
-    guard: &ExecutionGuard<'_>,
+fn run_block_prologue<'a>(
+    interp: &mut InterpreterContext<'a>,
+    guard: &ExecutionGuard<'a>,
     block_metadata: &BlockMetadata,
 ) -> Result<(), MoveExecutionFailure> {
-    let args = block_prologue_common_args(
-        block_metadata.id().to_vec(),
-        block_metadata.epoch(),
-        block_metadata.round(),
-        block_metadata.proposer(),
-        block_metadata.failed_proposer_indices(),
-        block_metadata.previous_block_votes_bitvec(),
-        block_metadata.timestamp_usecs(),
-    )?;
-    call_block_function(interp, guard, BLOCK_PROLOGUE, &args)
+    call_block_function(interp, guard, BLOCK_PROLOGUE, |call| {
+        place_prologue_common_args!(call, block_metadata)
+    })
 }
 
 /// Calls the `0x1::block::block_prologue_ext*` variant matching the extended
 /// metadata.
-fn run_block_prologue_ext(
-    interp: &mut InterpreterContext<'_>,
-    guard: &ExecutionGuard<'_>,
+fn run_block_prologue_ext<'a>(
+    interp: &mut InterpreterContext<'a>,
+    guard: &ExecutionGuard<'a>,
     block_metadata_ext: &BlockMetadataExt,
 ) -> Result<(), MoveExecutionFailure> {
-    let mut args = block_prologue_common_args(
-        block_metadata_ext.id().to_vec(),
-        block_metadata_ext.epoch(),
-        block_metadata_ext.round(),
-        block_metadata_ext.proposer(),
-        block_metadata_ext.failed_proposer_indices(),
-        block_metadata_ext.previous_block_votes_bitvec(),
-        block_metadata_ext.timestamp_usecs(),
-    )?;
-    let seed = |randomness: &Option<Randomness>| {
-        serialize(&randomness.as_ref().map(Randomness::randomness_cloned))
-    };
-    let function = match block_metadata_ext {
-        BlockMetadataExt::V0(_) => {
-            return Err(MoveExecutionFailure::RuntimeError(invariant_violation(
-                anyhow!("V0 metadata must run as a plain block-metadata transaction"),
-            )))
-        },
+    let seed =
+        |randomness: &Option<Randomness>| randomness.as_ref().map(Randomness::randomness_cloned);
+    match block_metadata_ext {
+        BlockMetadataExt::V0(_) => Err(MoveExecutionFailure::RuntimeError(invariant_violation(
+            "V0 metadata must run as a plain block-metadata transaction",
+        ))),
         BlockMetadataExt::V1(v1) => {
-            args.push(seed(&v1.randomness)?);
-            BLOCK_PROLOGUE_EXT
+            call_block_function(interp, guard, BLOCK_PROLOGUE_EXT, |call| {
+                place_prologue_common_args!(call, block_metadata_ext)?;
+                call.arg(&seed(&v1.randomness))
+            })
         },
         BlockMetadataExt::V2(v2) => {
-            args.push(seed(&v2.randomness)?);
-            args.push(serialize(
-                &v2.decryption_key
-                    .as_ref()
-                    .map(|key| key.decryption_key_cloned()),
-            )?);
-            BLOCK_PROLOGUE_EXT_V2
+            call_block_function(interp, guard, BLOCK_PROLOGUE_EXT_V2, |call| {
+                place_prologue_common_args!(call, block_metadata_ext)?;
+                call.arg(&seed(&v2.randomness))?;
+                call.arg(
+                    &v2.decryption_key
+                        .as_ref()
+                        .map(|key| key.decryption_key_cloned()),
+                )
+            })
         },
         BlockMetadataExt::V3(v3) => {
-            args.push(seed(&v3.randomness)?);
-            let payload = v3.decryption_payload.as_ref();
-            args.push(serialize(
-                &payload.map(|payload| payload.key.decryption_key_cloned()),
-            )?);
-            args.push(serialize(&payload.map(|payload| payload.decryption_round))?);
-            BLOCK_PROLOGUE_EXT_V3
+            call_block_function(interp, guard, BLOCK_PROLOGUE_EXT_V3, |call| {
+                place_prologue_common_args!(call, block_metadata_ext)?;
+                call.arg(&seed(&v3.randomness))?;
+                let payload = v3.decryption_payload.as_ref();
+                call.arg(&payload.map(|payload| payload.key.decryption_key_cloned()))?;
+                call.arg(&payload.map(|payload| payload.decryption_round))
+            })
         },
-    };
-    call_block_function(interp, guard, function, &args)
+    }
 }

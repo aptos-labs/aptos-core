@@ -21,7 +21,7 @@ use crate::{
     DescriptorId, MAX_ALIGN,
 };
 use bitflags::bitflags;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 /// Typed index into the program's [`ValueLayout`] table.
 #[repr(transparent)]
@@ -78,6 +78,25 @@ pub struct ValueLayout {
     pub flags: LayoutFlags,
     /// Describes layout's shape.
     pub kind: LayoutKind,
+}
+
+impl fmt::Display for ValueLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            LayoutKind::Bool => write!(f, "bool"),
+            LayoutKind::UnsignedInt => write!(f, "{}-byte unsigned integer", self.size),
+            LayoutKind::SignedInt => write!(f, "{}-byte signed integer", self.size),
+            LayoutKind::Address => write!(f, "address"),
+            LayoutKind::Signer => write!(f, "signer"),
+            LayoutKind::Struct { fields } => write!(f, "struct with {} fields", fields.len()),
+            LayoutKind::Vector { .. } => write!(f, "vector"),
+            LayoutKind::FrozenEnum { variants, .. } => {
+                write!(f, "enum with {} variants", variants.len())
+            },
+            LayoutKind::Ref => write!(f, "reference"),
+            LayoutKind::Function => write!(f, "function value"),
+        }
+    }
 }
 
 /// Layout information for a struct field.

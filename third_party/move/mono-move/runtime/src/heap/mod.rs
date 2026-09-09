@@ -17,8 +17,8 @@ use crate::{
     invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, read_vec_len,
-        write_descriptor, write_forwarding, write_object_header, write_ptr, write_u64,
-        MemoryRegion,
+        write_descriptor, write_enum_tag, write_forwarding, write_object_header, write_ptr,
+        write_u64, MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
@@ -386,7 +386,7 @@ pub(crate) unsafe fn deserialize_or_gc<
     top_frame: TopFrame<'_>,
 ) -> VMResult<()> {
     // SAFETY: forwarded from this function's contract.
-    match unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) } {
+    match unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) } {
         Ok(()) => Ok(()),
         Err(AllocationError::RuntimeError(err)) => Err(VMInternalError::new(err)),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
@@ -400,7 +400,7 @@ pub(crate) unsafe fn deserialize_or_gc<
                 top_frame,
             )?;
             // SAFETY: as above.
-            unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) }
+            unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) }
                 .map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
     }
@@ -567,10 +567,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     elem_size: u32,
     capacity_in_elems: u64,
 ) -> VMResult<*mut u8> {
-    let total_size = (capacity_in_elems as usize)
-        .checked_mul(elem_size as usize)
-        .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
-        .ok_or(RuntimeError::VecAllocSizeOverflow)?;
+    let total_size = vec_alloc_size(capacity_in_elems, elem_size)?;
     // `length` defaults to 0 via heap_alloc's zero-init.
     alloc_sized(
         heap,
@@ -583,6 +580,47 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         total_size,
         descriptor_id,
     )
+}
+
+/// Total allocation size of a vector object holding `capacity_in_elems`
+/// elements.
+fn vec_alloc_size(capacity_in_elems: u64, elem_size: u32) -> Result<usize, RuntimeError> {
+    (capacity_in_elems as usize)
+        .checked_mul(elem_size as usize)
+        .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
+        .ok_or(RuntimeError::VecAllocSizeOverflow)
+}
+
+/// Like [`alloc_vec`], but fails rather than triggering GC when the heap is
+/// full, and stamps `len` as the vector's length.
+pub(crate) fn alloc_vec_no_gc(
+    heap: &mut Heap,
+    descriptor_id: DescriptorId,
+    elem_size: u32,
+    len: u64,
+) -> AllocationResult<*mut u8> {
+    let vec_ptr = heap_alloc(heap, vec_alloc_size(len, elem_size)?, descriptor_id)?;
+    // SAFETY: the allocation stores the vector length at this offset.
+    unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
+    Ok(vec_ptr)
+}
+
+/// Allocates an enum object sized for its widest variant with `tag` stamped,
+/// failing rather than triggering GC when the heap is full.
+pub(crate) fn alloc_enum_no_gc(
+    heap: &mut Heap,
+    descriptor_id: DescriptorId,
+    tag: u64,
+    max_size_across_variants: usize,
+) -> AllocationResult<*mut u8> {
+    let obj_ptr = heap_alloc(
+        heap,
+        OBJECT_HEADER_SIZE + max_size_across_variants,
+        descriptor_id,
+    )?;
+    // SAFETY: the allocation has enough size to write the tag.
+    unsafe { write_enum_tag(obj_ptr, tag) };
+    Ok(obj_ptr)
 }
 
 /// Allocate a new zeroed heap object (struct or enum). Size comes from the

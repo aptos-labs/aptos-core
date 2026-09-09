@@ -1,10 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Execution of user transactions.
+//! Conversions between VM values and the representations outside the VM.
 
-mod args;
-mod execute;
-mod metadata;
-mod pre_execution_checks;
-mod validation;
+pub(crate) mod bcs;
+pub(crate) mod rust;

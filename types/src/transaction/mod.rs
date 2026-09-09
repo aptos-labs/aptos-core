@@ -31,6 +31,7 @@ use aptos_crypto::{
     CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use move_value_view_derive::MoveValueView;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::Rng;
@@ -112,7 +113,9 @@ pub enum Auth<'a> {
     },
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize, MoveValueView,
+)]
 pub enum ReplayProtector {
     Nonce(u64),
     SequenceNumber(u64),
@@ -891,7 +894,7 @@ impl TransactionExecutableRef<'_> {
 /// limit (100 = 1x, 200 = 2x, 250 = 2.5x).
 ///
 /// INVARIANT: must match Move representation for BCS serialization.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, MoveValueView)]
 pub enum RequestedMultipliers {
     V1 {
         /// Execution-gas multiplier as percent of the base limit where 100 is 1x.
@@ -929,7 +932,7 @@ impl RequestedMultipliers {
 /// prologue.
 ///
 /// INVARIANT: must match Move representation for BCS serialization.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, MoveValueView)]
 pub enum UserTxnLimitsRequest {
     /// Fee payer owns a stake pool.
     StakePoolOwner { multipliers: RequestedMultipliers },

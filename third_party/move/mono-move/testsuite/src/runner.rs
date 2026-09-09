@@ -615,16 +615,19 @@ fn execute_function_v2(
         extensions,
         heap_size,
         |runner| {
+            // Split the directive's arguments in order: signers back the
+            // entry's signer parameters, the rest are placed as typed values.
+            let mut signers = Vec::new();
+            let mut values = Vec::new();
+            for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
+                match kind.to_move_value(arg) {
+                    MoveValue::Signer(addr) => signers.push(addr),
+                    value => values.push(value),
+                }
+            }
             let result = runner.run(
-                |interpreter| {
-                    let mut offset: u32 = 0;
-                    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
-                        offset = mono_move_core::align_up_u32(offset, kind.align());
-                        let bytes = kind.parse_to_bytes(arg);
-                        interpreter.set_root_arg(offset, &bytes);
-                        offset += kind.size();
-                    }
-                },
+                &signers,
+                |call, index| call.arg(&values[index]),
                 |interpreter| {
                     let mut ret_off: u32 = 0;
                     let mut vals = Vec::with_capacity(return_kinds.len());
@@ -859,76 +862,7 @@ impl PrimitiveKind {
         }
     }
 
-    /// Parse `s` into the raw little-endian byte representation that
-    /// mono-move stores in a frame slot.
-    fn parse_to_bytes(self, s: &str) -> Vec<u8> {
-        match self {
-            PrimitiveKind::Bool => vec![parse_bool_arg(s) as u8],
-            PrimitiveKind::U8 => vec![s.parse::<u8>().expect("invalid u8 literal")],
-            PrimitiveKind::U16 => s
-                .parse::<u16>()
-                .expect("invalid u16 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U32 => s
-                .parse::<u32>()
-                .expect("invalid u32 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U64 => s
-                .parse::<u64>()
-                .expect("invalid u64 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U128 => s
-                .parse::<u128>()
-                .expect("invalid u128 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U256 => s
-                .parse::<U256>()
-                .expect("invalid u256 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I8 => (s.parse::<i8>().expect("invalid i8 literal") as u8)
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I16 => s
-                .parse::<i16>()
-                .expect("invalid i16 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I32 => s
-                .parse::<i32>()
-                .expect("invalid i32 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I64 => s
-                .parse::<i64>()
-                .expect("invalid i64 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I128 => s
-                .parse::<i128>()
-                .expect("invalid i128 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I256 => s
-                .parse::<I256>()
-                .expect("invalid i256 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::Address | PrimitiveKind::Signer => AccountAddress::from_hex_literal(s)
-                .expect("invalid address literal")
-                .into_bytes()
-                .to_vec(),
-            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector | PrimitiveKind::U64Vector => {
-                unreachable!("String / vector are return-only kinds")
-            },
-        }
-    }
-
-    /// Format `bytes` (in the same layout produced by `parse_to_bytes`) as a
+    /// Format the raw little-endian frame bytes of a returned scalar as a
     /// decimal string (or hex for addresses).
     fn format_bytes(self, bytes: &[u8]) -> String {
         match self {
