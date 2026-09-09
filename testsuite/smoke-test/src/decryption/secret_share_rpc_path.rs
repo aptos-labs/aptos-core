@@ -9,17 +9,17 @@ use aptos_types::on_chain_config::{
 };
 use std::{sync::Arc, time::Duration};
 
-/// Verify that SecretShareMsg works via the RPC path (not just direct send).
+/// Verify that SecretShareMsg recovers a locally missing self-share via RPC.
 ///
 /// This test disables the direct-send broadcast of secret shares via a failpoint,
-/// forcing the system to rely on the RPC path. If the RPC handler for SecretShareMsg
-/// is missing, validators will not be able to exchange secret shares and the chain
-/// will stall.
+/// forcing the system to rely on the RPC path, and drops the original self-share
+/// delivery on one validator. That validator must reconstruct its share from its
+/// retained ordered block before the network can continue aggregating keys.
 #[tokio::test]
 async fn secret_share_rpc_path() {
     let epoch_duration_secs = 20;
 
-    let mut swarm = SwarmBuilder::new_local(4)
+    let mut swarm = SwarmBuilder::new_local(5)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
             config.api.failpoints_enabled = true;
@@ -62,6 +62,13 @@ async fn secret_share_rpc_path() {
             .await
             .expect("Failed to set failpoint");
     }
+    validator_clients[0]
+        .set_failpoint(
+            "consensus::secret_share_manager::drop_derived_share_delivery".to_string(),
+            "return".to_string(),
+        )
+        .await
+        .expect("Failed to drop the original self-share delivery");
 
     // Generate encrypted traffic to exercise the decryption / secret share path.
     info!("Emitting encrypted traffic with direct-send disabled...");
@@ -96,5 +103,5 @@ async fn secret_share_rpc_path() {
         .await
         .expect("Timed out waiting for epoch 3 — SecretShareMsg RPC path may be broken");
 
-    info!("All validators reached epoch 3 using only the RPC path for secret shares.");
+    info!("All validators reached epoch 3 after recovering the missing self-share.");
 }

@@ -23,7 +23,11 @@ use crate::{
             storage::interface::RandStorage,
             types::{AugmentedData, RandConfig, Share},
         },
-        secret_sharing::{secret_share_manager::SecretShareManager, verifier::SecretShareVerifier},
+        secret_sharing::{
+            secret_share_manager::SecretShareManager,
+            secret_share_recovery::{LateBoundSecretShareRecovery, SecretShareRecovery},
+            verifier::SecretShareVerifier,
+        },
     },
     state_computer::ExecutionProxy,
     state_replication::StateComputer,
@@ -124,6 +128,8 @@ pub trait TExecutionClient: Send + Sync {
 
     /// Returns a pipeline builder for the current epoch.
     fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder;
+
+    fn set_secret_share_recovery(&self, _recovery: Arc<dyn SecretShareRecovery>) {}
 }
 
 struct BufferManagerHandle {
@@ -193,6 +199,7 @@ pub struct ExecutionProxyClient {
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    secret_share_recovery: Arc<LateBoundSecretShareRecovery>,
 }
 
 impl ExecutionProxyClient {
@@ -218,6 +225,7 @@ impl ExecutionProxyClient {
             rand_storage,
             consensus_observer_config,
             consensus_publisher,
+            secret_share_recovery: Arc::new(LateBoundSecretShareRecovery::default()),
         }
     }
 
@@ -295,6 +303,7 @@ impl ExecutionProxyClient {
             self.bounded_executor.clone(),
             &self.consensus_config.secret_share_rb_config,
             self.consensus_config.secret_share_request_delay_ms,
+            self.secret_share_recovery.clone(),
         );
 
         tokio::spawn(secret_share_manager.start(
@@ -544,6 +553,7 @@ impl TExecutionClient for ExecutionProxyClient {
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
     ) {
+        self.secret_share_recovery.clear();
         let network_sender = Arc::new(NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -812,6 +822,10 @@ impl TExecutionClient for ExecutionProxyClient {
 
     fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder {
         self.execution_proxy.pipeline_builder(signer)
+    }
+
+    fn set_secret_share_recovery(&self, recovery: Arc<dyn SecretShareRecovery>) {
+        self.secret_share_recovery.set(recovery);
     }
 }
 

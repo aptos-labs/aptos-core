@@ -1598,6 +1598,15 @@ pub static DECRYPTION_PIPELINE_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static SECRET_SHARE_RECOVERY_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_secret_share_recovery_count",
+        "Count of reactive secret-share recovery outcomes by category.",
+        &["result"]
+    )
+    .unwrap()
+});
+
 /// The dense decryption round consumed by the most recent key-producing block.
 /// Decoupled from the consensus round; advances only on blocks that produce a
 /// decryption key. Watch alongside `TRUSTED_SETUP_NUM_ROUNDS` to track how much
