@@ -57,12 +57,30 @@ class ModelProfileTest(unittest.TestCase):
             select_model(opus, glm, "glm")
             self.assertEqual(ExperimentConfig.load(glm).effort, "max")
 
+    def test_select_sonnet_uses_subscription_and_xhigh_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sonnet.json"
+            select_model(ROOT / "config/default.json", output, "sonnet")
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "claude-sonnet-5")
+            self.assertEqual(config.provider_base_url, "https://api.anthropic.com")
+            self.assertEqual(config.effort, "xhigh")
+            env = subscription_environment(config, {
+                "CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-secret",
+            })
+            self.assertEqual(env["ANTHROPIC_MODEL"], "claude-sonnet-5")
+            self.assertEqual(env["CLAUDE_CODE_EFFORT_LEVEL"], "xhigh")
+
     def test_effort_validation_preserves_history_and_rejects_glm_xhigh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"
             path.write_text(json.dumps(asdict(replace(self.config, effort="max"))))
             self.assertEqual(ExperimentConfig.load(path).effort, "max")
-            for model, effort in (("glm-5.3[1m]", "xhigh"), ("claude-opus-5", "typo")):
+            for model, effort in (
+                ("glm-5.3[1m]", "xhigh"),
+                ("claude-opus-5", "typo"),
+                ("claude-sonnet-5", "typo"),
+            ):
                 path.write_text(json.dumps(asdict(replace(self.config, model=model, effort=effort))))
                 with self.assertRaisesRegex(ValueError, "effort must"):
                     ExperimentConfig.load(path)

@@ -16,7 +16,9 @@ from .config import ExperimentConfig
 PROFILES = {
     "glm": ("glm-5.3[1m]", "https://api.z.ai/api/anthropic"),
     "opus": ("claude-opus-5", "https://api.anthropic.com"),
+    "sonnet": ("claude-sonnet-5", "https://api.anthropic.com"),
 }
+SUBSCRIPTION_PROFILES = {PROFILES["opus"], PROFILES["sonnet"]}
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -25,7 +27,7 @@ def select_model(base: Path, output: Path, model: str) -> None:
         ExperimentConfig.load(base),
         model=PROFILES[model][0],
         provider_base_url=PROFILES[model][1],
-        effort="xhigh" if model == "opus" else "max",
+        effort="xhigh" if model in ("opus", "sonnet") else "max",
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     # A scheduled configuration is immutable; never overwrite an existing one.
@@ -71,7 +73,7 @@ def launch(config_path: Path, command: list[str]) -> None:
         env["MOVE_INFERENCE_CLAUDE_VERSION"] = config.claude_code_version
         wrapper = str(ROOT / "sandbox/with-glm-env.sh")
         os.execve(wrapper, [wrapper, *command], env)
-    if pair != PROFILES["opus"]:
+    if pair not in SUBSCRIPTION_PROFILES:
         raise ValueError("no credential profile for this model/endpoint pair")
     env = subscription_environment(config, dict(os.environ))
     versioned = Path.home() / ".local/share/claude/versions" / config.claude_code_version

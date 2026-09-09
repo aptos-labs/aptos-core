@@ -75,13 +75,14 @@ SDK metrics remain available for cost accounting; missing terminal usage is
 not zero usage. The launch report distinguishes queued aborts (`started: false`)
 from in-flight aborts (`started: true`). Neither is a completed evaluation.
 
-## Select GLM or Opus
+## Select GLM, Opus, or Sonnet
 
 Select the model before screening and scheduling. `--model glm` selects
 GLM 5.3 through Z.ai; `--model opus` selects `claude-opus-5` through Anthropic
-with Claude subscription authentication and `xhigh` effort. GLM uses `max`
-effort. The selector writes a new config, preserves budgets and source
-provenance, and refuses to overwrite a config:
+with Claude subscription authentication and `xhigh` effort; `--model sonnet`
+selects `claude-sonnet-5` through the same subscription-only path and also uses
+`xhigh`. GLM uses `max` effort. The selector writes a new config, preserves
+budgets and source provenance, and refuses to overwrite a config:
 
 ```text
 .venv/bin/python -m harness.model_profile select --model opus \
@@ -89,7 +90,7 @@ provenance, and refuses to overwrite a config:
   --output evaluation-artifacts/corpus3.2-run1-opus/config.json
 ```
 
-For Opus, run `claude setup-token` locally and set `CLAUDE_CODE_OAUTH_TOKEN`
+For Opus or Sonnet, run `claude setup-token` locally and set `CLAUDE_CODE_OAUTH_TOKEN`
 to its token, or save just the token in a private file outside the repository
 and set `MOVE_INFERENCE_CLAUDE_TOKEN_FILE` to that path. The sandbox passes
 subscription OAuth through and redacts it from artifacts. An API key is not

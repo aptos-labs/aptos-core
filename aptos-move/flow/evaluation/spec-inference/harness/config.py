@@ -49,12 +49,13 @@ class ExperimentConfig:
         config = cls(**data)
         if config.schema_version != 1:
             raise ValueError(f"unsupported config schema {config.schema_version}")
-        # Keep historical max-effort Opus configs readable. New Opus profiles
-        # select xhigh; GLM and other existing profiles retain max.
+        # Keep historical max-effort Claude configs readable. New Opus and
+        # Sonnet profiles select xhigh; GLM and other profiles retain max.
         if config.effort != "max" and not (
-            config.model == "claude-opus-5" and config.effort == "xhigh"
+            config.model in ("claude-opus-5", "claude-sonnet-5")
+            and config.effort == "xhigh"
         ):
-            raise ValueError("effort must be max, or xhigh for Opus 5")
+            raise ValueError("effort must be max, or xhigh for Opus/Sonnet 5")
         if config.feedback_level not in FEEDBACK_LEVELS:
             raise ValueError(
                 f"feedback_level must be one of {list(FEEDBACK_LEVELS)}"
