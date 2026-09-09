@@ -63,4 +63,4 @@ pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
-pub use vm_error::{VMInternalError, VMResult};
+pub use vm_error::{ErrorLocation, VMInternalError, VMResult};
