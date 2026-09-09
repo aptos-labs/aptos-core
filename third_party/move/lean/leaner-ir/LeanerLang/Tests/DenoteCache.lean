@@ -77,3 +77,23 @@ theorem «0x42».forged_cache.lookalike.compiled_eq : True := True.intro
 /-- error: `lookalike` has no completed denotation verification -/
 #guard_msgs in
 #leaner_verify 0x42::forged_cache::lookalike
+
+-- A private extension is not a security boundary for source metaprograms.
+theorem «0x42».forged_cache.lookalike.verified : True := True.intro
+
+open Lean Elab Command in
+run_cmd do
+  let env ← getEnv
+  let some name := env.constants.fold (init := none) fun found name _ =>
+      if name.toString.endsWith "LeanerLang.Verify.completedDenotations" then some name else found
+    | throwError "completion extension not found"
+  let extension ← evalConst (checkMeta := false) TagDeclarationExtension name
+  modifyEnv fun env => extension.tag env `«0x42».forged_cache.lookalike.typedVerified
+
+/-- error: `lookalike` has an invalid public verification certificate -/
+#guard_msgs in
+#leaner_verify 0x42::forged_cache::lookalike
+
+/-- error: `lookalike` has an invalid public verification certificate -/
+#guard_msgs in
+#leaner_require_native 0x42::forged_cache::lookalike

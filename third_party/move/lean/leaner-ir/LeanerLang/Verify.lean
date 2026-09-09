@@ -781,6 +781,43 @@ def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
         pending := pending.push dependency
   unless completedDenotations.isTagged env (base ++ `typedVerified) do
     throwError m!"`{function}` has no completed denotation verification"
+  -- The completion tag is only bookkeeping: source metaprograms can mutate
+  -- extensions. Require an actual theorem for this registered unit, function
+  -- and authored contract, reconstructed without trusting cached definitions.
+  let some publicInfo := env.find? (base ++ `verified)
+    | throwError m!"`{function}` has no public verification certificate"
+  let namespaceName := artifacts.getPrefix
+  let some unit := LeanerLang.registeredUnit? env namespaceName
+    | throwError m!"unknown Leaner namespace `{namespaceName}`"
+  let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
+    | throwError m!"unknown function `{function}` in `{namespaceName}`"
+  let some (params, result) := nativeSignature? unit ⟨namespaceIndex⟩ declaration
+    | throwError m!"`{function}` has no native signature"
+  let segments := namespaceName.components.toArray.map (·.getString!)
+  let (twins, families) ← SpecTypes.ensureSpecTypes segments unit
+  let valid ← liftTermElabM do
+    let raw ← buildContract unit ⟨namespaceIndex⟩ ns declaration twins families
+    let argumentsCodec := mkApp (mkConst ``hlistCodec) (← quoteRow params)
+    let resultsCodec := mkApp (mkConst ``resultCodec) (← quoteShape result)
+    let typed ← mkAppM ``LeanerIR.Proofs.Contract.typed #[argumentsCodec, resultsCodec, raw]
+    let publicContract ← mkAppM ``LeanerIR.Proofs.Contract.runtime
+      #[argumentsCodec, resultsCodec, typed]
+    let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
+    let expected ← withLocalDecl `registry .implicit
+        (mkConst ``LeanerIR.Validation.SemanticsRegistry) fun registry =>
+      withLocalDecl `executable .implicit
+          (mkConst ``LeanerIR.Validation.ExecutableUnit) fun executable => do
+        let prepared ← mkAppM ``LeanerIR.Validation.prepareExecution #[registry, toExpr unit]
+        let errorType := (← inferType prepared).getAppArgs[0]!
+        let success ← mkAppOptM ``Except.ok #[some errorType,
+          some (mkConst ``LeanerIR.Validation.ExecutableUnit), some executable]
+        let preparation ← mkEq prepared success
+        let conclusion ← mkAppM ``LeanerIR.Proofs.SatisfiesFunction
+          #[executable, toExpr handle, publicContract]
+        mkForallFVars #[registry, executable] (← mkArrow preparation conclusion)
+    isDefEq publicInfo.type expected
+  unless valid do
+    throwError m!"`{function}` has an invalid public verification certificate"
 
 /-- Verify one function through its denotation. -/
 def verifyFunction (reference : Syntax) (segments : Array String) (function : String)
