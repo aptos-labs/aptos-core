@@ -30,11 +30,14 @@ class MetricsTests(unittest.TestCase):
         self.assertNotIn("SECRET", json.dumps(counts))
 
     def test_report_retains_attempts_without_double_counting_reused_jobs(self):
-        def job(identifier):
+        def job(identifier, name=None, start="2026-09-09T00:00:00Z"):
             return {
                 "id": identifier,
-                "started_at": "2026-09-09T00:00:00Z",
+                "name": name or str(identifier),
+                "started_at": start,
                 "completed_at": "2026-09-09T00:01:00Z",
+                "runner_id": 1,
+                "conclusion": "success",
                 "labels": [
                     "2cpu-gh-ubuntu24-x64" if identifier == 3 else "runs-on,cpu=32"
                 ],
@@ -45,7 +48,7 @@ class MetricsTests(unittest.TestCase):
             side_effect=[
                 {"run_attempt": 2},
                 {"jobs": [job(1), job(2)]},
-                {"jobs": [job(2), job(3)]},
+                {"jobs": [job(2), job(20, name="2"), job(3)]},
                 {},
                 {},
             ],
@@ -57,6 +60,38 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(
             sum(job["allocated_vcpu_minutes"] for job in report["jobs"]), 66
         )
+        self.assertEqual(report["jobs"][1]["reused_job_ids"], [20])
+
+    def test_report_counts_a_real_rerun_of_the_same_job(self):
+        job = {
+            "id": 1,
+            "name": "test",
+            "runner_id": 1,
+            "conclusion": "failure",
+            "started_at": "2026-09-09T00:00:00Z",
+            "completed_at": "2026-09-09T00:01:00Z",
+            "labels": ["cpu=32"],
+        }
+        retry = {
+            **job,
+            "id": 2,
+            "runner_id": 2,
+            "conclusion": "success",
+            "started_at": "2026-09-09T00:02:00Z",
+            "completed_at": "2026-09-09T00:03:00Z",
+        }
+        with patch(
+            "ci_metrics.gh_json",
+            side_effect=[
+                {"run_attempt": 2},
+                {"jobs": [job]},
+                {"jobs": [retry]},
+                {},
+                {},
+            ],
+        ):
+            report = run_report("owner/repo", 1)
+        self.assertEqual(sum(j["allocated_vcpu_minutes"] for j in report["jobs"]), 64)
 
     def test_host_memory_sample(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -102,14 +137,15 @@ class MetricsTests(unittest.TestCase):
     def test_threshold_boundaries(self):
         for count, expected in [
             (0, "inline"),
-            (999, "inline"),
-            (1000, "inline"),
-            (1001, "shard"),
+            (2341, "inline"),
+            (2999, "inline"),
+            (3000, "inline"),
+            (3001, "shard"),
         ]:
-            self.assertEqual(execution_mode(count, 1000), expected)
+            self.assertEqual(execution_mode(count, 3000), expected)
         for count in [-1, "1000", None, True]:
             with self.assertRaises(ValueError):
-                execution_mode(count, 1000)
+                execution_mode(count, 3000)
 
     def test_partition_coverage_and_duplicates(self):
         first, second = ("binary", "a", False), ("binary", "b", False)

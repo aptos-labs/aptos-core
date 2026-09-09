@@ -96,6 +96,14 @@ jobs:
         uses: ./.github/actions/postgres-start
 
       # Exact artifact IDs also work when only failed shard jobs are rerun.
+      - name: Require the producer artifact IDs
+        env:
+          NODE_ARTIFACT_ID: ${{ needs.build-smoke-aptos-node.outputs.artifact-id }}
+          TEST_ARTIFACT_ID: ${{ needs.build-smoke-tests.outputs.artifact-id }}
+        run: |
+          [[ "$NODE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || { echo "Missing or invalid node artifact ID"; exit 1; }
+          [[ "$TEST_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || { echo "Missing or invalid test artifact ID"; exit 1; }
+
       - name: Download aptos-node binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
         with:

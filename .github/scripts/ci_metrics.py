@@ -134,7 +134,7 @@ def gh_json(endpoint):
 
 def run_report(repo, run_id):
     run = gh_json(f"repos/{repo}/actions/runs/{run_id}")
-    by_id = {}
+    executions = {}
     for attempt in range(1, run["run_attempt"] + 1):
         page = 1
         while True:
@@ -142,13 +142,30 @@ def run_report(repo, run_id):
                 f"repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100&page={page}"
             )["jobs"]
             for job in batch:
-                # Reused successful jobs must not be billed twice in the report.
-                if job["id"] not in by_id:
-                    by_id[job["id"]] = {**job, "measurement_run_attempt": attempt}
+                # GitHub gives reused jobs new IDs but preserves their execution
+                # timestamps and runner. Count each execution only once.
+                identity = tuple(
+                    job.get(field)
+                    for field in (
+                        "name",
+                        "started_at",
+                        "completed_at",
+                        "runner_id",
+                        "conclusion",
+                    )
+                )
+                if identity not in executions:
+                    executions[identity] = {
+                        **job,
+                        "measurement_run_attempt": attempt,
+                        "reused_job_ids": [],
+                    }
+                elif job["id"] != executions[identity]["id"]:
+                    executions[identity]["reused_job_ids"].append(job["id"])
             if len(batch) < 100:
                 break
             page += 1
-    jobs = list(by_id.values())
+    jobs = list(executions.values())
     for job in jobs:
         if job["started_at"] and job["completed_at"]:
             job["runner_minutes"] = (
@@ -191,7 +208,7 @@ def main():
     run.add_argument("argv", nargs=argparse.REMAINDER)
     plan = commands.add_parser("plan")
     plan.add_argument("listing", type=Path)
-    plan.add_argument("--threshold", type=int, default=1000)
+    plan.add_argument("--threshold", type=int, default=3000)
     compare = commands.add_parser("compare")
     compare.add_argument("expected", type=Path)
     compare.add_argument("partitions", nargs="+", type=Path)

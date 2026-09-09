@@ -29,6 +29,22 @@ function shell(script, env) {
   });
 }
 
+test('artifact consumers reject empty, invalid and multiple producer IDs', () => {
+  for (const [file, name, fields] of [
+    ['.github/workflows/targeted-unit-tests.yaml', 'Require the producer artifact ID', ['TEST_ARTIFACT_ID']],
+    ['.github/workflows/smoke-tests.yaml', 'Require the producer artifact IDs', ['NODE_ARTIFACT_ID', 'TEST_ARTIFACT_ID']],
+  ]) {
+    const script = stepRun(file, name);
+    const valid = Object.fromEntries(fields.map(field => [field, '10126978793']));
+    assert.equal(shell(script, valid).status, 0);
+    for (const field of fields) {
+      for (const invalid of ['', '0', '-1', 'abc', '123,456']) {
+        assert.notEqual(shell(script, { ...valid, [field]: invalid }).status, 0, `${name}: ${field}=${invalid}; ${script}`);
+      }
+    }
+  }
+});
+
 test('required checks reject failures, cancellations, missing results and unexpected skips', () => {
   for (const [file, name] of [
     ['.github/workflows/lint-test.yaml', 'Check targeted unit test results'],

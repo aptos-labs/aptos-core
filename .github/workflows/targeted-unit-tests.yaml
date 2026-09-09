@@ -31,7 +31,7 @@ env:
   TEST_ARCHIVE: targeted-tests.tar.zst
   # Runs with at most this many tests execute inline in the build job.
   # Larger runs fan out to the shard matrix below.
-  INLINE_TEST_COUNT_MAX: "1000"
+  INLINE_TEST_COUNT_MAX: "3000"
   CI_BENCHMARK_PACKAGES: ${{ inputs.benchmark-packages }}
   # Test runtime environment, shared by the inline run and the shards.
   INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
@@ -139,6 +139,12 @@ jobs:
 
       # The archive carries the test binaries but not the prover tools some tests shell out to.
       - uses: ./.github/actions/prover-tools-setup
+
+      - name: Require the producer artifact ID
+        env:
+          TEST_ARTIFACT_ID: ${{ needs.build.outputs.artifact-id }}
+        run: |
+          [[ "$TEST_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || { echo "Missing or invalid test artifact ID"; exit 1; }
 
       - name: Restore the test archive
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4

@@ -18,7 +18,7 @@ on:
         description: Run only the CI A/B benchmark on this ref
       benchmark-suite:
         type: choice
-        options: [small, large]
+        options: [small, medium, large]
         default: small
         description: Fixed package selection for all samples
       benchmark-cache:
@@ -30,6 +30,10 @@ on:
         type: boolean
         default: false
         description: Include CLI/API runner comparisons using the reference image
+      benchmark-rerun:
+        type: boolean
+        default: false
+        description: Intentionally fail one large-suite shard once to test failed-job reruns
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -60,6 +64,7 @@ jobs:
       suite: ${{ inputs.benchmark-suite }}
       cache: ${{ inputs.benchmark-cache }}
       include-e2e: ${{ inputs.benchmark-e2e }}
+      exercise-rerun: ${{ inputs.benchmark-rerun }}
 
   # This job determines which files were changed
   file_change_determinator:

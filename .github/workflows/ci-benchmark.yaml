@@ -17,6 +17,10 @@ on:
         type: boolean
         default: false
         description: Also compare CLI/API runners using the prebuilt reference image
+      exercise-rerun:
+        type: boolean
+        default: false
+        description: Intentionally fail the last shard of the first sample on attempt one
 
 permissions:
   contents: read
@@ -24,7 +28,7 @@ permissions:
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
-  CI_BENCHMARK_PACKAGES: ${{ inputs.suite == 'large' && 'move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || 'aptos-cargo-cli' }}
+  CI_BENCHMARK_PACKAGES: ${{ inputs.suite == 'large' && 'e2e-move-tests aptos-api move-prover move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || inputs.suite == 'medium' && 'move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || 'aptos-cargo-cli' }}
   INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
   RUST_MIN_STACK: "4297152"
   MVP_TEST_ON_CI: "true"
@@ -47,6 +51,16 @@ jobs:
         run: |
           node --test .github/scripts/*.test.cjs
           python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+      - name: Exercise a missing artifact
+        id: missing-artifact
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
+        with:
+          artifact-ids: "0"
+      - name: Require missing-artifact failure
+        env:
+          OUTCOME: ${{ steps.missing-artifact.outcome }}
+        run: test "$OUTCOME" = failure
 
   seed:
     if: inputs.cache == 'seeded'
@@ -111,11 +125,11 @@ jobs:
         sample: [1, 2, 3]
     uses: ./.github/workflows/targeted-unit-tests.yaml
     with:
-      benchmark-packages: ${{ inputs.suite == 'large' && 'move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || 'aptos-cargo-cli' }}
+      benchmark-packages: ${{ inputs.suite == 'large' && 'e2e-move-tests aptos-api move-prover move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || inputs.suite == 'medium' && 'move-compiler-v2 move-prover-boogie-backend move-prover-e2e-tests' || 'aptos-cargo-cli' }}
       run-name: candidate-${{ matrix.sample }}
       cache-enabled: ${{ inputs.cache != 'disabled' }}
       cache-namespace: benchmark-${{ github.run_id }}
-      exercise-rerun: ${{ inputs.suite == 'large' && inputs.cache == 'disabled' && matrix.sample == 1 }}
+      exercise-rerun: ${{ inputs.exercise-rerun && matrix.sample == 1 }}
 
   # Both versions use the same prebuilt image. The candidate CLI tests also
   # include this branch's assertion fixes; API test sources remain unchanged.
@@ -189,7 +203,7 @@ jobs:
               candidate = latest(f'candidate-{sample}-build')
               expected = inventory(baseline)
               check_partitions(expected, [inventory(candidate)])
-              if execution_mode(candidate['test-count'], 1000) == 'shard':
+              if execution_mode(candidate['test-count'], 3000) == 'shard':
                   shards = [latest(f'candidate-{sample}-shard-{partition}') for partition in range(1, 9)]
                   check_partitions(expected, [inventory(shard) for shard in shards])
               print(f'Sample {sample}: {len(expected)} tests, exact inventory and partition match')

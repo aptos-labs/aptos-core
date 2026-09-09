@@ -4,7 +4,7 @@
 
 Targeted unit tests use the same affected-package selector for `run` and
 `archive`, including the four existing exclusions. A 64-vCPU job builds the
-archive once. Selections with at most 1,000 tests execute there; larger selections
+archive once. Selections with at most 3,000 tests execute there; larger selections
 use eight 32-vCPU partitions. The threshold and runner sizes are provisional
 until the Linux A/B measurements below are complete. This does not replace
 workspace tests, doctests, VM-feature checks, or smoke tests.
@@ -64,14 +64,18 @@ gh workflow run lint-test.yaml --ref vk/ci-improve-1 \
   -f benchmark-cache=disabled -f benchmark-e2e=true
 ```
 
-Repeat for `small` and `large`, each with `disabled`, `cold`, and `seeded` cache
+Repeat for `small`, `medium`, and `large`, each with `disabled`, `cold`, and `seeded` cache
 modes. Each dispatch uses three fresh baseline runners and three fresh candidate
 build runners. Run these experiments sequentially to avoid unnecessary runner
 contention and expense. The fixed suites are:
 
 - Small: `aptos-cargo-cli`.
-- Large: `move-compiler-v2`, `move-prover-boogie-backend`, and
-  `move-prover-e2e-tests`. Verify that it actually exceeds the sharding threshold.
+- Medium: `move-compiler-v2`, `move-prover-boogie-backend`, and
+  `move-prover-e2e-tests` (2,341 tests; originally called `large`). This suite
+  completed too quickly to justify eight-way fan-out, motivating the raised cutoff.
+- Large: the medium packages plus `e2e-move-tests`, `aptos-api`, and `move-prover`.
+  These include the dominant test-time consumers in the historical targeted run.
+  Verify that the resulting selection exceeds the sharding threshold.
 
 Both paths check out the dispatch's exact SHA, select the same packages, and use
 the same nextest profile/retry policy. The baseline retains the original tool
@@ -94,11 +98,12 @@ jobs keep the reference source. The first three runner-size comparisons were
 dispatched before those fixes and use reference test sources on both sides.
 Record resolved network-image digests; moving tags can confound comparisons.
 
-The large, cache-disabled experiment intentionally fails the last shard of the
-first candidate after its tests finish. Run `gh run rerun RUN_ID --failed` to
+With `benchmark-rerun=true`, a sharded experiment intentionally fails the last
+shard of the first candidate after its tests finish. Run `gh run rerun RUN_ID --failed` to
 verify that the rerun downloads the successful original build's exact artifact
 ID. Keep first-attempt test timings and rerun-validation overhead separate.
-The report retains all attempts without counting reused job IDs twice.
+The report retains all attempts without counting reused executions twice;
+GitHub can assign new IDs to successful jobs that were not executed again.
 
 After each completed run:
 
@@ -138,7 +143,7 @@ workflow's read-only policy is bypassed. Check real default-branch restore
 behavior using a trusted cache entry. Do not weaken the backend boundary to
 perform this test.
 
-Keep the 1,000-test cutoff and eight-way fan-out only if measured overhead,
+Keep the 3,000-test cutoff and eight-way fan-out only if measured overhead,
 memory, and cost support them; otherwise tune them within this PR. Likewise keep
 the smaller CLI/API and merge-base runners only after Linux runs pass without
 material timeout or memory regressions. Delete only benchmark artifact/cache IDs
