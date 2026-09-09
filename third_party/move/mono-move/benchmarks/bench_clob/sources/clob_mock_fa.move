@@ -73,6 +73,13 @@ module bench::clob_mock_fa {
     public fun mint(
         _admin: &signer, asset: Object<Metadata>, to: address, amount: u64
     ) acquires Refs {
+        faucet(asset, to, amount);
+    }
+
+    /// Unpermissioned mint. A harness drives thousands of independent accounts
+    /// that each need funding, and routing every one through the admin would
+    /// serialize them on the admin's sequence number.
+    public fun faucet(asset: Object<Metadata>, to: address, amount: u64) acquires Refs {
         let refs = borrow_global<Refs>(object::object_address(&asset));
         primary_fungible_store::mint(&refs.mint_ref, to, amount);
     }

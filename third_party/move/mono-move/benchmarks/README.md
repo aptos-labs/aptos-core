@@ -87,6 +87,67 @@ and not wall clock (`move-unit-test/src/test_runner.rs`).
 Knob values that exceed the bound belong in the harness, not in a test. Each
 package README marks which of its values those are.
 
+## Criterion micro-benches
+
+The six compute packages also run as criterion benches in `mono-move-testsuite`,
+which is the quickest way to get a mono-vs-legacy number locally:
+
+```bash
+cargo bench -p mono-move-testsuite --bench towers
+```
+
+Each bench compiles the package source with `include_str!`, so the `.move` files
+here are the single copy. Adding one means a `src/programs/<name>.rs` wrapper, a
+`benches/<name>.rs`, a `[[bench]]` entry in `testsuite/Cargo.toml`, and an id in
+`testsuite/benches/perf/config.json` to put it behind the regression gate.
+
+The knobs are frozen constants at the top of each bench file, sized so the mono
+arm runs 1 to 30 ms. Changing one invalidates the stored criterion baselines, so
+the A/B gate cannot compare across such a change.
+
+The three DeFi packages are not wired here. They need `AptosFramework`, and the
+mono bench runner publishes only the modules it compiles, with no framework
+underneath. They run on the e2e path instead.
+
+## E2E transaction benchmarks
+
+The three DeFi packages run as `aptos-executor-benchmark` transaction types
+`bench-aave`, `bench-clob`, and `bench-clmm`, and as workloads in
+[`../../../../testsuite/mono_move/e2e-perf/run_e2e_perf_test.py`](../../../../testsuite/mono_move/e2e-perf/run_e2e_perf_test.py).
+
+```bash
+cargo build --release -p aptos-executor-benchmark
+target/release/aptos-executor-benchmark \
+  --block-executor-type aptos-vm-with-block-stm --execution-threads 4 \
+  --num-generator-workers 1 --generate-then-execute --block-size 500 \
+  run-executor --data-dir <db> --checkpoint-dir <cp> \
+  --transaction-type bench-clob --module-working-set-size 1 \
+  --main-signer-accounts 1000 --additional-dst-pool-accounts 30000 --blocks 30
+```
+
+Each is a three-stage `BenchWorkflowKind` in
+`crates/transaction-workloads-lib/src/bench_workflows.rs`: create accounts,
+onboard each with one transaction, then loop a sampled mix. The mix draws an
+entry function per transaction from a `WeightedIndex` over the generator's
+seeded rng, so one registration produces a varied stream. Adding a package means
+a variant there, a `TransactionTypeArg` in `args.rs`, and a `Workload` in the
+e2e-perf script.
+
+Two settings are not optional:
+
+- `--num-generator-workers 1`. Generator threads assign sequence numbers in
+  whatever order they run, but the block keeps the order the slots were laid out
+  in. The looping stage draws the same account twice in a block, and a reversed
+  pair is discarded as `SEQUENCE_NUMBER_TOO_NEW`.
+- A gas ceiling on account-signed transactions, which
+  `bench_workflows.rs` applies. The prologue makes the sender cover
+  `max_gas_amount * gas_unit_price` up front, so the SDK default of 20M units
+  would put a 20 APT floor under every account the harness creates.
+
+Setup dilutes the measurement: `2 * num_accounts` of the transactions in a run
+are account creation and onboarding rather than the mix. At 500 accounts and 30
+blocks of 500 that is 7%.
+
 ## Provenance
 
 The four AWFY kernels are ports of MIT-licensed source and carry the MIT notice.

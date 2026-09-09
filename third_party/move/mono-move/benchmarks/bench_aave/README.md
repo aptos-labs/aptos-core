@@ -140,9 +140,16 @@ Named address `bench` is `0xB0`, and `admin` must be that address.
    no borrowing power. Mode `2` is variable and is the only mode accepted.
 
 7. Advance the clock. Both indexes are written only when
-   `timestamp::now_seconds()` has moved, so with a frozen clock every accrual
-   short-circuits and none of the interest math runs. A month is enough for
-   the indexes to leave one ray.
+   `timestamp::now_microseconds()` has moved, so with a frozen clock every
+   accrual short-circuits and none of the interest math runs. A month is enough
+   for the indexes to leave one ray.
+
+   Rates are denominated per microsecond, not per second as upstream does it.
+   The benchmark harness advances the block timestamp by one microsecond per
+   block, so a second-denominated reserve would accrue once for the whole run
+   and every later transaction would take the short-circuit. The annual rate is
+   unchanged; only the granularity differs, and the unit tests pin the same ray
+   values as before.
 
 ### Bulk seeding
 
@@ -200,7 +207,10 @@ average_liquidation_threshold, health_factor, has_zero_ltv_collateral)`, or
 | `aave_pool::oracle_set_price(admin, underlying, price)` | Set a price, 8 decimals. |
 | `aave_mock_fa::create_asset_entry(admin, symbol, decimals)` | Create an underlying. |
 | `aave_mock_fa::mint(admin, asset, to, amount)` | Fund an address. |
+| `aave_mock_fa::faucet(asset, to, amount)` | Same, without the admin check. |
 | `aave_logic::seed_users(admin, n_users, collaterals_per_user, supply_amount, borrow_amount, seed)` | Build `n_users` supplied-and-borrowed users in one call. |
+| `aave_logic::bench_onboard(account, start, collaterals, supply_amount, borrow_amount)` | Fund, supply `collaterals` reserves from `start`, and take one variable borrow, in one transaction. |
+| `aave_logic::bench_supply(account, asset, amount)` | Faucet then supply, so a long run cannot exhaust the account. |
 | `aave_logic::supply(account, asset, amount)` | Deposit and mint aTokens. |
 | `aave_logic::withdraw(account, asset, amount, to)` | Burn aTokens and release underlying. `amount = u256::MAX` withdraws the full balance and clears the collateral bit. |
 | `aave_logic::borrow(account, asset, amount, interest_rate_mode)` | Mint variable debt and release underlying. |
@@ -219,6 +229,27 @@ Views: `aave_logic::user_account_data`, `aave_logic::health_factor`,
 `flash_loan_simple_take` and `flash_loan_simple_repay` are also public.
 `take` returns a `FlashLoanReceipt` with no abilities, so the compiler will not
 let a caller end the transaction without repaying.
+
+## Transaction harness
+
+`seed_users` builds its users from admin-derived signers, so every transaction
+it produces is signed by the admin and they all serialize on one sequence
+number. A harness that wants thousands of independent senders uses the
+`bench_*` surface instead:
+
+1. Publisher, once: `initialize`, then per reserve `create_asset_entry`,
+   `admin_add_reserve`, `oracle_set_price`, and `bench_supply` for the
+   bootstrap liquidity every reserve needs before anyone can borrow from it.
+2. Each account, once: `bench_onboard(start, collaterals, supply, borrow)`.
+   `start` is any function of the address, so the mix can recompute which
+   reserves an account holds without tracking anything.
+3. Steady state: `bench_supply`, `withdraw`, `borrow`, `repay`,
+   `set_user_use_reserve_as_collateral`, `flash_loan_simple`. Every one of
+   these succeeds from a plain signer for as long as the run lasts, provided
+   the amounts stay small next to what `bench_onboard` supplied.
+
+`aptos-transaction-workloads-lib` drives exactly this recipe; see
+`bench_workflows.rs`. `test_harness_onboard_then_mix` pins it in Move.
 
 ## Knobs
 
@@ -242,7 +273,7 @@ compile time.
 - **`amount`**: on every entry point. Utilization decides which slope of the
   rate model runs, and the `optimal_usage_ratio_bps` argument decides where the
   kink sits.
-- **Elapsed seconds**: whether index accrual and treasury accrual run, or
+- **Elapsed microseconds**: whether index accrual and treasury accrual run, or
   short-circuit on `last_update_timestamp == now`. Zero, one hour and one month
   are three distinct paths.
 - **`premium_bps`** on `flash_loan_simple`: zero skips the index cumulation
