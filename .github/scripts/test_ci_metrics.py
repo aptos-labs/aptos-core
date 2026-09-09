@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,7 @@ from ci_metrics import (
     cgroup_peak,
     check_partitions,
     execution_mode,
+    host_busy_cpu_seconds,
     host_memory_used,
     inventory,
     measure,
@@ -135,6 +137,17 @@ class MetricsTests(unittest.TestCase):
             self.assertEqual(host_memory_used(path), 400 * 1024)
             path.write_text("MemTotal: 1000 kB\n")
             self.assertIsNone(host_memory_used(path))
+
+    def test_host_cpu_counter_excludes_idle_iowait_steal_and_duplicate_guest(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "stat"
+            self.assertIsNone(host_busy_cpu_seconds(path))
+            path.write_text("cpu 100 20 30 400 50 6 7 80 90 10\ncpu0 0 0 0\n")
+            self.assertEqual(
+                host_busy_cpu_seconds(path), 163 / os.sysconf("SC_CLK_TCK")
+            )
+            path.write_text("cpu 1\n")
+            self.assertIsNone(host_busy_cpu_seconds(path))
 
     def test_cgroup_peak_versions_and_missing_counter(self):
         with tempfile.TemporaryDirectory() as temporary:

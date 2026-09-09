@@ -127,6 +127,9 @@ Collect and compare:
   largest child RSS, **not** aggregate parallel-process memory. They also record
   the runner cgroup memory high-water mark when available. Use runner telemetry
   for aggregate memory and utilization when that counter is unavailable.
+  Child CPU/RSS omit work in a separately started sccache daemon. New records
+  additionally measure host busy CPU from `/proc/stat`, including that daemon
+  and other host processes; idle, I/O wait, and stolen time are excluded.
 - Archive sizes and transfer time, native cache usage/evictions, retained artifact
   storage, and request throttling. At the initial measurement there were five
   repository caches totaling 7,115,327,502 bytes; confirm the actual storage limit
@@ -240,7 +243,7 @@ main-to-PR restore/write-denial exercise remain external pre-merge checks.
 
 - `cargo check`, all nine `aptos-cargo-cli` unit tests, package Clippy with
   warnings denied, and package formatting pass.
-- Eight Node and twelve Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
+- Eight Node and thirteen Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
   shell bodies, cache preflight fallback, threshold boundaries, partition
   completeness, explicit package selection, fail-closed dependency checks,
   missing/invalid artifact IDs, and correct rerun allocation accounting.

@@ -87,9 +87,22 @@ def cache_error_counts(log):
     return counts
 
 
+def host_busy_cpu_seconds(path=Path("/proc/stat")):
+    try:
+        fields = path.read_text().splitlines()[0].split()
+        if fields[0] != "cpu":
+            return None
+        ticks = list(map(int, fields[1:]))
+        # user, nice, system, irq, softirq; guest time is already in user/nice.
+        return sum(ticks[index] for index in (0, 1, 2, 5, 6)) / os.sysconf("SC_CLK_TCK")
+    except (OSError, IndexError, ValueError):
+        return None
+
+
 def measure(phase, command, output_dir):
     output_dir.mkdir(parents=True, exist_ok=True)
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
+    host_cpu_before = host_busy_cpu_seconds()
     started_at = datetime.now(timezone.utc).isoformat()
     start = time.monotonic()
     sampled_memory = []
@@ -108,6 +121,7 @@ def measure(phase, command, output_dir):
         print(error, file=sys.stderr)
         result = 127
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    host_cpu_after = host_busy_cpu_seconds()
     row = {
         "phase": phase,
         "started_at": started_at,
@@ -125,6 +139,10 @@ def measure(phase, command, output_dir):
     }
     # Keep the counter's scope explicit; this is not a per-phase memory peak.
     row.update(cgroup_peak())
+    if host_cpu_before is not None and host_cpu_after is not None:
+        # Unlike RUSAGE_CHILDREN, this includes a separately started sccache daemon.
+        row["host_busy_cpu_seconds"] = max(0, host_cpu_after - host_cpu_before)
+        row["host_cpu_capacity_seconds"] = os.cpu_count() * row["elapsed_seconds"]
     if sampled_memory:
         # Host-wide MemTotal - MemAvailable includes other runner processes.
         row["sampled_host_used_peak_bytes"] = max(sampled_memory)
