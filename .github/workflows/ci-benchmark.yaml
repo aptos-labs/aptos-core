@@ -47,6 +47,10 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/rust-check-merge-base
+      - uses: ./.github/actions/sccache-setup
+      - name: Require the default-off compilation cache
+        if: vars.CI_COMPILATION_CACHE_ENABLED != 'true'
+        run: test -z "${RUSTC_WRAPPER:-}"
       - name: Validate CI helpers on Linux
         run: |
           node --test .github/scripts/*.test.cjs
@@ -70,6 +74,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/sccache-setup
         with:
+          force-enable: "true"
           namespace: benchmark-${{ github.run_id }}
       - uses: ./.github/actions/prover-tools-setup
       - name: Seed only this workflow's benchmark namespace

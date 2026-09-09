@@ -178,6 +178,7 @@ jobs:
     uses: ./.github/workflows/smoke-tests.yaml
     with:
       only_docs_changed: ${{ needs.file_change_determinator.outputs.only_docs_changed }}
+      cache-enabled: ${{ vars.CI_COMPILATION_CACHE_ENABLED == 'true' }}
 
   # Required check compatibility shim. Maintains the "rust-smoke-tests" check name
   # that branch protection rules expect, while the actual work happens in smoke-tests.yaml.

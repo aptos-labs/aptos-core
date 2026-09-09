@@ -9,13 +9,19 @@ use eight 32-vCPU partitions. The threshold and runner sizes are provisional
 until the Linux A/B measurements below are complete. This does not replace
 workspace tests, doctests, VM-feature checks, or smoke tests.
 
-Compilation and prover tools use GitHub's native cache service. GitHub enforces
+Optional compilation caching and prover tools use GitHub's native cache service. GitHub enforces
 branch access using the job's runtime credentials: pull requests can read the
 default/base branch caches, but cannot write into the default branch's scope.
 Changing a key or bypassing this repository's setup action does not grant that
 write access. See [GitHub's cache restrictions](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache).
 
-Normal cache producers are pushes and manual runs on `main`. Other jobs restore
+Compilation caching is **off by default**. Enable normal CI only by setting the
+repository variable `CI_COMPILATION_CACHE_ENABLED=true` after the quota and
+large warm-cache gates below pass. Explicit benchmark inputs can enable it
+without changing repository settings. Cold smoke builds regressed materially;
+the isolated small warm-cache win does not justify a broad default rollout.
+
+When enabled, normal cache producers are pushes and manual runs on `main`. Other jobs restore
 only. `sccache` is pinned, uses only its GHA backend, and includes compiler inputs
 in its keys; its namespace is not rotated weekly. Prover keys include OS,
 architecture, and the hash of `scripts/dev_setup.sh`. The installer checks the
@@ -272,7 +278,7 @@ the following assertion required that failure, and the Linux helper tests passed
 
 - `cargo check`, all nine `aptos-cargo-cli` unit tests, package Clippy with
   warnings denied, and package formatting pass.
-- Nine Node and thirteen Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
+- Ten Node and thirteen Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
   shell bodies, cache preflight fallback, threshold boundaries, partition
   completeness, explicit package selection, fail-closed dependency checks,
   missing/invalid artifact IDs, and correct rerun allocation accounting.

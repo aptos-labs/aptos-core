@@ -139,6 +139,25 @@ test('compiler cache uses only GHA and benchmark readers cannot populate it', ()
   }
 });
 
+test('compiler-cache setup requires repository opt-in or an explicit benchmark', () => {
+  const source = fs.readFileSync(path.join(root, '.github/actions/sccache-setup/action.yaml'), 'utf8');
+  const gates = source.split('\n').filter(line => line.includes('if:') && line.includes('CI_COMPILATION_CACHE_ENABLED'));
+  assert.equal(gates.length, 2, 'Gate both credential setup and cache installation');
+  for (const configured of ['', 'false', 'true']) {
+    for (const forced of ['', 'false', 'true']) {
+      for (const credentials of ['false', 'true']) {
+        for (const gate of gates) {
+          const expression = gate.split('if: ')[1].replaceAll('inputs.force-enable', 'inputs.force_enable');
+          const evaluate = new Function('vars', 'inputs', 'env', `return (${expression});`);
+          const expected = (configured === 'true' || forced === 'true') &&
+            (!gate.includes('env.CI_CACHE_ENABLED') || credentials === 'true');
+          assert.equal(evaluate({ CI_COMPILATION_CACHE_ENABLED: configured }, { force_enable: forced }, { CI_CACHE_ENABLED: credentials }), expected);
+        }
+      }
+    }
+  }
+});
+
 test('dynamic dependency check fails closed on resolution errors and banned packages', () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-dependency-check-'));
   try {

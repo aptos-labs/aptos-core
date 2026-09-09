@@ -60,6 +60,7 @@ jobs:
       - uses: ./.github/actions/sccache-setup
         if: inputs.cache-enabled
         with:
+          force-enable: ${{ inputs.benchmark-packages != '' }}
           namespace: ${{ inputs.cache-namespace }}
           read-only: ${{ inputs.benchmark-packages != '' }}
 

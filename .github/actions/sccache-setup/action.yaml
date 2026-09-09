@@ -1,6 +1,9 @@
 name: sccache setup
 description: Reuse compilation results through GitHub's branch-scoped cache service
 inputs:
+  force-enable:
+    description: Enable an explicit benchmark before the repository-wide cache rollout
+    default: "false"
   namespace:
     description: Cache namespace; benchmarks use a separate namespace from production
     default: aptos-ci-v1
@@ -11,9 +14,10 @@ runs:
   using: composite
   steps:
     - uses: ./.github/actions/github-cache-setup
+      if: vars.CI_COMPILATION_CACHE_ENABLED == 'true' || inputs.force-enable == 'true'
     - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # pin@v0.0.11
       id: install
-      if: env.CI_CACHE_ENABLED == 'true'
+      if: env.CI_CACHE_ENABLED == 'true' && (vars.CI_COMPILATION_CACHE_ENABLED == 'true' || inputs.force-enable == 'true')
       continue-on-error: true
       with:
         version: v0.17.0
