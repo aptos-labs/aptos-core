@@ -44,6 +44,7 @@ impl IntoExecutionError for ModuleProviderError {
     }
 }
 
+#[derive(Clone)]
 pub struct InMemoryModuleProvider {
     module_bytes: HashMap<(AccountAddress, Identifier), Bytes>,
     packages: HashMap<(AccountAddress, Identifier), Vec<Identifier>>,
@@ -120,7 +121,7 @@ impl ModuleProvider for InMemoryModuleProvider {
     }
 
     fn verify_module(&self, _module: &CompiledModule) -> VMResult<()> {
-        // Tests assume the compiled modules are already valid.
+        // The loader verifies bytecode during translation, so no separate check is needed here.
         Ok(())
     }
 
