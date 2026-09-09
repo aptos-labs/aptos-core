@@ -71,6 +71,13 @@ module bench::aave_mock_fa {
         admin: &signer, asset: address, to: address, amount: u64
     ) acquires AssetRefs {
         assert!(signer::address_of(admin) == @bench, ENOT_ADMIN);
+        faucet(asset, to, amount);
+    }
+
+    /// Unpermissioned mint. A harness drives thousands of independent accounts
+    /// that each need funding, and routing every one through the admin would
+    /// serialize them on the admin's sequence number.
+    public fun faucet(asset: address, to: address, amount: u64) acquires AssetRefs {
         let refs = borrow_global<AssetRefs>(asset);
         primary_fungible_store::mint(&refs.mint_ref, to, amount);
     }

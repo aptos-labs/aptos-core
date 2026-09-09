@@ -482,6 +482,57 @@ module bench::aave_logic {
     /// supply runs before any borrow, which keeps a borrow from arriving at a
     /// reserve whose only supplier is a later user.
     ///
+    /// Brings a fresh account to the state the benchmark mix assumes: funded,
+    /// supplying `collaterals` reserves starting at `start`, and carrying one
+    /// variable-rate debt position on the next reserve after those.
+    ///
+    /// `start` is an argument rather than derived from the address so a
+    /// harness can spread accounts over the reserve space however it likes.
+    public entry fun bench_onboard(
+        account: &signer,
+        start: u64,
+        collaterals: u64,
+        supply_amount: u256,
+        borrow_amount: u256
+    ) {
+        assert!(collaterals > 0, EAMOUNT_ZERO);
+        let n_reserves = aave_pool::reserves_count();
+        assert!(n_reserves > collaterals, ENOT_ENOUGH_RESERVES);
+
+        let user = signer::address_of(account);
+        let k = 0;
+        while (k < collaterals) {
+            let asset = aave_pool::reserve_address_by_id((start + k) % n_reserves);
+            // Twice what is supplied, so the account keeps a spendable balance
+            // for flash-loan premiums and repays.
+            aave_mock_fa::faucet(asset, user, ((supply_amount * 2) as u64));
+            supply(account, asset, supply_amount);
+            set_user_use_reserve_as_collateral(account, asset, true);
+            k = k + 1;
+        };
+
+        // Fund the debt asset too, so later repays and flash-loan premiums do
+        // not depend on the account still holding what it borrowed.
+        let debt_asset =
+            aave_pool::reserve_address_by_id((start + collaterals) % n_reserves);
+        aave_mock_fa::faucet(debt_asset, user, (supply_amount as u64));
+        borrow(
+            account,
+            debt_asset,
+            borrow_amount,
+            aave_config::interest_rate_mode_variable()
+        );
+    }
+
+    /// Faucet then supply, so a benchmark account never runs out of underlying
+    /// however long the mix runs.
+    public entry fun bench_supply(
+        account: &signer, asset: address, amount: u256
+    ) {
+        aave_mock_fa::faucet(asset, signer::address_of(account), (amount as u64));
+        supply(account, asset, amount);
+    }
+
     /// Each borrow reserve still needs liquidity from somewhere. With few
     /// users the LCG will not cover the id space, so seed a liquidity provider
     /// across all reserves first.

@@ -15,6 +15,7 @@ module bench::clmm_pool {
     use bench::clmm_swap_math;
     use bench::clmm_tick::{Self, Ticks};
     use bench::clmm_tick_bitmap::{Self, BitMap};
+    use bench::clmm_mock_fa;
     use bench::clmm_tick_math;
 
     /// A pool already exists for this token pair and configuration.
@@ -446,6 +447,83 @@ module bench::clmm_pool {
         let pool_signer = object::generate_signer_for_extending(&pool.extend_ref);
         pay_in(trader, vault_in, token_in, gross_in);
         pay_out(&pool_signer, vault_out, trader_address, amount_out);
+    }
+
+    //
+    // Benchmark harness surface.
+    //
+
+    /// Brings a fresh account to the state the benchmark mix assumes: funded
+    /// on both sides of the pair and holding one position.
+    public entry fun bench_onboard(
+        owner: &signer,
+        pool_id: address,
+        tick_lower: i32,
+        tick_upper: i32,
+        liquidity: u128,
+        fund_amount: u64
+    ) acquires Pool {
+        faucet_pair(owner, pool_id, fund_amount, fund_amount);
+        mint(owner, pool_id, tick_lower, tick_upper, liquidity);
+    }
+
+    /// Faucet the input side, then swap it all the way to the price bound.
+    /// Fauceting first means a long run of swaps in one direction cannot
+    /// exhaust the trader.
+    public entry fun bench_swap_in(
+        trader: &signer, pool_id: address, a_to_b: bool, amount_in: u64
+    ) acquires Pool {
+        if (a_to_b) {
+            faucet_pair(trader, pool_id, amount_in, 0);
+        } else {
+            faucet_pair(trader, pool_id, 0, amount_in);
+        };
+        // A limit has to sit strictly inside the bounds, so step one off them.
+        let limit =
+            if (a_to_b) clmm_tick_math::min_sqrt_price() + 1
+            else clmm_tick_math::max_sqrt_price() - 1;
+        swap(trader, pool_id, a_to_b, amount_in, true, limit);
+    }
+
+    /// Mint, burn the same liquidity back, then collect. The position ends
+    /// where it started, so the mix can run indefinitely, but it walks
+    /// `modify_position` twice and touches every tick in the range.
+    public entry fun bench_rebalance(
+        owner: &signer,
+        pool_id: address,
+        tick_lower: i32,
+        tick_upper: i32,
+        liquidity: u128,
+        fund_amount: u64
+    ) acquires Pool {
+        faucet_pair(owner, pool_id, fund_amount, fund_amount);
+        mint(owner, pool_id, tick_lower, tick_upper, liquidity);
+        burn(owner, pool_id, tick_lower, tick_upper, liquidity);
+        collect(
+            owner,
+            pool_id,
+            tick_lower,
+            tick_upper,
+            (MAX_U64 as u64),
+            (MAX_U64 as u64)
+        );
+    }
+
+    fun faucet_pair(
+        owner: &signer, pool_id: address, amount_a: u64, amount_b: u64
+    ) acquires Pool {
+        assert!(exists<Pool>(pool_id), ENO_POOL);
+        let owner_address = signer::address_of(owner);
+        let (token_a, token_b) = {
+            let pool = borrow_global<Pool>(pool_id);
+            (pool.token_a, pool.token_b)
+        };
+        if (amount_a != 0) {
+            clmm_mock_fa::faucet(token_a, owner_address, amount_a);
+        };
+        if (amount_b != 0) {
+            clmm_mock_fa::faucet(token_b, owner_address, amount_b);
+        }
     }
 
     //

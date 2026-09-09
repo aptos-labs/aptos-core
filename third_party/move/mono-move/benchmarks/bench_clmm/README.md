@@ -45,6 +45,7 @@ accumulators and real fungible-asset vaults.
 | --- | --- |
 | `clmm_mock_fa::create_asset_entry(admin, symbol, decimals)` | Create a test token. |
 | `clmm_mock_fa::mint(admin, asset, to, amount)` | Fund an address. |
+| `clmm_mock_fa::faucet(asset, to, amount)` | Same, without the owner check. |
 | `clmm_pool::create_pool(admin, token_a, token_b, fee_rate, tick_spacing, initial_sqrt_price)` | Open a pool. |
 | `clmm_pool::mint(owner, pool_id, tick_lower, tick_upper, liquidity)` | Add liquidity, pulling both tokens as the price dictates. |
 | `clmm_pool::burn(owner, pool_id, tick_lower, tick_upper, liquidity)` | Remove liquidity; the principal is credited to the position. |
@@ -53,10 +54,34 @@ accumulators and real fungible-asset vaults.
 | `clmm_pool::swap_exact_in(trader, pool_id, a_to_b, amount_in, sqrt_price_limit)` | Sell a fixed amount. |
 | `clmm_pool::swap_exact_out(trader, pool_id, a_to_b, amount_out, sqrt_price_limit)` | Buy a fixed amount. |
 | `clmm_pool::seed_positions(admin, pool_id, n_positions, width_ticks, seed)` | Open a batch of jittered positions. |
+| `clmm_pool::bench_onboard(owner, pool_id, tick_lower, tick_upper, liquidity, fund_amount)` | Faucet both tokens and open one position. |
+| `clmm_pool::bench_swap_in(trader, pool_id, a_to_b, amount_in)` | Faucet the input side, then swap to the price bound. |
+| `clmm_pool::bench_rebalance(owner, pool_id, tick_lower, tick_upper, liquidity, fund_amount)` | Mint, burn the same liquidity, and collect. |
 
 Views: `state`, `liquidity`, `current_tick`, `sqrt_price`, `vault_balances`,
 `position_liquidity`, `position_tokens_owed`, `tick_is_initialized`,
 `tick_liquidity_net`, `tick_liquidity_gross`.
+
+## Transaction harness
+
+The `bench_*` entry points exist so a harness driving thousands of independent
+senders can reach every code path without observing chain state:
+
+1. Publisher, once: create both tokens, mint itself a large balance,
+   `create_pool`, `mint` a wide backstop position, then `seed_positions`.
+2. Each account, once: `bench_onboard(pool_id, lower, upper, liquidity, fund)`.
+   Deriving the range from the account address lets the mix recompute it later
+   without tracking anything.
+3. Steady state: `bench_swap_in`, `bench_rebalance`, `poke`, `collect`.
+
+Two things keep every transaction succeeding. A swap aborts with `EEMPTY_SWAP`
+when it cannot move at all, so the publisher's backstop position has to span
+much wider than the mix can push the price. And every transaction that pays
+into the pool faucets first, so a long run of swaps in one direction cannot
+exhaust a trader.
+
+`aptos-transaction-workloads-lib` drives this recipe; see `bench_workflows.rs`.
+`test_harness_onboard_then_mix` pins it in Move.
 
 ## Knobs
 

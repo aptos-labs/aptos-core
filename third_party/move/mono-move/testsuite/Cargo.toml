@@ -82,3 +82,27 @@ harness = false
 [[bench]]
 name = "int_arith_loop"
 harness = false
+
+[[bench]]
+name = "towers"
+harness = false
+
+[[bench]]
+name = "sieve"
+harness = false
+
+[[bench]]
+name = "queens"
+harness = false
+
+[[bench]]
+name = "bounce"
+harness = false
+
+[[bench]]
+name = "exchange2"
+harness = false
+
+[[bench]]
+name = "pathtracer"
+harness = false

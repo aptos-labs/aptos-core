@@ -93,6 +93,9 @@ WORKLOADS = [
     Workload("token-v2-ambassador-mint", block_size=500),
     Workload("liquidity-pool-swap", block_size=500),
     Workload("order-book-no-matches1-market", block_size=500),
+    Workload("bench-aave", block_size=500),
+    Workload("bench-clob", block_size=500),
+    Workload("bench-clmm", block_size=500),
 ]
 
 
@@ -347,6 +350,11 @@ def common_flags(workload, db_dir, checkpoint_dir):
         f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
         f"--execution-threads 1 --generate-then-execute "
+        # Several generator threads assign sequence numbers in whatever order
+        # they run, but the block keeps the order the slots were laid out in.
+        # A workload that draws the same account twice in a block then lands
+        # its transactions reversed, and the second one is discarded.
+        f"--num-generator-workers 1 "
         f"--block-size {workload.block_size} "
         f"run-executor "
         f"--data-dir {db_dir} --checkpoint-dir {checkpoint_dir}"

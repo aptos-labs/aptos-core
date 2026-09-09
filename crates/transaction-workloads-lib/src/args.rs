@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    bench_workflows::BenchWorkflowKind,
     move_workloads::{FibonacciFunctionType, LoopType, PreBuiltPackagesImpl},
     token_workflow::TokenWorkflowKind,
     EntryPoints, MonotonicCounterType, OrderBookState,
@@ -113,6 +114,11 @@ pub enum TransactionTypeArg {
     // Encrypted variants
     EncryptedCoinTransfer,
     EncryptedAptFaTransfer,
+
+    // DeFi packages from third_party/move/mono-move/benchmarks
+    BenchAave,
+    BenchClob,
+    BenchClmm,
 }
 
 impl TransactionTypeArg {
@@ -348,6 +354,36 @@ impl TransactionTypeArg {
                 workflow_kind: Box::new(TokenWorkflowKind::CreateMintBurn {
                     count: 10000,
                     creation_balance: 200000,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::BenchAave => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::Aave {
+                    num_accounts: 500,
+                    num_reserves: 8,
+                    collaterals_per_account: 3,
+                    num_txns: 1000000,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::BenchClob => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::Clob {
+                    num_accounts: 500,
+                    seed_orders_per_side: 512,
+                    index_limit: 64,
+                    num_txns: 1000000,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::BenchClmm => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::Clmm {
+                    num_accounts: 500,
+                    seed_positions: 64,
+                    swap_size: 100000000,
+                    num_txns: 1000000,
                 }),
                 num_modules: 1,
                 progress_type: workflow_progress_type,

@@ -92,6 +92,10 @@ all `n_bids + n_asks` orders rest.
 | `change_order_size` | `(user, market_id, market_order_id, new_size)` |
 | `seed_book` | `(admin, market_id, n_bids, n_asks, base_price, spread, seed)` |
 | `run` | `(_s, market_id, side, limit, expected)` |
+| `bench_onboard` | `(user, market_id, base_amount, quote_amount)` |
+| `bench_topup` | `(user, market_id, base_amount, quote_amount)` |
+| `bench_place_and_cancel` | `(user, market_id, side, price, size)` |
+| `bench_index` | `(_s, market_id, side, limit)` |
 
 `side` is `true` for bids and `false` for asks; `clob_market::bid_side()` and
 `ask_side()` return them. `price` is in ticks and `size` in lots, so the base
@@ -118,6 +122,34 @@ crossing a price level goes back up through the tree. `run` aborts with
 
 Six `#[view]` functions read state without changing it: `best_price`,
 `book_height`, `n_orders`, `resting_size`, `account_state`, `store_balances`.
+
+## Transaction harness
+
+The `bench_*` entry points exist so a harness driving thousands of independent
+senders can reach every code path without observing chain state:
+
+1. Publisher, once: create both assets, `register_market`, `bench_onboard` for
+   itself, then `seed_book` to fill the tree.
+2. Each account, once: `bench_onboard(market_id, base, quote)` — registers the
+   market account and funds both sides in one transaction.
+3. Steady state: `seed_book` with a small count and a jittered base price
+   replenishes; `place_market_order` matches; `bench_place_and_cancel` inserts
+   and removes; `bench_index` traverses; `bench_topup` refunds.
+
+`bench_place_and_cancel` is the only way to reach the AVL remove path from a
+harness, since a placement's market order id is never visible off-chain. It
+tolerates a full fill, in which case nothing rests and nothing is cancelled.
+`bench_index` is `run` without the checksum, for a caller that cannot predict
+one.
+
+Sizing matters in one place. The AVL queue holds at most 16383 nodes per side,
+so the mix must not add orders faster than it removes them. Drawing market
+order sizes from a wider range than resting order sizes gives the book more
+removal capacity than arrivals, and depth then settles where market orders
+start running out of book rather than growing without bound.
+
+`aptos-transaction-workloads-lib` drives this recipe; see `bench_workflows.rs`.
+`test_harness_onboard_then_mix` pins it in Move.
 
 ## Knobs
 

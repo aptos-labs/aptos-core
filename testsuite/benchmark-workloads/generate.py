@@ -14,7 +14,8 @@ PACKAGES = [
     "testsuite/benchmark-workloads/packages",
     "aptos-move/move-examples/token_objects/ambassador",
     "aptos-move/move-examples/aggregator_examples",
-    "aptos-move/move-examples/bcs-stream"
+    "aptos-move/move-examples/bcs-stream",
+    "third_party/move/mono-move/benchmarks"
 ]
 # Specifies directories for experimental packages (will be compiled with latest, possibly unstable) language version.
 # Paths are relative to the root of the aptos-core repository.

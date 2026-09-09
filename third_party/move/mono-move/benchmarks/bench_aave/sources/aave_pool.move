@@ -225,7 +225,7 @@ module bench::aave_pool {
                 current_liquidity_rate: 0,
                 variable_borrow_index: (aave_math::ray() as u128),
                 current_variable_borrow_rate: 0,
-                last_update_timestamp: timestamp::now_seconds(),
+                last_update_timestamp: timestamp::now_microseconds(),
                 id,
                 a_token,
                 variable_debt_token,
@@ -518,11 +518,11 @@ module bench::aave_pool {
         self.last_update_timestamp
     }
 
-    /// Rolls both indexes forward to now and persists them. Repeated calls in
-    /// the same second are free, which matters because every action starts
+    /// Rolls both indexes forward to now and persists them. Repeated calls at
+    /// the same timestamp are free, which matters because every action starts
     /// here.
     public fun update_state(cache: &mut ReserveCache) acquires ReserveData {
-        let now = timestamp::now_seconds();
+        let now = timestamp::now_microseconds();
         if (cache.last_update_timestamp == now) {
             return
         };
@@ -637,7 +637,7 @@ module bench::aave_pool {
     }
 
     fun normalized_income_of(reserve: &ReserveData): u256 {
-        if (reserve.last_update_timestamp == timestamp::now_seconds()) {
+        if (reserve.last_update_timestamp == timestamp::now_microseconds()) {
             (reserve.liquidity_index as u256)
         } else {
             aave_math::ray_mul(
@@ -651,7 +651,7 @@ module bench::aave_pool {
     }
 
     fun normalized_debt_of(reserve: &ReserveData): u256 {
-        if (reserve.last_update_timestamp == timestamp::now_seconds()) {
+        if (reserve.last_update_timestamp == timestamp::now_microseconds()) {
             (reserve.variable_borrow_index as u256)
         } else {
             aave_math::ray_mul(

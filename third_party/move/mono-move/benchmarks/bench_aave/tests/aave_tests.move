@@ -14,6 +14,10 @@ module bench::aave_tests {
     const WAD: u256 = 1_000_000_000_000_000_000;
     const YEAR: u64 = 31_536_000;
     const MONTH: u64 = 2_592_000;
+
+    /// Reserve timestamps are microseconds, so a formula called with an
+    /// explicit timestamp needs this rather than `YEAR`.
+    const YEAR_MICROS: u64 = 31_536_000_000_000;
     const VARIABLE: u8 = 2;
 
     fun start(aptos_framework: &signer, admin: &signer) {
@@ -112,13 +116,13 @@ module bench::aave_tests {
         // 1 + x + x^2/2 + x^3/6 at x = 0.1 is 1.105166666..., against the true
         // e^0.1 = 1.10517091.
         assert!(
-            aave_math::calculate_compounded_interest(RAY / 10, 0, YEAR)
+            aave_math::calculate_compounded_interest(RAY / 10, 0, YEAR_MICROS)
                 == 1_105_166_666_666_666_666_666_666_667,
             2
         );
         // x = 0.025 gives 1.025315104166..., against e^0.025 = 1.02531512.
         assert!(
-            aave_math::calculate_compounded_interest(RAY / 40, 0, YEAR)
+            aave_math::calculate_compounded_interest(RAY / 40, 0, YEAR_MICROS)
                 == 1_025_315_104_166_666_666_666_666_667,
             3
         );
@@ -696,5 +700,47 @@ module bench::aave_tests {
         add_reserve(admin, b"SD10", 6, 100_000_000, 8000, 8500, 10500, 0, 0);
         add_reserve(admin, b"SD11", 6, 100_000_000, 8000, 8500, 10500, 0, 0);
         aave_logic::seed_users(admin, 1, 2, 1_000_000_000, 500_000_000, 7);
+    }
+
+    // The recipe a transaction harness follows: bootstrap liquidity once as
+    // admin, onboard each account with one transaction, then run the mix. Every
+    // step after onboarding must succeed from a plain signer.
+    #[test(aptos_framework = @0x1, admin = @bench, user = @0xbe0)]
+    fun test_harness_onboard_then_mix(
+        aptos_framework: &signer, admin: &signer, user: &signer
+    ) {
+        start(aptos_framework, admin);
+        let assets = vector[
+            add_reserve(admin, b"HM0", 6, 100_000_000, 8000, 8500, 10500, 1000, 0),
+            add_reserve(admin, b"HM1", 6, 100_000_000, 8000, 8500, 10500, 1000, 0),
+            add_reserve(admin, b"HM2", 6, 200_000_000, 7500, 8000, 11000, 1000, 0),
+            add_reserve(admin, b"HM3", 6, 50_000_000, 7000, 7500, 11000, 1000, 0)
+        ];
+        // Every reserve needs liquidity before anyone can borrow from it, and
+        // `seed_users` only ever covers a window of the reserve space.
+        let r = 0;
+        while (r < 4) {
+            aave_logic::bench_supply(admin, *vector::borrow(&assets, r), 100_000_000_000);
+            r = r + 1;
+        };
+
+        aave_logic::bench_onboard(user, 1, 2, 1_000_000_000, 100_000_000);
+        let user_addr = signer::address_of(user);
+        assert!(scaled_collateral(user_addr, *vector::borrow(&assets, 1)) > 0, 1);
+        assert!(scaled_collateral(user_addr, *vector::borrow(&assets, 2)) > 0, 2);
+        assert!(scaled_debt(user_addr, *vector::borrow(&assets, 3)) > 0, 3);
+
+        let collateral = *vector::borrow(&assets, 1);
+        let debt = *vector::borrow(&assets, 3);
+        aave_logic::bench_supply(user, collateral, 1_000_000);
+        aave_logic::withdraw(user, collateral, 1_000_000, user_addr);
+        aave_logic::borrow(user, debt, 1_000_000, VARIABLE);
+        aave_logic::repay(user, debt, 1_000_000, VARIABLE);
+        aave_logic::set_user_use_reserve_as_collateral(user, collateral, true);
+        aave_logic::flash_loan_simple(user, collateral, 10_000_000, 9, 4);
+
+        // The mix is net-neutral, so the position it started from survives it.
+        assert!(scaled_debt(user_addr, debt) > 0, 4);
+        assert!(scaled_collateral(user_addr, collateral) > 0, 5);
     }
 }

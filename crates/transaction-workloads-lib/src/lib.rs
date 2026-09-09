@@ -4,10 +4,12 @@
 #![forbid(unsafe_code)]
 
 pub mod args;
+mod bench_workflows;
 mod move_workloads;
 mod prebuilt_packages;
 mod token_workflow;
 
+pub use bench_workflows::BenchWorkflowKind;
 pub use move_workloads::{
     EntryPoints, LoopType, MapType, MonotonicCounterType, MoveVmMicroBenchmark, OrderBookState,
 };

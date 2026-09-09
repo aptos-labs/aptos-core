@@ -348,6 +348,48 @@ module bench::clob_market {
         change_order_size_id(user, market_id, market_order_id, new_size);
     }
 
+    /// Brings a fresh account to the state the benchmark mix assumes: a market
+    /// account funded on both sides.
+    public entry fun bench_onboard(
+        user: &signer, market_id: u64, base_amount: u64, quote_amount: u64
+    ) acquires Registry, MarketAccounts {
+        register_market_account(user, market_id);
+        bench_topup(user, market_id, base_amount, quote_amount);
+    }
+
+    /// Faucet then deposit, so a benchmark account never runs out of
+    /// collateral however long the mix runs.
+    public entry fun bench_topup(
+        user: &signer, market_id: u64, base_amount: u64, quote_amount: u64
+    ) acquires Registry, MarketAccounts {
+        let user_addr = signer::address_of(user);
+        let (base, quote) = market_assets(market_id);
+        clob_mock_fa::faucet(base, user_addr, base_amount);
+        clob_mock_fa::faucet(quote, user_addr, quote_amount);
+        deposit(user, market_id, base, base_amount);
+        deposit(user, market_id, quote, quote_amount);
+    }
+
+    /// Place a limit order and cancel whatever rests. This is the only way to
+    /// reach the AVL remove path from a harness, which never sees the market
+    /// order id a placement produced.
+    public entry fun bench_place_and_cancel(
+        user: &signer, market_id: u64, side: bool, price: u64, size: u64
+    ) acquires Registry, MarketAccounts {
+        let market_order_id =
+            place_limit_order_id(user, market_id, side, price, size);
+        if (market_order_id != 0) {
+            cancel_order(user, market_id, market_order_id);
+        }
+    }
+
+    /// `run` without the checksum, for a caller that cannot predict one.
+    public entry fun bench_index(
+        _s: &signer, market_id: u64, side: bool, limit: u64
+    ) acquires Registry {
+        index_orders(market_id, side, limit);
+    }
+
     /// Fill an LCG-jittered book of `n_bids` bids below and `n_asks` asks
     /// above `base_price`, all owned by `admin` and collateralised from
     /// `admin`'s market account. Evenly spaced prices would produce an

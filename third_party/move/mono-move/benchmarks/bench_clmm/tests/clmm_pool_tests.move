@@ -329,4 +329,38 @@ module bench::clmm_pool_tests {
         let pool_id = setup(admin);
         clmm_pool::mint(admin, pool_id, -600, 600, 0);
     }
+
+    // The recipe a transaction harness follows: seed liquidity once as admin,
+    // onboard each account with one transaction, then run the mix. Every step
+    // after onboarding must succeed from a plain signer holding nothing.
+    #[test(admin = @bench, alice = @0xa11ce)]
+    fun test_harness_onboard_then_mix(admin: &signer, alice: &signer) {
+        let pool_id = setup(admin);
+        // A wide range keeps liquidity in play whichever way the mix pushes
+        // the price, so no swap can find an empty book.
+        clmm_pool::mint(admin, pool_id, -60000, 60000, BASE_LIQUIDITY);
+        clmm_pool::seed_positions(admin, pool_id, 16, 600, 11);
+
+        clmm_pool::bench_onboard(alice, pool_id, -1200, 1200, EXTRA_LIQUIDITY, FUNDING);
+        assert!(
+            clmm_pool::position_liquidity(pool_id, @0xa11ce, -1200, 1200)
+                == EXTRA_LIQUIDITY,
+            0
+        );
+
+        clmm_pool::bench_swap_in(alice, pool_id, true, 1000000);
+        clmm_pool::bench_swap_in(alice, pool_id, false, 1000000);
+        clmm_pool::poke(alice, pool_id, -1200, 1200);
+        clmm_pool::collect(alice, pool_id, -1200, 1200, 1000000, 1000000);
+        clmm_pool::bench_rebalance(alice, pool_id, -600, 600, EXTRA_LIQUIDITY, FUNDING);
+
+        // Rebalancing leaves nothing behind, and the onboarded position is
+        // untouched by it.
+        assert!(clmm_pool::position_liquidity(pool_id, @0xa11ce, -600, 600) == 0, 0);
+        assert!(
+            clmm_pool::position_liquidity(pool_id, @0xa11ce, -1200, 1200)
+                == EXTRA_LIQUIDITY,
+            0
+        );
+    }
 }
