@@ -4,6 +4,7 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
   workflow_call:
     inputs:
       only_docs_changed:
@@ -26,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/sccache-setup
       - name: Build aptos-node
-        run: cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
+        run: python3 .github/scripts/ci_metrics.py run smoke-node-build -- cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
         shell: bash
       - name: Upload aptos-node binary
         id: artifact
@@ -55,11 +56,11 @@ jobs:
       - name: Build smoke test archive and helper binaries
         run: |
           # Build helper binaries needed by smoke tests
-          cargo build --locked --release --package aptos --package aptos-debugger
+          python3 .github/scripts/ci_metrics.py run smoke-helpers-build -- cargo build --locked --release --package aptos --package aptos-debugger
           # Create nextest archive with compiled test binaries.
           # LOCAL_SWARM_NODE_RELEASE must be set at compile time (option_env!) so the
           # test binary uses the release aptos-node binary instead of building a debug one.
-          LOCAL_SWARM_NODE_RELEASE=1 cargo nextest archive --locked --release --package smoke-test --archive-file smoke-test-archive.tar.zst
+          LOCAL_SWARM_NODE_RELEASE=1 python3 .github/scripts/ci_metrics.py run smoke-archive-build -- cargo nextest archive --locked --release --package smoke-test --archive-file smoke-test-archive.tar.zst
         shell: bash
       - name: Upload smoke test archive and helper binaries
         id: artifact
@@ -114,12 +115,17 @@ jobs:
           SMOKE_TEST_PREBUILD_BINARIES=1 \
           SMOKE_TEST_BIN_DIR=${{ github.workspace }}/target/release \
           LOCAL_SWARM_NODE_RELEASE=1 \
-          cargo nextest run \
+          python3 .github/scripts/ci_metrics.py run smoke-shard -- cargo nextest run \
             --archive-file smoke-test-archive.tar.zst \
             --workspace-remap . \
             --profile smoke-test \
             --partition count:${{ matrix.partition }}/8
         shell: bash
+
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: smoke-shard-${{ matrix.partition }}
 
       # Upload logs on failure for debugging.
       - name: Upload smoke test logs for failed and flaky tests
