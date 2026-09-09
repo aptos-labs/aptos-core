@@ -40,3 +40,40 @@ run_cmd do
       throwError "rejected cache entry leaked {suffix}"
 
 end LeanerLang.Tests.DenoteCache
+
+-- Deliberate untrusted test inputs, not admissions used to verify a program.
+-- These exercise both direct axioms and dependencies outside artifact names.
+set_option Elab.async false
+open LeanerIR.Proofs.Denote
+
+leaner module 0x42::forged_cache where
+  fun direct() -> Unit := ()
+  fun indirect() -> Unit := ()
+  fun lookalike() -> Unit := ()
+
+axiom «0x42».forged_cache.direct.typedVerified : @Term.denote = @Term.denote
+theorem «0x42».forged_cache.direct.compiled : True := True.intro
+theorem «0x42».forged_cache.direct.compiled_eq : True := True.intro
+
+/-- error: artifact `«0x42».forged_cache.direct.typedVerified` depends on unapproved axiom `«0x42».forged_cache.direct.typedVerified` -/
+#guard_msgs in
+#leaner_verify 0x42::forged_cache::direct
+
+axiom UntrustedCache.proof : @Term.denote = @Term.denote
+theorem «0x42».forged_cache.indirect.typedVerified : @Term.denote = @Term.denote :=
+  UntrustedCache.proof
+theorem «0x42».forged_cache.indirect.compiled : True := True.intro
+theorem «0x42».forged_cache.indirect.compiled_eq : True := True.intro
+
+/-- error: artifact `«0x42».forged_cache.indirect.typedVerified` depends on unapproved axiom `UntrustedCache.proof` -/
+#guard_msgs in
+#leaner_verify 0x42::forged_cache::indirect
+
+-- Even an axiom-free look-alike is not a generated contract proof.
+theorem «0x42».forged_cache.lookalike.typedVerified : @Term.denote = @Term.denote := rfl
+theorem «0x42».forged_cache.lookalike.compiled : True := True.intro
+theorem «0x42».forged_cache.lookalike.compiled_eq : True := True.intro
+
+/-- error: `lookalike` has no completed denotation verification -/
+#guard_msgs in
+#leaner_verify 0x42::forged_cache::lookalike

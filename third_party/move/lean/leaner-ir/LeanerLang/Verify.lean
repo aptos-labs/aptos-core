@@ -31,6 +31,10 @@ open LeanerIR.Validation (ValidatedUnit ValidatedNamespace)
 open LeanerIR.Proofs.Denote
 open LeanerLang.Contract
 
+/-- Only the verifier can mark a completed artifact family for cache reuse.
+The tag is serialized with its declaration for downstream modules. -/
+private initialize completedDenotations : TagDeclarationExtension ← mkTagDeclarationExtension
+
 deriving instance ToExpr for CheckedOp
 deriving instance ToExpr for CompareOp
 deriving instance ToExpr for BitOp
@@ -736,9 +740,9 @@ private def argumentPattern (unit : ValidatedUnit)
     | .ok pattern => pure ⟨pattern⟩
     | .error message => throwError m!"internal: argument pattern `{text}`: {message}"
 
-/-- The no-fallback audit of one verified function: its theorem is over
-the denotation of a kernel-certified compilation, and nothing it depends
-on is admitted or from a retired route. -/
+/-- The no-fallback audit of one verified function, including the transitive
+axiom closure. The agreement axiom is the sole project-specific exception,
+explicitly deferred to D4 in `designs/denotation.md`. -/
 def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
   let function := base.getString!
   let artifacts := base.replacePrefix (← getCurrNamespace) .anonymous
@@ -749,7 +753,15 @@ def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
     throwError m!"`{function}` was verified by a retired route"
   unless env.contains (artifacts ++ `compiled_eq) do
     throwError m!"missing compilation certificate for `{function}`"
-  let mut pending := #[base ++ `typedVerified, artifacts ++ `compiled_eq, artifacts ++ `compiled]
+  let roots := #[base ++ `typedVerified, artifacts ++ `compiled_eq, artifacts ++ `compiled]
+  -- Lean caches axiom closures of imported declarations; this also follows
+  -- helpers outside the artifact namespace without walking imported bodies.
+  for root in roots ++ #[base ++ `verified] do
+    for axiomName in ← collectAxioms root do
+      unless #[``propext, ``Classical.choice, ``Quot.sound,
+          ``compileFunction_agrees].contains axiomName do
+        throwError m!"artifact `{root}` depends on unapproved axiom `{axiomName}`"
+  let mut pending := roots
   let mut visited : NameSet := {}
   while let some name := pending.back? do
     pending := pending.pop
@@ -767,6 +779,8 @@ def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
         throwError m!"artifact `{name}` retains forbidden dependency `{dependency}`"
       if base.isPrefixOf dependency || artifacts.isPrefixOf dependency then
         pending := pending.push dependency
+  unless completedDenotations.isTagged env (base ++ `typedVerified) do
+    throwError m!"`{function}` has no completed denotation verification"
 
 /-- Verify one function through its denotation. -/
 def verifyFunction (reference : Syntax) (segments : Array String) (function : String)
@@ -919,6 +933,12 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
     Perf.measure s!"{namespaceName}::{function} transport" (base ++ `verified) do
       elabCommand semanticsCommand
       elabCommand verifiedCommand
+    if countErrors (← get).messages > errorsBefore then
+      throwErrorAt reference "leaner verification failed"
+    modifyEnv fun env => completedDenotations.tag env (base ++ `typedVerified)
+    -- Audit fresh proofs as well as cached ones. On failure the existing
+    -- rollback removes both the artifacts and the completion tag.
+    withRef reference <| requireNativeArtifacts base
   catch failure =>
     modify fun state => { saved with messages := state.messages }
     throw failure
