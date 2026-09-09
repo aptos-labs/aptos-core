@@ -47,6 +47,8 @@ Attempt-specific producer names avoid upload collisions; IDs allow failed-job
 reruns to reuse a successful earlier build. Build artifacts expire after one day;
 measurements after seven. Longer-delayed reruns must rerun their build jobs.
 Smoke executables have their executable permissions restored after download.
+Smoke uploads use fast compression for their large raw binaries; nextest-only
+artifacts retain compression level zero because their contents are already zstd.
 
 The required check names remain unchanged. Failures, cancellations, and
 unexpected skips fail the result gates. Only the explicit skip conditions are

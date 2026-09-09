@@ -47,7 +47,7 @@ jobs:
         with:
           path: target/release/aptos-node
           name: smoke-aptos-node-${{ github.run_attempt }}
-          compression-level: 0
+          compression-level: 1 # Compress the raw binary's large debug sections.
           retention-days: 1
           if-no-files-found: error
 
@@ -86,7 +86,7 @@ jobs:
             target/release/aptos-debugger
             smoke-test-archive.tar.zst
           name: smoke-test-archive-${{ github.run_attempt }}
-          compression-level: 0
+          compression-level: 1 # The helper binaries are not pre-compressed.
           retention-days: 1
           if-no-files-found: error
 
