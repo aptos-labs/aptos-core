@@ -172,7 +172,8 @@ pub trait NativeContext {
     fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>>;
 
     /// The constant BCS-serialized size of any value of type `ty`.
-    /// Returns `None` if the size is data-dependent (e.g. vectors).
+    /// Returns `None` if the size is data-dependent (e.g. vectors) or `ty`
+    /// reaches `signer`.
     fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>>;
 
     /// Compares the values of type `ty` at `a` and `b` (the natural ordering).

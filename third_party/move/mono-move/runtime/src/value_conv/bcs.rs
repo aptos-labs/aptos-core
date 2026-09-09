@@ -32,7 +32,8 @@ use mono_move_core::{
 };
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
-/// is data-dependent (e.g., for vectors, enums, function values, etc.).
+/// is data-dependent (e.g., for vectors, enums, function values) or the type
+/// reaches `signer`.
 pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     ty: InternedType,
@@ -880,9 +881,9 @@ mod tests {
 
     #[test]
     fn deserialize_rejects_non_canonical_bool_in_struct() {
-        // `{u8, bool}`: no padding (BCS 2 == size 2), so blittable for
-        // serialize/equals, but the bool field keeps it off the deserialize
-        // fast path so the bad byte is caught.
+        // `{u8, bool}`: no padding (BCS 2 == size 2), so serialize/equals take
+        // the raw-copy fast path, but the bool field keeps it off the
+        // deserialize fast path so the bad byte is caught.
         let mut table = ValueLayoutTable::new();
         let layout = build_struct_layout(&table, 2, vec![(0, U8_LAYOUT_ID), (1, BOOL_LAYOUT_ID)]);
         assert!(layout.has_no_pointers_no_padding());
@@ -922,6 +923,8 @@ mod tests {
     ) -> ValueLayout {
         let mut const_total = 0u64;
         let mut data_dependent = false;
+        let mut packed_size = 0u32;
+        let mut fields_no_pointers_no_padding = true;
         let mut all_bytes_valid = true;
         for &(_, id) in &fields {
             let child = table.layout(id).unwrap();
@@ -929,11 +932,13 @@ mod tests {
                 Some(n) => const_total += n as u64,
                 None => data_dependent = true,
             }
+            packed_size += child.size;
+            fields_no_pointers_no_padding &= child.has_no_pointers_no_padding();
             all_bytes_valid &= child.all_byte_patterns_valid();
         }
         let const_bcs = (!data_dependent).then_some(const_total as u32);
         let mut flags = LayoutFlags::empty();
-        if const_bcs == Some(size) {
+        if fields_no_pointers_no_padding && packed_size == size {
             flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
             if all_bytes_valid {
                 flags |= LayoutFlags::ALL_BYTE_PATTERNS_VALID;
@@ -964,8 +969,8 @@ mod tests {
         let layout = table.layout(id).unwrap();
         let bcs_len = bcs::to_bytes(&values[0]).unwrap().len();
 
-        // Const size is the packed BCS size; blittable iff that equals the
-        // in-memory size.
+        // Const size is the packed BCS size; the raw-copy fast path applies iff
+        // that equals the in-memory size.
         assert_eq!(layout.fixed_serialized_size(), Some(bcs_len as u32));
         assert_eq!(layout.has_no_pointers_no_padding(), bcs_len == size);
 
@@ -974,8 +979,8 @@ mod tests {
             // A fixed-size struct encodes to the same length for every value.
             assert_eq!(x_bcs.len(), bcs_len);
 
-            // Serialize matches bcs; a wrongly-blittable padded struct would
-            // memcpy its padding and diverge here.
+            // Serialize matches bcs; a padded struct wrongly put on the raw-copy
+            // fast path would memcpy its padding and diverge here.
             let mut out = vec![];
             unsafe { serialize_impl(table, ptr(x), layout, &mut out).unwrap() };
             assert_eq!(out, x_bcs);
@@ -1028,7 +1033,7 @@ mod tests {
             (offset_of!(S, a) as u32, U8_LAYOUT_ID),
             (offset_of!(S, b) as u32, U64_LAYOUT_ID),
         ]);
-        // In-memory 16, BCS 9 (7 bytes padding), so not blittable.
+        // In-memory 16, BCS 9 (7 bytes padding), so no raw-copy fast path.
         assert_eq!(layout.fixed_serialized_size(), Some(9));
         assert!(!layout.has_no_pointers_no_padding());
 
@@ -1047,7 +1052,7 @@ mod tests {
     }
 
     #[test]
-    fn test_struct_blittable() {
+    fn test_struct_unpadded() {
         #[repr(C)]
         #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
         struct S {
@@ -1060,7 +1065,7 @@ mod tests {
             (offset_of!(S, a) as u32, U64_LAYOUT_ID),
             (offset_of!(S, b) as u32, U64_LAYOUT_ID),
         ]);
-        // No padding: BCS 16 equals in-memory 16, so blittable.
+        // No padding: BCS 16 equals in-memory 16, so the raw-copy fast path applies.
         assert_eq!(layout.fixed_serialized_size(), Some(16));
         assert!(layout.has_no_pointers_no_padding());
 
@@ -1140,8 +1145,8 @@ mod tests {
             (offset_of!(Outer, x) as u32, inner_id),
             (offset_of!(Outer, y) as u32, U8_LAYOUT_ID),
         ]);
-        // Outer is BCS 17, size 24 (trailing pad): a blittable child (Inner)
-        // does not make the parent blittable.
+        // Outer is BCS 17, size 24 (trailing pad): an unpadded child (Inner)
+        // does not put the parent on the raw-copy fast path.
         assert_eq!(outer.fixed_serialized_size(), Some(17));
         assert!(!outer.has_no_pointers_no_padding());
 
@@ -1274,8 +1279,8 @@ mod tests {
     #[test]
     fn test_vector_nested() {
         let mut table = ValueLayoutTable::new();
-        // `vector<vector<u64>>`: the element is a vector pointer (not
-        // blittable), so the walks recurse per element.
+        // `vector<vector<u64>>`: the element is a vector pointer, so the walks
+        // recurse per element.
         let inner_id = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
         let vid = table.push(U64_TY, vector_layout(inner_id));
         let values: [Vec<Vec<u64>>; 6] = [
@@ -1291,8 +1296,8 @@ mod tests {
 
     #[test]
     fn test_vector_of_struct() {
-        // Element is a padded (non-blittable) struct, so the vector recurses
-        // per element into the struct field walk.
+        // Element is a padded struct, so the vector recurses per element into
+        // the struct field walk.
         #[repr(C)]
         #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord)]
         struct Kv {
@@ -1333,7 +1338,8 @@ mod tests {
         let vec_id = table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
         let bag_layout = build_struct_layout(&table, 16, vec![(0, U64_LAYOUT_ID), (8, vec_id)]);
         let id = table.push(U64_TY, bag_layout);
-        // The vector field makes the struct data-dependent and not blittable.
+        // The vector field makes the struct data-dependent and rules out the
+        // raw-copy fast path.
         assert_eq!(table.layout(id).unwrap().fixed_serialized_size(), None);
         assert!(!table.layout(id).unwrap().has_no_pointers_no_padding());
 

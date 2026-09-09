@@ -50,7 +50,8 @@ pub fn native_serialized_size<C: NativeContext>(ctx: &C) -> VMResult<NativeStatu
 
 /// `0x1::bcs::constant_serialized_size<T>(): Option<u64>`
 ///
-/// `Some(n)` if every value of `T` serializes to `n` bytes, else `None`.
+/// `Some(n)` if every value of `T` serializes to `n` bytes, else `None`. Also
+/// `None` for any `T` reaching `signer`, matching the V1 VM.
 //
 // TODO(metering): charge gas.
 pub fn native_constant_serialized_size<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
