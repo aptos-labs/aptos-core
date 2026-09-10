@@ -9,18 +9,18 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_types::secret_sharing::{SecretShare, SecretShareMetadata};
 use std::{collections::HashMap, sync::Arc};
 
-struct RecoveredSelfShare {
+struct CachedSelfShare {
     share: SecretShare,
     verified: bool,
 }
 
-pub struct RecoveredSelfShares {
+pub struct PersistedSelfShares {
     storage: Arc<dyn SecretShareStorage>,
     retention_rounds: Round,
-    shares: HashMap<SecretShareKey, RecoveredSelfShare>,
+    shares: HashMap<SecretShareKey, CachedSelfShare>,
 }
 
-impl RecoveredSelfShares {
+impl PersistedSelfShares {
     pub fn new(
         epoch: u64,
         author: Author,
@@ -53,7 +53,7 @@ impl RecoveredSelfShares {
                 expired_keys.push(key);
                 continue;
             }
-            shares.insert(key, RecoveredSelfShare {
+            shares.insert(key, CachedSelfShare {
                 share,
                 verified: false,
             });
@@ -70,9 +70,11 @@ impl RecoveredSelfShares {
     }
 
     pub fn persist(&mut self, share: SecretShare) -> anyhow::Result<()> {
+        // Overwriting is safe: self-share derivation is deterministic, using the fixed epoch
+        // master-secret share and the block's deterministic ciphertext/round digest, with no RNG.
         self.storage.save_self_share(&share)?;
         self.shares
-            .insert(storage_key(share.metadata()), RecoveredSelfShare {
+            .insert(storage_key(share.metadata()), CachedSelfShare {
                 share,
                 verified: false,
             });

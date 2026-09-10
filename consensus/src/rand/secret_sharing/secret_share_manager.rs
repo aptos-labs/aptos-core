@@ -9,7 +9,7 @@ use crate::{
     rand::secret_sharing::{
         block_queue::{BlockQueue, QueueItem},
         network_messages::{SecretShareMessage, SecretShareRpc},
-        recovered_self_shares::RecoveredSelfShares,
+        persisted_self_shares::PersistedSelfShares,
         reliable_broadcast_state::SecretShareAggregateState,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
         storage::SecretShareStorage,
@@ -64,7 +64,7 @@ pub struct SecretShareManager {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
-    recovered_self_shares: RecoveredSelfShares,
+    persisted_self_shares: PersistedSelfShares,
     block_queue: BlockQueue,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
@@ -104,7 +104,7 @@ impl SecretShareManager {
             verifier.clone(),
             decision_tx,
         )));
-        let recovered_self_shares = RecoveredSelfShares::new(
+        let persisted_self_shares = PersistedSelfShares::new(
             epoch_state.epoch,
             author,
             secret_share_storage,
@@ -125,7 +125,7 @@ impl SecretShareManager {
             outgoing_blocks,
 
             secret_share_store: dec_store,
-            recovered_self_shares,
+            persisted_self_shares,
             block_queue: BlockQueue::new(),
             pending_derives: FuturesUnordered::new(),
         }
@@ -197,7 +197,7 @@ impl SecretShareManager {
             },
         };
 
-        self.recovered_self_shares
+        self.persisted_self_shares
             .persist(share.clone())
             .expect("Failed to persist self secret share");
         self.prune_expired_self_shares(round);
@@ -229,7 +229,7 @@ impl SecretShareManager {
     }
 
     fn prune_expired_self_shares(&mut self, latest_round: Round) {
-        self.recovered_self_shares.advance_retention(latest_round);
+        self.persisted_self_shares.advance_retention(latest_round);
     }
 
     fn process_recovered_share_request(
@@ -239,7 +239,7 @@ impl SecretShareManager {
         response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
     ) {
         if let Some(share) = self
-            .recovered_self_shares
+            .persisted_self_shares
             .get(metadata, &self.verifier, &self.author)
         {
             self.process_response(protocol, response_sender, SecretShareMessage::Share(share));
@@ -735,10 +735,10 @@ mod tests {
             .unwrap();
         assert_eq!(persisted.metadata(), &metadata);
         assert!(manager
-            .recovered_self_shares
+            .persisted_self_shares
             .contains_key(&storage_key(&metadata)));
         assert!(!manager
-            .recovered_self_shares
+            .persisted_self_shares
             .is_verified(&storage_key(&metadata)));
         assert!(manager
             .secret_share_store
@@ -771,7 +771,7 @@ mod tests {
             .get_self_share(&metadata)
             .unwrap()
             .is_none());
-        assert_eq!(manager.recovered_self_shares.len(), 0);
+        assert_eq!(manager.persisted_self_shares.len(), 0);
         assert!(
             tokio::time::timeout(Duration::from_millis(10), network_rx.next())
                 .await
@@ -798,10 +798,10 @@ mod tests {
         assert_eq!(recovered.len(), 1);
         assert_eq!(recovered[0].metadata(), &boundary_metadata);
         assert!(!manager
-            .recovered_self_shares
+            .persisted_self_shares
             .contains_key(&storage_key(&old_metadata)));
         assert!(manager
-            .recovered_self_shares
+            .persisted_self_shares
             .contains_key(&storage_key(&boundary_metadata)));
     }
 
@@ -819,7 +819,7 @@ mod tests {
 
         assert!(storage.load_self_shares(ctx.epoch).unwrap().is_empty());
         assert!(!manager
-            .recovered_self_shares
+            .persisted_self_shares
             .contains_key(&storage_key(&metadata)));
     }
 
@@ -842,7 +842,7 @@ mod tests {
 
         assert!(storage.load_self_shares(ctx.epoch).unwrap().is_empty());
         assert!(!manager
-            .recovered_self_shares
+            .persisted_self_shares
             .contains_key(&storage_key(&metadata)));
     }
 
@@ -867,7 +867,7 @@ mod tests {
         });
         rx.await.unwrap();
 
-        assert_eq!(manager.recovered_self_shares.len(), 1);
+        assert_eq!(manager.persisted_self_shares.len(), 1);
         assert!(manager
             .secret_share_store
             .lock()
@@ -879,7 +879,7 @@ mod tests {
         manager.handle_incoming_msg(request);
         assert!(response.await.unwrap().is_ok());
         assert!(manager
-            .recovered_self_shares
+            .persisted_self_shares
             .is_verified(&storage_key(&metadata)));
     }
 
@@ -896,12 +896,12 @@ mod tests {
             .lock()
             .update_highest_known_round(metadata.round);
         assert!(!manager
-            .recovered_self_shares
+            .persisted_self_shares
             .is_verified(&storage_key(&metadata)));
         let (request_1, response_1) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_1);
         assert!(manager
-            .recovered_self_shares
+            .persisted_self_shares
             .is_verified(&storage_key(&metadata)));
         let (request_2, response_2) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_2);
@@ -943,7 +943,7 @@ mod tests {
             .lock()
             .update_highest_known_round(metadata.round);
         assert!(manager
-            .recovered_self_shares
+            .persisted_self_shares
             .contains_key(&storage_key(&metadata)));
         let (request, _) = request_rpc(metadata.clone());
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
