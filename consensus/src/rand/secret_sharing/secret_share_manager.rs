@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    counters::DEC_QUEUE_SIZE,
+    counters::{DEC_QUEUE_SIZE, SECRET_SHARE_RECOVERY_COUNT},
     logging::{LogEvent, LogSchema},
     network::{IncomingSecretShareRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
@@ -273,6 +273,11 @@ impl SecretShareManager {
             self.persisted_self_shares
                 .get(request.metadata(), &self.verifier, &self.author)
         {
+            info!(LogSchema::new(LogEvent::ServePersistedSecretShare)
+                .author(self.author)
+                .epoch(request.metadata().epoch)
+                .round(request.metadata().round));
+            SECRET_SHARE_RECOVERY_COUNT.inc();
             self.process_response(protocol, response_sender, SecretShareMessage::Share(share));
         }
     }

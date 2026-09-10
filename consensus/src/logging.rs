@@ -65,6 +65,7 @@ pub enum LogEvent {
     ReceiveSecretShare,
     BroadcastSecretShare,
     ReceiveReactiveSecretShare,
+    ServePersistedSecretShare,
 }
 
 impl LogSchema {
