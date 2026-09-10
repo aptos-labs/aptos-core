@@ -1,0 +1,67 @@
+# Tests excluded from MonoMove parity checks because MonoMove does not support
+# these features. Currently also includes tests that may hang, because MonoMove
+# does not enable metering. See README.md for more details.
+
+[[test]]
+name = "aptos::aptos$genesis::tests::test_genesis_e2e_flow"
+note = "Enable when MonoMove is production-ready. CLI rejects MonoMove before that."
+
+[[test]]
+name = "aptos::aptos$genesis::tests::test_mainnet_genesis_e2e_flow"
+note = "Enable when MonoMove is production-ready. CLI rejects MonoMove before that."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::code_publishing_disallow_system_native_entry"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::code_publishing_disallow_user_native"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::code_publishing_disallow_user_native_entry"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::code_publishing_upgrade_loader_cache_consistency"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::code_publishing_using_resource_account"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::code_publishing_with_two_attempts_and_verify_loader_is_invalidated"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::test_init_module_should_not_publish_modules"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::test_module_publishing_does_not_fallback"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::test_module_publishing_does_not_leak_speculative_information"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::code_publishing::test_trace_replay_with_module_republishing"
+note = "MonoMove does not support code publishing."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::infinite_loop::empty_while_loop"
+note = "MonoMove does not support gas metering. TODO(completeness): remove once metering is added."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module::init_module_with_abort_and_republish"
+note = "MonoMove does not support init_module."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module::invalid_init_module::true_expects"
+note = "MonoMove does not support init_module."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::per_category_gas_limits::execution_limit_reached"
+note = "MonoMove does not support gas metering. TODO(completeness): remove once metering is added."
