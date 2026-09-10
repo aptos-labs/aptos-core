@@ -269,10 +269,7 @@ impl SecretShareManager {
             return;
         }
 
-        if let Some(share) =
-            self.persisted_self_shares
-                .get(request.metadata(), &self.verifier, &self.author)
-        {
+        if let Some(share) = self.persisted_self_shares.get(request.metadata()) {
             info!(LogSchema::new(LogEvent::ServePersistedSecretShare)
                 .author(self.author)
                 .epoch(request.metadata().epoch)
@@ -590,9 +587,7 @@ mod tests {
         network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
         rand::secret_sharing::{
             storage::{storage_key, InMemorySecretShareStorage, SecretShareDb, SecretShareKey},
-            test_utils::{
-                create_bad_secret_share, create_metadata, create_secret_share, TestContext,
-            },
+            test_utils::{create_metadata, create_secret_share, TestContext},
         },
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -740,9 +735,6 @@ mod tests {
         assert!(manager
             .persisted_self_shares
             .contains_key(&storage_key(&metadata)));
-        assert!(!manager
-            .persisted_self_shares
-            .is_verified(&storage_key(&metadata)));
         assert!(manager
             .secret_share_store
             .lock()
@@ -888,9 +880,6 @@ mod tests {
         let (request, response) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request);
         assert!(response.await.unwrap().is_ok());
-        assert!(manager
-            .persisted_self_shares
-            .is_verified(&storage_key(&metadata)));
     }
 
     #[tokio::test]
@@ -905,14 +894,8 @@ mod tests {
             .secret_share_store
             .lock()
             .update_highest_known_round(metadata.round);
-        assert!(!manager
-            .persisted_self_shares
-            .is_verified(&storage_key(&metadata)));
         let (request_1, response_1) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_1);
-        assert!(manager
-            .persisted_self_shares
-            .is_verified(&storage_key(&metadata)));
         let (request_2, response_2) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_2);
 
@@ -930,7 +913,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_invalid_recovered_records_fail_stop_and_requests_are_rejected() {
+    async fn test_wrong_author_and_invalid_requests_are_rejected() {
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
         let metadata = create_metadata(ctx.epoch, 10);
 
@@ -940,24 +923,6 @@ mod tests {
             .unwrap();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             make_manager(&ctx, 0, wrong_author_storage)
-        }));
-        assert!(result.is_err());
-
-        let bad_crypto_storage = Arc::new(InMemorySecretShareStorage::new());
-        bad_crypto_storage
-            .save_self_share(&create_bad_secret_share(&ctx, 0, &metadata))
-            .unwrap();
-        let (mut manager, _) = make_manager(&ctx, 0, bad_crypto_storage);
-        manager
-            .secret_share_store
-            .lock()
-            .update_highest_known_round(metadata.round);
-        assert!(manager
-            .persisted_self_shares
-            .contains_key(&storage_key(&metadata)));
-        let (request, _) = request_rpc(metadata.clone());
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            manager.handle_incoming_msg(request)
         }));
         assert!(result.is_err());
 

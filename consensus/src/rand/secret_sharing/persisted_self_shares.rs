@@ -1,23 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::rand::secret_sharing::{
-    storage::{storage_key, SecretShareKey, SecretShareStorage},
-    verifier::SecretShareVerifier,
-};
+use crate::rand::secret_sharing::storage::{storage_key, SecretShareKey, SecretShareStorage};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_types::secret_sharing::{SecretShare, SecretShareMetadata};
 use std::{collections::HashMap, sync::Arc};
 
-struct CachedSelfShare {
-    share: SecretShare,
-    verified: bool,
-}
-
 pub struct PersistedSelfShares {
     storage: Arc<dyn SecretShareStorage>,
     retention_rounds: Round,
-    shares: HashMap<SecretShareKey, CachedSelfShare>,
+    shares: HashMap<SecretShareKey, SecretShare>,
 }
 
 impl PersistedSelfShares {
@@ -54,10 +46,7 @@ impl PersistedSelfShares {
                 keys_to_prune.push(key);
                 continue;
             }
-            shares.insert(key, CachedSelfShare {
-                share,
-                verified: false,
-            });
+            shares.insert(key, share);
         }
         storage
             .prune_self_shares(&keys_to_prune)
@@ -74,11 +63,7 @@ impl PersistedSelfShares {
         // Overwriting is safe: self-share derivation is deterministic, using the fixed epoch
         // master-secret share and the block's deterministic ciphertext/round digest, with no RNG.
         self.storage.save_self_share(&share)?;
-        self.shares
-            .insert(storage_key(share.metadata()), CachedSelfShare {
-                share,
-                verified: false,
-            });
+        self.shares.insert(storage_key(share.metadata()), share);
         Ok(())
     }
 
@@ -87,9 +72,7 @@ impl PersistedSelfShares {
         let expired_keys = self
             .shares
             .iter()
-            .filter_map(|(key, recovered)| {
-                (recovered.share.round() < oldest_retained_round).then_some(*key)
-            })
+            .filter_map(|(key, share)| (share.round() < oldest_retained_round).then_some(*key))
             .collect::<Vec<_>>();
         if expired_keys.is_empty() {
             return;
@@ -102,23 +85,12 @@ impl PersistedSelfShares {
         }
     }
 
-    pub fn get(
-        &mut self,
-        metadata: &SecretShareMetadata,
-        verifier: &SecretShareVerifier,
-        author: &Author,
-    ) -> Option<SecretShare> {
-        let recovered = self.shares.get_mut(&storage_key(metadata))?;
-        if recovered.share.metadata() != metadata {
+    pub fn get(&self, metadata: &SecretShareMetadata) -> Option<SecretShare> {
+        let share = self.shares.get(&storage_key(metadata))?;
+        if share.metadata() != metadata {
             return None;
         }
-        if !recovered.verified {
-            verifier
-                .verify(&recovered.share, author)
-                .expect("Invalid persisted secret share");
-            recovered.verified = true;
-        }
-        Some(recovered.share.clone())
+        Some(share.clone())
     }
 
     #[cfg(test)]
@@ -129,12 +101,5 @@ impl PersistedSelfShares {
     #[cfg(test)]
     pub fn contains_key(&self, key: &SecretShareKey) -> bool {
         self.shares.contains_key(key)
-    }
-
-    #[cfg(test)]
-    pub fn is_verified(&self, key: &SecretShareKey) -> bool {
-        self.shares
-            .get(key)
-            .is_some_and(|recovered| recovered.verified)
     }
 }
