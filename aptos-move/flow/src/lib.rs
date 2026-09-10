@@ -1,6 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod candidate;
+pub mod conditions;
+pub mod evaluation;
+pub mod experiment;
 pub mod hooks;
 pub mod mcp;
 pub mod plugin;
@@ -8,6 +12,7 @@ pub mod update;
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use evaluation::{EvaluationConfig, FeedbackLevel, InferenceTactic};
 use mcp::supervisor::{run_supervised, RESTART_ENV_VAR};
 use std::path::PathBuf;
 
@@ -37,6 +42,30 @@ pub struct GlobalOpts {
     /// built-in content directory.
     #[arg(long, global = true)]
     pub content_dir: Option<PathBuf>,
+
+    /// Specification-inference tactic. The CLI overrides
+    /// MOVE_FLOW_INFERENCE_TACTIC; the default is hybrid-guided.
+    #[arg(long, value_enum, global = true)]
+    pub inference_tactic: Option<InferenceTactic>,
+
+    /// Render and run with strict experiment safeguards (no verification skips).
+    #[arg(long, global = true)]
+    pub evaluation_mode: bool,
+
+    /// How much deterministic post-edit feedback the session provides. The CLI
+    /// overrides MOVE_FLOW_FEEDBACK_LEVEL; the default is acceptance.
+    #[arg(long, value_enum, global = true)]
+    pub feedback_level: Option<FeedbackLevel>,
+}
+
+impl GlobalOpts {
+    pub fn evaluation_config(&self) -> Result<EvaluationConfig> {
+        EvaluationConfig::resolve(
+            self.inference_tactic,
+            self.evaluation_mode,
+            self.feedback_level,
+        )
+    }
 }
 
 /// Subcommands.
@@ -49,6 +78,8 @@ pub enum FlowCommand {
     /// Hook subcommands (called from AI platform hooks).
     #[command(subcommand)]
     Hook(hooks::HookCommand),
+    /// Build and validate specification-inference experiment artifacts.
+    Experiment(experiment::ExperimentArgs),
     /// Update move-flow to the latest release.
     Update(update::UpdateArgs),
 }
@@ -78,7 +109,13 @@ impl FlowCli {
                 None => run_supervised().await,
                 Some(v) => mcp::run(args, &self.global, v == "1").await,
             },
-            FlowCommand::Hook(cmd) => hooks::run(cmd),
+            FlowCommand::Hook(cmd) => hooks::run(cmd, &self.global),
+            FlowCommand::Experiment(args) => {
+                let args = args.clone();
+                tokio::task::spawn_blocking(move || experiment::run(&args))
+                    .await
+                    .context("experiment task panicked")?
+            },
             FlowCommand::Update(args) => {
                 let args = args.clone();
                 tokio::task::spawn_blocking(move || update::run(&args))

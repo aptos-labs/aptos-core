@@ -6,8 +6,9 @@
 use crate::{
     align::MAX_ALIGN,
     memory::{read_fat_ptr, read_ptr, read_u64, write_fat_ptr, write_ptr},
+    native::native_vector_index_out_of_bounds,
     root_pool::{ObjectHandle, ReferenceHandle, RootPool},
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    VMResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -317,7 +318,42 @@ impl<'a, V> Vector<'a, V> {
         self.len() == 0
     }
 
+    /// Reinterprets the element type of a vector.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the object's actual element layout matches
+    /// the target layout.
+    #[inline]
+    pub(crate) unsafe fn transmute_unchecked<U>(self) -> Vector<'a, U> {
+        Vector::from_handle(self.handle)
+    }
+
     // TODO(completeness): Other vector APIs, added on-demand.
+}
+
+impl<'a, V: VMValue<'a>> Vector<'a, V> {
+    /// Reads element `i` by value, using `V`'s in-frame representation. Any heap
+    /// pointer the element carries is rooted for the rest of the native call, so
+    /// the result survives GC. Returns an invalid-operation error if `i` is out
+    /// of bounds.
+    #[inline]
+    pub fn get_element(&self, i: u64) -> VMResult<V> {
+        let len = self.len();
+        if i >= len {
+            return Err(native_vector_index_out_of_bounds(i, len));
+        }
+        // SAFETY: element `i` (bounds-checked above) lives at `VEC_DATA_OFFSET +
+        // i * FRAME_SLOT_SIZE` in the vector object; `read_from_frame` reads it
+        // and roots any heap pointer it carries.
+        Ok(unsafe {
+            V::read_from_frame(
+                self.handle.pool(),
+                self.ptr(),
+                VEC_DATA_OFFSET + i as usize * <V as VMValue<'a>>::FRAME_SLOT_SIZE,
+            )
+        })
+    }
 }
 
 impl Vector<'_, u8> {
@@ -412,6 +448,17 @@ impl<'a, T> VMValue<'a> for Boxed<'a, T> {
 mod tests {
     use super::*;
 
+    // `#[repr(align(N))]` needs a literal, so the buffers below use `u64`
+    // backing to get `MAX_ALIGN`.
+    //
+    // TODO(cleanup, testing): allocate through `MemoryRegion`, which is
+    // `MAX_ALIGN`-aligned by construction; it lives in `mono-move-runtime`,
+    // which this crate cannot depend on.
+    const _: () = assert!(
+        core::mem::align_of::<u64>() >= MAX_ALIGN,
+        "u64 no longer covers MAX_ALIGN"
+    );
+
     /// A `Ref` must preserve its value even after the frame slot it was read
     /// from is overwritten — e.g. by a `set_return` that reuses the argument
     /// region.
@@ -419,25 +466,124 @@ mod tests {
     fn ref_preserves_value_after_source_slot_overwritten() {
         let pool = RootPool::new();
 
-        // Slot 0 holds the reference; slot 1 is room for a write-back.
-        let mut frame = [0u8; 32];
-        let base = 0x1000_usize as *mut u8;
-        let offset = 24_u64;
-        unsafe { write_fat_ptr(frame.as_mut_ptr(), 0usize, base, offset) };
+        // A real allocation: `Ref::ptr` offsets `base`, which needs provenance.
+        let backing = vec![0u64; 0x400];
+        let base = backing.as_ptr() as *mut u8;
+        // SAFETY: 0x1000 is within `backing`.
+        let unrelated = unsafe { base.add(0x1000) };
 
-        let r: Ref<Opaque> = unsafe { Ref::read_from_frame(&pool, frame.as_ptr(), 0) };
+        // Slot 0 holds the reference; slot 1 takes the write-back. The frame is
+        // `MAX_ALIGN`-aligned because the fat-pointer halves are written as
+        // aligned 8-byte stores.
+        let mut frame = [0u64; 4];
+        let frame_ptr: *mut u8 = frame.as_mut_ptr().cast();
+        let offset = 24_u64;
+        unsafe { write_fat_ptr(frame_ptr, 0usize, base, offset) };
+
+        let reference: Ref<Opaque> = unsafe { Ref::read_from_frame(&pool, frame_ptr, 0) };
 
         // Overwrite slot 0 with unrelated bytes, as a later `set_return` would.
-        unsafe { write_fat_ptr(frame.as_mut_ptr(), 0usize, 0x9999_usize as *mut u8, 7) };
+        unsafe { write_fat_ptr(frame_ptr, 0usize, unrelated, 7) };
 
         // Reading the pointer still resolves the original referent.
-        assert_eq!(r.ptr(), unsafe { base.add(offset as usize) });
+        assert_eq!(reference.ptr(), unsafe { base.add(offset as usize) });
 
         // Writing the reference into slot 1 writes the original fat pointer.
-        unsafe { r.write_to_frame(frame.as_mut_ptr(), 16) };
-        assert_eq!(
-            unsafe { read_fat_ptr(frame.as_ptr(), 16usize) },
-            (base, offset)
-        );
+        unsafe { reference.write_to_frame(frame_ptr, 16) };
+        assert_eq!(unsafe { read_fat_ptr(frame_ptr, 16usize) }, (base, offset));
+    }
+
+    /// Lays out a `vector<u8>` heap object -- `[len: u64][bytes...]` -- in an
+    /// 8-byte-aligned buffer. The object's data pointer is the buffer's start:
+    /// the length is at `VEC_LENGTH_OFFSET`, the bytes at `VEC_DATA_OFFSET`.
+    fn byte_vec_object_for_test(bytes: &[u8]) -> Vec<u64> {
+        let mut buf = vec![0u64; 1 + bytes.len().div_ceil(8)];
+        buf[0] = bytes.len() as u64;
+        // SAFETY: `buf` has room for `bytes.len()` bytes after the length word.
+        let data = unsafe {
+            std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(1) as *mut u8, bytes.len())
+        };
+        data.copy_from_slice(bytes);
+        buf
+    }
+
+    /// `Vector::<Vector<u8>>::get_element` reads each inner byte vector back by
+    /// value, including an empty inner vector.
+    #[test]
+    fn nested_byte_vector_get_reads_elements() {
+        let pool = RootPool::new();
+
+        // Three inner byte vectors, kept alive for the reads below.
+        let inners = [
+            byte_vec_object_for_test(b"hello"),
+            byte_vec_object_for_test(b""),
+            byte_vec_object_for_test(b"world!!"),
+        ];
+
+        // Outer object: `[len: u64][inner_ptr0][inner_ptr1][inner_ptr2]`.
+        let mut outer = vec![0u64; 1 + inners.len()];
+        outer[0] = inners.len() as u64;
+        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
+        for (i, inner) in inners.iter().enumerate() {
+            // SAFETY: slot `i` is within `outer`. The pointers are stored with
+            // `write_ptr` rather than as `u64`, which would discard provenance
+            // and leave `get` reading through an address it cannot dereference.
+            unsafe { write_ptr(outer_ptr, VEC_DATA_OFFSET + i * 8, inner.as_ptr().cast()) };
+        }
+
+        // SAFETY: `outer` is a valid `vector<vector<u8>>` object and the inner
+        // buffers outlive the reads.
+        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_ptr) });
+
+        assert_eq!(vec.len(), 3);
+        // Bind each inner handle so its bytes outlive the borrow.
+        let e0 = vec.get_element(0).unwrap();
+        let e1 = vec.get_element(1).unwrap();
+        let e2 = vec.get_element(2).unwrap();
+        assert_eq!(unsafe { e0.as_bytes() }, b"hello");
+        assert_eq!(unsafe { e1.as_bytes() }, b"");
+        assert_eq!(unsafe { e2.as_bytes() }, b"world!!");
+    }
+
+    /// `get_element` fails with an invalid-operation error on an out-of-bounds
+    /// index rather than reading past the vector object.
+    #[test]
+    fn get_element_out_of_bounds_errors() {
+        let pool = RootPool::new();
+
+        // Outer object holding two inner byte vectors.
+        let inners = [
+            byte_vec_object_for_test(b"a"),
+            byte_vec_object_for_test(b"b"),
+        ];
+        let mut outer = vec![0u64; 1 + inners.len()];
+        outer[0] = inners.len() as u64;
+        for (i, inner) in inners.iter().enumerate() {
+            outer[1 + i] = inner.as_ptr() as u64;
+        }
+
+        // SAFETY: `outer` is a valid `vector<vector<u8>>` object.
+        let vec: Vector<Vector<u8>> =
+            Vector::from_handle(unsafe { pool.root_object(outer.as_ptr() as *mut u8) });
+
+        assert_eq!(vec.len(), 2);
+        assert!(vec.get_element(0).is_ok());
+        // Index == len and beyond both fail.
+        match vec.get_element(2) {
+            Ok(_) => panic!("out-of-bounds index must not read an element"),
+            Err(err) => assert_eq!(err.kind(), crate::ExecutionErrorKind::InvalidOperation),
+        }
+        assert!(vec.get_element(u64::MAX).is_err());
+    }
+
+    /// `get_element` on an empty vector errors for every index.
+    #[test]
+    fn get_element_empty_vector_errors() {
+        let pool = RootPool::new();
+        // A null-backed vector reads as empty.
+        let vec: Vector<u64> =
+            Vector::from_handle(unsafe { pool.root_object(std::ptr::null_mut()) });
+        assert_eq!(vec.len(), 0);
+        assert!(vec.get_element(0).is_err());
     }
 }

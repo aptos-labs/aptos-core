@@ -345,7 +345,7 @@ pub async fn execute_txn_list<T: Clone, B: SignedTransactionBuilder<T>>(
 
     let accounts_with_work = work_chunks
         .into_iter()
-        .zip(accounts.into_iter())
+        .zip(accounts)
         .map(|(work, account)| AccountWork::new(account, work))
         .collect::<Vec<_>>();
     let txn_factory = &txn_factory;

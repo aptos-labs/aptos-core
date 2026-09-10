@@ -28,9 +28,6 @@ pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 /// Language versions enabling specific features
 pub mod lang_feature_versions {
     use crate::LanguageVersion;
-    /// This version guards built-in constant `__COMPILE_FOR_TESTING__`,
-    /// which is set to `true` when the code is compiled for testing purposes.
-    pub const LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING: LanguageVersion = LanguageVersion::V2_2;
     pub const LANGUAGE_VERSION_FOR_SINT: LanguageVersion = LanguageVersion::V2_3;
     pub const LANGUAGE_VERSION_FOR_PUBLIC_STRUCT: LanguageVersion = LanguageVersion::V2_4;
     /// This version guards checks for unused private functions, private structs, and constants.
@@ -184,18 +181,14 @@ impl CompilerVersion {
 
 /// Represents a language version.
 ///
-/// The versioning scheme is `major.minor`, where for `major = 1` we do not
-/// distinguish a minor version. This we have versions `1, 2.0, 2.1, .., 3.0, 3.1, ..`.
+/// The versioning scheme is `major.minor`. Versions below 2.2 are no longer
+/// supported and rejected when parsing.
 /// Typically, a major version change is given with an addition of larger new language
 /// features. There are no breaking changes expected with major version changes,
 /// however, there maybe some isolated exceptions.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum LanguageVersion {
-    /// The 2.0 version of Move.
-    V2_0,
-    /// The 2.1 version of Move,
-    V2_1,
-    /// The 2.2 version of Move
+    /// The 2.2 version of Move, the minimum supported version.
     V2_2,
     /// The 2.3 version of Move, which adds support for
     /// - signed integer types
@@ -241,15 +234,17 @@ impl FromStr for LanguageVersion {
         // Strip unstable marker as it is not relevant for parsing.
         let s1 = s.replace(UNSTABLE_MARKER, "");
         match s1.as_str() {
-            "1" => bail!("language version 1 is no longer supported"),
-            "2.0" => Ok(Self::V2_0),
-            "2" | "2.1" => Ok(Self::V2_1),
+            "1" | "2.0" | "2.1" => bail!(
+                "language version {} is no longer supported (the minimum supported version is 2.2)",
+                s1
+            ),
+            "2" => Ok(Self::latest_stable()),
             "2.2" => Ok(Self::V2_2),
             "2.3" => Ok(Self::V2_3),
             "2.4" => Ok(Self::V2_4),
             "2.5" => Ok(Self::V2_5),
             _ => bail!(
-                "unrecognized language version \"{}\" (supported versions: \"2\", \"2.0\"-\"2.5\")",
+                "unrecognized language version \"{}\" (supported versions: \"2\", \"2.2\"-\"2.5\")",
                 s
             ),
         }
@@ -259,8 +254,6 @@ impl FromStr for LanguageVersion {
 impl From<LanguageVersion> for CompilerLanguageVersion {
     fn from(val: LanguageVersion) -> Self {
         match val {
-            LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
-            LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
             LanguageVersion::V2_2 => CompilerLanguageVersion::V2_2,
             LanguageVersion::V2_3 => CompilerLanguageVersion::V2_3,
             LanguageVersion::V2_4 => CompilerLanguageVersion::V2_4,
@@ -275,7 +268,7 @@ impl LanguageVersion {
     pub const fn unstable(self) -> bool {
         use LanguageVersion::*;
         match self {
-            V2_0 | V2_1 | V2_2 | V2_3 | V2_4 => false,
+            V2_2 | V2_3 | V2_4 => false,
             V2_5 => true,
         }
     }
@@ -307,19 +300,15 @@ impl LanguageVersion {
     /// debugging purposes, respects the MOVE_BYTECODE_VERSION env var as an override.
     pub fn infer_bytecode_version(&self, version: Option<u32>) -> u32 {
         env::get_bytecode_version_from_env(version).unwrap_or(match self {
-            LanguageVersion::V2_0
-            | LanguageVersion::V2_1
-            | LanguageVersion::V2_2
-            | LanguageVersion::V2_3
-            | LanguageVersion::V2_4 => VERSION_DEFAULT,
+            LanguageVersion::V2_2 | LanguageVersion::V2_3 | LanguageVersion::V2_4 => {
+                VERSION_DEFAULT
+            },
             LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_5,
         })
     }
 
     pub const fn to_str(&self) -> &'static str {
         match self {
-            LanguageVersion::V2_0 => "2.0",
-            LanguageVersion::V2_1 => "2.1",
             LanguageVersion::V2_2 => "2.2",
             LanguageVersion::V2_3 => "2.3",
             LanguageVersion::V2_4 => "2.4",
@@ -333,14 +322,7 @@ impl Display for LanguageVersion {
         write!(
             f,
             "{}{}",
-            match self {
-                LanguageVersion::V2_0 => "2.0",
-                LanguageVersion::V2_1 => "2.1",
-                LanguageVersion::V2_2 => "2.2",
-                LanguageVersion::V2_3 => "2.3",
-                LanguageVersion::V2_4 => "2.4",
-                LanguageVersion::V2_5 => "2.5",
-            },
+            self.to_str(),
             if self.unstable() { UNSTABLE_MARKER } else { "" }
         )
     }

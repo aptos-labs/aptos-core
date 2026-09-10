@@ -1,8 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{execution::execute_workload, state_view::ReadSet, workload::Workload};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
+use crate::{
+    execution::{execute_workload, local_config},
+    state_view::ReadSet,
+    workload::Workload,
+};
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use std::time::Instant;
 
 /// Represents a block for benchmarking: a workload consisting of a block of transactions with the
@@ -16,8 +20,8 @@ pub struct ReplayBlock {
 
 impl ReplayBlock {
     /// Executes the workload using the specified concurrency level.
-    pub(crate) fn run(&self, executor: &AptosVMBlockExecutor, concurrency_level: usize) {
-        execute_workload(executor, &self.workload, &self.inputs, concurrency_level);
+    pub(crate) fn run(&self, executor: &AptosVMBlockExecutor) {
+        execute_workload(executor, &self.workload, &self.inputs);
     }
 }
 
@@ -62,10 +66,11 @@ impl BenchmarkRunner {
             .collect::<Vec<_>>();
 
         for _ in 0..self.num_repeats {
-            let executor = AptosVMBlockExecutor::new();
+            let executor =
+                AptosVMBlockExecutor::new_with_local_config(local_config(concurrency_level));
             for (idx, block) in blocks.iter().enumerate() {
                 let start_time = Instant::now();
-                block.run(&executor, concurrency_level);
+                block.run(&executor);
                 let time = start_time.elapsed().as_micros();
                 times[idx].push(time);
             }
@@ -92,17 +97,18 @@ impl BenchmarkRunner {
     fn measure_overall_execution_time(&self, blocks: &[ReplayBlock], concurrency_level: usize) {
         let mut times = Vec::with_capacity(self.num_repeats);
         for _ in 0..self.num_repeats {
-            let executor = AptosVMBlockExecutor::new();
+            let executor =
+                AptosVMBlockExecutor::new_with_local_config(local_config(concurrency_level));
 
             // Warm-up.
             for block in &blocks[..self.num_blocks_to_skip] {
-                block.run(&executor, concurrency_level);
+                block.run(&executor);
             }
 
             // Actual measurement.
             let start_time = Instant::now();
             for block in &blocks[self.num_blocks_to_skip..] {
-                block.run(&executor, concurrency_level);
+                block.run(&executor);
             }
             let time = start_time.elapsed().as_micros();
             times.push(time);

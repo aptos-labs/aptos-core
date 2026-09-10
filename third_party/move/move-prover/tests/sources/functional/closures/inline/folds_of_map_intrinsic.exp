@@ -1,0 +1,35 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:128:9
+    │
+128 │ ╭         ensures result == spec_fold<u64, Map<u64, u64>>(
+129 │ │             |acc, e| spec_set(acc, e, 2u64), v, spec_new(), len(v)); // error: wrong inserted value
+    │ ╰────────────────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:121: collect_wrong
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:122: collect_wrong
+    =         m = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:46: each_ref
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:122: collect_wrong
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:47: each_ref
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:48: each_ref
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:52: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:53: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:54: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:55: each_ref
+    =     enter loop, variable(s) m, i havocked and reassigned
+    =         m = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:53: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:54: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:55: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:49: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:124: collect_wrong
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:121: collect_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:128: collect_wrong (spec)

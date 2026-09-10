@@ -49,11 +49,13 @@ use move_vm_types::{
     code::{ModuleCode, SyncModuleCache, WithAddress, WithBytes, WithHash, WithName, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
 };
+use serde::Serialize;
 use std::{
     collections::{
         hash_map::Entry::{self, Occupied, Vacant},
         BTreeMap, BTreeSet, HashMap, HashSet,
     },
+    fmt::Debug,
     hash::Hash,
     ops::Deref,
     sync::Arc,
@@ -1197,9 +1199,9 @@ where
 /// to decide whether the transaction must re-execute. Abstracts the concrete
 /// read-set representation so the executor does not depend on a specific VM's form.
 pub trait TxnInput: Send + Sync {
-    type Key;
-    type Tag;
-    type Value: SpeculativeValue;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + 'static;
+    type Tag: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Serialize + 'static;
+    type Value: SpeculativeValue + 'static;
 
     /// Returns true if the data reads are still consistent with the multi-version
     /// data map at the given validation index.

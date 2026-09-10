@@ -50,13 +50,14 @@ pub mod options;
 pub mod pragmas;
 pub mod pureness_checker;
 pub mod sourcifier;
+pub mod spec_derivation;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
 pub mod ty_invariant_analysis;
 pub mod well_known;
 
-pub use builder::binary_module_loader;
+pub use builder::{binary_module_loader, xir_loader};
 
 /// Represents information about a package: the sources it contains and the package private
 /// address mapping.
@@ -321,6 +322,22 @@ fn pre_register_lemma_decls(
     builder: &mut ModelBuilder<'_>,
     sorted_modules: &[(usize, (ModuleIdent, E::ModuleDefinition))],
 ) {
+    for &(module_count, (ref module_id, ref module_def)) in sorted_modules {
+        let loc = builder.to_loc(&module_def.loc);
+        let addr_bytes = builder.resolve_address(&loc, &module_id.value.address);
+        let module_name = ModuleName::from_address_bytes_and_name(
+            addr_bytes,
+            builder
+                .env
+                .symbol_pool()
+                .make(&module_id.value.module.0.value),
+        );
+        let mid = ModuleId::new(module_count);
+        let mut module_translator = ModuleBuilder::new(builder, mid, module_name);
+        module_translator.pre_declare_structs(module_def);
+    }
+    // Only now: a lemma's parameters may be structs of any module, and a
+    // signature translated before those are declared reports them undeclared.
     for &(module_count, (ref module_id, ref module_def)) in sorted_modules {
         let loc = builder.to_loc(&module_def.loc);
         let addr_bytes = builder.resolve_address(&loc, &module_id.value.address);

@@ -63,29 +63,29 @@ fun push_and_sum(r0): u64 {
     r5: u64
   code:
   L6:
-    0: r1 := vec_pack u64, 0, []
-    1: r2 := ld_u64 0
+    0: r1 := vec_pack u64, 0, [] @0
+    1: r2 := ld_u64 0 @2
   L2:
-    2: br_ge L0, r2, r0
+    2: br_ge L0, r2, r0 @6
   L1:
-    3: r3 := mut_borrow_loc r1
-    4: vec_push_back u64, r3, r2
-    5: r2 := add r2, #1
-    6: branch L2
+    3: r3 := mut_borrow_loc r1 @8
+    4: vec_push_back u64, r3, r2 @10
+    5: r2 := add r2, #1 @13
+    6: branch L2 @15
   L0:
-    7: r0 := ld_u64 0
-    8: r4 := imm_borrow_loc r1
-    9: r2 := vec_len u64, r4
+    7: r0 := ld_u64 0 @16
+    8: r4 := imm_borrow_loc r1 @18
+    9: r2 := vec_len u64, r4 @19
   L5:
-    10: br_le L3, r2, #0
+    10: br_le L3, r2, #0 @22
   L4:
-    11: r3 := mut_borrow_loc r1
-    12: r5 := vec_pop_back u64, r3
-    13: r0 := add r0, r5
-    14: r2 := sub r2, #1
-    15: branch L5
+    11: r3 := mut_borrow_loc r1 @26
+    12: r5 := vec_pop_back u64, r3 @27
+    13: r0 := add r0, r5 @28
+    14: r2 := sub r2, #1 @32
+    15: branch L5 @34
   L3:
-    16: ret [r0]
+    16: ret [r0] @36
 }
 === micro-ops ===
 // module 0xc0ffee::foo
@@ -94,23 +94,23 @@ fun push_and_sum() {
   frame_data_size: 64
   entry_gas: 12
   code:
-    0: VecNew [8]
-    1: StoreImm8 [16] <- #0
-    2: JumpGreaterEqualU64 @7 [16] >= [0] gas_taken=6 gas_fallthrough=37
-    3: SlotBorrow [24] <- &[8]
-    4: VecPushBack [24].push([16], size=8, desc=0)
-    5: AddU64Imm [16] <- [16] + #1
-    6: Jump @2 gas=3
-    7: StoreImm8 [0] <- #0
-    8: SlotBorrow [40] <- &[8]
-    9: VecLen [16] <- vec_len([40])
-    10: JumpLessEqualU64Imm @16 [16] <= #0 gas_taken=54 gas_fallthrough=42
-    11: SlotBorrow [24] <- &[8]
-    12: VecPopBack [56] <- [24].pop(size=8)
-    13: AddU64 [0] <- [0] + [56]
-    14: SubU64Imm [16] <- [16] - #1
-    15: Jump @10 gas=3
-    16: Return
+    0: VecNew [8] @0
+    1: StoreImm8 [16] <- #0 @2
+    2: JumpGreaterEqualU64 @7 [16] >= [0] gas_taken=6 gas_fallthrough=37 @6
+    3: SlotBorrow [24] <- &[8] @8
+    4: VecPushBack [24].push([16], size=8, desc=0) @10
+    5: AddU64Imm [16] <- [16] + #1 @13
+    6: Jump @2 gas=3 @15
+    7: StoreImm8 [0] <- #0 @16
+    8: SlotBorrow [40] <- &[8] @18
+    9: VecLen [16] <- vec_len([40]) @19
+    10: JumpLessEqualU64Imm @16 [16] <= #0 gas_taken=54 gas_fallthrough=42 @22
+    11: SlotBorrow [24] <- &[8] @26
+    12: VecPopBack [56] <- [24].pop(size=8) @27
+    13: AddU64 [0] <- [0] + [56] @28
+    14: SubU64Imm [16] <- [16] - #1 @32
+    15: Jump @10 gas=3 @34
+    16: Return @36
   safe_point_layouts:
     4: []
 }
@@ -135,8 +135,8 @@ fun sum_first_n(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call push_and_sum, [r0]
-    1: ret [x0]
+    0: [x0] := call push_and_sum, [r0] @1
+    1: ret [x0] @2
 }
 === micro-ops ===
 // module 0xc0ffee::bar
@@ -145,10 +145,10 @@ fun sum_first_n() {
   frame_data_size: 8
   entry_gas: 90
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0xc0ffee::foo::push_and_sum
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Move8 [32] <- [0] @1
+    1: CallIndirect 0xc0ffee::foo::push_and_sum @1
+    2: Move8 [0] <- [32] @2
+    3: Return @2
 }
 === frame-layout ===
 // module 0xc0ffee::bar

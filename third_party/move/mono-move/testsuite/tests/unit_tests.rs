@@ -32,19 +32,16 @@ fn run_tests_for_pkg(pkg: &str, use_latest_language: bool) {
 }
 
 #[test]
-#[ignore]
 fn move_stdlib_on_mono_move() {
     run_tests_for_pkg("move-stdlib", false);
 }
 
 #[test]
-#[ignore]
 fn aptos_stdlib_on_mono_move() {
     run_tests_for_pkg("aptos-stdlib", false);
 }
 
 #[test]
-#[ignore]
 fn aptos_framework_on_mono_move() {
     run_tests_for_pkg("aptos-framework", false);
 }

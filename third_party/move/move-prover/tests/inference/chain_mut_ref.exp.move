@@ -35,7 +35,7 @@ module 0x42::chain_mut_ref {
         aborts_if false;
         pragma opaque = true;
         ensures [inferred] result == n;
-        aborts_if [inferred] n == 18446744073709551616;
+        aborts_if [inferred] false;
     }
 
     // Reads &Pool; impure because it calls helper (while loop → Assign).
@@ -84,19 +84,9 @@ module 0x42::chain_mut_ref {
     }
     spec chain(self: &mut Pool, x: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == {
-            let a = ..S1 |~ result_of<compute>(old(self), x);
-            S1.. |~ result_of<update>(update_field(old(self), total, old(self).total + a), a)
-        };
-        aborts_if [inferred] S1 |~ {
-            let a = ..S1 |~ result_of<compute>(self, x);
-            aborts_of<update>(update_field(self, total, self.total + a), a)
-        };
-        aborts_if [inferred] {
-            let a = ..S1 |~ result_of<compute>(self, x);
-            self.total + a > MAX_U64
-        };
+        ensures [inferred] result == result_of<update>(update_field(old(self), total, old(self).total + (x + old(self).total)), x + old(self).total);
         aborts_if [inferred] aborts_of<compute>(self, x);
+        aborts_if [inferred] self.total + (x + self.total) > MAX_U64;
     }
 
 }

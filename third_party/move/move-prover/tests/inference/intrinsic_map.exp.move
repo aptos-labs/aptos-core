@@ -17,11 +17,11 @@ module 0x42::intrinsic_map {
     fun has(m: &SimpleMap<u64, u64>, k: u64): bool {
         simple_map::contains_key(m, &k)
     }
-    spec has(m: &simple_map::SimpleMap<u64, u64>, k: u64): bool {
+    spec has(m: &0x1::simple_map::SimpleMap<u64, u64>, k: u64): bool {
         use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_contains_key<u64, u64>(m, k);
-        aborts_if [inferred] aborts_of<simple_map::contains_key<u64, u64>>(m, k);
+        aborts_if [inferred] false;
     }
 
 
@@ -29,11 +29,10 @@ module 0x42::intrinsic_map {
     fun size(m: &SimpleMap<u64, u64>): u64 {
         simple_map::length(m)
     }
-    spec size(m: &simple_map::SimpleMap<u64, u64>): u64 {
+    spec size(m: &0x1::simple_map::SimpleMap<u64, u64>): u64 {
         use 0x1::simple_map;
-        pragma opaque = true;
+        pragma opaque = true, aborts_if_is_partial = true;
         ensures [inferred] result == simple_map::spec_len<u64, u64>(m);
-        aborts_if [inferred] aborts_of<simple_map::length<u64, u64>>(m);
     }
 
 
@@ -41,11 +40,10 @@ module 0x42::intrinsic_map {
     fun make(): SimpleMap<u64, u64> {
         simple_map::create()
     }
-    spec make(): simple_map::SimpleMap<u64, u64> {
+    spec make(): 0x1::simple_map::SimpleMap<u64, u64> {
         use 0x1::simple_map;
-        pragma opaque = true;
+        pragma opaque = true, aborts_if_is_partial = true;
         ensures [inferred] result == simple_map::spec_new<u64, u64>();
-        aborts_if [inferred] aborts_of<simple_map::create<u64, u64>>();
     }
 
 
@@ -55,7 +53,8 @@ module 0x42::intrinsic_map {
     fun drop(m: SimpleMap<u64, u64>) {
         simple_map::destroy_empty(m)
     }
-    spec drop(m: simple_map::SimpleMap<u64, u64>) {
+    spec drop(m: 0x1::simple_map::SimpleMap<u64, u64>) {
+        use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] ensures_of<simple_map::destroy_empty<u64, u64>>(m);
         aborts_if [inferred] aborts_of<simple_map::destroy_empty<u64, u64>>(m);
@@ -69,7 +68,7 @@ module 0x42::intrinsic_map {
     fun get_value(m: &SimpleMap<u64, u64>, k: u64): u64 {
         *simple_map::borrow(m, &k)
     }
-    spec get_value(m: &simple_map::SimpleMap<u64, u64>, k: u64): u64 {
+    spec get_value(m: &0x1::simple_map::SimpleMap<u64, u64>, k: u64): u64 {
         use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_get<u64, u64>(m, k);
@@ -78,5 +77,44 @@ module 0x42::intrinsic_map {
 
 }
 /*
-Verification: Succeeded.
+Inference diagnostics:
+warning: WP could not characterize the aborts of `intrinsic_map::size` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = callee `0x1::simple_map::length` has no trusted complete abort summary
+   ┌─ tests/inference/intrinsic_map.move:22:5
+   │
+22 │ ╭     fun size(m: &SimpleMap<u64, u64>): u64 {
+23 │ │         simple_map::length(m)
+24 │ │     }
+   │ ╰─────^
+
+warning: WP could not characterize the aborts of `intrinsic_map::make` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = callee `0x1::simple_map::create` has no trusted complete abort summary
+   ┌─ tests/inference/intrinsic_map.move:27:5
+   │
+27 │ ╭     fun make(): SimpleMap<u64, u64> {
+28 │ │         simple_map::create()
+29 │ │     }
+   │ ╰─────^
+
+Verification: exiting with condition generation errors
+error: this function has no specification but is referenced by a behavioral predicate
+   ┌─ ../../../aptos-move/framework/aptos-stdlib/sources/simple_map.move:59:5
+   │
+59 │ ╭     public fun borrow<Key: store, Value: store>(
+60 │ │         self: &SimpleMap<Key, Value>,
+61 │ │         key: &Key,
+62 │ │     ): &Value {
+   · │
+66 │ │         &self.data.borrow(idx).value
+67 │ │     }
+   │ ╰─────^
+
+error: this function has no specification but is referenced by a behavioral predicate
+   ┌─ ../../../aptos-move/framework/aptos-stdlib/sources/simple_map.move:87:5
+   │
+87 │ ╭     public fun destroy_empty<Key: store, Value: store>(self: SimpleMap<Key, Value>) {
+88 │ │         let SimpleMap { data } = self;
+89 │ │         data.destroy_empty();
+90 │ │     }
+   │ ╰─────^
 */

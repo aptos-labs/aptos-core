@@ -5,14 +5,8 @@ error: [boogie translator] function result type not yet supported
 9 │         fun f2(): | |num { | | 1 }
   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: [boogie translator] current restriction: a function value cannot be used in a specification expression.
-   ┌─ tests/sources/functional/restrictions.move:13:13
-   │
-13 │             f(1u64)
-   │             ^^^^^^^
-
 error: [boogie translator] lambda not supported in spec expressions
-   ┌─ tests/sources/functional/restrictions.move:18:21
+   ┌─ tests/sources/functional/restrictions.move:23:21
    │
-18 │             let f = |x| x + 1;
+23 │             let f = |x| x + 1;
    │                     ^^^^^^^^^

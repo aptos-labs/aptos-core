@@ -9,14 +9,11 @@ pub(crate) mod package_test;
 mod package_verify;
 pub(crate) mod replay_tracing;
 mod replay_transaction;
+mod spec_check;
 
 use super::package_data::VerifiedScope;
 use move_model::model::{GlobalEnv, VerificationScope};
 use std::path::Path;
-
-/// Upper bound on package-supplied `shards`. Bounded so a malicious
-/// `Prover.toml` can't expand a single MCP call into an unbounded shard fan-out.
-const MAX_SHARDS: usize = 16;
 
 /// Load prover options for an MCP call.
 ///
@@ -28,7 +25,6 @@ const MAX_SHARDS: usize = 16;
 /// flags, fan-out, coverage toggles — stays at its safe default regardless of
 /// what the file says. Allowlist:
 ///
-/// - `backend.shards` (clamped to `[1, MAX_SHARDS]`)
 /// - `prover.borrow_natives`
 ///
 /// These are the only fields the framework's own `Prover.toml` uses; adding
@@ -37,9 +33,15 @@ const MAX_SHARDS: usize = 16;
 pub(crate) fn load_sanitized_prover_options(
     package_path: &Path,
 ) -> Result<move_prover::cli::Options, String> {
+    let mut opts = move_prover::cli::Options::default();
+    // A timeout otherwise reports only that a budget was exhausted. The replay
+    // costs a bounded solver run on the failure path and names the definitions
+    // responsible, so Flow always asks for it. Sanitizing to the default
+    // backend keeps the Z3 solver the analysis requires.
+    opts.backend.timeout_analysis = true;
     let prover_toml = package_path.join("Prover.toml");
     if !prover_toml.exists() {
-        return Ok(move_prover::cli::Options::default());
+        return Ok(opts);
     }
     let from_toml = move_prover::cli::Options::create_from_toml_file(
         &prover_toml.to_string_lossy(),
@@ -51,8 +53,6 @@ pub(crate) fn load_sanitized_prover_options(
             e
         )
     })?;
-    let mut opts = move_prover::cli::Options::default();
-    opts.backend.shards = from_toml.backend.shards.clamp(1, MAX_SHARDS);
     opts.prover.borrow_natives = from_toml.prover.borrow_natives;
     Ok(opts)
 }
@@ -99,24 +99,32 @@ pub(crate) fn resolve_filter(
         Some(f) => f,
     };
 
-    if let Some(pos) = filter.rfind("::") {
-        // Function filter: "module::function"
-        let module_part = module_part_of(filter);
-        let func_part = &filter[pos + 2..];
+    let module_part = module_part_of(filter);
+    let mut modules = env
+        .get_modules()
+        .filter(|m| m.is_target() && m.matches_name(module_part));
+    let module = modules.next().ok_or_else(|| {
+        rmcp::ErrorData::invalid_params(
+            format!(
+                "no module matching `{}` found in target modules",
+                module_part
+            ),
+            None,
+        )
+    })?;
+    if modules.next().is_some() {
+        return Err(rmcp::ErrorData::invalid_params(
+            format!(
+                "module `{}` is ambiguous; use `address::module::function` to select a target",
+                module_part
+            ),
+            None,
+        ));
+    }
 
-        let module_sym = env.symbol_pool().make(module_part);
-        let module = env
-            .find_module_by_name(module_sym)
-            .filter(|m| m.is_target())
-            .ok_or_else(|| {
-                rmcp::ErrorData::invalid_params(
-                    format!(
-                        "no module matching `{}` found in target modules",
-                        module_part
-                    ),
-                    None,
-                )
-            })?;
+    if let Some(pos) = filter.rfind("::") {
+        // Function filter: "module::function" or "address::module::function".
+        let func_part = &filter[pos + 2..];
         let func_sym = env.symbol_pool().make(func_part);
         let func = module.find_function(func_sym).ok_or_else(|| {
             rmcp::ErrorData::invalid_params(
@@ -131,19 +139,61 @@ pub(crate) fn resolve_filter(
         ))
     } else {
         // Module filter: "module_name"
-        let module_sym = env.symbol_pool().make(filter);
-        let module = env
-            .find_module_by_name(module_sym)
-            .filter(|m| m.is_target())
-            .ok_or_else(|| {
-                rmcp::ErrorData::invalid_params(
-                    format!("no module matching `{}` found in target modules", filter),
-                    None,
-                )
-            })?;
         Ok((
             VerifiedScope::Module(module.get_id()),
             VerificationScope::OnlyModule(filter.to_string()),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    /// A timeout otherwise reports only an exhausted budget, so every Flow
+    /// prover invocation asks for the replay analysis.
+    #[test]
+    fn prover_options_request_timeout_analysis_without_a_prover_toml() {
+        let package = tempfile::tempdir().unwrap();
+
+        let options = load_sanitized_prover_options(package.path()).unwrap();
+
+        assert!(options.backend.timeout_analysis);
+    }
+
+    #[test]
+    fn prover_options_request_timeout_analysis_with_a_prover_toml() {
+        let package = tempfile::tempdir().unwrap();
+        fs::write(
+            package.path().join("Prover.toml"),
+            "[prover]\nborrow_natives = [\"borrow_mut\"]\n",
+        )
+        .unwrap();
+
+        let options = load_sanitized_prover_options(package.path()).unwrap();
+
+        assert!(options.backend.timeout_analysis);
+        assert_eq!(
+            vec!["borrow_mut".to_string()],
+            options.prover.borrow_natives
+        );
+    }
+
+    /// The analysis drives the solver directly and rejects a non-Z3 backend,
+    /// so sanitization must not carry one over from the package.
+    #[test]
+    fn prover_options_keep_the_default_z3_backend() {
+        let package = tempfile::tempdir().unwrap();
+        fs::write(
+            package.path().join("Prover.toml"),
+            "[backend]\nuse_cvc5 = true\n",
+        )
+        .unwrap();
+
+        let options = load_sanitized_prover_options(package.path()).unwrap();
+
+        assert!(!options.backend.use_cvc5);
+        assert!(options.backend.boogie_flags.is_empty());
     }
 }

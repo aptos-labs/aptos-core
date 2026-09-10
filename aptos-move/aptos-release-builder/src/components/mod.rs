@@ -866,30 +866,27 @@ impl Default for ReleaseConfig {
 }
 
 pub fn get_execution_hash(result: &[(String, String)]) -> Option<HashValue> {
-    if result.is_empty() {
-        None
-    } else {
-        let temp_script_path = TempPath::new();
-        temp_script_path.create_as_file().unwrap();
-        let mut move_script_path = temp_script_path.path().to_path_buf();
-        move_script_path.set_extension("move");
-        std::fs::write(move_script_path.as_path(), result.last().unwrap().1.clone())
-            .map_err(|err| {
-                anyhow!(
-                    "Failed to get execution hash: failed to write to file: {:?}",
-                    err
-                )
-            })
-            .unwrap();
+    result
+        .last()
+        .map(|(_, source)| compile_script_and_hash(source).unwrap().1)
+}
 
-        let (_, hash) = GenerateExecutionHash {
-            script_path: Option::from(move_script_path),
-            framework_local_dir: Some(aptos_framework_path()),
-        }
-        .generate_hash()
-        .unwrap();
-        Some(hash)
+/// Compile a governance script source and return its bytecode along with its
+/// execution hash (the hash of the bytecode, which governance voters approve).
+pub fn compile_script_and_hash(source: &str) -> Result<(Vec<u8>, HashValue)> {
+    let temp_script_path = TempPath::new();
+    temp_script_path.create_as_file()?;
+    let mut move_script_path = temp_script_path.path().to_path_buf();
+    move_script_path.set_extension("move");
+    std::fs::write(move_script_path.as_path(), source)
+        .map_err(|err| anyhow!("failed to write script source to a temp file: {:?}", err))?;
+
+    GenerateExecutionHash {
+        script_path: Option::from(move_script_path),
+        framework_local_dir: Some(aptos_framework_path()),
     }
+    .generate_hash()
+    .map_err(|err| anyhow!("failed to compile script: {}", err))
 }
 
 fn append_script_hash(raw_script: String) -> String {

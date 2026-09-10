@@ -1,0 +1,85 @@
+
+Diagnostics:
+error: expected 2 argument(s) for folds_of but 3 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:11:17
+   │
+11 │         ensures folds_of<f>(v, x, x);
+   │                 ^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use `bool` with an operator which expects a value of type `num`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:13:17
+   │
+13 │         ensures folds_of<f>(v, x) + 1 == 2;
+   │                 ^^^^^^^^^^^^^^^^^
+
+error: behavior predicate target must have function type, found `u64`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:15:17
+   │
+15 │         ensures folds_of<x>(v, x);
+   │                 ^^^^^^^^^^^^^^^^^
+
+error: `folds_of` implicitly relates the pre-state to the current state and cannot have a post-state label
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:17:27
+   │
+17 │         ensures ..post |~ folds_of<f>(v, x);
+   │                           ^^^^^^^^^^^^^^^^^
+
+error: state label `post` is defined but never referenced; every post-state label must be referenced by a pre-state label in the same spec
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:17:27
+   │
+17 │         ensures ..post |~ folds_of<f>(v, x);
+   │                           ^^^^^^^^^^^^^^^^^
+
+error: `folds_of` implicitly relates the pre-state to the current state and cannot have a post-state label
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:19:25
+   │
+19 │         ensures a..a |~ folds_of<f>(v, x);
+   │                         ^^^^^^^^^^^^^^^^^
+
+error: ensures_of/result_of/unchanged_of/folds_of require two-state range notation; use `..S |~` (post-only), `S.. |~` (pre-only), or `A..S |~` (full range) instead of `S |~`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:19:25
+   │
+19 │         ensures a..a |~ folds_of<f>(v, x);
+   │                         ^^^^^^^^^^^^^^^^^
+
+error: cyclic state label reference detected: a -> a
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:9:5
+   │
+ 9 │ ╭     spec apply {
+10 │ │         // Error: folds_of takes 2 args, but 3 provided
+11 │ │         ensures folds_of<f>(v, x, x);
+12 │ │         // Error: bool result used as integer
+   · │
+19 │ │         ensures a..a |~ folds_of<f>(v, x);
+20 │ │     }
+   │ ╰─────^
+
+error: the element form `folds_of<f>(v, i)` requires `f` to take exactly one parameter, but it takes 2; use the general form `folds_of<f>(|j| (..), i)` with a literal index lambda instead
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:28:17
+   │
+28 │         ensures folds_of<f>(v, i);
+   │                 ^^^^^^^^^^^^^^^^^
+
+error: the index function of `folds_of` must take exactly one `u64` index parameter, but this lambda takes 2
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:30:29
+   │
+30 │         ensures folds_of<f>(|j, k| (j, k), i);
+   │                             ^^^^^^^^^^^^^
+
+error: expected `(u64, u64)` but found a value of type `u64`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:32:33
+   │
+32 │         ensures folds_of<f>(|j| j, i);
+   │                                 ^
+
+error: expected `vector<u64>` but found a value of type `|u64|u64`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:42:29
+   │
+42 │         ensures folds_of<f>(g, i);
+   │                             ^
+
+error: expected `vector<u64>` but found a value of type `vector<bool>`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_folds_of_err.move:44:29
+   │
+44 │         ensures folds_of<f>(v, i);
+   │                             ^

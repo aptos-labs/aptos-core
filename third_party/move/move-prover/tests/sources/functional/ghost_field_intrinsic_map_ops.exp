@@ -1,0 +1,27 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:100:9
+    │
+100 │         ensures spec_preserved(m, old(m)); // FAILS: mutation havocs the slot
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:95: add_preserved_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:96: add_preserved_bad
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:95: add_preserved_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:99: add_preserved_bad (spec)
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:100: add_preserved_bad (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:128:9
+    │
+128 │         ensures spec_preserved(m, old(m)); // FAILS: mutation havocs the slot
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:124: addall_preserved_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:125: addall_preserved_bad
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:124: addall_preserved_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:128: addall_preserved_bad (spec)

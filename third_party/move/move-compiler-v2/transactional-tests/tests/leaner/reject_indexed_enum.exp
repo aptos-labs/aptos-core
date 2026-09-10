@@ -1,0 +1,24 @@
+processed 1 task
+task 0 lines 1-22:  publish [import Move]
+Error: compilation errors:
+ error: failed to generate `Inhabited` instance for `Indexed`
+  ┌─ TEMPFILE:7:1
+  │  
+7 │ ╭ @[move_enum]
+8 │ │ inductive Indexed : Bool → Type where
+  │ ╰^
+
+error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:14:31
+   │
+14 │ end LeanerTxnRejectIndexedEnum
+   │                               ^
+
+error: indexed Move enum `LeanerTxnRejectIndexedEnum.Indexed` is not supported by the prototype
+   ┌─ TEMPFILE:14:31
+   │
+14 │ end LeanerTxnRejectIndexedEnum
+   │                               ^
+
+
+exiting with Leaner elaboration errors

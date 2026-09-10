@@ -1,0 +1,66 @@
+processed 18 tasks
+task 0 lines 1-101:  publish [import Move]
+task 1 lines 103-103:  run 0x0::LeanerVectorOperations::empty_length
+return values: 0
+task 2 lines 105-105:  run 0x0::LeanerVectorOperations::pushed
+return values: 9
+task 3 lines 107-107:  run 0x0::LeanerVectorOperations::set_edges
+return values: 40
+task 4 lines 109-109:  run 0x0::LeanerVectorOperations::nested
+return values: 3
+task 5 lines 111-111:  run 0x0::LeanerVectorOperations::bool_round_trip --args true
+return values: true
+task 6 lines 113-113:  run 0x0::LeanerVectorOperations::bool_round_trip --args false
+return values: false
+task 7 lines 115-115:  run 0x0::LeanerVectorOperations::mutate_and_read
+return values: 27
+task 8 lines 117-117:  run 0x0::LeanerVectorOperations::mutate_then_borrow_other
+return values: 30
+task 9 lines 119-119:  run 0x0::LeanerVectorOperations::freeze_element
+return values: 55
+task 10 lines 121-121:  run 0x0::LeanerVectorOperations::insert_middle
+return values: 20
+task 11 lines 123-123:  run 0x0::LeanerVectorOperations::insert_edges
+return values: 43
+task 12 lines 125-125:  run 0x0::LeanerVectorOperations::remove_middle
+return values: 52
+task 13 lines 127-127:  run 0x0::LeanerVectorOperations::get_out_of_bounds
+Error: Function execution failed with VMError: {
+    major_status: VECTOR_OPERATION_ERROR,
+    sub_status: Some(1),
+    location: 0x0::LeanerVectorOperations,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(9), 9)],
+}
+task 14 lines 129-129:  run 0x0::LeanerVectorOperations::set_out_of_bounds
+Error: Function execution failed with VMError: {
+    major_status: VECTOR_OPERATION_ERROR,
+    sub_status: Some(1),
+    location: 0x0::LeanerVectorOperations,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(14), 12)],
+}
+task 15 lines 131-131:  run 0x0::LeanerVectorOperations::borrow_out_of_bounds
+Error: Function execution failed with VMError: {
+    major_status: VECTOR_OPERATION_ERROR,
+    sub_status: Some(1),
+    location: 0x0::LeanerVectorOperations,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 11)],
+}
+task 16 lines 133-133:  run 0x0::LeanerVectorOperations::insert_out_of_bounds
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(131072),
+    location: 0x0::LeanerVectorOperations,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 23)],
+}
+task 17 lines 135-135:  run 0x0::LeanerVectorOperations::remove_out_of_bounds
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(131072),
+    location: 0x0::LeanerVectorOperations,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(13), 21)],
+}

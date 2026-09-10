@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-19:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error `vectorRef`: cannot activate a mutable reference while an immutable reference is live in the same tree (conflicts with `observation`)
+   ┌─ TEMPFILE:10:5
+   │
+10 │     vectorRef.swap 0 1
+   │     ^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

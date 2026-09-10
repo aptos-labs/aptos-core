@@ -1,0 +1,14 @@
+Move prover returns: exiting with bytecode transformation errors
+warning: unused type parameter
+  ┌─ tests/sources/functional/intrinsic_iter_role_err2.move:5:35
+  │
+5 │     enum WideIter<K: copy + drop, V> has copy, drop {
+  │                                   ^
+  │                                   │
+  │                                   Unused type parameter `V`. Consider declaring it as phantom
+
+error: the iterator enum of a `map_iter_borrow_mut` function must have at most one type parameter (the key type)
+   ┌─ tests/sources/functional/intrinsic_iter_role_err2.move:18:5
+   │
+18 │     native fun ibm<K: copy + drop, V>(it: WideIter<K, V>, m: &mut Map<K, V>): &mut V;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

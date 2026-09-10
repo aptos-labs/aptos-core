@@ -116,6 +116,9 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
     }
 }
 
+/// Shared options for supplying an x25519 network private key
+///
+/// The key may be given directly or read from a file, but not both.
 #[derive(Debug, Default, Parser)]
 pub struct NetworkKeyInputOptions {
     /// x25519 Private key input file name
@@ -393,6 +396,10 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for ExtractPublicKey {
     }
 }
 
+/// Shared options for writing a generated key pair to disk
+///
+/// The private key is written to the given output file and the public key to
+/// the same path with a `.pub` extension, both in the selected encoding.
 #[derive(Debug, Parser, Clone)]
 pub struct SaveKey {
     #[clap(flatten)]

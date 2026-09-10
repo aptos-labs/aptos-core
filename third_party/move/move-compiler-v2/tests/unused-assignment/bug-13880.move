@@ -1,9 +1,9 @@
-module 0x42::create_signer {
-    friend 0x42::object;
+module 0x4::create_signer {
+    friend 0x4::object;
     public(friend) native fun create_signer(addr: address): signer;
 }
 
-module 0x42::signer {
+module 0x4::signer {
     native public fun borrow_address(s: &signer): &address;
 
     // Copies the address of the signer
@@ -14,7 +14,7 @@ module 0x42::signer {
 
 }
 
-module 0x42::event {
+module 0x4::event {
     public fun emit<T: store + drop>(_msg: T) {
         // write_module_event_to_store<T>(msg);
     }
@@ -31,16 +31,16 @@ module 0x42::event {
     }
 }
 
-module 0x42::error {
+module 0x4::error {
     public fun permission_denied(i: u64): u64 {
         i
     }
 }
 
-module 0x42::object {
-    use 0x42::create_signer::create_signer;
-    use 0x42::signer;
-    use 0x42::event;
+module 0x4::object {
+    use 0x4::create_signer::create_signer;
+    use 0x4::signer;
+    use 0x4::event;
 
     const ENOT_OBJECT_OWNER: u64 = 4;
     const EOBJECT_DOES_NOT_EXIST: u64 = 5;

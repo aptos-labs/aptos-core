@@ -1,0 +1,17 @@
+processed 1 task
+task 0 lines 1-19:  publish [import Move]
+Error: compilation errors:
+ error: Move type `InvalidCopy` derives `Copy`, but field `resource` does not have the required `Copy` ability
+   ┌─ TEMPFILE:13:18
+   │
+13 │     deriving Copy
+   │                  ^
+
+error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:13:18
+   │
+13 │     deriving Copy
+   │                  ^
+
+
+exiting with Leaner elaboration errors

@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-framework-natives = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
@@ -27,7 +28,8 @@ legacy-move-compiler = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
-mono-move-natives = { workspace = true }
+mono-move-natives = { workspace = true, features = ["testing"] }
+mono-move-output = { workspace = true }
 mono-move-runtime = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
@@ -40,6 +42,7 @@ move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
+rand_core = { workspace = true }
 smallvec = { workspace = true }
 specializer = { workspace = true }
 tempfile = { workspace = true }

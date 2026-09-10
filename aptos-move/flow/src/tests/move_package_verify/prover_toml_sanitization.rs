@@ -38,10 +38,8 @@ async fn move_package_verify_prover_toml_move_sources_does_not_panic() {
     common::check_baseline(file!(), &formatted);
 }
 
-/// A package-supplied `shards = 1024` (or any fan-out knob set arbitrarily
-/// high) must be capped — `tokio::time::timeout` does not interrupt shard
-/// loops or worker subprocesses once verification is running. Verification
-/// should still complete normally with the clamped value.
+/// Package-supplied fan-out knobs must be ignored so verification cannot
+/// exhaust host resources.
 #[tokio::test]
 async fn move_package_verify_prover_toml_fanout_clamped() {
     let pkg = common::make_package("toml_fanout", &[(
@@ -52,11 +50,9 @@ async fn move_package_verify_prover_toml_fanout_clamped() {
 }",
     )]);
     let mut f = std::fs::File::create(pkg.path().join("Prover.toml")).expect("create toml");
-    // Each of these exceeds the sanitizer's cap; if the cap regressed,
-    // the prover would honor the package value and exhaust resources.
     writeln!(
         f,
-        "[backend]\nshards = 1024\nnum_instances = 1024\nproc_cores = 1024\n[prover]\nnum_instances = 1024"
+        "[backend]\nnum_instances = 1024\nproc_cores = 1024\n[prover]\nnum_instances = 1024"
     )
     .expect("write toml");
 

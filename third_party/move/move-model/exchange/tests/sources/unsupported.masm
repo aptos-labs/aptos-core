@@ -1,0 +1,5 @@
+module 0x42::m
+
+fun f(): u8
+    ld_u8 1
+    ret

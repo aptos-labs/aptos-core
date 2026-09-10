@@ -1,0 +1,8 @@
+processed 4 tasks
+task 0 lines 1-28:  publish [import Move]
+task 1 lines 30-30:  run 0x0::LeanerEnums::idle_total
+return values: 0
+task 2 lines 32-32:  run 0x0::LeanerEnums::transfer_total --args 9u64
+return values: 9
+task 3 lines 34-34:  run 0x0::LeanerEnums::split_total --args 4u64 5u64
+return values: 9

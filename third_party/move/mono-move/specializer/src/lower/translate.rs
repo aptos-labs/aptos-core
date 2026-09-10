@@ -22,11 +22,11 @@ use crate::{
 use mono_move_core::{
     native::{FrameSlot, NativeABI},
     types::{is_closed_type, strip_ref, view_type, view_type_list, InternedType, Type},
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, DescriptorId, FrameLayoutInfo, FrameOffset,
-    IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, JumpIntCmpOp,
-    JumpValueCmpOp, JumpValueRefCmpOp, LayoutKind, LayoutProvider, MicroOp, PackClosureOp,
-    SafePointEntry, ShiftOperand, SizedSlot, VMInternalError, VMResult, ValueCmpOp, ValueRefCmpOp,
-    VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
+    BytecodeOffset, CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, DescriptorId,
+    FrameLayoutInfo, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand,
+    IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, LayoutKind, LayoutProvider,
+    MicroOp, PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, VMInternalError, VMResult,
+    ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp, FRAME_METADATA_SIZE,
 };
 use move_binary_format::file_format::{
     ConstantPoolIndex, FieldHandleIndex, VariantFieldHandleIndex,
@@ -49,6 +49,9 @@ fn const_imm<const N: usize>(idx: ConstantPoolIndex, bytes: &[u8]) -> VMResult<[
 /// Temporary result of lowering a function to micro-ops.
 pub(super) struct LoweredFunction {
     pub code: Vec<MicroOp>,
+    /// Originating bytecode offset of each micro-op, parallel to `code`:
+    /// every micro-op inherits its IR instruction's origin.
+    pub origins: Vec<BytecodeOffset>,
     /// Static cost of the entry basic block.
     pub entry_gas: u64,
     /// One entry **per allocating micro-op only**, in code-offset order.
@@ -82,7 +85,8 @@ pub(super) fn lower_function(
         // Resolve this block's cost formula to concrete gas for this instantiation.
         state.block_costs[block.label.0 as usize] =
             state.resolve_block_cost(&func_ir.block_costs[block.label.0 as usize])?;
-        for instr in &block.instrs {
+        for (instr, origin) in block.instrs.iter_with_origins() {
+            state.current_origin = origin;
             state.lower_instr(func_ir, instr)?;
             state.commit_transfer_bindings_after(instr);
         }
@@ -102,6 +106,11 @@ pub(super) fn lower_function(
         }
     }
     state.fixup_branches()?;
+    debug_assert_eq!(
+        state.origins_buf.len(),
+        state.out_buf.len(),
+        "emit stamps one origin per micro-op"
+    );
     let entry_gas = func_ir
         .blocks
         .first()
@@ -109,6 +118,7 @@ pub(super) fn lower_function(
         .unwrap_or_default();
     Ok(LoweredFunction {
         code: state.out_buf,
+        origins: state.origins_buf,
         entry_gas,
         safe_points: state.pending_safe_points,
     })
@@ -167,6 +177,11 @@ struct LoweringState<'a> {
     /// Safe-point entries in code-offset order. Populated by `emit`
     /// when `op.is_allocating()`.
     pending_safe_points: Vec<SafePointEntry>,
+    /// Origin of each emitted micro-op, parallel to `out_buf`.
+    origins_buf: Vec<BytecodeOffset>,
+    /// Origin of the IR instruction currently being lowered; every micro-op
+    /// it expands to inherits this offset.
+    current_origin: BytecodeOffset,
 }
 
 impl gas::CostResolver for LoweringState<'_> {
@@ -195,6 +210,8 @@ impl<'a> LoweringState<'a> {
             transfer_bindings: vec![None; num_transfer_positions],
             pending_def_binds: Vec::new(),
             pending_safe_points: Vec::new(),
+            origins_buf: Vec::new(),
+            current_origin: 0,
         }
     }
 
@@ -478,10 +495,10 @@ impl<'a> LoweringState<'a> {
         Ok(())
     }
 
-    /// Append `op` to the output buffer. For allocating `op`s,
-    /// also emit a paired `SafePointEntry` whose `code_offset` is
-    /// `op`'s index in the buffer and whose `heap_ptr_offsets`
-    /// are derived from the current `transfer_bindings`.
+    /// Append `op`, stamped with `current_origin`. The sole emission path,
+    /// so origins stay parallel to the code by construction. An allocating
+    /// `op` also gets a `SafePointEntry` at its index, with pointer offsets
+    /// derived from the live `transfer_bindings`.
     fn emit(&mut self, op: MicroOp) -> VMResult<()> {
         if op.is_allocating() {
             let code_offset = CodeOffset(self.out_buf.len() as u32);
@@ -500,6 +517,7 @@ impl<'a> LoweringState<'a> {
             });
         }
         self.out_buf.push(op);
+        self.origins_buf.push(self.current_origin);
         Ok(())
     }
 
@@ -1363,7 +1381,11 @@ impl<'a> LoweringState<'a> {
                         width: src.size,
                     });
                 }
-                parallel_copy::emit_parallel_copy(&mut self.out_buf, &copies, self.ctx.scratch)?;
+                let mut copy_ops = Vec::new();
+                parallel_copy::emit_parallel_copy(&mut copy_ops, &copies, self.ctx.scratch)?;
+                for copy_op in copy_ops {
+                    self.emit(copy_op)?;
+                }
                 self.emit(MicroOp::Return)?;
             },
 

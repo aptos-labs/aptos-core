@@ -1,0 +1,162 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x42::copy_prop_stale_read
+// Function definition at index 0
+fun first(l0: vector<u64>): u64
+    borrow_loc l0
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ret
+
+// Function definition at index 1
+fun make(l0: u64): vector<u64>
+    local l1: vector<u64>
+    vec_pack <u64>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    copy_loc l0
+    vec_push_back <u64>
+    // @5
+    mut_borrow_loc l1
+    copy_loc l0
+    ld_u64 1
+    add
+    vec_push_back <u64>
+    // @10
+    mut_borrow_loc l1
+    move_loc l0
+    ld_u64 2
+    add
+    vec_push_back <u64>
+    // @15
+    move_loc l1
+    ret
+
+// Function definition at index 2
+fun mutate_first(l0: vector<u64>): u64
+    local l1: vector<u64>
+    move_loc l0
+    st_loc l1
+    ld_u64 99
+    mut_borrow_loc l1
+    ld_u64 0
+    // @5
+    vec_mut_borrow <u64>
+    write_ref
+    borrow_loc l1
+    vec_len <u64>
+    ret
+
+// Function definition at index 3
+fun stale_read_after_consume(): u64
+    local l0: vector<u64>
+    local l1: vector<u64>
+    local l2: u64
+    local l3: u64
+    ld_u64 7
+    call make
+    st_loc l0
+    copy_loc l0
+    st_loc l1
+    // @5
+    borrow_loc l1
+    vec_len <u64>
+    st_loc l2
+    move_loc l0
+    call mutate_first
+    // @10
+    st_loc l3
+    move_loc l1
+    call first
+    ld_u64 100
+    mul
+    // @15
+    move_loc l3
+    add
+    move_loc l2
+    add
+    ret
+
+=== stackless ===
+// module 0x42::copy_prop_stale_read
+
+fun first(r0): u64 {
+  slots: params(1), locals(0), temps(3)
+    r0: vector<u64>
+    r1: &vector<u64>
+    r2: u64
+    r3: &u64
+  code:
+  L0:
+    0: r1 := imm_borrow_loc r0 @0
+    1: r2 := ld_u64 0 @1
+    2: r3 := vec_imm_borrow u64, r1, r2 @2
+    3: r2 := read_ref r3 @3
+    4: ret [r2] @4
+}
+
+fun make(r0): vector<u64> {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: vector<u64>
+    r2: &mut vector<u64>
+    r3: u64
+  code:
+  L0:
+    0: r1 := vec_pack u64, 0, [] @0
+    1: r2 := mut_borrow_loc r1 @2
+    2: vec_push_back u64, r2, r0 @4
+    3: r2 := mut_borrow_loc r1 @5
+    4: r3 := add r0, #1 @8
+    5: vec_push_back u64, r2, r3 @9
+    6: r2 := mut_borrow_loc r1 @10
+    7: r3 := add r0, #2 @13
+    8: vec_push_back u64, r2, r3 @14
+    9: ret [r1] @16
+}
+
+fun mutate_first(r0): u64 {
+  slots: params(1), locals(1), temps(5)
+    r0: vector<u64>
+    r1: vector<u64>
+    r2: u64
+    r3: &mut vector<u64>
+    r4: u64
+    r5: &mut u64
+    r6: &vector<u64>
+  code:
+  L0:
+    0: r1 := move r0 @0
+    1: r2 := ld_u64 99 @2
+    2: r3 := mut_borrow_loc r1 @3
+    3: r4 := ld_u64 0 @4
+    4: r5 := vec_mut_borrow u64, r3, r4 @5
+    5: write_ref r5, r2 @6
+    6: r6 := imm_borrow_loc r1 @7
+    7: r2 := vec_len u64, r6 @8
+    8: ret [r2] @9
+}
+
+fun stale_read_after_consume(): u64 {
+  slots: params(0), locals(4), temps(2), transfer(1)
+    r0: vector<u64>
+    r1: vector<u64>
+    r2: u64
+    r3: u64
+    r4: &vector<u64>
+    r5: u64
+  code:
+  L0:
+    0: x0 := ld_u64 7 @0
+    1: [r0] := call make, [x0] @1
+    2: r1 := copy r0 @3
+    3: r4 := imm_borrow_loc r1 @5
+    4: r2 := vec_len u64, r4 @6
+    5: [r3] := call mutate_first, [r0] @9
+    6: [x0] := call first, [r1] @12
+    7: r5 := mul x0, #100 @14
+    8: r5 := add r5, r3 @16
+    9: r5 := add r5, r2 @18
+    10: ret [r5] @19
+}

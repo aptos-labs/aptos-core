@@ -9,9 +9,13 @@
 // use backtrace::Backtrace;
 use crate::{
     boogie_helpers,
-    boogie_helpers::{boogie_inst_suffix, boogie_reverse_function_name, boogie_struct_name},
+    boogie_helpers::{
+        boogie_closure_pack_name, boogie_fun_param_name, boogie_inst_suffix,
+        boogie_struct_field_name, boogie_struct_name,
+    },
     options::{BoogieOptions, VectorTheory},
-    prover_task_runner::{ProverTaskRunner, RunBoogieWithSeeds},
+    prover_task_runner::{BoogieTaskOutput, ProverTaskRunner, RunBoogieWithSeeds},
+    timeout_analysis::{cleanup_artifacts, normalize_vc_id, render_notes, RawTimeoutAnalysis},
 };
 use anyhow::anyhow;
 use codespan::{ByteIndex, ColumnIndex, LineIndex, Location, Span};
@@ -19,13 +23,18 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use itertools::Itertools;
 use log::{debug, info, warn};
 use move_binary_format::file_format::FunctionDefinitionIndex;
+use move_core_types::function::ClosureMask;
 use move_model::{
     ast::TempIndex,
     code_writer::CodeWriter,
-    model::{FunId, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, StructEnv},
+    model::{
+        FunId, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, QualifiedInstId, StructEnv, StructId,
+    },
     pragmas::INTRINSIC_TYPE_MAP,
+    symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
+use move_prover_bytecode_pipeline::mono_analysis;
 use move_stackless_bytecode::function_target_pipeline::{FunctionTargetsHolder, FunctionVariant};
 use num::BigInt;
 use once_cell::sync::Lazy;
@@ -36,7 +45,11 @@ use std::{
     fs,
     num::ParseIntError,
     option::Option::None,
+    path::Path,
+    sync::Arc,
+    time::{Duration, Instant},
 };
+use tokio::sync::Notify;
 
 /// A type alias for the way how we use crate `pretty`'s document type. `pretty` is a
 /// Wadler-style pretty printer. Our simple usage doesn't require any lifetime management.
@@ -44,6 +57,52 @@ type PrettyDoc = RcDoc<'static, ()>;
 
 // -----------------------------------------------
 // # Boogie Wrapper
+
+/// Source entity a function value in a counterexample originated from.
+enum FunValueSource {
+    /// A closure packing the given function with the given capture mask.
+    Closure(QualifiedInstId<FunId>, ClosureMask),
+    /// The value of a function-typed parameter of a verification target.
+    Parameter(QualifiedInstId<FunId>, Symbol),
+    /// The value held by a function-typed struct field.
+    StructField(QualifiedInstId<StructId>, Symbol),
+}
+
+/// Resolve a function-type datatype constructor to the source entity it was
+/// generated for. The Boogie backend derives these constructors from the
+/// monomorphization registries, so regenerating the names from the same
+/// registries is exact, unlike parsing the mangled name back.
+fn resolve_fun_value_ctor(env: &GlobalEnv, ctor: &str) -> Option<FunValueSource> {
+    let info = mono_analysis::get_info(env);
+    for closures in info.fun_infos.values() {
+        for closure in closures {
+            if boogie_closure_pack_name(env, &closure.fun, closure.mask) == ctor {
+                return Some(FunValueSource::Closure(closure.fun.clone(), closure.mask));
+            }
+        }
+    }
+    for params in info.fun_param_infos.values() {
+        for param in params {
+            if boogie_fun_param_name(env, &param.fun, param.param_sym) == ctor {
+                return Some(FunValueSource::Parameter(
+                    param.fun.clone(),
+                    param.param_sym,
+                ));
+            }
+        }
+    }
+    for fields in info.fun_struct_field_infos.values() {
+        for field in fields {
+            if boogie_struct_field_name(env, &field.struct_id, field.field_sym) == ctor {
+                return Some(FunValueSource::StructField(
+                    field.struct_id.clone(),
+                    field.field_sym,
+                ));
+            }
+        }
+    }
+    None
+}
 
 /// Represents the boogie wrapper.
 pub struct BoogieWrapper<'env> {
@@ -60,6 +119,23 @@ pub struct BoogieOutput {
 
     /// Full output as a string.
     pub all_output: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BoogieRunStatus {
+    Ok,
+    Timeout,
+    Errors,
+}
+
+impl BoogieRunStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Timeout => "timeout",
+            Self::Errors => "errors",
+        }
+    }
 }
 
 /// Kind of boogie error.
@@ -83,6 +159,7 @@ pub struct BoogieError {
     pub kind: BoogieErrorKind,
     pub loc: Loc,
     pub message: String,
+    pub notes: Vec<String>,
     pub execution_trace: Vec<TraceEntry>,
     pub model: Option<Model>,
 }
@@ -104,45 +181,169 @@ static VERIFICATION_DIAG_STARTS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^assert_failed\((?P<args>[^)]*)\): (?P<msg>.*)$").unwrap());
 
 static INCONCLUSIVE_DIAG_STARTS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^.*\((?P<line>\d+),(?P<col>\d+)\).*Verification(?P<str>.*)(inconclusive|out of resource|timed out).*$")
+    Regex::new(r"(?mi)^.*\((?P<line>\d+),(?P<col>\d+)\).*Verification(?P<str>.*)(inconclusive|out of resource|timed out).*$")
         .unwrap()
+});
+
+static TIMEOUT_PROCEDURE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)Verification of (?P<procedure>\S+).*?(?:inconclusive|out of resource|timed out)",
+    )
+    .unwrap()
 });
 
 static INCONSISTENCY_DIAG_STARTS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^inconsistency_detected\((?P<args>[^)]*)\)").unwrap());
 
 impl BoogieWrapper<'_> {
+    /// Removes the replay captures written for timeout analysis, unless the
+    /// user asked for the artifacts to be kept.
+    fn cleanup_timeout_artifacts(&self, boogie_file: &str) {
+        if self.options.timeout_analysis && !self.options.keep_artifacts {
+            cleanup_artifacts(boogie_file);
+        }
+    }
+
+    fn make_boogie_task(
+        options: &BoogieOptions,
+        boogie_file: String,
+        process_timeout_secs: u64,
+        vc_timeout_secs: usize,
+        seed_handoff_after: Option<Duration>,
+        process_deadline: Option<Instant>,
+    ) -> RunBoogieWithSeeds {
+        let mut options = options.clone();
+        options.proc_cores = 1;
+        if options.z3_trace_file.is_some() {
+            options.z3_trace_file = Some(
+                Path::new(&boogie_file)
+                    .with_extension("z3.trace")
+                    .to_string_lossy()
+                    .to_string(),
+            );
+        }
+        let prefer_primary = options.stable_test_output;
+        RunBoogieWithSeeds {
+            options,
+            boogie_file,
+            prefer_primary,
+            process_timeout_secs,
+            vc_timeout_secs,
+            process_deadline,
+            seed_handoff_after,
+            primary_started: Arc::new(Notify::new()),
+        }
+    }
+
+    fn boogie_seed_plan(options: &BoogieOptions) -> (usize, bool) {
+        // A separate Boogie process loses the solver warm state established by
+        // preceding VCs. Retry a soft timeout once with the next seed, but do
+        // not duplicate Boogie's frontend work for successful roots.
+        if options.num_instances == 1 && options.seed_handoff_ratio > 0.0 {
+            (2, false)
+        } else {
+            (options.num_instances, options.sequential_task)
+        }
+    }
+
+    /// Generate bounded Boogie work and consume each result as it completes.
+    pub fn run_boogie_pipeline<M, E, P, C>(
+        options: &BoogieOptions,
+        job_count: usize,
+        mut produce: P,
+        consume: C,
+    ) -> Result<(), E>
+    where
+        P: FnMut(usize) -> Result<(String, u64, usize, Option<Duration>, Option<Instant>, M), E>,
+        C: FnMut(usize, M, usize, std::io::Result<BoogieTaskOutput>, Duration) -> Result<(), E>,
+    {
+        // Preserve root-ordered diagnostics in snapshot tests.
+        let process_limit = if options.stable_test_output {
+            1
+        } else {
+            options.proc_cores
+        };
+        let (num_instances, sequential) = Self::boogie_seed_plan(options);
+        ProverTaskRunner::run_task_pipeline(
+            job_count,
+            num_instances,
+            sequential,
+            0,
+            process_limit,
+            |index| {
+                let (
+                    boogie_file,
+                    process_timeout_secs,
+                    vc_timeout_secs,
+                    seed_handoff_after,
+                    process_deadline,
+                    metadata,
+                ) = produce(index)?;
+                Ok((
+                    Self::make_boogie_task(
+                        options,
+                        boogie_file,
+                        process_timeout_secs,
+                        vc_timeout_secs,
+                        seed_handoff_after,
+                        process_deadline,
+                    ),
+                    metadata,
+                ))
+            },
+            consume,
+        )
+    }
+
     /// Calls boogie on the given file. On success, returns a struct representing the analyzed
     /// output of boogie.
     pub fn call_boogie(&self, boogie_file: &str) -> anyhow::Result<BoogieOutput> {
-        let args = self.options.get_boogie_command(boogie_file)?;
         info!("running solver");
-        debug!("command line: {}", args.iter().join(" "));
         let task = RunBoogieWithSeeds {
             options: self.options.clone(),
             boogie_file: boogie_file.to_string(),
+            prefer_primary: false,
+            process_timeout_secs: 0,
+            vc_timeout_secs: self.options.vc_timeout,
+            process_deadline: None,
+            seed_handoff_after: self.options.seed_handoff_after(self.options.vc_timeout),
+            primary_started: Arc::new(Notify::new()),
         };
         // When running on complicated formulas(especially those with quantifiers), SMT solvers
         // can suffer from the so-called butterfly effect, where minor changes such as using
         // different random seeds cause significant instabilities in verification times.
         // Thus by running multiple instances of Boogie with different random seeds, we can
         // potentially alleviate the instability.
+        let (num_instances, sequential) = Self::boogie_seed_plan(self.options);
         let (seed, output_res) = ProverTaskRunner::run_tasks(
             task,
-            self.options.num_instances,
-            self.options.sequential_task,
+            num_instances,
+            sequential,
             self.options.hard_timeout_secs,
         );
+        self.analyze_boogie_result(boogie_file, seed, output_res)
+    }
+
+    /// Analyze one raw result returned by the bounded process queue.
+    pub fn analyze_boogie_result(
+        &self,
+        boogie_file: &str,
+        seed: usize,
+        output_res: std::io::Result<BoogieTaskOutput>,
+    ) -> anyhow::Result<BoogieOutput> {
+        let args = self.options.get_boogie_command(boogie_file)?;
+        debug!("command line: {}", args.iter().join(" "));
         let output = match output_res {
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::TimedOut {
                     let err = BoogieError {
-                        kind: BoogieErrorKind::Internal,
+                        kind: BoogieErrorKind::Inconclusive,
                         loc: self.env.unknown_loc(),
                         message: format!(
                             "Boogie execution exceeded hard timeout of {}s",
                             self.options.hard_timeout_secs
                         ),
+                        notes: vec![],
                         execution_trace: vec![],
                         model: None,
                     };
@@ -156,6 +357,10 @@ impl BoogieWrapper<'_> {
             },
             Ok(out) => out,
         };
+        let BoogieTaskOutput {
+            output,
+            timeout_analysis,
+        } = output;
         if self.options.num_instances > 1 {
             debug!("Boogie instance with seed {} finished first", seed);
         }
@@ -210,8 +415,14 @@ impl BoogieWrapper<'_> {
             ));
         }
         let mut errors = self.extract_verification_errors(&out);
-        errors.extend(self.extract_inconclusive_errors(&out));
+        errors.extend(self.extract_inconclusive_errors(&out, &timeout_analysis, boogie_file));
         errors.extend(self.extract_inconsistency_errors(&out));
+        if self.options.stable_test_output {
+            // Boogie can emit independent assertion failures in a different
+            // order even with one solver core and a fixed seed. Diagnostics
+            // are logically unordered, so canonicalize them for baselines.
+            canonicalize_errors(&mut errors);
+        }
         Ok(BoogieOutput {
             errors,
             all_output: out,
@@ -220,7 +431,51 @@ impl BoogieWrapper<'_> {
 
     /// Calls boogie and analyzes output.
     pub fn call_boogie_and_verify_output(&self, boogie_file: &str) -> anyhow::Result<()> {
-        let BoogieOutput { errors, all_output } = self.call_boogie(boogie_file)?;
+        let BoogieOutput { errors, all_output } = match self.call_boogie(boogie_file) {
+            Ok(output) => output,
+            Err(err) => {
+                self.cleanup_timeout_artifacts(boogie_file);
+                return Err(err);
+            },
+        };
+        self.verify_output(boogie_file, errors, all_output)
+    }
+
+    /// Analyze and report one result returned by the bounded process queue.
+    pub fn analyze_and_verify_output(
+        &self,
+        boogie_file: &str,
+        seed: usize,
+        output_res: std::io::Result<BoogieTaskOutput>,
+    ) -> anyhow::Result<BoogieRunStatus> {
+        let BoogieOutput { errors, all_output } =
+            match self.analyze_boogie_result(boogie_file, seed, output_res) {
+                Ok(output) => output,
+                Err(err) => {
+                    self.cleanup_timeout_artifacts(boogie_file);
+                    return Err(err);
+                },
+            };
+        let status = if errors
+            .iter()
+            .any(|error| error.kind == BoogieErrorKind::Inconclusive)
+        {
+            BoogieRunStatus::Timeout
+        } else if errors.is_empty() {
+            BoogieRunStatus::Ok
+        } else {
+            BoogieRunStatus::Errors
+        };
+        self.verify_output(boogie_file, errors, all_output)?;
+        Ok(status)
+    }
+
+    fn verify_output(
+        &self,
+        boogie_file: &str,
+        errors: Vec<BoogieError>,
+        all_output: String,
+    ) -> anyhow::Result<()> {
         let boogie_log_file = self.options.get_boogie_log_file(boogie_file);
         let log_file_existed = std::path::Path::new(&boogie_log_file).exists();
         debug!("writing boogie log to {}", boogie_log_file);
@@ -229,6 +484,8 @@ impl BoogieWrapper<'_> {
         for error in &errors {
             self.add_error(error);
         }
+
+        self.cleanup_timeout_artifacts(boogie_file);
 
         if !log_file_existed && !self.options.keep_artifacts {
             std::fs::remove_file(boogie_log_file).unwrap_or_default();
@@ -452,6 +709,9 @@ impl BoogieWrapper<'_> {
             display.dedup();
             diag = diag.with_notes(display);
         }
+        if !error.notes.is_empty() {
+            diag = diag.with_notes(error.notes.clone());
+        }
         self.env.add_diag(diag);
     }
 
@@ -525,6 +785,7 @@ impl BoogieWrapper<'_> {
                         "unexpected boogie output: `{} ..`",
                         &inbetween[0..inbetween.len().min(70)]
                     ),
+                    notes: vec![],
                     execution_trace: vec![],
                     model: None,
                 })
@@ -551,6 +812,7 @@ impl BoogieWrapper<'_> {
                     kind: BoogieErrorKind::Assertion,
                     loc,
                     message: msg.to_string(),
+                    notes: vec![],
                     execution_trace,
                     model: if model.is_empty() { None } else { Some(model) },
                 });
@@ -764,7 +1026,12 @@ impl BoogieWrapper<'_> {
     }
 
     /// Extracts inconclusive (timeout) errors.
-    fn extract_inconclusive_errors(&self, out: &str) -> Vec<BoogieError> {
+    fn extract_inconclusive_errors(
+        &self,
+        out: &str,
+        timeout_analysis: &[RawTimeoutAnalysis],
+        boogie_file: &str,
+    ) -> Vec<BoogieError> {
         INCONCLUSIVE_DIAG_STARTS
             .captures_iter(out)
             .filter_map(|cap| {
@@ -777,20 +1044,39 @@ impl BoogieWrapper<'_> {
                     let line = cap.name("line").unwrap().as_str();
                     let col = cap.name("col").unwrap().as_str();
                     let msg = cap.get(0).unwrap().as_str();
+                    let lower_msg = msg.to_ascii_lowercase();
+                    let procedure = TIMEOUT_PROCEDURE
+                        .captures(msg)
+                        .and_then(|capture| capture.name("procedure"))
+                        .map(|procedure| normalize_vc_id(procedure.as_str()));
                     let loc = self
                         .get_loc_from_pos(make_position(line, col))
                         .unwrap_or_else(|| self.env.unknown_loc());
                     Some(BoogieError {
                         kind: BoogieErrorKind::Inconclusive,
                         loc,
-                        message: if msg.contains("out of resource") || msg.contains("timed out") {
+                        message: if lower_msg.contains("out of resource")
+                            || lower_msg.contains("timed out")
+                        {
                             let timeout = self.options.vc_timeout;
                             format!(
-                                "verification out of resources/timeout (global timeout set to {}s)",
+                                "verification out of resources/timeout (timeout set to {}s)",
                                 timeout
                             )
                         } else {
                             "verification inconclusive".to_string()
+                        },
+                        notes: if self.options.timeout_analysis {
+                            render_notes(
+                                timeout_analysis,
+                                procedure.as_deref(),
+                                self.env,
+                                self.writer,
+                                boogie_file,
+                                self.options.stable_test_output,
+                            )
+                        } else {
+                            vec![]
                         },
                         execution_trace: vec![],
                         model: None,
@@ -811,6 +1097,7 @@ impl BoogieWrapper<'_> {
                     kind: BoogieErrorKind::Inconsistency,
                     loc,
                     message: "there is an inconsistent assumption in the function, which may allow any post-condition (including false) to be proven".to_string(),
+                    notes: vec![],
                     execution_trace: vec![],
                     model: None,
                 }
@@ -827,6 +1114,14 @@ impl BoogieWrapper<'_> {
             .unwrap_or(ByteIndex(0));
         self.writer.get_source_location(index)
     }
+}
+
+fn canonicalize_errors(errors: &mut [BoogieError]) {
+    errors.sort_by(|left, right| {
+        left.loc
+            .cmp(&right.loc)
+            .then_with(|| left.message.cmp(&right.message))
+    });
 }
 
 /// Creates a position (line/column pair) from strings which are known to consist only of digits.
@@ -1317,16 +1612,17 @@ impl ModelValue {
         None
     }
 
-    /// Extract the arguments of a list of the form `(<ctor_prefix>... element...)`, also returning
-    /// the ctor string for further analysis.
-    fn extract_ctor_and_list(&self, ctor_prefix: &str) -> Option<(String, &[ModelValue])> {
+    /// Extract the constructor name and arguments of a datatype value.
+    /// Boogie quotes a generated constructor name with `|`; the name is
+    /// returned unquoted.
+    fn extract_ctor_name_and_list(&self) -> Option<(String, &[ModelValue])> {
         if let ModelValue::List(elems) = self {
-            if !elems.is_empty() {
-                let literal = elems[0].extract_literal()?;
-                if let Some(stripped) = literal.strip_prefix(ctor_prefix) {
-                    return Some((stripped.to_string(), &elems[1..]));
-                }
-            }
+            let literal = elems.first()?.extract_literal()?;
+            let name = literal
+                .strip_prefix('|')
+                .and_then(|rest| rest.strip_suffix('|'))
+                .unwrap_or(literal);
+            return Some((name.to_string(), &elems[1..]));
         }
         None
     }
@@ -1382,6 +1678,78 @@ impl ModelValue {
         })
     }
 
+    /// Pretty prints a function value.
+    ///
+    /// A function type is encoded as a Boogie datatype whose variants the
+    /// backend derives from the monomorphization registries: a closure over a
+    /// named function, the value of a function-typed parameter, or the value
+    /// stored in a function-typed struct field. Resolving the constructor
+    /// through those same registries names the source entity exactly, rather
+    /// than reversing the mangled Boogie name.
+    fn pretty_fun_value(&self, wrapper: &BoogieWrapper, model: &Model, ty: &Type) -> PrettyDoc {
+        let env = wrapper.env;
+        let unknown = || {
+            PrettyDoc::text(format!(
+                "<some `{}`>",
+                ty.display(&env.get_type_display_ctx())
+            ))
+        };
+        let Some((ctor, args)) = self.extract_ctor_name_and_list() else {
+            return unknown();
+        };
+        match resolve_fun_value_ctor(env, &ctor) {
+            Some(FunValueSource::Closure(fun, mask)) => {
+                let fun_env = env.get_function(fun.to_qualified_id());
+                let params = fun_env.get_parameters();
+                // The captured arguments are the masked parameters, in order.
+                let captured = params
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| mask.is_captured(*i))
+                    .zip(args)
+                    .map(|((_, param), value)| {
+                        PrettyDoc::text(format!("{} = ", param.0.display(env.symbol_pool())))
+                            .append(value.pretty_or_raw(
+                                wrapper,
+                                model,
+                                &param.1.instantiate(&fun.inst),
+                            ))
+                    })
+                    .collect_vec();
+                let name = PrettyDoc::text(fun_env.get_full_name_str());
+                if captured.is_empty() {
+                    name
+                } else {
+                    name.append(PrettyDoc::text("(captured "))
+                        .append(PrettyDoc::intersperse(captured, PrettyDoc::text(", ")))
+                        .append(PrettyDoc::text(")"))
+                }
+            },
+            Some(FunValueSource::Parameter(fun, param)) => PrettyDoc::text(format!(
+                "<value of function parameter `{}` of `{}`>",
+                param.display(env.symbol_pool()),
+                env.get_function(fun.to_qualified_id()).get_full_name_str()
+            )),
+            Some(FunValueSource::StructField(struct_id, field)) => {
+                // The single argument distinguishes the struct instances a
+                // field value came from; it is not a captured value.
+                let instance = args
+                    .first()
+                    .and_then(|value| value.extract_literal())
+                    .map(|value| format!(" #{}", value))
+                    .unwrap_or_default();
+                PrettyDoc::text(format!(
+                    "<value of function field `{}.{}`{}>",
+                    env.get_struct_qid(struct_id.to_qualified_id())
+                        .get_full_name_str(),
+                    field.display(env.symbol_pool()),
+                    instance
+                ))
+            },
+            None => unknown(),
+        }
+    }
+
     /// Pretty prints the given model value which has given type.
     pub fn pretty(&self, wrapper: &BoogieWrapper, model: &Model, ty: &Type) -> Option<PrettyDoc> {
         if self.extract_list("Error").is_some() {
@@ -1429,7 +1797,38 @@ impl ModelValue {
             Type::Struct(module_id, struct_id, params) => {
                 let struct_env = wrapper.env.get_struct_qid(module_id.qualified(*struct_id));
                 if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
-                    self.pretty_table(wrapper, model, &params[0], &params[1])
+                    // Ghost-bearing intrinsic maps are carrier datatypes:
+                    // unwrap the raw table and render the ghosts after the
+                    // entries.
+                    let ghost_fields = struct_env.get_ghost_fields().collect_vec();
+                    if ghost_fields.is_empty() {
+                        self.pretty_table(wrapper, model, &params[0], &params[1])
+                    } else {
+                        // The value's own constructor name disambiguates the
+                        // bv twin, so try both carrier names.
+                        let carrier_name = boogie_struct_name(&struct_env, params, false);
+                        let carrier_name_bv = boogie_struct_name(&struct_env, params, true);
+                        let args = self
+                            .extract_list(&carrier_name)
+                            .or_else(|| self.extract_list(&format!("|{}|", carrier_name)))
+                            .or_else(|| self.extract_list(&carrier_name_bv))
+                            .or_else(|| self.extract_list(&format!("|{}|", carrier_name_bv)))?;
+                        let mut doc = args
+                            .first()?
+                            .pretty_table(wrapper, model, &params[0], &params[1])?;
+                        for (i, f) in ghost_fields.iter().enumerate() {
+                            let ty = f.get_type().instantiate(params);
+                            let default = ModelValue::error();
+                            let v = args.get(1 + i).unwrap_or(&default);
+                            doc = doc
+                                .append(PrettyDoc::text(format!(
+                                    " ghost {} = ",
+                                    f.get_name().display(struct_env.symbol_pool())
+                                )))
+                                .append(v.pretty_or_raw(wrapper, model, &ty));
+                        }
+                        Some(doc)
+                    }
                 } else {
                     self.pretty_struct(wrapper, model, &struct_env, params)
                 }
@@ -1444,29 +1843,7 @@ impl ModelValue {
                 // effect the verification outcome, we may not have much need for seeing it.
                 Some(PrettyDoc::text("<generic>"))
             },
-            Type::Fun(..) => {
-                let repr = if let Some((ctor_rest, args)) = self.extract_ctor_and_list("|$closure'")
-                {
-                    let end = ctor_rest.rfind("'")?;
-                    let fun_name_mangled = &ctor_rest[..end];
-                    let fun_name = boogie_reverse_function_name(wrapper.env, fun_name_mangled)
-                        .unwrap_or_else(|| fun_name_mangled.to_string());
-                    format!("{}(captured={:?})", fun_name, args)
-                } else if let Some((_, args)) = self.extract_ctor_and_list("|$unknown_function'") {
-                    format!(
-                        "<some `{}`>(captured={:?})",
-                        ty.display(&wrapper.env.get_type_display_ctx()),
-                        args
-                    )
-                } else {
-                    format!(
-                        "<some `{}`>(captured={:?})",
-                        ty.display(&wrapper.env.get_type_display_ctx()),
-                        self
-                    )
-                };
-                Some(PrettyDoc::text(repr))
-            },
+            Type::Fun(..) => Some(self.pretty_fun_value(wrapper, model, ty)),
             Type::Tuple(_)
             | Type::Primitive(_)
             | Type::TypeDomain(_)
@@ -1835,5 +2212,107 @@ fn index_range_check(max: usize) -> impl FnOnce(usize) -> Result<usize, ModelPar
                 max, idx
             )))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_generated_constructor_name_is_unquoted_with_its_arguments() {
+        // Boogie quotes generated constructor names with `|`; the datatype
+        // value the solver reports is `(<ctor> arg...)`.
+        let value = ModelValue::List(vec![
+            ModelValue::literal("|$struct_field'$42_calculator_State$0'|"),
+            ModelValue::literal("2"),
+        ]);
+
+        let (ctor, args) = value
+            .extract_ctor_name_and_list()
+            .expect("is a datatype value");
+
+        assert_eq!("$struct_field'$42_calculator_State$0'", ctor);
+        assert_eq!(vec![ModelValue::literal("2")], args.to_vec());
+    }
+
+    #[test]
+    fn an_unquoted_constructor_name_is_read_as_is() {
+        let value = ModelValue::List(vec![ModelValue::literal("$dummy")]);
+
+        let (ctor, args) = value
+            .extract_ctor_name_and_list()
+            .expect("is a datatype value");
+
+        assert_eq!("$dummy", ctor);
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn a_value_that_is_not_a_datatype_has_no_constructor() {
+        assert!(ModelValue::literal("7")
+            .extract_ctor_name_and_list()
+            .is_none());
+    }
+
+    #[test]
+    fn stable_errors_are_ordered_by_location_then_message() {
+        let make_error = |loc: Loc, message: &str| BoogieError {
+            kind: BoogieErrorKind::Assertion,
+            loc,
+            message: message.to_owned(),
+            notes: vec![],
+            execution_trace: vec![],
+            model: None,
+        };
+        let base = Loc::default();
+        let later = Loc::new(base.file_id(), Span::new(ByteIndex(1), ByteIndex(2)));
+        let mut errors = vec![
+            make_error(later, "later"),
+            make_error(base.clone(), "z"),
+            make_error(base, "a"),
+        ];
+
+        canonicalize_errors(&mut errors);
+
+        assert_eq!(
+            errors
+                .iter()
+                .map(|error| error.message.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a", "z", "later"]
+        );
+    }
+
+    #[test]
+    fn default_seed_retry_is_hedged() {
+        assert_eq!(
+            BoogieWrapper::boogie_seed_plan(&BoogieOptions::default()),
+            (2, false)
+        );
+    }
+
+    #[test]
+    fn zero_seed_handoff_disables_fallback() {
+        let options = BoogieOptions {
+            seed_handoff_ratio: 0.0,
+            ..Default::default()
+        };
+        assert_eq!(BoogieWrapper::boogie_seed_plan(&options), (1, false));
+    }
+
+    #[test]
+    fn explicit_seed_configuration_is_preserved() {
+        let concurrent = BoogieOptions {
+            num_instances: 3,
+            ..Default::default()
+        };
+        assert_eq!(BoogieWrapper::boogie_seed_plan(&concurrent), (3, false));
+
+        let sequential = BoogieOptions {
+            sequential_task: true,
+            ..concurrent
+        };
+        assert_eq!(BoogieWrapper::boogie_seed_plan(&sequential), (3, true));
     }
 }

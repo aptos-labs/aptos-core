@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Move specification-inference judge result",
+  "type": "object",
+  "required": ["schema_version", "state", "compile", "policy", "prover"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "state": {
+      "enum": [
+        "infrastructure_failure",
+        "compile_failure",
+        "forbidden_weakening",
+        "prover_failure",
+        "prover_timeout",
+        "no_progress",
+        "operational_success"
+      ]
+    },
+    "compile": {"type": "object"},
+    "policy": {"type": "object"},
+    "prover": {"type": "object"}
+  },
+  "additionalProperties": true
+}

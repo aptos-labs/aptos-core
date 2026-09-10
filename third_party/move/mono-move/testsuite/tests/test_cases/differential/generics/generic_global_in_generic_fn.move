@@ -118,7 +118,9 @@ module 0x42::generic_global_in_generic_fn {
 // RUN: execute 0x42::generic_global_in_generic_fn::double_publish_u64 --args 0x61, 4
 // CHECK-V1-SUBSTR: RESOURCE_ALREADY_EXISTS
 // CHECK-V2-SUBSTR: already exists
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x42::generic_global_in_generic_fn::take_missing_bool --args 0x62
 // CHECK-V1-SUBSTR: MISSING_DATA
 // CHECK-V2-SUBSTR: MoveFrom: resource does not exist
+// CHECK-ERROR-PARITY

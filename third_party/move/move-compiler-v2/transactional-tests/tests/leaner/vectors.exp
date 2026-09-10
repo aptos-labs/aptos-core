@@ -1,0 +1,12 @@
+processed 6 tasks
+task 0 lines 1-30:  publish [import Move]
+task 1 lines 32-32:  run 0x0::LeanerVectors::length
+return values: 3
+task 2 lines 34-34:  run 0x0::LeanerVectors::middle
+return values: 20
+task 3 lines 36-36:  run 0x0::LeanerVectors::replaced
+return values: 42
+task 4 lines 38-38:  run 0x0::LeanerVectors::borrowed
+return values: 20
+task 5 lines 40-40:  run 0x0::LeanerVectors::borrowed_mut
+return values: 42

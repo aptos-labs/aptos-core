@@ -191,12 +191,16 @@ error: property `do_not_verify` is not valid in this context
     │
 135 │         pragma do_not_verify, timeout = 60;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = valid pragmas here are: aborts_if_is_partial, aborts_if_is_strict, emits_is_partial, emits_is_strict, inference, intrinsic, unroll, verify
 
 error: property `timeout` is not valid in this context
     ┌─ tests/more-v1/parser/spec_parsing_ok.move:135:9
     │
 135 │         pragma do_not_verify, timeout = 60;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = valid pragmas here are: aborts_if_is_partial, aborts_if_is_strict, emits_is_partial, emits_is_strict, inference, intrinsic, unroll, verify
 
 error: cannot use `u256` with an operator which expects a value of type `address`
     ┌─ tests/more-v1/parser/spec_parsing_ok.move:142:37

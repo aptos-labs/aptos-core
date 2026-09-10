@@ -31,8 +31,8 @@ module 0x42::loop_memory_havoc {
 
     // Loop invariants recover full precision over the havocked memory: the
     // exact final value and the complete abort condition are provable.
-    // `old(..)` is not available in loop invariants, so the initial value is
-    // snapshotted into a local.
+    // Here the initial value is snapshotted into a local; see
+    // `bump_loop_with_old_invariant` below for the direct `old(..)` form.
     fun bump_loop_with_invariant(addr: address, n: u64) acquires R {
         let x0 = borrow_global<R>(addr).x;
         let i = 0;
@@ -480,5 +480,26 @@ module 0x42::loop_memory_havoc {
         requires exists<R>(addr);
         requires exists<S>(addr);
         ensures result == 7;
+    }
+
+    // `old(..)` over global state can be used directly in a loop invariant;
+    // it resolves to the memory at function entry, so no snapshot local is
+    // needed (compare `bump_loop_with_invariant` above).
+    fun bump_loop_with_old_invariant(addr: address, n: u64) {
+        let i = 0;
+        while (i < n) {
+            let r = &mut R[addr];
+            r.x = r.x + 1;
+            i = i + 1;
+        } spec {
+            invariant i <= n;
+            invariant exists<R>(addr);
+            invariant R[addr].x == old(R[addr].x) + i;
+        };
+    }
+    spec bump_loop_with_old_invariant {
+        requires exists<R>(addr);
+        aborts_if global<R>(addr).x + n > MAX_U64;
+        ensures global<R>(addr).x == old(global<R>(addr).x) + n;
     }
 }

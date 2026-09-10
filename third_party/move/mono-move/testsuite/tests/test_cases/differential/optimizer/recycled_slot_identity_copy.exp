@@ -1,0 +1,69 @@
+=== stackless ===
+// module 0x42::recycled_slot_identity_copy
+
+fun assign_through_call(r0): u64 {
+  slots: params(1), locals(2), temps(7), transfer(1)
+    r0: u64
+    r1: vector<u64>
+    r2: 0x42::recycled_slot_identity_copy::Wrap
+    r3: vector<u64>
+    r4: u64
+    r5: &mut vector<u64>
+    r6: u64
+    r7: &mut u64
+    r8: &vector<u64>
+    r9: &u64
+  code:
+  L0:
+    0: [r1] := call make, [r0] @1
+    1: x0 := add r0, #10 @5
+    2: [r3] := call make, [x0] @6
+    3: [r0] := call consume_len, [r1] @8
+    4: r1 := move r3 @10
+    5: r3 := copy r1 @11
+    6: r2 := pack 0x42::recycled_slot_identity_copy::Wrap, [r3] @12
+    7: r4 := ld_u64 99 @14
+    8: r5 := mut_borrow_loc_field Wrap::v, r2 @15
+    9: r6 := ld_u64 0 @17
+    10: r7 := vec_mut_borrow u64, r5, r6 @18
+    11: write_ref r7, r4 @19
+    12: r8 := imm_borrow_loc r1 @20
+    13: r4 := ld_u64 0 @21
+    14: r9 := vec_imm_borrow u64, r8, r4 @22
+    15: r4 := read_ref r9 @23
+    16: r4 := mul r4, #100 @25
+    17: r4 := add r4, r0 @27
+    18: ret [r4] @28
+}
+
+fun consume_len(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: vector<u64>
+    r1: &vector<u64>
+    r2: u64
+  code:
+  L0:
+    0: r1 := imm_borrow_loc r0 @0
+    1: r2 := vec_len u64, r1 @1
+    2: ret [r2] @2
+}
+
+fun make(r0): vector<u64> {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: vector<u64>
+    r2: &mut vector<u64>
+    r3: u64
+  code:
+  L0:
+    0: r1 := vec_pack u64, 0, [] @0
+    1: r2 := mut_borrow_loc r1 @2
+    2: vec_push_back u64, r2, r0 @4
+    3: r2 := mut_borrow_loc r1 @5
+    4: r3 := add r0, #1 @8
+    5: vec_push_back u64, r2, r3 @9
+    6: r2 := mut_borrow_loc r1 @10
+    7: r3 := add r0, #2 @13
+    8: vec_push_back u64, r2, r3 @14
+    9: ret [r1] @16
+}

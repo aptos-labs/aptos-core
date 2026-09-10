@@ -287,6 +287,11 @@ pub trait ExpRewriterFunctions {
     ) -> Option<Condition> {
         None
     }
+    /// Called before the expressions of a spec condition are rewritten,
+    /// allowing implementations to track which condition is being processed.
+    /// There is no exit notification; state set here is overwritten when the
+    /// next condition is entered.
+    fn rewrite_enter_condition(&mut self, target: &SpecBlockTarget, cond: &Condition) {}
 
     // Core traversal functions, not intended to be re-implemented
     // -----------------------------------------------------------
@@ -746,6 +751,7 @@ pub trait ExpRewriterFunctions {
         target: &SpecBlockTarget,
         cond: &Condition,
     ) -> (bool, Condition) {
+        self.rewrite_enter_condition(target, cond);
         let (mut changed, exp) = self.internal_rewrite_exp(&cond.exp);
         let additional_exps =
             if let Some(additional_exps) = self.internal_rewrite_vec(&cond.additional_exps) {
@@ -929,28 +935,29 @@ pub trait ExpRewriterFunctions {
 /// Used when inlining opaque function specs at call sites to avoid label collisions
 /// between different inlining instances.
 ///
-/// Uses a local counter rather than `GlobalEnv::new_global_id()` to ensure
-/// deterministic label IDs regardless of prior global allocations — the global
-/// counter depends on compilation order which can vary across machines.
-pub struct MemoryLabelFreshener {
-    counter: usize,
+/// Fresh labels are allocated through `GlobalEnv::new_global_id()`: all
+/// memory labels in one environment must come from this single allocator.
+/// Labels from an independent counter can collide with labels allocated
+/// elsewhere — e.g. with the state anchor labels of inline-function
+/// expansions — letting one label's memory snapshot overwrite another's.
+pub struct MemoryLabelFreshener<'a> {
+    env: &'a GlobalEnv,
     label_map: BTreeMap<MemoryLabel, MemoryLabel>,
 }
 
-impl MemoryLabelFreshener {
-    pub fn new(start: usize) -> Self {
+impl<'a> MemoryLabelFreshener<'a> {
+    pub fn new(env: &'a GlobalEnv) -> Self {
         Self {
-            counter: start,
+            env,
             label_map: BTreeMap::new(),
         }
     }
 
     fn freshen(&mut self, label: MemoryLabel) -> MemoryLabel {
-        *self.label_map.entry(label).or_insert_with(|| {
-            let id = MemoryLabel::new(self.counter);
-            self.counter += 1;
-            id
-        })
+        *self
+            .label_map
+            .entry(label)
+            .or_insert_with(|| MemoryLabel::new(self.env.new_global_id().as_usize()))
     }
 
     fn freshen_range(&mut self, range: &MemoryRange) -> MemoryRange {
@@ -963,14 +970,9 @@ impl MemoryLabelFreshener {
     pub fn label_map(&self) -> &BTreeMap<MemoryLabel, MemoryLabel> {
         &self.label_map
     }
-
-    /// Returns the next available counter value for chaining multiple freshenings.
-    pub fn next_counter(&self) -> usize {
-        self.counter
-    }
 }
 
-impl ExpRewriterFunctions for MemoryLabelFreshener {
+impl ExpRewriterFunctions for MemoryLabelFreshener<'_> {
     fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         let new_oper = match oper {
             Operation::Global(Some(l)) => Some(Operation::Global(Some(self.freshen(*l)))),
@@ -989,6 +991,11 @@ impl ExpRewriterFunctions for MemoryLabelFreshener {
             },
             Operation::SpecUpdate(r) if !r.is_default() => {
                 Some(Operation::SpecUpdate(self.freshen_range(r)))
+            },
+            Operation::SaveStateAnchor(l) => Some(Operation::SaveStateAnchor(self.freshen(*l))),
+            Operation::WithStateAnchor(l) => Some(Operation::WithStateAnchor(self.freshen(*l))),
+            Operation::FoldsCaptureAnchor(l) => {
+                Some(Operation::FoldsCaptureAnchor(self.freshen(*l)))
             },
             _ => None,
         };

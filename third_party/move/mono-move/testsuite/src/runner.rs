@@ -8,8 +8,8 @@ use crate::{
     compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
     engine::RunResult,
     extensions::{
-        seed_extensions, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
-        TEST_TXN_INDEX,
+        seed_extensions, test_user_transaction_context, TEST_CHAIN_ID, TEST_SCRIPT_HASH,
+        TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
     },
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
@@ -18,27 +18,30 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use aptos_framework_natives::{
-    event::NativeEventContext, object::NativeObjectContext,
-    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
+    cryptography::ristretto255_point::NativeRistrettoPointContext, event::NativeEventContext,
+    object::NativeObjectContext, state_storage::NativeStateStorageContext,
+    transaction_context::NativeTransactionContext,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     contract_event::ContractEvent,
-    event::EventKey,
     on_chain_config::{Features, TimedFeaturesBuilder},
     state_store::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         StateViewId,
     },
-    transaction::user_transaction_context::{TransactionIndexKind, UserTransactionContext},
 };
 use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
-use mono_move_core::{native::NativeExtensions, types::type_to_string};
+use mono_move_core::{native::NativeExtensions, BytecodeOffset, VMInternalError};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_natives::{EventKind, EventStore};
-use mono_move_runtime::serialize;
-use move_binary_format::{errors::Location, CompiledModule};
+use mono_move_loader::LoaderError;
+use mono_move_natives::EventStore;
+use mono_move_output::{
+    to_contract_events_from_store,
+    v1_error::{self, V1Equivalent},
+};
+use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
@@ -58,11 +61,138 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
-use std::{path::Path, sync::OnceLock};
+use std::{fmt, path::Path, sync::OnceLock};
 
 /// Execution output from a VM as a normalized display string.
-struct Output {
-    display: String,
+pub(crate) struct Output {
+    pub(crate) display: String,
+    pub(crate) parity: ParityOutcome,
+}
+
+/// A step's failure in the form `CHECK-ERROR-PARITY` compares, or why there is
+/// nothing to compare.
+pub(crate) enum ParityOutcome {
+    /// The step failed, and the failure can be stated in V1 terms.
+    Comparable(V1Failure),
+    /// The step failed, but the error has no V1 mapping to state it through.
+    Unmappable,
+    /// The step ended in a Move abort, which carries no VM error to state.
+    Aborted,
+    /// The step did not fail.
+    NoFailure,
+}
+
+impl Output {
+    fn success(display: String) -> Self {
+        Self {
+            display,
+            parity: ParityOutcome::NoFailure,
+        }
+    }
+
+    fn aborted(display: String) -> Self {
+        Self {
+            display,
+            parity: ParityOutcome::Aborted,
+        }
+    }
+}
+
+/// A failure stated in V1 terms for `CHECK-ERROR-PARITY`.
+pub(crate) struct V1Failure {
+    /// The status, sub-status, and message.
+    pub(crate) failure: String,
+    /// The error location. [`None`] where MonoMove attributes the failure
+    /// differently by design, so the directive does not compare it.
+    pub(crate) location: Option<String>,
+}
+
+impl V1Failure {
+    /// Whether `self` (MonoMove's failure) agrees with `expected` (V1's). The
+    /// location is compared only when both sides state one.
+    pub(crate) fn agrees_with(&self, expected: &Self) -> bool {
+        self.failure == expected.failure
+            && match (&self.location, &expected.location) {
+                (Some(actual), Some(expected)) => actual == expected,
+                (None, _) | (_, None) => true,
+            }
+    }
+}
+
+impl fmt::Display for V1Failure {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} | ", self.failure)?;
+        match &self.location {
+            Some(location) => write!(formatter, "{}", location),
+            None => write!(formatter, "location not compared"),
+        }
+    }
+}
+
+/// Renders a failure's V1 status, sub-status, and message.
+fn render_v1_failure(status: StatusCode, sub_status: Option<u64>, message: Option<&str>) -> String {
+    format!(
+        "{:?} | sub-status {} | {}",
+        status,
+        sub_status.map_or_else(|| "none".to_string(), |sub| sub.to_string()),
+        message.unwrap_or("no message"),
+    )
+}
+
+/// Renders a failure's V1 error location and faulting instruction.
+fn render_v1_location(
+    location: &Location,
+    offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
+) -> String {
+    format!(
+        "in {} at {}",
+        render_error_location(location),
+        offset.map_or_else(
+            || "no offset".to_string(),
+            |(def_idx, code_offset)| format!("function {} offset {}", def_idx.0, code_offset)
+        ),
+    )
+}
+
+/// Renders an error location as `undefined`, `script`, or a module ID.
+pub(crate) fn render_error_location(location: &Location) -> String {
+    match location {
+        Location::Undefined => "undefined".to_string(),
+        Location::Script => "script".to_string(),
+        Location::Module(module_id) => render_module_location(module_id),
+    }
+}
+
+/// MonoMove's failure in V1 terms, when it can be stated in them at all.
+/// A failure that cannot be stated, including one that was never located, is
+/// not comparable with V1's.
+fn describe_v2_error_as_v1(err: &VMInternalError) -> ParityOutcome {
+    let V1Equivalent::Described(v1_info) = v1_error::describe(err) else {
+        return ParityOutcome::Unmappable;
+    };
+    if !v1_info.message.is_comparable() || !v1_info.sub_status.is_comparable() {
+        return ParityOutcome::Unmappable;
+    }
+    let location = if err.downcast_ref::<LoaderError>().is_some() {
+        // Attributed differently by design, see `V1Failure::location`.
+        None
+    } else {
+        // A missing location attachment is not equivalent to V1's explicit
+        // `Location::Undefined` and cannot be compared as agreement.
+        let Some(location) = err.location() else {
+            return ParityOutcome::Unmappable;
+        };
+        let (location, offset) = v1_error::v1_location(Some(location));
+        Some(render_v1_location(&location, offset))
+    };
+    ParityOutcome::Comparable(V1Failure {
+        failure: render_v1_failure(
+            v1_info.status,
+            v1_info.sub_status.known(),
+            v1_info.message.text(),
+        ),
+        location,
+    })
 }
 
 /// A [`StateStorageView`] over empty storage that serves a fixed usage, for
@@ -128,12 +258,17 @@ fn render_execution_output(vals: &[String], events: &[String]) -> String {
     segments.join(" | ")
 }
 
-/// Renders the events emitted into the legacy VM's [`NativeEventContext`], in
+/// Renders the events emitted into the V1 VM's [`NativeEventContext`], in
 /// emission order, for cross-VM comparison.
 pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
-    extensions
-        .get::<NativeEventContext>()
-        .events_iter()
+    render_contract_events(extensions.get::<NativeEventContext>().events_iter())
+}
+
+/// Renders materialized events into the normalized form used for cross-VM
+/// comparison.
+fn render_contract_events<'a>(events: impl IntoIterator<Item = &'a ContractEvent>) -> Vec<String> {
+    events
+        .into_iter()
         .map(|event| {
             let type_str = event.type_tag().to_canonical_string();
             match event {
@@ -155,40 +290,20 @@ pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
 ///
 /// # Safety
 ///
-/// The VM heap must be live: each entry's `msg_data` embeds heap pointers that
-/// [`serialize`] dereferences.
+/// Every allocation reachable through the event data must remain live, and
+/// `layouts` must be the matching execution guard. No GC may run during
+/// serialization.
 pub unsafe fn finalize_events_v2(
     extensions: &NativeExtensions,
     layouts: &ExecutionGuard<'_>,
 ) -> Vec<String> {
     let store = extensions
-        .get_mut::<EventStore>()
+        .get::<EventStore>()
         .expect("event store installed");
-    store
-        .entries()
-        .iter()
-        .map(|entry| {
-            let type_str = type_to_string(entry.msg_ty);
-            // SAFETY: forwarded from this function's contract — the heap is live.
-            let blob = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }
-                .expect("event value serializes");
-            match &entry.kind {
-                EventKind::V2 => render_event(None, None, &type_str, &blob),
-                EventKind::V1 {
-                    guid,
-                    sequence_number,
-                } => {
-                    let key: EventKey = bcs::from_bytes(guid).expect("guid decodes to EventKey");
-                    render_event(
-                        Some(key.get_creator_address()),
-                        Some(*sequence_number),
-                        &type_str,
-                        &blob,
-                    )
-                },
-            }
-        })
-        .collect()
+    // SAFETY: forwarded from this function's contract.
+    let events = unsafe { to_contract_events_from_store(&store, layouts) }
+        .expect("events materialize into ContractEvents");
+    render_contract_events(&events)
 }
 
 /// Run all steps in a differential test, checking both VMs produce matching
@@ -254,18 +369,21 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                 // Run only the VM(s) a step actually checks (via `CHECK-V1` /
                 // `CHECK-V2`). This lets a step assert just one side — needed for
                 // natives one VM cannot run (e.g. `aggregator_v2`, which the
-                // legacy harness installs no extension for and would panic on).
+                // V1 harness installs no extension for and would panic on).
                 // `CHECK-GC-COUNT` inspects the V2 collector, so it also needs V2.
-                let needs_v1 = checks.iter().any(|c| matches!(c, Check::V1(..)));
+                // `CHECK-ERROR-PARITY` compares the two, so it needs both.
+                let needs_v1 = checks
+                    .iter()
+                    .any(|c| matches!(c, Check::V1(..) | Check::ErrorParity));
                 let needs_v2 = checks
                     .iter()
-                    .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..)));
+                    .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..) | Check::ErrorParity));
 
                 let v1 = needs_v1.then(|| {
                     execute_function_v1(&storage, &address, &module_name, &function_name, &args)
                 });
 
-                let (v2_display, v2_gc_count) = if needs_v2 {
+                let (v2_output, v2_gc_count) = if needs_v2 {
                     // V2 needs the arg/return kinds. Reuse V1's if it ran,
                     // otherwise load the function (without running it) to size them.
                     let (param_kinds, return_kinds) = match &v1 {
@@ -288,13 +406,15 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                         &return_kinds,
                         heap_size,
                     );
-                    (v2_output.display, v2_gc_count)
+                    (v2_output, v2_gc_count)
                 } else {
-                    (String::new(), 0)
+                    (Output::success(String::new()), 0)
                 };
 
-                let v1_display = v1.map(|v| v.output.display).unwrap_or_default();
-                check_output(&checks, &v1_display, &v2_display, v2_gc_count)?;
+                let v1_output = v1
+                    .map(|v| v.output)
+                    .unwrap_or_else(|| Output::success(String::new()));
+                check_output(&checks, &v1_output, &v2_output, v2_gc_count)?;
             },
         }
     }
@@ -307,7 +427,7 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
     Ok(())
 }
 
-/// Native table for the legacy VM. This includes both the real Aptos production
+/// Native table for the V1 VM. This includes both the real Aptos production
 /// natives and some toy ones for tests.
 fn v1_native_table() -> NativeFunctionTable {
     let mut table = aptos_natives(
@@ -317,7 +437,16 @@ fn v1_native_table() -> NativeFunctionTable {
         TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     );
-    table.extend(crate::v1_test_natives::make_all_v1_test_natives());
+    // The mirrors take precedence over same-name production natives (cargo
+    // feature unification can put `unit_test` natives into the production
+    // table), so both VMs run the same implementation in the comparison.
+    let overrides = crate::v1_test_natives::make_all_v1_test_natives();
+    table.retain(|(addr, module, fun, _)| {
+        !overrides.iter().any(|(o_addr, o_module, o_fun, _)| {
+            addr == o_addr && module == o_module && fun == o_fun
+        })
+    });
+    table.extend(overrides);
     table
 }
 
@@ -369,9 +498,9 @@ fn primitive_kinds(
     (param_kinds, return_kinds)
 }
 
-/// Loads a function via the legacy VM and returns its parameter and return
-/// kinds, without executing it. Used to size the V2 arg/return regions when the
-/// legacy VM is skipped for a step (no `CHECK-V1`/shared checks).
+/// Loads a function via the V1 VM and returns its parameter and return
+/// kinds, without executing it. Used to size the V2 arg/return regions when the V1
+/// VM is skipped for a step (no `CHECK-V1`/shared checks).
 fn load_signature_v1(
     storage: &InMemoryStorage,
     address: &AccountAddress,
@@ -403,7 +532,7 @@ fn load_signature_v1(
     )
 }
 
-/// Execute a function via legacy MoveVM and returns normalized output.
+/// Execute a function via the V1 VM and returns normalized output.
 fn execute_function_v1(
     storage: &InMemoryStorage,
     address: &AccountAddress,
@@ -455,31 +584,17 @@ fn execute_function_v1(
         usage: StateStorageUsage::new(TEST_STATE_ITEMS as usize, TEST_STATE_BYTES as usize),
     };
     let mut extensions = NativeContextExtensions::default();
-    let user_transaction_context = UserTransactionContext::new(
-        AccountAddress::ZERO,
-        vec![],
-        AccountAddress::ZERO,
-        0,
-        0,
-        0,
-        None,
-        None,
-        TransactionIndexKind::BlockExecution {
-            transaction_index: TEST_TXN_INDEX,
-        },
-        false, // is_encrypted_txn
-        false, // is_orderless_txn
-    );
     extensions.add(NativeTransactionContext::new(
         TEST_TXN_HASH.to_vec(),
-        vec![],
-        0,
-        Some(user_transaction_context),
+        TEST_SCRIPT_HASH.to_vec(),
+        TEST_CHAIN_ID,
+        Some(test_user_transaction_context()),
         TEST_SESSION_COUNTER,
     ));
     extensions.add(NativeObjectContext::default());
     extensions.add(NativeStateStorageContext::new(&state_storage_view));
     extensions.add(NativeEventContext::default());
+    extensions.add(NativeRistrettoPointContext::new());
 
     let mut data_cache = TransactionDataCache::empty();
     let output = match MoveVM::execute_loaded_function(
@@ -510,23 +625,32 @@ fn execute_function_v1(
                 })
                 .collect::<Vec<_>>();
             let events = finalize_events_v1(&extensions);
-            Output {
-                display: render_execution_output(&vals, &events),
-            }
+            Output::success(render_execution_output(&vals, &events))
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
             let code = err.sub_status().unwrap();
-            let location = match err.location() {
-                Location::Module(module_id) => render_module_location(module_id),
-                Location::Script => "script".to_string(),
-                Location::Undefined => "undefined".to_string(),
-            };
-            Output {
-                display: render_abort(code, err.message().map(String::as_str), &location),
-            }
+            Output::aborted(render_abort(
+                code,
+                err.message().map(String::as_str),
+                &render_error_location(err.location()),
+            ))
         },
+        // V1 is the reference, so its own failure is the expected value.
         Err(err) => Output {
             display: format!("error: {}", err),
+            parity: ParityOutcome::Comparable(V1Failure {
+                failure: render_v1_failure(
+                    err.major_status(),
+                    err.sub_status(),
+                    err.message().map(String::as_str),
+                ),
+                location: Some(render_v1_location(
+                    err.location(),
+                    // The V1 interpreter records only the failing instruction's offset, so
+                    // `offsets` is empty or a single entry. So using `last()`.
+                    err.offsets().last().copied(),
+                )),
+            }),
         },
     };
     V1Output {
@@ -549,8 +673,8 @@ fn execute_function_v2(
     return_kinds: &[PrimitiveKind],
     heap_size: Option<usize>,
 ) -> (Output, usize) {
-    // Seed extensions with the same fixed inputs as the legacy side.
-    let extensions = seed_extensions();
+    // For differential tests, treat transaction as a user transaction.
+    let extensions = seed_extensions(true);
 
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.
@@ -564,16 +688,19 @@ fn execute_function_v2(
         extensions,
         heap_size,
         |runner| {
+            // Split the directive's arguments in order: signers back the
+            // entry's signer parameters, the rest are placed as typed values.
+            let mut signers = Vec::new();
+            let mut values = Vec::new();
+            for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
+                match kind.to_move_value(arg) {
+                    MoveValue::Signer(addr) => signers.push(addr),
+                    value => values.push(value),
+                }
+            }
             let result = runner.run(
-                |interpreter| {
-                    let mut offset: u32 = 0;
-                    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
-                        offset = mono_move_core::align_up_u32(offset, kind.align());
-                        let bytes = kind.parse_to_bytes(arg);
-                        interpreter.set_root_arg(offset, &bytes);
-                        offset += kind.size();
-                    }
-                },
+                &signers,
+                |call, index| call.arg(&values[index]),
                 |interpreter| {
                     let mut ret_off: u32 = 0;
                     let mut vals = Vec::with_capacity(return_kinds.len());
@@ -611,9 +738,19 @@ fn execute_function_v2(
         },
     );
 
-    let display = match outcome {
-        Err(err) => format!("error: {}", err),
-        Ok(RunResult::Error(err)) => format!("error: {}", err),
+    let output = match outcome {
+        // Setup failure (loading, lowering). `{:#}` renders the whole chain;
+        // the typed VM error, when there is one, is the source.
+        Err(err) => Output {
+            display: format!("error: {:#}", err),
+            parity: err
+                .downcast_ref::<VMInternalError>()
+                .map_or(ParityOutcome::Unmappable, describe_v2_error_as_v1),
+        },
+        Ok(RunResult::Error(err)) => Output {
+            display: format!("error: {}", err),
+            parity: describe_v2_error_as_v1(&err),
+        },
         Ok(RunResult::Aborted {
             code,
             message,
@@ -623,11 +760,13 @@ fn execute_function_v2(
                 AbortLocation::Module(module_id) => render_module_location(module_id),
                 AbortLocation::Script => "script".to_string(),
             };
-            render_abort(code, message.as_deref(), &location)
+            Output::aborted(render_abort(code, message.as_deref(), &location))
         },
-        Ok(RunResult::Success((vals, events))) => render_execution_output(&vals, &events),
+        Ok(RunResult::Success((vals, events))) => {
+            Output::success(render_execution_output(&vals, &events))
+        },
     };
-    (Output { display }, gc_count)
+    (output, gc_count)
 }
 
 /// Renders an abort outcome. Both VMs go through this so the abort location
@@ -796,76 +935,7 @@ impl PrimitiveKind {
         }
     }
 
-    /// Parse `s` into the raw little-endian byte representation that
-    /// mono-move stores in a frame slot.
-    fn parse_to_bytes(self, s: &str) -> Vec<u8> {
-        match self {
-            PrimitiveKind::Bool => vec![parse_bool_arg(s) as u8],
-            PrimitiveKind::U8 => vec![s.parse::<u8>().expect("invalid u8 literal")],
-            PrimitiveKind::U16 => s
-                .parse::<u16>()
-                .expect("invalid u16 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U32 => s
-                .parse::<u32>()
-                .expect("invalid u32 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U64 => s
-                .parse::<u64>()
-                .expect("invalid u64 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U128 => s
-                .parse::<u128>()
-                .expect("invalid u128 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U256 => s
-                .parse::<U256>()
-                .expect("invalid u256 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I8 => (s.parse::<i8>().expect("invalid i8 literal") as u8)
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I16 => s
-                .parse::<i16>()
-                .expect("invalid i16 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I32 => s
-                .parse::<i32>()
-                .expect("invalid i32 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I64 => s
-                .parse::<i64>()
-                .expect("invalid i64 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I128 => s
-                .parse::<i128>()
-                .expect("invalid i128 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I256 => s
-                .parse::<I256>()
-                .expect("invalid i256 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::Address | PrimitiveKind::Signer => AccountAddress::from_hex_literal(s)
-                .expect("invalid address literal")
-                .into_bytes()
-                .to_vec(),
-            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector | PrimitiveKind::U64Vector => {
-                unreachable!("String / vector are return-only kinds")
-            },
-        }
-    }
-
-    /// Format `bytes` (in the same layout produced by `parse_to_bytes`) as a
+    /// Format the raw little-endian frame bytes of a returned scalar as a
     /// decimal string (or hex for addresses).
     fn format_bytes(self, bytes: &[u8]) -> String {
         match self {

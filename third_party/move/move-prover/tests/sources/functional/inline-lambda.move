@@ -1,10 +1,10 @@
+// Function values cannot be applied in specifications; behavioral predicates
+// must be used instead.
 module 0x42::Test {
-    use std::vector;
 
     inline fun apply(v: u64, predicate: |u64| bool): bool {
         spec {
-            assert v != 42;
-            assert predicate(v);
+            assert predicate(v); // error: function value applied in a specification
         };
         predicate(v)
     }
@@ -21,121 +21,31 @@ module 0x42::Test {
         };
     }
 
-    inline fun inline_1(x: u64, f: |u64|bool, g:|u64|bool, e:|u64|bool) : bool {
+    inline fun apply2(x: u64, f: |u64| u64): u64 {
         let y = f(x);
-        let z = g(x);
-        let w = e(x);
         spec {
-            assert y == (x > 2);
-            assert y == f(x);
-            assert z == g(x);
-            assert w == e(x); // e is translated into an uninterpreted spec fun
+            assert y == f(x); // error: function value applied in a specification
         };
         y
     }
 
-    fun call_inline_1(y: u64) {
-        let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec { // error: imperative expressions not supported in specs
-            ensures result == (x > 5);
-            ensures result != !(x > 5);
-        });
+    fun test_apply2(a: u64): u64 {
+        apply2(a, |x| x + 1)
     }
 
-    inline fun inline_2(x: u64, e:|u64|bool): bool {
-        if (x > 0) {
-            let w = e(x);
-            spec {
-                assert x > 0;
-                assert w == e(x);
-            };
-            true
-        } else {
-            false
-        }
-    }
-
-    fun call_inline_2(y: u64) {
-        let z = 3 + y;
-        inline_2(y, |x| { while(z < y) {let _x = x;}; x > 5 } spec { // error: imperative expressions not supported in specs
-            pragma opaque;
-            requires x > 0;
-            ensures result == (x > 5);
-            ensures result != !(x > 5);
-        });
-    }
-
-    fun call_inline_2_aborts_if(y: u64) {
-        inline_2(y, |x| { if (x == 0) { abort 1; }; x > 5  } spec { // error: imperative expressions not supported in specs
-            aborts_if !(x > 0);
-            ensures result == (x > 5);
-            ensures result != !(x > 5);
-        });
-    }
-
-    fun call_inline_fail_1(y: u64) {
-        let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec { // error: imperative expressions not supported in specs
-            aborts_if x > 0; // This does not verify
-            ensures result == (x > 5);
-            ensures result != !(x > 5);
-        });
-    }
-
-    fun call_inline_fail_2(y: u64) {
-        let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec // error: imperative expressions not supported in specs
-        {
-            aborts_if false; // This verifies
-            requires x > 0; // This does not verify at the call site
-            requires z > 5; // This does not verify at the call site
-            invariant x >= 0; // This verifies
-            ensures result == (x == 5); //  This does not verify
-            ensures result ==> !(x == 5); //  This verifies
-        });
-    }
-
-    inline fun find<Element>(s: &vector<Element>, f: |&Element|bool): (bool, u64) {
-        let find = false;
-        let found_index = 0;
+    inline fun for_range(n: u64, f: |u64| bool): bool {
+        let all = true;
         let i = 0;
-        let len = vector::length(s);
-        while ({
-            spec {
-               invariant i <= len;
-               invariant found_index == 0;
-               invariant forall j in 0..i: !f(s[j]);
-            };
-            i < len
-            }) {
-            if (f(vector::borrow(s, i))) {
-                find = true;
-                found_index = i;
-                break
-            };
+        while (i < n) {
+            all = all && f(i);
             i = i + 1;
+        } spec {
+            invariant forall j in 0..i: f(j); // error: function value applied in a specification
         };
-        (find, found_index)
+        all
     }
 
-    fun call_find() {
-        let s = vector[1, 2, 3];
-        let (_a, _b) = find(&s, |x| *x > 1);
+    fun test_for_range(n: u64): bool {
+        for_range(n, |x| x >= 0)
     }
-
-    inline fun inline_3(x: &mut u64, f: |&mut u64|) {
-        f(x);
-    }
-
-    fun call_inline_3(x: &mut u64) {
-        inline_3(x, |y| *y = *y + 1 spec {
-            ensures y == old(y) + 1;
-        });
-    }
-
-    spec call_inline_3 {
-        ensures x == old(x) + 1;
-    }
-
-
 }

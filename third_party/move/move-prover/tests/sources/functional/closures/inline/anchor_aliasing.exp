@@ -1,0 +1,40 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/anchor_aliasing.move:20:13
+   │
+20 │             assert ensures_of<f>(a) && ensures_of<g>(a); // error: for the `bump_twice*` callers, f's conjunct is false: from f's pre-state to the assertion state the value moved by +2, not +1
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:45: bump_twice_derived
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:53: bump_twice_derived (spec)
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:45: bump_twice_derived
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:14: apply_two
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:53: bump_twice_derived (spec)
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:47: bump_twice_derived
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:53: bump_twice_derived (spec)
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:48: bump_twice_derived
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:20: apply_two
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/anchor_aliasing.move:20:13
+   │
+20 │             assert ensures_of<f>(a) && ensures_of<g>(a); // error: for the `bump_twice*` callers, f's conjunct is false: from f's pre-state to the assertion state the value moved by +2, not +1
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:31: bump_twice_spec
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:39: bump_twice_spec (spec)
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:31: bump_twice_spec
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:14: apply_two
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:39: bump_twice_spec (spec)
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:33: bump_twice_spec
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:39: bump_twice_spec (spec)
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:34: bump_twice_spec
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_aliasing.move:20: apply_two

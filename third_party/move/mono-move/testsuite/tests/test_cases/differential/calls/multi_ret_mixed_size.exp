@@ -7,8 +7,8 @@ fun multi_ret(r0): &mut u64 * u64 {
     r1: u64
   code:
   L0:
-    0: r1 := ld_u64 7
-    1: ret [r0, r1]
+    0: r1 := ld_u64 7 @1
+    1: ret [r0, r1] @2
 }
 
 fun other_call(r0, r1) {
@@ -17,7 +17,7 @@ fun other_call(r0, r1) {
     r1: u64
   code:
   L0:
-    0: ret []
+    0: ret [] @0
 }
 
 fun caller(r0) {
@@ -26,12 +26,12 @@ fun caller(r0) {
     r1: u64
   code:
   L0:
-    0: [x0, r1] := call multi_ret, [r0]
-    1: r1 := read_ref x0
-    2: x0 := ld_u64 0
-    3: x1 := ld_u64 0
-    4: [] := call other_call, [x0, x1]
-    5: ret []
+    0: [x0, r1] := call multi_ret, [r0] @1
+    1: r1 := read_ref x0 @3
+    2: x0 := ld_u64 0 @5
+    3: x1 := ld_u64 0 @6
+    4: [] := call other_call, [x0, x1] @7
+    5: ret [] @8
 }
 
 fun trigger(): u64 {
@@ -39,10 +39,10 @@ fun trigger(): u64 {
     r0: u64
   code:
   L0:
-    0: r0 := ld_u64 99
-    1: x0 := mut_borrow_loc r0
-    2: [] := call caller, [x0]
-    3: ret [r0]
+    0: r0 := ld_u64 99 @0
+    1: x0 := mut_borrow_loc r0 @2
+    2: [] := call caller, [x0] @3
+    3: ret [r0] @5
 }
 === micro-ops ===
 // module 0x66::test
@@ -51,37 +51,37 @@ fun multi_ret() {
   frame_data_size: 40
   entry_gas: 156
   code:
-    0: StoreImm8 [16] <- #7
-    1: Return
+    0: StoreImm8 [16] <- #7 @1
+    1: Return @2
 }
 
 fun other_call() {
   frame_data_size: 16
   entry_gas: 2
   code:
-    0: Return
+    0: Return @0
 }
 
 fun caller() {
   frame_data_size: 24
   entry_gas: 180
   code:
-    0: Move(16) [48] <- [0]
-    1: CallIndirect 0x66::test::multi_ret
-    2: Move8 [16] <- [64]
-    3: ReadRef [16] <- *[48] (size=8)
-    4: StoreImm8 [48] <- #0
-    5: StoreImm8 [56] <- #0
-    6: CallIndirect 0x66::test::other_call
-    7: Return
+    0: Move(16) [48] <- [0] @1
+    1: CallIndirect 0x66::test::multi_ret @1
+    2: Move8 [16] <- [64] @1
+    3: ReadRef [16] <- *[48] (size=8) @3
+    4: StoreImm8 [48] <- #0 @5
+    5: StoreImm8 [56] <- #0 @6
+    6: CallIndirect 0x66::test::other_call @7
+    7: Return @8
 }
 
 fun trigger() {
   frame_data_size: 8
   entry_gas: 118
   code:
-    0: StoreImm8 [0] <- #99
-    1: SlotBorrow [32] <- &[0]
-    2: CallIndirect 0x66::test::caller
-    3: Return
+    0: StoreImm8 [0] <- #99 @0
+    1: SlotBorrow [32] <- &[0] @2
+    2: CallIndirect 0x66::test::caller @3
+    3: Return @5
 }

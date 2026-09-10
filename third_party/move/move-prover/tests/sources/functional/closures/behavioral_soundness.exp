@@ -1,0 +1,54 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_soundness.move:16:9
+   │
+16 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_soundness.move:14: always_aborts_context_is_consistent (spec)
+   =     at tests/sources/functional/closures/behavioral_soundness.move:16: always_aborts_context_is_consistent (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_soundness.move:31:9
+   │
+31 │         ensures !aborts_of<partially_specified_abort>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_soundness.move:27: partial_abort_predicate_is_not_complete
+   =     at tests/sources/functional/closures/behavioral_soundness.move:29: partial_abort_predicate_is_not_complete (spec)
+   =     at tests/sources/functional/closures/behavioral_soundness.move:27: partial_abort_predicate_is_not_complete
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_soundness.move:31: partial_abort_predicate_is_not_complete (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_soundness.move:44:9
+   │
+44 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_soundness.move:42: result_of_outside_precondition_is_consistent (spec)
+   =     at tests/sources/functional/closures/behavioral_soundness.move:44: result_of_outside_precondition_is_consistent (spec)
+
+warning: generic type reflection in a function specification is not yet supported through behavioral predicates; leaving `ensures_of` uninterpreted; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/behavioral_soundness.move:47:5
+   │
+47 │ ╭     fun generic_reflection_identity<T>(x: u64): u64 {
+48 │ │         x
+49 │ │     }
+   │ ╰─────^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_soundness.move:58:9
+   │
+58 │         ensures ensures_of<generic_reflection_identity<T>>(0, 1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_soundness.move:58: generic_reflection_ensures_are_not_assumed (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_soundness.move:72:9
+   │
+72 │         ensures result_of<generic_requires_positive<T>>(0) == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_soundness.move:72: generic_result_outside_precondition_is_not_fixed (spec)

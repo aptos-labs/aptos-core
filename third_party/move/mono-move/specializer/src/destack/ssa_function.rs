@@ -10,9 +10,9 @@
 
 use crate::stackless_exec_ir::{
     instr_utils::{for_each_value_use, is_commutative},
-    BasicBlock, BinaryOp, FieldPath, Instr, SsaSlot,
+    BasicBlock, BinaryOp, FieldPath, Instr, InstrSeq, SsaSlot,
 };
-use mono_move_core::types::InternedType;
+use mono_move_core::{types::InternedType, VMResult};
 use shared_dsa::UnorderedMap;
 
 /// Intermediate SSA representation of a single function, before slot allocation.
@@ -28,57 +28,24 @@ pub(crate) struct SSAFunction {
 impl SSAFunction {
     /// Run all instruction fusion passes; they precede slot allocation, so
     /// fused-away value IDs never receive frame slots.
-    pub(crate) fn with_fusion_passes(mut self) -> Self {
+    pub(crate) fn with_fusion_passes(mut self) -> VMResult<Self> {
         // TODO(perf): right now, we have each different fusion operation to be a separate pass.
         // This is easier to reason about, but we could make it more efficient by
         // combining the passes.
         for block in &mut self.blocks {
             // Collapse depth-N inline-field chains first, on the raw borrow chain.
-            fuse_field_chains(&mut block.instrs);
-            fuse_pairs(&mut block.instrs, try_fuse_field_access);
+            fuse_field_chains(&mut block.instrs)?;
+            block.instrs.fuse_pairs(try_fuse_field_access)?;
             // Consumes ReadField/WriteField produced above, maintain this
             // ordering between fusion passes.
-            fuse_pairs(&mut block.instrs, try_fuse_local_field_access);
-            fuse_pairs(&mut block.instrs, try_fuse_immediate_binop);
+            block.instrs.fuse_pairs(try_fuse_local_field_access)?;
+            block.instrs.fuse_pairs(try_fuse_immediate_binop)?;
             // Must run after try_fuse_immediate_binop so that BinaryOpImm is
             // available for the BrCmpImm variant.
-            fuse_pairs(&mut block.instrs, try_fuse_compare_branch);
+            block.instrs.fuse_pairs(try_fuse_compare_branch)?;
         }
-        self
+        Ok(self)
     }
-}
-
-/// In-place compaction that fuses consecutive instruction pairs.
-///
-/// For each position, calls `try_fuse(&instrs[r], &instrs[r+1])`. If it returns
-/// `Some(fused)`, the pair is replaced by the single fused instruction. Otherwise
-/// the instruction is kept as-is. Uses a write-cursor so no allocation is needed.
-fn fuse_pairs(
-    instrs: &mut Vec<Instr<SsaSlot>>,
-    try_fuse: fn(&Instr<SsaSlot>, &Instr<SsaSlot>) -> Option<Instr<SsaSlot>>,
-) {
-    let mut write = 0;
-    let mut read = 0;
-    while read < instrs.len() {
-        let fused = instrs
-            .get(read + 1)
-            .and_then(|next| try_fuse(&instrs[read], next));
-
-        match fused {
-            Some(fused_instr) => {
-                instrs[write] = fused_instr;
-                read += 2;
-            },
-            None => {
-                if write != read {
-                    instrs.swap(write, read);
-                }
-                read += 1;
-            },
-        }
-        write += 1;
-    }
-    instrs.truncate(write);
 }
 
 /// Try to fuse a borrow+deref pair into a combined field access instruction.
@@ -341,7 +308,7 @@ const MIN_CHAIN_DEPTH: usize = 2;
 /// that terminal is sound because a reference is an address compute
 /// (`base + offset`), not a value snapshot, and Move forbids modifying the root
 /// while it stays borrowed. Depth-1 runs are left to the pairwise passes.
-fn fuse_field_chains(instrs: &mut Vec<Instr<SsaSlot>>) {
+fn fuse_field_chains(instrs: &mut InstrSeq<SsaSlot>) -> VMResult<()> {
     // Every fusable chain contains at least `MIN_CHAIN_DEPTH` struct field
     // borrows; skip the analysis allocations for blocks that cannot hold one
     // (the common case).
@@ -356,7 +323,7 @@ fn fuse_field_chains(instrs: &mut Vec<Instr<SsaSlot>>) {
         .take(MIN_CHAIN_DEPTH)
         .count();
     if field_borrows < MIN_CHAIN_DEPTH {
-        return;
+        return Ok(());
     }
 
     let use_info = value_use_info(instrs);
@@ -397,24 +364,13 @@ fn fuse_field_chains(instrs: &mut Vec<Instr<SsaSlot>>) {
         }
     }
     if placed.is_empty() {
-        return;
+        return Ok(());
     }
 
-    // In-place write-cursor compaction (same shape as `fuse_pairs`): fused
-    // instructions overwrite their `place_at` position, removed ones drop out.
-    let mut write = 0;
-    for read in 0..len {
-        if removed[read] {
-            continue;
-        }
-        if let Some(fused) = placed[read].take() {
-            instrs[write] = fused;
-        } else if write != read {
-            instrs.swap(write, read);
-        }
-        write += 1;
-    }
-    instrs.truncate(write);
+    // A chain cannot abort, so keeping `place_at`'s origin is sound; it
+    // also preserves intra-block origin monotonicity even for a terminal
+    // sunk past its right-hand side.
+    instrs.apply_rewrite_plan(placed, removed)
 }
 
 /// For each `ValueId`, the `(use count, last consumer position)` pair. A reference
@@ -608,5 +564,130 @@ fn try_fuse_immediate_binop(
             })
         },
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stackless_exec_ir::{CmpKind, ImmValue, InstrSeq, Label};
+    use mono_move_core::types::U64_TY;
+    use move_binary_format::file_format::{FieldHandleIndex, VariantFieldHandleIndex};
+
+    fn value(id: u16) -> SsaSlot {
+        SsaSlot::ValueId(id)
+    }
+
+    #[test]
+    fn immediate_binop_fusion_keeps_the_arithmetic_origin() {
+        let mut seq = InstrSeq::new();
+        seq.push(
+            Instr::LdImm {
+                dst: value(0),
+                imm: ImmValue::U64(2),
+            },
+            4,
+        );
+        seq.push(
+            Instr::BinaryOp {
+                dst: value(1),
+                op: BinaryOp::Add,
+                lhs: SsaSlot::Home(crate::stackless_exec_ir::HomeIndex(0)),
+                rhs: value(0),
+            },
+            5,
+        );
+        seq.fuse_pairs(try_fuse_immediate_binop).expect("fusable");
+        assert!(matches!(seq[0], Instr::BinaryOpImm { .. }));
+        assert_eq!(seq.origins(), [5]);
+    }
+
+    #[test]
+    fn variant_field_read_fusion_keeps_the_borrow_origin() {
+        let mut seq = InstrSeq::new();
+        seq.push(
+            Instr::ImmBorrowVariantField {
+                dst: value(1),
+                owner_ty: U64_TY,
+                field: VariantFieldHandleIndex(0),
+                src: value(0),
+            },
+            2,
+        );
+        seq.push(
+            Instr::ReadRef {
+                dst: value(2),
+                src: value(1),
+            },
+            6,
+        );
+        seq.fuse_pairs(try_fuse_field_access).expect("fusable");
+        assert!(matches!(seq[0], Instr::ReadVariantField { .. }));
+        assert_eq!(seq.origins(), [2]);
+    }
+
+    #[test]
+    fn compare_branch_fusion_keeps_the_compare_origin() {
+        let mut seq = InstrSeq::new();
+        seq.push(
+            Instr::BinaryOp {
+                dst: value(1),
+                op: BinaryOp::Cmp(CmpKind::Lt),
+                lhs: value(0),
+                rhs: value(0),
+            },
+            3,
+        );
+        seq.push(
+            Instr::BrTrue {
+                target: Label(0),
+                cond: value(1),
+            },
+            4,
+        );
+        seq.fuse_pairs(try_fuse_compare_branch).expect("fusable");
+        assert!(matches!(seq[0], Instr::BrCmp { .. }));
+        assert_eq!(seq.origins(), [3]);
+    }
+
+    #[test]
+    fn field_chain_fusion_keeps_the_terminal_origin() {
+        let mut seq = InstrSeq::new();
+        seq.push(
+            Instr::ImmBorrowLoc {
+                dst: value(0),
+                local: SsaSlot::Home(crate::stackless_exec_ir::HomeIndex(0)),
+            },
+            0,
+        );
+        seq.push(
+            Instr::ImmBorrowField {
+                dst: value(1),
+                owner_ty: U64_TY,
+                field: FieldHandleIndex(0),
+                src: value(0),
+            },
+            1,
+        );
+        seq.push(
+            Instr::ImmBorrowField {
+                dst: value(2),
+                owner_ty: U64_TY,
+                field: FieldHandleIndex(1),
+                src: value(1),
+            },
+            2,
+        );
+        seq.push(
+            Instr::ReadRef {
+                dst: value(3),
+                src: value(2),
+            },
+            3,
+        );
+        fuse_field_chains(&mut seq).expect("fusable");
+        assert_eq!(seq.len(), 1);
+        assert!(matches!(seq[0], Instr::ReadLocFieldChain { .. }));
+        assert_eq!(seq.origins(), [3]);
     }
 }

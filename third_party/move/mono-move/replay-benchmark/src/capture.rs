@@ -5,16 +5,10 @@
 //! transaction and a chain-backed state view, run it on V1 to record the read-set, then close the
 //! module dependency graph so V2 has every module it needs (not just the ones V1's path loads).
 
-use crate::data::ReadSet;
-use anyhow::{anyhow, Context, Result};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
+use anyhow::{anyhow, bail, Context, Result};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_types::{
-    block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
-        transaction_slice_metadata::TransactionSliceMetadata,
-    },
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         state_slot::{StateSlot, StateSlotKind},
@@ -23,11 +17,14 @@ use aptos_types::{
         StateView, StateViewResult, TStateView,
     },
     transaction::{
-        signature_verified_transaction::into_signature_verified_block, AuxiliaryInfo,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
         PersistedAuxiliaryInfo, Transaction, TransactionBlock, Version,
     },
 };
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_core_types::language_storage::ModuleId;
 use std::{
@@ -43,6 +40,7 @@ pub fn run(
     versions: Vec<Version>,
     out_dir: PathBuf,
 ) -> Result<()> {
+    aptos_logger::Logger::new().init();
     std::fs::create_dir_all(&out_dir)
         .with_context(|| format!("failed to create output dir {:?}", out_dir))?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -105,43 +103,43 @@ fn capture_blocking(
 
     // Capture the read-set by executing the transaction on V1.
     let capturing = ReadSetCapturingStateView::new(&state_view);
-    execute(version, txn, aux_info, &capturing)?;
-    let mut read_set = capturing.into_captured();
+    execute(txn, aux_info, &capturing)?;
+    let mut read_set = capturing.into_captured()?;
 
     // Close the module dependency graph so V2 (which needs the static closure) has every module.
     close_module_graph(&mut read_set, &state_view)?;
 
-    let inputs_bytes =
-        bcs::to_bytes(&vec![ReadSet { data: read_set }]).context("failed to serialize read-set")?;
+    let inputs_bytes = bcs::to_bytes(&vec![read_set]).context("failed to serialize read-set")?;
 
     std::fs::write(out_dir.join(format!("{version}_txns")), &txns_bytes)?;
     std::fs::write(out_dir.join(format!("{version}_inputs")), &inputs_bytes)?;
     Ok(())
 }
 
-/// Executes the single transaction through the production block executor (the legacy Move VM) so
-/// that every state read it performs is recorded by the capturing state view.
+/// Executes the single transaction through the same V1 path the benchmark replays it on (see
+/// `v1.rs`), so the capturing state view records exactly the reads a replay performs — including
+/// the environment's on-chain config reads (features, gas schedule).
 fn execute(
-    version: Version,
     txn: Transaction,
     aux_info: Option<PersistedAuxiliaryInfo>,
     state_view: &(impl StateView + Sync),
 ) -> Result<()> {
-    let signature_verified = into_signature_verified_block(vec![txn]);
-    let txn_provider = match aux_info {
-        Some(aux) => {
-            DefaultTxnProvider::new(signature_verified, vec![AuxiliaryInfo::new(aux, None)])
+    let env = AptosEnvironment::new(state_view);
+    let vm = AptosVM::new(&env);
+    let resolver = state_view.as_move_resolver();
+    let code_storage = state_view.as_aptos_code_storage(&env);
+    let log_context = AdapterLogSchema::new(state_view.id(), 0);
+    let aux_info = AuxiliaryInfo::new(aux_info.unwrap_or(PersistedAuxiliaryInfo::None), None);
+    match txn {
+        Transaction::UserTransaction(txn) => {
+            vm.execute_user_transaction(&resolver, &code_storage, &txn, &log_context, &aux_info);
         },
-        None => DefaultTxnProvider::new_without_info(signature_verified),
-    };
-    let config = BlockExecutorConfig {
-        local: BlockExecutorLocalConfig::default_with_concurrency_level(1),
-        onchain: BlockExecutorConfigFromOnchain::on_but_large_for_test(),
-    };
-    let metadata = TransactionSliceMetadata::chunk(version, version + 1);
-    AptosVMBlockExecutor::new()
-        .execute_block_with_config(&txn_provider, state_view, config, metadata)
-        .map_err(|err| anyhow!("block execution failed: {:?}", err))?;
+        txn => {
+            let txn = SignatureVerifiedTransaction::Valid(txn);
+            vm.execute_single_transaction(&txn, &resolver, &code_storage, &log_context, &aux_info)
+                .map_err(|status| anyhow!("V1 rejected the transaction: {:?}", status))?;
+        },
+    }
     Ok(())
 }
 
@@ -154,10 +152,10 @@ fn close_module_graph(
     let mut visited: HashSet<ModuleId> = HashSet::new();
     let mut queue: VecDeque<ModuleId> = VecDeque::new();
     for key in read_set.keys() {
-        if let Some(module_id) = module_id_of(key) {
-            if visited.insert(module_id.clone()) {
-                queue.push_back(module_id);
-            }
+        if let Some(module_id) = module_id_of(key)
+            && visited.insert(module_id.clone())
+        {
+            queue.push_back(module_id);
         }
     }
 
@@ -199,30 +197,51 @@ fn module_id_of(key: &StateKey) -> Option<ModuleId> {
 /// A [`StateView`] that records every read so the set can be persisted as the dump's read-set.
 /// Mirrors `aptos-replay-benchmark`'s capturing view, including preloading the framework so the
 /// prologue never misses framework modules.
+///
+/// Failed reads are recorded too: the VM swallows some read errors into an executed output (the
+/// block-epilogue fallback, for one), which would silently produce an incomplete dump, so
+/// [`Self::into_captured`] fails if any read failed.
 struct ReadSetCapturingStateView<'s, S> {
     captured: Mutex<HashMap<StateKey, StateValue>>,
+    failures: Mutex<Vec<String>>,
     state_view: &'s S,
 }
 
 impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
     fn new(state_view: &'s S) -> Self {
         let mut captured = HashMap::new();
+        let mut failures = vec![];
         for package in &aptos_cached_packages::head_release_bundle().packages {
             for (_, module) in package.sorted_code_and_modules() {
                 let key = StateKey::module(module.self_addr(), module.self_name());
-                if let Ok(Some(value)) = state_view.get_state_value(&key) {
-                    captured.entry(key).or_insert(value);
+                // A module the current framework has but the captured state does not is fine;
+                // only failed fetches make the dump unreliable.
+                match state_view.get_state_value(&key) {
+                    Ok(Some(value)) => {
+                        captured.insert(key, value);
+                    },
+                    Ok(None) => {},
+                    Err(err) => failures.push(format!("preload of {key:?} failed: {err}")),
                 }
             }
         }
         Self {
             captured: Mutex::new(captured),
+            failures: Mutex::new(failures),
             state_view,
         }
     }
 
-    fn into_captured(self) -> HashMap<StateKey, StateValue> {
-        self.captured.into_inner().unwrap()
+    fn into_captured(self) -> Result<HashMap<StateKey, StateValue>> {
+        let failures = self.failures.into_inner().unwrap();
+        if !failures.is_empty() {
+            bail!(
+                "{} read(s) failed, the dump would be incomplete; first failure: {}",
+                failures.len(),
+                failures[0]
+            );
+        }
+        Ok(self.captured.into_inner().unwrap())
     }
 }
 
@@ -239,7 +258,16 @@ impl<S: StateView> TStateView for ReadSetCapturingStateView<'_, S> {
                 },
             ));
         }
-        let slot = self.state_view.get_state_slot(state_key)?;
+        let slot = match self.state_view.get_state_slot(state_key) {
+            Ok(slot) => slot,
+            Err(err) => {
+                self.failures
+                    .lock()
+                    .unwrap()
+                    .push(format!("read of {state_key:?} failed: {err}"));
+                return Err(err);
+            },
+        };
         if let Some(value) = slot.as_state_value_opt() {
             let mut captured = self.captured.lock().unwrap();
             captured
@@ -284,7 +312,10 @@ mod tests {
                 continue;
             }
             let read_sets = load_read_sets(&path).expect("load read-set");
-            let modules = read_sets[0].modules();
+            let modules: Vec<(ModuleId, Vec<u8>)> = read_sets[0]
+                .iter()
+                .filter_map(|(key, value)| module_id_of(key).map(|id| (id, value.bytes().to_vec())))
+                .collect();
             let present: HashSet<ModuleId> = modules.iter().map(|(id, _)| id.clone()).collect();
 
             // Modules referenced as dependencies of present modules but not themselves present.
@@ -336,12 +367,10 @@ mod tests {
         let (b_id, b_val) = bytes("b");
 
         // "Chain" has both modules; the read-set initially has only `a`.
-        let chain = ReadSet {
-            data: HashMap::from([
-                (StateKey::module_id(&a_id), a_val.clone()),
-                (StateKey::module_id(&b_id), b_val),
-            ]),
-        };
+        let chain = aptos_transaction_simulation::InMemoryStateStore::new_with_state_values([
+            (StateKey::module_id(&a_id), a_val.clone()),
+            (StateKey::module_id(&b_id), b_val),
+        ]);
         let mut read_set = HashMap::from([(StateKey::module_id(&a_id), a_val)]);
 
         close_module_graph(&mut read_set, &chain).expect("close");

@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: argument renders as a bitvector but the spec function parameter renders as an integer, and no conversion exists for this type
+   ┌─ tests/sources/functional/bv_internal_aggregate.move:14:50
+   │
+14 │         ensures [abstract] result == bytes_value(v);
+   │                                                  ^

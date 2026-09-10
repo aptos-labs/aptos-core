@@ -4,6 +4,7 @@
 pub mod package_path;
 pub mod source_check;
 
+use crate::GlobalOpts;
 use anyhow::Result;
 use clap::Subcommand;
 
@@ -16,9 +17,9 @@ pub enum HookCommand {
     PackagePath,
 }
 
-pub fn run(cmd: &HookCommand) -> Result<()> {
+pub fn run(cmd: &HookCommand, global: &GlobalOpts) -> Result<()> {
     match cmd {
-        HookCommand::Edit => source_check::run(),
+        HookCommand::Edit => source_check::run(global),
         HookCommand::PackagePath => package_path::run(),
     }
 }

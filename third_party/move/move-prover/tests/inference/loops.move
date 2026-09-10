@@ -133,8 +133,8 @@ module 0x42::loops {
         };
     }
     spec inc_global_n_times {
-        // Test with unrolling. Notice that the inferred spec is incomplete and will
-        // fail verification.
+        // Test with unrolling. Each unrolled write must retain its intermediate
+        // state rather than claiming that an earlier value is the final value.
         pragma unroll = 3;
     }
 

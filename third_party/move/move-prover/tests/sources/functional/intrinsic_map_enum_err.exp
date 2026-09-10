@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: cannot pack a value of an intrinsic map type in verified code; use the map's creation functions
+   ┌─ tests/sources/functional/intrinsic_map_enum_err.move:18:9
+   │
+18 │         Map::Empty // error: cannot pack an intrinsic map
+   │         ^^^^^^^^^^

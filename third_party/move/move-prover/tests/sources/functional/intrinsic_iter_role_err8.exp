@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: a position-based `map_iter_borrow_mut` function requires `map_spec_key_at` to be bound: the position is turned into a key through the enumeration
+   ┌─ tests/sources/functional/intrinsic_iter_role_err8.move:18:5
+   │
+18 │     native fun ibm<K: copy + drop, V>(it: PosIter, m: &mut Map<K, V>): &mut V;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

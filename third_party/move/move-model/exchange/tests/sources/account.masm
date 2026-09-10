@@ -1,0 +1,23 @@
+module 0x42::account
+
+struct Account has key
+  balance: u64
+
+fun withdraw(s: &signer, addr: address, amount: u64) acquires Account
+    requires s == addr
+    requires exists<Account>(addr)
+    requires amount <= global<Account>(addr).balance
+    ensures global<Account>(addr).balance == old(global<Account>(addr).balance) - amount
+    modifies global<Account>(addr)
+    local acc: Account
+    copy_loc addr
+    move_from Account
+    unpack Account
+    copy_loc amount
+    sub
+    pack Account
+    st_loc acc
+    copy_loc s
+    move_loc acc
+    move_to Account
+    ret

@@ -1,0 +1,1065 @@
+{
+  "schema": "move-xast-module",
+  "version": 4,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "generics",
+  "doc": "",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [
+    {
+      "name": "Pair",
+      "doc": "",
+      "loc": 1,
+      "abilities": [
+        "copy",
+        "drop",
+        "store"
+      ],
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [],
+          "is_phantom": false
+        },
+        {
+          "name": "U",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "first",
+          "doc": "",
+          "ty": 0
+        },
+        {
+          "name": "second",
+          "doc": "",
+          "ty": 1
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "Vault",
+      "doc": "",
+      "loc": 2,
+      "abilities": [
+        "key"
+      ],
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [
+            "store"
+          ],
+          "is_phantom": false
+        }
+      ],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "value",
+          "doc": "",
+          "ty": 0
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "swap",
+      "doc": "",
+      "loc": 21,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [
+            "copy",
+            "drop"
+          ],
+          "is_phantom": false
+        },
+        {
+          "name": "U",
+          "abilities": [
+            "copy",
+            "drop"
+          ],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "value",
+          "ty": 2
+        }
+      ],
+      "result": 3,
+      "pragmas": [],
+      "spec": {
+        "loc": 20,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "ensures",
+            "loc": 8,
+            "properties": [],
+            "exp": {
+              "ty": 4,
+              "loc": 13,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                1
+              ],
+              "args": [
+                {
+                  "ty": 1,
+                  "loc": 10,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "first"
+                    }
+                  },
+                  "inst": [
+                    3
+                  ],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 9,
+                      "kind": "call",
+                      "op": {
+                        "result": 0
+                      },
+                      "inst": [],
+                      "args": [],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 1,
+                  "loc": 12,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "second"
+                    }
+                  },
+                  "inst": [
+                    2
+                  ],
+                  "args": [
+                    {
+                      "ty": 2,
+                      "loc": 11,
+                      "kind": "param",
+                      "index": 0
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "ensures",
+            "loc": 14,
+            "properties": [],
+            "exp": {
+              "ty": 4,
+              "loc": 19,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 16,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "second"
+                    }
+                  },
+                  "inst": [
+                    3
+                  ],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 15,
+                      "kind": "call",
+                      "op": {
+                        "result": 0
+                      },
+                      "inst": [],
+                      "args": [],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 0,
+                  "loc": 18,
+                  "kind": "call",
+                  "op": {
+                    "select": {
+                      "name": 0,
+                      "field": "first"
+                    }
+                  },
+                  "inst": [
+                    2
+                  ],
+                  "args": [
+                    {
+                      "ty": 2,
+                      "loc": 17,
+                      "kind": "param",
+                      "index": 0
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null
+      },
+      "body": {
+        "ty": 3,
+        "loc": 7,
+        "kind": "call",
+        "op": {
+          "pack": {
+            "name": 0,
+            "variant": null
+          }
+        },
+        "inst": [
+          1,
+          0
+        ],
+        "args": [
+          {
+            "ty": 1,
+            "loc": 4,
+            "kind": "call",
+            "op": {
+              "select": {
+                "name": 0,
+                "field": "second"
+              }
+            },
+            "inst": [
+              2
+            ],
+            "args": [
+              {
+                "ty": 2,
+                "loc": 3,
+                "kind": "param",
+                "index": 0
+              }
+            ],
+            "surface": null
+          },
+          {
+            "ty": 0,
+            "loc": 6,
+            "kind": "call",
+            "op": {
+              "select": {
+                "name": 0,
+                "field": "first"
+              }
+            },
+            "inst": [
+              2
+            ],
+            "args": [
+              {
+                "ty": 2,
+                "loc": 5,
+                "kind": "param",
+                "index": 0
+              }
+            ],
+            "surface": null
+          }
+        ],
+        "surface": null
+      }
+    },
+    {
+      "name": "has_vault",
+      "doc": "",
+      "loc": 24,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [
+            "store"
+          ],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "addr",
+          "ty": 6
+        }
+      ],
+      "result": 4,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 4,
+        "loc": 23,
+        "kind": "call",
+        "op": {
+          "exists": null
+        },
+        "inst": [
+          5
+        ],
+        "args": [
+          {
+            "ty": 6,
+            "loc": 22,
+            "kind": "param",
+            "index": 0
+          }
+        ],
+        "surface": null
+      }
+    },
+    {
+      "name": "publish_generic",
+      "doc": "",
+      "loc": 29,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [
+            "store"
+          ],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "account",
+          "ty": 8
+        },
+        {
+          "name": "value",
+          "ty": 0
+        }
+      ],
+      "result": 9,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 9,
+        "loc": 28,
+        "kind": "call",
+        "op": "move_to",
+        "inst": [
+          5
+        ],
+        "args": [
+          {
+            "ty": 8,
+            "loc": 25,
+            "kind": "param",
+            "index": 0
+          },
+          {
+            "ty": 5,
+            "loc": 27,
+            "kind": "call",
+            "op": {
+              "pack": {
+                "name": 1,
+                "variant": null
+              }
+            },
+            "inst": [
+              0
+            ],
+            "args": [
+              {
+                "ty": 0,
+                "loc": 26,
+                "kind": "param",
+                "index": 1
+              }
+            ],
+            "surface": null
+          }
+        ],
+        "surface": null
+      }
+    },
+    {
+      "name": "swapped",
+      "doc": "",
+      "loc": 36,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "value",
+          "ty": 10
+        }
+      ],
+      "result": 11,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 11,
+        "loc": 35,
+        "kind": "call",
+        "op": {
+          "move_function": 2
+        },
+        "inst": [
+          10,
+          10
+        ],
+        "args": [
+          {
+            "ty": 11,
+            "loc": 34,
+            "kind": "call",
+            "op": {
+              "pack": {
+                "name": 0,
+                "variant": null
+              }
+            },
+            "inst": [
+              10,
+              10
+            ],
+            "args": [
+              {
+                "ty": 10,
+                "loc": 30,
+                "kind": "param",
+                "index": 0
+              },
+              {
+                "ty": 10,
+                "loc": 33,
+                "kind": "call",
+                "op": "add",
+                "inst": [
+                  10
+                ],
+                "args": [
+                  {
+                    "ty": 10,
+                    "loc": 31,
+                    "kind": "param",
+                    "index": 0
+                  },
+                  {
+                    "ty": 10,
+                    "loc": 32,
+                    "kind": "value",
+                    "value": {
+                      "number": "1"
+                    },
+                    "constant": null
+                  }
+                ],
+                "surface": null
+              }
+            ],
+            "surface": null
+          }
+        ],
+        "surface": null
+      }
+    }
+  ],
+  "spec_funs": [
+    {
+      "name": "$swap",
+      "doc": "",
+      "loc": 21,
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [
+            "copy",
+            "drop"
+          ],
+          "is_phantom": false
+        },
+        {
+          "name": "U",
+          "abilities": [
+            "copy",
+            "drop"
+          ],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "value",
+          "ty": 2
+        }
+      ],
+      "result": 3,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 3,
+        "loc": 7,
+        "kind": "call",
+        "op": {
+          "pack": {
+            "name": 0,
+            "variant": null
+          }
+        },
+        "inst": [
+          1,
+          0
+        ],
+        "args": [
+          {
+            "ty": 1,
+            "loc": 4,
+            "kind": "call",
+            "op": {
+              "select": {
+                "name": 0,
+                "field": "second"
+              }
+            },
+            "inst": [
+              2
+            ],
+            "args": [
+              {
+                "ty": 2,
+                "loc": 3,
+                "kind": "local",
+                "name": "value"
+              }
+            ],
+            "surface": null
+          },
+          {
+            "ty": 0,
+            "loc": 6,
+            "kind": "call",
+            "op": {
+              "select": {
+                "name": 0,
+                "field": "first"
+              }
+            },
+            "inst": [
+              2
+            ],
+            "args": [
+              {
+                "ty": 2,
+                "loc": 5,
+                "kind": "local",
+                "name": "value"
+              }
+            ],
+            "surface": null
+          }
+        ],
+        "surface": null
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    },
+    {
+      "name": "$swapped",
+      "doc": "",
+      "loc": 36,
+      "type_params": [],
+      "params": [
+        {
+          "name": "value",
+          "ty": 10
+        }
+      ],
+      "result": 11,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 11,
+        "loc": 35,
+        "kind": "call",
+        "op": {
+          "spec_function": {
+            "name": 3,
+            "range": {
+              "pre": null,
+              "post": null
+            }
+          }
+        },
+        "inst": [
+          10,
+          10
+        ],
+        "args": [
+          {
+            "ty": 11,
+            "loc": 34,
+            "kind": "call",
+            "op": {
+              "pack": {
+                "name": 0,
+                "variant": null
+              }
+            },
+            "inst": [
+              10,
+              10
+            ],
+            "args": [
+              {
+                "ty": 10,
+                "loc": 30,
+                "kind": "local",
+                "name": "value"
+              },
+              {
+                "ty": 10,
+                "loc": 33,
+                "kind": "call",
+                "op": "add",
+                "inst": [
+                  10
+                ],
+                "args": [
+                  {
+                    "ty": 10,
+                    "loc": 31,
+                    "kind": "local",
+                    "name": "value"
+                  },
+                  {
+                    "ty": 10,
+                    "loc": 32,
+                    "kind": "value",
+                    "value": {
+                      "number": "1"
+                    },
+                    "constant": null
+                  }
+                ],
+                "surface": null
+              }
+            ],
+            "surface": null
+          }
+        ],
+        "surface": null
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      }
+    }
+  ],
+  "spec_vars": [],
+  "invariants": [],
+  "skipped": [],
+  "comments": [],
+  "sources": [
+    "generics.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 0,
+      "end": 743
+    },
+    {
+      "file": 0,
+      "start": 28,
+      "end": 112
+    },
+    {
+      "file": 0,
+      "start": 118,
+      "end": 174
+    },
+    {
+      "file": 0,
+      "start": 276,
+      "end": 281
+    },
+    {
+      "file": 0,
+      "start": 276,
+      "end": 288
+    },
+    {
+      "file": 0,
+      "start": 298,
+      "end": 303
+    },
+    {
+      "file": 0,
+      "start": 298,
+      "end": 309
+    },
+    {
+      "file": 0,
+      "start": 262,
+      "end": 311
+    },
+    {
+      "file": 0,
+      "start": 342,
+      "end": 379
+    },
+    {
+      "file": 0,
+      "start": 350,
+      "end": 356
+    },
+    {
+      "file": 0,
+      "start": 350,
+      "end": 362
+    },
+    {
+      "file": 0,
+      "start": 366,
+      "end": 371
+    },
+    {
+      "file": 0,
+      "start": 366,
+      "end": 378
+    },
+    {
+      "file": 0,
+      "start": 350,
+      "end": 378
+    },
+    {
+      "file": 0,
+      "start": 388,
+      "end": 425
+    },
+    {
+      "file": 0,
+      "start": 396,
+      "end": 402
+    },
+    {
+      "file": 0,
+      "start": 396,
+      "end": 409
+    },
+    {
+      "file": 0,
+      "start": 413,
+      "end": 418
+    },
+    {
+      "file": 0,
+      "start": 413,
+      "end": 424
+    },
+    {
+      "file": 0,
+      "start": 396,
+      "end": 424
+    },
+    {
+      "file": 0,
+      "start": 322,
+      "end": 431
+    },
+    {
+      "file": 0,
+      "start": 180,
+      "end": 317
+    },
+    {
+      "file": 0,
+      "start": 622,
+      "end": 626
+    },
+    {
+      "file": 0,
+      "start": 605,
+      "end": 627
+    },
+    {
+      "file": 0,
+      "start": 550,
+      "end": 633
+    },
+    {
+      "file": 0,
+      "start": 513,
+      "end": 520
+    },
+    {
+      "file": 0,
+      "start": 530,
+      "end": 535
+    },
+    {
+      "file": 0,
+      "start": 522,
+      "end": 537
+    },
+    {
+      "file": 0,
+      "start": 505,
+      "end": 538
+    },
+    {
+      "file": 0,
+      "start": 437,
+      "end": 544
+    },
+    {
+      "file": 0,
+      "start": 708,
+      "end": 713
+    },
+    {
+      "file": 0,
+      "start": 723,
+      "end": 728
+    },
+    {
+      "file": 0,
+      "start": 731,
+      "end": 732
+    },
+    {
+      "file": 0,
+      "start": 723,
+      "end": 732
+    },
+    {
+      "file": 0,
+      "start": 694,
+      "end": 734
+    },
+    {
+      "file": 0,
+      "start": 689,
+      "end": 735
+    },
+    {
+      "file": 0,
+      "start": 639,
+      "end": 741
+    }
+  ],
+  "types": [
+    {
+      "type_param": 0
+    },
+    {
+      "type_param": 1
+    },
+    {
+      "struct": {
+        "name": 0,
+        "args": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "struct": {
+        "name": 0,
+        "args": [
+          1,
+          0
+        ]
+      }
+    },
+    "bool",
+    {
+      "struct": {
+        "name": 1,
+        "args": [
+          0
+        ]
+      }
+    },
+    "address",
+    "signer",
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 7
+      }
+    },
+    {
+      "tuple": []
+    },
+    "u64",
+    {
+      "struct": {
+        "name": 0,
+        "args": [
+          10,
+          10
+        ]
+      }
+    }
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "generics"
+    }
+  ],
+  "names": [
+    {
+      "module": 0,
+      "name": "Pair"
+    },
+    {
+      "module": 0,
+      "name": "Vault"
+    },
+    {
+      "module": 0,
+      "name": "swap"
+    },
+    {
+      "module": 0,
+      "name": "$swap"
+    }
+  ]
+}

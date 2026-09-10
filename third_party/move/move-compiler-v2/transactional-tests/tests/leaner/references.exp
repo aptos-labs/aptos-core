@@ -1,0 +1,65 @@
+processed 3 tasks
+task 0 lines 1-41:  publish --print-bytecode [import Move]
+
+== BEGIN Bytecode ==
+// Bytecode version v10
+module 0x0::LeanerReferences
+struct BalanceValue has copy + drop + store
+  value: u64
+
+struct Balance has key
+  balance: BalanceValue
+
+// Function definition at index 0
+fun read_balance(l0: address): u64 acquires Balance
+    move_loc l0
+    borrow_global Balance
+    borrow_field Balance, balance
+    borrow_field BalanceValue, value
+    read_ref
+    // @5
+    ret
+
+// Function definition at index 1
+fun add_to_balance(l0: address, l1: u64) acquires Balance
+    local l2: &mut u64
+    move_loc l0
+    mut_borrow_global Balance
+    mut_borrow_field Balance, balance
+    mut_borrow_field BalanceValue, value
+    st_loc l2
+    // @5
+    copy_loc l2
+    read_ref
+    move_loc l1
+    add
+    move_loc l2
+    // @10
+    write_ref
+    ret
+
+// Function definition at index 2
+fun deposit(l0: address, l1: u64) acquires Balance
+    move_loc l0
+    move_loc l1
+    call add_to_balance
+    ret
+
+
+== END Bytecode ==
+task 1 lines 43-43:  run 0x0::LeanerReferences::deposit --args @0x42 5u64
+Error: Function execution failed with VMError: {
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x0::LeanerReferences,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+}
+task 2 lines 45-45:  run 0x0::LeanerReferences::read_balance --args @0x42
+Error: Function execution failed with VMError: {
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0x0::LeanerReferences,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}

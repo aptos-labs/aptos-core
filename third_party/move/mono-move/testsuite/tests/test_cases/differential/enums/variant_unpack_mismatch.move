@@ -14,7 +14,8 @@ module 0x42::enum_unpack_mismatch {
 }
 
 // RUN: execute 0x42::enum_unpack_mismatch::unpack_as_b --args 0
-// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V2-SUBSTR: enum variant mismatch
 
 // RUN: execute 0x42::enum_unpack_mismatch::unpack_as_b --args 1
 // CHECK: results: 9

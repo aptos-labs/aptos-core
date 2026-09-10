@@ -1,0 +1,27 @@
+warning: cannot derive `folds_of` exactly for this lambda argument: the enclosing function has no specification which requires the fold summary; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_pure_callee.move:24:23
+    │
+ 24 │                 invariant folds_of<f>(v, i);
+    │                           ^^^^^^^^^^^^^^^^^
+    ·
+113 │ ╭           each_ref(remove, |r| {
+    │ │ ╭──────────────────────────'
+114 │ │ │             let (found, idx) = vector::index_of(&owners, r);
+115 │ │ │             if (found) {
+116 │ │ │                 vector::swap_remove(&mut owners, idx);
+117 │ │ │             }
+118 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the enclosing function has no specification which requires the fold summary; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_pure_callee.move:24:23
+    │
+ 24 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+128 │         each_ref(vs, |v| vector::append(&mut acc, *v));
+    │         ----------------------------------------------
+    │         │            │
+    │         │            lambda argument
+    │         from a call inlined at this callsite

@@ -12,19 +12,19 @@ fun mk_e(r0, r1): E {
     r6: u16
   code:
   L2:
-    0: br_neq L0, r0, #0
+    0: br_neq L0, r0, #0 @1
   L1:
-    1: r2 := ld_u8 1
-    2: r3 := ld_u8 7
-    3: r4 := pack 0x99::chained_variant_field_fusion::Inner, [r3, r1]
-    4: r5 := pack_variant 0x99::chained_variant_field_fusion::E@0, [r2, r4]
-    5: ret [r5]
+    1: r2 := ld_u8 1 @4
+    2: r3 := ld_u8 7 @5
+    3: r4 := pack 0x99::chained_variant_field_fusion::Inner, [r3, r1] @7
+    4: r5 := pack_variant 0x99::chained_variant_field_fusion::E@0, [r2, r4] @8
+    5: ret [r5] @9
   L0:
-    6: r6 := ld_u16 2
-    7: r2 := ld_u8 7
-    8: r4 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1]
-    9: r5 := pack_variant 0x99::chained_variant_field_fusion::E@1, [r6, r4]
-    10: ret [r5]
+    6: r6 := ld_u16 2 @10
+    7: r2 := ld_u8 7 @11
+    8: r4 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1] @13
+    9: r5 := pack_variant 0x99::chained_variant_field_fusion::E@1, [r6, r4] @14
+    10: ret [r5] @15
 }
 
 fun mk_u(r0, r1): U {
@@ -36,17 +36,17 @@ fun mk_u(r0, r1): U {
     r4: 0x99::chained_variant_field_fusion::U
   code:
   L2:
-    0: br_neq L0, r0, #0
+    0: br_neq L0, r0, #0 @1
   L1:
-    1: r2 := ld_u8 7
-    2: r3 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1]
-    3: r4 := pack_variant 0x99::chained_variant_field_fusion::U@0, [r3]
-    4: ret [r4]
+    1: r2 := ld_u8 7 @4
+    2: r3 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1] @6
+    3: r4 := pack_variant 0x99::chained_variant_field_fusion::U@0, [r3] @7
+    4: ret [r4] @8
   L0:
-    5: r2 := ld_u8 7
-    6: r3 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1]
-    7: r4 := pack_variant 0x99::chained_variant_field_fusion::U@1, [r3]
-    8: ret [r4]
+    5: r2 := ld_u8 7 @9
+    6: r3 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1] @11
+    7: r4 := pack_variant 0x99::chained_variant_field_fusion::U@1, [r3] @12
+    8: ret [r4] @13
 }
 
 fun read_e(r0): u8 {
@@ -56,9 +56,9 @@ fun read_e(r0): u8 {
     r2: u8
   code:
   L0:
-    0: r1 := imm_borrow_variant_field E::P0::p, r0
-    1: r2 := read_field Inner::b, r1
-    2: ret [r2]
+    0: r1 := imm_borrow_variant_field E::P0::p, r0 @1
+    1: r2 := read_field Inner::b, r1 @2
+    2: ret [r2] @4
 }
 
 fun read_f(r0): u8 {
@@ -68,9 +68,9 @@ fun read_f(r0): u8 {
     r2: u8
   code:
   L0:
-    0: r1 := imm_borrow_variant_field F::Fb::y, r0
-    1: r2 := read_field Inner::b, r1
-    2: ret [r2]
+    0: r1 := imm_borrow_variant_field F::Fb::y, r0 @1
+    1: r2 := read_field Inner::b, r1 @2
+    2: ret [r2] @4
 }
 
 fun read_u(r0): u8 {
@@ -80,9 +80,9 @@ fun read_u(r0): u8 {
     r2: u8
   code:
   L0:
-    0: r1 := imm_borrow_variant_field U::Ua::p, r0
-    1: r2 := read_field Inner::b, r1
-    2: ret [r2]
+    0: r1 := imm_borrow_variant_field U::Ua::p, r0 @1
+    1: r2 := read_field Inner::b, r1 @2
+    2: ret [r2] @4
 }
 
 fun run_read_e(r0, r1): u8 {
@@ -92,10 +92,10 @@ fun run_read_e(r0, r1): u8 {
     r2: 0x99::chained_variant_field_fusion::E
   code:
   L0:
-    0: [r2] := call mk_e, [r0, r1]
-    1: x0 := imm_borrow_loc r2
-    2: [x0] := call read_e, [x0]
-    3: ret [x0]
+    0: [r2] := call mk_e, [r0, r1] @2
+    1: x0 := imm_borrow_loc r2 @4
+    2: [x0] := call read_e, [x0] @5
+    3: ret [x0] @6
 }
 
 fun run_read_f(r0): u8 {
@@ -108,21 +108,21 @@ fun run_read_f(r0): u8 {
     r5: 0x99::chained_variant_field_fusion::Inner
   code:
   L3:
-    0: br_neq L0, r0, #0
+    0: br_neq L0, r0, #0 @1
   L1:
-    1: r2 := ld_u8 1
-    2: r1 := pack_variant 0x99::chained_variant_field_fusion::F@0, [r2]
+    1: r2 := ld_u8 1 @4
+    2: r1 := pack_variant 0x99::chained_variant_field_fusion::F@0, [r2] @5
   L2:
-    3: x0 := imm_borrow_loc r1
-    4: [x0] := call read_f, [x0]
-    5: ret [x0]
+    3: x0 := imm_borrow_loc r1 @7
+    4: [x0] := call read_f, [x0] @8
+    5: ret [x0] @9
   L0:
-    6: r2 := ld_u8 1
-    7: r3 := ld_u8 7
-    8: r4 := ld_u8 9
-    9: r5 := pack 0x99::chained_variant_field_fusion::Inner, [r3, r4]
-    10: r1 := pack_variant 0x99::chained_variant_field_fusion::F@1, [r2, r5]
-    11: branch L2
+    6: r2 := ld_u8 1 @10
+    7: r3 := ld_u8 7 @11
+    8: r4 := ld_u8 9 @12
+    9: r5 := pack 0x99::chained_variant_field_fusion::Inner, [r3, r4] @13
+    10: r1 := pack_variant 0x99::chained_variant_field_fusion::F@1, [r2, r5] @14
+    11: branch L2 @16
 }
 
 fun run_read_u(r0, r1): u8 {
@@ -132,10 +132,10 @@ fun run_read_u(r0, r1): u8 {
     r2: 0x99::chained_variant_field_fusion::U
   code:
   L0:
-    0: [r2] := call mk_u, [r0, r1]
-    1: x0 := imm_borrow_loc r2
-    2: [x0] := call read_u, [x0]
-    3: ret [x0]
+    0: [r2] := call mk_u, [r0, r1] @2
+    1: x0 := imm_borrow_loc r2 @4
+    2: [x0] := call read_u, [x0] @5
+    3: ret [x0] @6
 }
 
 fun run_write_e(r0, r1): u8 {
@@ -145,13 +145,13 @@ fun run_write_e(r0, r1): u8 {
     r2: 0x99::chained_variant_field_fusion::E
   code:
   L0:
-    0: x1 := ld_u8 0
-    1: [r2] := call mk_e, [r0, x1]
-    2: x0 := mut_borrow_loc r2
-    3: [] := call write_e, [x0, r1]
-    4: x0 := imm_borrow_loc r2
-    5: [x0] := call read_e, [x0]
-    6: ret [x0]
+    0: x1 := ld_u8 0 @1
+    1: [r2] := call mk_e, [r0, x1] @2
+    2: x0 := mut_borrow_loc r2 @4
+    3: [] := call write_e, [x0, r1] @6
+    4: x0 := imm_borrow_loc r2 @7
+    5: [x0] := call read_e, [x0] @8
+    6: ret [x0] @9
 }
 
 fun write_e(r0, r1) {
@@ -162,10 +162,10 @@ fun write_e(r0, r1) {
     r3: &mut 0x99::chained_variant_field_fusion::Inner
   code:
   L0:
-    0: r2 := add r1, #1u8
-    1: r3 := mut_borrow_variant_field E::P0::p, r0
-    2: write_field Inner::b, r3, r2
-    3: ret []
+    0: r2 := add r1, #1u8 @2
+    1: r3 := mut_borrow_variant_field E::P0::p, r0 @4
+    2: write_field Inner::b, r3, r2 @5
+    3: ret [] @7
 }
 === micro-ops ===
 // module 0x99::chained_variant_field_fusion
@@ -174,25 +174,25 @@ fun mk_e() {
   frame_data_size: 40
   entry_gas: 3
   code:
-    0: JumpIntCmp @10 [0] != u64 #0 gas_taken=90 gas_fallthrough=87
-    1: StoreImm1 [9] <- #1
-    2: StoreImm1 [10] <- #7
-    3: Move(1) [12] <- [8]
-    4: Move(1) [11] <- [10]
-    5: EnumNew [16] desc=2 tag #0
-    6: HeapMoveTo [16]+8 <- [9] (size=1)
-    7: HeapMoveTo [16]+9 <- [11] (size=2)
-    8: Move8 [0] <- [16]
-    9: Return
-    10: StoreImm2 [24] <- #2
-    11: StoreImm1 [9] <- #7
-    12: Move(1) [12] <- [8]
-    13: Move(1) [11] <- [9]
-    14: EnumNew [16] desc=2 tag #1
-    15: HeapMoveTo [16]+8 <- [24] (size=2)
-    16: HeapMoveTo [16]+10 <- [11] (size=2)
-    17: Move8 [0] <- [16]
-    18: Return
+    0: JumpIntCmp @10 [0] != u64 #0 gas_taken=90 gas_fallthrough=87 @1
+    1: StoreImm1 [9] <- #1 @4
+    2: StoreImm1 [10] <- #7 @5
+    3: Move(1) [12] <- [8] @7
+    4: Move(1) [11] <- [10] @7
+    5: EnumNew [16] desc=2 tag #0 @8
+    6: HeapMoveTo [16]+8 <- [9] (size=1) @8
+    7: HeapMoveTo [16]+9 <- [11] (size=2) @8
+    8: Move8 [0] <- [16] @9
+    9: Return @9
+    10: StoreImm2 [24] <- #2 @10
+    11: StoreImm1 [9] <- #7 @11
+    12: Move(1) [12] <- [8] @13
+    13: Move(1) [11] <- [9] @13
+    14: EnumNew [16] desc=2 tag #1 @14
+    15: HeapMoveTo [16]+8 <- [24] (size=2) @14
+    16: HeapMoveTo [16]+10 <- [11] (size=2) @14
+    17: Move8 [0] <- [16] @15
+    18: Return @15
   safe_point_layouts:
     5: []
     14: []
@@ -202,21 +202,21 @@ fun mk_u() {
   frame_data_size: 32
   entry_gas: 3
   code:
-    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=80 gas_fallthrough=80
-    1: StoreImm1 [9] <- #7
-    2: Move(1) [11] <- [8]
-    3: Move(1) [10] <- [9]
-    4: EnumNew [16] desc=3 tag #0
-    5: HeapMoveTo [16]+8 <- [10] (size=2)
-    6: Move8 [0] <- [16]
-    7: Return
-    8: StoreImm1 [9] <- #7
-    9: Move(1) [11] <- [8]
-    10: Move(1) [10] <- [9]
-    11: EnumNew [16] desc=3 tag #1
-    12: HeapMoveTo [16]+8 <- [10] (size=2)
-    13: Move8 [0] <- [16]
-    14: Return
+    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=80 gas_fallthrough=80 @1
+    1: StoreImm1 [9] <- #7 @4
+    2: Move(1) [11] <- [8] @6
+    3: Move(1) [10] <- [9] @6
+    4: EnumNew [16] desc=3 tag #0 @7
+    5: HeapMoveTo [16]+8 <- [10] (size=2) @7
+    6: Move8 [0] <- [16] @8
+    7: Return @8
+    8: StoreImm1 [9] <- #7 @9
+    9: Move(1) [11] <- [8] @11
+    10: Move(1) [10] <- [9] @11
+    11: EnumNew [16] desc=3 tag #1 @12
+    12: HeapMoveTo [16]+8 <- [10] (size=2) @12
+    13: Move8 [0] <- [16] @13
+    14: Return @13
   safe_point_layouts:
     4: []
     11: []
@@ -226,67 +226,67 @@ fun read_e() {
   frame_data_size: 40
   entry_gas: 19
   code:
-    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)]
-    1: ReadRefOffset [32] <- *([16]+1) (size=1)
-    2: Move(1) [0] <- [32]
-    3: Return
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)] @1
+    1: ReadRefOffset [32] <- *([16]+1) (size=1) @2
+    2: Move(1) [0] <- [32] @4
+    3: Return @4
 }
 
 fun read_f() {
   frame_data_size: 40
   entry_gas: 19
   code:
-    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [None, Some(9)]
-    1: ReadRefOffset [32] <- *([16]+1) (size=1)
-    2: Move(1) [0] <- [32]
-    3: Return
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [None, Some(9)] @1
+    1: ReadRefOffset [32] <- *([16]+1) (size=1) @2
+    2: Move(1) [0] <- [32] @4
+    3: Return @4
 }
 
 fun read_u() {
   frame_data_size: 40
   entry_gas: 19
   code:
-    0: HeapBorrow [16] <- &[0]+8
-    1: ReadRefOffset [32] <- *([16]+1) (size=1)
-    2: Move(1) [0] <- [32]
-    3: Return
+    0: HeapBorrow [16] <- &[0]+8 @1
+    1: ReadRefOffset [32] <- *([16]+1) (size=1) @2
+    2: Move(1) [0] <- [32] @4
+    3: Return @4
 }
 
 fun run_read_e() {
   frame_data_size: 24
   entry_gas: 141
   code:
-    0: Move(1) [56] <- [8]
-    1: Move8 [48] <- [0]
-    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e
-    3: Move8 [16] <- [48]
-    4: SlotBorrow [48] <- &[16]
-    5: CallIndirect 0x99::chained_variant_field_fusion::read_e
-    6: Move(1) [0] <- [48]
-    7: Return
+    0: Move(1) [56] <- [8] @2
+    1: Move8 [48] <- [0] @2
+    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e @2
+    3: Move8 [16] <- [48] @2
+    4: SlotBorrow [48] <- &[16] @4
+    5: CallIndirect 0x99::chained_variant_field_fusion::read_e @5
+    6: Move(1) [0] <- [48] @6
+    7: Return @6
 }
 
 fun run_read_f() {
   frame_data_size: 32
   entry_gas: 3
   code:
-    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=37 gas_fallthrough=15
-    1: StoreImm1 [16] <- #1
-    2: EnumNew [8] desc=4 tag #0
-    3: HeapMoveTo [8]+8 <- [16] (size=1)
-    4: SlotBorrow [56] <- &[8]
-    5: CallIndirect 0x99::chained_variant_field_fusion::read_f
-    6: Move(1) [0] <- [56]
-    7: Return
-    8: StoreImm1 [16] <- #1
-    9: StoreImm1 [17] <- #7
-    10: StoreImm1 [18] <- #9
-    11: Move(1) [20] <- [18]
-    12: Move(1) [19] <- [17]
-    13: EnumNew [8] desc=4 tag #1
-    14: HeapMoveTo [8]+8 <- [16] (size=1)
-    15: HeapMoveTo [8]+9 <- [19] (size=2)
-    16: Jump @4 gas=74
+    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=37 gas_fallthrough=15 @1
+    1: StoreImm1 [16] <- #1 @4
+    2: EnumNew [8] desc=4 tag #0 @5
+    3: HeapMoveTo [8]+8 <- [16] (size=1) @5
+    4: SlotBorrow [56] <- &[8] @7
+    5: CallIndirect 0x99::chained_variant_field_fusion::read_f @8
+    6: Move(1) [0] <- [56] @9
+    7: Return @9
+    8: StoreImm1 [16] <- #1 @10
+    9: StoreImm1 [17] <- #7 @11
+    10: StoreImm1 [18] <- #9 @12
+    11: Move(1) [20] <- [18] @13
+    12: Move(1) [19] <- [17] @13
+    13: EnumNew [8] desc=4 tag #1 @14
+    14: HeapMoveTo [8]+8 <- [16] (size=1) @14
+    15: HeapMoveTo [8]+9 <- [19] (size=2) @14
+    16: Jump @4 gas=74 @16
   safe_point_layouts:
     2: []
     13: []
@@ -296,39 +296,39 @@ fun run_read_u() {
   frame_data_size: 24
   entry_gas: 141
   code:
-    0: Move(1) [56] <- [8]
-    1: Move8 [48] <- [0]
-    2: CallIndirect 0x99::chained_variant_field_fusion::mk_u
-    3: Move8 [16] <- [48]
-    4: SlotBorrow [48] <- &[16]
-    5: CallIndirect 0x99::chained_variant_field_fusion::read_u
-    6: Move(1) [0] <- [48]
-    7: Return
+    0: Move(1) [56] <- [8] @2
+    1: Move8 [48] <- [0] @2
+    2: CallIndirect 0x99::chained_variant_field_fusion::mk_u @2
+    3: Move8 [16] <- [48] @2
+    4: SlotBorrow [48] <- &[16] @4
+    5: CallIndirect 0x99::chained_variant_field_fusion::read_u @5
+    6: Move(1) [0] <- [48] @6
+    7: Return @6
 }
 
 fun run_write_e() {
   frame_data_size: 24
   entry_gas: 210
   code:
-    0: StoreImm1 [56] <- #0
-    1: Move8 [48] <- [0]
-    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e
-    3: Move8 [16] <- [48]
-    4: SlotBorrow [48] <- &[16]
-    5: Move(1) [64] <- [8]
-    6: CallIndirect 0x99::chained_variant_field_fusion::write_e
-    7: SlotBorrow [48] <- &[16]
-    8: CallIndirect 0x99::chained_variant_field_fusion::read_e
-    9: Move(1) [0] <- [48]
-    10: Return
+    0: StoreImm1 [56] <- #0 @1
+    1: Move8 [48] <- [0] @2
+    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e @2
+    3: Move8 [16] <- [48] @2
+    4: SlotBorrow [48] <- &[16] @4
+    5: Move(1) [64] <- [8] @6
+    6: CallIndirect 0x99::chained_variant_field_fusion::write_e @6
+    7: SlotBorrow [48] <- &[16] @7
+    8: CallIndirect 0x99::chained_variant_field_fusion::read_e @8
+    9: Move(1) [0] <- [48] @9
+    10: Return @9
 }
 
 fun write_e() {
   frame_data_size: 40
   entry_gas: 14
   code:
-    0: IntAdd [17] <- [16] + u8 #1
-    1: EnumBorrowVariantFieldByTag [24] <- &(*[0]) by tag [Some(9), Some(10)]
-    2: WriteRefOffset *([24]+1) <- [17] (size=1)
-    3: Return
+    0: IntAdd [17] <- [16] + u8 #1 @2
+    1: EnumBorrowVariantFieldByTag [24] <- &(*[0]) by tag [Some(9), Some(10)] @4
+    2: WriteRefOffset *([24]+1) <- [17] (size=1) @5
+    3: Return @7
 }

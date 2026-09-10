@@ -6,7 +6,7 @@
 use crate::{
     config::VMConfig,
     data_cache::MoveVmDataCache,
-    execution_tracing::TraceRecorder,
+    execution_tracing::{FunctionCallKind, TraceRecorder},
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     interpreter_caches::InterpreterFunctionCaches,
@@ -376,6 +376,11 @@ where
         )
         .map_err(|err| self.set_location(err))?;
 
+        trace_recorder.record_function_call(
+            None,
+            current_frame.function.as_ref(),
+            FunctionCallKind::Entrypoint,
+        );
         trace_recorder.record_entrypoint(current_frame.function.as_ref());
         loop {
             let exit_code = current_frame
@@ -430,8 +435,8 @@ where
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::Call(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        if let Some(PerInstructionCache::Call(function, frame_cache)) =
+                            current_frame_cache.instruction_cache_at(current_frame.pc)
                         {
                             let frame_cache = frame_cache.upgrade().ok_or_else(|| {
                                 PartialVMError::new_invariant_violation(
@@ -469,11 +474,13 @@ where
                                         (function.clone(), frame_cache)
                                     },
                                 };
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                            current_frame_cache.memoize_instruction(
+                                current_frame.pc,
                                 PerInstructionCache::Call(
                                     Rc::clone(&function),
                                     Rc::downgrade(&frame_cache),
-                                );
+                                ),
+                            );
                             (function, frame_cache)
                         }
                     } else {
@@ -509,6 +516,11 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
+                        trace_recorder.record_function_call(
+                            Some(current_frame.function.as_ref()),
+                            function.as_ref(),
+                            FunctionCallKind::Call,
+                        );
                         let dispatched = self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
@@ -522,11 +534,17 @@ where
                         )?;
                         trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
                         if dispatched {
+                            trace_recorder.record_function_call(
+                                Some(function.as_ref()),
+                                current_frame.function.as_ref(),
+                                FunctionCallKind::NativeDynamicDispatch,
+                            );
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
                         continue;
                     }
 
+                    let caller = Rc::clone(&current_frame.function);
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
                         gas_meter,
@@ -537,14 +555,19 @@ where
                         ClosureMask::empty(),
                         vec![],
                     )?;
+                    trace_recorder.record_function_call(
+                        Some(caller.as_ref()),
+                        current_frame.function.as_ref(),
+                        FunctionCallKind::Call,
+                    );
                     trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
                 },
                 ExitCode::CallGeneric(idx) => {
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        if let Some(PerInstructionCache::CallGeneric(function, frame_cache)) =
+                            current_frame_cache.instruction_cache_at(current_frame.pc)
                         {
                             let frame_cache = frame_cache.upgrade().ok_or_else(|| {
                                 PartialVMError::new_invariant_violation(
@@ -582,11 +605,13 @@ where
                                     (function.clone(), frame_cache)
                                 },
                             };
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                            current_frame_cache.memoize_instruction(
+                                current_frame.pc,
                                 PerInstructionCache::CallGeneric(
                                     Rc::clone(&function),
                                     Rc::downgrade(&frame_cache),
-                                );
+                                ),
+                            );
                             (function, frame_cache)
                         }
                     } else {
@@ -629,6 +654,11 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
+                        trace_recorder.record_function_call(
+                            Some(current_frame.function.as_ref()),
+                            function.as_ref(),
+                            FunctionCallKind::CallGeneric,
+                        );
                         let dispatched = self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
@@ -643,11 +673,17 @@ where
                         trace_recorder
                             .record_successful_instruction(&Instruction::CallGeneric(idx));
                         if dispatched {
+                            trace_recorder.record_function_call(
+                                Some(function.as_ref()),
+                                current_frame.function.as_ref(),
+                                FunctionCallKind::NativeDynamicDispatch,
+                            );
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
                         continue;
                     }
 
+                    let caller = Rc::clone(&current_frame.function);
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
                         gas_meter,
@@ -658,6 +694,11 @@ where
                         ClosureMask::empty(),
                         vec![],
                     )?;
+                    trace_recorder.record_function_call(
+                        Some(caller.as_ref()),
+                        current_frame.function.as_ref(),
+                        FunctionCallKind::CallGeneric,
+                    );
                     trace_recorder.record_successful_instruction(&Instruction::CallGeneric(idx));
                 },
                 ExitCode::CallClosure(sig_idx) => {
@@ -765,6 +806,11 @@ where
 
                     // Call function
                     if callee.is_native() {
+                        trace_recorder.record_function_call(
+                            Some(current_frame.function.as_ref()),
+                            callee.as_ref(),
+                            FunctionCallKind::CallClosure,
+                        );
                         let dispatched = self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
@@ -783,9 +829,15 @@ where
                             .record_successful_instruction(&Instruction::CallClosure(sig_idx));
                         trace_recorder.record_call_closure(&callee, mask);
                         if dispatched {
+                            trace_recorder.record_function_call(
+                                Some(callee.as_ref()),
+                                current_frame.function.as_ref(),
+                                FunctionCallKind::NativeDynamicDispatch,
+                            );
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
                     } else {
+                        let caller = Rc::clone(&current_frame.function);
                         let frame_cache = if self.vm_config.enable_function_caches {
                             function_caches.get_or_create_frame_cache(&callee)
                         } else {
@@ -797,11 +849,15 @@ where
                             callee,
                             fn_guard,
                             CallType::ClosureDynamicDispatch,
-                            // Make sure the frame cache is empty for the new call.
                             frame_cache,
                             mask,
                             captured_vec,
                         )?;
+                        trace_recorder.record_function_call(
+                            Some(caller.as_ref()),
+                            current_frame.function.as_ref(),
+                            FunctionCallKind::CallClosure,
+                        );
                         trace_recorder
                             .record_successful_instruction(&Instruction::CallClosure(sig_idx));
                         trace_recorder.record_call_closure(current_frame.function.as_ref(), mask);

@@ -1,2 +1,31 @@
 
-============ bytecode verification succeeded ========
+Diagnostics:
+error: native functions cannot be entry functions
+  ┌─ tests/more-v1/parser/entry_function.move:5:5
+  │
+5 │     native entry fun f3();
+  │     ^^^^^^^^^^^^^^^^^^^^^^
+
+error: native functions cannot be entry functions
+  ┌─ tests/more-v1/parser/entry_function.move:6:5
+  │
+6 │     entry native fun f4();
+  │     ^^^^^^^^^^^^^^^^^^^^^^
+
+error: native functions cannot be entry functions
+  ┌─ tests/more-v1/parser/entry_function.move:7:5
+  │
+7 │     entry native public fun f5();
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: native functions cannot be entry functions
+  ┌─ tests/more-v1/parser/entry_function.move:8:5
+  │
+8 │     native entry public fun f6();
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: native functions cannot be entry functions
+  ┌─ tests/more-v1/parser/entry_function.move:9:5
+  │
+9 │     native public entry fun f7();
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,18 @@
+processed 1 task
+task 0 lines 1-10:  publish [import Move]
+Error: compilation errors:
+ error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+  ┌─ TEMPFILE:6:67
+  │
+6 │     if value < 1 then 0 else value + continue sum_down (value - 1)
+  │                                                                   ^
+
+error: while compiling Move function `LeanerRejectNonTailContinue.sum_down`:
+`continue` must mark a direct self-call in tail position
+  ┌─ TEMPFILE:6:67
+  │
+6 │     if value < 1 then 0 else value + continue sum_down (value - 1)
+  │                                                                   ^
+
+
+exiting with Leaner elaboration errors

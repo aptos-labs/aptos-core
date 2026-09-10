@@ -1,0 +1,18 @@
+name = "leaner-rust"
+defaultTargets = ["LeanerRust"]
+testDriver = "LeanerRustTests"
+
+[[require]]
+name = "leaner-ir"
+path = "../leaner-ir"
+
+[[lean_lib]]
+name = "LeanerRust"
+
+[[lean_exe]]
+name = "leaner-rust"
+root = "Main"
+
+[[lean_lib]]
+name = "LeanerRustTests"
+roots = ["LeanerRust.Tests.Profile", "LeanerRust.Tests.Driver", "LeanerRust.Tests.LeanerLang", "LeanerRust.Tests.RegistryConsumer", "LeanerRust.Tests.Source", "LeanerRust.Tests.SourcePredicates"]

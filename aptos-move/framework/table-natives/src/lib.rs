@@ -10,7 +10,8 @@
 //! See [`Table.move`](../sources/Table.move) for language use.
 //! See [`README.md`](../README.md) for integration into an adapter.
 
-use aptos_gas_schedule::gas_params::natives::table::*;
+use aptos_gas_algebra::AbstractValueSize;
+use aptos_gas_schedule::{gas_params::natives::table::*, AbstractValueSizeGasParameters};
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
@@ -41,7 +42,6 @@ use std::{
     mem::drop,
 };
 use triomphe::Arc as TriompheArc;
-
 // ===========================================================================================
 // Public Data Structures and Constants
 
@@ -322,10 +322,46 @@ pub fn table_natives(
     })
 }
 
+/// Computes the heap memory usage and, when value-node traversal metering is enabled,
+/// the abstract value size of a just-loaded table entry. Returns `None` when memory
+/// double counting is fixed and nothing was loaded (the value is already accounted for
+/// elsewhere). The value size is only `Some` when `charge_value_traversal` is set.
+fn compute_mem_usage(
+    gv: &GlobalValue,
+    abs_val_gas_params: &AbstractValueSizeGasParameters,
+    gas_feature_version: u64,
+    fix_memory_double_counting: bool,
+    loaded: Option<Option<NumBytes>>,
+    charge_value_traversal: bool,
+) -> PartialVMResult<Option<(u64, Option<AbstractValueSize>)>> {
+    if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                let (heap_size, val_size) =
+                    abs_val_gas_params.abstract_heap_and_value_size(&val, gas_feature_version)?;
+                Ok::<_, PartialVMError>((
+                    u64::from(heap_size),
+                    charge_value_traversal.then_some(val_size),
+                ))
+            })
+            .transpose()
+    } else {
+        Ok(None)
+    }
+}
+
 fn charge_load_cost(
     context: &mut SafeNativeContext,
     loaded: Option<Option<NumBytes>>,
+    mem_usage: Option<(u64, Option<AbstractValueSize>)>,
 ) -> SafeNativeResult<()> {
+    if let Some((amount, val_size)) = mem_usage {
+        context.use_heap_memory(amount)?;
+        if let Some(val_size) = val_size {
+            context.charge_value_traversal(val_size)?;
+        }
+    }
+
     context.charge(COMMON_LOAD_BASE_LEGACY)?;
 
     match loaded {
@@ -397,6 +433,8 @@ fn native_add_box(
     let closure_serialization_disabled = context
         .get_feature_flags()
         .is_closure_bcs_serialization_disabled();
+    let charge_value_traversal =
+        context.timed_feature_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -421,17 +459,14 @@ fn native_add_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view()
-            .map(|val| {
-                abs_val_gas_params
-                    .abstract_heap_size(&val, gas_feature_version)
-                    .map(u64::from)
-            })
-            .transpose()?
-    } else {
-        None
-    };
+    let mem_usage = compute_mem_usage(
+        gv,
+        abs_val_gas_params,
+        gas_feature_version,
+        fix_memory_double_counting,
+        loaded,
+        charge_value_traversal,
+    )?;
 
     let res = match gv.move_to(val) {
         Ok(_) => Ok(smallvec![]),
@@ -442,10 +477,7 @@ fn native_add_box(
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
-    if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount)?;
-    }
-    charge_load_cost(context, loaded)?;
+    charge_load_cost(context, loaded, mem_usage)?;
 
     res
 }
@@ -464,6 +496,8 @@ fn native_borrow_box(
     let closure_serialization_disabled = context
         .get_feature_flags()
         .is_closure_bcs_serialization_disabled();
+    let charge_value_traversal =
+        context.timed_feature_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -487,17 +521,14 @@ fn native_borrow_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view()
-            .map(|val| {
-                abs_val_gas_params
-                    .abstract_heap_size(&val, gas_feature_version)
-                    .map(u64::from)
-            })
-            .transpose()?
-    } else {
-        None
-    };
+    let mem_usage = compute_mem_usage(
+        gv,
+        abs_val_gas_params,
+        gas_feature_version,
+        fix_memory_double_counting,
+        loaded,
+        charge_value_traversal,
+    )?;
 
     let res = match gv.borrow_global() {
         Ok(ref_val) => Ok(smallvec![ref_val]),
@@ -508,10 +539,7 @@ fn native_borrow_box(
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
-    if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount)?;
-    }
-    charge_load_cost(context, loaded)?;
+    charge_load_cost(context, loaded, mem_usage)?;
 
     res
 }
@@ -530,6 +558,8 @@ fn native_contains_box(
     let closure_serialization_disabled = context
         .get_feature_flags()
         .is_closure_bcs_serialization_disabled();
+    let charge_value_traversal =
+        context.timed_feature_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -553,27 +583,21 @@ fn native_contains_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view()
-            .map(|val| {
-                abs_val_gas_params
-                    .abstract_heap_size(&val, gas_feature_version)
-                    .map(u64::from)
-            })
-            .transpose()?
-    } else {
-        None
-    };
+    let mem_usage = compute_mem_usage(
+        gv,
+        abs_val_gas_params,
+        gas_feature_version,
+        fix_memory_double_counting,
+        loaded,
+        charge_value_traversal,
+    )?;
     let exists = Value::bool(gv.exists());
 
     drop(table_data);
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
-    if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount)?;
-    }
-    charge_load_cost(context, loaded)?;
+    charge_load_cost(context, loaded, mem_usage)?;
 
     Ok(smallvec![exists])
 }
@@ -592,6 +616,8 @@ fn native_remove_box(
     let closure_serialization_disabled = context
         .get_feature_flags()
         .is_closure_bcs_serialization_disabled();
+    let charge_value_traversal =
+        context.timed_feature_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -615,17 +641,14 @@ fn native_remove_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view()
-            .map(|val| {
-                abs_val_gas_params
-                    .abstract_heap_size(&val, gas_feature_version)
-                    .map(u64::from)
-            })
-            .transpose()?
-    } else {
-        None
-    };
+    let mem_usage = compute_mem_usage(
+        gv,
+        abs_val_gas_params,
+        gas_feature_version,
+        fix_memory_double_counting,
+        loaded,
+        charge_value_traversal,
+    )?;
 
     let res = match gv.move_from() {
         Ok(val) => Ok(smallvec![val]),
@@ -636,10 +659,7 @@ fn native_remove_box(
 
     // TODO(Gas): Figure out a way to charge this earlier.
     context.charge(key_cost)?;
-    if let Some(amount) = mem_usage {
-        context.use_heap_memory(amount)?;
-    }
-    charge_load_cost(context, loaded)?;
+    charge_load_cost(context, loaded, mem_usage)?;
 
     res
 }

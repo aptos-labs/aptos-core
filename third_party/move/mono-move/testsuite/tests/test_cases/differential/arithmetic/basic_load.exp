@@ -6,8 +6,8 @@ fun load_values(): u64 {
     r0: u64
   code:
   L0:
-    0: r0 := ld_u64 42
-    1: ret [r0]
+    0: r0 := ld_u64 42 @0
+    1: ret [r0] @1
 }
 
 fun load_and_store() {
@@ -15,8 +15,8 @@ fun load_and_store() {
     r0: u64
   code:
   L0:
-    0: r0 := ld_u64 10
-    1: ret []
+    0: r0 := ld_u64 10 @0
+    1: ret [] @2
 }
 === micro-ops ===
 // module 0x66::test
@@ -25,14 +25,14 @@ fun load_values() {
   frame_data_size: 8
   entry_gas: 56
   code:
-    0: StoreImm8 [0] <- #42
-    1: Return
+    0: StoreImm8 [0] <- #42 @0
+    1: Return @1
 }
 
 fun load_and_store() {
   frame_data_size: 8
   entry_gas: 4
   code:
-    0: StoreImm8 [0] <- #10
-    1: Return
+    0: StoreImm8 [0] <- #10 @0
+    1: Return @2
 }

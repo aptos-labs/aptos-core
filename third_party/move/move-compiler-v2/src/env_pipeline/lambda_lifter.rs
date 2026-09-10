@@ -516,14 +516,12 @@ impl<'a> LambdaLifter<'a> {
 impl ExpRewriterFunctions for LambdaLifter<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Intercept descent and compute lambdas being exempted from lifting, currently
-        // those passed as parameters to inline functions. Calls to retained inline-opaque
-        // functions survive inlining (verify mode), so their lambda arguments must be
-        // lifted like for regular function calls.
+        // those passed as parameters to inline functions.
         if !self.options.include_inline_functions {
             if let ExpData::Call(_, Operation::MoveFunction(mid, fid), args) = exp.as_ref() {
                 let env = self.fun_env.module_env.env;
                 let callee = env.get_function(mid.qualified(*fid));
-                if callee.is_inline() && !callee.is_inline_opaque_retained() {
+                if callee.is_inline() {
                     for arg in args {
                         if matches!(arg.as_ref(), ExpData::Lambda(..)) {
                             self.exempted_lambdas.insert(arg.node_id());

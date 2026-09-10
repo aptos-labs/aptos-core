@@ -1,0 +1,19 @@
+{
+  "version": 10,
+  "structs": [],
+  "funs": [
+    {
+      "name": "g",
+      "params": 1,
+      "locals": ["u64", "u64"],
+      "returns": ["u64"],
+      "blocks": [
+        {"instrs": [], "term": {"jump": 2}},
+        {"instrs": [{"assign": [1, 0]}], "term": {"ret": [1]}},
+        {"instrs": [], "term": {"jump": 1}}
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    }
+  ]
+}

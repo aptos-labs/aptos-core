@@ -182,6 +182,9 @@ impl RewriteTargets {
                 (MoveFun(fnid), Def(def)) => env.set_function_def(fnid, def),
                 (SpecFun(fnid), Def(def)) => env.get_spec_fun_mut(fnid).body = Some(def),
                 (SpecBlock(sb_target), Spec(spec)) => {
+                    if let SpecBlockTarget::Function(mid, fid) = &sb_target {
+                        env.sync_lemma_from_spec(mid.qualified(*fid), &spec);
+                    }
                     *env.get_spec_block_mut(&sb_target) = spec;
                 },
                 _ => panic!("unexpected rewrite target and result combination"),

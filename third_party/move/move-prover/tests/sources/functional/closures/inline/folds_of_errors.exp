@@ -1,0 +1,192 @@
+Move prover returns: exiting with compilation errors
+warning: cannot derive `folds_of` exactly for this lambda argument: the lambda combines captured-variable writes or abort conditions with global state access, whose per-iteration evaluation state is not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+   │
+14 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+32 │         each_ref(v, |e| sum = sum + *e + R[@0x1].v); // warning: capture write combined with global state access
+   │         -------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the per-iteration effect of the lambda's body cannot be derived exactly; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+   │
+14 │                 invariant folds_of<f>(v, i);
+   │                           ^^^^^^^^^^^^^^^^^
+   ·
+40 │ ╭           each_ref(v, |e| {
+   │ │ ╭─────────────────────'
+41 │ │ │             let x = *e;
+42 │ │ │             while (x > 0) {
+43 │ │ │                 x = x - 1;
+44 │ │ │                 sum = sum + 1;
+45 │ │ │             }
+46 │ │ │         }); // warning: the per-iteration effect cannot be derived exactly
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the lambda accumulates into a captured variable through a function call whose effect on the capture cannot be summarized as a value; perform the update directly in the lambda body, use a helper function that returns the new value, or give the callee a functional `ensures` for the `&mut` parameter (e.g. `ensures p == f(old(p), ..)`, with `pragma opaque` and `[abstract]` if stated rather than proven), which the derivation can consume; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+   │
+14 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+68 │         each_ref(v, |e| add_to_relational(&mut sum, *e)); // warning: accumulation through a relational callee weakened
+   │         ------------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the lambda accumulates into a captured variable through a function call whose effect on the capture cannot be summarized as a value; perform the update directly in the lambda body, use a helper function that returns the new value, or give the callee a functional `ensures` for the `&mut` parameter (e.g. `ensures p == f(old(p), ..)`, with `pragma opaque` and `[abstract]` if stated rather than proven), which the derivation can consume; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+   │
+14 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+83 │         each_ref(v, |e| add_to_looping(&mut sum, *e)); // warning: accumulation through a looping callee weakened
+   │         ---------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the capture transformer contains behavior which cannot be summarized as a value; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+   │
+14 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+97 │         each_ref(v, |e| vector::push_back(&mut out, looping_result(*e)));
+   │         ----------------------------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the values written to the captured variables cannot be expressed over the iteration's pre-state; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+    │
+ 14 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+116 │         each_ref(v, |_e| set_two(&mut p.x, &mut p.y)); // warning: capture values not expressible
+    │         ---------------------------------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda writes 9 captured variables, more than the supported maximum of 8 (the generated fold recursion returns the capture tuple)
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+    │
+ 14 │                 invariant folds_of<f>(v, i);
+    │                           ^^^^^^^^^^^^^^^^^
+    ·
+145 │ ╭           each_ref(v, |e| {
+    │ │ ╭─────────────────────'
+146 │ │ │             // error: more captures than the supported maximum
+147 │ │ │             c1 = c1 + *e;
+148 │ │ │             c2 = c2 + *e;
+    · │ │
+155 │ │ │             c9 = c9 + *e;
+156 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda writes `acc`, which names a parameter of the enclosing function; copy the parameter into a local variable and capture that instead
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+    │
+ 14 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+164 │         each_ref(v, |e| acc = acc + *e); // error: writes a parameter of the enclosing function
+    │         -------------------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the lambda both writes the captured variable(s) `out` and forwards to the function-typed parameter `f`; the cumulative capture effect cannot be split across the forwarding — perform the capture updates in the lambda eventually bound to `f`, or restate this wrapper without the intermediate lambda; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20383
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+    │
+ 14 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+220 │         each_ref(v, |e| vector::push_back(&mut out, f(e))); // error: capture write mixed with forwarding
+    │         --------------------------------------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda forwards to the function-value parameter `f` of a non-inline function: `folds_of` requires the cumulative effect of a concrete lambda, which a function value provides only through inline expansion
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:14:23
+    │
+ 14 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+231 │         each_ref(v, |e| f(e)); // error: folds_of deferral needs an inline enclosing function
+    │         ---------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the enclosing function has no specification which requires the fold summary; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:123:20
+    │
+123 │                 assert folds_of<f>(v, 1); // error: folds_of can only be used in a loop invariant
+    │                        ^^^^^^^^^^^^^^^^^
+    ·
+129 │ ╭           apply_one(v, |e| {
+    │ │ ╭──────────────────────'
+130 │ │ │             let _ = 1 / *e;
+131 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: `folds_of` can only be used in a loop invariant
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:123:20
+    │
+123 │                 assert folds_of<f>(v, 1); // error: folds_of can only be used in a loop invariant
+    │                        ^^^^^^^^^^^^^^^^^
+    ·
+129 │ ╭           apply_one(v, |e| {
+    │ │ ╭──────────────────────'
+130 │ │ │             let _ = 1 / *e;
+131 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: cannot resolve `folds_of` for this lambda argument: the index function of `folds_of` must produce a literal tuple of the target's 2 argument(s)
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:178:23
+    │
+178 │             invariant folds_of<f>(|j| if (j > 0) (v[j], v[j]) else (v[0], v[0]), i);
+    │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+186 │         zip_with_self(v, |x, y| sum = sum + x + y);
+    │         ------------------------------------------
+    │         │                │
+    │         │                lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the index function's arguments depend on a captured variable the lambda writes, whose per-iteration value is not expressible
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:199:23
+    │
+199 │             invariant folds_of<f>(|j| k + j, i);
+    │                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+207 │         each_off(v, sum, |x| sum = sum + x); // error: index arguments depend on a written capture
+    │         -----------------------------------
+    │         │                │
+    │         │                lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `folds_of` exactly for this lambda argument: the index function of `folds_of` accesses global state, whose per-iteration evaluation state is not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:252:23
+    │
+252 │             invariant folds_of<f>(|_j| wrapped_stateful_index(), i);
+    │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+259 │         each_stateful_index(n, |_x| {});
+    │         -------------------------------
+    │         │                      │
+    │         │                      lambda argument
+    │         from a call inlined at this callsite

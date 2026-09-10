@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/intrinsic_map_rank_bulk.move:119:9
+    │
+119 │         ensures spec_key_at(result, 0) == keys[0];
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/intrinsic_map_rank_bulk.move:113: build_wrong
+    =     at tests/sources/functional/intrinsic_map_rank_bulk.move:117: build_wrong (spec)
+    =     at tests/sources/functional/intrinsic_map_rank_bulk.move:113: build_wrong
+    =         keys = <redacted>
+    =         values = <redacted>
+    =     at tests/sources/functional/intrinsic_map_rank_bulk.move:114: build_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/intrinsic_map_rank_bulk.move:119: build_wrong (spec)

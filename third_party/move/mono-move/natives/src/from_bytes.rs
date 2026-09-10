@@ -15,7 +15,7 @@ use mono_move_core::{
 const EFROM_BYTES: u64 = 0x01_0001;
 
 /// `0x1::from_bcs::from_bytes<T>(bytes: vector<u8>): T`, and the identical
-/// `0x1::util::from_bytes<T>`.
+/// `0x1::util::from_bytes<T>`
 ///
 /// Deserializes `bytes` as a value of type `T`, aborting with `EFROM_BYTES` if
 /// `bytes` is not a valid encoding.

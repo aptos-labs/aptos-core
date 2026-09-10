@@ -234,4 +234,25 @@ module 0x42::frame_conditions {
         ensures Counter[addr] == old(Counter[addr]);
         ensures Config[addr] == old(Config[addr]);
     }
+
+    /// Deliberately omits `modifies` but still provides a memory postcondition.
+    fun set_balance_without_frame(addr: address) acquires Balance {
+        Balance[addr].coins = 7;
+    }
+    spec set_balance_without_frame {
+        pragma opaque;
+        ensures Balance[addr].coins == 7;
+    }
+
+    /// An opaque closure's postcondition survives conservative pre-call havoc.
+    fun test_unframed_opaque_closure_ensures(addr: address) acquires Balance {
+        let f = |a| set_balance_without_frame(a) spec {
+            ensures Balance[a].coins == 7;
+        };
+        f(addr);
+    }
+    spec test_unframed_opaque_closure_ensures {
+        pragma aborts_if_is_partial;
+        ensures Balance[addr].coins == 7;
+    }
 }

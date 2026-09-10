@@ -27,8 +27,9 @@ use move_model::{
     model::StructEnv,
 };
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::BTreeMap, env, num::NonZeroUsize, str::FromStr, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, env, num::NonZeroUsize, str::FromStr};
 use thiserror::Error;
+use triomphe::Arc;
 
 pub mod prelude {
     pub use crate::vm::module_metadata::{

@@ -32,8 +32,8 @@ fun entry(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call outer<u64>, [r0]
-    1: ret [x0]
+    0: [x0] := call outer<u64>, [r0] @1
+    1: ret [x0] @2
 }
 
 fun innermost(r0): _0 {
@@ -41,7 +41,7 @@ fun innermost(r0): _0 {
     r0: _0
   code:
   L0:
-    0: ret [r0]
+    0: ret [r0] @1
 }
 
 fun middle(r0): _0 {
@@ -49,8 +49,8 @@ fun middle(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call innermost<_0>, [r0]
-    1: ret [x0]
+    0: [x0] := call innermost<_0>, [r0] @1
+    1: ret [x0] @2
 }
 
 fun outer(r0): _0 {
@@ -58,8 +58,8 @@ fun outer(r0): _0 {
     r0: _0
   code:
   L0:
-    0: [x0] := call middle<_0>, [r0]
-    1: ret [x0]
+    0: [x0] := call middle<_0>, [r0] @1
+    1: ret [x0] @2
 }
 === micro-ops ===
 // module 0x1::test
@@ -68,10 +68,10 @@ fun entry() {
   frame_data_size: 8
   entry_gas: 90
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0x1::test::outer<u64>
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Move8 [32] <- [0] @1
+    1: CallIndirect 0x1::test::outer<u64> @1
+    2: Move8 [0] <- [32] @2
+    3: Return @2
 }
 
 fun innermost(): skipped (generic function not instantiated)

@@ -1,0 +1,18 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_spec_len` binding must be a `spec native fun`; its definition is provided by the intrinsic model
+   ┌─ tests/sources/functional/intrinsic_map_native_role_err.move:22:10
+   │
+22 │       spec fun spec_len<K, V>(_m: Map<K, V>): num {
+   │ ╭──────────^
+23 │ │         0
+24 │ │     }
+   │ ╰─────^
+
+error: a `map_spec_iter_valid` binding must be a `spec native fun`; its definition is provided by the intrinsic model
+   ┌─ tests/sources/functional/intrinsic_map_native_role_err.move:26:10
+   │
+26 │       spec fun spec_iter_valid<K, V>(_it: Iter<K>, _m: Map<K, V>): bool {
+   │ ╭──────────^
+27 │ │         true
+28 │ │     }
+   │ ╰─────^

@@ -31,6 +31,7 @@ use aptos_crypto::{
     CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use move_value_view_derive::MoveValueView;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::Rng;
@@ -51,9 +52,11 @@ pub mod encrypted_payload;
 mod module;
 mod multisig;
 mod script;
+pub mod session_id;
 pub mod signature_verified_transaction;
 pub mod use_case;
 pub mod user_transaction_context;
+pub mod validation;
 pub mod webauthn;
 
 pub use self::block_epilogue::{
@@ -87,12 +90,14 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
+pub use session_id::SessionId;
 use std::{
     collections::BTreeSet,
     hash::Hash,
     ops::Deref,
     sync::{atomic::AtomicU64, Arc},
 };
+pub use validation::{EpilogueArgs, PrologueArgs};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -108,7 +113,9 @@ pub enum Auth<'a> {
     },
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Serialize, Deserialize, MoveValueView,
+)]
 pub enum ReplayProtector {
     Nonce(u64),
     SequenceNumber(u64),
@@ -887,7 +894,7 @@ impl TransactionExecutableRef<'_> {
 /// limit (100 = 1x, 200 = 2x, 250 = 2.5x).
 ///
 /// INVARIANT: must match Move representation for BCS serialization.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, MoveValueView)]
 pub enum RequestedMultipliers {
     V1 {
         /// Execution-gas multiplier as percent of the base limit where 100 is 1x.
@@ -925,7 +932,7 @@ impl RequestedMultipliers {
 /// prologue.
 ///
 /// INVARIANT: must match Move representation for BCS serialization.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, MoveValueView)]
 pub enum UserTxnLimitsRequest {
     /// Fee payer owns a stake pool.
     StakePoolOwner { multipliers: RequestedMultipliers },
@@ -979,6 +986,20 @@ pub enum TransactionExtraConfig {
 }
 
 impl TransactionPayload {
+    /// The SHA3-256 hash of a script payload's code; empty for every other
+    /// payload kind.
+    pub fn script_hash(&self) -> Vec<u8> {
+        match self.executable_ref() {
+            Ok(TransactionExecutableRef::Script(script)) => {
+                HashValue::sha3_256_of(script.code()).to_vec()
+            },
+            Ok(TransactionExecutableRef::EntryFunction(_))
+            | Ok(TransactionExecutableRef::Empty)
+            | Ok(TransactionExecutableRef::Encrypted)
+            | Err(_) => vec![],
+        }
+    }
+
     pub fn is_multisig(&self) -> bool {
         match self {
             TransactionPayload::EntryFunction(_) => false,

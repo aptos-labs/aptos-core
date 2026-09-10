@@ -3,27 +3,59 @@
 
 use crate::errors::{LimitExceededError, SafeNativeError, SafeNativeResult};
 use aptos_gas_algebra::{
-    AbstractValueSize, DynamicExpression, GasExpression, GasQuantity, InternalGasUnit,
+    AbstractValueSize, DynamicExpression, GasExpression, GasQuantity,
+    InternalGasPerAbstractValueUnit, InternalGasUnit,
 };
 use aptos_gas_schedule::{
     gas_feature_versions::RELEASE_V1_32, AbstractValueSizeGasParameters, MiscGasParameters,
     NativeGasParameters,
 };
 use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
-    gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
+    account_address::AccountAddress,
+    gas_algebra::{InternalGas, NumBytes},
+    identifier::Identifier,
+    language_storage::ModuleId,
 };
 use move_vm_runtime::{
     native_extensions::NativeContextExtensions,
     native_functions::{LoaderContext, NativeContext},
     Function,
 };
-use move_vm_types::values::Value;
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    values::{GlobalValue, Value},
+};
 use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+
+/// Computes the abstract heap and value sizes of a just-loaded resource, but only when
+/// value-node metering is enabled and the resource was actually present. Kept as a macro
+/// so the immutable field borrows of context stay disjoint from the mutable borrow behind
+/// other data.
+macro_rules! compute_abs_heap_and_value_size {
+    ($self:expr, $gv:expr, $num_bytes:expr) => {{
+        let calculate_abs_size = $self
+            .timed_features
+            .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize);
+        if calculate_abs_size && $num_bytes.is_some() {
+            $gv.view()
+                .map(|val| {
+                    let (heap_size, val_size) = $self
+                        .misc_gas_params
+                        .abs_val
+                        .abstract_heap_and_value_size(&val, $self.gas_feature_version)?;
+                    Ok::<_, PartialVMError>((u64::from(heap_size), val_size))
+                })
+                .transpose()?
+        } else {
+            None
+        }
+    }};
+}
 
 /// A proxy between the VM and the native functions, allowing the latter to query VM configurations
 /// or access certain VM functionalities.
@@ -100,6 +132,53 @@ impl<'b, 'c> SafeNativeContext<'_, 'b, 'c, '_> {
                 Ok(())
             }
         }
+    }
+
+    /// Loads resource from global storage for immutable borrow.
+    /// Returns the value, the number of bytes loaded, and the heap
+    /// size and the value size of the loaded data.
+    pub fn load_resource_with_abs_sizes(
+        &mut self,
+        address: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(
+        &GlobalValue,
+        Option<NumBytes>,
+        Option<(u64, AbstractValueSize)>,
+    )> {
+        let (gv, num_bytes) = self.inner.load_resource(address, ty)?;
+        let amount = compute_abs_heap_and_value_size!(self, gv, num_bytes);
+        Ok((gv, num_bytes, amount))
+    }
+
+    /// Loads resource from global storage for mutable borrow.
+    /// Returns the value, the number of bytes loaded and the heap
+    /// size and the value size of the loaded data.
+    pub fn load_resource_mut_with_abs_sizes(
+        &mut self,
+        address: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(
+        &mut GlobalValue,
+        Option<NumBytes>,
+        Option<(u64, AbstractValueSize)>,
+    )> {
+        let (gv, num_bytes) = self.inner.load_resource_mut(address, ty)?;
+        let amount = compute_abs_heap_and_value_size!(self, gv, num_bytes);
+        Ok((gv, num_bytes, amount))
+    }
+
+    /// Charges gas proportional to the number of value nodes.
+    pub fn charge_value_traversal(&mut self, val_size: AbstractValueSize) -> SafeNativeResult<()> {
+        // Set to 3x `cmp::compare`'s base and per-abstract-value-unit costs
+        // (3670 and 140).
+        // TODO: add these to 1.50 schedule.
+        const PER_VALUE_TRAVERSAL_BASE: InternalGas = InternalGas::new(11010);
+        const PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT: InternalGasPerAbstractValueUnit =
+            InternalGasPerAbstractValueUnit::new(420);
+
+        self.charge(PER_VALUE_TRAVERSAL_BASE + PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * val_size)?;
+        Ok(())
     }
 
     /// Returns true if native functions have access to gas meter and cah charge gas. Otherwise,

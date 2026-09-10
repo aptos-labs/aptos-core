@@ -1,0 +1,65 @@
+=== stackless ===
+// module 0x42::coalesce_copy_bypass
+
+fun direct_arg_copy(r0): u64 {
+  slots: params(1), locals(1), temps(3), transfer(1)
+    r0: u64
+    r1: vector<u64>
+    r2: &vector<u64>
+    r3: u64
+    r4: &u64
+  code:
+  L0:
+    0: [r1] := call make, [r0] @1
+    1: x0 := copy r1 @3
+    2: [r0] := call mutate_first, [x0] @4
+    3: r2 := imm_borrow_loc r1 @6
+    4: r3 := ld_u64 0 @7
+    5: r4 := vec_imm_borrow u64, r2, r3 @8
+    6: r3 := read_ref r4 @9
+    7: r3 := mul r3, #100 @11
+    8: r3 := add r3, r0 @13
+    9: ret [r3] @14
+}
+
+fun make(r0): vector<u64> {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: vector<u64>
+    r2: &mut vector<u64>
+    r3: u64
+  code:
+  L0:
+    0: r1 := vec_pack u64, 0, [] @0
+    1: r2 := mut_borrow_loc r1 @2
+    2: vec_push_back u64, r2, r0 @4
+    3: r2 := mut_borrow_loc r1 @5
+    4: r3 := add r0, #1 @8
+    5: vec_push_back u64, r2, r3 @9
+    6: r2 := mut_borrow_loc r1 @10
+    7: r3 := add r0, #2 @13
+    8: vec_push_back u64, r2, r3 @14
+    9: ret [r1] @16
+}
+
+fun mutate_first(r0): u64 {
+  slots: params(1), locals(1), temps(5)
+    r0: vector<u64>
+    r1: vector<u64>
+    r2: u64
+    r3: &mut vector<u64>
+    r4: u64
+    r5: &mut u64
+    r6: &vector<u64>
+  code:
+  L0:
+    0: r1 := move r0 @0
+    1: r2 := ld_u64 99 @2
+    2: r3 := mut_borrow_loc r1 @3
+    3: r4 := ld_u64 0 @4
+    4: r5 := vec_mut_borrow u64, r3, r4 @5
+    5: write_ref r5, r2 @6
+    6: r6 := imm_borrow_loc r1 @7
+    7: r2 := vec_len u64, r6 @8
+    8: ret [r2] @9
+}

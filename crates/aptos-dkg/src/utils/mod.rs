@@ -130,7 +130,7 @@ pub fn pairing_g2_g1(lhs: &G2Affine, rhs: &G1Affine) -> Gt {
     pairing(rhs, lhs)
 }
 
-pub trait HasMultiExp: for<'a> Sized + Clone {
+pub trait HasMultiExp: Sized + Clone {
     fn multi_exp_slice(bases: &[Self], scalars: &[blstrs::Scalar]) -> Self;
 
     fn multi_exp_iter<'a, 'b, I>(

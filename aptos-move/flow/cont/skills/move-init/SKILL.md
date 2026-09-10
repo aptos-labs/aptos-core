@@ -1,43 +1,29 @@
-{{ frontmatter(name="move-init", description="Initialize Move workflow routing in the project CLAUDE.md") }}
+{{ frontmatter(name="move-init", description="Add idempotent MoveFlow workflow routing to a Move package's CLAUDE.md. Use when configuring a package for future Claude Code sessions.") }}
 
-## Task
+## Configure routing
 
-Add Move workflow routing instructions to the project's CLAUDE.md so that
-future prompts automatically delegate to the right agent.
+1. Locate the intended package root containing `Move.toml`. If the current tree
+   contains several packages and the user's target is ambiguous, ask which one.
+2. Read or create `CLAUDE.md` at that package root.
+3. If it already contains `<!-- move-flow-routing -->`, report that routing is
+   configured and make no change.
+4. Otherwise append this block without altering existing instructions:
 
-### Steps
-
-1. Find the Move package root by looking for `Move.toml` in the current
-   directory or its parents.
-2. If no `Move.toml` found, tell the user this is not a Move package and stop.
-3. Read `CLAUDE.md` at the package root. If it does not exist, create it.
-4. Check if the file already contains `<!-- move-flow-routing -->`.
-   If yes, tell the user "Move workflow routing already configured" and stop.
-5. Append the following block to the end of CLAUDE.md:
-
-```
+```markdown
 <!-- move-flow-routing -->
-## Move Workflow Routing
+## MoveFlow routing
 
-When working with Move code in this package, use the appropriate workflow.
-If the user asks to run something "in an agent" or "as a subagent", use
-the Agent tool with the agent name. Otherwise, use the Skill tool with
-the /skill-name to load the workflow into the current conversation.
+Use the specialized workflow that matches the request:
 
-- **Spec inference** (infer specs, generate specifications, WP analysis):
-  Skill: `/move-inf`. Agent: `move-inf`.
-- **Verification** (verify, prove, run prover, check specifications):
-  Skill: `/move-prove`. Agent: `move-verify`.
-- **Testing** (generate tests, unit tests, improve coverage):
-  Skill: `/move-test`. Agent: `move-test`.
-- **Fix compilation** (check errors, fix compilation, won't compile):
-  Skill: `/move-check`. Agent: `move-check`.
+- `/move-inf` or agent `move-inf`: infer missing specifications and invariants.
+- `/move-prove` or agent `move-verify`: verify or repair existing specifications.
+- `/move-test` or agent `move-test`: generate or improve unit tests.
+- `/move-check` or agent `move-check`: diagnose or fix compiler errors.
+- `/move-replay`: replay a committed transaction or compare local overrides.
+- `/move`: general Move implementation, review, debugging, and explanation.
 
-Do not call `move_package_wp` or `move_package_verify` MCP tools directly —
-always use the skill or agent which has the full workflow context.
-
-For general Move development (writing code, reading code, explaining),
-use the `/move` skill for language and tool references.
+Load the corresponding skill before calling its low-level MoveFlow tools so its
+scope, interpretation, and completion rules are available.
 ```
 
-6. Tell the user that Move workflow routing has been configured.
+5. Report the updated file path.

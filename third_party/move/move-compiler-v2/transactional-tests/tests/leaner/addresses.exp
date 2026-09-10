@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 3-23:  publish [import Move]
+task 1 lines 25-25:  run 0x42::LeanerAddresses::own_address
+return values: 0000000000000000000000000000000000000000000000000000000000000042
+task 2 lines 27-27:  run 0x42::LeanerAddresses::literal_address
+return values: 000000000000000000000000000000000000000000000000000000000000cafe
+task 3 lines 29-29:  run 0x42::LeanerAddresses::is_application --args @0x42
+return values: true
+task 4 lines 31-31:  run 0x42::LeanerAddresses::is_application --args @0x43
+return values: false

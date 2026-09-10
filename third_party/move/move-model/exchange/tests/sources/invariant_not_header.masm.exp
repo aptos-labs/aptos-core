@@ -1,0 +1,1 @@
+error: in function `f`: function `f` has an invariant at block 2 which is not a loop header

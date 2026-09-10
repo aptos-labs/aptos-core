@@ -590,9 +590,13 @@ impl<T: Clone + Send + Sync + Serialize + CryptoHash> SignatureAggregator<T> {
             // voters can collude and create a valid aggregated signature.
             Ok(aggregated_sig) => Ok((self.data.clone(), aggregated_sig)),
             Err(_) => {
+                // Drops signatures not valid for `self.data` and penalizes their
+                // senders; below quorum yields TooLittleVotingPower, so we wait.
                 self.filter_invalid_signatures(verifier);
 
                 let aggregated_sig = self.try_aggregate(verifier)?;
+                // Fail closed: never return a certificate that doesn't verify.
+                verifier.verify_multi_signatures(&self.data, &aggregated_sig)?;
                 Ok((self.data.clone(), aggregated_sig))
             },
         }
@@ -1005,5 +1009,79 @@ mod tests {
         assert!(validator_verifier
             .pessimistic_verify_set()
             .contains(&validator_signers[5].author()));
+    }
+
+    /// A signature over a different message still carries a `true` verification
+    /// status, so the recovery path must recheck rather than trust it.
+    #[test]
+    fn cross_message_signature_does_not_poison_aggregation() {
+        let block_info = BlockInfo::empty();
+        let ledger_info = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        // Same commit_info, different consensus_data_hash: a distinct message.
+        let other_ledger_info = LedgerInfo::new(block_info, HashValue::random());
+
+        const NUM_SIGNERS: u8 = 7;
+        let validator_signers: Vec<ValidatorSigner> = (0..NUM_SIGNERS)
+            .map(|i| ValidatorSigner::random([i; 32]))
+            .collect();
+        let validator_infos = validator_signers
+            .iter()
+            .map(|v| ValidatorConsensusInfo::new(v.author(), v.public_key(), 1))
+            .collect();
+        // Quorum voting power of 5.
+        let validator_verifier =
+            ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
+                .expect("Incorrect quorum size.");
+
+        let mut signature_aggregator = SignatureAggregator::new(ledger_info.clone());
+        let mut partial_sig = PartialSignatures::empty();
+
+        // Five honest signatures — exactly enough for quorum on their own.
+        for signer in validator_signers.iter().take(5) {
+            let signature = signer.sign(&ledger_info).unwrap();
+            signature_aggregator.add_signature(
+                signer.author(),
+                &SignatureWithStatus::from(signature.clone()),
+            );
+            partial_sig.add_signature(signer.author(), signature);
+        }
+
+        // Real signature over `other_ledger_info`. Production sets the flag via
+        // optimistic_verify against the voter's own message; set it directly here.
+        let attacker = &validator_signers[5];
+        let poison = SignatureWithStatus::from(attacker.sign(&other_ledger_info).unwrap());
+        poison.set_verified();
+        assert!(poison.is_verified());
+        signature_aggregator.add_signature(attacker.author(), &poison);
+
+        // Voting power (6) clears quorum, so aggregation is attempted.
+        assert_eq!(
+            signature_aggregator
+                .check_voting_power(&validator_verifier, true)
+                .unwrap(),
+            6
+        );
+
+        // The certificate must still form, over the five valid signatures only.
+        let expected_sig = validator_verifier
+            .aggregate_signatures(partial_sig.signatures_iter())
+            .unwrap();
+        assert_eq!(
+            signature_aggregator
+                .aggregate_and_verify(&validator_verifier)
+                .unwrap(),
+            (ledger_info.clone(), expected_sig.clone())
+        );
+        // Result must be a genuinely valid aggregate signature.
+        validator_verifier
+            .verify_multi_signatures(&ledger_info, &expected_sig)
+            .unwrap();
+
+        // The attacker was dropped and flagged for pessimistic verification.
+        assert_eq!(signature_aggregator.all_voters().count(), 5);
+        assert!(!signature_aggregator.contains_voter(&attacker.author()));
+        assert!(validator_verifier
+            .pessimistic_verify_set()
+            .contains(&attacker.author()));
     }
 }

@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-17:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error: a returned reference must derive from a reference parameter
+  ┌─ TEMPFILE:9:5
+  │
+9 │     &Counter[address].value
+  │     ^^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

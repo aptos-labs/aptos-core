@@ -95,6 +95,43 @@ export async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImage
   process.exit(1);
 }
 
+// Registries occasionally serve 5xx for a while - a run of HTTP 500s from auth.docker.io has aborted
+// a nightly release before. crane does retry internally, but only a few times and only over a couple
+// of seconds, so a registry having a bad minute fails the whole release even when every other image
+// copied fine. Back off far enough to ride that out.
+const REGISTRY_RETRY_ATTEMPTS = 5;
+const REGISTRY_RETRY_INITIAL_DELAY_MS = 5000; // 5s, 10s, 20s, 40s between attempts
+
+/**
+ * Runs `fn`, retrying with exponential backoff if it throws. Only use this for operations that are
+ * safe to repeat: `crane copy` is idempotent, so re-running it after a partial failure is fine.
+ */
+export async function retryWithBackoff(
+  description,
+  fn,
+  { attempts = REGISTRY_RETRY_ATTEMPTS, initialDelayMs = REGISTRY_RETRY_INITIAL_DELAY_MS, sleepFn = sleep } = {},
+) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (attempt >= attempts) {
+        console.error(chalk.red(`ERROR: ${description} failed after ${attempts} attempts`));
+        throw e;
+      }
+      const delayMs = initialDelayMs * 2 ** (attempt - 1);
+      console.warn(
+        chalk.yellow(
+          // prettier-ignore
+          `WARN: ${description} failed (attempt ${attempt}/${attempts}) - retrying in ${delayMs / 1000} seconds`,
+        ),
+      );
+      console.warn(chalk.yellow(e.stderr ?? e));
+      await sleepFn(delayMs);
+    }
+  }
+}
+
 export const Environment = {
   CI: "ci",
   LOCAL: "local",

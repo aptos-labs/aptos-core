@@ -490,7 +490,7 @@ datatype $Memory<T> {
     $Memory(domain: [int]bool, contents: [int]T)
 }
 
-// Tuple Types (2-8 elements) for spec functions returning multiple values
+// Tuple Types (2-11 elements) for spec functions returning multiple values
 datatype $Tuple2<T1, T2> {
     $Tuple2($0: T1, $1: T2)
 }

@@ -30,7 +30,8 @@ pub mod table;
 
 pub const NUM_STATE_SHARDS: usize = 16;
 
-/// Identifies which snapshot store an operation targets.
+/// Identifies a snapshot store whose leaves use the standard `StateValue` representation.
+/// Hot state uses `HotStateValue` leaves and separate APIs, so it is not a variant of this enum.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum StateKind {
     MainState,

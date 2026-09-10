@@ -136,6 +136,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::NATIVE_CHECK.to_string(),
+            description: "Whether to check for native functions/structs in non-special modules"
+                .to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
+        },
+        Experiment {
             name: Experiment::RECURSIVE_TYPE_CHECK.to_string(),
             description: "Turns on or off checking of recursive structs and type instantiations"
                 .to_string(),
@@ -337,6 +343,7 @@ impl Experiment {
     pub const LIFT_INLINE_FUNS: &'static str = "lift-inline-funs";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
+    pub const NATIVE_CHECK: &'static str = "native-check";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
     pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =

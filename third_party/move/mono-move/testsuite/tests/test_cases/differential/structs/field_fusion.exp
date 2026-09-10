@@ -6,7 +6,7 @@ fun identity(r0): u64 {
     r0: u64
   code:
   L0:
-    0: ret [r0]
+    0: ret [r0] @1
 }
 
 fun add_two_fields(r0): u64 {
@@ -16,10 +16,10 @@ fun add_two_fields(r0): u64 {
     r2: u64
   code:
   L0:
-    0: r1 := read_loc_field Pair::_1, r0
-    1: r2 := read_loc_field Pair::_2, r0
-    2: r2 := add r1, r2
-    3: ret [r2]
+    0: r1 := read_loc_field Pair::_1, r0 @0
+    1: r2 := read_loc_field Pair::_2, r0 @3
+    2: r2 := add r1, r2 @6
+    3: ret [r2] @7
 }
 
 fun field_to_call(r0): u64 {
@@ -27,9 +27,9 @@ fun field_to_call(r0): u64 {
     r0: 0x66::field_fusion::Pair
   code:
   L0:
-    0: x0 := read_loc_field Pair::_1, r0
-    1: [x0] := call identity, [x0]
-    2: ret [x0]
+    0: x0 := read_loc_field Pair::_1, r0 @0
+    1: [x0] := call identity, [x0] @3
+    2: ret [x0] @4
 }
 
 fun two_fields_to_call(r0, r1): u64 {
@@ -40,11 +40,11 @@ fun two_fields_to_call(r0, r1): u64 {
     r3: u64
   code:
   L0:
-    0: r2 := read_loc_field Pair::_1, r0
-    1: r3 := read_loc_field Pair::_2, r1
-    2: x0 := add r2, r3
-    3: [x0] := call identity, [x0]
-    4: ret [x0]
+    0: r2 := read_loc_field Pair::_1, r0 @0
+    1: r3 := read_loc_field Pair::_2, r1 @3
+    2: x0 := add r2, r3 @6
+    3: [x0] := call identity, [x0] @7
+    4: ret [x0] @8
 }
 
 fun field_plus_constant(r0): u64 {
@@ -53,9 +53,9 @@ fun field_plus_constant(r0): u64 {
     r1: u64
   code:
   L0:
-    0: r1 := read_loc_field Pair::_1, r0
-    1: r1 := add r1, #42
-    2: ret [r1]
+    0: r1 := read_loc_field Pair::_1, r0 @0
+    1: r1 := add r1, #42 @4
+    2: ret [r1] @5
 }
 
 fun increment_field(r0) {
@@ -64,10 +64,10 @@ fun increment_field(r0) {
     r1: u64
   code:
   L0:
-    0: r1 := read_field Pair::_1, r0
-    1: r1 := add r1, #1
-    2: write_field Pair::_1, r0, r1
-    3: ret []
+    0: r1 := read_field Pair::_1, r0 @1
+    1: r1 := add r1, #1 @4
+    2: write_field Pair::_1, r0, r1 @6
+    3: ret [] @8
 }
 
 fun test_add_two_fields(r0, r1): u64 {
@@ -77,9 +77,9 @@ fun test_add_two_fields(r0, r1): u64 {
     r2: 0x66::field_fusion::Pair
   code:
   L0:
-    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1]
-    1: [x0] := call add_two_fields, [r2]
-    2: ret [x0]
+    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1] @2
+    1: [x0] := call add_two_fields, [r2] @5
+    2: ret [x0] @6
 }
 
 fun test_field_to_call(r0, r1): u64 {
@@ -89,9 +89,9 @@ fun test_field_to_call(r0, r1): u64 {
     r2: 0x66::field_fusion::Pair
   code:
   L0:
-    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1]
-    1: [x0] := call field_to_call, [r2]
-    2: ret [x0]
+    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1] @2
+    1: [x0] := call field_to_call, [r2] @5
+    2: ret [x0] @6
 }
 
 fun test_two_fields_to_call(r0, r1, r2, r3): u64 {
@@ -104,10 +104,10 @@ fun test_two_fields_to_call(r0, r1, r2, r3): u64 {
     r5: 0x66::field_fusion::Pair
   code:
   L0:
-    0: r4 := pack 0x66::field_fusion::Pair, [r0, r1]
-    1: r5 := pack 0x66::field_fusion::Pair, [r2, r3]
-    2: [x0] := call two_fields_to_call, [r4, r5]
-    3: ret [x0]
+    0: r4 := pack 0x66::field_fusion::Pair, [r0, r1] @2
+    1: r5 := pack 0x66::field_fusion::Pair, [r2, r3] @6
+    2: [x0] := call two_fields_to_call, [r4, r5] @10
+    3: ret [x0] @11
 }
 
 fun test_field_plus_constant(r0, r1): u64 {
@@ -117,9 +117,9 @@ fun test_field_plus_constant(r0, r1): u64 {
     r2: 0x66::field_fusion::Pair
   code:
   L0:
-    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1]
-    1: [x0] := call field_plus_constant, [r2]
-    2: ret [x0]
+    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1] @2
+    1: [x0] := call field_plus_constant, [r2] @5
+    2: ret [x0] @6
 }
 
 fun test_increment_field(r0, r1): u64 {
@@ -131,11 +131,11 @@ fun test_increment_field(r0, r1): u64 {
     r4: u64
   code:
   L0:
-    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1]
-    1: x0 := mut_borrow_loc r2
-    2: [] := call increment_field, [x0]
-    3: [r3, r4] := unpack 0x66::field_fusion::Pair, r2
-    4: ret [r3]
+    0: r2 := pack 0x66::field_fusion::Pair, [r0, r1] @2
+    1: x0 := mut_borrow_loc r2 @4
+    2: [] := call increment_field, [x0] @5
+    3: [r3, r4] := unpack 0x66::field_fusion::Pair, r2 @7
+    4: ret [r3] @9
 }
 === micro-ops ===
 // module 0x66::field_fusion
@@ -144,123 +144,123 @@ fun identity() {
   frame_data_size: 8
   entry_gas: 54
   code:
-    0: Return
+    0: Return @1
 }
 
 fun add_two_fields() {
   frame_data_size: 32
   entry_gas: 111
   code:
-    0: Move8 [16] <- [0]
-    1: Move8 [24] <- [8]
-    2: AddU64 [24] <- [16] + [24]
-    3: Move8 [0] <- [24]
-    4: Return
+    0: Move8 [16] <- [0] @0
+    1: Move8 [24] <- [8] @3
+    2: AddU64 [24] <- [16] + [24] @6
+    3: Move8 [0] <- [24] @7
+    4: Return @7
 }
 
 fun field_to_call() {
   frame_data_size: 16
   entry_gas: 116
   code:
-    0: Move8 [40] <- [0]
-    1: CallIndirect 0x66::field_fusion::identity
-    2: Move8 [0] <- [40]
-    3: Return
+    0: Move8 [40] <- [0] @0
+    1: CallIndirect 0x66::field_fusion::identity @3
+    2: Move8 [0] <- [40] @4
+    3: Return @4
 }
 
 fun two_fields_to_call() {
   frame_data_size: 48
   entry_gas: 147
   code:
-    0: Move8 [32] <- [0]
-    1: Move8 [40] <- [24]
-    2: AddU64 [72] <- [32] + [40]
-    3: CallIndirect 0x66::field_fusion::identity
-    4: Move8 [0] <- [72]
-    5: Return
+    0: Move8 [32] <- [0] @0
+    1: Move8 [40] <- [24] @3
+    2: AddU64 [72] <- [32] + [40] @6
+    3: CallIndirect 0x66::field_fusion::identity @7
+    4: Move8 [0] <- [72] @8
+    5: Return @8
 }
 
 fun field_plus_constant() {
   frame_data_size: 24
   entry_gas: 85
   code:
-    0: Move8 [16] <- [0]
-    1: AddU64Imm [16] <- [16] + #42
-    2: Move8 [0] <- [16]
-    3: Return
+    0: Move8 [16] <- [0] @0
+    1: AddU64Imm [16] <- [16] + #42 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
 }
 
 fun increment_field() {
   frame_data_size: 24
   entry_gas: 59
   code:
-    0: ReadRefOffset [16] <- *([0]+0) (size=8)
-    1: AddU64Imm [16] <- [16] + #1
-    2: WriteRefOffset *([0]+0) <- [16] (size=8)
-    3: Return
+    0: ReadRefOffset [16] <- *([0]+0) (size=8) @1
+    1: AddU64Imm [16] <- [16] + #1 @4
+    2: WriteRefOffset *([0]+0) <- [16] (size=8) @6
+    3: Return @8
 }
 
 fun test_add_two_fields() {
   frame_data_size: 32
   entry_gas: 164
   code:
-    0: Move8 [24] <- [8]
-    1: Move8 [16] <- [0]
-    2: Move(16) [56] <- [16]
-    3: CallIndirect 0x66::field_fusion::add_two_fields
-    4: Move8 [0] <- [56]
-    5: Return
+    0: Move8 [24] <- [8] @2
+    1: Move8 [16] <- [0] @2
+    2: Move(16) [56] <- [16] @5
+    3: CallIndirect 0x66::field_fusion::add_two_fields @5
+    4: Move8 [0] <- [56] @6
+    5: Return @6
 }
 
 fun test_field_to_call() {
   frame_data_size: 32
   entry_gas: 164
   code:
-    0: Move8 [24] <- [8]
-    1: Move8 [16] <- [0]
-    2: Move(16) [56] <- [16]
-    3: CallIndirect 0x66::field_fusion::field_to_call
-    4: Move8 [0] <- [56]
-    5: Return
+    0: Move8 [24] <- [8] @2
+    1: Move8 [16] <- [0] @2
+    2: Move(16) [56] <- [16] @5
+    3: CallIndirect 0x66::field_fusion::field_to_call @5
+    4: Move8 [0] <- [56] @6
+    5: Return @6
 }
 
 fun test_two_fields_to_call() {
   frame_data_size: 64
   entry_gas: 264
   code:
-    0: Move8 [40] <- [8]
-    1: Move8 [32] <- [0]
-    2: Move8 [56] <- [24]
-    3: Move8 [48] <- [16]
-    4: Move(16) [104] <- [48]
-    5: Move(16) [88] <- [32]
-    6: CallIndirect 0x66::field_fusion::two_fields_to_call
-    7: Move8 [0] <- [88]
-    8: Return
+    0: Move8 [40] <- [8] @2
+    1: Move8 [32] <- [0] @2
+    2: Move8 [56] <- [24] @6
+    3: Move8 [48] <- [16] @6
+    4: Move(16) [104] <- [48] @10
+    5: Move(16) [88] <- [32] @10
+    6: CallIndirect 0x66::field_fusion::two_fields_to_call @10
+    7: Move8 [0] <- [88] @11
+    8: Return @11
 }
 
 fun test_field_plus_constant() {
   frame_data_size: 32
   entry_gas: 164
   code:
-    0: Move8 [24] <- [8]
-    1: Move8 [16] <- [0]
-    2: Move(16) [56] <- [16]
-    3: CallIndirect 0x66::field_fusion::field_plus_constant
-    4: Move8 [0] <- [56]
-    5: Return
+    0: Move8 [24] <- [8] @2
+    1: Move8 [16] <- [0] @2
+    2: Move(16) [56] <- [16] @5
+    3: CallIndirect 0x66::field_fusion::field_plus_constant @5
+    4: Move8 [0] <- [56] @6
+    5: Return @6
 }
 
 fun test_increment_field() {
   frame_data_size: 48
   entry_gas: 216
   code:
-    0: Move8 [24] <- [8]
-    1: Move8 [16] <- [0]
-    2: SlotBorrow [72] <- &[16]
-    3: CallIndirect 0x66::field_fusion::increment_field
-    4: Move8 [40] <- [24]
-    5: Move8 [32] <- [16]
-    6: Move8 [0] <- [32]
-    7: Return
+    0: Move8 [24] <- [8] @2
+    1: Move8 [16] <- [0] @2
+    2: SlotBorrow [72] <- &[16] @4
+    3: CallIndirect 0x66::field_fusion::increment_field @5
+    4: Move8 [40] <- [24] @7
+    5: Move8 [32] <- [16] @7
+    6: Move8 [0] <- [32] @9
+    7: Return @9
 }

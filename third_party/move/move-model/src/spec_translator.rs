@@ -26,6 +26,7 @@ use crate::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE},
+    well_known,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -57,11 +58,19 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     result: TranslatedSpec,
     /// Whether we are in "old" (pre-state) context
     in_old: bool,
-    /// Shared label for all `old()` memory saves within this translator.
-    /// All `old()` references in a single SpecTranslator refer to the same program point
-    /// (function entry), so all saved memories can share one label. Using a single label
-    /// avoids conflicts when multiple invariants/conditions reference overlapping memory types.
+    /// Shared label for all `old()` memory saves within the current old-state
+    /// scope of this translator. Outside of `WithStateAnchor` wrappers, all
+    /// `old()` references refer to the same program point (function entry),
+    /// so all saved memories can share one label; inside a wrapper, the label
+    /// is the wrapper's anchor label. Sharing one label per scope avoids
+    /// conflicts when multiple invariants/conditions reference overlapping
+    /// memory types.
     shared_old_label: Option<MemoryLabel>,
+    /// The anchor label of the innermost enclosing `WithStateAnchor` wrapper,
+    /// if any. Determines the save scope of parameter snapshots: `None` means
+    /// function entry (`saved_params`), `Some(label)` the matching
+    /// `SaveStateAnchor` marker (`anchored_saved_params`).
+    current_anchor: Option<MemoryLabel>,
 }
 
 /// A flattened proof action produced by translating a structured `Proof` tree.
@@ -82,7 +91,7 @@ pub enum ProofAction {
 
 impl ProofAction {
     /// Freshen memory labels in this proof action's expressions.
-    pub fn freshen_labels(&mut self, freshener: &mut MemoryLabelFreshener) {
+    pub fn freshen_labels(&mut self, freshener: &mut MemoryLabelFreshener<'_>) {
         match self {
             ProofAction::Assert(exp, _) => *exp = freshener.rewrite_exp(exp.clone()),
             ProofAction::Assume(exp) => *exp = freshener.rewrite_exp(exp.clone()),
@@ -99,9 +108,29 @@ impl ProofAction {
 /// Represents a translated spec.
 #[derive(Default)]
 pub struct TranslatedSpec {
-    pub saved_memory: BTreeMap<QualifiedInstId<StructId>, MemoryLabel>,
-    pub saved_spec_vars: BTreeMap<QualifiedInstId<SpecVarId>, MemoryLabel>,
+    /// The memories saved under a label, that is, the `(resource, label)`
+    /// pairs for which a `SaveMem` needs to be emitted. The same resource can
+    /// be saved under multiple labels: a single condition may reference the
+    /// pre-states of multiple `SaveStateAnchor` program points (in addition
+    /// to the function-entry state), and each of those states needs its own
+    /// snapshot of the resource.
+    pub saved_memory: BTreeSet<(QualifiedInstId<StructId>, MemoryLabel)>,
+    /// The spec vars saved under a label, analogous to `saved_memory`.
+    pub saved_spec_vars: BTreeSet<(QualifiedInstId<SpecVarId>, MemoryLabel)>,
+    /// The labels of `SaveStateAnchor` program points at which parts of this
+    /// (inline property) spec are anchored: `old(..)` references translated
+    /// inside a `WithStateAnchor(label)` wrapper refer to the state at the
+    /// matching marker rather than at function entry. Spec instrumentation
+    /// emits the state saves registered under each of these labels at the
+    /// matching marker, and all remaining saves at function entry.
+    pub anchors: BTreeSet<MemoryLabel>,
+    /// Parameters saved at function entry: maps the parameter temp to the
+    /// snapshot temp holding its entry value.
     pub saved_params: BTreeMap<TempIndex, TempIndex>,
+    /// Parameters saved at a `SaveStateAnchor` program point, grouped by the
+    /// anchor label: their snapshot assignments are emitted at the matching
+    /// marker rather than at function entry.
+    pub anchored_saved_params: BTreeMap<MemoryLabel, BTreeMap<TempIndex, TempIndex>>,
     pub debug_traces: Vec<(NodeId, TraceKind, Exp)>,
     pub pre: Vec<(Loc, Exp)>,
     pub post: Vec<(Loc, Exp)>,
@@ -233,12 +262,11 @@ impl TranslatedSpec {
         }
     }
 
-    /// Freshen all memory labels in this translated spec by replacing them with
-    /// deterministic new labels starting from `counter`. The counter is advanced
-    /// past all allocated labels and returned so that subsequent freshenings can
-    /// continue from a non-colliding value.
-    pub fn freshen_labels(&mut self, counter: &mut usize) {
-        let mut freshener = MemoryLabelFreshener::new(*counter);
+    /// Freshen all memory labels in this translated spec by replacing them
+    /// with new labels from the environment's global id allocator, the
+    /// single source of memory labels (see `MemoryLabelFreshener`).
+    pub fn freshen_labels(&mut self, env: &GlobalEnv) {
+        let mut freshener = MemoryLabelFreshener::new(env);
         for (_, exp) in &mut self.post {
             *exp = freshener.rewrite_exp(exp.clone());
         }
@@ -285,7 +313,8 @@ impl TranslatedSpec {
         for (_, _, exp) in &mut self.debug_traces {
             *exp = freshener.rewrite_exp(exp.clone());
         }
-        // Freshen labels in saved_memory and saved_spec_vars
+        // Freshen labels in saved_memory, saved_spec_vars, anchors, and
+        // anchored_saved_params.
         let map = freshener.label_map();
         self.saved_memory = self
             .saved_memory
@@ -297,7 +326,15 @@ impl TranslatedSpec {
             .iter()
             .map(|(k, v)| (k.clone(), map.get(v).copied().unwrap_or(*v)))
             .collect();
-        *counter = freshener.next_counter();
+        self.anchors = self
+            .anchors
+            .iter()
+            .map(|l| map.get(l).copied().unwrap_or(*l))
+            .collect();
+        self.anchored_saved_params = std::mem::take(&mut self.anchored_saved_params)
+            .into_iter()
+            .map(|(l, params)| (map.get(&l).copied().unwrap_or(l), params))
+            .collect();
     }
 }
 
@@ -333,6 +370,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let_locals: Default::default(),
             in_old: false,
             shared_old_label: None,
+            current_anchor: None,
         };
         translator.translate_spec(for_call);
         translator.result
@@ -359,6 +397,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let_locals: Default::default(),
             in_old: false,
             shared_old_label: None,
+            current_anchor: None,
         };
         // Clone invariants so `inst` lives for the entire loop
         let invariants = invariants.collect_vec();
@@ -395,6 +434,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let_locals: Default::default(),
             in_old: false,
             shared_old_label: None,
+            current_anchor: None,
         };
 
         // Handle updating of global spec variables
@@ -702,7 +742,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
 
     fn save_memory(&mut self, qid: QualifiedInstId<StructId>) -> MemoryLabel {
         let label = self.get_or_create_old_label();
-        *self.result.saved_memory.entry(qid).or_insert(label)
+        self.result.saved_memory.insert((qid, label));
+        label
     }
 
     /// Save memory for multiple resources using the shared old label.
@@ -717,7 +758,19 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             .map(|m| m.to_owned().instantiate(inst))
             .collect();
         for mem in mems {
-            self.result.saved_memory.entry(mem).or_insert(label);
+            self.result.saved_memory.insert((mem, label));
+        }
+        label
+    }
+
+    /// Save already-instantiated resource memory under the shared old label.
+    fn save_memory_concrete(
+        &mut self,
+        used_memory: impl IntoIterator<Item = QualifiedInstId<StructId>>,
+    ) -> MemoryLabel {
+        let label = self.get_or_create_old_label();
+        for memory in used_memory {
+            self.result.saved_memory.insert((memory, label));
         }
         label
     }
@@ -885,6 +938,42 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         let lemma = module_env.get_lemma(qid.id);
         let params = lemma.params.clone();
         let conditions = lemma.conditions.clone();
+        let applied_measure = lemma.measure(env);
+        let applied_group = lemma.recursion_group;
+
+        // An application within the lemma's own recursion group must decrease
+        // the measure; see doc/dev/lemma_well_foundedness.md.
+        if let Some(enclosing) = self.enclosing_lemma() {
+            let (enclosing_group, enclosing_measure) = {
+                let env = self.builder.global_env();
+                let module_env = env.get_module(enclosing.module_id);
+                let decl = module_env.get_lemma(enclosing.id);
+                (decl.recursion_group, decl.measure(env))
+            };
+            let same_group = applied_group.is_some()
+                && enclosing.module_id == qid.module_id
+                && enclosing_group == applied_group;
+            if same_group {
+                let current: Vec<Exp> = enclosing_measure
+                    .iter()
+                    .map(|e| self.translate_exp(e, false))
+                    .collect();
+                let env = self.builder.global_env();
+                let next: Vec<Exp> = applied_measure
+                    .iter()
+                    .map(|e| Self::substitute_lemma_params(env, &params, args, e))
+                    .collect();
+                let decreases = self.mk_lexicographic_decrease(loc, &next, &current);
+                let guarded = self.guard_proof_exp(decreases, path_cond);
+                self.push_proof_action(
+                    loc.clone(),
+                    ProofAction::Assert(
+                        guarded,
+                        "recursive lemma application does not decrease the measure".to_string(),
+                    ),
+                );
+            }
+        }
 
         // Process requires first (assert), then ensures (assume), to avoid
         // assuming conclusions before checking premises when conditions are
@@ -909,6 +998,51 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let subst_exp = Self::substitute_lemma_params(env, &params, args, &cond.exp);
             let guarded = self.guard_proof_exp(subst_exp, path_cond);
             self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
+        }
+    }
+
+    /// The lemma whose proof is being translated, if the current function is
+    /// a lemma's synthetic function.
+    fn enclosing_lemma(&self) -> Option<QualifiedId<crate::ast::LemmaId>> {
+        if !self.fun_env.is_lemma() {
+            return None;
+        }
+        let module_env = &self.fun_env.module_env;
+        module_env
+            .find_lemma_by_name(self.fun_env.get_name())
+            .map(|(id, _)| module_env.get_id().qualified(id))
+    }
+
+    /// `next <_lex current`, well-founded by bounding the component that
+    /// strictly decreases: `(n0 < c0 && 0 <= c0) || (n0 == c0 && (n1 < c1 && 0 <= c1)) || ...`
+    fn mk_lexicographic_decrease(&self, loc: &Loc, next: &[Exp], current: &[Exp]) -> Exp {
+        let env = self.builder.global_env();
+        let zero = || {
+            ExpData::Value(
+                env.new_node(loc.clone(), crate::ty::NUM_TYPE),
+                crate::ast::Value::Number(0.into()),
+            )
+            .into_exp()
+        };
+        let mut disjuncts = vec![];
+        for k in 0..next.len().min(current.len()) {
+            let mut conjuncts: Vec<Exp> = (0..k)
+                .map(|j| self.builder.mk_eq(next[j].clone(), current[j].clone()))
+                .collect();
+            conjuncts.push(
+                self.builder
+                    .mk_bool_call(Operation::Lt, vec![next[k].clone(), current[k].clone()]),
+            );
+            conjuncts.push(
+                self.builder
+                    .mk_bool_call(Operation::Le, vec![zero(), current[k].clone()]),
+            );
+            disjuncts.push(self.builder.mk_and_n(conjuncts));
+        }
+        if disjuncts.is_empty() {
+            self.builder.mk_bool_const(false)
+        } else {
+            self.builder.mk_or_n(disjuncts)
         }
     }
 
@@ -998,14 +1132,34 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
     }
 
+    /// Returns the temporary's old-state snapshot in the current anchor scope.
     fn save_param(&mut self, idx: TempIndex) -> TempIndex {
-        if let Some(saved) = self.result.saved_params.get(&idx) {
+        let saved_opt = match self.current_anchor {
+            None => self.result.saved_params.get(&idx),
+            Some(label) => self
+                .result
+                .anchored_saved_params
+                .get(&label)
+                .and_then(|params| params.get(&idx)),
+        };
+        if let Some(saved) = saved_opt {
             *saved
         } else {
             let saved = self
                 .builder
                 .new_temp(self.builder.get_local_type(idx).skip_reference().clone());
-            self.result.saved_params.insert(idx, saved);
+            match self.current_anchor {
+                None => {
+                    self.result.saved_params.insert(idx, saved);
+                },
+                Some(label) => {
+                    self.result
+                        .anchored_saved_params
+                        .entry(label)
+                        .or_default()
+                        .insert(idx, saved);
+                },
+            }
             saved
         }
     }
@@ -1021,6 +1175,11 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         let ExpData::Call(node_id, Operation::Behavior(kind, range), args) = exp.as_ref() else {
             return exp.clone();
         };
+        if matches!(kind, BehaviorKind::FoldsOf) {
+            // The arguments of `folds_of` are `(v, i)` / `(g, i)`, not the
+            // target's parameter list; there are no `&mut` input slots.
+            return exp.clone();
+        }
         let Some(fun_exp) = args.first() else {
             return exp.clone();
         };
@@ -1124,60 +1283,6 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         .into_exp()
     }
 
-    /// For a two-state spec_fun call (whose declaration emits dual
-    /// `(old_p, p)` Boogie parameters for each `&mut` input), double each
-    /// `&mut` argument into a `(Old(arg), arg)` pair. The `Old` wrapper
-    /// triggers `save_param` during `rewrite_temporary`, so the pre-state
-    /// value is captured via a snapshot temp at function entry — matching
-    /// the mechanism used for `&mut` arguments to behavioral predicates.
-    ///
-    /// Idempotent: detects when args have already been doubled by comparing
-    /// `args.len()` against `decl.params.len()`.
-    fn wrap_mut_ref_spec_fun_inputs(&mut self, exp: &Exp) -> Exp {
-        let env = self.builder.global_env();
-        let ExpData::Call(node_id, Operation::SpecFunction(mid, fid, range), args) = exp.as_ref()
-        else {
-            return exp.clone();
-        };
-        let (uses_old, params) = {
-            let module_env = env.get_module(*mid);
-            let decl = module_env.get_spec_fun(*fid);
-            (decl.uses_old, decl.params.clone())
-        };
-        if !uses_old {
-            return exp.clone();
-        }
-        // Already doubled by a prior pass.
-        if args.len() != params.len() {
-            return exp.clone();
-        }
-        let any_mut = params
-            .iter()
-            .any(|crate::model::Parameter(_, ty, _)| ty.is_mutable_reference());
-        if !any_mut {
-            return exp.clone();
-        }
-        let mut new_args: Vec<Exp> = Vec::with_capacity(args.len() * 2);
-        for (param, arg) in params.iter().zip(args.iter()) {
-            let crate::model::Parameter(_, ty, _) = param;
-            if ty.is_mutable_reference() {
-                let arg_ty = env.get_node_type(arg.node_id());
-                let arg_loc = env.get_node_loc(arg.node_id());
-                let new_id = env.new_node(arg_loc, arg_ty);
-                new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg.clone()]).into_exp());
-                new_args.push(arg.clone());
-            } else {
-                new_args.push(arg.clone());
-            }
-        }
-        ExpData::Call(
-            *node_id,
-            Operation::SpecFunction(*mid, *fid, range.clone()),
-            new_args,
-        )
-        .into_exp()
-    }
-
     /// True if `arg` is a stateful `&mut`-source shape: a ref-typed
     /// expression, `Borrow(Mut, ...)`, `Old(...)` of a stateful inner,
     /// a `Select`/`SelectVariants` rooted in a stateful inner, or a
@@ -1210,6 +1315,23 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
 
 impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        // A `WithStateAnchor(L)` wrapper anchors `old(..)` references of the
+        // wrapped condition at the `SaveStateAnchor(L)` program point instead
+        // of function entry: within the wrapper, old-state saves use `L`.
+        // A single condition can contain multiple wrappers with different
+        // labels (e.g. a conjunction of behavioral predicates over distinct
+        // state-effecting lambda parameters), so the anchors are collected as
+        // a set and each save is registered under the label of its enclosing
+        // scope.
+        if let ExpData::Call(_, Operation::WithStateAnchor(label), args) = exp.as_ref() {
+            let saved_label = self.shared_old_label.replace(*label);
+            let saved_anchor = self.current_anchor.replace(*label);
+            self.result.anchors.insert(*label);
+            let inner = self.rewrite_exp(args[0].clone());
+            self.shared_old_label = saved_label;
+            self.current_anchor = saved_anchor;
+            return inner;
+        }
         // `Old`-wrap stateful `&mut` BP args so `save_param` routes their
         // pre-state through captured temps.
         let exp = if let ExpData::Call(_, Operation::Behavior(_, _), _) = exp.as_ref() {
@@ -1222,11 +1344,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         // dual `(old_p, p)` parameters emitted by the Boogie backend. The `Old`
         // wrapper triggers `save_param` during descent, capturing the pre-state
         // value through a snapshot temp.
-        let exp = if let ExpData::Call(_, Operation::SpecFunction(_, _, _), _) = exp.as_ref() {
-            self.wrap_mut_ref_spec_fun_inputs(&exp)
-        } else {
-            exp
-        };
+        let exp = wrap_mut_ref_spec_fun_inputs(self.builder.global_env(), &exp).unwrap_or(exp);
 
         // Do some pre-processing of the expression before actual rewrite, reporting
         // errors.
@@ -1237,7 +1355,17 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 is_old = true;
                 // Generate an error if an `old` function is applied to a pure expression.
                 let arg = &args[0];
-                if arg.is_pure(self.builder.global_env()) {
+                // Behavioral evaluators are conservatively treated as
+                // stateful here even if `is_pure` cannot see their target's
+                // memory summary yet. The rewrite below labels both sides of
+                // the evaluator at the old state.
+                let is_behavior =
+                    matches!(arg.as_ref(), ExpData::Call(_, Operation::Behavior(..), _));
+                // Internal anchors may snapshot otherwise-pure owned locals.
+                if self.current_anchor.is_none()
+                    && arg.is_pure(self.builder.global_env())
+                    && !is_behavior
+                {
                     let loc = self.builder.global_env().get_node_loc(*id);
                     // Compute labels for any sub-expressions which are included into this
                     // expression via substitution (from schema inclusion, for example). This
@@ -1262,7 +1390,8 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     self.builder.global_env().diag_with_labels(
                         Severity::Error,
                         &loc,
-                        "`old(..)` applied to expression which does not depend on state",
+                        "`old(..)` applied to expression which does not depend on state; \
+                         remove `old(..)` to use the state-independent value",
                         labels,
                     )
                 }
@@ -1357,23 +1486,42 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 )
                 .into_exp(),
             ),
+            // Snapshot the enclosing pre-state explicitly, just as for old
+            // reads. It is function entry for a definition, but call entry
+            // for a callee contract and the anchor point for an inline spec.
+            // Boogie-native old() would incorrectly use the caller's entry
+            // when the resource changed before an opaque call.
+            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range) if range.pre.is_none() => {
+                let label = self.save_memory(self.builder.get_memory_of_node(id));
+                let new_range = MemoryRange {
+                    pre: Some(label),
+                    post: range.post,
+                };
+                let new_oper = match oper {
+                    SpecPublish(_) => SpecPublish(new_range),
+                    SpecRemove(_) => SpecRemove(new_range),
+                    SpecUpdate(_) => SpecUpdate(new_range),
+                    _ => unreachable!(),
+                };
+                Some(Call(id, new_oper, args.to_owned()).into_exp())
+            },
             // SpecFunction with labels from state labels: still may need pre-state SaveMem
             SpecFunction(mid, fid, range) if !range.is_default() => {
                 // If the spec fun uses old() and has no pre-label, save memory
                 // for the pre-state. This happens with `..S |~ spec_fun(a)` where
                 // post=S but pre=None (function entry).
-                let (uses_old, has_old_memory, used_memory) = {
+                let inst = self.builder.global_env().get_node_instantiation(id);
+                let (uses_old, old_memory, used_memory) = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
                     (
                         decl.uses_old,
-                        !decl.old_memory.is_empty(),
-                        decl.used_memory.clone(),
+                        decl.old_memory_instantiated(&inst),
+                        decl.used_memory_instantiated(&inst),
                     )
                 };
-                if uses_old && has_old_memory && range.pre.is_none() {
-                    let inst = self.builder.global_env().get_node_instantiation(id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                if uses_old && !old_memory.is_empty() && range.pre.is_none() {
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
@@ -1385,13 +1533,19 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             },
             // SpecFunction in old context: save memory for pre-state
             SpecFunction(mid, fid, range) if self.in_old => {
-                let used_memory = {
-                    let module_env = self.builder.global_env().get_module(*mid);
-                    let decl = module_env.get_spec_fun(*fid);
-                    decl.used_memory.clone()
-                };
                 let inst = self.builder.global_env().get_node_instantiation(id);
-                let label = self.save_memory_shared(&used_memory, &inst);
+                let used_memory = {
+                    let env = self.builder.global_env();
+                    let decl = env.get_module(*mid).get_spec_fun(*fid).clone();
+                    let mut used_memory = decl.used_memory_instantiated(&inst);
+                    used_memory.extend(well_known::object_spec_exists_at_memory(
+                        env,
+                        mid.qualified(*fid),
+                        &inst,
+                    ));
+                    used_memory
+                };
+                let label = self.save_memory_concrete(used_memory);
                 let new_range = MemoryRange {
                     pre: Some(label),
                     post: range.post,
@@ -1400,18 +1554,18 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             },
             // SpecFunction outside old but uses_old: save memory for pre-state
             SpecFunction(mid, fid, range) if !self.in_old => {
-                let (uses_old, has_old_memory, used_memory) = {
+                let inst = self.builder.global_env().get_node_instantiation(id);
+                let (uses_old, old_memory, used_memory) = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
                     (
                         decl.uses_old,
-                        !decl.old_memory.is_empty(),
-                        decl.used_memory.clone(),
+                        decl.old_memory_instantiated(&inst),
+                        decl.used_memory_instantiated(&inst),
                     )
                 };
-                if uses_old && has_old_memory {
-                    let inst = self.builder.global_env().get_node_instantiation(id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                if uses_old && !old_memory.is_empty() {
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
@@ -1421,21 +1575,31 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     None
                 }
             },
-            // Behavior with labels already set: leave as-is
-            Behavior(_, range) if !range.is_default() => None,
-            // Behavior that needs pre-state label
+            // An explicit post label does not supply the implicit entry state.
+            // Save that entry state for `..S` just as for an unlabeled call.
+            Behavior(_, range) if range.pre.is_some() => None,
+            // Behavior that needs a pre-state label. When the whole
+            // evaluator is under `old(..)`, both of its states are the old
+            // state: leaving `post` unlabeled would let `result_of` and other
+            // post-reading evaluators observe current memory.
             Behavior(kind, range) if needs_pre_label(kind, self.in_old) => {
                 let env = self.builder.global_env();
                 if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
                     args.first().map(|a| a.as_ref())
                 {
-                    let fun_env = env.get_function(mid.qualified(*fid));
-                    let used_memory = fun_env.get_spec_used_memory().clone();
                     let inst = env.get_node_instantiation(*closure_id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let used_memory = crate::spec_derivation::behavioral_target_memory(
+                        env,
+                        mid.qualified(*fid),
+                        &inst,
+                    );
+                    if range.post.is_some() && used_memory.is_empty() {
+                        return None;
+                    }
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
-                        post: range.post,
+                        post: self.in_old.then_some(label).or(range.post),
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
                 } else if let Some(ExpData::Call(_, Operation::Select(smid, sid, field_id), _)) =
@@ -1450,10 +1614,13 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     let struct_env = env.get_module(*smid).into_struct(*sid);
                     let field_sym = field_id.symbol();
                     let memory = collect_field_access_memory(env, &struct_env, field_sym);
+                    if range.post.is_some() && memory.is_empty() {
+                        return None;
+                    }
                     let label = self.save_memory_shared(&memory, self.type_args);
                     let new_range = MemoryRange {
                         pre: Some(label),
-                        post: range.post,
+                        post: self.in_old.then_some(label).or(range.post),
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
                 } else {
@@ -1465,10 +1632,13 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     // the function's spec_used_memory / spec_old_memory, so
                     // this fallback covers the fun-param case too.
                     let used_memory = self.fun_env.get_spec_used_memory().clone();
+                    if range.post.is_some() && used_memory.is_empty() {
+                        return None;
+                    }
                     let label = self.save_memory_shared(&used_memory, self.type_args);
                     let new_range = MemoryRange {
                         pre: Some(label),
-                        post: range.post,
+                        post: self.in_old.then_some(label).or(range.post),
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
                 }
@@ -1531,6 +1701,73 @@ fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
 /// (the spec translator runs before `mono_analysis`), so over-saving is
 /// acceptable: extra saved memory only adds a cheap `SaveMem` at procedure
 /// entry without affecting verification soundness.
+/// For a two-state spec_fun call (whose declaration emits dual `(old_p, p)`
+/// Boogie parameters for each `&mut` input), double each `&mut` argument into
+/// a `(Old(arg), arg)` pair. The `Old` wrapper triggers `save_param` during
+/// `rewrite_temporary`, so the pre-state value is captured via a snapshot temp
+/// at function entry — matching the mechanism used for `&mut` arguments to
+/// behavioral predicates.
+///
+/// Inspects only the top node; returns `None` when nothing needs doubling.
+/// Idempotent: detects when args have already been doubled by comparing
+/// `args.len()` against `decl.params.len()`.
+pub fn wrap_mut_ref_spec_fun_inputs(env: &GlobalEnv, exp: &Exp) -> Option<Exp> {
+    let ExpData::Call(node_id, Operation::SpecFunction(mid, fid, range), args) = exp.as_ref()
+    else {
+        return None;
+    };
+    let (uses_old, params) = {
+        let module_env = env.get_module(*mid);
+        let decl = module_env.get_spec_fun(*fid);
+        (decl.uses_old, decl.params.clone())
+    };
+    let any_mut = params
+        .iter()
+        .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+    // The length test rejects args already doubled by a prior pass.
+    if !uses_old || !any_mut || args.len() != params.len() {
+        return None;
+    }
+    let mut new_args: Vec<Exp> = Vec::with_capacity(args.len() * 2);
+    for (Parameter(_, ty, _), arg) in params.iter().zip(args.iter()) {
+        if ty.is_mutable_reference() {
+            let arg_ty = env.get_node_type(arg.node_id());
+            let arg_loc = env.get_node_loc(arg.node_id());
+            let new_id = env.new_node(arg_loc, arg_ty);
+            new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg.clone()]).into_exp());
+        }
+        new_args.push(arg.clone());
+    }
+    Some(
+        ExpData::Call(
+            *node_id,
+            Operation::SpecFunction(*mid, *fid, range.clone()),
+            new_args,
+        )
+        .into_exp(),
+    )
+}
+
+/// Apply [`wrap_mut_ref_spec_fun_inputs`] to every spec-fun call in `exp`.
+/// The instrumenting path doubles per node as it descends; callers that
+/// translate a raw spec expression (with no instrumentation) need this
+/// standalone traversal to reach the same canonical form.
+pub fn wrap_mut_ref_spec_fun_inputs_deep(env: &GlobalEnv, exp: &Exp) -> Exp {
+    struct Doubler<'a> {
+        env: &'a GlobalEnv,
+    }
+    impl ExpRewriterFunctions for Doubler<'_> {
+        fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+            if !matches!(oper, Operation::SpecFunction(..)) {
+                return None;
+            }
+            let exp = ExpData::Call(id, oper.clone(), args.to_vec()).into_exp();
+            wrap_mut_ref_spec_fun_inputs(self.env, &exp)
+        }
+    }
+    Doubler { env }.rewrite_exp(exp.clone())
+}
+
 fn collect_field_access_memory(
     env: &crate::model::GlobalEnv,
     struct_env: &crate::model::StructEnv,

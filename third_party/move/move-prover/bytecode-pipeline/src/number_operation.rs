@@ -55,13 +55,42 @@
 
 use itertools::Itertools;
 use move_model::{
-    ast::{PropertyValue, TempIndex, Value},
-    model::{FieldId, FunId, FunctionEnv, ModuleId, NodeId, SpecFunId, StructEnv, StructId},
-    pragmas::{BV_PARAM_PROP, BV_RET_PROP},
+    ast::{Exp, PropertyValue, Spec, TempIndex, Value},
+    model::{FieldId, FunId, FunctionEnv, Loc, ModuleId, NodeId, SpecFunId, StructEnv, StructId},
+    pragmas::{
+        BV_INTERNAL_PRAGMA, BV_PARAM_PROP, BV_RET_PROP, CONDITION_ABSTRACT_PROP,
+        CONDITION_CONCRETE_PROP,
+    },
 };
-use std::{collections::BTreeMap, ops::Deref, str};
+use move_stackless_bytecode::stackless_bytecode::AttrId;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Deref,
+    str,
+};
 
 static PARSING_ERROR: &str = "error happened when parsing the bv pragma";
+
+/// Bitwise operators in a `bv_internal` contract.
+pub static BV_INTERNAL_SPEC_BITWISE_MSG: &str = "the specification of a `bv_internal` function \
+     must stay in integer world and cannot use bitwise operators or int2bv";
+
+/// Contract conditions of `bv_internal` functions, keyed by containing function and
+/// variant. The analysis classifies these in integer world regardless of context.
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct BvInternalBoundaryProps {
+    props: BTreeSet<(ModuleId, FunId, bool, AttrId)>,
+}
+
+impl BvInternalBoundaryProps {
+    pub fn insert(&mut self, mid: ModuleId, fid: FunId, baseline: bool, attr_id: AttrId) {
+        self.props.insert((mid, fid, baseline, attr_id));
+    }
+
+    pub fn contains(&self, mid: ModuleId, fid: FunId, baseline: bool, attr_id: AttrId) -> bool {
+        self.props.contains(&(mid, fid, baseline, attr_id))
+    }
+}
 
 /// Represents the type of numeric operations a value participates in.
 /// This forms a lattice with Bottom < Arithmetic and Bottom < Bitwise.
@@ -321,6 +350,19 @@ impl GlobalNumberOperationState {
         let ret_idx_vec =
             Self::extract_bv_vars(spec.properties.get(&symbol_pool.make(BV_RET_PROP)));
 
+        if func_env.is_pragma_true(BV_INTERNAL_PRAGMA, || false) {
+            let env = func_env.module_env.env;
+            let loc = spec.loc.clone().unwrap_or_else(|| func_env.get_id_loc());
+            if !func_env.is_opaque() {
+                env.error(
+                    &loc,
+                    "`pragma bv_internal` requires `pragma opaque`: callers must not \
+                     see the function's bitvector representation",
+                );
+            }
+            Self::check_bv_internal_spec_stays_int(func_env, spec);
+        }
+
         // Populate operation maps using the helper
         let param_map = Self::populate_operation_map(func_env.get_parameter_count(), &para_idx_vec);
         let ret_map = Self::populate_operation_map(func_env.get_return_count(), &ret_idx_vec);
@@ -330,6 +372,63 @@ impl GlobalNumberOperationState {
         self.ret_operation_map.insert(func_key, ret_map);
         self.local_oper_baseline.insert(func_key, BTreeMap::new());
         self.local_oper.insert(func_key, BTreeMap::new());
+    }
+
+    /// Check that a `bv_internal` contract stays in integer world, transitively through
+    /// spec functions. Needed for `[abstract]` conditions, which the analysis never sees.
+    fn check_bv_internal_spec_stays_int(func_env: &FunctionEnv, spec: &Spec) {
+        use move_model::ast::{ExpData, Operation};
+        let env = func_env.module_env.env;
+        let mut visited_spec_funs = BTreeSet::new();
+        let mut worklist = vec![];
+        let collect_spec = |spec: &Spec, worklist: &mut Vec<(Exp, Loc)>| {
+            for cond in &spec.conditions {
+                // `[concrete]` is verified against the body and never assumed by a caller,
+                // so it stays in the body's bitvector world.
+                // Concrete-only conditions never reach a caller; one also marked
+                // `[abstract]` still travels and must stay integer world.
+                if env
+                    .is_property_true(&cond.properties, CONDITION_CONCRETE_PROP)
+                    .unwrap_or(false)
+                    && !env
+                        .is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
+                        .unwrap_or(false)
+                {
+                    continue;
+                }
+                for exp in cond.all_exps() {
+                    worklist.push((exp.clone(), cond.loc.clone()));
+                }
+            }
+        };
+        // Boundary conditions only: `on_impl` holds inline body specs over bitvector
+        // locals.
+        collect_spec(spec, &mut worklist);
+        while let Some((exp, loc)) = worklist.pop() {
+            let mut nested = vec![];
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(_, oper, _) = e {
+                    match oper {
+                        Operation::BitOr
+                        | Operation::BitAnd
+                        | Operation::Xor
+                        | Operation::Int2Bv => {
+                            env.error(&loc, BV_INTERNAL_SPEC_BITWISE_MSG);
+                        },
+                        Operation::SpecFunction(mid, sid, _) => {
+                            if visited_spec_funs.insert((*mid, *sid)) {
+                                if let Some(body) = &env.get_module(*mid).get_spec_fun(*sid).body {
+                                    nested.push((body.clone(), loc.clone()));
+                                }
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+                true
+            });
+            worklist.append(&mut nested);
+        }
     }
 
     /// Create the initial NumOperation state for a struct.

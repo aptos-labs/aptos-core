@@ -1,0 +1,15 @@
+# A logical model of Move bytecode: stackless IR, execution semantics, prover
+# stages, and the masm/Move-source frontend.  Depends on nothing in `Move`.
+name = "move-model"
+defaultTargets = ["MoveModel"]
+testDriver = "MoveModelTests"
+
+[[lean_lib]]
+name = "MoveModel"
+
+# Interpreter, IR, frontend, and prover regressions, in this library's own
+# namespace.  The frontend-embedding tests (`masm%`/`move%`) run the Aptos CLI
+# (`aptos move exchange`) at elaboration time, hence not a default target.
+[[lean_lib]]
+name = "MoveModelTests"
+roots = ["MoveModel.Tests"]

@@ -8,8 +8,8 @@ use crate::{
     failpoint::fail_point_poem,
     page::Page,
     response::{
-        BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-        InternalError,
+        pruned_or_internal_error, BadRequestError, BasicErrorWith404, BasicResponse,
+        BasicResponseStatus, BasicResultWith404, InternalError,
     },
     ApiTags,
 };
@@ -169,13 +169,7 @@ impl EventsApi {
                 ledger_version,
             )
             .context(format!("Failed to find events by key {}", event_key))
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &latest_ledger_info,
-                )
-            })?;
+            .map_err(|err| pruned_or_internal_error(err, &latest_ledger_info))?;
 
         match accept_type {
             AcceptType::Json => {

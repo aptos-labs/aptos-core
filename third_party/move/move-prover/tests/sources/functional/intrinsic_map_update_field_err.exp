@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: cannot update a field of an intrinsic map type in a specification
+   ┌─ tests/sources/functional/intrinsic_map_update_field_err.move:19:27
+   │
+19 │         ensures result == update_field(result, dummy, false);
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

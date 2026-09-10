@@ -1,0 +1,24 @@
+processed 13 tasks
+task 0 lines 1-101:  publish [import Move]
+task 1 lines 103-103:  run 0x0::LeanerGenerics::round_trip --args 37u64
+return values: 37
+task 2 lines 105-105:  run 0x0::LeanerGenerics::enum_round_trip --args 19u64
+return values: 19
+task 3 lines 107-107:  run 0x0::LeanerGenerics::swap_first --args 3u64 41u64
+return values: 41
+task 4 lines 109-109:  run 0x0::LeanerGenerics::generic_vector_length --args 23u64
+return values: 1
+task 5 lines 111-111:  run 0x0::LeanerGenerics::equal_u64 --args 17u64 17u64
+return values: true
+task 6 lines 113-116:  run 0x0::LeanerGenerics::equal_u64 --args 17u64 18u64 [-- The same generic resource at two instantiations must occupy distinct]
+return values: false
+task 7 lines 117-117:  run --args 29u64 --signers 0x42 -- 0x0::LeanerGenerics::publish_u64
+task 8 lines 119-119:  run --args true --signers 0x42 -- 0x0::LeanerGenerics::publish_bool
+task 9 lines 121-121:  run 0x0::LeanerGenerics::has_u64 --args @0x42
+return values: true
+task 10 lines 123-123:  run 0x0::LeanerGenerics::has_bool --args @0x42
+return values: true
+task 11 lines 125-125:  run 0x0::LeanerGenerics::take_u64 --args @0x42
+return values: 29
+task 12 lines 127-127:  run 0x0::LeanerGenerics::take_bool --args @0x42
+return values: true

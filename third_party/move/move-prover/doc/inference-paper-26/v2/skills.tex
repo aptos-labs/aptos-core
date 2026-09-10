@@ -1,0 +1,30 @@
+% !TEX root = main.tex
+\Section{Tactics and Skills}
+\label{sec:skills}
+
+The agentic side of the workflow is delivered as a plugin to a general-purpose coding agent: skills that instruct it, hooks that check generated Move as it is written, and the Move toolchain exposed as tools it can call. The setup is at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}; we summarize the design.
+
+\Paragraph{Inference tactics}
+Inference runs in one of three \emph{tactics}, which differ in whether the \WP tool is available and who decides when to use it.
+\begin{Itemize}
+\item \emph{agent-only:} \WP is unavailable. The contract and any loop invariants are derived directly from the implementation and the contracts of its dependencies, checked as the work proceeds.
+\item \emph{hybrid-guided:} the workflow of Sec.~\ref{sec:example}, prescribed as a fixed order --- run \WP over the scope, take one warned function and write an invariant from the bounded loop-head facts, rerun \WP on that function alone until the warning is gone, simplify what \WP derived, then check.
+\item \emph{hybrid-flexible:} \WP is available as one inference pass among others, and the agent decides whether and when to call it and how to combine it with its own reasoning.
+\end{Itemize}
+
+\Paragraph{Skills}
+A tactic selects the \emph{plan} --- the sequence of tasks and which of them consult \WP --- and nothing else. Everything a tactic would otherwise have to rediscover is shared reference material, identical in all three tactics: the specification language, the rules for writing and editing specs, the verification sub-workflow, and the toolchain's capabilities and limits. Only the description of the \WP tool itself is withheld where the tool is absent; the underlying idea of backward reasoning, and what a loop without an invariant costs, is background every tactic receives.
+
+Three areas of that guidance carry most of the weight.
+\begin{Itemize}
+\item \emph{Loop invariants:} when to introduce recursive helper functions for iterative quantities, and when to prefer state-level invariants on resources --- assumed by the prover at every call site, including each loop iteration --- over per-loop inductive arguments.
+\item \emph{Simplification:} discard vacuous conditions; replace unbounded quantifiers, a frequent source of SMT timeouts, with bounded or closed-form equivalents; and require trigger annotations on the surviving ones.
+\item \emph{Timeout resolution:} a hierarchy of escalations --- strengthen state-level invariants, then introduce spec helpers, then lemmas, then explicit proof scripts --- with a strict prohibition on weakening abort or postconditions to silence a timeout, since this trades a real property for the appearance of progress.
+\end{Itemize}
+\noindent
+Independently of the tactic, every emitted condition is tagged with an \texttt{[inferred]} marker, so that re-runs are idempotent and never disturb user-written specifications.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

@@ -146,11 +146,6 @@ impl ExpTranslator<'_, '_, '_> {
         let abort_arg = match rest.len() {
             0 => {
                 // assert!(cond)
-                self.check_language_version(
-                    &self.to_loc(&loc),
-                    "single-argument `assert!` macro",
-                    LanguageVersion::V2_0,
-                );
                 sp(
                     loc,
                     Exp_::Value(sp(loc, Value_::U64(UNSPECIFIED_ABORT_CODE))),

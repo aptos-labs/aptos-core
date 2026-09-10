@@ -1,30 +1,57 @@
-{# Inference tasks — composable: includes verification tasks inline #}
+{# Only treatment-specific orchestration belongs here; WP semantics live in wp_tool.md. #}
 {% if once(name="spec_inf_tasks") %}
 
-## Inference Tasks — Execute In Order
+## Specification inference
 
-**Skip test functions.** Do not infer specs for `#[test]` or `#[test_only]`
-functions — the WP tool also skips them automatically.
+Infer a complete specification for the requested function or module.
+Preserve executable behavior and user-written specifications.
 
-**Task: Synthesize loop invariants.** For every loop lacking an invariant in a
-function matching the `filter`, add one marked as `[inferred]`. Define
-recursive spec helper functions as needed. Avoid the Common Pitfalls
-described in the reference material below.
-When using `spec_output: "file"`, add loop invariants directly in the source
-(they must stay inside the function body), but place any new spec helper
-functions and lemmas in the `.spec.move` file inside a `spec module { }` block.
+{% if tactic_selectable %}
+### Tactic
 
-**Task: Infer weakest preconditions.** With invariants in place, run the WP tool with the `filter`.
-Let the WP tool generate the specs — do not write them by hand.
+Two hybrid tactics are available; the default is
+**{{ inference_tactic | replace(from="_", to="-") }}**. An invocation may select
+`/move-inf hybrid-guided` or `/move-inf hybrid-flexible`, followed by the scope.
+Invocation arguments: `$ARGUMENTS`. Follow only the selected tactic.
+{% endif %}
+{% if inference_tactic == "agent_only" %}
+### Direct tactic
 
-**Task: Simplify inferred specs.** Apply the simplification rules from the
-reference material below. Every function must keep both `ensures` and
-`aborts_if` conditions — do not drop `aborts_if` just because it is hard
-to verify.
-When using `spec_output: "file"`, all inferred spec helper functions and
-lemmas belong in the `.spec.move` file inside a `spec module { }` block,
-and function conditions go in `spec fun_name { }` blocks in the same file.
+Derive the contract and loop invariants from the implementation and dependency
+contracts. Check one coherent candidate, then refine the rejected parts.
+{% endif %}
+{% if inference_tactic == "hybrid_flexible" or tactic_selectable %}
+### Flexible hybrid tactic{% if tactic_selectable %} (`hybrid-flexible`){% endif %}
 
-{% include "templates/verification_tasks.md" %}
+`{{ tool(name="move_package_wp") }}` is available as an inference pass. Decide
+whether and when to use it alongside direct reasoning and invariant synthesis.
+It runs on any scope, loops included. Interpret its result using **WP tool**
+below.
+{% if not args.no_wp_simplification %}
+Once the repairable warnings are resolved, simplify as much as the contract
+needs while preserving its meaning, then check the candidate.
+{% else %}
+Check the generated clauses directly; change them only to address a diagnostic.
+{% endif %}
+{% endif %}
+{% if inference_tactic == "hybrid_guided" or tactic_selectable %}
+### Guided hybrid tactic{% if tactic_selectable %} (`hybrid-guided`){% endif %}
 
+Follow this order:
+
+1. **Run WP over the requested scope**, including loops, with the requested
+   output location.
+2. **Handle its diagnostics** as described under **WP tool**. Repair missing
+   loop invariants one function at a time and rerun WP. Retain inherited callee
+   partiality; retrying the caller cannot eliminate it.
+{% if not args.no_wp_simplification %}
+3. **Simplify what WP derived** while preserving every result, abort, and frame
+   obligation. Use the simplification reference below.
+{% endif %}
+{% if args.no_wp_simplification %}3{% else %}4{% endif %}. **Check the candidate.**{% if args.no_wp_simplification %} Check the generated clauses directly.{% endif %}
+   Repair a timeout using the proof guidance. A counterexample to unmodified,
+   warning-free WP output is a tool bug; report the failing condition.
+{% endif %}
+
+{% include "templates/candidate_check.md" %}
 {% endif %}

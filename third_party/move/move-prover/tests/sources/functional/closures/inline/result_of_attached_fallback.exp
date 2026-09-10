@@ -1,0 +1,18 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/result_of_attached_fallback.move:32:13
+   │
+32 │             assert result_of<f>(x) == expected; // error: for the `wrong_expectation` caller, x + 1 != x + 2
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:37: wrong_expectation
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:41: wrong_expectation (spec)
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:37: wrong_expectation
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:26: apply_expect
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:38: wrong_expectation
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:26: apply_expect
+   =         expected = <redacted>
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:38: wrong_expectation
+   =     at tests/sources/functional/closures/inline/result_of_attached_fallback.move:32: apply_expect

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot pass a lambda to native or uninterpreted spec function `opaque_fold`
+   ┌─ tests/inline-opaque/specialize_forward_bodyless.move:17:9
+   │
+17 │         opaque_fold(f, v, init, end) // error: cannot pass a lambda to native or uninterpreted spec function
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

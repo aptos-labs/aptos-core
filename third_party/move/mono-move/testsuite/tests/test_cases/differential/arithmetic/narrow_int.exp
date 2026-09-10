@@ -8,8 +8,8 @@ fun add_u8(r0, r1): u8 {
     r2: u8
   code:
   L0:
-    0: r2 := add r0, r1
-    1: ret [r2]
+    0: r2 := add r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun sub_u8(r0, r1): u8 {
@@ -19,8 +19,8 @@ fun sub_u8(r0, r1): u8 {
     r2: u8
   code:
   L0:
-    0: r2 := sub r0, r1
-    1: ret [r2]
+    0: r2 := sub r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun mul_u8(r0, r1): u8 {
@@ -30,8 +30,8 @@ fun mul_u8(r0, r1): u8 {
     r2: u8
   code:
   L0:
-    0: r2 := mul r0, r1
-    1: ret [r2]
+    0: r2 := mul r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun add_i8(r0, r1): i8 {
@@ -41,8 +41,8 @@ fun add_i8(r0, r1): i8 {
     r2: i8
   code:
   L0:
-    0: r2 := add r0, r1
-    1: ret [r2]
+    0: r2 := add r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun sub_i8(r0, r1): i8 {
@@ -52,8 +52,8 @@ fun sub_i8(r0, r1): i8 {
     r2: i8
   code:
   L0:
-    0: r2 := sub r0, r1
-    1: ret [r2]
+    0: r2 := sub r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun negate_i8(r0): i8 {
@@ -62,8 +62,8 @@ fun negate_i8(r0): i8 {
     r1: i8
   code:
   L0:
-    0: r1 := negate r0
-    1: ret [r1]
+    0: r1 := negate r0 @1
+    1: ret [r1] @2
 }
 === micro-ops ===
 // module 0x77::narrow
@@ -72,52 +72,52 @@ fun add_u8() {
   frame_data_size: 8
   entry_gas: 17
   code:
-    0: IntAdd [2] <- [0] + u8 [1]
-    1: Move(1) [0] <- [2]
-    2: Return
+    0: IntAdd [2] <- [0] + u8 [1] @2
+    1: Move(1) [0] <- [2] @3
+    2: Return @3
 }
 
 fun sub_u8() {
   frame_data_size: 8
   entry_gas: 17
   code:
-    0: IntSub [2] <- [0] - u8 [1]
-    1: Move(1) [0] <- [2]
-    2: Return
+    0: IntSub [2] <- [0] - u8 [1] @2
+    1: Move(1) [0] <- [2] @3
+    2: Return @3
 }
 
 fun mul_u8() {
   frame_data_size: 8
   entry_gas: 17
   code:
-    0: IntMul [2] <- [0] * u8 [1]
-    1: Move(1) [0] <- [2]
-    2: Return
+    0: IntMul [2] <- [0] * u8 [1] @2
+    1: Move(1) [0] <- [2] @3
+    2: Return @3
 }
 
 fun add_i8() {
   frame_data_size: 8
   entry_gas: 17
   code:
-    0: IntAdd [2] <- [0] + i8 [1]
-    1: Move(1) [0] <- [2]
-    2: Return
+    0: IntAdd [2] <- [0] + i8 [1] @2
+    1: Move(1) [0] <- [2] @3
+    2: Return @3
 }
 
 fun sub_i8() {
   frame_data_size: 8
   entry_gas: 17
   code:
-    0: IntSub [2] <- [0] - i8 [1]
-    1: Move(1) [0] <- [2]
-    2: Return
+    0: IntSub [2] <- [0] - i8 [1] @2
+    1: Move(1) [0] <- [2] @3
+    2: Return @3
 }
 
 fun negate_i8() {
   frame_data_size: 8
   entry_gas: 17
   code:
-    0: IntNegate.i8 [1] <- -[0]
-    1: Move(1) [0] <- [1]
-    2: Return
+    0: IntNegate.i8 [1] <- -[0] @1
+    1: Move(1) [0] <- [1] @2
+    2: Return @2
 }

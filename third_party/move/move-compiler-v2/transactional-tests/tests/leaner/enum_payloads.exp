@@ -1,0 +1,26 @@
+processed 13 tasks
+task 0 lines 1-90:  publish [import Move]
+task 1 lines 92-92:  run 0x0::LeanerEnumPayloads::choose_and_score --args false 10u64
+return values: 11
+task 2 lines 94-94:  run 0x0::LeanerEnumPayloads::choose_and_score --args true 10u64
+return values: 12
+task 3 lines 96-96:  run 0x0::LeanerEnumPayloads::left_score --args 10u64
+return values: 11
+task 4 lines 98-98:  run 0x0::LeanerEnumPayloads::right_score --args 10u64
+return values: 12
+task 5 lines 100-100:  run 0x0::LeanerEnumPayloads::left_is_right --args 10u64
+return values: 0
+task 6 lines 102-102:  run 0x0::LeanerEnumPayloads::right_is_right --args 10u64
+return values: 1
+task 7 lines 104-104:  run 0x0::LeanerEnumPayloads::populated_batch
+return values: 4
+task 8 lines 106-106:  run 0x0::LeanerEnumPayloads::empty_batch
+return values: 0
+task 9 lines 108-108:  run 0x0::LeanerEnumPayloads::make_positional --args 8u64 9u64
+return values: 17
+task 10 lines 110-110:  run 0x0::LeanerEnumPayloads::make_wrapper --args 23u64
+return values: 23
+task 11 lines 112-112:  run 0x0::LeanerEnumPayloads::vector_of_enums
+return values: 7
+task 12 lines 114-114:  run 0x0::LeanerEnumPayloads::replace_enum_element
+return values: 9

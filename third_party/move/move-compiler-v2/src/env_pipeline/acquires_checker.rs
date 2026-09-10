@@ -17,7 +17,6 @@
 //!
 //! This check is enabled by flag `Experiment::ACQUIRES_CHECK`.
 
-use crate::Options;
 use codespan_reporting::diagnostic::Severity;
 use move_model::{
     ast::{AccessSpecifierKind, ExpData, Operation, ResourceSpecifier, VisitorPosition},
@@ -29,13 +28,6 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// Performs acquires checking
 pub fn acquires_checker(env: &mut GlobalEnv) {
-    let options = env
-        .get_extension::<Options>()
-        .expect("Options is available");
-    let acquires_relaxed = options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2);
     // Map of inferred acquires which need to be updated in the environment after analysis.
     // We can't do this during analysis since we keep references into env.
     let mut acquired_updates = BTreeMap::new();
@@ -55,8 +47,8 @@ pub fn acquires_checker(env: &mut GlobalEnv) {
                     continue;
                 }
                 let mut declared_acquires = get_acquired_resources(&fun_env);
-                if acquires_relaxed && declared_acquires.is_empty() {
-                    // No checking needed
+                if declared_acquires.is_empty() {
+                    // No checking needed, since `acquires` is inferred when omitted.
                     continue;
                 }
                 for (sid, acquired) in &acquires.0 {
@@ -83,15 +75,11 @@ pub fn acquires_checker(env: &mut GlobalEnv) {
                                 s_name.display(env.symbol_pool())
                             ),
                             "",
-                            if acquires_relaxed {
-                                vec![format!(
-                                    "since Move {}, `acquires` is inferred by the compiler \
-                                     and can be omitted from the function declaration.",
-                                    LanguageVersion::V2_2
-                                )]
-                            } else {
-                                vec![]
-                            },
+                            vec![format!(
+                                "since Move {}, `acquires` is inferred by the compiler \
+                                 and can be omitted from the function declaration.",
+                                LanguageVersion::V2_2
+                            )],
                             vec![label],
                         )
                     }
@@ -162,7 +150,7 @@ impl AcquiredResources {
     /// Joins the resources acquired by `other_fun`
     fn join(&mut self, other_fun: FunId, other_fun_called_at: Loc, other_acquries: &Self) -> bool {
         let mut changed = false;
-        for (sid, _) in other_acquries.0.iter() {
+        for sid in other_acquries.0.keys() {
             use std::collections::btree_map::Entry::*;
             match self.0.entry(*sid) {
                 Vacant(e) => {
@@ -229,7 +217,7 @@ impl<'a> AcquireChecker<'a> {
         let reversed_call_graph = call_graph.iter().fold(
             BTreeMap::new(),
             |mut reversed: BTreeMap<FunId, BTreeSet<FunId>>, (caller, callees)| {
-                for (callee, _) in callees.iter() {
+                for callee in callees.keys() {
                     reversed.entry(*callee).or_default().insert(*caller);
                 }
                 reversed

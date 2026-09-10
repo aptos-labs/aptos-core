@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: a function value cannot be applied in a specification; use a behavioral predicate instead (e.g. `result_of<f>(..)` for the value of `f(..)`)
+   ┌─ tests/sources/functional/bug_14762.move:33:29
+   │
+33 │             assert find ==> f(v[found_index]);
+   │                             ^^^^^^^^^^^^^^^^^

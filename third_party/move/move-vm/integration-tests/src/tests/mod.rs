@@ -3,7 +3,7 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::compiler::{as_module, compile_units};
+use crate::compiler::{as_module, compile_units_allowing_natives};
 use move_binary_format::errors::{Location, VMResult};
 use move_core_types::{
     effects::ChangeSet,
@@ -26,6 +26,7 @@ mod bad_entry_point_tests;
 mod bad_storage_tests;
 mod binary_format_version;
 mod exec_func_effects_tests;
+mod frame_cache_budget_tests;
 mod function_arg_tests;
 mod instantiation_tests;
 mod leak_tests;
@@ -38,9 +39,10 @@ mod return_value_tests;
 mod runtime_reentrancy_check_tests;
 mod vm_arguments_tests;
 
-/// Given code string, compiles it, serializes and adds to storage.
-fn compile_and_publish(storage: &mut InMemoryStorage, code: String) {
-    let mut units = compile_units(&code).unwrap();
+/// Given code string, compiles it, serializes and adds to storage. Natives are
+/// allowed at any address, for tests that register custom native tables.
+fn compile_and_publish_allowing_natives(storage: &mut InMemoryStorage, code: String) {
+    let mut units = compile_units_allowing_natives(&code).unwrap();
     let m = as_module(units.pop().unwrap());
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();

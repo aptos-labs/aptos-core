@@ -161,7 +161,7 @@ module 0x42::intermediate_states {
         (a, b)
     }
     spec test_abort_propagation {
-        // Either Counter or Config missing causes abort.
+        pragma aborts_if_is_partial;
         aborts_if !exists<Counter>(addr);
     }
 

@@ -80,7 +80,11 @@ impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
 }
 
 impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
-    fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
+    fn get_resource(
+        &self,
+        key: &InMemoryStorageKey,
+        _group: Option<InternedType>,
+    ) -> Result<StorageRead, ResourceProviderError> {
         // Cache hit?
         {
             let materialized = self.materialized.borrow();

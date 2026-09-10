@@ -1,9 +1,7 @@
-// In verification, closures capturing immutable references are only supported as
-// direct arguments of calls to retained inline-opaque functions, where the captured
-// locations are statically visible to the spec instrumentation. A reference capture
-// for any other call, or one hidden inside a struct value, is rejected by the
-// closure checker. (Modifying a captured variable is a separate error reported at
-// lambda lifting; see the compiler-v2 `inline-opaque` tests.)
+// Closures cannot capture references, also when the model is built for
+// verification. (Lambdas passed to inline functions are beta-reduced instead of
+// lifted, so they may freely use references from the enclosing scope; see
+// `hof_no_spec.move`.)
 module 0x42::ref_capture_restriction {
 
     fun regular_apply(f: |u64| u64, x: u64): u64 {

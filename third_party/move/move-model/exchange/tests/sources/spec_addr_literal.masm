@@ -1,0 +1,11 @@
+module 0x42::addrlit
+
+struct R has key
+  v: u64
+
+fun f(a: address): bool
+    ensures result == exists<R>(0x42)
+    modifies global<R>(0x42)
+    copy_loc a
+    exists R
+    ret

@@ -1,0 +1,35 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/fold_symbolic.move:102:9
+    │
+102 │         ensures result == spec_sum(v, len(v)) + 1; // error: off by one
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:97: sum_wrong
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:14: fold
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:104: sum_wrong (spec)
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:19: fold
+    =         acc = <redacted>
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:20: fold
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:21: fold
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:25: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:26: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:27: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:28: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:29: fold
+    =     enter loop, variable(s) acc, i havocked and reassigned
+    =         acc = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:26: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:27: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:28: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:29: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:22: fold
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:18: fold
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/inline/fold_symbolic.move:102: sum_wrong (spec)

@@ -301,6 +301,7 @@ impl AptosDB {
         db_dir: &StorageDirPaths,
         target_version: Version,
     ) -> Result<()> {
+        // TODO(HotState): Preserve hot state during truncation and pass its config to catch-up.
         let delete_hot_state_on_restart = true;
         let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
             Self::open_dbs(
@@ -358,13 +359,13 @@ impl AptosDB {
 
     pub(super) fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> Result<()> {
         let min_readable_version = self.ledger_pruner.get_min_readable_version();
-        ensure!(
-            version >= min_readable_version,
-            "{} at version {} is pruned, min available version is {}.",
-            data_type,
-            version,
-            min_readable_version
-        );
+        if version < min_readable_version {
+            return Err(AptosDbError::LedgerPruned {
+                data_type: data_type.to_string(),
+                version,
+                min_available_version: min_readable_version,
+            });
+        }
         Ok(())
     }
 

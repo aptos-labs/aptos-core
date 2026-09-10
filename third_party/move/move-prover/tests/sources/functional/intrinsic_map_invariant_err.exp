@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: data invariants are not supported on intrinsic map types; the map's validity is defined by its model
+   ┌─ tests/sources/functional/intrinsic_map_invariant_err.move:10:9
+   │
+10 │         invariant 0 == 0; // error: even a trivial invariant is rejected
+   │         ^^^^^^^^^^^^^^^^^

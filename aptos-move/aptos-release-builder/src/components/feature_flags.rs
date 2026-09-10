@@ -178,6 +178,8 @@ pub enum FeatureFlag {
     FunctionValueDispatch,
     DisableClosureBcsSerialization,
     LazyModuleInitialization,
+    EnableMonoMove,
+    CheckFunctionTypeAbilities,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -463,6 +465,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION
             },
             FeatureFlag::LazyModuleInitialization => AptosFeatureFlag::LAZY_MODULE_INITIALIZATION,
+            FeatureFlag::EnableMonoMove => AptosFeatureFlag::ENABLE_MONO_MOVE,
+            FeatureFlag::CheckFunctionTypeAbilities => {
+                AptosFeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES
+            },
         }
     }
 }
@@ -675,6 +681,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::DisableClosureBcsSerialization
             },
             AptosFeatureFlag::LAZY_MODULE_INITIALIZATION => FeatureFlag::LazyModuleInitialization,
+            AptosFeatureFlag::ENABLE_MONO_MOVE => FeatureFlag::EnableMonoMove,
+            AptosFeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES => {
+                FeatureFlag::CheckFunctionTypeAbilities
+            },
         }
     }
 }

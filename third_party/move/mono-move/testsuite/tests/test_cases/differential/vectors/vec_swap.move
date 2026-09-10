@@ -72,21 +72,25 @@ module 0x66::vec_swap {
 // RUN: execute 0x66::vec_swap::swap_encode --args 5, 5
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecSwap index out of bounds
+// CHECK-ERROR-PARITY
 
 // First index out of bounds, second in bounds.
 // RUN: execute 0x66::vec_swap::swap_encode --args 4, 1
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecSwap index out of bounds
+// CHECK-ERROR-PARITY
 
 // Second index out of bounds, first in bounds.
 // RUN: execute 0x66::vec_swap::swap_encode --args 1, 4
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecSwap index out of bounds
+// CHECK-ERROR-PARITY
 
 // Swap on an empty (null-pointer) vector.
 // RUN: execute 0x66::vec_swap::swap_empty --args 0, 0
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecSwap index out of bounds
+// CHECK-ERROR-PARITY
 
 // swap_remove middle: last element moves into the hole.
 // RUN: execute 0x66::vec_swap::swap_remove_encode --args 1

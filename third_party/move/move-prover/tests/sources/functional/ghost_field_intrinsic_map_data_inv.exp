@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/ghost_field_intrinsic_map_data_inv.move:11:9
+   │
+11 │         invariant v != 0;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_intrinsic_map_data_inv.move:40: bad
+   =         m = <redacted>
+   =         k = <redacted>
+   =     at tests/sources/functional/ghost_field_intrinsic_map_data_inv.move:41: bad
+   =         w = <redacted>
+   =     at tests/sources/functional/ghost_field_intrinsic_map_data_inv.move:42: bad
+   =         m = <redacted>
+   =     at tests/sources/functional/ghost_field_intrinsic_map_data_inv.move:40: bad
+   =         m = <redacted>
+   =     at tests/sources/functional/ghost_field_intrinsic_map_data_inv.move:11

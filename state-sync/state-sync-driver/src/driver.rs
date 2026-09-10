@@ -530,6 +530,7 @@ impl<
                 ))
             );
         };
+        self.storage_synchronizer.acknowledge_storage_data_error();
     }
 
     /// Checks if the node has successfully reached the sync target or duration
@@ -561,6 +562,12 @@ impl<
 
             // Yield to avoid starving the storage synchronizer threads.
             yield_now().await;
+        }
+
+        if self.storage_synchronizer.pending_storage_data_error() {
+            return Err(Error::UnexpectedError(
+                "The storage synchronizer failed while draining pending data!".into(),
+            ));
         }
 
         // If the request was to sync for a specified duration, we should only

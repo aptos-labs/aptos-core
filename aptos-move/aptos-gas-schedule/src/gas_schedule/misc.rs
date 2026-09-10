@@ -963,6 +963,18 @@ impl AbstractValueSizeGasParameters {
 
         Ok(abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into()))
     }
+
+    pub fn abstract_heap_and_value_size(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> PartialVMResult<(AbstractValueSize, AbstractValueSize)> {
+        let stack_size = self.abstract_stack_size(&val, feature_version)?;
+        let abs_size = self.abstract_value_size(val, feature_version)?;
+
+        let heap_size = abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into());
+        Ok((heap_size, abs_size))
+    }
 }
 
 /// Miscellaneous gas parameters.

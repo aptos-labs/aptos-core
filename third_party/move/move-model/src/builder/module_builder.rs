@@ -28,8 +28,9 @@ use crate::{
         SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind, UserId,
     },
     pragmas::{
-        is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
-        CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP, INTRINSIC_PRAGMA,
+        is_pragma_valid_for_block, is_property_valid_for_condition, valid_pragmas_for_block,
+        CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
+        INTRINSIC_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -218,6 +219,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     pub fn translate(&mut self, loc: Loc, module_def: EA::ModuleDefinition) {
         self.decl_ana(&module_def);
         self.def_ana(&module_def);
+        self.synthesize_validity_slots();
         self.collect_spec_block_infos(&module_def);
         let attrs = self.translate_attributes(&module_def.attributes);
         self.populate_and_finalize_env(loc, attrs);
@@ -486,6 +488,15 @@ impl ModuleBuilder<'_, '_> {
 /// # Declaration Analysis
 
 impl ModuleBuilder<'_, '_> {
+    /// Pre-declare this module's structs so a lemma signature pre-registered
+    /// before the module is analyzed can name them. `decl_ana` declares them
+    /// again on the real builder and tolerates the repeat.
+    pub(crate) fn pre_declare_structs(&mut self, module_def: &EA::ModuleDefinition) {
+        for (name, struct_def) in module_def.structs.key_cloned_iter() {
+            self.decl_ana_struct(&name, struct_def);
+        }
+    }
+
     /// Pre-register lemma declarations from spec blocks so cross-module references
     /// resolve regardless of module processing order.
     pub(crate) fn pre_register_lemma_decls(&mut self, module_def: &EA::ModuleDefinition) {
@@ -570,7 +581,15 @@ impl ModuleBuilder<'_, '_> {
 
     fn decl_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
-        if self.parent.struct_table.contains_key(&qsym) {
+        let def_loc = self.parent.to_loc(&def.loc);
+        // The same definition, pre-declared for lemma signatures, is not a
+        // duplicate; a different definition under the same name is.
+        if self
+            .parent
+            .struct_table
+            .get(&qsym)
+            .is_some_and(|entry| entry.loc != def_loc)
+        {
             self.parent.env.error(
                 &self.parent.to_loc(&name.loc()),
                 &format!("duplicate declaration of `{}`", &name.value()),
@@ -906,7 +925,9 @@ impl ModuleBuilder<'_, '_> {
             params,
             result_type,
             used_memory: BTreeSet::new(),
+            generic_used_memory: BTreeSet::new(),
             old_memory: BTreeSet::new(),
+            generic_old_memory: BTreeSet::new(),
             uninterpreted,
             is_move_fun: false,
             is_native: false,
@@ -970,6 +991,8 @@ impl ModuleBuilder<'_, '_> {
             conditions: vec![],
             properties: Default::default(),
             proof: None,
+            decreases: None,
+            recursion_group: None,
         });
     }
 
@@ -1184,13 +1207,6 @@ impl ModuleBuilder<'_, '_> {
                 if !self.parent.const_table.contains_key(&qsym) {
                     continue;
                 }
-                if !self.test_language_version(
-                    &loc,
-                    "constant definitions referring to other constants",
-                    LanguageVersion::V2_0,
-                ) {
-                    continue;
-                }
                 if visited.contains(&const_name) {
                     continue;
                 }
@@ -1262,15 +1278,15 @@ impl ModuleBuilder<'_, '_> {
             self.def_ana_fun(&name, fun_def);
         }
 
-        // TODO: we should re-visit this decision once we have high-order function ready on
-        // the compiled bytecode (i.e., file format) level. Before that, the rule is:
-        // - an inline function can have in-body spec blocks
-        // - an inline function cannot have function spec (i.e., pre/post-conditions)
-        //
-        // On the verification side:
-        // - we do not verify the correctness of in-body spec blocks in the inline function
-        // - instead, we inline these in-body spec blocks into the caller and verify these
-        //   specs in the context of caller.
+        // The rules for specs on inline functions are:
+        // - an inline function can have in-body spec blocks; they are expanded into the
+        //   caller and verified in the caller's context
+        // - an inline function without function-typed parameters can have a function spec;
+        //   in verify mode such a function is compiled to bytecode and checked against its
+        //   spec, and if it is opaque, calls are retained and use the spec at call sites
+        // - an inline function with function-typed parameters cannot have a function spec:
+        //   its spec would need to refer to the behavior of lambda arguments, which is not
+        //   supported (see move-prover/doc/dev/inline_fun_specs.md)
 
         // Analyze all module level spec blocks (except schemas)
         for spec in &module_def.specs {
@@ -1295,6 +1311,20 @@ impl ModuleBuilder<'_, '_> {
                                 &spec.value.target.value
                             {
                                 self.validate_target_signature(&fun_decl, &loc, signature);
+                            }
+
+                            if fun_decl.kind == FunctionKind::Inline
+                                && fun_decl
+                                    .params
+                                    .iter()
+                                    .any(|Parameter(_, ty, _)| ty.is_function())
+                            {
+                                self.parent.error(
+                                    &loc,
+                                    "function spec blocks are not supported for inline \
+                                     functions with function-typed parameters; those \
+                                     functions are verified at each application site",
+                                );
                             }
                         },
                         SpecBlockContext::Struct(..) | SpecBlockContext::Module => (),
@@ -1334,7 +1364,7 @@ impl ModuleBuilder<'_, '_> {
                     if let Some(kind) = self.convert_condition_kind(kind, &context) {
                         let properties = self.translate_properties(properties, &|_, _, prop| {
                             if !is_property_valid_for_condition(&kind, prop) {
-                                Some(loc.clone())
+                                Some((loc.clone(), vec![]))
                             } else {
                                 None
                             }
@@ -1671,10 +1701,9 @@ impl ModuleBuilder<'_, '_> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
-            let is_lang_version_2_1 = et.env().language_version.is_at_least(LanguageVersion::V2_1);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
                 let symbol_pool = et.parent.parent.env.symbol_pool();
-                if !is_lang_version_2_1 || symbol_pool.string(*n).as_ref() != "_" {
+                if symbol_pool.string(*n).as_ref() != "_" {
                     et.define_local(loc, *n, ty.clone(), None, Some(idx));
                 }
             }
@@ -1784,6 +1813,13 @@ impl ModuleBuilder<'_, '_> {
                                     predicates.push((range.pre, range.post, *id, None));
                                 }
                             },
+                            Operation::SpecPublish(range)
+                            | Operation::SpecRemove(range)
+                            | Operation::SpecUpdate(range) => {
+                                if range.pre.is_some() || range.post.is_some() {
+                                    predicates.push((range.pre, range.post, *id, None));
+                                }
+                            },
                             Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
                                 memory_labels.push((*label, *id));
                             },
@@ -1818,23 +1854,31 @@ impl ModuleBuilder<'_, '_> {
             if let Some(pre_name) = pre_label.and_then(&get_label_name) {
                 used_pre_labels.insert(pre_name);
             }
-            // Reject post-state labels on single-state predicates (requires_of, aborts_of).
+            // Reject post-state labels on predicates without an explicit
+            // post-state (requires_of, aborts_of, unchanged_of, folds_of).
             if post_label.is_some() {
-                if let Some(BehaviorKind::RequiresOf | BehaviorKind::AbortsOf) = behavior_kind {
-                    let kind_name = match behavior_kind.unwrap() {
-                        BehaviorKind::RequiresOf => "requires_of",
-                        BehaviorKind::AbortsOf => "aborts_of",
+                if let Some(
+                    kind @ (BehaviorKind::RequiresOf
+                    | BehaviorKind::AbortsOf
+                    | BehaviorKind::UnchangedOf
+                    | BehaviorKind::FoldsOf),
+                ) = behavior_kind
+                {
+                    let msg = match kind {
+                        BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => format!(
+                            "`{}` describes a single state and cannot have a post-state label; \
+                             only `ensures_of` and `result_of` support state transitions",
+                            kind,
+                        ),
+                        BehaviorKind::UnchangedOf | BehaviorKind::FoldsOf => format!(
+                            "`{}` implicitly relates the pre-state to the current \
+                             state and cannot have a post-state label",
+                            kind,
+                        ),
                         _ => unreachable!(),
                     };
                     let exp_loc = self.parent.env.get_node_loc(*node_id);
-                    self.parent.env.error(
-                        &exp_loc,
-                        &format!(
-                            "`{}` describes a single state and cannot have a post-state label; \
-                             only `ensures_of` and `result_of` support state transitions",
-                            kind_name,
-                        ),
-                    );
+                    self.parent.env.error(&exp_loc, &msg);
                 }
             }
         }
@@ -1943,7 +1987,7 @@ impl ModuleBuilder<'_, '_> {
                 if let Some(kind) = self.convert_condition_kind(kind, context) {
                     let properties = self.translate_properties(properties, &|_, _, prop| {
                         if !is_property_valid_for_condition(&kind, prop) {
-                            Some(loc.clone())
+                            Some((loc.clone(), vec![]))
                         } else {
                             None
                         }
@@ -2564,7 +2608,21 @@ impl ModuleBuilder<'_, '_> {
             .map(|spec| (spec.conditions.clone(), spec.properties.clone()))
             .unwrap_or_default();
 
-        // Store conditions into the existing skeleton.
+        // A `decreases` clause is the lemma's termination measure, not a
+        // condition of its synthetic function.
+        let (decreases, conditions): (Vec<_>, Vec<_>) = conditions
+            .into_iter()
+            .partition(|c| c.kind == ConditionKind::Decreases);
+        if decreases.len() > 1 {
+            self.parent.error(
+                &decreases[1].loc,
+                "at most one `decreases` clause per lemma",
+            );
+        }
+        self.lemmas[idx].decreases = decreases
+            .into_iter()
+            .next()
+            .map(|c| std::iter::once(c.exp).chain(c.additional_exps).collect());
         self.lemmas[idx].conditions = conditions;
         self.lemmas[idx].properties = properties;
 
@@ -2575,6 +2633,129 @@ impl ModuleBuilder<'_, '_> {
             let model_proof = self.def_ana_proof(&lemma_context, p, &mut proof_locals, false, true);
             self.lemmas[idx].proof = model_proof;
         }
+    }
+}
+
+/// ## Lemma Recursion Analysis
+
+impl ModuleBuilder<'_, '_> {
+    /// Whether the context is the condition block of a lemma.
+    fn is_lemma_context(&self, context: &SpecBlockContext) -> bool {
+        match context {
+            SpecBlockContext::Function(qsym) => self
+                .parent
+                .fun_table
+                .get(qsym)
+                .is_some_and(|entry| entry.kind == FunctionKind::Lemma),
+            _ => false,
+        }
+    }
+
+    /// Computes the recursion groups of this module's lemmas (strongly connected
+    /// components of the lemma application graph) and checks that every recursive
+    /// lemma has a measure of the group's arity. `forall ... apply` of a lemma from
+    /// the same group is rejected: it has no decreasing instance to check.
+    fn analyze_lemma_recursion(&mut self) {
+        use petgraph::{algo::tarjan_scc, graph::DiGraph};
+        let module_id = self.module_id;
+        let mut graph = DiGraph::<(), ()>::new();
+        let nodes: Vec<_> = self.lemmas.iter().map(|_| graph.add_node(())).collect();
+        let applies: Vec<Vec<(Loc, usize, bool)>> = self
+            .lemmas
+            .iter()
+            .map(|lemma| {
+                let mut applies = vec![];
+                if let Some(proof) = &lemma.proof {
+                    collect_lemma_applies(proof, &mut applies);
+                }
+                applies
+                    .into_iter()
+                    .filter(|(_, qid, _)| qid.module_id == module_id)
+                    .map(|(loc, qid, forall)| (loc, qid.id.as_usize(), forall))
+                    .collect()
+            })
+            .collect();
+        for (from, applies) in applies.iter().enumerate() {
+            for (_, to, _) in applies {
+                graph.add_edge(nodes[from], nodes[*to], ());
+            }
+        }
+        for (group, members) in tarjan_scc(&graph).into_iter().enumerate() {
+            let members: Vec<usize> = members.into_iter().map(|n| n.index()).collect();
+            let recursive = members.len() > 1
+                || applies[members[0]]
+                    .iter()
+                    .any(|(_, to, _)| *to == members[0]);
+            if !recursive {
+                continue;
+            }
+            // The first declared member fixes the group's arity.
+            let reference = *members.iter().min().expect("non-empty component");
+            let arity = self.lemmas[reference].measure_arity();
+            for &idx in &members {
+                self.lemmas[idx].recursion_group = Some(group);
+                let lemma = &self.lemmas[idx];
+                let name = lemma.name.display(self.symbol_pool()).to_string();
+                if lemma.measure_arity() == 0 {
+                    self.parent.error(
+                        &lemma.loc,
+                        &format!(
+                            "recursive lemma `{}` needs a `decreases` clause: it has no integer \
+                             parameter to use as the default measure",
+                            name
+                        ),
+                    );
+                } else if lemma.measure_arity() != arity {
+                    self.parent.error(
+                        &lemma.loc,
+                        &format!(
+                            "lemma `{}` has a measure of {} component(s), but its recursion \
+                             group uses {}",
+                            name,
+                            lemma.measure_arity(),
+                            arity
+                        ),
+                    );
+                }
+                for (loc, to, forall) in &applies[idx] {
+                    if *forall && members.contains(to) {
+                        self.parent.error(
+                            loc,
+                            "`forall ... apply` cannot apply a lemma from the same recursion \
+                             group; use `apply` at a decreasing instance",
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Collects the lemma applications in a proof: (location, lemma, is forall-apply).
+fn collect_lemma_applies(
+    proof: &Proof,
+    out: &mut Vec<(Loc, crate::model::QualifiedId<LemmaId>, bool)>,
+) {
+    match proof {
+        Proof::Apply(loc, qid, _) => out.push((loc.clone(), *qid, false)),
+        Proof::ForallApply(loc, _, _, qid, _, _) => out.push((loc.clone(), *qid, true)),
+        Proof::IfElse(_, _, then_p, else_p) => {
+            collect_lemma_applies(then_p, out);
+            if let Some(else_p) = else_p {
+                collect_lemma_applies(else_p, out);
+            }
+        },
+        Proof::Block(_, proofs) => {
+            for p in proofs {
+                collect_lemma_applies(p, out);
+            }
+        },
+        Proof::Post(_, inner) => collect_lemma_applies(inner, out),
+        Proof::Let(..)
+        | Proof::Assert(..)
+        | Proof::Assume(..)
+        | Proof::Calc(..)
+        | Proof::Split(..) => {},
     }
 }
 
@@ -2653,7 +2834,13 @@ impl ModuleBuilder<'_, '_> {
     ) {
         let mut properties = self.translate_properties(properties, &|symbols, bag, prop| {
             if !is_pragma_valid_for_block(symbols, bag, context, prop) {
-                Some(loc.clone())
+                let valid = valid_pragmas_for_block(context);
+                let notes = if valid.is_empty() {
+                    vec!["this specification block accepts no pragmas".to_string()]
+                } else {
+                    vec![format!("valid pragmas here are: {}", valid.join(", "))]
+                };
+                Some((loc.clone(), notes))
             } else {
                 None
             }
@@ -2675,8 +2862,8 @@ impl ModuleBuilder<'_, '_> {
         check_prop: &F,
     ) -> PropertyBag
     where
-        // Returns the location if not valid
-        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<Loc>,
+        // Returns the location and explanatory notes if not valid
+        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<(Loc, Vec<String>)>,
     {
         let mut props = PropertyBag::default();
         for prop in properties {
@@ -2691,14 +2878,15 @@ impl ModuleBuilder<'_, '_> {
         prop: &EA::PragmaProperty,
         check_prop: &F,
     ) where
-        // Returns the location if not valid
-        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<Loc>,
+        // Returns the location and explanatory notes if not valid
+        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<(Loc, Vec<String>)>,
     {
         let prop_str = prop.value.name.value.as_str();
-        if let Some(loc) = check_prop(self.symbol_pool(), bag, prop_str) {
-            self.parent.error(
+        if let Some((loc, notes)) = check_prop(self.symbol_pool(), bag, prop_str) {
+            self.parent.error_with_notes(
                 &loc,
                 &format!("property `{}` is not valid in this context", prop_str),
+                notes,
             );
             return;
         }
@@ -3047,6 +3235,7 @@ impl ModuleBuilder<'_, '_> {
             Function(name) => {
                 let entry = self.parent.fun_table.get(name).expect("function defined");
                 cond.kind.allowed_on_fun_decl(entry.visibility)
+                    || (entry.kind == FunctionKind::Lemma && cond.kind == ConditionKind::Decreases)
             },
             FunctionCodeV2(.., from_lambda) => {
                 if from_lambda.is_some() {
@@ -3114,33 +3303,62 @@ impl ModuleBuilder<'_, '_> {
             cond.exp.visit_post_order(&mut visitor);
         } else if !context.allow_old() {
             let name = context.name().expect("should have name");
-            // Restrict accesses to function arguments only for `old(..)` in in-spec block
+            // For `old(..)` in an inline spec block, restrict the wrapped
+            // expression to function parameters and global state: local
+            // variables have no value at function entry. Everything built
+            // from parameters, `global`/`exists` reads, selections thereof,
+            // and pure operations is admissible.
             let entry = self.parent.fun_table.get(name).expect("function defined");
+            let param_count = entry.params.len();
+            // Variables bound within the condition itself (quantifiers, lets,
+            // lambdas) are rigid values, not state-dependent: `old(..)`
+            // reinterprets only state reads. Only occurrences free in the
+            // whole condition refer to locals of the enclosing function.
+            let mut free_occurrences = BTreeSet::new();
+            cond.exp.visit_free_local_vars(|id, _sym| {
+                free_occurrences.insert(id);
+            });
             let mut visitor = |e: &ExpData| {
                 if let ExpData::Call(_, Operation::Old, args) = e {
                     let arg = &args[0];
-                    match args[0].as_ref() {
-                        ExpData::Temporary(_, idx) if *idx < entry.params.len() => (),
-                        _ => {
-                            let label_cond = (
-                                cond.loc.clone(),
-                                "only a function parameter is allowed in old(..) expressions \
-                                in inline spec block"
-                                    .to_owned(),
-                            );
-                            let label_exp = (
-                                self.parent.env.get_node_loc(arg.node_id()),
-                                "this expression is not a function parameter".to_owned(),
-                            );
-                            self.parent.env.diag_with_labels(
-                                Severity::Error,
-                                loc,
-                                "invalid old(..) expression in inline spec block",
-                                vec![label_cond, label_exp],
-                            );
-                            ok = false;
-                        },
-                    };
+                    let mut offender = None;
+                    arg.visit_pre_order(&mut |sub| {
+                        if offender.is_some() {
+                            return false;
+                        }
+                        match sub {
+                            ExpData::LocalVar(id, _) if free_occurrences.contains(id) => {
+                                offender = Some(*id);
+                                false
+                            },
+                            ExpData::Temporary(id, idx) if *idx >= param_count => {
+                                offender = Some(*id);
+                                false
+                            },
+                            _ => true,
+                        }
+                    });
+                    if let Some(offender_id) = offender {
+                        let label_cond = (
+                            cond.loc.clone(),
+                            "only function parameters and global state can be used \
+                            in old(..) in inline spec blocks"
+                                .to_owned(),
+                        );
+                        let label_exp = (
+                            self.parent.env.get_node_loc(offender_id),
+                            "this refers to a local variable, which has no value \
+                            at function entry"
+                                .to_owned(),
+                        );
+                        self.parent.env.diag_with_labels(
+                            Severity::Error,
+                            loc,
+                            "invalid old(..) expression in inline spec block",
+                            vec![label_cond, label_exp],
+                        );
+                        ok = false;
+                    }
                 }
                 true // continue visit, note all problematic subexprs
             };
@@ -3301,13 +3519,41 @@ impl ModuleBuilder<'_, '_> {
         exp: &EA::Exp,
         additional_exps: &[EA::Exp],
     ) {
-        if matches!(kind, ConditionKind::Decreases | ConditionKind::SucceedsIf) {
+        if matches!(kind, ConditionKind::SucceedsIf)
+            || (kind == ConditionKind::Decreases && !self.is_lemma_context(context))
+        {
             self.parent.error(loc, "condition kind is not supported");
             return;
         }
         let expected_type = self.expected_type_for_condition(&kind);
         let mut et = self.exp_translator_for_context(loc, context, &kind);
         let (translated, translated_additional) = match kind {
+            ConditionKind::Decreases => {
+                // `decreases e` or `decreases (e1, ..., en)`: integer components.
+                if !additional_exps.is_empty() {
+                    et.error(loc, "additional expressions not allowed with `decreases`");
+                }
+                let (_, translated) = et.translate_exp_free(exp);
+                let mut components = match translated {
+                    ExpData::Call(_, Operation::Tuple, items) => items,
+                    other => vec![other.into_exp()],
+                };
+                if components.is_empty() {
+                    et.error(loc, "`decreases` requires at least one component");
+                    return;
+                }
+                for component in &components {
+                    let ty = et.get_node_type(component.node_id());
+                    if !ty.is_number() {
+                        et.error(
+                            &et.env().get_node_loc(component.node_id()),
+                            "`decreases` components must be integers",
+                        );
+                    }
+                }
+                let first = components.remove(0);
+                (first, components)
+            },
             ConditionKind::AbortsIf => (
                 et.translate_exp(exp, &expected_type).into_exp(),
                 additional_exps
@@ -4062,6 +4308,111 @@ impl ModuleBuilder<'_, '_> {
             .clear();
     }
 
+    /// Backend-synthesized iterator-validity slots. Binding a validity
+    /// predicate role (`map_spec_iter_valid`, `map_spec_leaf_iter_valid`, or
+    /// `map_spec_iter_preserved`) gives the intrinsic map — and, for the
+    /// per-iterator predicates, the predicate's iterator enum — a hidden
+    /// ghost field named `$validity`. The name is not spellable in Move
+    /// source, so no user spec can read, write, initialize, or constrain the
+    /// slot; the ghost machinery (carrier representation, fresh-at-pack,
+    /// havoc on structural mutation, equality exclusion) carries it, and the
+    /// role templates define the predicates over it.
+    fn synthesize_validity_slots(&mut self) {
+        use crate::pragmas::{
+            INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED, INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+            INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+        };
+        let hidden = self.symbol_pool().make("$validity");
+        let mut to_stamp: Vec<QualifiedSymbol> = vec![];
+        let mut bad_roles: Vec<(&'static str, Loc)> = vec![];
+        for decl in &self.parent.intrinsics {
+            if decl.get_move_type().module_id != self.module_id {
+                continue;
+            }
+            let mut any = false;
+            for role in [
+                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+            ] {
+                let Some(sf_qid) = decl.lookup_spec_fun(self.parent.env, role) else {
+                    continue;
+                };
+                any = true;
+                // The iterator enum is the predicate's first parameter; it
+                // must live in this module so its slot can be synthesized
+                // here. Full signature validation happens at mono analysis.
+                let (iter_qsym, sf_loc) = if sf_qid.module_id == self.module_id {
+                    let sf = &self.spec_funs[sf_qid.id.as_usize()];
+                    let qsym = match sf.params.first() {
+                        Some(Parameter(_, Type::Struct(mid, sid, _), _))
+                            if *mid == self.module_id =>
+                        {
+                            Some(QualifiedSymbol {
+                                module_name: self.module_name.clone(),
+                                symbol: sid.symbol(),
+                            })
+                        },
+                        _ => None,
+                    };
+                    (qsym, sf.loc.clone())
+                } else {
+                    let sf_loc = self
+                        .parent
+                        .env
+                        .get_module(sf_qid.module_id)
+                        .get_spec_fun(sf_qid.id)
+                        .loc
+                        .clone();
+                    (None, sf_loc)
+                };
+                match iter_qsym {
+                    Some(qsym) => to_stamp.push(qsym),
+                    None => bad_roles.push((role, sf_loc)),
+                }
+            }
+            if decl
+                .lookup_spec_fun(self.parent.env, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED)
+                .is_some()
+            {
+                any = true;
+            }
+            if any {
+                to_stamp.push(QualifiedSymbol {
+                    module_name: self.module_name.clone(),
+                    symbol: decl.get_move_type().id.symbol(),
+                });
+            }
+        }
+        for (role, loc) in bad_roles {
+            self.parent.env.error(
+                &loc,
+                &format!(
+                    "the first parameter of a `{}` binding must be an iterator \
+                     type declared in the same module as the map",
+                    role
+                ),
+            );
+        }
+        for qsym in to_stamp {
+            let Some(entry) = self.parent.struct_table.get_mut(&qsym) else {
+                continue;
+            };
+            if entry.ghost_fields.contains_key(&hidden) {
+                continue;
+            }
+            let offset = entry.ghost_fields.len();
+            entry.ghost_fields.insert(hidden, FieldData {
+                name: hidden,
+                loc: entry.loc.clone(),
+                offset,
+                variant: None,
+                ty: Type::Primitive(PrimitiveType::Num),
+                is_ghost: true,
+                init: None,
+            });
+        }
+    }
+
     /// Post-definition-analysis check of all ghost field types in this
     /// module for recursion through runtime fields. Rejecting ghosts whose
     /// type reaches back to the enclosing struct keeps the generated Boogie
@@ -4310,6 +4661,9 @@ impl ModuleBuilder<'_, '_> {
                 );
                 return;
             }
+            // Read-only-ness of intrinsic-map ghosts is checked in spec
+            // instrumentation, where the intrinsics annotation is complete
+            // even for same-module declarations.
             // Bitwise operators on the RHS produce bitvector-typed Boogie
             // expressions, but ghost fields are declared as unbounded integer
             // in Boogie (they are model-only and don't participate in
@@ -4526,7 +4880,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     if let Some(kind) = self.convert_condition_kind(kind, &context) {
                         let properties = self.translate_properties(properties, &|_, _, prop| {
                             if !is_property_valid_for_condition(&kind, prop) {
-                                Some(member_loc.clone())
+                                Some((member_loc.clone(), vec![]))
                             } else {
                                 None
                             }
@@ -5324,18 +5678,22 @@ impl ModuleBuilder<'_, '_> {
             // New struct in this module
             let spec = self.struct_specs.remove(&name.symbol).unwrap_or_default();
             // Intrinsic types have no generated Boogie datatype to carry
-            // ghost constructor arguments; reject ghosts on them. This is
-            // the earliest point where the intrinsic pragma is reliably
-            // known (spec blocks are fully analyzed).
-            if !entry.ghost_fields.is_empty()
-                && spec
-                    .properties
-                    .contains_key(&self.parent.env.symbol_pool().make(INTRINSIC_PRAGMA))
-            {
-                for f in entry.ghost_fields.values() {
-                    self.parent
-                        .env
-                        .error(&f.loc, "ghost fields are not supported on intrinsic types");
+            // ghost constructor arguments; reject ghosts on them — except
+            // intrinsic MAP types, which gain a carrier datatype. This is the
+            // earliest point where the intrinsic pragma is reliably known.
+            if !entry.ghost_fields.is_empty() {
+                let pool = self.parent.env.symbol_pool();
+                if spec.properties.contains_key(&pool.make(INTRINSIC_PRAGMA)) {
+                    for f in entry.ghost_fields.values() {
+                        // Backend-synthesized validity slots carry unspellable
+                        // `$`-names and exist precisely for intrinsic maps.
+                        if pool.string(f.name).starts_with('$') {
+                            continue;
+                        }
+                        self.parent
+                            .env
+                            .error(&f.loc, "ghost fields are not supported on intrinsic types");
+                    }
                 }
             }
             let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();
@@ -5457,9 +5815,11 @@ impl ModuleBuilder<'_, '_> {
                 result_type: entry.result_type.clone(),
                 access_specifiers,
                 fun_param_access_of,
-                spec_used_memory: BTreeSet::new(),
-                spec_old_memory: BTreeSet::new(),
-                spec_uses_old: false,
+                spec_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_uses_old: std::cell::Cell::new(false),
                 acquired_structs: None,
                 spec: spec.into(),
                 def,
@@ -5468,6 +5828,8 @@ impl ModuleBuilder<'_, '_> {
             };
             function_data.insert(fun_id, data);
         }
+
+        self.analyze_lemma_recursion();
 
         // Create synthetic FunctionData entries for lemma declarations so they are visible
         // to the prover pipeline via `get_functions()`. They have `def: None` and
@@ -5497,9 +5859,11 @@ impl ModuleBuilder<'_, '_> {
                 result_type: Type::unit(),
                 access_specifiers: None,
                 fun_param_access_of: vec![],
-                spec_used_memory: BTreeSet::new(),
-                spec_old_memory: BTreeSet::new(),
-                spec_uses_old: false,
+                spec_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_uses_old: std::cell::Cell::new(false),
                 acquired_structs: None,
                 spec: spec.into(),
                 def: None,

@@ -1,0 +1,50 @@
+Move prover returns: exiting with compilation errors
+error: the lambda's result depends on global state, which cannot be anchored in a value position; use `ensures_of` with an explicit result argument instead
+   ┌─ tests/sources/functional/closures/inline/result_of_attached_state.move:25:27
+   │
+25 │             assert res == result_of<f>(x) + 1; // error: the lambda's result depends on global state
+   │                           ^^^^^^^^^^^^^^^
+   ·
+31 │         bump_then_apply(|y| R[a].v + y spec { ensures result == old(R[a].v) + y; }, a, x)
+   │         ---------------------------------------------------------------------------------
+   │         │               │
+   │         │               lambda argument
+   │         from a call inlined at this callsite
+
+error: the lambda's result depends on global state, which cannot be anchored in a value position; use `ensures_of` with an explicit result argument instead
+   ┌─ tests/sources/functional/closures/inline/result_of_attached_state.move:47:31
+   │
+47 │             assert res + 1 == result_of<f>(x); // error: the lambda's result depends on global state
+   │                               ^^^^^^^^^^^^^^^
+   ·
+54 │         apply_then_bump(|y| R[a].v + y spec { ensures result == R[a].v + y; }, a, x)
+   │         ----------------------------------------------------------------------------
+   │         │               │
+   │         │               lambda argument
+   │         from a call inlined at this callsite
+
+error: the lambda's result depends on global state, which cannot be anchored in a value position; use `ensures_of` with an explicit result argument instead
+   ┌─ tests/sources/functional/closures/inline/result_of_attached_state.move:47:31
+   │
+47 │             assert res + 1 == result_of<f>(x); // error: the lambda's result depends on global state
+   │                               ^^^^^^^^^^^^^^^
+   ·
+62 │         apply_then_bump(|y| R[a].v + y, a, x)
+   │         -------------------------------------
+   │         │               │
+   │         │               lambda argument
+   │         from a call inlined at this callsite
+
+error: the lambda's result depends on global state, which cannot be anchored in a value position; use `ensures_of` with an explicit result argument instead
+   ┌─ tests/sources/functional/closures/inline/result_of_attached_state.move:47:31
+   │
+47 │               assert res + 1 == result_of<f>(x); // error: the lambda's result depends on global state
+   │                                 ^^^^^^^^^^^^^^^
+   ·
+77 │ ╭         apply_then_bump(
+78 │ │             |y| read_r(a) + y spec { ensures result == result_of<read_r>(a) + y; },
+   │ │             ---------------------------------------------------------------------- lambda argument
+79 │ │             a,
+80 │ │             x,
+81 │ │         )
+   │ ╰─────────' from a call inlined at this callsite

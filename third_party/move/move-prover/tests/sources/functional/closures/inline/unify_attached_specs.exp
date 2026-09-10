@@ -1,0 +1,39 @@
+Move prover returns: exiting with verification errors
+error: induction case of the loop invariant does not hold
+   ┌─ tests/sources/functional/closures/inline/unify_attached_specs.move:24:13
+   │
+24 │             invariant acc == spec_fold(f, v, init, i); // error: for the `sum_attached_wrong` caller, the attached spec disagrees with the lambda's body
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:39: sum_attached_wrong
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:14: fold
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:15: fold
+   =         acc = <redacted>
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:16: fold
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:17: fold
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:21: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:22: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:23: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:24: fold
+   =     enter loop, variable(s) acc, i havocked and reassigned
+   =         acc = <redacted>
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:22: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:23: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:24: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:18: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:19: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:40: sum_attached_wrong
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:19: fold
+   =         acc = <redacted>
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:20: fold
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:18: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:22: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:23: fold
+   =     at tests/sources/functional/closures/inline/unify_attached_specs.move:24: fold

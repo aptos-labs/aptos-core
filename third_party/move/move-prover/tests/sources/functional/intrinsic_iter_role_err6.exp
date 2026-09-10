@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_iter_borrow_mut` function must take its iterator enum by value as the first parameter
+   ┌─ tests/sources/functional/intrinsic_iter_role_err6.move:18:5
+   │
+18 │     native fun ibm<K: copy + drop, V>(it: &mut Iter<K>, m: &mut Map<K, V>): &mut V;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

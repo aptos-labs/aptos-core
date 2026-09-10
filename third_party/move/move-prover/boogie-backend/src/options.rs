@@ -8,7 +8,7 @@ use itertools::Itertools;
 use move_command_line_common::env::{read_bool_env_var, read_env_var};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::{process::Command, time::Duration};
 
 /// Default flags passed to boogie. Additional flags will be added to this via the -B option.
 const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
@@ -21,6 +21,16 @@ const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
 const MOD_SET_ANALYSIS_LEGACY_FLAG: &str = "-doModSetAnalysis";
 
 const MOD_SET_ANALYSIS_NEW_FLAG_SINCE_3_5_1: &str = "-inferModifies";
+
+fn parse_seed_handoff_ratio(value: &str) -> Result<f64, String> {
+    let ratio = value
+        .parse::<f64>()
+        .map_err(|_| "seed handoff ratio must be a number".to_string())?;
+    if !ratio.is_finite() || !(0.0..=1.0).contains(&ratio) {
+        return Err("seed handoff ratio must be between 0 and 1".to_string());
+    }
+    Ok(ratio)
+}
 
 /// Versions for boogie, z3, and cvc5. The upgrade of boogie and z3 is mostly backward compatible,
 /// but not always. Setting the max version allows Prover to warn users for the higher version of
@@ -44,6 +54,9 @@ pub enum VectorTheory {
     SmtArrayExt,
     SmtSeq,
 }
+
+/// Reported wherever timeout analysis meets a non-Z3 solver selection.
+const NOT_Z3_BACKEND: &str = "--timeout-analysis is only supported with the Z3 backend";
 
 impl VectorTheory {
     pub fn is_extensional(&self) -> bool {
@@ -143,16 +156,10 @@ pub struct BoogieOptions {
     /// A seed for the prover.
     #[arg(short = 'S', long = "seed", default_value_t = 1)]
     pub random_seed: usize,
-    /// The number of cores to use for parallel processing of verification conditions.
-    #[arg(long = "cores", default_value_t = 4)]
+    /// The maximum number of Boogie processes to run concurrently. Can also be set with
+    /// `MVP_PROC_CORES`.
+    #[arg(long = "cores", default_value_t = 4, env = "MVP_PROC_CORES")]
     pub proc_cores: usize,
-    /// The number of shards to split the verification problem into.
-    #[arg(skip)]
-    pub shards: usize,
-    /// If there are shards, specifies to only run the given shard. Shards are numbered
-    /// starting at 1.
-    #[arg(skip)]
-    pub only_shard: Option<usize>,
     /// A (soft) timeout for the solver, per verification condition, in seconds.
     #[arg(short = 'T', long = "timeout", default_value_t = 40)]
     pub vc_timeout: usize,
@@ -168,19 +175,44 @@ pub struct BoogieOptions {
     /// Lazy threshold for quantifier instantiation.
     #[arg(long, default_value_t = 100)]
     pub lazy_threshold: usize,
+    /// Whether to leave Z3's quantifier-instantiation thresholds at their
+    /// solver defaults instead of passing explicit Boogie overrides.
+    #[arg(skip)]
+    pub use_solver_default_qi_thresholds: bool,
     /// Whether to use the new Boogie `{:debug ..}` attribute for tracking debug values.
     #[arg(long)]
     pub stable_test_output: bool,
+    /// Whether to replay timed-out Z3 queries with lightweight solver profiling
+    /// enabled. On by default: a timeout that reports only an exhausted budget
+    /// says nothing about why, and the replay costs a bounded solver run on a
+    /// path that has already failed. Opt out with `--timeout-analysis=false`.
+    #[arg(
+        long,
+        default_value_t = true,
+        action = clap::ArgAction::Set,
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
+    )]
+    pub timeout_analysis: bool,
     /// Number of Boogie instances to be run concurrently.
     #[arg(long, default_value_t = 1)]
     pub num_instances: usize,
     /// Whether to run Boogie instances sequentially.
     #[arg(skip)]
     pub sequential_task: bool,
+    /// Fraction of a VC's soft timeout after which to start the implicit fallback seed.
+    /// Zero disables the early fallback.
+    #[arg(long, default_value_t = 2.0 / 3.0, value_parser = parse_seed_handoff_ratio)]
+    pub seed_handoff_ratio: f64,
     /// A hard timeout for boogie execution; if the process does not terminate within
     /// this time frame, it will be killed. Zero for no timeout.
     #[arg(skip)]
     pub hard_timeout_secs: u64,
+    /// A deadline for the entire verification request. This is an embedding-only
+    /// safeguard; zero leaves package verification unbounded.
+    #[arg(skip)]
+    pub package_timeout_secs: u64,
     /// Whether to skip verification of type instantiations of functions. This may miss
     /// some verification conditions if different type instantiations can create
     /// different behavior via type reflection or storage access, but can speed up
@@ -213,6 +245,10 @@ pub struct BoogieOptions {
     /// condition.
     #[arg(long, default_value_t = 5)]
     pub error_limit: usize,
+    /// Maximum verifier errors retained for an entire package. Zero disables
+    /// this embedding-only safeguard.
+    #[arg(skip)]
+    pub package_error_limit: usize,
 }
 
 impl Default for BoogieOptions {
@@ -232,17 +268,19 @@ impl Default for BoogieOptions {
             serialize_bound: 0,
             random_seed: 1,
             proc_cores: 4,
-            shards: 1,
-            only_shard: None,
             vc_timeout: 40,
             global_timeout_overwrite: true,
             keep_artifacts: false,
             eager_threshold: 100,
             lazy_threshold: 100,
+            use_solver_default_qi_thresholds: false,
             stable_test_output: false,
+            timeout_analysis: true,
             num_instances: 1,
             sequential_task: false,
+            seed_handoff_ratio: 2.0 / 3.0,
             hard_timeout_secs: 0,
+            package_timeout_secs: 0,
             vector_theory: VectorTheory::BoogieArray,
             z3_trace_file: None,
             custom_natives: None,
@@ -251,11 +289,18 @@ impl Default for BoogieOptions {
             skip_instance_check: false,
             split_vcs_by_assert: false,
             error_limit: 5,
+            package_error_limit: 0,
         }
     }
 }
 
 impl BoogieOptions {
+    /// The derived process timeout is a watchdog for a wedged Boogie process,
+    /// not another VC timeout. It includes parsing, type checking, inlining,
+    /// and VC construction, none of which is covered by Boogie's `timeLimit`.
+    const MIN_PROCESS_TIMEOUT_SECS: u64 = 180;
+    const PROCESS_TIMEOUT_FACTOR: u64 = 4;
+
     /// Derive options based on other set options.
     pub fn derive_options(&mut self) {
         use VectorTheory::*;
@@ -267,6 +312,17 @@ impl BoogieOptions {
 
     /// Returns command line to call boogie.
     pub fn get_boogie_command(&self, boogie_file: &str) -> anyhow::Result<Vec<String>> {
+        self.get_boogie_command_with_prover_log(boogie_file, None)
+    }
+
+    /// Returns the command line to call Boogie, optionally forcing a prover-log
+    /// pattern after custom flags. The latter is used by timeout analysis so a
+    /// caller-provided `-proverLog` cannot disable or collide with its capture.
+    pub(crate) fn get_boogie_command_with_prover_log(
+        &self,
+        boogie_file: &str,
+        prover_log: Option<&str>,
+    ) -> anyhow::Result<Vec<String>> {
         let mut result = if self.use_exp_boogie {
             // This should have a better ux...
             vec![read_env_var("EXP_BOOGIE_EXE")]
@@ -296,14 +352,16 @@ impl BoogieOptions {
             }
         } else {
             add(&["-useArrayAxioms"]);
-            add(&[&format!(
-                "-proverOpt:O:smt.QI.EAGER_THRESHOLD={}",
-                self.eager_threshold
-            )]);
-            add(&[&format!(
-                "-proverOpt:O:smt.QI.LAZY_THRESHOLD={}",
-                self.lazy_threshold
-            )]);
+            if !self.use_solver_default_qi_thresholds {
+                add(&[&format!(
+                    "-proverOpt:O:smt.QI.EAGER_THRESHOLD={}",
+                    self.eager_threshold
+                )]);
+                add(&[&format!(
+                    "-proverOpt:O:smt.QI.LAZY_THRESHOLD={}",
+                    self.lazy_threshold
+                )]);
+            }
         }
         if let Some(iters) = self.loop_unroll {
             add(&[&format!("-loopUnroll:{}", iters)]);
@@ -335,14 +393,52 @@ impl BoogieOptions {
                 &format!("-proverOpt:O:trace_file_name={}", file),
             ]);
         }
-        if self.generate_smt {
+        if self.generate_smt && prover_log.is_none() {
             add(&["-proverLog:@PROC@.smt"]);
         }
         for f in &self.boogie_flags {
             add(&[f.as_str()]);
         }
+        if let Some(file) = prover_log {
+            add(&[&format!("-proverLog:{}", file)]);
+        }
         add(&[boogie_file]);
         Ok(result)
+    }
+
+    /// Return the Z3 executable which wins after applying custom Boogie flags.
+    /// Timeout analysis invokes the solver directly and therefore must reject
+    /// custom solver selections which do not denote Z3.
+    pub(crate) fn effective_z3_exe(&self) -> anyhow::Result<String> {
+        if self.use_cvc5 {
+            anyhow::bail!(NOT_Z3_BACKEND);
+        }
+        let mut path = self.z3_exe.clone();
+        for flag in &self.boogie_flags {
+            let normalized = flag.trim_start_matches(['-', '/']);
+            let lower = normalized.to_ascii_lowercase();
+            if lower.starts_with("proveropt:solver=")
+                && !normalized
+                    .split_once('=')
+                    .is_some_and(|(_, value)| value.eq_ignore_ascii_case("z3"))
+            {
+                anyhow::bail!(NOT_Z3_BACKEND);
+            }
+            if lower.starts_with("proveropt:prover_name=") {
+                anyhow::bail!(
+                    "--timeout-analysis does not support overriding Boogie's PROVER_NAME"
+                );
+            }
+            if lower.starts_with("proveropt:prover_path=") {
+                if let Some((_, value)) = normalized.split_once('=') {
+                    path = value.to_string();
+                }
+            }
+        }
+        if path.is_empty() {
+            anyhow::bail!("No z3 executable set. Please set Z3_EXE");
+        }
+        Ok(path)
     }
 
     /// Returns name of file where to log boogie output.
@@ -359,6 +455,27 @@ impl BoogieOptions {
         } else {
             time
         }
+    }
+
+    /// Return the watchdog deadline for a BPL containing one verification
+    /// root. An explicit hard timeout takes precedence. Otherwise, use a
+    /// generous deadline independent of Boogie's solver-only soft timeout.
+    pub fn process_timeout_secs(&self, root_timeout_secs: usize) -> u64 {
+        if self.hard_timeout_secs > 0 {
+            self.hard_timeout_secs
+        } else if root_timeout_secs == 0 {
+            0
+        } else {
+            (self.adjust_timeout(root_timeout_secs) as u64)
+                .saturating_mul(Self::PROCESS_TIMEOUT_FACTOR)
+                .max(Self::MIN_PROCESS_TIMEOUT_SECS)
+        }
+    }
+
+    /// Return when the implicit fallback seed should begin for this root.
+    pub fn seed_handoff_after(&self, root_timeout_secs: usize) -> Option<Duration> {
+        (self.num_instances == 1 && root_timeout_secs > 0 && self.seed_handoff_ratio > 0.0)
+            .then(|| Duration::from_secs_f64(root_timeout_secs as f64 * self.seed_handoff_ratio))
     }
 
     /// Get the mod set analysis flag based on the boogie version.
@@ -385,6 +502,10 @@ impl BoogieOptions {
 
     /// Checks whether the expected tool versions are installed in the environment.
     pub fn check_tool_versions(&self) -> anyhow::Result<()> {
+        let effective_z3 = self
+            .timeout_analysis
+            .then(|| self.effective_z3_exe())
+            .transpose()?;
         if !self.boogie_exe.is_empty() {
             // On Mac, version arg is `/version`, not `-version`
             let version_arg = if cfg!(target_os = "macos") {
@@ -406,9 +527,9 @@ impl BoogieOptions {
                 MAX_BOOGIE_VERSION,
             )?;
         }
-        if !self.z3_exe.is_empty() && !self.use_cvc5 {
-            let version =
-                Self::get_version("z3", &self.z3_exe, &["--version"], r"version ([0-9.]*)")?;
+        let z3_exe = effective_z3.as_deref().unwrap_or(&self.z3_exe);
+        if !z3_exe.is_empty() && !self.use_cvc5 {
+            let version = Self::get_version("z3", z3_exe, &["--version"], r"version ([0-9.]*)")?;
             Self::check_version_is_compatible("z3", &version, MIN_Z3_VERSION, MAX_Z3_VERSION)?;
         }
         if !self.cvc5_exe.is_empty() && self.use_cvc5 {
@@ -479,7 +600,7 @@ impl BoogieOptions {
             ));
         }
 
-        for (l, g) in lesser_parts.into_iter().zip(greater_parts.into_iter()) {
+        for (l, g) in lesser_parts.into_iter().zip(greater_parts) {
             let ln = l.parse::<usize>()?;
             let gn = g.parse::<usize>()?;
             if gn < ln {
@@ -496,5 +617,126 @@ impl BoogieOptions {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BoogieOptions;
+    use std::time::Duration;
+
+    #[test]
+    fn can_leave_quantifier_thresholds_at_solver_defaults() {
+        let mut options = BoogieOptions {
+            boogie_exe: "boogie".to_owned(),
+            z3_exe: "z3".to_owned(),
+            ..BoogieOptions::default()
+        };
+
+        let command = options.get_boogie_command("input.bpl").unwrap();
+        assert!(command
+            .iter()
+            .any(|arg| arg.contains("smt.QI.EAGER_THRESHOLD")));
+        assert!(command
+            .iter()
+            .any(|arg| arg.contains("smt.QI.LAZY_THRESHOLD")));
+
+        options.use_solver_default_qi_thresholds = true;
+        let command = options.get_boogie_command("input.bpl").unwrap();
+        assert!(!command.iter().any(|arg| arg.contains("smt.QI.")));
+        assert!(command.iter().any(|arg| arg == "-useArrayAxioms"));
+    }
+
+    #[test]
+    fn derives_process_timeout_from_root_timeout() {
+        let mut options = BoogieOptions::default();
+        for root_timeout_secs in [40, 100] {
+            let expected = (options.adjust_timeout(root_timeout_secs) as u64)
+                .saturating_mul(BoogieOptions::PROCESS_TIMEOUT_FACTOR)
+                .max(BoogieOptions::MIN_PROCESS_TIMEOUT_SECS);
+            assert_eq!(options.process_timeout_secs(root_timeout_secs), expected);
+        }
+        assert_eq!(options.process_timeout_secs(0), 0);
+
+        options.hard_timeout_secs = 7;
+        assert_eq!(options.process_timeout_secs(40), 7);
+        assert_eq!(options.process_timeout_secs(0), 7);
+    }
+
+    #[test]
+    fn derives_seed_handoff_from_root_timeout() {
+        let mut options = BoogieOptions::default();
+        assert!(options.seed_handoff_after(0).is_none());
+        assert!((options.seed_handoff_after(60).unwrap().as_secs_f64() - 40.0).abs() < 0.001);
+
+        options.seed_handoff_ratio = 0.0;
+        assert!(options.seed_handoff_after(60).is_none());
+
+        options.seed_handoff_ratio = 1.0;
+        assert_eq!(
+            options.seed_handoff_after(60).unwrap(),
+            Duration::from_secs(60)
+        );
+
+        options.seed_handoff_ratio = 2.0 / 3.0;
+        options.num_instances = 2;
+        assert!(options.seed_handoff_after(60).is_none());
+    }
+
+    #[test]
+    fn timeout_analysis_defaults_on() {
+        // A timeout that reports only an exhausted budget is nearly useless, and
+        // the replay costs a bounded solver run on a path that has already
+        // failed. Callers should have to opt *out*, not in.
+        assert!(BoogieOptions::default().timeout_analysis);
+    }
+
+    #[test]
+    fn timeout_analysis_rejects_non_z3_backends() {
+        let cvc5 = BoogieOptions {
+            use_cvc5: true,
+            ..Default::default()
+        };
+        assert!(cvc5.effective_z3_exe().is_err());
+
+        let custom = BoogieOptions {
+            z3_exe: "z3".to_string(),
+            boogie_flags: vec!["-proverOpt:SOLVER=cvc5".to_string()],
+            ..Default::default()
+        };
+        assert!(custom.effective_z3_exe().is_err());
+    }
+
+    #[test]
+    fn timeout_analysis_uses_effective_custom_z3_path() {
+        let options = BoogieOptions {
+            z3_exe: "default-z3".to_string(),
+            boogie_flags: vec!["-proverOpt:PROVER_PATH=/custom/z3".to_string()],
+            ..Default::default()
+        };
+        assert_eq!(options.effective_z3_exe().unwrap(), "/custom/z3");
+    }
+
+    #[test]
+    fn analysis_capture_overrides_custom_prover_log() {
+        let options = BoogieOptions {
+            boogie_exe: "boogie".to_string(),
+            z3_exe: "z3".to_string(),
+            boogie_flags: vec!["-proverLog:caller.smt".to_string()],
+            ..Default::default()
+        };
+        let command = options
+            .get_boogie_command_with_prover_log("test.bpl", Some("selected.@PROC@.smt"))
+            .unwrap();
+        let caller = command
+            .iter()
+            .position(|arg| arg == "-proverLog:caller.smt")
+            .unwrap();
+        let selected = command
+            .iter()
+            .position(|arg| arg == "-proverLog:selected.@PROC@.smt")
+            .unwrap();
+        assert!(selected > caller);
+        assert_eq!(command.last().unwrap(), "test.bpl");
     }
 }

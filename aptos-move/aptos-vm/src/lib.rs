@@ -108,6 +108,7 @@ pub mod data_cache;
 pub mod aptos_vm;
 pub mod block_executor;
 mod errors;
+pub mod function_usage;
 pub mod gas;
 #[cfg(not(feature = "testing"))]
 mod keyless_validation;

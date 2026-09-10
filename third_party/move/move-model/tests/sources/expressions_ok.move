@@ -1,6 +1,12 @@
 module 0x42::M {
 
+  struct R has key { value: u64 }
+
   spec module {
+
+    fun can_modify_resource(addr: address): bool {
+      can_modify<R>(addr)
+    }
 
     fun add1(x: num): num { x + 1 }
 

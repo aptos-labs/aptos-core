@@ -10,14 +10,14 @@ fun bump_via_mut_ref(r0, r1): u8 {
     r4: u8
   code:
   L0:
-    0: [r2] := call mk, [r0, r1]
-    1: x0 := mut_borrow_loc r2
-    2: [r3] := call mut_ref, [x0]
-    3: r4 := read_ref r3
-    4: r4 := add r4, #1u8
-    5: write_ref r3, r4
-    6: r4 := read_ref r3
-    7: ret [r4]
+    0: [r2] := call mk, [r0, r1] @2
+    1: x0 := mut_borrow_loc r2 @4
+    2: [r3] := call mut_ref, [x0] @5
+    3: r4 := read_ref r3 @8
+    4: r4 := add r4, #1u8 @10
+    5: write_ref r3, r4 @12
+    6: r4 := read_ref r3 @14
+    7: ret [r4] @15
 }
 
 fun imm_ref(r0): &u8 {
@@ -27,9 +27,9 @@ fun imm_ref(r0): &u8 {
     r2: &u8
   code:
   L0:
-    0: r1 := imm_borrow_variant_field E::P0::p, r0
-    1: r2 := imm_borrow_field Inner::b, r1
-    2: ret [r2]
+    0: r1 := imm_borrow_variant_field E::P0::p, r0 @1
+    1: r2 := imm_borrow_field Inner::b, r1 @2
+    2: ret [r2] @3
 }
 
 fun mk(r0, r1): E {
@@ -43,19 +43,19 @@ fun mk(r0, r1): E {
     r6: u16
   code:
   L2:
-    0: br_neq L0, r0, #0
+    0: br_neq L0, r0, #0 @1
   L1:
-    1: r2 := ld_u8 1
-    2: r3 := ld_u8 7
-    3: r4 := pack 0x77::variant_field_tail_borrows::Inner, [r3, r1]
-    4: r5 := pack_variant 0x77::variant_field_tail_borrows::E@0, [r2, r4]
-    5: ret [r5]
+    1: r2 := ld_u8 1 @4
+    2: r3 := ld_u8 7 @5
+    3: r4 := pack 0x77::variant_field_tail_borrows::Inner, [r3, r1] @7
+    4: r5 := pack_variant 0x77::variant_field_tail_borrows::E@0, [r2, r4] @8
+    5: ret [r5] @9
   L0:
-    6: r6 := ld_u16 2
-    7: r2 := ld_u8 7
-    8: r4 := pack 0x77::variant_field_tail_borrows::Inner, [r2, r1]
-    9: r5 := pack_variant 0x77::variant_field_tail_borrows::E@1, [r6, r4]
-    10: ret [r5]
+    6: r6 := ld_u16 2 @10
+    7: r2 := ld_u8 7 @11
+    8: r4 := pack 0x77::variant_field_tail_borrows::Inner, [r2, r1] @13
+    9: r5 := pack_variant 0x77::variant_field_tail_borrows::E@1, [r6, r4] @14
+    10: ret [r5] @15
 }
 
 fun mut_ref(r0): &mut u8 {
@@ -65,9 +65,9 @@ fun mut_ref(r0): &mut u8 {
     r2: &mut u8
   code:
   L0:
-    0: r1 := mut_borrow_variant_field E::P0::p, r0
-    1: r2 := mut_borrow_field Inner::b, r1
-    2: ret [r2]
+    0: r1 := mut_borrow_variant_field E::P0::p, r0 @1
+    1: r2 := mut_borrow_field Inner::b, r1 @2
+    2: ret [r2] @3
 }
 
 fun read_via_imm_ref(r0, r1): u8 {
@@ -78,11 +78,11 @@ fun read_via_imm_ref(r0, r1): u8 {
     r3: u8
   code:
   L0:
-    0: [r2] := call mk, [r0, r1]
-    1: x0 := imm_borrow_loc r2
-    2: [x0] := call imm_ref, [x0]
-    3: r3 := read_ref x0
-    4: ret [r3]
+    0: [r2] := call mk, [r0, r1] @2
+    1: x0 := imm_borrow_loc r2 @4
+    2: [x0] := call imm_ref, [x0] @5
+    3: r3 := read_ref x0 @6
+    4: ret [r3] @7
 }
 === micro-ops ===
 // module 0x77::variant_field_tail_borrows
@@ -91,54 +91,54 @@ fun bump_via_mut_ref() {
   frame_data_size: 48
   entry_gas: 211
   code:
-    0: Move(1) [80] <- [8]
-    1: Move8 [72] <- [0]
-    2: CallIndirect 0x77::variant_field_tail_borrows::mk
-    3: Move8 [16] <- [72]
-    4: SlotBorrow [72] <- &[16]
-    5: CallIndirect 0x77::variant_field_tail_borrows::mut_ref
-    6: Move(16) [24] <- [72]
-    7: ReadRef [40] <- *[24] (size=1)
-    8: IntAdd [40] <- [40] + u8 #1
-    9: WriteRef *[24] <- [40] (size=1)
-    10: ReadRef [40] <- *[24] (size=1)
-    11: Move(1) [0] <- [40]
-    12: Return
+    0: Move(1) [80] <- [8] @2
+    1: Move8 [72] <- [0] @2
+    2: CallIndirect 0x77::variant_field_tail_borrows::mk @2
+    3: Move8 [16] <- [72] @2
+    4: SlotBorrow [72] <- &[16] @4
+    5: CallIndirect 0x77::variant_field_tail_borrows::mut_ref @5
+    6: Move(16) [24] <- [72] @5
+    7: ReadRef [40] <- *[24] (size=1) @8
+    8: IntAdd [40] <- [40] + u8 #1 @10
+    9: WriteRef *[24] <- [40] (size=1) @12
+    10: ReadRef [40] <- *[24] (size=1) @14
+    11: Move(1) [0] <- [40] @15
+    12: Return @15
 }
 
 fun imm_ref() {
   frame_data_size: 48
   entry_gas: 106
   code:
-    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)]
-    1: DeriveRefOffsetImm [32] <- [16]+1
-    2: Move(16) [0] <- [32]
-    3: Return
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)] @1
+    1: DeriveRefOffsetImm [32] <- [16]+1 @2
+    2: Move(16) [0] <- [32] @3
+    3: Return @3
 }
 
 fun mk() {
   frame_data_size: 40
   entry_gas: 3
   code:
-    0: JumpIntCmp @10 [0] != u64 #0 gas_taken=90 gas_fallthrough=87
-    1: StoreImm1 [9] <- #1
-    2: StoreImm1 [10] <- #7
-    3: Move(1) [12] <- [8]
-    4: Move(1) [11] <- [10]
-    5: EnumNew [16] desc=2 tag #0
-    6: HeapMoveTo [16]+8 <- [9] (size=1)
-    7: HeapMoveTo [16]+9 <- [11] (size=2)
-    8: Move8 [0] <- [16]
-    9: Return
-    10: StoreImm2 [24] <- #2
-    11: StoreImm1 [9] <- #7
-    12: Move(1) [12] <- [8]
-    13: Move(1) [11] <- [9]
-    14: EnumNew [16] desc=2 tag #1
-    15: HeapMoveTo [16]+8 <- [24] (size=2)
-    16: HeapMoveTo [16]+10 <- [11] (size=2)
-    17: Move8 [0] <- [16]
-    18: Return
+    0: JumpIntCmp @10 [0] != u64 #0 gas_taken=90 gas_fallthrough=87 @1
+    1: StoreImm1 [9] <- #1 @4
+    2: StoreImm1 [10] <- #7 @5
+    3: Move(1) [12] <- [8] @7
+    4: Move(1) [11] <- [10] @7
+    5: EnumNew [16] desc=2 tag #0 @8
+    6: HeapMoveTo [16]+8 <- [9] (size=1) @8
+    7: HeapMoveTo [16]+9 <- [11] (size=2) @8
+    8: Move8 [0] <- [16] @9
+    9: Return @9
+    10: StoreImm2 [24] <- #2 @10
+    11: StoreImm1 [9] <- #7 @11
+    12: Move(1) [12] <- [8] @13
+    13: Move(1) [11] <- [9] @13
+    14: EnumNew [16] desc=2 tag #1 @14
+    15: HeapMoveTo [16]+8 <- [24] (size=2) @14
+    16: HeapMoveTo [16]+10 <- [11] (size=2) @14
+    17: Move8 [0] <- [16] @15
+    18: Return @15
   safe_point_layouts:
     5: []
     14: []
@@ -148,23 +148,23 @@ fun mut_ref() {
   frame_data_size: 48
   entry_gas: 106
   code:
-    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)]
-    1: DeriveRefOffsetImm [32] <- [16]+1
-    2: Move(16) [0] <- [32]
-    3: Return
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)] @1
+    1: DeriveRefOffsetImm [32] <- [16]+1 @2
+    2: Move(16) [0] <- [32] @3
+    3: Return @3
 }
 
 fun read_via_imm_ref() {
   frame_data_size: 32
   entry_gas: 146
   code:
-    0: Move(1) [64] <- [8]
-    1: Move8 [56] <- [0]
-    2: CallIndirect 0x77::variant_field_tail_borrows::mk
-    3: Move8 [16] <- [56]
-    4: SlotBorrow [56] <- &[16]
-    5: CallIndirect 0x77::variant_field_tail_borrows::imm_ref
-    6: ReadRef [24] <- *[56] (size=1)
-    7: Move(1) [0] <- [24]
-    8: Return
+    0: Move(1) [64] <- [8] @2
+    1: Move8 [56] <- [0] @2
+    2: CallIndirect 0x77::variant_field_tail_borrows::mk @2
+    3: Move8 [16] <- [56] @2
+    4: SlotBorrow [56] <- &[16] @4
+    5: CallIndirect 0x77::variant_field_tail_borrows::imm_ref @5
+    6: ReadRef [24] <- *[56] (size=1) @6
+    7: Move(1) [0] <- [24] @7
+    8: Return @7
 }

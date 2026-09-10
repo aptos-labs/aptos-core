@@ -101,7 +101,7 @@ fn insert_in_batches(
             |batches| {
                 let mut map = HashMap::new();
                 for batch in batches {
-                    map.extend(batch.into_iter());
+                    map.extend(batch);
                 }
                 map
             },
@@ -116,7 +116,7 @@ fn insert_in_batches(
             |batches| {
                 let mut map = BTreeMap::new();
                 for batch in batches {
-                    map.extend(batch.into_iter());
+                    map.extend(batch);
                 }
                 map
             },

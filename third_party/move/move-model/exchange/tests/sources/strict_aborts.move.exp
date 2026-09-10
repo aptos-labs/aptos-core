@@ -1,0 +1,15 @@
+{
+  "version": 10,
+  "structs": [],
+  "funs": [
+    {
+      "name": "f",
+      "params": 0,
+      "locals": ["u64"],
+      "returns": ["u64"],
+      "blocks": [{"instrs": [{"load": [0, {"num": "0"}]}], "term": {"ret": [0]}}],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [{"value": {"bool": false}}], "ensures": [], "modifies": []}
+    }
+  ]
+}

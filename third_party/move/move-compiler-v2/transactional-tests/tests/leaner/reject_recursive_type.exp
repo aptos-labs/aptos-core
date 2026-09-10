@@ -1,0 +1,17 @@
+processed 1 task
+task 0 lines 1-21:  publish [import Move]
+Error: compilation errors:
+ error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:13:33
+   │
+13 │ end LeanerTxnRejectRecursiveType
+   │                                 ^
+
+error: recursive Move type `LeanerTxnRejectRecursiveType.RecursiveType` is not supported by the prototype
+   ┌─ TEMPFILE:13:33
+   │
+13 │ end LeanerTxnRejectRecursiveType
+   │                                 ^
+
+
+exiting with Leaner elaboration errors

@@ -2,10 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::{CapturedReads, DataRead, ReadKind},
+    captured_reads::{CapturedReads, DataRead, ReadKind, TxnInput},
     counters,
     errors::ResourceGroupSerializationError,
-    task::{ExecutorTask, LegacyTxnOutput},
+    task::{LegacyTxnOutput, TxnOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ViewState},
 };
@@ -29,7 +29,7 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::{execution_tracing::Trace, Module};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rand::{thread_rng, Rng};
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 use triomphe::Arc as TriompheArc;
 
 /// Block executor state access required to materialize a transaction output at
@@ -63,13 +63,13 @@ pub trait Materializer<T: Transaction> {
 /// during execution are fetched from the captured read-set.
 pub(crate) struct ParallelMaterializer<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     latest_view: &'a LatestView<'a, T, S>,
-    read_set: Arc<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+    read_set: &'a CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ParallelMaterializer<'a, T, S> {
     pub(crate) fn new(
         latest_view: &'a LatestView<'a, T, S>,
-        read_set: Arc<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
+        read_set: &'a CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
     ) -> Self {
         Self {
             latest_view,
@@ -570,13 +570,14 @@ fn replace_ids_with_values<T: Transaction, M: Materializer<T>>(
     }
 }
 
-pub(crate) fn update_transaction_on_abort<T, E>(
+pub(crate) fn update_transaction_on_abort<T, I, O>(
     txn_idx: TxnIndex,
-    last_input_output: &TxnLastInputOutput<T, E::Output>,
-    versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+    last_input_output: &TxnLastInputOutput<T, I, O>,
+    versioned_cache: &MVHashMap<I::Key, I::Tag, I::Value, DelayedFieldID>,
 ) where
     T: Transaction,
-    E: ExecutorTask<Txn = T>,
+    I: TxnInput,
+    O: TxnOutput<Txn = T, Key = I::Key, Tag = I::Tag>,
 {
     counters::SPECULATIVE_ABORT_COUNT.inc();
 

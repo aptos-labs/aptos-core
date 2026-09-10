@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/anchor_arg_effects.move:27:13
+   │
+27 │             assert ensures_of<f>(a); // error: for the `noop_after_bump` caller, the lambda changes nothing, so its claimed +1 effect is false
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:48: noop_after_bump
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:55: noop_after_bump (spec)
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:48: noop_after_bump
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:24: apply_to_bumped
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:25: apply_to_bumped
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:12: bump
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:13: bump
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:14: bump
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:12: bump
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_arg_effects.move:27: apply_to_bumped

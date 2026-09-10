@@ -1,0 +1,14 @@
+processed 7 tasks
+task 0 lines 1-49:  publish [import Move]
+task 1 lines 51-51:  run 0x0::LeanerLoops::count_down --args 5u64
+return values: 0
+task 2 lines 53-53:  run 0x0::LeanerLoops::count_down_loop --args 5u64
+return values: 0
+task 3 lines 55-55:  run 0x0::LeanerLoops::skip_evens --args 5u64 0u64
+return values: 2
+task 4 lines 57-57:  run 0x0::LeanerLoops::labeled_count_down --args 5u64
+return values: 0
+task 5 lines 59-59:  run 0x0::LeanerLoops::return_in_loop --args 5u64
+return values: 1
+task 6 lines 61-61:  run 0x0::LeanerLoops::return_in_loop --args 2u64
+return values: 0

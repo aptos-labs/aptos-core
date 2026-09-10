@@ -5,7 +5,7 @@ use super::{
     super::{package_data::DiagnosticSource, session::FlowSession},
     load_sanitized_prover_options, resolve_filter,
 };
-use crate::hooks::source_check;
+use crate::{evaluation::LOOP_INVARIANT_EVIDENCE_DEPTH, hooks::source_check};
 use codespan_reporting::term::termcolor::NoColor;
 use move_model::model::GlobalEnv;
 use move_prover::inference::InferenceOutput;
@@ -40,7 +40,9 @@ enum SpecOutput {
 struct MovePackageSpecInferParams {
     /// Path to the Move package directory.
     package_path: String,
-    /// Optional filter: `module_name` or `module_name::function_name`.
+    /// Optional filter: `module_name`, `module_name::function_name`, or
+    /// `address::module_name::function_name` (numeric or named address).
+    /// A module name without an address must be unambiguous.
     /// When omitted, all target modules are inferred.
     filter: Option<String>,
     /// Where to write inferred specifications. Defaults to `inline` (inject into
@@ -52,12 +54,10 @@ struct MovePackageSpecInferParams {
 
 #[tool_router(router = package_spec_infer_router, vis = "pub(crate)")]
 impl FlowSession {
-    // Low-level WP inference tool. Requires multi-phase workflow context
-    // (loop-invariant synthesis, simplification, verification) that is only
-    // available through subagent delegation. See skill docs for spec_output param.
+    // Low-level WP inference tool. The skill supplies the loop/callee repair workflow.
     #[tool(
-        description = "Raw WP engine — output requires loop-invariant synthesis and simplification \
-                       that only the /move-inf skill workflow provides. Do not call directly.",
+        description = "WP specification inference. Use through /move-inf; repair any reported \
+                       missing loop invariants or incomplete callee contracts and rerun.",
         annotations(read_only_hint = false, destructive_hint = true)
     )]
     async fn move_package_wp(
@@ -72,6 +72,11 @@ impl FlowSession {
         let (pkg, _) = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
         let spec_output = params.spec_output;
+        let telemetry = self.telemetry().clone();
+        let telemetry_package = self.resolve_package_path(&params.package_path);
+        let telemetry_filter = filter.clone();
+        let evidence_depth = Some(LOOP_INVARIANT_EVIDENCE_DEPTH);
+        let uninvariant_loop_is_error = self.evaluation().uninvariant_loop_is_error();
 
         let tool_timeout = self.tool_timeout();
         let wrote_files = Arc::new(AtomicBool::new(false));
@@ -84,7 +89,7 @@ impl FlowSession {
                 // 1. Check for compilation errors.
                 if data.has_compilation_errors() {
                     return Ok(CallToolResult::error(vec![Content::text(
-                        "package has compilation errors; run move_package_status for details",
+                        data.compilation_errors_report(),
                     )]));
                 }
 
@@ -112,6 +117,15 @@ impl FlowSession {
                     SpecOutput::File => InferenceOutput::File,
                 };
                 options.inference.inference_output_dir = None;
+                // Bounded loop-head evidence explains why a loop resists
+                // inference. It is diagnostic-only and never becomes a
+                // condition, so it rides with the failure classification rung.
+                // Inference overwrites the prover field from this one.
+                options.inference.loop_invariant_evidence = evidence_depth;
+                // In a measured round an uninvariant loop must fail rather
+                // than yield an empty contract that verifies; see
+                // `EvaluationConfig::uninvariant_loop_is_error`.
+                options.prover.uninvariant_loop_is_error = uninvariant_loop_is_error;
                 options.output_path = temp_dir
                     .path()
                     .join("output.bpl")
@@ -128,6 +142,7 @@ impl FlowSession {
                 // intent is to be skipped (e.g. `storage_slot`).
                 let mut error_writer = NoColor::new(Vec::new());
                 let mut filtered_env_holder: Option<GlobalEnv> = None;
+                let wp_start = Instant::now();
                 let inference_result = if let Some(filter_str) = filter.as_deref() {
                     let mut fresh = match data.build_filtered_env(Some(filter_str), &[]) {
                         Ok(env) => env,
@@ -138,6 +153,13 @@ impl FlowSession {
                             ))]))
                         },
                     };
+                    // Model construction runs the whole inliner before
+                    // non-matching modules are demoted, so its warning buffer
+                    // can describe unrelated dependency functions. The cached
+                    // package was already checked for compilation errors above.
+                    // Start the requested WP operation with a clean buffer, as
+                    // the unfiltered path below already does.
+                    fresh.clear_diag();
                     let result = move_prover::inference::run_spec_inference_with_model(
                         &mut fresh,
                         &mut error_writer,
@@ -155,6 +177,15 @@ impl FlowSession {
                         Instant::now(),
                     )
                 };
+                telemetry.emit(
+                    "wp_engine",
+                    serde_json::json!({
+                        "package_id": &telemetry_package,
+                        "filter": &telemetry_filter,
+                        "duration_us": wp_start.elapsed().as_micros() as u64,
+                        "outcome": if inference_result.is_ok() { "success" } else { "error" },
+                    }),
+                );
 
                 match inference_result {
                     Ok(()) => {
@@ -236,12 +267,35 @@ impl FlowSession {
                         }
 
                         if modified_files.is_empty() {
+                            telemetry.emit(
+                                "wp_output",
+                                serde_json::json!({
+                                    "package_id": &telemetry_package,
+                                    "filter": &telemetry_filter,
+                                    "files_written": 0,
+                                    "inferred_conditions_in_written_files": 0,
+                                }),
+                            );
                             log::info!("move_package_wp: no specs inferred");
                             Ok(CallToolResult::success(vec![Content::text(
                                 "inference completed but no specifications were inferred",
                             )]))
                         } else {
                             wrote_files_in.store(true, Ordering::Relaxed);
+                            let inferred_conditions = modified_files
+                                .iter()
+                                .filter_map(|path| fs::read_to_string(path).ok())
+                                .map(|source| source.matches("[inferred").count())
+                                .sum::<usize>();
+                            telemetry.emit(
+                                "wp_output",
+                                serde_json::json!({
+                                    "package_id": &telemetry_package,
+                                    "filter": &telemetry_filter,
+                                    "files_written": modified_files.len(),
+                                    "inferred_conditions_in_written_files": inferred_conditions,
+                                }),
+                            );
                             log::info!(
                                 "move_package_wp: wrote specs to {} file(s)",
                                 modified_files.len()
@@ -252,7 +306,7 @@ impl FlowSession {
                             let mut check_diags = String::new();
                             for path in &modified_files {
                                 let source = fs::read_to_string(path).unwrap_or_default();
-                                let result = source_check::check(path, &source);
+                                let result = source_check::check_inferred_output(path, &source);
                                 if !result.has_parse_errors {
                                     source_check::format_file(path);
                                 }
@@ -279,6 +333,20 @@ impl FlowSession {
                                     "\ndiagnostics in inferred output:\n{}",
                                     check_diags
                                 ));
+                            }
+                            // Inference warns rather than aborting, so that one
+                            // unusable function does not stop a module-wide run.
+                            // The warnings carry the reason and the bounded
+                            // evidence.
+                            let warnings =
+                                String::from_utf8(error_writer.into_inner()).unwrap_or_default();
+                            if !warnings.trim().is_empty() {
+                                msg.push_str(&format!("\n{}", warnings.trim_end()));
+                            }
+                            if !warnings.trim().is_empty() {
+                                data.set_diagnostics(DiagnosticSource::Inference, vec![warnings
+                                    .trim_end()
+                                    .to_string()]);
                             }
                             Ok(CallToolResult::success(vec![Content::text(msg)]))
                         }

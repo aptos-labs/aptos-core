@@ -35,8 +35,6 @@ module 0x42::loops {
     }
     spec count_down(n: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == 0;
-        aborts_if [inferred] false;
     }
 
 
@@ -64,7 +62,7 @@ module 0x42::loops {
         aborts_if [inferred] 3 < n && r > MAX_U64 - 4;
         aborts_if [inferred] 2 < n && r > MAX_U64 - 3;
         aborts_if [inferred] 1 < n && r > MAX_U64 - 2;
-        aborts_if [inferred] 0 < n && r > MAX_U64 - 1;
+        aborts_if [inferred] 0 < n && r == MAX_U64;
     }
 
     // Double a value n times through a reference
@@ -150,8 +148,7 @@ module 0x42::loops {
     }
     spec cond_inc_loop(r: &mut u64, n: u64, do_inc: bool) {
         pragma opaque = true;
-        ensures [inferred] do_inc ==> r == old(r) + n;
-        ensures [inferred] !do_inc ==> r == old(r);
+        ensures [inferred] r == (if (do_inc) old(r) + n else old(r));
         aborts_if [inferred] do_inc && r + n > MAX_U64;
     }
 
@@ -172,15 +169,15 @@ module 0x42::loops {
         };
     }
     spec inc_global_n_times {
-        // Test with unrolling. Notice that the inferred spec is incomplete and will
-        // fail verification.
+        // Test with unrolling. Each unrolled write must retain its intermediate
+        // state rather than claiming that an earlier value is the final value.
         pragma unroll = 3;
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] 3 < n ==> {
-            let a = update_field(S3 |~ global<Counter>(addr), value, (S3 |~ global<Counter>(addr)).value + 1);
-            S3.. |~ update<Counter>(addr, a)
-        };
+        ensures [inferred] ({
+            let a = S3 |~ global<Counter>(addr);
+            3 < n ==> Counter[addr].value == a.value + 1
+        });
         ensures [inferred] 2 < n ==> {
             let a = update_field(S2 |~ global<Counter>(addr), value, (S2 |~ global<Counter>(addr)).value + 1);
             S2..S3 |~ update<Counter>(addr, a)
@@ -193,32 +190,32 @@ module 0x42::loops {
             let a = update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
             ..S1 |~ update<Counter>(addr, a)
         };
-        aborts_if [inferred] {
-            let a = S3 |~ global<Counter>(addr);
-            3 < n && a.value == MAX_U64
-        };
-        aborts_if [inferred] {
+        aborts_if [inferred] ({
             let a = S3 |~ exists<Counter>(addr);
             3 < n && !a
-        };
-        aborts_if [inferred] {
-            let a = S2 |~ global<Counter>(addr);
-            2 < n && a.value == MAX_U64
-        };
-        aborts_if [inferred] {
+        });
+        aborts_if [inferred] ({
             let a = S2 |~ exists<Counter>(addr);
             2 < n && !a
-        };
-        aborts_if [inferred] {
-            let a = S1 |~ global<Counter>(addr);
-            1 < n && a.value == MAX_U64
-        };
-        aborts_if [inferred] {
+        });
+        aborts_if [inferred] ({
             let a = S1 |~ exists<Counter>(addr);
             1 < n && !a
-        };
-        aborts_if [inferred] 0 < n && Counter[addr].value == MAX_U64;
+        });
         aborts_if [inferred] 0 < n && !exists<Counter>(addr);
+        aborts_if [inferred] ({
+            let a = S3 |~ global<Counter>(addr);
+            3 < n && a.value == MAX_U64
+        });
+        aborts_if [inferred] ({
+            let a = S2 |~ global<Counter>(addr);
+            2 < n && a.value == MAX_U64
+        });
+        aborts_if [inferred] ({
+            let a = S1 |~ global<Counter>(addr);
+            1 < n && a.value == MAX_U64
+        });
+        aborts_if [inferred] 0 < n && Counter[addr].value == MAX_U64;
     }
 
     // Increment global counter n times with a user-provided loop invariant
@@ -237,7 +234,7 @@ module 0x42::loops {
     spec inc_global_with_invariant(addr: address, n: u64) {
         pragma opaque = true, aborts_if_is_partial = true;
         modifies Counter[addr];
-        ensures [inferred] Counter[addr].value == old(Counter[addr]).value ==> (forall x: u64, y: Counter: Counter[addr].value == old(Counter[addr]).value + x && x < n ==> update<Counter>(addr, update_field(y, value, y.value + 1)));
+        ensures [inferred = sathard] Counter[addr].value == old(Counter[addr]).value ==> (forall x: u64, y: Counter: Counter[addr].value == old(Counter[addr]).value + x && x < n ==> update<Counter>(addr, update_field(y, value, y.value + 1)));
         aborts_if [inferred] !exists<Counter>(addr);
     }
 
@@ -312,10 +309,50 @@ module 0x42::loops {
     spec nested_count(m: u64, n: u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == m * n;
-        aborts_if [inferred] n > 0 && (m > 0 && m * n > MAX_U64);
+        aborts_if [inferred] n > 0 && m > 0 && m * n > MAX_U64;
     }
 
 }
 /*
+Inference diagnostics:
+warning: WP inferred `vacuous` conditions after this loop without an invariant. The loop havoc left part of the inferred condition unconstrained. Add a loop invariant before relying on the inferred specification.
+   ┌─ tests/inference/loops.move:25:16
+   │
+25 │         while (count > 0) {
+   │                ^^^^^
+   │
+   = loop-invariant evidence (bounded to 3 completed back-edge traversal(s); diagnostic only)
+   = source-visible loop-carried state: n
+   = bounded WP status: exact within the displayed bound
+   = bounded loop-head facts (for paths reaching each head):
+       head[0]: head[0].n == n
+       head[1]: n > 0 ==> head[1].n == n - 1
+       head[2]: n > 1 ==> head[2].n == n - 2
+       head[3]: n > 2 ==> head[3].n == n - 3
+   = seek a predicate which includes the entry facts and is preserved by one back-edge; bounded observations are not an invariant or a proof
+
+warning: WP retained a quantified loop summary despite the supplied invariant. Inference has not established a trusted complete contract. Strengthen the invariant to characterize the loop-carried values and mutated state relative to entry; a bounds-only invariant may not suffice.
+    ┌─ tests/inference/loops.move:149:11
+    │
+149 │           } spec {
+    │ ╭───────────^
+150 │ │             invariant i <= n;
+151 │ │             invariant global<Counter>(addr).value == start + i;
+152 │ │         };
+    │ ╰─────────^
+
+warning: WP could not characterize the aborts of `loops::inc_global_with_invariant` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an abort condition did not survive a memory-havocking loop
+    ┌─ tests/inference/loops.move:142:5
+    │
+142 │ ╭     fun inc_global_with_invariant(addr: address, n: u64) acquires Counter {
+143 │ │         let i = 0;
+144 │ │         let start = Counter[addr].value;
+145 │ │         while (i < n) {
+    · │
+152 │ │         };
+153 │ │     }
+    │ ╰─────^
+
 Verification: Succeeded.
 */

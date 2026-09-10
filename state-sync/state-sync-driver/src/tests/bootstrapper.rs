@@ -7,8 +7,9 @@ use crate::{
     error::Error,
     tests::{
         mocks::{
-            create_mock_db_reader, create_mock_streaming_client, create_ready_storage_synchronizer,
-            MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient,
+            create_mock_db_reader, create_mock_storage_synchronizer, create_mock_streaming_client,
+            create_ready_storage_synchronizer, MockMetadataStorage, MockStorageSynchronizer,
+            MockStreamingClient,
         },
         utils::{
             create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
@@ -38,7 +39,96 @@ use mockall::{
     predicate::{always, eq},
     Sequence,
 };
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+
+#[tokio::test]
+async fn test_bootstrapping_waits_for_pending_storage_data() {
+    let pending_data_polls = Arc::new(AtomicUsize::new(0));
+
+    let mut storage_synchronizer = create_mock_storage_synchronizer();
+    let pending_data_polls_for_poll = Arc::clone(&pending_data_polls);
+    storage_synchronizer
+        .expect_pending_storage_data()
+        .returning(move || pending_data_polls_for_poll.fetch_add(1, Ordering::SeqCst) == 0);
+    storage_synchronizer
+        .expect_pending_storage_data_error()
+        .return_const(false);
+
+    let pending_data_polls_at_finish = Arc::clone(&pending_data_polls);
+    storage_synchronizer
+        .expect_finish_chunk_executor()
+        .times(1)
+        .returning(move || {
+            assert_eq!(pending_data_polls_at_finish.load(Ordering::SeqCst), 2);
+        });
+
+    let driver_configuration = create_full_node_driver_configuration();
+    let output_fallback_handler =
+        OutputFallbackHandler::new(driver_configuration.clone(), TimeService::mock());
+    let mut database_reader = create_mock_db_reader();
+    database_reader
+        .expect_get_latest_epoch_state()
+        .return_once(|| Ok(create_empty_epoch_state()));
+    let mut bootstrapper = Bootstrapper::new(
+        driver_configuration,
+        MockMetadataStorage::new(),
+        output_fallback_handler,
+        create_mock_streaming_client(),
+        Arc::new(database_reader),
+        storage_synchronizer,
+    );
+
+    bootstrapper.bootstrapping_complete().await.unwrap();
+
+    assert_eq!(pending_data_polls.load(Ordering::SeqCst), 2);
+    assert!(bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
+async fn test_bootstrapping_rejects_pending_storage_error() {
+    let mut storage_synchronizer = create_mock_storage_synchronizer();
+    storage_synchronizer
+        .expect_pending_storage_data()
+        .return_const(false);
+    storage_synchronizer
+        .expect_pending_storage_data_error()
+        .return_const(true);
+    storage_synchronizer.expect_finish_chunk_executor().times(0);
+
+    let driver_configuration = create_full_node_driver_configuration();
+    let output_fallback_handler =
+        OutputFallbackHandler::new(driver_configuration.clone(), TimeService::mock());
+    let mut database_reader = create_mock_db_reader();
+    database_reader
+        .expect_get_latest_epoch_state()
+        .return_once(|| Ok(create_empty_epoch_state()));
+    let mut bootstrapper = Bootstrapper::new(
+        driver_configuration,
+        MockMetadataStorage::new(),
+        output_fallback_handler,
+        create_mock_streaming_client(),
+        Arc::new(database_reader),
+        storage_synchronizer,
+    );
+
+    let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();
+    bootstrapper
+        .subscribe_to_bootstrap_notifications(bootstrap_notification_sender)
+        .await
+        .unwrap();
+
+    let error = bootstrapper.bootstrapping_complete().await.unwrap_err();
+
+    assert_matches!(error, Error::UnexpectedError(_));
+    assert!(!bootstrapper.is_bootstrapped());
+    assert_none!(bootstrap_notification_receiver.now_or_never());
+}
 
 #[tokio::test]
 async fn test_bootstrap_genesis_waypoint() {

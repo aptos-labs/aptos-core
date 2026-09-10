@@ -1,0 +1,1 @@
+error: in function `f`: writes through references inside loops not yet supported by loop-target collection

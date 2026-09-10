@@ -232,7 +232,7 @@ impl CliCommand<serde_json::Value> for VerifyProposal {
                 "Transaction mismatch: The transaction you provided has a payload hash of \
                 {expected_payload_hash}, but the on-chain transaction proposal you specified has \
                 a payload hash of {actual_payload_hash}. For more info, see \
-                https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
+                https://aptos.dev/build/cli/working-with-move-contracts/multi-signature-tutorial"
             )))
         }
     }
@@ -512,7 +512,7 @@ impl CliCommand<serde_json::Value> for VerifyScriptProposal {
                 "Transaction mismatch: The transaction you provided has a payload hash of \
                 {expected_payload_hash}, but the on-chain transaction proposal you specified has \
                 a payload hash of {actual_payload_hash}. For more info, see \
-                https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
+                https://aptos.dev/build/cli/working-with-move-contracts/multi-signature-tutorial"
             )))
         }
     }

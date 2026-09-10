@@ -1,0 +1,10 @@
+name = "LeanerTransactionalTests"
+defaultTargets = ["LeanerTransactionalTests"]
+
+[[require]]
+name = "move"
+path = "../../../../lean/move"
+
+[[lean_lib]]
+name = "LeanerTransactionalTests"
+roots = ["arithmetic", "basic", "calls", "control_flow", "references"]

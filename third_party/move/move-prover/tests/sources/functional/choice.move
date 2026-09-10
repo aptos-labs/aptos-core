@@ -14,7 +14,7 @@ module 0x42::TestSome {
     }
 
     fun simple_incorrect(b: bool): u64 {
-        if (b) 4 else 5
+        return (if (b) 4 else 5)
     }
     spec simple_incorrect {
         // This fails because the interpretation is not influenced by an assertion.

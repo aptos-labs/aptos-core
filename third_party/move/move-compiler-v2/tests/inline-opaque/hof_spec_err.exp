@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: function spec blocks are not supported for inline functions with function-typed parameters; those functions are verified at each application site
+  ┌─ tests/inline-opaque/hof_spec_err.move:9:10
+  │
+9 │     spec apply {
+  │          ^^^^^
+
+error: function spec blocks are not supported for inline functions with function-typed parameters; those functions are verified at each application site
+   ┌─ tests/inline-opaque/hof_spec_err.move:16:10
+   │
+16 │     spec apply_opaque {
+   │          ^^^^^^^^^^^^

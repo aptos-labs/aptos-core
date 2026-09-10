@@ -116,6 +116,10 @@ impl NodeTool {
     }
 }
 
+/// Shared option for supplying validator settings from an operator config file
+///
+/// Values loaded from the file are used as defaults for the corresponding
+/// command line arguments, which take precedence when set explicitly.
 #[derive(Parser)]
 pub struct OperatorConfigFileArgs {
     /// Operator Configuration file
@@ -137,6 +141,10 @@ impl OperatorConfigFileArgs {
     }
 }
 
+/// Shared options for a validator's BLS12-381 consensus key
+///
+/// Both the public key and its proof of possession may instead be supplied
+/// through an operator config file.
 #[derive(Parser)]
 pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
@@ -187,6 +195,10 @@ impl ValidatorConsensusKeyArgs {
     }
 }
 
+/// Shared options for a validator's network addresses and network keys
+///
+/// These describe how the validator and its optional full node are reached by
+/// peers. They may instead be supplied through an operator config file.
 #[derive(Parser)]
 pub struct ValidatorNetworkAddressesArgs {
     /// Host and port pair for the validator

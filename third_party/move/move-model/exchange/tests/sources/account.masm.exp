@@ -1,0 +1,61 @@
+{
+  "version": 10,
+  "structs": [{"name": "Account", "fields": [{"name": "balance", "ty": "u64"}]}],
+  "funs": [
+    {
+      "name": "withdraw",
+      "params": 3,
+      "locals": [
+        {"ref": "signer"},
+        "address",
+        "u64",
+        {"struct": 0},
+        "address",
+        {"struct": 0},
+        "u64",
+        "u64",
+        "u64",
+        {"struct": 0},
+        {"ref": "signer"},
+        {"struct": 0}
+      ],
+      "returns": [],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [4, 1]},
+            {"call": [[5], {"move_from": 0}, [4]]},
+            {"call": [[6], "unpack", [5]]},
+            {"assign": [7, 2]},
+            {"call": [[8], {"sub": "u64"}, [6, 7]]},
+            {"call": [[9], "pack", [8]]},
+            {"assign": [3, 9]},
+            {"assign": [10, 0]},
+            {"assign": [11, 3]},
+            {"call": [[], {"move_to": 0}, [10, 11]]}
+          ],
+          "term": {"ret": []}
+        }
+      ],
+      "loops": [],
+      "spec": {
+        "requires": [
+          {"binop": ["eq", {"local": 0}, {"local": 1}]},
+          {"exists": [0, null, {"local": 1}]},
+          {"binop": ["le", {"local": 2}, {"select": [0, {"global": [0, null, {"local": 1}]}]}]}
+        ],
+        "aborts_if": [],
+        "ensures": [
+          {
+            "binop": [
+              "eq",
+              {"select": [0, {"global": [0, null, {"local": 1}]}]},
+              {"binop": ["sub", {"select": [0, {"global": [0, 0, {"local": 1}]}]}, {"local": 2}]}
+            ]
+          }
+        ],
+        "modifies": [{"resource": 0, "addr": {"local": 1}}]
+      }
+    }
+  ]
+}

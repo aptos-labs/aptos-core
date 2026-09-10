@@ -1,0 +1,7 @@
+Move prover returns: exiting with compilation errors
+error: a `map` intrinsic type must have exactly two type parameters (key and value)
+  ┌─ tests/sources/functional/intrinsic_map_arity_err.move:8:9
+  │
+8 │ ╭         pragma intrinsic = map,
+9 │ │             map_new = new;
+  │ ╰──────────────────────────^

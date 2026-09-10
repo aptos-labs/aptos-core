@@ -1,0 +1,25 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_spec_loop_anchor.move:25:15
+   │
+25 │           apply(|v: &mut vector<u64>| {
+   │ ╭───────────────^
+26 │ │             let i = 0;
+27 │ │             while (i < vector::length(v)) {
+28 │ │                 if (*vector::borrow(v, i) == 0) {
+   · │
+33 │ │             };
+34 │ │         }, x)
+   │ ╰─────────^
+   │
+   =     at tests/sources/functional/closures/lambda_spec_loop_anchor.move:25: drive
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/lambda_spec_loop_anchor.move:26: drive
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/lambda_spec_loop_anchor.move:27: drive
+   =     enter loop, variable(s) v, i havocked and reassigned
+   =         v = <redacted>
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/lambda_spec_loop_anchor.move:27: drive
+   =     at tests/sources/functional/closures/lambda_spec_loop_anchor.move:25: drive
+   =         v = <redacted>

@@ -1,87 +1,35 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! VM-agnostic execution outcomes ([`ExecOutcome`]) and the coarse three-category correctness
-//! check: both succeeding is a match, Move abort compares the abort code and message, other
-//! failures compare by kind, and anything else is a non-match.
-//!
-//! On success the two VMs are also compared on their **write set** — the writes each made, keyed
-//! by [`StateKey`] so both sides use the same `TransactionOutput` types.
+//! Comparison of the two VMs' transaction outputs. Both replays run
+//! configured to be gas-free, so allow for byte-for-byte equivalence.
 
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
+    transaction::TransactionOutput,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
-use move_core_types::vm_status::AbortLocation;
 use std::collections::BTreeMap;
 
-/// A transaction's writes, keyed by [`StateKey`]. `BTreeMap` gives a canonical order for free.
-pub type WriteSet = BTreeMap<StateKey, WriteOp>;
-
-/// A normalized, VM-agnostic class of non-abort runtime failure. The two VMs use different error
-/// types, so we match on the kind rather than a raw status code or message.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FailureKind {
-    /// Ran out of the gas budget.
-    OutOfGas,
-    /// Arithmetic overflow/underflow, division by zero, bad shift, bad cast.
-    Arithmetic,
-    /// `borrow_global`/`move_from` on a missing resource.
-    ResourceDoesNotExist,
-    /// `move_to` over an existing resource.
-    ResourceAlreadyExists,
-    /// Vector out-of-bounds, pop-from-empty, etc.
-    VectorError,
-    /// A structural runtime limit (stack/heap/value depth) was exceeded.
-    RuntimeLimitExceeded,
-    /// Type / reference-safety violation (paranoid checks, enum variant mismatch, etc.).
-    TypeOrReferenceSafety,
-    /// Missing/incompatible module, function, or struct (linking).
-    Linker,
-    /// A "should never happen" VM invariant violation.
-    InvariantViolation,
-    /// Anything not covered above.
-    Other,
-}
-
-impl std::fmt::Display for FailureKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-/// A VM-agnostic execution outcome, in one of the three comparable categories.
-pub enum ExecOutcome {
-    /// The entry function returned, emitting these events and producing this write set.
-    Success {
-        events: Vec<ContractEvent>,
-        writes: WriteSet,
-    },
-    /// The function executed a Move `abort` with this code. `message` is the optional abort message
-    /// (populated only for the message form of abort); `location` is the module that raised it.
-    Aborted {
-        code: u64,
-        message: Option<String>,
-        location: AbortLocation,
-    },
-    /// A non-abort runtime failure, classified by kind (with detail for reporting).
-    Failure { kind: FailureKind, detail: String },
-}
-
-/// The verdict of comparing the two VMs' outcomes.
+/// The verdict of comparing the two VMs' outputs.
 pub enum Correctness {
-    /// The outcomes agree at the level we check.
+    /// The outputs agree at the level we check.
     Match,
-    /// The outcomes disagree. Includes the case where V2 could not execute the transaction at all —
-    /// per the brief, that is just another non-match, not a softer category.
+    /// The outputs disagree. Includes the case where V2 could not execute the
+    /// transaction at all.
     Mismatch { detail: String },
 }
 
-/// Compares V1's outcome (V1 is the reference and is expected to always produce an outcome) with
-/// V2's result. `v2` is `Err` when V2 could not execute the transaction at all (the reason is
-/// surfaced as a mismatch).
-pub fn compare_outcomes(v1: &ExecOutcome, v2: Result<&ExecOutcome, &str>) -> Correctness {
+/// Compares V2's result against the reference (V1's output).
+///
+/// No-ops (modifications whose bytes equal the pre-transaction state) are pruned
+/// from both write sets before comparison.
+pub fn compare_outputs(
+    v1: &TransactionOutput,
+    v2: Result<&TransactionOutput, &str>,
+    pre_state: impl Fn(&StateKey) -> Option<Vec<u8>>,
+) -> Correctness {
     let v2 = match v2 {
         Ok(v2) => v2,
         Err(reason) => {
@@ -91,88 +39,94 @@ pub fn compare_outcomes(v1: &ExecOutcome, v2: Result<&ExecOutcome, &str>) -> Cor
         },
     };
 
-    match (v1, v2) {
-        (
-            ExecOutcome::Success {
-                events: v1_events,
-                writes: v1_writes,
-            },
-            ExecOutcome::Success {
-                events: v2_events,
-                writes: v2_writes,
-            },
-        ) => match compare_events(v1_events, v2_events) {
-            Correctness::Match => compare_write_sets(v1_writes, v2_writes),
-            mismatch => mismatch,
-        },
-        (
-            ExecOutcome::Aborted {
-                code: c1,
-                message: m1,
-                location: l1,
-            },
-            ExecOutcome::Aborted {
-                code: c2,
-                message: m2,
-                location: l2,
-            },
-        ) => {
-            if c1 != c2 {
-                Correctness::Mismatch {
-                    detail: format!(
-                        "both aborted but with different codes: V1={}, V2={}",
-                        c1, c2
-                    ),
-                }
-            } else if m1 != m2 {
-                Correctness::Mismatch {
-                    detail: format!(
-                        "both aborted with code {} but different messages: V1={:?}, V2={:?}",
-                        c1, m1, m2
-                    ),
-                }
-            } else if l1 != l2 {
-                Correctness::Mismatch {
-                    detail: format!(
-                        "both aborted with code {} but in different locations: V1={}, V2={}",
-                        c1, l1, l2
-                    ),
-                }
-            } else {
-                Correctness::Match
-            }
-        },
-        (ExecOutcome::Failure { kind: k1, .. }, ExecOutcome::Failure { kind: k2, .. }) => {
-            if k1 == k2 {
-                Correctness::Match
-            } else {
-                Correctness::Mismatch {
-                    detail: format!("both failed but with different kinds: V1={}, V2={}", k1, k2),
-                }
-            }
-        },
-        (v1, v2) => Correctness::Mismatch {
+    if v1.status() != v2.status() {
+        return Correctness::Mismatch {
             detail: format!(
-                "different outcome categories: V1={}, V2={}",
-                describe(v1),
-                describe(v2)
+                "statuses differ: V1={:?}, V2={:?}",
+                v1.status(),
+                v2.status()
             ),
-        },
+        };
+    }
+
+    // Both replays are gas-free; a nonzero charge means the zero-gas plumbing
+    // broke on one side.
+    if v1.gas_used() != v2.gas_used() {
+        return Correctness::Mismatch {
+            detail: format!(
+                "gas used differs under zero-gas replay: V1={}, V2={}",
+                v1.gas_used(),
+                v2.gas_used()
+            ),
+        };
+    }
+
+    match compare_write_sets(&real_writes(v1, &pre_state), &real_writes(v2, &pre_state)) {
+        Correctness::Match => compare_events(v1.events(), v2.events()),
+        mismatch => mismatch,
     }
 }
 
-fn describe(outcome: &ExecOutcome) -> String {
-    match outcome {
-        ExecOutcome::Success { .. } => "success".to_string(),
-        ExecOutcome::Aborted { code, location, .. } => {
-            format!("abort(code={} in {})", code, location)
-        },
-        ExecOutcome::Failure { kind, .. } => format!("failure({})", kind),
-    }
+/// The output's write set with no-op modifications pruned.
+fn real_writes<'a>(
+    output: &'a TransactionOutput,
+    pre_state: &impl Fn(&StateKey) -> Option<Vec<u8>>,
+) -> BTreeMap<&'a StateKey, &'a WriteOp> {
+    output
+        .write_set()
+        .write_op_iter()
+        .filter(|(key, op)| !is_noop_modification(key, op, pre_state))
+        .collect()
 }
 
-/// Compares the events emitted by the two VMs. Events are emitted in a deterministic order, so the
-/// sequences must agree element-for-element on type tag and payload.
+/// Whether the write is a modification whose bytes match the pre-transaction
+/// state, i.e. not a real state change.
+fn is_noop_modification(
+    key: &StateKey,
+    op: &WriteOp,
+    pre_state: impl Fn(&StateKey) -> Option<Vec<u8>>,
+) -> bool {
+    matches!(op.write_op_kind(), WriteOpKind::Modification)
+        && op
+            .bytes()
+            .is_some_and(|new| pre_state(key).is_some_and(|old| new.as_ref() == old.as_slice()))
+}
+
+/// Compares the two write sets: the same keys, and per key the same op kind
+/// and bytes. Metadata is gas bookkeeping (slot deposits, creation
+/// timestamps), which the gas-free replay does not model, so it is
+/// deliberately not compared.
+fn compare_write_sets(
+    v1: &BTreeMap<&StateKey, &WriteOp>,
+    v2: &BTreeMap<&StateKey, &WriteOp>,
+) -> Correctness {
+    for (key, op1) in v1 {
+        let Some(op2) = v2.get(*key) else {
+            return Correctness::Mismatch {
+                detail: format!("write to {:?} present in V1 but not V2", key),
+            };
+        };
+        if op1.write_op_kind() != op2.write_op_kind() || op1.bytes() != op2.bytes() {
+            return Correctness::Mismatch {
+                detail: format!(
+                    "write to {:?} differs: V1 {}, V2 {}",
+                    key,
+                    describe_op(op1),
+                    describe_op(op2)
+                ),
+            };
+        }
+    }
+    if let Some(key) = v2.keys().find(|key| !v1.contains_key(*key)) {
+        return Correctness::Mismatch {
+            detail: format!("write to {:?} present in V2 but not V1", key),
+        };
+    }
+    Correctness::Match
+}
+
+/// Compares the events emitted by the two VMs. Events are emitted in a
+/// deterministic order, so the sequences must agree element-for-element.
 fn compare_events(v1: &[ContractEvent], v2: &[ContractEvent]) -> Correctness {
     if v1.len() != v2.len() {
         return Correctness::Mismatch {
@@ -206,65 +160,6 @@ fn describe_event(event: &ContractEvent) -> String {
     )
 }
 
-/// Drops writes that did not actually change state, so a write set reflects real modifications.
-///
-/// Both VMs over-approximate: `borrow_global_mut` marks a resource written even if the borrow never
-/// mutates it, leaving a `Modification` whose new bytes equal the pre-transaction value. Pruning
-/// both sides makes the comparison about real state changes rather than these no-op copies.
-///
-/// `pre_state` returns the pre-transaction bytes, or `None` if the slot did not exist. A write is
-/// dropped only when the pre-state is known and byte-identical.
-pub fn prune_unchanged_modifications(
-    writes: &mut WriteSet,
-    pre_state: impl Fn(&StateKey) -> Option<Vec<u8>>,
-) {
-    writes.retain(|key, op| {
-        if !matches!(op.write_op_kind(), WriteOpKind::Modification) {
-            return true;
-        }
-        let Some(new_bytes) = op.bytes() else {
-            return true;
-        };
-        pre_state(key).is_none_or(|old_bytes| new_bytes.as_ref() != old_bytes.as_slice())
-    });
-}
-
-/// Compares the two VMs' write sets. A mismatch is reported for a key present on only one side or a
-/// differing write op (kind or bytes).
-///
-/// The comparison is strict: because both VMs over-approximate modifications, a write only one side
-/// emits — even with identical bytes — is surfaced rather than hidden.
-fn compare_write_sets(v1: &WriteSet, v2: &WriteSet) -> Correctness {
-    for key in v1.keys() {
-        if !v2.contains_key(key) {
-            return Correctness::Mismatch {
-                detail: format!("write to {:?} present in V1 but not V2", key),
-            };
-        }
-    }
-    for key in v2.keys() {
-        if !v1.contains_key(key) {
-            return Correctness::Mismatch {
-                detail: format!("write to {:?} present in V2 but not V1", key),
-            };
-        }
-    }
-    for (key, op1) in v1 {
-        let op2 = &v2[key];
-        if op1 != op2 {
-            return Correctness::Mismatch {
-                detail: format!(
-                    "write to {:?} differs: V1 {}, V2 {}",
-                    key,
-                    describe_op(op1),
-                    describe_op(op2)
-                ),
-            };
-        }
-    }
-    Correctness::Match
-}
-
 fn describe_op(op: &WriteOp) -> String {
     let kind = match op.write_op_kind() {
         WriteOpKind::Creation => "creation",
@@ -280,112 +175,159 @@ fn describe_op(op: &WriteOp) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_types::{
+        transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+        write_set::WriteSetMut,
+    };
 
     fn key(name: &str) -> StateKey {
         StateKey::raw(name.as_bytes())
     }
 
-    fn success(writes: WriteSet) -> ExecOutcome {
-        ExecOutcome::Success {
-            events: vec![],
+    fn output(
+        status: TransactionStatus,
+        writes: Vec<(&str, WriteOp)>,
+        events: Vec<ContractEvent>,
+    ) -> TransactionOutput {
+        let write_set = WriteSetMut::new(writes.into_iter().map(|(n, op)| (key(n), op)))
+            .freeze()
+            .expect("write set freezes");
+        TransactionOutput::new(
+            write_set,
+            events,
+            0,
+            status,
+            TransactionAuxiliaryData::default(),
+        )
+    }
+
+    fn success(writes: Vec<(&str, WriteOp)>, events: Vec<ContractEvent>) -> TransactionOutput {
+        output(
+            TransactionStatus::Keep(ExecutionStatus::Success),
             writes,
-        }
+            events,
+        )
     }
 
-    fn ws(entries: Vec<(&str, WriteOp)>) -> WriteSet {
-        entries.into_iter().map(|(n, op)| (key(n), op)).collect()
+    fn event(payload: Vec<u8>) -> ContractEvent {
+        use std::str::FromStr;
+        let type_tag = move_core_types::language_storage::TypeTag::from_str("0x1::test::Event")
+            .expect("valid type tag");
+        ContractEvent::new_v2(type_tag, payload).expect("valid event")
     }
 
-    fn is_match(v1: &ExecOutcome, v2: &ExecOutcome) -> bool {
-        matches!(compare_outcomes(v1, Ok(v2)), Correctness::Match)
-    }
-
-    fn abort_in(code: u64, module_name: &str) -> ExecOutcome {
-        use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-        ExecOutcome::Aborted {
-            code,
-            message: None,
-            location: AbortLocation::Module(move_core_types::language_storage::ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::new(module_name).expect("valid identifier"),
-            )),
-        }
+    fn is_match(v1: &TransactionOutput, v2: &TransactionOutput) -> bool {
+        matches!(compare_outputs(v1, Ok(v2), |_| None), Correctness::Match)
     }
 
     #[test]
-    fn identical_write_sets_match() {
-        let w = || ws(vec![("A", WriteOp::legacy_creation(vec![1, 2, 3].into()))]);
-        assert!(is_match(&success(w()), &success(w())));
-    }
-
-    #[test]
-    fn identical_aborts_match() {
-        assert!(is_match(&abort_in(7, "coin"), &abort_in(7, "coin")));
-    }
-
-    #[test]
-    fn abort_location_difference_is_a_mismatch() {
-        let Correctness::Mismatch { detail } =
-            compare_outcomes(&abort_in(7, "coin"), Ok(&abort_in(7, "account")))
-        else {
-            panic!("expected Mismatch");
+    fn identical_outputs_match() {
+        let make = || {
+            success(
+                vec![("A", WriteOp::legacy_creation(vec![1, 2, 3].into()))],
+                vec![event(vec![7])],
+            )
         };
-        assert!(detail.contains("different locations"), "{detail}");
+        assert!(is_match(&make(), &make()));
+    }
+
+    #[test]
+    fn status_difference_is_a_mismatch() {
+        let v1 = success(vec![], vec![]);
+        let v2 = output(
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+            vec![],
+            vec![],
+        );
+        assert!(!is_match(&v1, &v2));
     }
 
     #[test]
     fn missing_key_is_a_mismatch() {
-        let v1 = success(ws(vec![("A", WriteOp::legacy_creation(vec![1].into()))]));
-        let v2 = success(ws(vec![]));
+        let v1 = success(
+            vec![("A", WriteOp::legacy_creation(vec![1].into()))],
+            vec![],
+        );
+        let v2 = success(vec![], vec![]);
         assert!(!is_match(&v1, &v2));
         assert!(!is_match(&v2, &v1));
     }
 
     #[test]
     fn differing_bytes_are_a_mismatch() {
-        let v1 = success(ws(vec![(
-            "A",
-            WriteOp::legacy_modification(vec![1, 2, 3].into()),
-        )]));
-        let v2 = success(ws(vec![(
-            "A",
-            WriteOp::legacy_modification(vec![1, 2, 4].into()),
-        )]));
+        let v1 = success(
+            vec![("A", WriteOp::legacy_modification(vec![1, 2, 3].into()))],
+            vec![],
+        );
+        let v2 = success(
+            vec![("A", WriteOp::legacy_modification(vec![1, 2, 4].into()))],
+            vec![],
+        );
         assert!(!is_match(&v1, &v2));
     }
 
     #[test]
     fn differing_op_kind_is_a_mismatch() {
-        let v1 = success(ws(vec![("A", WriteOp::legacy_creation(vec![1].into()))]));
-        let v2 = success(ws(vec![(
-            "A",
-            WriteOp::legacy_modification(vec![1].into()),
-        )]));
+        let v1 = success(
+            vec![("A", WriteOp::legacy_creation(vec![1].into()))],
+            vec![],
+        );
+        let v2 = success(
+            vec![("A", WriteOp::legacy_modification(vec![1].into()))],
+            vec![],
+        );
         assert!(!is_match(&v1, &v2));
     }
 
     #[test]
-    fn prune_drops_only_unchanged_modifications() {
-        let mut writes = ws(vec![
-            ("Same", WriteOp::legacy_modification(vec![1, 2, 3].into())), // no-op: dropped
-            ("Changed", WriteOp::legacy_modification(vec![9].into())),    // real change: kept
-            ("New", WriteOp::legacy_creation(vec![1, 2, 3].into())),      // creation: kept
-            ("Gone", WriteOp::legacy_deletion()),                         // deletion: kept
-            ("Unknown", WriteOp::legacy_modification(vec![7].into())),    // no pre-state: kept
-        ]);
-        prune_unchanged_modifications(&mut writes, |k| {
-            if *k == key("Same") || *k == key("Changed") {
-                Some(vec![1, 2, 3])
-            } else {
-                None
-            }
-        });
+    fn differing_event_payload_is_a_mismatch() {
+        let v1 = success(vec![], vec![event(vec![1])]);
+        let v2 = success(vec![], vec![event(vec![2])]);
+        assert!(!is_match(&v1, &v2));
+    }
 
-        assert!(!writes.contains_key(&key("Same")));
-        assert!(writes.contains_key(&key("Changed")));
-        assert!(writes.contains_key(&key("New")));
-        assert!(writes.contains_key(&key("Gone")));
-        assert!(writes.contains_key(&key("Unknown")));
-        assert_eq!(writes.len(), 4);
+    #[test]
+    fn v2_not_running_is_a_mismatch() {
+        let v1 = success(vec![], vec![]);
+        let Correctness::Mismatch { detail } = compare_outputs(&v1, Err("it broke"), |_| None)
+        else {
+            panic!("expected Mismatch");
+        };
+        assert!(detail.contains("it broke"), "{detail}");
+    }
+
+    #[test]
+    fn one_sided_noop_modification_is_pruned() {
+        // V2 over-approximates: it also "writes" B, but with the pre-state
+        // bytes. Pruning treats that as no write, so the outputs match.
+        let v1 = success(
+            vec![("A", WriteOp::legacy_modification(vec![9].into()))],
+            vec![],
+        );
+        let v2 = success(
+            vec![
+                ("A", WriteOp::legacy_modification(vec![9].into())),
+                ("B", WriteOp::legacy_modification(vec![1, 2, 3].into())),
+            ],
+            vec![],
+        );
+        let pre_state = |k: &StateKey| (*k == key("B")).then(|| vec![1, 2, 3]);
+        assert!(matches!(
+            compare_outputs(&v1, Ok(&v2), pre_state),
+            Correctness::Match
+        ));
+
+        // A changed write to B (bytes differ from pre-state) is still real.
+        let v2_changed = success(
+            vec![
+                ("A", WriteOp::legacy_modification(vec![9].into())),
+                ("B", WriteOp::legacy_modification(vec![4, 5].into())),
+            ],
+            vec![],
+        );
+        assert!(matches!(
+            compare_outputs(&v1, Ok(&v2_changed), pre_state),
+            Correctness::Mismatch { .. }
+        ));
     }
 }

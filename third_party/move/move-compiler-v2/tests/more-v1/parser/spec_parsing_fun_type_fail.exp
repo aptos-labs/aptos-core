@@ -1,7 +1,17 @@
 
 Diagnostics:
-error: Only inline functions may have function-typed parameters, but non-inline function `M::fun_type_in_prog` has a function parameter:
-  ┌─ tests/more-v1/parser/spec_parsing_fun_type_fail.move:2:9
+warning: Unused value of parameter `p`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p`), or binding to `_`
+  ┌─ tests/more-v1/parser/spec_parsing_fun_type_fail.move:2:26
   │
 2 │     fun fun_type_in_prog(p: |u64|u64) {
-  │         ^^^^^^^^^^^^^^^^ - Parameter `p` has function-valued type `|u64|u64`.
+  │                          ^
+
+
+Diagnostics:
+error: local `p` of type `|u64|u64` does not have the `drop` ability
+  ┌─ tests/more-v1/parser/spec_parsing_fun_type_fail.move:2:39
+  │
+2 │       fun fun_type_in_prog(p: |u64|u64) {
+  │ ╭───────────────────────────────────────^
+3 │ │     }
+  │ ╰─────^ implicitly dropped here since it is no longer used

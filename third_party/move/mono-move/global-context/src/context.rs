@@ -71,7 +71,8 @@ mod module_ids;
 use module_ids::ModuleIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
-    FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
+    FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies,
+    ModuleSlot,
 };
 mod module_cache;
 use module_cache::ModuleCache;
@@ -318,35 +319,20 @@ pub struct ArenaRef<'guard, T: ?Sized> {
 
 impl GlobalContext {
     /// Creates a new global context with the specified number of workers that
-    /// can acquire [`ExecutionGuard`] and default maintenance config.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the number of workers is 0, greater than 128 or is not a
-    /// power of two.
+    /// can acquire [`ExecutionGuard`] and default maintenance config. The number
+    /// of workers is clamped to at least 1.
     pub fn with_num_execution_workers(num_workers: usize) -> Self {
         Self::with_num_execution_workers_and_config(num_workers, MaintenanceConfig::default())
     }
 
     /// Creates a new global context with the specified number of execution
     /// workers that can acquire [`ExecutionGuard`] and the maintenance config.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the number of workers is 0, greater than 128 or is not a
-    /// power of two.
+    /// The number of workers is clamped to at least 1.
     pub fn with_num_execution_workers_and_config(
         num_workers: usize,
         maintenance_config: MaintenanceConfig,
     ) -> Self {
-        assert!(
-            num_workers > 0 && num_workers <= 128,
-            "Number of workers must be between 1 and 128, got {num_workers}"
-        );
-        assert!(
-            num_workers.is_power_of_two(),
-            "Number of workers must be a power of two, got {num_workers}"
-        );
+        let num_workers = num_workers.max(1);
 
         Self {
             ctx: Context {
@@ -573,6 +559,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
                     .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}"));
                 self.append_descriptor(desc)
             })
+    }
+
+    /// The struct-object descriptor already published for `struct_ty`, if any.
+    pub fn struct_descriptor(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .struct_by_ty
+            .get(&struct_ty)
+            .map(|id| *id)
     }
 
     /// Materializes a struct-object descriptor for `struct_ty` (the inline

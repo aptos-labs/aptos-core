@@ -63,7 +63,9 @@ module 0x42::generic_resource_global {
 // RUN: execute 0x42::generic_resource_global::double_publish --args 0x11, 3
 // CHECK-V1-SUBSTR: RESOURCE_ALREADY_EXISTS
 // CHECK-V2-SUBSTR: already exists
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x42::generic_resource_global::take_missing --args 0x12
 // CHECK-V1-SUBSTR: MISSING_DATA
 // CHECK-V2-SUBSTR: MoveFrom: resource does not exist
+// CHECK-ERROR-PARITY

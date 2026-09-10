@@ -1,0 +1,18 @@
+processed 1 task
+task 0 lines 1-24:  publish [import Move]
+Error: compilation errors:
+ error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:15:34
+   │
+15 │ end LeanerTxnRejectUnselectedCall
+   │                                  ^
+
+error: while compiling Move function `LeanerTxnRejectUnselectedCall.caller`:
+Move function `LeanerTxnRejectUnselectedCall.helper` has no enclosing `module` identity
+   ┌─ TEMPFILE:15:34
+   │
+15 │ end LeanerTxnRejectUnselectedCall
+   │                                  ^
+
+
+exiting with Leaner elaboration errors

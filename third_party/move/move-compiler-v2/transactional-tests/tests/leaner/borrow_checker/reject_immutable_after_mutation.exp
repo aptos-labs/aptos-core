@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-20:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error `observation`: cannot create an immutable reference while a prophecy is active in the same tree (conflicts with `writer`)
+   ┌─ TEMPFILE:10:5
+   │
+10 │     let observation ← &owner
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

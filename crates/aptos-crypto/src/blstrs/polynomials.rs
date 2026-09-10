@@ -303,7 +303,7 @@ pub fn poly_mul_assign_slow(f: &[Scalar], g: &[Scalar], out: &mut Vec<Scalar>) {
     let g_len = g.len();
 
     // Set `out` to all zeros.
-    out.truncate(0); // Rust docs say "Note that this method has no effect on the allocated capacity of the vector."
+    out.clear(); // Rust docs say "Note that this method has no effect on the allocated capacity of the vector."
     out.resize(f_len + g_len - 1, Scalar::ZERO);
     for (i1, a) in f.iter().enumerate() {
         for (i2, b) in g.iter().enumerate() {
@@ -339,7 +339,7 @@ pub fn poly_mul_slow(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
 pub fn poly_mul_assign_less_slow(f: &Vec<Scalar>, g: &Vec<Scalar>, out: &mut Vec<Scalar>) {
     let mut result = poly_mul_less_slow(f.as_slice(), g.as_slice());
 
-    out.truncate(0);
+    out.clear();
     out.append(&mut result);
 }
 

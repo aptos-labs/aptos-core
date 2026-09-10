@@ -1,0 +1,60 @@
+name: "Framework function usage: Mainnet"
+
+on:
+  workflow_dispatch:
+    inputs:
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: Optional tools image commit; defaults to the current branch.
+      START_VERSION:
+        required: false
+        type: string
+        description: First ledger version. Mutually exclusive with START_TIME.
+      END_VERSION:
+        required: false
+        type: string
+        description: Last ledger version. Mutually exclusive with END_TIME.
+      START_TIME:
+        required: false
+        type: string
+        description: 'Start time, for example "7 days ago" or "2026-08-01" (UTC).'
+      END_TIME:
+        required: false
+        type: string
+        description: 'End time, for example "now" or "2026-08-08" (UTC).'
+      DRY_RUN:
+        required: false
+        type: boolean
+        description: Validate inputs without building or running workers.
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
+    secrets:
+      APTOS_BOT_PAT: ${{ secrets.APTOS_BOT_PAT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ENV_ECR_AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+      GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+    with:
+      NETWORK: mainnet
+      IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+      START_VERSION: ${{ inputs.START_VERSION }}
+      END_VERSION: ${{ inputs.END_VERSION }}
+      START_TIME: ${{ inputs.START_TIME }}
+      END_TIME: ${{ inputs.END_TIME }}
+      FRAMEWORK_USAGE: true
+      DRY_RUN: ${{ inputs.DRY_RUN || false }}

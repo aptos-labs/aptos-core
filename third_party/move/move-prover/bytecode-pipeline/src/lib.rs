@@ -6,6 +6,7 @@ pub mod eliminate_imm_refs;
 pub mod global_invariant_analysis;
 pub mod global_invariant_instrumentation;
 pub mod inconsistency_check;
+pub mod lifted_lambda;
 pub mod loop_analysis;
 pub mod memory_instrumentation;
 pub mod mono_analysis;

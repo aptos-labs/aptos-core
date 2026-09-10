@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Move specification-inference run",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "round_id",
+    "task_id",
+    "target",
+    "arm",
+    "replicate",
+    "task_snapshot",
+    "plugin_dir",
+    "plugin_manifest_sha256",
+    "initial_tree_sha256",
+    "mutant_manifest_sha256",
+    "required_contract_categories"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
+    "round_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
+    "task_id": {"type": "string"},
+    "target": {"type": "string"},
+    "arm": {"enum": ["agent_only", "hybrid_guided", "hybrid_flexible"]},
+    "replicate": {"type": "integer", "minimum": 1},
+    "order": {"type": "integer", "minimum": 1, "maximum": 3},
+    "task_snapshot": {"type": "string"},
+    "plugin_dir": {"type": "string"},
+    "plugin_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "initial_tree_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mutant_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "experiment_config_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "required_contract_categories": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["normal-result", "abort", "state-transition", "frame", "loop-invariant"]
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -60,15 +60,15 @@ fun cmp(r0, r1, r2, r3): u64 {
     r6: u64
   code:
   L2:
-    0: r4 := pack 0x1::test::Point, [r0, r1]
-    1: r5 := pack 0x1::test::Point, [r2, r3]
-    2: br_neq L0, r4, r5
+    0: r4 := pack 0x1::test::Point, [r0, r1] @2
+    1: r5 := pack 0x1::test::Point, [r2, r3] @5
+    2: br_neq L0, r4, r5 @6
   L1:
-    3: r6 := ld_u64 10
-    4: ret [r6]
+    3: r6 := ld_u64 10 @8
+    4: ret [r6] @9
   L0:
-    5: r6 := ld_u64 42
-    6: ret [r6]
+    5: r6 := ld_u64 42 @10
+    6: ret [r6] @11
 }
 
 fun eq(r0, r1, r2, r3): bool {
@@ -82,10 +82,10 @@ fun eq(r0, r1, r2, r3): bool {
     r6: bool
   code:
   L0:
-    0: r4 := pack 0x1::test::Point, [r0, r1]
-    1: r5 := pack 0x1::test::Point, [r2, r3]
-    2: r6 := eq r4, r5
-    3: ret [r6]
+    0: r4 := pack 0x1::test::Point, [r0, r1] @2
+    1: r5 := pack 0x1::test::Point, [r2, r3] @5
+    2: r6 := eq r4, r5 @6
+    3: ret [r6] @7
 }
 
 fun neq(r0, r1, r2, r3): bool {
@@ -99,10 +99,10 @@ fun neq(r0, r1, r2, r3): bool {
     r6: bool
   code:
   L0:
-    0: r4 := pack 0x1::test::Point, [r0, r1]
-    1: r5 := pack 0x1::test::Point, [r2, r3]
-    2: r6 := neq r4, r5
-    3: ret [r6]
+    0: r4 := pack 0x1::test::Point, [r0, r1] @2
+    1: r5 := pack 0x1::test::Point, [r2, r3] @5
+    2: r6 := neq r4, r5 @6
+    3: ret [r6] @7
 }
 === micro-ops ===
 // module 0x1::test
@@ -111,41 +111,41 @@ fun cmp() {
   frame_data_size: 72
   entry_gas: 103
   code:
-    0: Move8 [40] <- [8]
-    1: Move8 [32] <- [0]
-    2: Move8 [56] <- [24]
-    3: Move8 [48] <- [16]
-    4: JumpValueCmp @8 [32] != [48] : 0x1::test::Point gas_taken=56 gas_fallthrough=56
-    5: StoreImm8 [64] <- #10
-    6: Move8 [0] <- [64]
-    7: Return
-    8: StoreImm8 [64] <- #42
-    9: Move8 [0] <- [64]
-    10: Return
+    0: Move8 [40] <- [8] @2
+    1: Move8 [32] <- [0] @2
+    2: Move8 [56] <- [24] @5
+    3: Move8 [48] <- [16] @5
+    4: JumpValueCmp @8 [32] != [48] : 0x1::test::Point gas_taken=56 gas_fallthrough=56 @6
+    5: StoreImm8 [64] <- #10 @8
+    6: Move8 [0] <- [64] @9
+    7: Return @9
+    8: StoreImm8 [64] <- #42 @10
+    9: Move8 [0] <- [64] @11
+    10: Return @11
 }
 
 fun eq() {
   frame_data_size: 72
   entry_gas: 117
   code:
-    0: Move8 [40] <- [8]
-    1: Move8 [32] <- [0]
-    2: Move8 [56] <- [24]
-    3: Move8 [48] <- [16]
-    4: ValueCmp [64] <- [32] == [48] : 0x1::test::Point
-    5: Move(1) [0] <- [64]
-    6: Return
+    0: Move8 [40] <- [8] @2
+    1: Move8 [32] <- [0] @2
+    2: Move8 [56] <- [24] @5
+    3: Move8 [48] <- [16] @5
+    4: ValueCmp [64] <- [32] == [48] : 0x1::test::Point @6
+    5: Move(1) [0] <- [64] @7
+    6: Return @7
 }
 
 fun neq() {
   frame_data_size: 72
   entry_gas: 117
   code:
-    0: Move8 [40] <- [8]
-    1: Move8 [32] <- [0]
-    2: Move8 [56] <- [24]
-    3: Move8 [48] <- [16]
-    4: ValueCmp [64] <- [32] != [48] : 0x1::test::Point
-    5: Move(1) [0] <- [64]
-    6: Return
+    0: Move8 [40] <- [8] @2
+    1: Move8 [32] <- [0] @2
+    2: Move8 [56] <- [24] @5
+    3: Move8 [48] <- [16] @5
+    4: ValueCmp [64] <- [32] != [48] : 0x1::test::Point @6
+    5: Move(1) [0] <- [64] @7
+    6: Return @7
 }

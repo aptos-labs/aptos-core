@@ -106,7 +106,25 @@ pub trait NativeContext {
     /// Allocates a `vector<u8>` on the VM heap initialized with `bytes` and
     /// returns a handle to it. The vector stays live for the rest of the
     /// native call.
-    fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> VMResult<Vector<'a, u8>>;
+    fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> VMResult<Vector<'a, u8>> {
+        let vec = self.new_vector_no_pointers(1, bytes.len() as u64, bytes)?;
+        // SAFETY: the vector was allocated with element size 1 and no internal
+        // pointers, matching the layout of `u8`.
+        Ok(unsafe { vec.transmute_unchecked() })
+    }
+
+    /// Allocates a vector of the specified number of pointer-free elements on
+    /// the heap, initialized from already packed in-frame element bytes. These
+    /// bytes must be exactly `count * elem_size` bytes long.
+    ///
+    /// Only valid when the element has no internal heap pointers (for example,
+    /// an integer or address).
+    fn new_vector_no_pointers<'a>(
+        &'a self,
+        elem_size: u32,
+        count: u64,
+        data: &[u8],
+    ) -> VMResult<Vector<'a, Opaque>>;
 
     /// Moves the elements of `from` at `[removal_position, removal_position + length)`
     /// into `to` at `insert_position`.

@@ -1,0 +1,7 @@
+module 0x42::acyclic
+
+fun g(t: u64): u64
+    branch l2
+l1: move_loc t
+    ret
+l2: branch l1

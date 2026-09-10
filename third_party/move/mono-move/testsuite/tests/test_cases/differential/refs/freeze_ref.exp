@@ -8,11 +8,11 @@ fun frozen_read(r0): u64 {
     r2: &mut u64
   code:
   L0:
-    0: r1 := move r0
-    1: r2 := mut_borrow_loc r1
-    2: x0 := freeze_ref r2
-    3: [x0] := call read, [x0]
-    4: ret [x0]
+    0: r1 := move r0 @0
+    1: r2 := mut_borrow_loc r1 @2
+    2: x0 := freeze_ref r2 @3
+    3: [x0] := call read, [x0] @4
+    4: ret [x0] @5
 }
 
 fun read(r0): u64 {
@@ -21,8 +21,8 @@ fun read(r0): u64 {
     r1: u64
   code:
   L0:
-    0: r1 := read_ref r0
-    1: ret [r1]
+    0: r1 := read_ref r0 @1
+    1: ret [r1] @2
 }
 === micro-ops ===
 // module 0x1::test
@@ -31,19 +31,19 @@ fun frozen_read() {
   frame_data_size: 32
   entry_gas: 147
   code:
-    0: Move8 [8] <- [0]
-    1: SlotBorrow [16] <- &[8]
-    2: Move(16) [56] <- [16]
-    3: CallIndirect 0x1::test::read
-    4: Move8 [0] <- [56]
-    5: Return
+    0: Move8 [8] <- [0] @0
+    1: SlotBorrow [16] <- &[8] @2
+    2: Move(16) [56] <- [16] @3
+    3: CallIndirect 0x1::test::read @4
+    4: Move8 [0] <- [56] @5
+    5: Return @5
 }
 
 fun read() {
   frame_data_size: 24
   entry_gas: 80
   code:
-    0: ReadRef [16] <- *[0] (size=8)
-    1: Move8 [0] <- [16]
-    2: Return
+    0: ReadRef [16] <- *[0] (size=8) @1
+    1: Move8 [0] <- [16] @2
+    2: Return @2
 }

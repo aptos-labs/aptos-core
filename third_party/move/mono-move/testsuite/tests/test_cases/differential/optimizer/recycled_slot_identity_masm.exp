@@ -1,0 +1,71 @@
+=== stackless ===
+// module 0x66::recycled_slot_identity_copy_masm
+
+fun bonus7(): u64 {
+  slots: params(0), locals(0), temps(1)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 7 @0
+    1: ret [r0] @1
+}
+
+fun mutate_first(r0, r1): u64 {
+  slots: params(2), locals(0), temps(6)
+    r0: vector<u64>
+    r1: u64
+    r2: u64
+    r3: &mut vector<u64>
+    r4: u64
+    r5: &mut u64
+    r6: &vector<u64>
+    r7: &u64
+  code:
+  L0:
+    0: r2 := ld_u64 99 @0
+    1: r3 := mut_borrow_loc r0 @1
+    2: r4 := ld_u64 0 @2
+    3: r5 := vec_mut_borrow u64, r3, r4 @3
+    4: write_ref r5, r2 @4
+    5: r6 := imm_borrow_loc r0 @5
+    6: r2 := ld_u64 0 @6
+    7: r7 := vec_imm_borrow u64, r6, r2 @7
+    8: r2 := read_ref r7 @8
+    9: r2 := add r2, r1 @10
+    10: ret [r2] @11
+}
+
+fun trigger(): u64 {
+  slots: params(0), locals(2), temps(6), transfer(2)
+    r0: vector<u64>
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+    r5: vector<u64>
+    r6: &vector<u64>
+    r7: &u64
+  code:
+  L0:
+    0: r2 := ld_u64 1 @0
+    1: r3 := ld_u64 2 @1
+    2: r4 := ld_u64 3 @2
+    3: r0 := vec_pack u64, 3, [r2, r3, r4] @3
+    4: r4 := ld_u64 11 @5
+    5: r3 := ld_u64 12 @6
+    6: r2 := ld_u64 13 @7
+    7: r5 := vec_pack u64, 3, [r4, r3, r2] @8
+    8: r6 := imm_borrow_loc r0 @9
+    9: r1 := vec_len u64, r6 @10
+    10: r0 := move r5 @12
+    11: r5 := copy r0 @13
+    12: [x1] := call bonus7, [] @14
+    13: [r1] := call mutate_first, [r5, x1] @15
+    14: r6 := imm_borrow_loc r0 @17
+    15: r2 := ld_u64 0 @18
+    16: r7 := vec_imm_borrow u64, r6, r2 @19
+    17: r2 := read_ref r7 @20
+    18: r2 := mul r2, #100 @22
+    19: r2 := add r2, r1 @24
+    20: ret [r2] @25
+}

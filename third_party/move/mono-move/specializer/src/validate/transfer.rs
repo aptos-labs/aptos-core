@@ -310,13 +310,14 @@ mod tests {
     use super::*;
     use crate::{
         stackless_exec_ir::{
-            BasicBlock, BinaryOp, FunctionIR, HomeIndex, ImmValue, Instr, Label, NamedSlot,
+            BasicBlock, BinaryOp, FunctionIR, HomeIndex, ImmValue, Instr, InstrSeq, Label,
+            NamedSlot,
         },
         validate::TranslationWitness,
     };
     use move_binary_format::{
         control_flow_graph::VMControlFlowGraph,
-        file_format::{Bytecode, FunctionHandleIndex, IdentifierIndex},
+        file_format::{Bytecode, FunctionDefinitionIndex, FunctionHandleIndex, IdentifierIndex},
     };
 
     fn home(index: u16) -> NamedSlot {
@@ -342,13 +343,14 @@ mod tests {
         FunctionIR {
             name_idx: IdentifierIndex(0),
             handle_idx: FunctionHandleIndex(0),
+            def_idx: FunctionDefinitionIndex(0),
             num_params: 0,
             num_locals: 0,
             num_home_slots,
             num_transfer_positions,
             blocks: vec![BasicBlock {
                 label: Label(0),
-                instrs,
+                instrs: InstrSeq::for_tests(instrs),
             }],
             home_slot_types: Vec::new(),
             block_costs: Vec::new(),

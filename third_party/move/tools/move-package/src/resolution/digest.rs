@@ -5,7 +5,7 @@
 
 use crate::source_package::{layout::SourcePackageLayout, parsed_manifest::PackageDigest};
 use anyhow::Result;
-use move_command_line_common::files::MOVE_EXTENSION;
+use move_command_line_common::files::{LEAN_EXTENSION, MOVE_EXTENSION};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
@@ -18,7 +18,7 @@ pub fn compute_digest(paths: &[PathBuf]) -> Result<PackageDigest> {
     };
     let mut maybe_hash_file = |path: &Path| -> Result<()> {
         match path.extension() {
-            Some(x) if MOVE_EXTENSION == x => hash(path),
+            Some(x) if MOVE_EXTENSION == x || LEAN_EXTENSION == x => hash(path),
             _ if path.ends_with(SourcePackageLayout::Manifest.path()) => hash(path),
             _ => Ok(()),
         }

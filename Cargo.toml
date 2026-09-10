@@ -210,8 +210,11 @@ members = [
     "third_party/move/documentation/framework-book/builder",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
+    "third_party/move/mono-move/aptos-state-view-providers",
+    "third_party/move/mono-move/aptos-transaction-executor",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/global-context",
+    "third_party/move/mono-move/lean-link",
     "third_party/move/mono-move/loader",
     "third_party/move/mono-move/natives",
     "third_party/move/mono-move/orchestrator",
@@ -240,6 +243,7 @@ members = [
     "third_party/move/move-model/bytecode",
     "third_party/move/move-model/bytecode-test-utils",
     "third_party/move/move-model/bytecode/ast-generator-tests",
+    "third_party/move/move-model/exchange",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
@@ -247,6 +251,8 @@ members = [
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
+    "third_party/move/move-value-view",
+    "third_party/move/move-value-view-derive",
     "third_party/move/move-vm/integration-tests",
     "third_party/move/move-vm/metrics",
     "third_party/move/move-vm/profiler",
@@ -303,7 +309,7 @@ license = "LicenseRef-Aptos"
 license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.88"
+rust-version = "1.93"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -709,6 +715,7 @@ nalgebra = "0.32"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
+nix = { version = "0.29", features = ["signal"] }
 notify = "8.2.0"
 ntest = "0.9.3"
 num = "0.4.0"
@@ -902,8 +909,11 @@ aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/aptos-state-view-providers" }
+mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
+mono-move-lean-link = { path = "third_party/move/mono-move/lean-link" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-natives = { path = "third_party/move/mono-move/natives" }
 mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
@@ -922,12 +932,15 @@ move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytec
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
+move-value-view = { path = "third_party/move/move-value-view" }
+move-value-view-derive = { path = "third_party/move/move-value-view-derive" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
+move-model-exchange = { path = "third_party/move/move-model/exchange" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-package-cache = { path = "third_party/move/tools/move-package-cache" }
 move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }

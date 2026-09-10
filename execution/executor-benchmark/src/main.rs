@@ -24,7 +24,7 @@ use aptos_executor_benchmark::{
         },
     },
     pipeline::PipelineConfig,
-    BenchmarkWorkload, StorageTestConfig,
+    BenchmarkWorkload, FeatureFlagOverrides, StorageTestConfig,
 };
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
@@ -437,6 +437,20 @@ enum Command {
             help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
             Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
         disable_feature: Vec<FeatureFlag>,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Feature flags to enable on-chain after the init/publish phase and before the measured run, via a governance transaction that reconfigures. Enable / disable flags cannot overlap.")]
+        enable_feature_after_init: Vec<FeatureFlag>,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Feature flags to disable on-chain after the init/publish phase and before the measured run, via a governance transaction that reconfigures. Enable / disable flags cannot overlap.")]
+        disable_feature_after_init: Vec<FeatureFlag>,
     },
     AddAccounts {
         #[clap(long, value_parser)]
@@ -510,12 +524,9 @@ where
             checkpoint_dir,
             enable_feature,
             disable_feature,
+            enable_feature_after_init,
+            disable_feature_after_init,
         } => {
-            // aptos_types::on_chain_config::hack_enable_default_features_for_genesis(enable_feature);
-            // aptos_types::on_chain_config::hack_disable_default_features_for_genesis(
-            //     disable_feature,
-            // );
-
             let workload = if transaction_type.is_empty() {
                 BenchmarkWorkload::Transfer {
                     connected_tx_grps: opt.connected_tx_grps,
@@ -558,6 +569,10 @@ where
                     .pipeline_config(opt.storage_opt.enable_indexer_grpc),
                 get_init_features(enable_feature, disable_feature),
                 opt.use_keyless_accounts,
+                FeatureFlagOverrides {
+                    enable: enable_feature_after_init,
+                    disable: disable_feature_after_init,
+                },
             );
         },
         Command::AddAccounts {

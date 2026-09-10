@@ -58,11 +58,14 @@ module 0x42::globals {
 // RUN: execute 0x42::globals::double_publish --args 0x5
 // CHECK-V1-SUBSTR: RESOURCE_ALREADY_EXISTS
 // CHECK-V2-SUBSTR: already exists
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x42::globals::borrow_missing --args 0x123
 // CHECK-V1-SUBSTR: MISSING_DATA
 // CHECK-V2-SUBSTR: BorrowGlobal: resource does not exist
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x42::globals::take_missing --args 0x123
 // CHECK-V1-SUBSTR: MISSING_DATA
 // CHECK-V2-SUBSTR: MoveFrom: resource does not exist
+// CHECK-ERROR-PARITY

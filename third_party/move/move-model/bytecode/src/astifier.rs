@@ -2370,11 +2370,16 @@ impl AssignTransformer<'_> {
                 | Operation::Global(..)
                 | Operation::CanModify
                 | Operation::Old
+                | Operation::SaveStateAnchor(..)
+                | Operation::WithStateAnchor(..)
+                | Operation::FoldsCaptureAnchor(..)
+                | Operation::InlineCallSummary
                 | Operation::Trace(..)
                 | Operation::EmptyVec
                 | Operation::SingleVec
                 | Operation::UpdateVec
                 | Operation::ConcatVec
+                | Operation::ReverseVec
                 | Operation::IndexOfVec
                 | Operation::InRangeRange
                 | Operation::InRangeVec

@@ -6,8 +6,8 @@ fun get_val(): u64 {
     r0: u64
   code:
   L0:
-    0: r0 := ld_u64 42
-    1: ret [r0]
+    0: r0 := ld_u64 42 @0
+    1: ret [r0] @1
 }
 
 fun consume(r0): u64 {
@@ -16,8 +16,8 @@ fun consume(r0): u64 {
     r1: u64
   code:
   L0:
-    0: r1 := ld_u64 99
-    1: ret [r1]
+    0: r1 := ld_u64 99 @0
+    1: ret [r1] @1
 }
 
 fun trigger(r0): u64 {
@@ -25,14 +25,14 @@ fun trigger(r0): u64 {
     r0: u64
   code:
   L2:
-    0: br_gt L0, r0, #0
+    0: br_gt L0, r0, #0 @1
   L1:
-    1: [x0] := call get_val, []
-    2: ret [x0]
+    1: [x0] := call get_val, [] @4
+    2: ret [x0] @5
   L0:
-    3: x0 := ld_u64 5
-    4: [x0] := call consume, [x0]
-    5: ret [x0]
+    3: x0 := ld_u64 5 @6
+    4: [x0] := call consume, [x0] @7
+    5: ret [x0] @8
 }
 === micro-ops ===
 // module 0x66::test
@@ -41,29 +41,29 @@ fun get_val() {
   frame_data_size: 8
   entry_gas: 56
   code:
-    0: StoreImm8 [0] <- #42
-    1: Return
+    0: StoreImm8 [0] <- #42 @0
+    1: Return @1
 }
 
 fun consume() {
   frame_data_size: 16
   entry_gas: 56
   code:
-    0: StoreImm8 [8] <- #99
-    1: Move8 [0] <- [8]
-    2: Return
+    0: StoreImm8 [8] <- #99 @0
+    1: Move8 [0] <- [8] @1
+    2: Return @1
 }
 
 fun trigger() {
   frame_data_size: 8
   entry_gas: 3
   code:
-    0: JumpGreaterU64Imm @4 [0] > #0 gas_taken=92 gas_fallthrough=64
-    1: CallIndirect 0x66::test::get_val
-    2: Move8 [0] <- [32]
-    3: Return
-    4: StoreImm8 [32] <- #5
-    5: CallIndirect 0x66::test::consume
-    6: Move8 [0] <- [32]
-    7: Return
+    0: JumpGreaterU64Imm @4 [0] > #0 gas_taken=92 gas_fallthrough=64 @1
+    1: CallIndirect 0x66::test::get_val @4
+    2: Move8 [0] <- [32] @5
+    3: Return @5
+    4: StoreImm8 [32] <- #5 @6
+    5: CallIndirect 0x66::test::consume @7
+    6: Move8 [0] <- [32] @8
+    7: Return @8
 }

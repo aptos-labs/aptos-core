@@ -8,5 +8,5 @@ pub mod resource_provider;
 
 pub use module_provider::{ModuleProvider, NoModuleProvider};
 pub use resource_provider::{
-    NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
+    nominal_tag, NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
 };

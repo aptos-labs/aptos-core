@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-24:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error `parent`: reference is suspended by an active child borrow
+   ┌─ TEMPFILE:14:5
+   │
+14 │     let parentValue ← *parent
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

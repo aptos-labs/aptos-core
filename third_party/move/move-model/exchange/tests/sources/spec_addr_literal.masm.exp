@@ -1,0 +1,20 @@
+{
+  "version": 10,
+  "structs": [{"name": "R", "fields": [{"name": "v", "ty": "u64"}]}],
+  "funs": [
+    {
+      "name": "f",
+      "params": 1,
+      "locals": ["address", "address", "bool"],
+      "returns": ["bool"],
+      "blocks": [{"instrs": [{"assign": [1, 0]}, {"call": [[2], {"exists": 0}, [1]]}], "term": {"ret": [2]}}],
+      "loops": [],
+      "spec": {
+        "requires": [],
+        "aborts_if": [],
+        "ensures": [{"binop": ["eq", {"result": 0}, {"exists": [0, null, {"value": {"address": "0x42"}}]}]}],
+        "modifies": [{"resource": 0, "addr": {"value": {"address": "0x42"}}}]
+      }
+    }
+  ]
+}

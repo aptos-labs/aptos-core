@@ -18,7 +18,10 @@ use move_model::{
     ast::{ConditionKind, Exp, ExpData, QuantKind, RewriteResult, TempIndex},
     exp_generator::ExpGenerator,
     model::{FunctionEnv, Loc, NodeId, StructEnv},
-    pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
+    pragmas::{
+        INTRINSIC_FUN_MAP_BORROW_MUT, INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT,
+        INTRINSIC_FUN_MAP_ITER_BORROW_MUT, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP,
+    },
     ty::Type,
     well_known,
 };
@@ -187,13 +190,40 @@ impl<'a> Instrumenter<'a> {
             Type::Struct(mid, sid, targs) => {
                 let struct_env = env.get_module(*mid).into_struct(*sid);
                 if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                    // Propagating value invariants through a map requires the
+                    // `map_spec_get` binding. Without it: if the map also binds
+                    // a value-MUTATING role, stored values are reachable through
+                    // the model's write-back but the deep invariant cannot be
+                    // stated — silently skipping would DROP the check (unsound),
+                    // so that is a hard error. A map with no mutating role
+                    // (e.g. a ghost-declaring map with no bindings) skips
+                    // soundly: values are only ever inserted whole, with their
+                    // invariants checked at their own pack sites.
                     let decl = env
                         .get_intrinsics()
                         .get_decl_for_struct(&mid.qualified(*sid))
                         .expect("intrinsic declaration");
-                    let spec_fun_get = decl
-                        .lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_GET)
-                        .expect("intrinsic map_get function");
+                    let Some(spec_fun_get) = decl.lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_GET)
+                    else {
+                        let mutating = [
+                            INTRINSIC_FUN_MAP_BORROW_MUT,
+                            INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT,
+                            INTRINSIC_FUN_MAP_ITER_BORROW_MUT,
+                        ];
+                        if mutating
+                            .iter()
+                            .any(|role| decl.lookup_move_fun(env, role).is_some())
+                        {
+                            env.error(
+                                &env.get_node_loc(value.node_id()),
+                                "an intrinsic map binding a value-mutating role \
+                                 (`map_borrow_mut`, `map_borrow_mut_with_default`, \
+                                 `map_iter_borrow_mut`) must also bind `map_spec_get` \
+                                 so data invariants over stored values can be stated",
+                            );
+                        }
+                        return vec![];
+                    };
 
                     // When dealing with a map, we cannot maintain individual locations for
                     // invariants. Instead we choose just one as a representative.

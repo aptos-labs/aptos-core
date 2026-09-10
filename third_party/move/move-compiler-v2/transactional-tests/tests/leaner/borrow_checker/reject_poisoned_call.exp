@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-25:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error `poisoned`: reference was poisoned by an overlapping write (conflicts with `selected`)
+   ┌─ TEMPFILE:16:5
+   │
+16 │     observe poisoned
+   │     ^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

@@ -1,0 +1,57 @@
+// RUN: publish --print(stackless)
+module 0x66::recycled_slot_identity_copy_masm
+
+fun bonus7(): u64
+    ld_u64 7
+    ret
+
+// Takes the vector by value, writes 99 into element 0 in place, and
+// returns elem0_after + bonus.
+fun mutate_first(items: vector<u64>, bonus: u64): u64
+    ld_u64 99
+    mut_borrow_loc items
+    ld_u64 0
+    vec_mut_borrow <u64>
+    write_ref
+    borrow_loc items
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    move_loc bonus
+    add
+    ret
+
+fun trigger(): u64
+    local h: vector<u64>
+    local sink: u64
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    vec_pack <u64>, 3
+    st_loc h
+    ld_u64 11
+    ld_u64 12
+    ld_u64 13
+    vec_pack <u64>, 3
+    borrow_loc h
+    vec_len <u64>
+    st_loc sink
+    st_loc h
+    copy_loc h
+    call bonus7
+    call mutate_first
+    st_loc sink
+    borrow_loc h
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ld_u64 100
+    mul
+    move_loc sink
+    add
+    ret
+
+// h[0] must still be 11 after the callee mutates its copy:
+// 11*100 + (99 + 7) = 1206.
+// RUN: execute 0x66::recycled_slot_identity_copy_masm::trigger
+// CHECK: results: 1206

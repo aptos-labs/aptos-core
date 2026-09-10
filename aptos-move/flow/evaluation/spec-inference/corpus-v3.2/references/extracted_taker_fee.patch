@@ -1,0 +1,15 @@
+--- a/sources/etna/extracted_taker_fee.move
++++ b/sources/etna/extracted_taker_fee.move
+@@ -26,0 +27,12 @@ module decibel_dex::extracted_taker_fee {
++
++    spec calculate_min_net_taker_fee {
++        pragma opaque;
++        // Each `100 - pct` is `u128` subtraction, so a percentage above 100
++        // underflows. The source neither guards nor mentions it.
++        aborts_if [inferred] referral_fee_enabled && referred_fee_discount_pct > 100;
++        aborts_if [inferred] referral_fee_enabled && referral_fee_pct > 100;
++        ensures [inferred] !referral_fee_enabled ==> result == min_base_taker_fee;
++        ensures [inferred] referral_fee_enabled ==> result
++            == min_base_taker_fee * (100 - referred_fee_discount_pct) / 100
++                * (100 - referral_fee_pct) / 100;
++    }

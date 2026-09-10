@@ -9,13 +9,13 @@ fun local_across_blocks(r0, r1): u64 {
     r3: u64
   code:
   L2:
-    0: r2 := copy r1
-    1: br_true L0, r0
+    0: r2 := copy r1 @0
+    1: br_true L0, r0 @3
   L1:
-    2: r3 := ld_u64 0
-    3: ret [r3]
+    2: r3 := ld_u64 0 @4
+    3: ret [r3] @5
   L0:
-    4: ret [r2]
+    4: ret [r2] @7
 }
 
 fun borrow_written_local(r0): u64 {
@@ -26,10 +26,10 @@ fun borrow_written_local(r0): u64 {
     r3: u64
   code:
   L0:
-    0: r1 := copy r0
-    1: r2 := imm_borrow_loc r1
-    2: r3 := read_ref r2
-    3: ret [r3]
+    0: r1 := copy r0 @0
+    1: r2 := imm_borrow_loc r1 @2
+    2: r3 := read_ref r2 @3
+    3: ret [r3] @4
 }
 === micro-ops ===
 // module 0x66::locals_soundness
@@ -38,22 +38,22 @@ fun local_across_blocks() {
   frame_data_size: 32
   entry_gas: 29
   code:
-    0: Move8 [16] <- [8]
-    1: JumpNotZeroByte @5 [0] gas_taken=54 gas_fallthrough=56
-    2: StoreImm8 [24] <- #0
-    3: Move8 [0] <- [24]
-    4: Return
-    5: Move8 [0] <- [16]
-    6: Return
+    0: Move8 [16] <- [8] @0
+    1: JumpNotZeroByte @5 [0] gas_taken=54 gas_fallthrough=56 @3
+    2: StoreImm8 [24] <- #0 @4
+    3: Move8 [0] <- [24] @5
+    4: Return @5
+    5: Move8 [0] <- [16] @7
+    6: Return @7
 }
 
 fun borrow_written_local() {
   frame_data_size: 40
   entry_gas: 108
   code:
-    0: Move8 [8] <- [0]
-    1: SlotBorrow [16] <- &[8]
-    2: ReadRef [32] <- *[16] (size=8)
-    3: Move8 [0] <- [32]
-    4: Return
+    0: Move8 [8] <- [0] @0
+    1: SlotBorrow [16] <- &[8] @2
+    2: ReadRef [32] <- *[16] (size=8) @3
+    3: Move8 [0] <- [32] @4
+    4: Return @4
 }

@@ -1,0 +1,35 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/folds_of_callee_ensures.move:189:9
+    │
+189 │         ensures result == spec_sum(v, len(v)) + 1; // error: off by one
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:182: sum_via_callee_wrong
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:191: sum_via_callee_wrong (spec)
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:183: sum_via_callee_wrong
+    =         sum = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:11: each_ref
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:191: sum_via_callee_wrong (spec)
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:12: each_ref
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:13: each_ref
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:17: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:18: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:19: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:20: each_ref
+    =     enter loop, variable(s) sum, i havocked and reassigned
+    =         sum = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:18: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:19: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:20: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:14: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:185: sum_via_callee_wrong
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:182: sum_via_callee_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:189: sum_via_callee_wrong (spec)

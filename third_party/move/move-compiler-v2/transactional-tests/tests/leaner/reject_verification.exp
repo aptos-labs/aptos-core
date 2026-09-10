@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-15:  publish [import Move]
+Error: compilation errors:
+ error: verification failed for `LeanerRejectVerification.wrong_increment`: the implementation does not prove its contract; use `verify LeanerRejectVerification.wrong_increment by` to inspect and prove the remaining obligation
+  ┌─ TEMPFILE:9:3
+  │
+9 │   verify wrong_increment
+  │   ^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

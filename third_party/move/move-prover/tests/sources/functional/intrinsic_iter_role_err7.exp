@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_spec_aborts_iter_borrow_mut` function must have two type parameters and the signature (iterator_enum<K>, map<K, V>): bool, with the iterator enum of the `map_iter_borrow_mut` binding
+   ┌─ tests/sources/functional/intrinsic_iter_role_err7.move:21:10
+   │
+21 │     spec native fun bad_aborts<K: copy + drop, V, W>(it: Iter<K>, m: Map<K, V>, w: W): bool;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a `map_spec_aborts_iter_borrow_mut` binding requires `map_iter_borrow_mut` bound on the same map
+   ┌─ tests/sources/functional/intrinsic_iter_role_err7.move:45:10
+   │
+45 │     spec native fun lone_aborts<K: copy + drop, V>(it: Iter<K>, m: Map<K, V>): bool;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

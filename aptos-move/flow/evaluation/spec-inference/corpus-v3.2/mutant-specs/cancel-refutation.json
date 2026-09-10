@@ -1,0 +1,16 @@
+{
+ "TR-cancel-026": [
+  {"mutant_id": "TR-cancel-026-price-removed-alone", "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "                prices.remove(i);\n                sizes.remove(i);", "replace": "\n                sizes.remove(i);", "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "Only the price level is removed, so the two vectors fall out of step and every later size belongs to the wrong price."},
+  {"mutant_id": "TR-cancel-026-returns-the-price", "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "let cancelled_size = sizes[i];", "replace": "sizes[i]", "with": "prices[i]",
+   "obligation_category": "normal-result",
+   "rationale": "Returns the price of the cancelled level rather than its size."},
+  {"mutant_id": "TR-cancel-026-scans-past-end", "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "while (i < prices.length()) {\n            if (prices[i] == price) {", "replace": "i < prices.length()", "with": "i <= prices.length()",
+   "obligation_category": "abort",
+   "rationale": "One iteration too many indexes past the end when no level matches."}
+ ]
+}

@@ -1,0 +1,13 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "«move-model»",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../move-model",
+   "configFile": "lakefile.toml"}],
+ "name": "move",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

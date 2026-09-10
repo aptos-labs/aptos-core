@@ -25,9 +25,10 @@ fun aliased_swap(a: &mut E, b: &mut E, faked: &mut E) {
 \end{minipage}\hfil
 
 \noindent A call of the form |aliased_swap(p, q, ...)| where |p| and |q| alias should normally be rejected by the bytecode verifier.
-However, in hand-crafted bytecode, a borrow-analysis bug failed to recognize that |e.f1| and |e.f2|, fields of different variants, occupy the same physical offset, and so treated them as non-aliasing.
-This allowed creating mutable references to the same field offset in the enum, enabling a call to |aliased_swap| with aliased mutable references.
-This bug was discovered via the bug bounty program after the introduction of enum types.
+However, the implementation of the static borrow analysis had a bug in its \emph{borrow graph} representation.
+The analysis treats borrows along edges with distinct labels as disjoint, but the representation of labels for enum fields was not canonical: two distinct labels could denote the same field offset, though only in carefully hand-crafted bytecode (not shown here), never in compiler-emitted code.
+Verification thus admitted such bytecode where |aliased_swap| could be called with aliased mutable references, resulting in the type confusion vulnerability shown in the listing above.
+This bug was discovered via the bug bounty program after the introduction of enum types and was never exploited on the blockchain.
 
 \paragraph{Performing the Checks.}
 Checking reference safety at runtime for Move-style borrow semantics is novel (\S\ref{sec:concl}).
@@ -108,13 +109,14 @@ On return, every returned reference must denote a place inside the tree of some 
 Returned mutable references must also denote mutually disjoint places.
 Hence, the checker tracks precisely which parameter each returned reference derives from, along the executed path, while the static verifier conservatively assumes that a returned reference may borrow from every reference argument.
 
-Thus, we have a \emph{relaxed dynamic semantics} of the static borrow analysis: bytecode accepted by a correct static verifier is expected to pass the runtime checks on every execution, while the checker, observing only the executed path, does not have the join and call-summary over-approximations of the static verifier and thus admits strictly more behaviors.
+Thus, the checker realizes a \emph{relaxed dynamic semantics} of the static borrow analysis: (a) bytecode accepted by a correct static verifier is expected to pass the runtime checks on every execution, and (b) the checker admits strictly more behaviors, because it observes only the executed path and has none of the verifier's join and call-summary over-approximations.
+We have validated (a) empirically --- through extensive testing, fuzzing, and re-execution of billions of historical Aptos transactions --- without observing a false positive.
+We have confirmed (b) by hand-crafting bytecode that the static verifier rejects, yet which executes without violating reference safety and is hence admitted by the checker.
 
-Revisiting the example (Fig.~\ref{fig:aliastree}), the bytecode fragment runs successfully: the second $\BORROWLOC\ s$ briefly creates a second mutable reference at the tree root for $s$, but that reference is consumed by $\BORROWFIELD\ b$ before any destructive write fires, so nothing is poisoned.
-The exploit that mints the overlapping references is caught by poisoning%
-%\footnote{This description assumes \texttt{aliased\_swap} is inlined at the call site. Otherwise, it is caught by the checker at the call site due to non-disjoint arguments.}
-instead: tree edges are field offsets, so the borrow paths |e.f1| and |e.f2| land on the same node by construction.
-The destructive |mem::swap| then poisons the still-live payload reference |c| sitting at a descendant place, and the |admin_action(c)| aborts as it is considered |c|'s use.
+For the example (Fig.~\ref{fig:aliastree}), the bytecode fragment runs successfully: the second $\BORROWLOC\ s$ briefly creates a second mutable reference at the tree root for $s$, but that reference is consumed by $\BORROWFIELD\ b$ before any destructive write fires, so nothing is poisoned.
+
+The exploit described earlier in this section, that creates the aliased mutable references, is caught by poisoning instead: edges in the enum's access path tree are field offsets, so the two references land on the same node by construction.
+The destructive |mem::swap| then poisons the still-live payload reference |c| sitting at a descendant place, and the |admin_action(c)| aborts because it is |c|'s use.
 
 
 %%% Local Variables:

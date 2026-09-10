@@ -8,7 +8,7 @@ use crate::{
             respawned_session::RespawnedSession,
             user_transaction_sessions::session_change_sets::UserSessionChangeSet,
         },
-        AptosMoveResolver, SessionId,
+        AptosMoveResolver,
     },
     transaction_metadata::TransactionMetadata,
     verifier, AptosVM,
@@ -45,7 +45,7 @@ impl<'r> UserSession<'r> {
         resolver: &'r impl AptosMoveResolver,
         prologue_change_set: VMChangeSet,
     ) -> Self {
-        let session_id = SessionId::txn_meta(txn_meta);
+        let session_id = txn_meta.user_session_id();
 
         let session = RespawnedSession::spawn(
             vm,

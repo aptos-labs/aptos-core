@@ -893,7 +893,7 @@ where
     /// Updates the metrics for tracking pre-dial and connected peer ping latencies
     fn update_ping_latency_metrics(&self) {
         // Update the pre-dial peer ping latencies
-        for (_, peer) in self.discovered_peers.read().peer_set.iter() {
+        for peer in self.discovered_peers.read().peer_set.values() {
             if let Some(ping_latency_secs) = peer.ping_latency_secs {
                 counters::observe_pre_dial_ping_time(&self.network_context, ping_latency_secs);
             }

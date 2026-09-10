@@ -237,7 +237,7 @@ impl VerifiedEpochStates {
     /// exists).
     pub fn next_epoch_ending_version(&self, version: Version) -> Option<Version> {
         // BTreeMap keys are iterated through in increasing key orders (i.e., versions)
-        for (epoch_ending_version, _) in self.new_epoch_ending_ledger_infos.iter() {
+        for epoch_ending_version in self.new_epoch_ending_ledger_infos.keys() {
             if *epoch_ending_version > version {
                 return Some(*epoch_ending_version);
             }
@@ -386,9 +386,33 @@ impl<
 
     /// Marks bootstrapping as complete and notifies any listeners
     pub async fn bootstrapping_complete(&mut self) -> Result<(), Error> {
+        if self.is_bootstrapped() {
+            return Ok(());
+        }
+
+        self.reset_active_stream(None).await?;
+
+        // Chunks already handed to the storage synchronizer may still be in flight.
+        while self.storage_synchronizer.pending_storage_data() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                info!("Waiting for the storage synchronizer to handle pending data!")
+            );
+
+            // Yield to avoid starving the storage synchronizer threads.
+            tokio::task::yield_now().await;
+        }
+
+        if self.storage_synchronizer.pending_storage_data_error() {
+            return Err(Error::UnexpectedError(
+                "The storage synchronizer failed while draining pending data!".into(),
+            ));
+        }
+
+        self.storage_synchronizer.finish_chunk_executor();
+        self.bootstrapped = true;
         info!(LogSchema::new(LogEntry::Bootstrapper)
             .message("The node has successfully bootstrapped!"));
-        self.bootstrapped = true;
         self.notify_listeners_if_bootstrapped().await
     }
 
@@ -418,8 +442,6 @@ impl<
                     )));
                 }
             }
-            self.reset_active_stream(None).await?;
-            self.storage_synchronizer.finish_chunk_executor(); // The bootstrapper is now complete
         }
 
         Ok(())

@@ -37,10 +37,8 @@ pub fn read_env_var(v: &str) -> String {
 
 /// Build the test-mode `ProverOptions` shared by both the panic-on-error
 /// and baseline-driven entry points.
-fn build_test_options(shards: usize, only_shard: Option<usize>) -> ProverOptions {
+fn build_test_options() -> ProverOptions {
     let mut options = ProverOptions::default_for_test();
-    options.shards = Some(shards);
-    options.only_shard = only_shard;
     options.check_inconsistency = read_env_var(ENV_TEST_INCONSISTENCY) == "1";
     options.unconditional_abort_as_inconsistency =
         read_env_var(ENV_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY) == "1";
@@ -69,13 +67,9 @@ fn assert_prover_tools_available(options: &ProverOptions) {
     }
 }
 
-pub fn run_prover_for_pkg(
-    path_to_pkg: impl Into<String>,
-    shards: usize,
-    only_shard: Option<usize>,
-) {
+pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    let options = build_test_options(shards, only_shard);
+    let options = build_test_options();
     assert_prover_tools_available(&options);
     options
         .prove(
@@ -100,14 +94,9 @@ pub fn run_prover_for_pkg(
 /// The error is captured into the baseline output, so subsequent runs verify
 /// the captured text against the stored baseline. Set `UB=1` (or `UPBL=1` /
 /// `UPDATE_BASELINE=1`) to (re)create the baseline from the current output.
-pub fn run_prover_for_pkg_with_baseline(
-    test_file: &str,
-    path_to_pkg: impl Into<String>,
-    shards: usize,
-    only_shard: Option<usize>,
-) {
+pub fn run_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    let mut options = build_test_options(shards, only_shard);
+    let mut options = build_test_options();
     // Redact non-deterministic values (signer addresses, fresh temp ids, …)
     // in the prover's diagnostic output so the captured baseline is stable
     // across runs — same mechanism as `move-prover/tests/testsuite.rs`.
@@ -177,20 +166,20 @@ fn check_baseline(test_file: &str, output: &str) {
 
 #[test]
 fn move_framework_prover_tests() {
-    run_prover_for_pkg("aptos-framework", 5, None);
+    run_prover_for_pkg("aptos-framework");
 }
 
 #[test]
 fn move_token_prover_tests() {
-    run_prover_for_pkg("aptos-token", 1, None);
+    run_prover_for_pkg("aptos-token");
 }
 
 #[test]
 fn move_aptos_stdlib_prover_tests() {
-    run_prover_for_pkg("aptos-stdlib", 1, None);
+    run_prover_for_pkg("aptos-stdlib");
 }
 
 #[test]
 fn move_stdlib_prover_tests() {
-    run_prover_for_pkg("move-stdlib", 1, None);
+    run_prover_for_pkg("move-stdlib");
 }

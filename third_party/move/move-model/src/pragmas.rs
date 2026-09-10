@@ -105,6 +105,27 @@ pub const INTRINSIC_FUN_MAP_NEW_WITH_CONFIG: &str = "map_new_with_config";
 /// `[spec] fun map_new<K, V>(): Map<K, V>`
 pub const INTRINSIC_FUN_MAP_SPEC_NEW: &str = "map_spec_new";
 
+/// Iterator validity predicates: `(iterator_enum, map): bool`, true iff the
+/// iterator's hidden validity slot matches the map's — i.e. the iterator was
+/// created from the map's current version. Binding one of these gives the map
+/// a backend-synthesized validity slot (havoced by structural mutations) and
+/// the predicate's iterator enum a matching slot; neither is visible to or
+/// nameable from user specs. Two role names so a map can cover both a keyed
+/// iterator and a key-agnostic (leaf/node) walker.
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_VALID: &str = "map_spec_iter_valid";
+pub const INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID: &str = "map_spec_leaf_iter_valid";
+/// Validity-preservation predicate: `(map_new, map_old): bool`, true iff the
+/// two map states share a validity version (no structural mutation between
+/// them) — the frame promise for operations that keep iterators valid.
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED: &str = "map_spec_iter_preserved";
+
+/// Position of a leaf/node walker in the enumeration: the number of keys held
+/// before it. Uninterpreted — the map's own spec states where it starts, how
+/// it advances, and that it reaches the map's length when the walk ends, which
+/// is what lets a leaf walk carry a position-indexed invariant.
+/// `[spec] fun map_spec_leaf_offset<K, V>(leaf: LeafIter, m: Map<K, V>): num`
+pub const INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET: &str = "map_spec_leaf_offset";
+
 /// Get the value associated with key `k`.
 /// The behavior is undefined if `k` does not exist in the map
 /// `[spec] fun map_get<K, V>(m: Map<K, V>, k: K): V`
@@ -126,6 +147,15 @@ pub const INTRINSIC_FUN_MAP_SPEC_LEN: &str = "map_spec_len";
 /// Check whether the map is empty (the spec version)
 /// `[move] fun map_is_empty<K, V>(m: Map<K, V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_IS_EMPTY: &str = "map_spec_is_empty";
+
+/// The i-th smallest key under `cmp::compare`, for `0 <= i < len`
+/// `[spec] fun map_key_at<K, V>(m: Map<K, V>, i: num): K`
+pub const INTRINSIC_FUN_MAP_SPEC_KEY_AT: &str = "map_spec_key_at";
+
+/// The position of contained key `k` in `cmp::compare` order; the inverse
+/// of `map_spec_key_at`
+/// `[spec] fun map_rank<K, V>(m: Map<K, V>, k: K): num`
+pub const INTRINSIC_FUN_MAP_SPEC_RANK: &str = "map_spec_rank";
 
 /// Get the number of entries in the map
 /// `[move] fun map_len<K, V>(m: &Map<K, V>): u64`
@@ -282,6 +312,17 @@ pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with
 /// `[move] fun map_borrow_with_default<K, V>(m: &Map<K, V>, k: K, default: V): &V`
 pub const INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT: &str = "map_borrow_with_default";
 
+/// Mutable borrow of the value at an iterator's position. The first parameter must be
+/// an enum with exactly one variant carrying a field of the key type (the iterator's
+/// key); the map is the second parameter. Aborts if the iterator is the end iterator
+/// or its key is not in the map.
+/// `[move] fun map_iter_borrow_mut<K, V>(self: Iter<K>, m: &mut Map<K, V>): &mut V`
+pub const INTRINSIC_FUN_MAP_ITER_BORROW_MUT: &str = "map_iter_borrow_mut";
+
+/// Abort condition for map_iter_borrow_mut
+/// `[spec] fun map_spec_aborts_iter_borrow_mut<K, V>(self: Iter<K>, m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT: &str = "map_spec_aborts_iter_borrow_mut";
+
 /// Abort condition for map_destroy_empty: true when the map is non-empty
 /// `[spec] fun map_spec_aborts_destroy_empty<K, V>(m: Map<K, V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY: &str = "map_spec_aborts_destroy_empty";
@@ -392,12 +433,30 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 ),
             ),
             (INTRINSIC_FUN_MAP_SPEC_NEW, IntrinsicFunDef::spec_fun()),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
+                IntrinsicFunDef::spec_fun(),
+            ),
             (INTRINSIC_FUN_MAP_SPEC_GET, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_SET, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_DEL, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_LEN, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_KEY_AT, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_RANK, IntrinsicFunDef::spec_fun()),
             (
                 INTRINSIC_FUN_MAP_LEN,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_LEN), None),
@@ -541,6 +600,17 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_GET), None),
             ),
             (
+                INTRINSIC_FUN_MAP_ITER_BORROW_MUT,
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT),
+                ),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
                 IntrinsicFunDef::spec_fun(),
             ),
@@ -591,6 +661,70 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
         ])
     });
 
+/// Pragmas accepted in a module specification block.
+const MODULE_PRAGMAS: &[&str] = &[
+    VERIFY_PRAGMA,
+    EMITS_IS_STRICT_PRAGMA,
+    EMITS_IS_PARTIAL_PRAGMA,
+    ABORTS_IF_IS_STRICT_PRAGMA,
+    ABORTS_IF_IS_PARTIAL_PRAGMA,
+    INTRINSIC_PRAGMA,
+    UNROLL_PRAGMA,
+    INFERENCE_PRAGMA,
+];
+
+/// Pragmas accepted in a function specification block.
+const FUNCTION_PRAGMAS: &[&str] = &[
+    VERIFY_PRAGMA,
+    TIMEOUT_PRAGMA,
+    SEED_PRAGMA,
+    VERIFY_DURATION_ESTIMATE_PRAGMA,
+    INTRINSIC_PRAGMA,
+    OPAQUE_PRAGMA,
+    EMITS_IS_STRICT_PRAGMA,
+    EMITS_IS_PARTIAL_PRAGMA,
+    ABORTS_IF_IS_PARTIAL_PRAGMA,
+    ABORTS_IF_IS_STRICT_PRAGMA,
+    REQUIRES_IF_ABORTS_PRAGMA,
+    ALWAYS_ABORTS_TEST_PRAGMA,
+    ADDITION_OVERFLOW_UNCHECKED_PRAGMA,
+    ASSUME_NO_ABORT_FROM_HERE_PRAGMA,
+    EXPORT_ENSURES_PRAGMA,
+    FRIEND_PRAGMA,
+    DISABLE_INVARIANTS_IN_BODY_PRAGMA,
+    DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
+    BV_PARAM_PROP,
+    BV_RET_PROP,
+    BV_INTERNAL_PRAGMA,
+    UNROLL_PRAGMA,
+    INFERENCE_PRAGMA,
+];
+
+/// Pragmas accepted in a struct specification block, besides the associated
+/// functions of an intrinsic map type.
+const STRUCT_PRAGMAS: &[&str] = &[INTRINSIC_PRAGMA, BV_PARAM_PROP];
+
+/// Pragmas accepted in a specification block of the given kind.
+fn pragmas_for_block(target: &SpecBlockContext) -> &'static [&'static str] {
+    use crate::builder::module_builder::SpecBlockContext::*;
+    match target {
+        Module => MODULE_PRAGMAS,
+        Function(..) | FunctionCodeV2(.., Some(..)) => FUNCTION_PRAGMAS,
+        Struct(..) => STRUCT_PRAGMAS,
+        _ => &[],
+    }
+}
+
+/// Pragmas accepted in a specification block of the given kind, sorted by name.
+///
+/// Reported alongside an invalid-pragma error so that a rejected name does not
+/// have to be diagnosed by trial and error.
+pub fn valid_pragmas_for_block(target: &SpecBlockContext) -> Vec<&'static str> {
+    let mut names = pragmas_for_block(target).to_vec();
+    names.sort_unstable();
+    names
+}
+
 /// Checks whether a pragma is valid in a specific spec block.
 pub fn is_pragma_valid_for_block(
     symbols: &SymbolPool,
@@ -599,57 +733,20 @@ pub fn is_pragma_valid_for_block(
     pragma: &str,
 ) -> bool {
     use crate::builder::module_builder::SpecBlockContext::*;
-    match target {
-        Module => matches!(
-            pragma,
-            VERIFY_PRAGMA
-                | EMITS_IS_STRICT_PRAGMA
-                | EMITS_IS_PARTIAL_PRAGMA
-                | ABORTS_IF_IS_STRICT_PRAGMA
-                | ABORTS_IF_IS_PARTIAL_PRAGMA
-                | INTRINSIC_PRAGMA
-                | UNROLL_PRAGMA
-                | INFERENCE_PRAGMA
-        ),
-        Function(..) | FunctionCodeV2(.., Some(..)) => matches!(
-            pragma,
-            VERIFY_PRAGMA
-                | TIMEOUT_PRAGMA
-                | SEED_PRAGMA
-                | VERIFY_DURATION_ESTIMATE_PRAGMA
-                | INTRINSIC_PRAGMA
-                | OPAQUE_PRAGMA
-                | EMITS_IS_STRICT_PRAGMA
-                | EMITS_IS_PARTIAL_PRAGMA
-                | ABORTS_IF_IS_PARTIAL_PRAGMA
-                | ABORTS_IF_IS_STRICT_PRAGMA
-                | REQUIRES_IF_ABORTS_PRAGMA
-                | ALWAYS_ABORTS_TEST_PRAGMA
-                | ADDITION_OVERFLOW_UNCHECKED_PRAGMA
-                | ASSUME_NO_ABORT_FROM_HERE_PRAGMA
-                | EXPORT_ENSURES_PRAGMA
-                | FRIEND_PRAGMA
-                | DISABLE_INVARIANTS_IN_BODY_PRAGMA
-                | DELEGATE_INVARIANTS_TO_CALLER_PRAGMA
-                | BV_PARAM_PROP
-                | BV_RET_PROP
-                | UNROLL_PRAGMA
-                | INFERENCE_PRAGMA
-        ),
-        Struct(..) => match pragma {
-            INTRINSIC_PRAGMA | BV_PARAM_PROP => true,
-            _ if INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.contains_key(pragma) => bag
-                .get(&symbols.make(INTRINSIC_PRAGMA))
-                .map(|v| match v {
-                    PropertyValue::Symbol(s) => symbols.string(*s).as_str() == INTRINSIC_TYPE_MAP,
-                    _ => false,
-                })
-                .unwrap_or(false),
-            // all other cases
-            _ => false,
-        },
-        _ => false,
+    if pragmas_for_block(target).contains(&pragma) {
+        return true;
     }
+    // A struct block can in addition name the associated functions of an
+    // intrinsic map type, provided it declares the type as such.
+    matches!(target, Struct(..))
+        && INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.contains_key(pragma)
+        && bag
+            .get(&symbols.make(INTRINSIC_PRAGMA))
+            .map(|v| match v {
+                PropertyValue::Symbol(s) => symbols.string(*s).as_str() == INTRINSIC_TYPE_MAP,
+                _ => false,
+            })
+            .unwrap_or(false)
 }
 
 /// Internal property attached to conditions if they are injected via an apply or a module
@@ -699,12 +796,16 @@ pub const CONDITION_DEACTIVATED_PROP: &str = "deactivated";
 /// `Symbol("sathard")` for hard-to-solve quantifier patterns.
 pub const CONDITION_INFERRED_PROP: &str = "inferred";
 
-/// Symbol value for `inferred` property indicating vacuously strong conditions
-/// (unconstrained quantifier variables).
+/// Symbol value for `inferred` property indicating a condition the derivation
+/// cannot justify: an unconstrained quantifier variable, or state carried past
+/// the havoc of a loop without an invariant. Such conditions are reported and
+/// then dropped rather than published, since they may simply be false.
 pub const CONDITION_INFERRED_VACUOUS: &str = "vacuous";
 
-/// Symbol value for `inferred` property indicating conditions with quantifiers
-/// that are hard for SAT/SMT solvers (exists in aborts_if, forall in ensures).
+/// Symbol value for `inferred` property indicating a condition which holds but
+/// is hard for SAT/SMT solvers (`exists` in `aborts_if`, `forall` in
+/// `ensures`, or a dependency on an unverified callee's contract). Unlike
+/// `vacuous` these are kept, since they are justified -- only expensive.
 pub const CONDITION_INFERRED_SATHARD: &str = "sathard";
 
 /// Symbol value for `inferred` property indicating conditions suggested by an
@@ -732,6 +833,11 @@ pub const BV_PARAM_PROP: &str = "bv";
 /// to explicitly specify which return value will be translated into a bv type in the boogie file
 /// example: bv_ret=b"0,1"
 pub const BV_RET_PROP: &str = "bv_ret";
+
+/// A pragma declaring a function's bitwise representation internal: the body verifies
+/// with bitvectors, while parameters, results and the contract are integers at the
+/// boundary. Requires `pragma opaque`.
+pub const BV_INTERNAL_PRAGMA: &str = "bv_internal";
 
 /// A function which determines whether a property is valid for a given condition kind.
 pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool {

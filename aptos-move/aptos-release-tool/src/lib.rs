@@ -19,6 +19,7 @@ pub mod table;
 
 use crate::network::NetworkSelection;
 use anyhow::Result;
+use aptos_types::account_address::AccountAddress;
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
@@ -75,6 +76,66 @@ enum Commands {
         node_api_key: Option<String>,
     },
 
+    /// Execute a bundle's governance proposal on a test network. Never mainnet.
+    ///
+    /// Runs the full preflight (verify-bundle with sign-off, execution-hash
+    /// reproducibility check, simulation) and then the test-network governance
+    /// ceremony: shrink the voting period (root), propose and vote
+    /// (validator), execute every step, restore the voting period.
+    DeployTestnet {
+        /// Path to the bundle directory.
+        #[clap(short, long)]
+        bundle: PathBuf,
+
+        /// Network to deploy to. Mainnet is refused.
+        ///
+        /// Possible values: devnet, testnet, <url to rest endpoint>
+        #[clap(long)]
+        network: NetworkSelection,
+
+        /// Hex-encoded root (core resources) private key. Signs only the
+        /// voting-period changes, which are test-network-only operations.
+        #[clap(long, env = "ROOT_KEY", hide_env_values = true)]
+        root_key: String,
+
+        /// The validator's stake pool address, used to propose and vote.
+        #[clap(long, env = "VALIDATOR_ADDRESS")]
+        validator_address: AccountAddress,
+
+        /// Hex-encoded private key of the validator's voter account.
+        #[clap(long, env = "VALIDATOR_KEY", hide_env_values = true)]
+        validator_key: String,
+
+        /// API key for node API ratelimiting.
+        /// May also be set via the NODE_API_KEY environment variable.
+        #[clap(long, env)]
+        node_api_key: Option<String>,
+
+        /// Metadata URL recorded on-chain with the proposal. Informational
+        /// only; nothing in this flow fetches it. The default is a dummy URL
+        /// on the RFC 2606 reserved `.invalid` TLD, which is guaranteed to
+        /// never resolve.
+        #[clap(long, default_value = "https://dummy.invalid/proposal-metadata.json")]
+        metadata_url: String,
+
+        /// Mint gas funds to the validator first (root-signed). For throwaway
+        /// networks (local swarms, forge); refused on testnet.
+        #[clap(long)]
+        mint_to_validator: bool,
+
+        /// Do not require the bundle's sign-off checkboxes to be ticked.
+        #[clap(long)]
+        skip_signoff: bool,
+
+        /// Skip the pre-deployment simulation.
+        #[clap(long)]
+        skip_simulation: bool,
+
+        /// Run every preflight check, then stop before submitting anything.
+        #[clap(long)]
+        dry_run: bool,
+    },
+
     /// Verify a deployed framework release on-chain against a bundle.
     VerifyFrameworkDeployment {
         /// Path to the bundle directory.
@@ -125,6 +186,37 @@ pub async fn run(args: Argument) -> Result<()> {
             bundle,
             require_signoff,
         } => commands::verify::run(&bundle, require_signoff),
+        Commands::DeployTestnet {
+            bundle,
+            network,
+            root_key,
+            validator_address,
+            validator_key,
+            node_api_key,
+            metadata_url,
+            mint_to_validator,
+            skip_signoff,
+            skip_simulation,
+            dry_run,
+        } => {
+            commands::deploy::run(
+                &bundle,
+                network.to_url()?,
+                commands::deploy::Signers {
+                    root_key,
+                    validator_address,
+                    validator_key,
+                },
+                node_api_key,
+                &metadata_url,
+                &core_path,
+                mint_to_validator,
+                skip_signoff,
+                skip_simulation,
+                dry_run,
+            )
+            .await
+        },
         Commands::Simulate {
             bundle,
             network,

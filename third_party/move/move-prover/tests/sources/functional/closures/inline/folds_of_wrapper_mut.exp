@@ -1,0 +1,37 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:86:9
+   │
+86 │         ensures forall i in 0..len(entries): entries[i].value == old(entries)[i].value;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:79: mirror_keys_wrong
+   =         entries = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:15: each_mut
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:79: mirror_keys_wrong
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:16: each_mut
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:17: each_mut
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:21: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:22: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:23: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:24: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:25: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:26: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:27: each_mut
+   =     enter loop, variable(s) entries, i havocked and reassigned
+   =         entries = <redacted>
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:22: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:23: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:24: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:25: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:26: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:27: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:18: each_mut
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:79: mirror_keys_wrong
+   =         entries = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:86: mirror_keys_wrong (spec)

@@ -1,0 +1,18 @@
+Move prover returns: exiting with condition generation errors
+error: [boogie translator] cannot pack a value of an intrinsic map type in a specification; use the map's `map_spec_new` binding
+   ┌─ tests/sources/functional/intrinsic_map_spec_pack_err.move:22:46
+   │
+22 │         ensures spec_len(result) == spec_len(Map<u64, u64> {});
+   │                                              ^^^^^^^^^^^^^^^^
+
+error: [boogie translator] cannot pack a value of an intrinsic map type in a specification; use the map's `map_spec_new` binding
+   ┌─ tests/sources/functional/intrinsic_map_spec_pack_err.move:49:46
+   │
+49 │         ensures spec_len(result) == spec_len(Map<u64, u64> {});
+   │                                              ^^^^^^^^^^^^^^^^
+
+error: [boogie translator] cannot pack a value of an intrinsic map type in a specification; use the map's `map_spec_new` binding
+   ┌─ tests/sources/functional/intrinsic_map_spec_pack_err.move:78:56
+   │
+78 │         ensures spec_len(result) == spec_len<u64, u64>(Map::Empty);
+   │                                                        ^^^^^^^^^^

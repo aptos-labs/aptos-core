@@ -2,7 +2,7 @@
 address 0x2 {
 
 module Map {
-    native struct T<K, V> has copy, drop, store;
+    struct T<phantom K, phantom V> has copy, drop, store { dummy_field: bool }
 
     native public fun empty<K, V>(): T<K, V>;
 

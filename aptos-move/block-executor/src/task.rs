@@ -29,6 +29,7 @@ use aptos_vm_types::{
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
@@ -122,11 +123,11 @@ pub trait ExecutorTask {
 /// The output of executing a single transaction. The associated `Key`, `Tag`, and
 /// `Value` are the multi-version map's types (the writes applied to and validated
 /// against the map); `Txn` provides the storage-side key/value/event types.
-pub trait TransactionOutput: Send + Debug {
+pub trait TxnOutput: Send + Debug {
     type Txn: Transaction;
-    type Key;
-    type Tag: Clone + Eq + Hash;
-    type Value: SpeculativeValue;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + 'static;
+    type Tag: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Serialize + 'static;
+    type Value: SpeculativeValue + 'static;
     /// The materialized output produced from this (speculative) output.
     type CommittedOutput: CommittedTransactionOutput;
 
@@ -208,7 +209,7 @@ pub trait TransactionOutput: Send + Debug {
 
 /// Output accessors used only by the legacy Move VM's materialization; a VM that
 /// materializes its own output does not implement this.
-pub trait LegacyTxnOutput: TransactionOutput {
+pub trait LegacyTxnOutput: TxnOutput {
     fn reads_needing_delayed_field_exchange(
         &self,
     ) -> Vec<(Self::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)>;

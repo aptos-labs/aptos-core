@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: the iterator parameter of a `map_iter_borrow_mut` function must be instantiated with the function's first (key) type parameter
+   ┌─ tests/sources/functional/intrinsic_iter_role_err3.move:19:5
+   │
+19 │     native fun ibm<K: copy + drop, V: copy + drop>(it: Iter<V>, m: &mut Map<K, V>): &mut V;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

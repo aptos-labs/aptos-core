@@ -18,6 +18,7 @@ use crate::{
         types::{KeyType, MockIncarnation, MockTransaction, ValueType},
     },
     executor::BlockExecutor,
+    single_transaction_executor::LegacyTransactionExecutor,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
@@ -48,7 +49,7 @@ where
     let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), None);
     let block_executor = BlockExecutor::<
         TestTransaction,
-        MockTask<TestKey, MockEvent>,
+        LegacyTransactionExecutor<MockTask<TestKey, MockEvent>>,
         MockStateView<TestKey>,
         NoOpTransactionCommitHook<usize>,
         Provider,

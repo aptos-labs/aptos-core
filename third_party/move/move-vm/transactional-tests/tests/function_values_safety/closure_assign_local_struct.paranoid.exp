@@ -2,7 +2,7 @@ processed 2 tasks
 task 0 lines 1-39:  publish [module 0x66::helpers]
 task 1 lines 43-66:  run --verbose [script]
 Error: Script execution failed with VMError: {
-    message: Expected type |s#7|s#7 has copy, got |s#7|s#7 which is not assignable ,
+    message: Expected type |s#8|s#8 has copy, got |s#8|s#8 which is not assignable ,
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
     location: script,

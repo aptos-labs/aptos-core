@@ -1,0 +1,12 @@
+processed 6 tasks
+task 0 lines 1-38:  publish [import Move]
+task 1 lines 40-40:  run 0x0::LeanerTailRecursion::countdown --args 2000u64 40u64
+return values: 2040
+task 2 lines 42-42:  run 0x0::LeanerTailRecursion::alternate --args 2001u64 10u64 20u64
+return values: 20
+task 3 lines 44-44:  run 0x0::LeanerTailRecursion::effect_countdown --args 2000u64 40u64
+return values: 2040
+task 4 lines 46-46:  run 0x0::LeanerTailRecursion::mixed_countdown --args 2000u64 40u64
+return values: 2040
+task 5 lines 48-48:  run 0x0::LeanerTailRecursion::sum_down --args 10u64
+return values: 55

@@ -25,7 +25,6 @@ use move_core_types::{
     int256,
     value::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
-        PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
     },
     vm_status::{
         sub_status::{
@@ -595,7 +594,11 @@ impl Container {
         }
     }
 
-    fn master_signer(x: AccountAddress) -> Self {
+    fn signer(x: AccountAddress) -> Self {
+        // A signer is represented at runtime as a single-variant enum wrapping the account
+        // address. The enum shape (rather than a plain struct) is preserved for gas / replay
+        // stability — any operation that traverses the value's node graph (e.g. signer
+        // equality) sees the same shape as the pre-collapse representation.
         Container::Struct(NestedValues::new(vec![
             Value::U16(MASTER_SIGNER_VARIANT),
             Value::Address(Box::new(x)),
@@ -2048,26 +2051,44 @@ impl Container {
     fn swap_contents(&self, other: &Self) -> PartialVMResult<()> {
         use Container::*;
 
+        // The two references must point to different containers. If they
+        // alias, borrowing both mutably would panic, so return an invariant
+        // violation instead. In general, bytecode verifier should never allow
+        // this to happen.
+        macro_rules! swap {
+            ($l:ident, $r:ident) => {{
+                let (mut lref, mut rref) = match ($l.try_borrow_mut(), $r.try_borrow_mut()) {
+                    (Ok(lref), Ok(rref)) => (lref, rref),
+                    _ => {
+                        return Err(PartialVMError::new_invariant_violation(
+                            "cannot swap aliasing container references",
+                        ));
+                    },
+                };
+                mem::swap(&mut *lref, &mut *rref);
+            }};
+        }
+
         match (self, other) {
-            (Vec(l), Vec(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (Struct(l), Struct(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (Vec(l), Vec(r)) => swap!(l, r),
+            (Struct(l), Struct(r)) => swap!(l, r),
 
-            (VecBool(l), VecBool(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecAddress(l), VecAddress(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecBool(l), VecBool(r)) => swap!(l, r),
+            (VecAddress(l), VecAddress(r)) => swap!(l, r),
 
-            (VecU8(l), VecU8(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU16(l), VecU16(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU32(l), VecU32(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU64(l), VecU64(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU128(l), VecU128(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU256(l), VecU256(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU8(l), VecU8(r)) => swap!(l, r),
+            (VecU16(l), VecU16(r)) => swap!(l, r),
+            (VecU32(l), VecU32(r)) => swap!(l, r),
+            (VecU64(l), VecU64(r)) => swap!(l, r),
+            (VecU128(l), VecU128(r)) => swap!(l, r),
+            (VecU256(l), VecU256(r)) => swap!(l, r),
 
-            (VecI8(l), VecI8(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI16(l), VecI16(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI32(l), VecI32(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI64(l), VecI64(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI128(l), VecI128(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI256(l), VecI256(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecI8(l), VecI8(r)) => swap!(l, r),
+            (VecI16(l), VecI16(r)) => swap!(l, r),
+            (VecI32(l), VecI32(r)) => swap!(l, r),
+            (VecI64(l), VecI64(r)) => swap!(l, r),
+            (VecI128(l), VecI128(r)) => swap!(l, r),
+            (VecI256(l), VecI256(r)) => swap!(l, r),
 
             (
                 Locals(_) | Vec(_) | Struct(_) | VecBool(_) | VecAddress(_) | VecU8(_) | VecU16(_)
@@ -2509,42 +2530,8 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        // The signer is internally represented as an enum (Master or Permissioned), but both
-        // variants store the account address at index 1. Thus, we can access it without checking
-        // the variant tag.
+        // A signer is a single-variant enum with the account address after the variant tag.
         self.0.borrow_elem(MASTER_ADDRESS_FIELD_OFFSET, None)
-    }
-
-    pub fn is_permissioned(&self) -> PartialVMResult<bool> {
-        match &self.0 {
-            ContainerRef::Local(Container::Struct(s)) => {
-                Ok(*s.borrow()[0].as_value_ref::<u16>()? == PERMISSIONED_SIGNER_VARIANT)
-            },
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("unexpected signer value: {:?}", self)),
-            ),
-        }
-    }
-
-    /// Get the permission address associated with a signer.
-    /// Needs to make sure the signer passed in is a permissioned signer.
-    pub fn permission_address(&self) -> PartialVMResult<Value> {
-        match &self.0 {
-            ContainerRef::Local(Container::Struct(s)) => Ok(Value::address(
-                *s.borrow()
-                    .get(PERMISSION_ADDRESS_FIELD_OFFSET)
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(format!("unexpected signer value: {:?}", self))
-                    })?
-                    .as_value_ref::<AccountAddress>()?,
-            )),
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("unexpected signer value: {:?}", self)),
-            ),
-        }
     }
 }
 
@@ -2724,21 +2711,14 @@ impl Value {
         Value::Address(Box::new(x))
     }
 
-    pub fn master_signer(x: AccountAddress) -> Self {
-        Value::Container(Container::master_signer(x))
-    }
-
-    pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
-        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
-            Value::address(x),
-            Value::address(perm_storage_address),
-        ]))
+    pub fn signer(x: AccountAddress) -> Self {
+        Value::Container(Container::signer(x))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
     /// execute function
-    pub fn master_signer_reference(x: AccountAddress) -> Self {
-        Value::ContainerRef(ContainerRef::Local(Container::master_signer(x)))
+    pub fn signer_reference(x: AccountAddress) -> Self {
+        Value::ContainerRef(ContainerRef::Local(Container::signer(x)))
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -4169,8 +4149,20 @@ impl VectorRef {
 
         macro_rules! move_range {
             ($from:expr, $to:expr) => {{
-                let mut from_v = $from.borrow_mut();
-                let mut to_v = $to.borrow_mut();
+                // `from` and `to` must be distinct vectors. If they alias,
+                // borrowing both mutably would panic, so return an invariant
+                // violation instead.
+                let (mut from_v, mut to_v) = match ($from.try_borrow_mut(), $to.try_borrow_mut()) {
+                    (Ok(from_v), Ok(to_v)) => (from_v, to_v),
+                    _ => {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message(
+                            "cannot move range between aliasing vector references".to_string(),
+                        ));
+                    },
+                };
 
                 if removal_position.checked_add(length).map_or(true, |end| end > from_v.len())
                         || insert_position > to_v.len() {
@@ -5357,18 +5349,22 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                 }
             },
 
-            // Signer.
+            // Signer. Legacy path emits just the address; non-legacy encodes the
+            // single-variant enum. The discriminator check guards against a future
+            // signer variant being silently read as a master signer.
             (L::Signer, Value::Container(Container::Struct(r))) => {
                 if self.ctx.legacy_signer {
-                    // Only allow serialization of master signer.
                     if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
                         invariant_violation::<S>(format!(
-                            "First field of a signer needs to be an enum descriminator, got {:?}",
+                            "First field of a signer needs to be an enum discriminator, got {:?}",
                             self.value
                         ))
                     })? != MASTER_SIGNER_VARIANT
                     {
-                        return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
+                        return Err(invariant_violation::<S>(format!(
+                            "unexpected signer variant while serializing {:?}",
+                            self.value
+                        )));
                     }
                     r.borrow()
                         .get(MASTER_ADDRESS_FIELD_OFFSET)
@@ -6281,9 +6277,7 @@ pub mod prop {
             L::I256 => any::<int256::I256>().prop_map(Value::i256).boxed(),
             L::Bool => any::<bool>().prop_map(Value::bool).boxed(),
             L::Address => any::<AccountAddress>().prop_map(Value::address).boxed(),
-            L::Signer => any::<AccountAddress>()
-                .prop_map(Value::master_signer)
-                .boxed(),
+            L::Signer => any::<AccountAddress>().prop_map(Value::signer).boxed(),
 
             L::Vector(layout) => match &**layout {
                 L::U8 => vec(any::<u8>(), 0..10)

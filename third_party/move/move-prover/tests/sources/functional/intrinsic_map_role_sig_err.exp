@@ -1,0 +1,21 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_spec_len` function must have two type parameters and the signature (map<K, V>): num
+   ┌─ tests/sources/functional/intrinsic_map_role_sig_err.move:17:10
+   │
+17 │     spec native fun spec_len<K, V>(t: Map<K, V>, extra: u64): num;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a `map_spec_aborts_empty` function must take the parameters of its `map_borrow_front` binding (references by value) and return bool
+   ┌─ tests/sources/functional/intrinsic_map_role_sig_err.move:39:10
+   │
+39 │       spec fun spec_aborts_empty<K, V>(t: Map<K, V>, extra: u64): bool {
+   │ ╭──────────^
+40 │ │         extra == 0
+41 │ │     }
+   │ ╰─────^
+
+error: a `map_spec_aborts_empty` binding must have a body or be declared uninterpreted; the prover's model does not define it
+   ┌─ tests/sources/functional/intrinsic_map_role_sig_err.move:63:10
+   │
+63 │     spec native fun spec_aborts_empty<K, V>(t: Map<K, V>): bool;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

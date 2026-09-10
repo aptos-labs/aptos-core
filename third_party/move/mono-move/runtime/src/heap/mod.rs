@@ -17,8 +17,8 @@ use crate::{
     invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, read_vec_len,
-        write_descriptor, write_forwarding, write_object_header, write_ptr, write_u64,
-        MemoryRegion,
+        write_descriptor, write_enum_tag, write_forwarding, write_object_header, write_ptr,
+        write_u64, MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
@@ -232,8 +232,13 @@ pub struct Heap {
 }
 
 impl Heap {
+    /// Creates a heap backed by an uninitialized buffer of the given size.
+    ///
+    /// The buffer is not zeroed. This is sound only while this contract holds:
+    /// every heap object is fully written before any byte of it is read, and
+    /// nothing reads the unbumped tail `[bump_ptr, buffer.end)`.
     pub fn new(size: usize) -> Self {
-        let buffer = MemoryRegion::new(size);
+        let buffer = MemoryRegion::new_uninit(size);
         Self {
             bump_ptr: buffer.as_ptr(),
             buffer,
@@ -381,7 +386,7 @@ pub(crate) unsafe fn deserialize_or_gc<
     top_frame: TopFrame<'_>,
 ) -> VMResult<()> {
     // SAFETY: forwarded from this function's contract.
-    match unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) } {
+    match unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) } {
         Ok(()) => Ok(()),
         Err(AllocationError::RuntimeError(err)) => Err(VMInternalError::new(err)),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
@@ -395,7 +400,7 @@ pub(crate) unsafe fn deserialize_or_gc<
                 top_frame,
             )?;
             // SAFETY: as above.
-            unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) }
+            unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) }
                 .map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
     }
@@ -453,6 +458,13 @@ impl<'a> RootScanner<'a> {
 ///
 /// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full
 /// so the caller can trigger GC and retry.
+///
+/// # Invariants
+///
+/// Each object's region is zeroed before it is returned. The GC and deep-copy
+/// copy the full object image, including inter-field padding and alignment
+/// gaps. Zeroing makes those bytes reproducibly zero, so the copied image is
+/// deterministic rather than arbitrary heap contents.
 pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
@@ -494,11 +506,16 @@ pub(crate) fn heap_alloc(
         // material win for large/wide-variant enums). It is not a drop-in
         // change: `gc_copy_object` / `deep_copy` copy the full object image
         // including dead-variant tail and inter-field padding, which is
-        // deterministically zero today; leaving it uninitialized makes that
-        // image carry stale heap bytes. Prefer zeroing only the
-        // tail/padding the active variant does not write (still skipping the
-        // large active body), or audit that no byte-image consumer
-        // (state commit / hashing) depends on those bytes first.
+        // deterministically zero today because this memset is the sole
+        // initializer (the backing buffer is uninitialized). Skipping it leaves
+        // those bytes uninitialized. A raw byte copy of them is fine in
+        // principle, but compilers (e.g. LLVM) may lower a small copy to a
+        // typed integer load/store, and reading uninitialized bytes as a typed
+        // value is UB, not merely a stale read.
+        // Prefer zeroing only the tail/padding the active variant does not
+        // write (still skipping the large active body), or audit that no
+        // byte-image consumer (state commit / hashing) depends on those bytes
+        // first.
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
         write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
@@ -550,10 +567,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     elem_size: u32,
     capacity_in_elems: u64,
 ) -> VMResult<*mut u8> {
-    let total_size = (capacity_in_elems as usize)
-        .checked_mul(elem_size as usize)
-        .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
-        .ok_or(RuntimeError::VecAllocSizeOverflow)?;
+    let total_size = vec_alloc_size(capacity_in_elems, elem_size)?;
     // `length` defaults to 0 via heap_alloc's zero-init.
     alloc_sized(
         heap,
@@ -566,6 +580,47 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         total_size,
         descriptor_id,
     )
+}
+
+/// Total allocation size of a vector object holding `capacity_in_elems`
+/// elements.
+fn vec_alloc_size(capacity_in_elems: u64, elem_size: u32) -> Result<usize, RuntimeError> {
+    (capacity_in_elems as usize)
+        .checked_mul(elem_size as usize)
+        .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
+        .ok_or(RuntimeError::VecAllocSizeOverflow)
+}
+
+/// Like [`alloc_vec`], but fails rather than triggering GC when the heap is
+/// full, and stamps `len` as the vector's length.
+pub(crate) fn alloc_vec_no_gc(
+    heap: &mut Heap,
+    descriptor_id: DescriptorId,
+    elem_size: u32,
+    len: u64,
+) -> AllocationResult<*mut u8> {
+    let vec_ptr = heap_alloc(heap, vec_alloc_size(len, elem_size)?, descriptor_id)?;
+    // SAFETY: the allocation stores the vector length at this offset.
+    unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
+    Ok(vec_ptr)
+}
+
+/// Allocates an enum object sized for its widest variant with `tag` stamped,
+/// failing rather than triggering GC when the heap is full.
+pub(crate) fn alloc_enum_no_gc(
+    heap: &mut Heap,
+    descriptor_id: DescriptorId,
+    tag: u64,
+    max_size_across_variants: usize,
+) -> AllocationResult<*mut u8> {
+    let obj_ptr = heap_alloc(
+        heap,
+        OBJECT_HEADER_SIZE + max_size_across_variants,
+        descriptor_id,
+    )?;
+    // SAFETY: the allocation has enough size to write the tag.
+    unsafe { write_enum_tag(obj_ptr, tag) };
+    Ok(obj_ptr)
 }
 
 /// Allocate a new zeroed heap object (struct or enum). Size comes from the
@@ -812,7 +867,9 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 ) -> VMResult<()> {
     heap.gc_count += 1;
 
-    let to_space = MemoryRegion::new(heap.buffer.len());
+    // Uninitialized is safe: the copy below fills to-space contiguously up to
+    // `free_ptr`, and the Phase-2 scan only reads `[to_space.start, free_ptr)`.
+    let to_space = MemoryRegion::new_uninit(heap.buffer.len());
     // `free_ptr` is a raw bump cursor — it points at the start of the
     // next *header* reservation, advancing by each object's total size.
     // Treating it as a raw cursor (rather than as an "object pointer"

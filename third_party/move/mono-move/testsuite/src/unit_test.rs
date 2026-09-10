@@ -10,12 +10,14 @@ use crate::{
     resource_provider::InMemoryResourceProvider,
 };
 use aptos_types::on_chain_config::{Features, OnChainConfig};
-use legacy_move_compiler::unit_test::{
-    ExpectedFailure, ExpectedMoveError, NamedOrBytecodeModule, TestCase,
+use legacy_move_compiler::unit_test::{ExpectedFailure, NamedOrBytecodeModule, TestCase};
+use mono_move_core::{
+    types::{is_signer_or_signer_immut_ref, EMPTY_TYPE_LIST},
+    ExecutionErrorKind, GasMeter, Interner, VMInternalError,
 };
-use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, VMInternalError};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
+use mono_move_output::v1_error::{self, V1Equivalent};
 use mono_move_runtime::{
     InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
 };
@@ -28,7 +30,7 @@ use move_core_types::{
 };
 use move_model::metadata::LanguageVersion;
 use move_package::BuildConfig;
-use move_unit_test::UnitTestingConfig;
+use move_unit_test::{test_reporter::MoveError, UnitTestingConfig};
 use std::{
     collections::BTreeMap,
     fmt::Write,
@@ -60,7 +62,7 @@ pub fn run_package_unit_tests(
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).expect("worker 0 is free");
-    let natives = build_natives(&guard);
+    let natives = build_natives();
 
     let mut module_provider = InMemoryModuleProvider::new();
     for info in test_plan.module_info.values() {
@@ -76,7 +78,7 @@ pub fn run_package_unit_tests(
                 &guard,
                 &module_provider,
                 &resource_provider,
-                &natives,
+                natives,
                 module_id,
                 test,
             );
@@ -162,116 +164,58 @@ fn execute(
         .intern_identifier(IdentStr::new(&test.test_name).unwrap())
         .into_global_arena_ptr();
 
-    let mut read_set = ModuleReadSet::new();
-    let mut gas_meter = GasMeter::new(GAS_BUDGET);
-    // SAFETY: the pointer lives in a `LoadedModule`'s arena; while `guard` is
-    // held the executable cache cannot reset that arena.
-    let function = match loader.load_function(
-        &mut read_set,
-        &mut gas_meter,
-        module_id,
-        func,
-        EMPTY_TYPE_LIST,
-    ) {
-        Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
-        Err(err) => return classify_error(&err),
-    };
-
     let mut interpreter = InterpreterContext::new(
         loader,
-        read_set,
-        gas_meter,
+        GasMeter::new(GAS_BUDGET),
         resource_provider,
         natives,
-        function,
     )
-    .with_extensions(seed_extensions());
+    // For Move unit tests, there is no user transaction context.
+    .with_extensions(seed_extensions(false));
+    let function = match interpreter.load_function(module_id, func, EMPTY_TYPE_LIST) {
+        Ok(function) => function,
+        Err(err) => return classify_error(&err),
+    };
+    // TODO(correctness): remove once the loader verifies lowered functions itself.
+    mono_move_runtime::assert_verified(function, guard);
 
-    // Reference arguments point into this storage, so it must outlive `run()`.
-    let _ref_args = marshal_args(&mut interpreter, function, &test.arguments);
+    assert_eq!(
+        test.arguments.len(),
+        function.param_tys.len(),
+        "test argument count does not match the function's parameter count"
+    );
+    let outcome = (|| {
+        let mut call = interpreter.build_call(function)?;
+        for (arg, ty) in test.arguments.iter().zip(&function.param_tys) {
+            if is_signer_or_signer_immut_ref(*ty) {
+                // A signer parameter takes its address from the argument.
+                match arg {
+                    MoveValue::Signer(addr) | MoveValue::Address(addr) => call.signer(addr)?,
+                    other => panic!("a signer parameter got a non-address argument: {:?}", other),
+                }
+            } else {
+                call.arg(arg)?;
+            }
+        }
+        call.run()
+    })();
 
-    match interpreter.run() {
+    match outcome {
         Ok(RuntimeStatus::Success) => TestResult::Success,
         Ok(RuntimeStatus::Aborted {
             code,
             message,
             location,
-        }) => TestResult::Abort {
-            code,
-            message,
-            location,
-        },
-        Err(err) => classify_error(&err),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Argument marshalling
-// ---------------------------------------------------------------------------
-
-/// A reference is a 16-byte fat pointer (8-byte base + 8-byte offset).
-/// TODO(cleanup): this reference size should be a shared constant, not redefined here.
-const REFERENCE_SIZE: u32 = 16;
-
-/// Write each argument into the root frame at its parameter-slot offset,
-/// returning backing storage that reference arguments point into; the caller
-/// must keep it alive until execution finishes.
-// Each target is boxed for a stable heap address: the fat pointer stores that
-// address, so a `Vec<[u8; 32]>` (whose elements move on reallocation) won't do.
-#[allow(clippy::vec_box)]
-fn marshal_args(
-    interpreter: &mut InterpreterContext<'_>,
-    function: &Function,
-    args: &[MoveValue],
-) -> Vec<Box<[u8; 32]>> {
-    assert_eq!(
-        args.len(),
-        function.param_slots.len(),
-        "test argument count does not match the function's parameter count"
-    );
-
-    let mut ref_args = Vec::new();
-    for (arg, slot) in args.iter().zip(&function.param_slots) {
-        let bytes = match arg {
-            // A `&signer`/`&address` is a fat pointer to a target kept alive past `run()`.
-            MoveValue::Signer(addr) | MoveValue::Address(addr) if slot.size == REFERENCE_SIZE => {
-                let boxed_bytes = Box::new(addr.into_bytes());
-                let mut fat = vec![0u8; REFERENCE_SIZE as usize];
-                fat[..8].copy_from_slice(&(boxed_bytes.as_ptr().addr() as u64).to_ne_bytes());
-                ref_args.push(boxed_bytes);
-                fat
+        }) => TestResult::Failure(MoveError(
+            StatusCode::ABORTED,
+            Some(code),
+            match location {
+                AbortLocation::Module(module_id) => Location::Module(module_id),
+                AbortLocation::Script => Location::Script,
             },
-            _ => inline_bytes(arg),
-        };
-        assert_eq!(
-            bytes.len() as u32,
-            slot.size,
-            "argument size does not match its parameter slot"
-        );
-        interpreter.set_root_arg(slot.offset.0, &bytes);
-    }
-    ref_args
-}
-
-fn inline_bytes(value: &MoveValue) -> Vec<u8> {
-    match value {
-        MoveValue::Bool(b) => vec![*b as u8],
-        MoveValue::U8(x) => vec![*x],
-        MoveValue::U16(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U32(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U64(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U128(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U256(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I8(x) => vec![*x as u8],
-        MoveValue::I16(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I32(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I64(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I128(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I256(x) => x.to_le_bytes().to_vec(),
-        MoveValue::Address(a) | MoveValue::Signer(a) => a.into_bytes().to_vec(),
-        MoveValue::Vector(_) | MoveValue::Struct(_) | MoveValue::Closure(_) => {
-            panic!("test argument cannot be a heap value")
-        },
+            message,
+        )),
+        Err(err) => classify_error(&err),
     }
 }
 
@@ -283,18 +227,12 @@ fn inline_bytes(value: &MoveValue) -> Vec<u8> {
 enum TestResult {
     /// Ran to completion.
     Success,
-    /// An explicit Move `abort`, with its code, optional message, and the
-    /// module that raised it.
-    Abort {
-        code: u64,
-        message: Option<String>,
-        location: AbortLocation,
-    },
-    /// An implicit runtime failure: arithmetic overflow, index out of bounds, etc.
-    RuntimeFailure(String),
+    /// An explicit Move abort or runtime error represented for direct
+    /// comparison with an `#[expected_failure]` annotation.
+    Failure(MoveError),
     /// Cannot build or run this yet: missing native, unlowered construct, etc.
     Unsupported(String),
-    /// A VM or harness fault.
+    /// A VM or harness error.
     Error(String),
 }
 
@@ -311,21 +249,20 @@ pub enum TestOutcome {
 /// else (specializer/lowering pass errors) means mono-move cannot lower this
 /// input yet.
 fn classify_error(err: &VMInternalError) -> TestResult {
-    if let Some(e) = err.downcast_ref::<LoaderError>() {
-        classify_loader_error(e)
-    } else if let Some(e) = err.downcast_ref::<RuntimeError>() {
-        classify_runtime_error(e)
-    } else {
-        TestResult::Error(err.to_string())
+    if let Some(loader_error) = err.downcast_ref::<LoaderError>() {
+        return classify_loader_error(loader_error);
+    }
+    match err.downcast_ref::<RuntimeError>() {
+        Some(runtime_error) => classify_runtime_error(err, runtime_error),
+        None => TestResult::Error(err.to_string()),
     }
 }
 
 fn classify_loader_error(err: &LoaderError) -> TestResult {
     match err {
         // mono-move can't build or resolve this yet: a native it doesn't
-        // implement (which surfaces as a missing function, since natives have
-        // no body to lower), or a feature the specializer/verifier can't lower.
-        LoaderError::FunctionIrMissing
+        // implement, or a feature the specializer/verifier can't lower.
+        LoaderError::NativeFunctionNotLoadable { .. }
         | LoaderError::LoweringSkipped { .. }
         | LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. } => TestResult::Unsupported(err.to_string()),
@@ -336,51 +273,60 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
     }
 }
 
-fn classify_runtime_error(err: &RuntimeError) -> TestResult {
-    match err {
+/// Classifies the concrete runtime error while retaining the location attached
+/// to `err`.
+fn classify_runtime_error(err: &VMInternalError, runtime_error: &RuntimeError) -> TestResult {
+    // A feature mono-move lacks means the test cannot run, not that it failed.
+    // Matched on the variant because `kind()` reports it as an invariant violation.
+    if matches!(runtime_error, RuntimeError::Unsupported(_)) {
+        return TestResult::Unsupported(err.to_string());
+    }
+    match err.kind() {
         // The program failed at runtime: overflow, OOB, missing resource, a hit
         // limit, ... mono-move matches the existing VM's behaviour and limits,
         // so these are real failures a `#[expected_failure]` test may want.
-        RuntimeError::ArithmeticOverflow { .. }
-        | RuntimeError::ArithmeticUnderflow { .. }
-        | RuntimeError::DivisionByZero { .. }
-        | RuntimeError::ShiftAmountOutOfRange { .. }
-        | RuntimeError::ArithmeticUnderOverflow { .. }
-        | RuntimeError::DivisionByZeroOrOverflow { .. }
-        | RuntimeError::NegateMinOverflow { .. }
-        | RuntimeError::CastOutOfRange { .. }
-        | RuntimeError::PopFromEmptyVector
-        | RuntimeError::VecUnpackLengthMismatch { .. }
-        | RuntimeError::VectorIndexOutOfBounds { .. }
-        | RuntimeError::ResourceDoesNotExist { .. }
-        | RuntimeError::ResourceAlreadyExists { .. }
-        | RuntimeError::EnumVariantMismatch { .. }
-        | RuntimeError::InvalidAbortMessage
-        | RuntimeError::BCSEof
-        | RuntimeError::BCSInvalidUleb
-        | RuntimeError::BCSInvalidBool { .. }
-        | RuntimeError::BCSSequenceTooLong { .. }
-        | RuntimeError::BCSRemainingInput { .. }
-        | RuntimeError::BCSSignerNotDeserializable
-        | RuntimeError::StackOverflow
-        | RuntimeError::OutOfHeapMemory { .. }
-        | RuntimeError::AllocationTooLarge { .. }
-        | RuntimeError::VecAllocSizeOverflow
-        | RuntimeError::AbortMessageTooLong { .. }
-        | RuntimeError::StateKeyTypeTooDeep => TestResult::RuntimeFailure(err.to_string()),
-
-        // Genuine problems: infrastructure failure, or a VM bug.
-        RuntimeError::InvariantViolation(_) | RuntimeError::ResourceProvider(_) => {
-            TestResult::Error(err.to_string())
+        ExecutionErrorKind::InvalidOperation | ExecutionErrorKind::RuntimeLimitExceeded => {
+            runtime_failure(err, runtime_error)
         },
+        // Genuine problems: infrastructure failure, or a VM bug.
+        ExecutionErrorKind::InvariantViolation
+        | ExecutionErrorKind::OutOfGas
+        | ExecutionErrorKind::LinkingError
+        | ExecutionErrorKind::Placeholder => TestResult::Error(err.to_string()),
     }
 }
 
+/// Converts a runtime error into the V1 fields used by `#[expected_failure]`.
+///
+/// Returns `Unsupported` when the mapping or location is incomplete because the
+/// expected failure cannot then be evaluated reliably.
+fn runtime_failure(err: &VMInternalError, runtime_error: &RuntimeError) -> TestResult {
+    let V1Equivalent::Described(descriptor) = v1_error::describe_runtime_error(runtime_error)
+    else {
+        return TestResult::Unsupported(format!("no legacy status for this failure: {err}"));
+    };
+    // Reject an unmodelled sub-status instead of treating it as absent, which
+    // could incorrectly satisfy an expectation without a sub-status.
+    if !descriptor.sub_status.is_comparable() {
+        return TestResult::Unsupported(format!("no legacy sub-status for this failure: {err}"));
+    }
+    let Some(location) = err.location() else {
+        return TestResult::Unsupported(format!("this failure carries no location: {err}"));
+    };
+    let (location, _offset) = v1_error::v1_location(Some(location));
+    TestResult::Failure(MoveError(
+        descriptor.status,
+        descriptor.sub_status.known(),
+        location,
+        Some(err.to_string()),
+    ))
+}
+
+/// Compares a failure with its `#[expected_failure]` status, sub-status, and
+/// location. The message is diagnostic only because annotations cannot specify
+/// one.
 fn adjudicate(result: TestResult, expected: &Option<ExpectedFailure>) -> TestOutcome {
-    // Outcomes that don't depend on the expectation; otherwise normalize the
-    // failure to (abort, detail) — an explicit abort carries a code and
-    // location, an implicit runtime failure carries neither.
-    let (abort, detail) = match result {
+    let actual = match result {
         TestResult::Success => {
             return match expected {
                 None => TestOutcome::Pass,
@@ -389,120 +335,63 @@ fn adjudicate(result: TestResult, expected: &Option<ExpectedFailure>) -> TestOut
                 },
             };
         },
-        TestResult::Abort {
-            code,
-            message,
-            location,
-        } => (Some((code, location)), message),
-        TestResult::RuntimeFailure(failure) => (None, Some(failure)),
+        TestResult::Failure(actual) => actual,
         TestResult::Unsupported(reason) => return TestOutcome::Unsupported(reason),
         TestResult::Error(error) => return TestOutcome::Fail(error),
     };
 
-    // The program failed; judge it against the expectation: the abort code
-    // must match, and so must the abort location when the expectation pins
-    // one. The abort message is never compared: `#[expected_failure]` cannot
-    // specify one, so it only feeds the failure diagnostics below.
-    //
-    // TODO(completeness): only abort expectations are fully checked. A
-    // non-ABORTED expectation (`arithmetic_error`, `vector_error`,
-    // `major_status = ..`, `out_of_gas`) — or ABORTED without `minor_status` —
-    // is satisfied by any failure; its status, minor status, and location go
-    // unchecked. Checking them requires mapping `RuntimeError` variants to
-    // status codes and attaching a location to non-abort failures.
     let reason = match expected {
-        // No failure was expected.
-        None => match abort {
-            Some((code, _)) => format!("unexpected abort with code {code}"),
-            None => "unexpected runtime failure".to_string(),
-        },
-        // A failure was expected; if it requires a specific abort code, check it.
-        Some(expected) => match expected_abort_code(expected) {
-            None => return TestOutcome::Pass,
-            Some(want) => match &abort {
-                Some((got, got_location)) if *got == want => {
-                    match expected_abort_location(expected) {
-                        None => return TestOutcome::Pass,
-                        Some(want_location) => {
-                            if location_matches(want_location, got_location) {
-                                return TestOutcome::Pass;
-                            }
-                            format!(
-                                "expected abort with code {want} originating in {}, \
-                                 but it aborted in {}",
-                                render_expected_location(want_location),
-                                render_abort_location(got_location),
-                            )
-                        },
-                    }
-                },
-                Some((got, _)) => format!("expected abort with code {want}, got code {got}"),
-                None => format!("expected abort with code {want}, got a runtime failure"),
-            },
-        },
-    };
-
-    // On a fail, fold in the abort message / runtime failure for diagnostics.
-    let detailed_reason = match detail {
-        Some(detail) => format!("{reason} ({detail})"),
-        None => reason,
-    };
-
-    TestOutcome::Fail(detailed_reason)
-}
-
-fn expected_abort_code(expected: &ExpectedFailure) -> Option<u64> {
-    match expected {
-        ExpectedFailure::Expected => None,
-        ExpectedFailure::ExpectedWithCodeDEPRECATED(code) => Some(*code),
-        ExpectedFailure::ExpectedWithError(ExpectedMoveError(status, sub, ..)) => {
-            if *status == StatusCode::ABORTED {
-                *sub
-            } else {
-                None
+        None => format!("unexpected failure: {}", render_failure(&actual)),
+        // A bare `#[expected_failure]` is satisfied by any failure.
+        Some(ExpectedFailure::Expected) => return TestOutcome::Pass,
+        // The deprecated form matches only the abort code.
+        Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(code)) => {
+            if actual.0 == StatusCode::ABORTED && actual.1 == Some(*code) {
+                return TestOutcome::Pass;
             }
+            format!(
+                "expected an abort with code {code}, got {}",
+                render_failure(&actual)
+            )
         },
-    }
-}
-
-/// The abort location the `#[expected_failure]` annotation pins, if any.
-fn expected_abort_location(expected: &ExpectedFailure) -> Option<&Location> {
-    match expected {
-        ExpectedFailure::Expected | ExpectedFailure::ExpectedWithCodeDEPRECATED(_) => None,
-        ExpectedFailure::ExpectedWithError(ExpectedMoveError(status, _, location, _)) => {
-            (*status == StatusCode::ABORTED).then_some(location)
+        // `ExpectedMoveError`'s equality compares status, sub-status, and
+        // location, and deliberately ignores the message.
+        Some(ExpectedFailure::ExpectedWithError(expected)) => {
+            if *expected == actual {
+                return TestOutcome::Pass;
+            }
+            format!(
+                "expected {}, got {}",
+                render_failure(expected),
+                render_failure(&actual)
+            )
         },
+    };
+    match &actual.3 {
+        Some(detail) => TestOutcome::Fail(format!("{reason} ({detail})")),
+        None => TestOutcome::Fail(reason),
     }
 }
 
-/// Whether the actual abort location satisfies the expected one.
-fn location_matches(expected: &Location, actual: &AbortLocation) -> bool {
-    match (expected, actual) {
-        (Location::Module(expected), AbortLocation::Module(actual)) => expected == actual,
-        (Location::Script, AbortLocation::Script) => true,
-        (Location::Undefined, _)
-        | (Location::Script, AbortLocation::Module(_))
-        | (Location::Module(_), AbortLocation::Script) => false,
-    }
-}
-
-/// Renders a [`Location`] as `script`/`undefined`/`0x<address>::<module>`
-/// (unlike its `Display`).
-fn render_expected_location(location: &Location) -> String {
-    match location {
-        Location::Undefined => "undefined".to_string(),
-        Location::Script => "script".to_string(),
-        Location::Module(module_id) => crate::runner::render_module_location(module_id),
-    }
-}
-
-/// Renders an actual [`AbortLocation`] in the same form as
-/// [`render_expected_location`].
-fn render_abort_location(location: &AbortLocation) -> String {
-    match location {
-        AbortLocation::Script => "script".to_string(),
-        AbortLocation::Module(module_id) => crate::runner::render_module_location(module_id),
-    }
+/// Renders a failure, or the expectation it is judged against, as the status,
+/// sub-status, and location the two are compared on. The message is left out:
+/// it is not part of the comparison.
+//
+// `ExpectedMoveError::verbiage` unwraps the sub-status for `ABORTED`, but an
+// annotation may specify `ABORTED` without a code and reach this function
+// outside the execution panic guard.
+fn render_failure(error: &MoveError) -> String {
+    let MoveError(status, sub_status, location, _) = error;
+    let sub_status = match sub_status {
+        // `ABORTED`'s sub-status is the Move abort code.
+        Some(code) if *status == StatusCode::ABORTED => format!(" with code {code}"),
+        Some(sub_status) => format!(" with sub-status {sub_status}"),
+        None => String::new(),
+    };
+    format!(
+        "{status:?}{sub_status} in {}",
+        crate::runner::render_error_location(location)
+    )
 }
 
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
@@ -622,17 +511,31 @@ mod tests {
     }
 
     fn abort_in(code: u64, name: &str) -> TestResult {
-        TestResult::Abort {
-            code,
-            message: None,
-            location: AbortLocation::Module(module(name)),
-        }
+        TestResult::Failure(MoveError(
+            StatusCode::ABORTED,
+            Some(code),
+            Location::Module(module(name)),
+            None,
+        ))
+    }
+
+    fn runtime_error_in(status: StatusCode, sub_status: Option<u64>, name: &str) -> TestResult {
+        TestResult::Failure(MoveError(
+            status,
+            sub_status,
+            Location::Module(module(name)),
+            Some("overflow".to_string()),
+        ))
     }
 
     fn expect_abort_in(code: u64, name: &str) -> Option<ExpectedFailure> {
-        Some(ExpectedFailure::ExpectedWithError(ExpectedMoveError(
-            StatusCode::ABORTED,
-            Some(code),
+        expect(StatusCode::ABORTED, Some(code), name)
+    }
+
+    fn expect(status: StatusCode, sub_status: Option<u64>, name: &str) -> Option<ExpectedFailure> {
+        Some(ExpectedFailure::ExpectedWithError(MoveError(
+            status,
+            sub_status,
             Location::Module(module(name)),
             None,
         )))
@@ -659,17 +562,20 @@ mod tests {
     }
 
     #[test]
-    fn abort_code_mismatch_reported_before_location() {
+    fn abort_code_mismatch_reports_both_codes() {
         let TestOutcome::Fail(reason) = adjudicate(abort_in(8, "b"), &expect_abort_in(7, "a"))
         else {
             panic!("expected Fail");
         };
-        assert!(reason.contains("got code 8"), "{reason}");
+        assert!(
+            reason.contains("code 7") && reason.contains("code 8"),
+            "{reason}"
+        );
     }
 
     #[test]
     fn expected_script_location_fails_module_abort() {
-        let expected = Some(ExpectedFailure::ExpectedWithError(ExpectedMoveError(
+        let expected = Some(ExpectedFailure::ExpectedWithError(MoveError(
             StatusCode::ABORTED,
             Some(7),
             Location::Script,
@@ -691,20 +597,105 @@ mod tests {
     }
 
     #[test]
-    fn non_abort_expectation_satisfied_by_any_failure() {
-        // Pins the under-checking documented at the TODO in `adjudicate`.
-        let expected = Some(ExpectedFailure::ExpectedWithError(ExpectedMoveError(
-            StatusCode::ARITHMETIC_ERROR,
-            None,
-            Location::Module(module("a")),
-            None,
-        )));
+    fn non_abort_expectation_matches_status_and_location() {
+        let expected = expect(StatusCode::ARITHMETIC_ERROR, None, "a");
         assert!(matches!(
             adjudicate(
-                TestResult::RuntimeFailure("overflow".to_string()),
+                runtime_error_in(StatusCode::ARITHMETIC_ERROR, None, "a"),
                 &expected
             ),
             TestOutcome::Pass
         ));
+    }
+
+    #[test]
+    fn non_abort_expectation_rejects_a_different_status() {
+        let expected = expect(StatusCode::ARITHMETIC_ERROR, None, "a");
+        let TestOutcome::Fail(reason) = adjudicate(
+            runtime_error_in(StatusCode::VECTOR_OPERATION_ERROR, Some(1), "a"),
+            &expected,
+        ) else {
+            panic!("expected Fail");
+        };
+        assert!(
+            reason.contains("ARITHMETIC_ERROR") && reason.contains("VECTOR_OPERATION_ERROR"),
+            "{reason}"
+        );
+    }
+
+    #[test]
+    fn non_abort_expectation_rejects_a_different_location() {
+        let expected = expect(StatusCode::ARITHMETIC_ERROR, None, "a");
+        let TestOutcome::Fail(reason) = adjudicate(
+            runtime_error_in(StatusCode::ARITHMETIC_ERROR, None, "b"),
+            &expected,
+        ) else {
+            panic!("expected Fail");
+        };
+        assert!(
+            reason.contains("0x1::a") && reason.contains("0x1::b"),
+            "{reason}"
+        );
+    }
+
+    /// A vector-error expectation distinguishes error kinds by sub-status.
+    #[test]
+    fn non_abort_expectation_rejects_a_different_sub_status() {
+        let expected = expect(StatusCode::VECTOR_OPERATION_ERROR, Some(1), "a");
+        assert!(matches!(
+            adjudicate(
+                runtime_error_in(StatusCode::VECTOR_OPERATION_ERROR, Some(2), "a"),
+                &expected
+            ),
+            TestOutcome::Fail(_)
+        ));
+    }
+
+    /// A bare `#[expected_failure]` accepts any failure.
+    #[test]
+    fn bare_expectation_satisfied_by_any_failure() {
+        let expected = Some(ExpectedFailure::Expected);
+        assert!(matches!(
+            adjudicate(
+                runtime_error_in(StatusCode::ARITHMETIC_ERROR, None, "a"),
+                &expected
+            ),
+            TestOutcome::Pass
+        ));
+    }
+
+    /// An abort does not match a runtime-error expectation because each has a
+    /// distinct status.
+    #[test]
+    fn abort_does_not_satisfy_a_runtime_error_expectation() {
+        let expected = expect(StatusCode::ARITHMETIC_ERROR, None, "a");
+        assert!(matches!(
+            adjudicate(abort_in(7, "a"), &expected),
+            TestOutcome::Fail(_)
+        ));
+    }
+
+    /// A failure without a complete V1 descriptor is unsupported because its
+    /// expected outcome cannot be evaluated.
+    #[test]
+    fn unstatable_failure_is_unsupported() {
+        let unstatable = VMInternalError::new(RuntimeError::BCSEof);
+        let TestOutcome::Unsupported(reason) = adjudicate(classify_error(&unstatable), &None)
+        else {
+            panic!("expected Unsupported");
+        };
+        assert!(reason.contains("no legacy status"), "{reason}");
+    }
+
+    /// An unmodelled V1 sub-status is unsupported rather than treated as
+    /// absent.
+    #[test]
+    fn unmodelled_sub_status_is_unsupported() {
+        let unmodelled = VMInternalError::new(RuntimeError::EnumVariantMismatch { tag: 2 });
+        let TestOutcome::Unsupported(reason) = adjudicate(classify_error(&unmodelled), &None)
+        else {
+            panic!("expected Unsupported");
+        };
+        assert!(reason.contains("no legacy sub-status"), "{reason}");
     }
 }

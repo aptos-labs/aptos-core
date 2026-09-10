@@ -7,6 +7,7 @@ use codespan_reporting::{
     diagnostic::Diagnostic,
     term::{emit, termcolor::WriteColor, Config},
 };
+use move_model::model::CwdRelativeFiles;
 
 /// It's used in the native aptos-cli output to show error messages.
 /// Wraps the `codespan_reporting::term::emit()` method.
@@ -28,6 +29,7 @@ where
     W: WriteColor,
 {
     fn emit(&mut self, source_files: &Files<String>, diag: &Diagnostic<FileId>) {
-        emit(&mut self.writer, &Config::default(), source_files, diag).expect("emit must not fail")
+        let source_files = CwdRelativeFiles::new(source_files);
+        emit(&mut self.writer, &Config::default(), &source_files, diag).expect("emit must not fail")
     }
 }

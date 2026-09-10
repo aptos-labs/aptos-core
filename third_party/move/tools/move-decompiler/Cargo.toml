@@ -19,12 +19,10 @@ default = []
 anyhow = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-codespan = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-bytecode-verifier = { workspace = true }
-move-command-line-common = { workspace = true }
 move-model = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 

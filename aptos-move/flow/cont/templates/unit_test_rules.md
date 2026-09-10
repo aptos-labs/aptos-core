@@ -1,7 +1,7 @@
 {# Move unit testing rules #}
 {% if once(name="unit_test_rules") %}
 
-## Move Unit Testing Reference
+## Move unit-test syntax
 
 ### Test Attributes
 
@@ -14,7 +14,7 @@
 | `#[expected_failure(abort_code = N)]` | Expects abort with specific code |
 | `#[expected_failure(abort_code = N, location = mod)]` | Expects abort at specific location |
 
-### Signer Parameters
+### Signer parameters
 
 Signers are bound via the test attribute, not passed as arguments:
 
@@ -32,11 +32,14 @@ fun test_multi(admin: &signer, user: &signer) { }
 fun test_framework(aptos_framework: &signer) { }
 ```
 
-### Expected Failure
+### Expected failures
 
 Use `#[expected_failure]` to test that code correctly aborts under certain conditions.
 
-**Basic usage** (any abort passes):
+Prefer an exact code and location. Use an unconstrained expected failure only
+when the failure kind genuinely is the behavior under test.
+
+**Any abort:**
 ```move
 #[test]
 #[expected_failure]
@@ -70,7 +73,7 @@ fun test_overflow() { let _ = 255u8 + 1; }
 fun test_out_of_bounds() { vector::borrow(&vector::empty<u8>(), 0); }
 ```
 
-### Test-Only Code
+### Test-only code
 
 ```move
 // Test-only module (entire module only compiled for tests)
@@ -88,7 +91,7 @@ module my_addr::my_module {
 }
 ```
 
-### Useful Test Utilities
+### Common test utilities
 
 ```move
 // Get address from signer
@@ -114,17 +117,19 @@ timestamp::update_global_time_for_test(1000000); // microseconds
 timestamp::update_global_time_for_test_secs(100); // seconds
 ```
 
-## Test Design Rules
+## Test design
 
-**Design rules:**
-- **One behavior per test.** Each test verifies exactly one scenario. Never combine success and failure cases.
-- **Minimal setup.** Only initialize what the specific test needs.
-- **Test the target function.** Every test must call the user-specified function.
-- **Document purpose.** Every test needs a comment explaining what behavior is tested.
+- Test one behavior per case with the minimum setup needed to reach it.
+- Call the requested function directly when its visibility permits. For an
+  inaccessible private function, test it through observable public behavior or
+  use an existing module-local test pattern; do not change production
+  visibility merely for a test.
+- Explain the behavior being checked, especially for abort and boundary cases.
+- Assert semantic outcomes, not incidental implementation details.
 
 **Naming:** `test_<function>_<scenario>` (e.g., `test_transfer_insufficient_balance`), module: `<module>_tests`
 
-**Common Mistakes:**
+**Common mistakes:**
 - `RESOURCE_ALREADY_EXISTS`: Don't initialize the same resource twice
 - `MISSING_DATA`: Ensure required resources exist before calling
 - Signer mismatch: Operations checking `signer::address_of()` require the correct signer. Match signers to expected addresses in test attributes.

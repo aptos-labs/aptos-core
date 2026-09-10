@@ -12,6 +12,8 @@ pub mod data_cache;
 pub mod execution_tracing;
 mod interpreter;
 mod interpreter_caches;
+#[cfg(any(test, feature = "testing"))]
+pub use interpreter_caches::InstructionCacheBudgetOverride;
 mod loader;
 pub mod logging;
 pub mod move_vm;

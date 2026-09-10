@@ -34,12 +34,13 @@ module 0x42::chained_opaque {
 
     // f1 and f2 call `helper`, making them transitively impure.
     // try_as_pure_spec_call returns None for both → they become behavior predicates.
+    // Neither publishes a functional result, so the composed `result_of` cannot
+    // be simplified away and the chained form is what the WP must render.
     fun f1(self: &Pool, x: u64): u64 { helper(x) }
     spec f1 {
         pragma opaque = true;
         pragma inference = none;
         aborts_if false;
-        ensures result == x;
     }
 
     fun f2(self: &Pool, x: u64): u64 { helper(x) }
@@ -47,7 +48,6 @@ module 0x42::chained_opaque {
         pragma opaque = true;
         pragma inference = none;
         aborts_if false;
-        ensures result == x;
     }
 
     // Chains f1 then passes its result via a local to f2.
@@ -64,11 +64,7 @@ module 0x42::chained_opaque {
             let a = ..S1 |~ result_of<f1>(self, x);
             S1.. |~ result_of<f2>(self, a)
         };
-        aborts_if [inferred] S1 |~ {
-            let a = ..S1 |~ result_of<f1>(self, x);
-            aborts_of<f2>(self, a)
-        };
-        aborts_if [inferred] aborts_of<f1>(self, x);
+        aborts_if [inferred] false;
     }
 
 }

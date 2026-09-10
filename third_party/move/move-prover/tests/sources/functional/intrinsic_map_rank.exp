@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_map_rank.move:77:9
+   │
+77 │         ensures spec_rank(_m, _k) > 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_map_rank.move:73: rank_wrong
+   =     at tests/sources/functional/intrinsic_map_rank.move:75: rank_wrong (spec)
+   =     at tests/sources/functional/intrinsic_map_rank.move:73: rank_wrong
+   =         _m = <redacted>
+   =         _k = <redacted>
+   =     at tests/sources/functional/intrinsic_map_rank.move:77: rank_wrong (spec)

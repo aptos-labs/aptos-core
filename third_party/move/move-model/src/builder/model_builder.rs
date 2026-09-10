@@ -242,14 +242,16 @@ impl AnyFunEntry {
         }
     }
 
-    pub fn is_equality_on_ref(&self) -> bool {
+    pub fn is_equality(&self) -> bool {
         matches!(self.get_operation(), Operation::Eq | Operation::Neq)
-            && self.get_signature().1[0].1.is_reference()
+    }
+
+    pub fn is_equality_on_ref(&self) -> bool {
+        self.is_equality() && self.get_signature().1[0].1.is_reference()
     }
 
     pub fn is_equality_on_non_ref(&self) -> bool {
-        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
-            && !self.get_signature().1[0].1.is_reference()
+        self.is_equality() && !self.get_signature().1[0].1.is_reference()
     }
 }
 
@@ -345,6 +347,7 @@ impl<'env> ModelBuilder<'env> {
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
             display_module_addr: false,
+            fully_qualify_external_types: false,
             recursive_vars: None,
         }
     }

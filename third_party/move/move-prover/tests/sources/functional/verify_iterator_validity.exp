@@ -1,0 +1,243 @@
+Move prover returns: exiting with verification errors
+warning: This assignment/binding to the left-hand-side variable `it` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_it`), or renaming to `_`
+    ┌─ tests/sources/functional/verify_iterator_validity.move:159:18
+    │
+159 │         let it = find(&t, 1);
+    │                  ^^^^^^^^^^^
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:60:9
+   │
+60 │         requires spec_iter_valid(self, t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:282: stale_borrow_mut_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:283: stale_borrow_mut_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:284: stale_borrow_mut_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:285: stale_borrow_mut_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:286: stale_borrow_mut_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:287: stale_borrow_mut_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:60: iter_borrow_mut (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:155: forward_stale_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:156: forward_stale_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:157: forward_stale_fails
+   =         b = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:158: forward_stale_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:159: forward_stale_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:160: forward_stale_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:161: forward_stale_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:471: copy_diverges_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:472: copy_diverges_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:473: copy_diverges_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:474: copy_diverges_fails
+   =         t2 = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:475: copy_diverges_fails
+   =         t2 = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:476: copy_diverges_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:406: cross_map_fails
+   =         a = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:407: cross_map_fails
+   =         b = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:408: cross_map_fails
+   =         a = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:409: cross_map_fails
+   =         b = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:410: cross_map_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:411: cross_map_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:319: generic_stale_fails
+   =         t = <redacted>
+   =         k1 = <redacted>
+   =         k2 = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:320: generic_stale_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:321: generic_stale_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:322: generic_stale_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:323: generic_stale_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:525: loop_mutation_fails
+   =         n = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:526: loop_mutation_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:527: loop_mutation_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:528: loop_mutation_fails
+   =         it = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:529: loop_mutation_fails
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:530: loop_mutation_fails
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:531: loop_mutation_fails
+   =     enter loop, variable(s) t, $t5, $t4 havocked and reassigned
+   =         t = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:532: loop_mutation_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:507: opaque_mut_wrapper_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:508: opaque_mut_wrapper_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:509: opaque_mut_wrapper_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:510: opaque_mut_wrapper_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:511: opaque_mut_wrapper_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:357: revalidation_by_alias_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:358: revalidation_by_alias_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:359: revalidation_by_alias_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:360: revalidation_by_alias_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:361: revalidation_by_alias_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:362: revalidation_by_alias_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:273: stale_use_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:274: stale_use_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:275: stale_use_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:276: stale_use_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:277: stale_use_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:294: use_after_invalidate_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:295: use_after_invalidate_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:296: use_after_invalidate_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:297: use_after_invalidate_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:298: use_after_invalidate_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:299: use_after_invalidate_fails
+   =         it2 = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:94: erase (spec)
+   =     at tests/sources/functional/verify_iterator_validity.move:299: use_after_invalidate_fails
+   =         t = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:300: use_after_invalidate_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/verify_iterator_validity.move:81:9
+   │
+81 │         requires spec_iter_valid(self, _t);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/verify_iterator_validity.move:431: vector_cross_element_fails
+   =         v = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:432: vector_cross_element_fails
+   =         v = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:433: vector_cross_element_fails
+   =         v = <redacted>
+   =     at tests/sources/functional/verify_iterator_validity.move:434: vector_cross_element_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:435: vector_cross_element_fails
+   =     at tests/sources/functional/verify_iterator_validity.move:81: iter_borrow (spec)
+
+error: precondition does not hold at this call
+    ┌─ tests/sources/functional/verify_iterator_validity.move:128:9
+    │
+128 │         requires spec_iter_valid(_self.it, _t);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:181: implant_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:182: implant_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:183: implant_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:184: implant_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:185: implant_stale_fails
+    =         b = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:186: implant_stale_fails
+    =         b = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:187: implant_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:128: box_use (spec)
+
+error: precondition does not hold at this call
+    ┌─ tests/sources/functional/verify_iterator_validity.move:223:9
+    │
+223 │         requires spec_node_valid(self, _t);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/verify_iterator_validity.move:344: node_walk_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:345: node_walk_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:346: node_walk_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:347: node_walk_stale_fails
+    =         t = <redacted>
+    =     at tests/sources/functional/verify_iterator_validity.move:348: node_walk_stale_fails
+    =     at tests/sources/functional/verify_iterator_validity.move:223: node_next (spec)

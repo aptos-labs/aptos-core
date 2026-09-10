@@ -40,6 +40,8 @@ impl std::fmt::Debug for FileHash {
 
 /// Extension for Move source language files
 pub const MOVE_EXTENSION: &str = "move";
+/// Extension for Lean sources which elaborate to Move XIR.
+pub const LEAN_EXTENSION: &str = "lean";
 /// Extension for Move IR files
 pub const MOVE_IR_EXTENSION: &str = "mvir";
 /// Extension for Move ASM files

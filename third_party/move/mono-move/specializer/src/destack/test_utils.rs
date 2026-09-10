@@ -36,7 +36,7 @@ impl SSAFunction {
     // TODO(testing): add feature gating so this pass is test-only.
     pub(crate) fn with_test_utils_passes(mut self, module: &PreparedModule) -> VMResult<Self> {
         for block in &mut self.blocks {
-            for instr in &mut block.instrs {
+            for instr in block.instrs.iter_mut() {
                 if let Instr::Call { data } = instr
                     && is_force_gc(module, data.function_handle)
                 {

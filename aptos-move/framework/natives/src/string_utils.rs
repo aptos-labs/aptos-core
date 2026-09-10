@@ -113,7 +113,7 @@ fn format_vector<'a>(
         return Ok(());
     }
     print_space_or_newline(newline, out, depth + 1);
-    for (i, (ty, val)) in fields.zip(values.into_iter()).enumerate() {
+    for (i, (ty, val)) in fields.zip(values).enumerate() {
         if i > 0 {
             out.push(',');
             print_space_or_newline(newline, out, depth + 1);
@@ -315,7 +315,7 @@ fn native_format_impl(
             let addr = if fix_enabled {
                 val.value_as::<Struct>()?
                     .unpack()?
-                    // The second field of a signer is always the master address regardless of which variants.
+                    // The signer's account address is at field 1, after the variant tag.
                     .nth(MASTER_ADDRESS_FIELD_OFFSET)
                     .ok_or_else(|| SafeNativeError::abort(EINVALID_FORMAT))?
                     .value_as::<AccountAddress>()?

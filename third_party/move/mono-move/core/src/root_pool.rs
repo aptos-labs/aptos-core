@@ -210,7 +210,12 @@ pub struct ObjectHandle<'a> {
     idx: usize,
 }
 
-impl ObjectHandle<'_> {
+impl<'a> ObjectHandle<'a> {
+    /// The pool this handle is rooted in.
+    pub(crate) fn pool(&self) -> &'a RootPool {
+        self.pool
+    }
+
     /// Reads the current pointer to the object.
     ///
     /// # Safety
@@ -232,73 +237,95 @@ impl Drop for ObjectHandle<'_> {
 mod tests {
     use super::*;
 
-    fn p(addr: usize) -> *mut u8 {
-        addr as *mut u8
-    }
+    /// Test addresses backed by a real allocation. The pool never reads through
+    /// these pointers, but it does offset them, which requires provenance.
+    struct Addrs(Vec<u8>);
 
-    // The pointers below are never dereferenced, so rooting and relocating them
-    // is sound despite being fabricated.
+    impl Addrs {
+        fn new() -> Self {
+            Self(vec![0u8; 0x8000])
+        }
+
+        /// Address 0 maps to null, the pool's freed-slot marker.
+        fn at(&self, addr: usize) -> *mut u8 {
+            if addr == 0 {
+                return std::ptr::null_mut();
+            }
+            // SAFETY: every test address is within the buffer.
+            unsafe { self.0.as_ptr().add(addr) as *mut u8 }
+        }
+    }
 
     #[test]
     fn object_handle_reads_back() {
+        let addrs = Addrs::new();
         let pool = RootPool::new();
-        let h = unsafe { pool.root_object(p(0x1000)) };
-        assert_eq!(h.ptr(), p(0x1000));
+        let handle = unsafe { pool.root_object(addrs.at(0x1000)) };
+        assert_eq!(handle.ptr(), addrs.at(0x1000));
     }
 
     #[test]
     fn reference_handle_adds_offset() {
+        let addrs = Addrs::new();
         let pool = RootPool::new();
-        let h = unsafe { pool.root_reference(p(0x1000), 24) };
-        assert_eq!(h.ptr(), p(0x1000 + 24));
-        assert_eq!(h.fat(), (p(0x1000), 24));
+        let handle = unsafe { pool.root_reference(addrs.at(0x1000), 24) };
+        assert_eq!(handle.ptr(), addrs.at(0x1000 + 24));
+        assert_eq!(handle.fat(), (addrs.at(0x1000), 24));
     }
 
     #[test]
     fn handles_coexist() {
+        let addrs = Addrs::new();
         let pool = RootPool::new();
-        let a = unsafe { pool.root_object(p(0x1000)) };
-        let b = unsafe { pool.root_reference(p(0x2000), 8) };
-        let c = unsafe { pool.root_object(p(0x3000)) };
-        assert_eq!(a.ptr(), p(0x1000));
-        assert_eq!(b.ptr(), p(0x2008));
-        assert_eq!(c.ptr(), p(0x3000));
+        let first = unsafe { pool.root_object(addrs.at(0x1000)) };
+        let second = unsafe { pool.root_reference(addrs.at(0x2000), 8) };
+        let third = unsafe { pool.root_object(addrs.at(0x3000)) };
+        assert_eq!(first.ptr(), addrs.at(0x1000));
+        assert_eq!(second.ptr(), addrs.at(0x2008));
+        assert_eq!(third.ptr(), addrs.at(0x3000));
     }
 
     #[test]
     fn relocate_updates_live_handles() {
+        let addrs = Addrs::new();
         let pool = RootPool::new();
-        let a = unsafe { pool.root_object(p(0x1000)) };
-        let b = unsafe { pool.root_reference(p(0x2000), 16) };
+        let object = unsafe { pool.root_object(addrs.at(0x1000)) };
+        let reference = unsafe { pool.root_reference(addrs.at(0x2000), 16) };
         // Simulate a GC that moves 0x1000 -> 0x5000 and 0x2000 -> 0x6000.
         unsafe {
-            pool.relocate_each(|base| match base as usize {
-                0x1000 => Some(p(0x5000)),
-                0x2000 => Some(p(0x6000)),
-                _ => None,
+            pool.relocate_each(|base| {
+                if base == addrs.at(0x1000) {
+                    Some(addrs.at(0x5000))
+                } else if base == addrs.at(0x2000) {
+                    Some(addrs.at(0x6000))
+                } else {
+                    None
+                }
             })
         };
-        assert_eq!(a.ptr(), p(0x5000));
-        assert_eq!(b.ptr(), p(0x6000 + 16));
+        assert_eq!(object.ptr(), addrs.at(0x5000));
+        assert_eq!(reference.ptr(), addrs.at(0x6000 + 16));
     }
 
     #[test]
     fn dropped_handle_recycles_its_slot() {
+        let addrs = Addrs::new();
         let pool = RootPool::new();
         {
-            let _h = unsafe { pool.root_object(p(0x1000)) };
+            let _handle = unsafe { pool.root_object(addrs.at(0x1000)) };
             assert_eq!(pool.slot_count(), 1);
         }
         // The slot is freed on drop and reused by the next root.
-        let _h2 = unsafe { pool.root_object(p(0x2000)) };
+        let _reused = unsafe { pool.root_object(addrs.at(0x2000)) };
         assert_eq!(pool.slot_count(), 1);
     }
 
     #[test]
     fn relocate_offers_every_slot() {
+        let addrs = Addrs::new();
         let pool = RootPool::new();
-        let a = unsafe { pool.root_object(p(0x1000)) };
-        drop(unsafe { pool.root_object(p(0x2000)) });
+        let live = unsafe { pool.root_object(addrs.at(0x1000)) };
+        drop(unsafe { pool.root_object(addrs.at(0x2000)) });
         let mut seen = Vec::new();
         unsafe {
             pool.relocate_each(|base| {
@@ -308,7 +335,7 @@ mod tests {
         };
         // Every entry is offered to `relocate`, including the freed slot (now a
         // null base) — skipping null/non-heap bases is `relocate`'s job.
-        assert_eq!(seen, vec![p(0x1000), p(0)]);
-        assert_eq!(a.ptr(), p(0x1000));
+        assert_eq!(seen, vec![addrs.at(0x1000), addrs.at(0)]);
+        assert_eq!(live.ptr(), addrs.at(0x1000));
     }
 }

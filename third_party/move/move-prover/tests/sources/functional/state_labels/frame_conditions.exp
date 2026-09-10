@@ -1,4 +1,13 @@
 Move prover returns: exiting with verification errors
+warning: opaque call to `frame_conditions::set_balance_without_frame` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+    ┌─ tests/sources/functional/state_labels/frame_conditions.move:242:5
+    │
+242 │ ╭     spec set_balance_without_frame {
+243 │ │         pragma opaque;
+244 │ │         ensures Balance[addr].coins == 7;
+245 │ │     }
+    │ ╰─────^
+
 error: function does not abort under this condition
     ┌─ tests/sources/functional/state_labels/frame_conditions.move:155:9
     │

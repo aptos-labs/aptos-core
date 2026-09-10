@@ -63,6 +63,10 @@ pub enum DataRequest {
     // V1 `GetStateValuesWithProof` / `GetNumberOfStatesAtVersion` variants.
     GetStateValuesWithProofV2(StateValuesWithProofRequestV2), // Fetches a list of states (of the given kind) with a proof
     GetNumberOfStatesAtVersionV2(NumberOfStatesRequestV2), // Fetches the number of states (of the given kind) at the specified version
+
+    // Hot state has a different value type, so it cannot use the state V2 variants above.
+    GetHotStateValuesWithProof(HotStateValuesWithProofRequest), // Fetches a list of hot state values with a proof
+    GetNumberOfHotStatesAtVersion(Version), // Fetches the number of hot states at the specified version
 }
 
 impl DataRequest {
@@ -77,6 +81,8 @@ impl DataRequest {
             Self::GetStateValuesWithProof(_) => "get_state_values_with_proof",
             Self::GetStateValuesWithProofV2(_) => "get_state_values_with_proof_v2",
             Self::GetNumberOfStatesAtVersionV2(_) => "get_number_of_states_at_version_v2",
+            Self::GetHotStateValuesWithProof(_) => "get_hot_state_values_with_proof",
+            Self::GetNumberOfHotStatesAtVersion(_) => "get_number_of_hot_states_at_version",
             Self::GetStorageServerSummary => "get_storage_server_summary",
             Self::GetTransactionOutputsWithProof(_) => "get_transaction_outputs_with_proof",
             Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",
@@ -367,6 +373,14 @@ pub struct StateValuesWithProofRequestV2 {
     pub start_index: u64,      // The index to start fetching state values (inclusive)
     pub end_index: u64,        // The index to stop fetching state values (inclusive)
     pub state_kind: StateKind, // Which snapshot store to fetch from
+}
+
+/// A storage service request for fetching hot state values at a specified version.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct HotStateValuesWithProofRequest {
+    pub version: u64,     // The version to fetch the hot state values at
+    pub start_index: u64, // The index to start fetching hot state values (inclusive)
+    pub end_index: u64,   // The index to stop fetching hot state values (inclusive)
 }
 
 /// A storage service request for fetching the number of state values (of the

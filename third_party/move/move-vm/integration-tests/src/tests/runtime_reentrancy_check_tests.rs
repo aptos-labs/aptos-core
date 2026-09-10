@@ -3,7 +3,9 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::tests::{compile_and_publish, execute_function_with_single_storage_for_test};
+use crate::tests::{
+    compile_and_publish_allowing_natives, execute_function_with_single_storage_for_test,
+};
 use claims::assert_ok;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
@@ -109,7 +111,7 @@ fn runtime_reentrancy_check() {
         TEST_ADDR.to_hex(),
     );
 
-    compile_and_publish(&mut storage, code_1);
+    compile_and_publish_allowing_natives(&mut storage, code_1);
 
     let code_2 = format!(
         r#"
@@ -135,7 +137,7 @@ fn runtime_reentrancy_check() {
         TEST_ADDR.to_hex(),
     );
 
-    compile_and_publish(&mut storage, code_2);
+    compile_and_publish_allowing_natives(&mut storage, code_2);
 
     let code_3 = format!(
         r#"
@@ -146,7 +148,7 @@ fn runtime_reentrancy_check() {
         TEST_ADDR.to_hex(),
     );
 
-    compile_and_publish(&mut storage, code_3);
+    compile_and_publish_allowing_natives(&mut storage, code_3);
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap());
 
