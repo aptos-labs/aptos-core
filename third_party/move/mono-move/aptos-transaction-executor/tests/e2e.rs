@@ -97,14 +97,15 @@ fn execute_v2_with<S: StateView>(
         &env,
         usage,
     );
-    run(&executor)
+    let (output, _groups) = run(&executor)
         .materialize(
             &guard,
             &data_provider,
             env.features(),
             TransactionAuxiliaryData::default(),
         )
-        .expect("the transaction output materializes")
+        .expect("the transaction output materializes");
+    output
 }
 
 /// Fresh genesis with a funded sender (sequence number 10) and recipient.

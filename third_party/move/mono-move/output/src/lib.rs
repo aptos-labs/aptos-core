@@ -14,4 +14,4 @@ pub mod events;
 pub mod v1_error;
 
 pub use error::OutputError;
-pub use events::{to_contract_events, to_contract_events_from_store};
+pub use events::{has_new_epoch_event, to_contract_events, to_contract_events_from_store};
