@@ -15,7 +15,6 @@ struct RecoveredSelfShare {
 }
 
 pub struct RecoveredSelfShares {
-    epoch: u64,
     storage: Arc<dyn SecretShareStorage>,
     retention_rounds: Round,
     shares: HashMap<SecretShareKey, RecoveredSelfShare>,
@@ -29,38 +28,41 @@ impl RecoveredSelfShares {
         highest_committed_round: Round,
         retention_rounds: Round,
     ) -> Self {
-        storage.prune_before_epoch(epoch).unwrap_or_else(|error| {
-            panic!("Failed to prune old secret shares at epoch start: {error}")
-        });
-        let oldest_retained_round = highest_committed_round.saturating_sub(retention_rounds);
         storage
-            .prune_before_round(epoch, oldest_retained_round)
-            .unwrap_or_else(|error| {
-                panic!("Failed to prune expired secret shares at epoch start: {error}")
-            });
-
+            .prune_before_epoch(epoch)
+            .expect("Failed to prune old secret shares at epoch start");
+        let oldest_retained_round = highest_committed_round.saturating_sub(retention_rounds);
         let loaded_self_shares = storage
             .load_self_shares(epoch)
-            .unwrap_or_else(|error| panic!("Failed to load secret shares at epoch start: {error}"));
+            .expect("Failed to load secret shares at epoch start");
         let mut shares = HashMap::new();
-        for loaded_share in loaded_self_shares {
-            let share = loaded_share
-                .unwrap_or_else(|error| panic!("Invalid persisted secret share: {error}"));
-            assert!(
-                share.epoch() == epoch && share.author() == &author,
-                "Persisted secret share has invalid identity: expected epoch {epoch} and author \
-                 {author}, got epoch {} and author {}",
+        let mut expired_keys = Vec::new();
+        for share in loaded_self_shares {
+            assert_eq!(
                 share.epoch(),
-                share.author(),
+                epoch,
+                "Persisted secret share has wrong epoch"
             );
-            shares.insert(storage_key(share.metadata()), RecoveredSelfShare {
+            assert_eq!(
+                share.author(),
+                &author,
+                "Persisted secret share has wrong author"
+            );
+            let key = storage_key(share.metadata());
+            if share.round() < oldest_retained_round {
+                expired_keys.push(key);
+                continue;
+            }
+            shares.insert(key, RecoveredSelfShare {
                 share,
                 verified: false,
             });
         }
+        storage
+            .prune_self_shares(&expired_keys)
+            .expect("Failed to prune expired secret shares at epoch start");
 
         Self {
-            epoch,
             storage,
             retention_rounds,
             shares,
@@ -69,30 +71,31 @@ impl RecoveredSelfShares {
 
     pub fn persist(&mut self, share: SecretShare) -> anyhow::Result<()> {
         self.storage.save_self_share(&share)?;
-        let round = share.round();
         self.shares
             .insert(storage_key(share.metadata()), RecoveredSelfShare {
                 share,
                 verified: false,
             });
-        self.advance_retention(round);
         Ok(())
     }
 
     pub fn advance_retention(&mut self, latest_round: Round) {
         let oldest_retained_round = latest_round.saturating_sub(self.retention_rounds);
-        let previous_len = self.shares.len();
-        self.shares
-            .retain(|_, recovered| recovered.share.round() >= oldest_retained_round);
-        if self.shares.len() != previous_len {
-            self.storage
-                .prune_before_round(self.epoch, oldest_retained_round)
-                .unwrap_or_else(|error| {
-                    panic!(
-                        "Failed to prune secret shares before round {oldest_retained_round}: \
-                         {error}"
-                    )
-                });
+        let expired_keys = self
+            .shares
+            .iter()
+            .filter_map(|(key, recovered)| {
+                (recovered.share.round() < oldest_retained_round).then_some(*key)
+            })
+            .collect::<Vec<_>>();
+        if expired_keys.is_empty() {
+            return;
+        }
+        self.storage
+            .prune_self_shares(&expired_keys)
+            .expect("Failed to prune expired secret shares");
+        for key in expired_keys {
+            self.shares.remove(&key);
         }
     }
 
@@ -109,7 +112,7 @@ impl RecoveredSelfShares {
         if !recovered.verified {
             verifier
                 .verify(&recovered.share, author)
-                .unwrap_or_else(|error| panic!("Invalid persisted secret share: {error}"));
+                .expect("Invalid persisted secret share");
             recovered.verified = true;
         }
         Some(recovered.share.clone())

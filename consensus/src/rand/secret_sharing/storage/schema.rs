@@ -7,13 +7,14 @@ use aptos_schemadb::{
     schema::{KeyCodec, ValueCodec},
     ColumnFamilyName,
 };
+use aptos_types::secret_sharing::SecretShare;
 
 pub const SECRET_SHARE_CF_NAME: ColumnFamilyName = "secret_share";
 
 define_schema!(
     SecretShareSchema,
     SecretShareKey,
-    Vec<u8>,
+    SecretShare,
     SECRET_SHARE_CF_NAME
 );
 
@@ -27,12 +28,12 @@ impl KeyCodec<SecretShareSchema> for SecretShareKey {
     }
 }
 
-impl ValueCodec<SecretShareSchema> for Vec<u8> {
+impl ValueCodec<SecretShareSchema> for SecretShare {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
-        Ok(self.clone())
+        Ok(bcs::to_bytes(self)?)
     }
 
     fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
-        Ok(data.to_vec())
+        Ok(bcs::from_bytes(data)?)
     }
 }

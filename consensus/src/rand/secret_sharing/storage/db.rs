@@ -3,11 +3,9 @@
 
 use super::{
     schema::{SecretShareSchema, SECRET_SHARE_CF_NAME},
-    storage_key, LoadedSecretShare, SecretShareStorage,
+    storage_key, SecretShareKey, SecretShareStorage,
 };
-use anyhow::{bail, ensure, Result};
-use aptos_consensus_types::common::Round;
-use aptos_infallible::Mutex;
+use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_schemadb::{batch::SchemaBatch, Options, DB};
 use aptos_types::secret_sharing::SecretShare;
@@ -23,7 +21,6 @@ const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 pub struct SecretShareDb {
     path: PathBuf,
     db: OnceLock<DB>,
-    write_lock: Mutex<()>,
 }
 
 impl SecretShareDb {
@@ -31,7 +28,6 @@ impl SecretShareDb {
         Self {
             path: db_root_path.as_ref().join(SECRET_SHARE_DB_NAME),
             db: OnceLock::new(),
-            write_lock: Mutex::new(()),
         }
     }
 
@@ -64,59 +60,34 @@ impl SecretShareDb {
 
 impl SecretShareStorage for SecretShareDb {
     fn save_self_share(&self, share: &SecretShare) -> Result<()> {
-        let key = storage_key(share.metadata());
-        let serialized = bcs::to_bytes(share)?;
-        let _guard = self.write_lock.lock();
-
-        match self.db().get::<SecretShareSchema>(&key)? {
-            Some(existing) if existing == serialized => Ok(()),
-            Some(_) => bail!(
-                "conflicting secret share for epoch {}, block {}",
-                key.0,
-                key.1
-            ),
-            None => {
-                let mut batch = SchemaBatch::new();
-                batch.put::<SecretShareSchema>(&key, &serialized)?;
-                self.db().write_schemas(batch)?;
-                Ok(())
-            },
-        }
+        let mut batch = SchemaBatch::new();
+        batch.put::<SecretShareSchema>(&storage_key(share.metadata()), share)?;
+        self.db().write_schemas(batch)?;
+        Ok(())
     }
 
-    fn load_self_shares(&self, epoch: u64) -> Result<Vec<LoadedSecretShare>> {
+    fn load_self_shares(&self, epoch: u64) -> Result<Vec<SecretShare>> {
         let mut iter = self.db().iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut shares = Vec::new();
         for entry in iter {
-            let (key, serialized) = match entry {
-                Ok(entry) => entry,
-                Err(error) => {
-                    shares.push(Err(error.into()));
-                    continue;
-                },
-            };
-            if key.0 != epoch {
+            let (key, share) = entry?;
+            if key.epoch != epoch {
                 continue;
             }
-            let share = (|| {
-                let share = bcs::from_bytes::<SecretShare>(&serialized)?;
-                ensure!(
-                    storage_key(share.metadata()) == key,
-                    "stored key does not match secret share metadata for epoch {}, block {}",
-                    key.0,
-                    key.1
-                );
-                Ok(share)
-            })();
+            ensure!(
+                storage_key(share.metadata()) == key,
+                "stored key does not match secret share metadata for epoch {}, block {}",
+                key.epoch,
+                key.block_id
+            );
             shares.push(share);
         }
         Ok(shares)
     }
 
     fn prune_before_epoch(&self, epoch: u64) -> Result<()> {
-        let _guard = self.write_lock.lock();
         let mut iter = self.db().iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
@@ -124,7 +95,7 @@ impl SecretShareStorage for SecretShareDb {
         let mut has_deletes = false;
         for entry in iter {
             let (key, _) = entry?;
-            if key.0 < epoch {
+            if key.epoch < epoch {
                 batch.delete::<SecretShareSchema>(&key)?;
                 has_deletes = true;
             }
@@ -135,26 +106,12 @@ impl SecretShareStorage for SecretShareDb {
         Ok(())
     }
 
-    fn prune_before_round(&self, epoch: u64, round: Round) -> Result<()> {
-        let _guard = self.write_lock.lock();
-        let mut iter = self.db().iter::<SecretShareSchema>()?;
-        iter.seek_to_first();
-
+    fn prune_self_shares(&self, keys: &[SecretShareKey]) -> Result<()> {
         let mut batch = SchemaBatch::new();
-        let mut has_deletes = false;
-        for entry in iter {
-            let (key, serialized) = entry?;
-            if key.0 != epoch {
-                continue;
-            }
-            // Leave malformed records for the load path to report and reject.
-            if bcs::from_bytes::<SecretShare>(&serialized).is_ok_and(|share| share.round() < round)
-            {
-                batch.delete::<SecretShareSchema>(&key)?;
-                has_deletes = true;
-            }
+        for key in keys {
+            batch.delete::<SecretShareSchema>(key)?;
         }
-        if has_deletes {
+        if !keys.is_empty() {
             self.db().write_schemas(batch)?;
         }
         Ok(())
@@ -181,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn test_idempotent_write_conflict_and_restart() {
+    fn test_overwrite_and_restart() {
         let temp_path = TempPath::new();
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
         let metadata = create_metadata(ctx.epoch, 10);
@@ -192,13 +149,9 @@ mod tests {
             db.save_self_share(&share).unwrap();
             db.save_self_share(&share).unwrap();
 
-            let mut conflicting = share.clone();
-            conflicting.metadata.timestamp += 1;
-            assert!(db
-                .save_self_share(&conflicting)
-                .unwrap_err()
-                .to_string()
-                .contains("conflicting secret share"));
+            let mut replacement = share.clone();
+            replacement.metadata.timestamp += 1;
+            db.save_self_share(&replacement).unwrap();
         }
 
         let reopened = SecretShareDb::new(&temp_path);
@@ -207,11 +160,12 @@ mod tests {
             .unwrap()
             .into_iter()
             .next()
-            .unwrap()
             .unwrap();
+        let mut expected = share;
+        expected.metadata.timestamp += 1;
         assert_eq!(
             bcs::to_bytes(&recovered).unwrap(),
-            bcs::to_bytes(&share).unwrap()
+            bcs::to_bytes(&expected).unwrap()
         );
     }
 
@@ -229,34 +183,29 @@ mod tests {
 
         db.prune_before_epoch(ctx.epoch + 1).unwrap();
 
-        let recovered = db
-            .load_self_shares(ctx.epoch + 1)
-            .unwrap()
-            .into_iter()
-            .collect::<Result<Vec<_>>>()
-            .unwrap();
+        let recovered = db.load_self_shares(ctx.epoch + 1).unwrap();
         assert_eq!(recovered.len(), 1);
         assert_eq!(recovered[0].metadata(), &new_metadata);
     }
 
     #[test]
-    fn test_prune_before_round() {
+    fn test_prune_self_shares() {
         let temp_path = TempPath::new();
         let db = SecretShareDb::new(&temp_path);
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
-        for round in [10, 20, 30] {
-            let metadata = create_metadata(ctx.epoch, round);
-            db.save_self_share(&create_secret_share(&ctx, 0, &metadata))
+        let metadata = [10, 20, 30].map(|round| create_metadata(ctx.epoch, round));
+        for metadata in &metadata {
+            db.save_self_share(&create_secret_share(&ctx, 0, metadata))
                 .unwrap();
         }
 
-        db.prune_before_round(ctx.epoch, 20).unwrap();
+        db.prune_self_shares(&[storage_key(&metadata[0])]).unwrap();
 
         let mut recovered_rounds = db
             .load_self_shares(ctx.epoch)
             .unwrap()
             .into_iter()
-            .map(|share| share.unwrap().round())
+            .map(|share| share.round())
             .collect::<Vec<_>>();
         recovered_rounds.sort_unstable();
         assert_eq!(recovered_rounds, vec![20, 30]);
@@ -264,6 +213,8 @@ mod tests {
 
     #[test]
     fn test_corrupt_record_is_rejected() {
+        use aptos_schemadb::batch::WriteBatch;
+
         let temp_path = TempPath::new();
         let db = SecretShareDb::new(&temp_path);
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
@@ -274,12 +225,12 @@ mod tests {
         let key = storage_key(&corrupt_metadata);
         let mut batch = SchemaBatch::new();
         batch
-            .put::<SecretShareSchema>(&key, &vec![0xFF, 0xFF])
+            .raw_put(SECRET_SHARE_CF_NAME, bcs::to_bytes(&key).unwrap(), vec![
+                0xFF, 0xFF,
+            ])
             .unwrap();
         db.db().write_schemas(batch).unwrap();
 
-        let records = db.load_self_shares(ctx.epoch).unwrap();
-        assert_eq!(records.iter().filter(|record| record.is_ok()).count(), 1);
-        assert_eq!(records.iter().filter(|record| record.is_err()).count(), 1);
+        assert!(db.load_self_shares(ctx.epoch).is_err());
     }
 }

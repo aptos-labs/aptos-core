@@ -7,26 +7,32 @@ mod in_memory;
 mod schema;
 
 use anyhow::Result;
-use aptos_consensus_types::common::Round;
 use aptos_crypto::HashValue;
 use aptos_types::secret_sharing::{SecretShare, SecretShareMetadata};
 pub use db::SecretShareDb;
 #[cfg(test)]
 pub use in_memory::InMemorySecretShareStorage;
+use serde::{Deserialize, Serialize};
 
-pub type SecretShareKey = (u64, HashValue);
-pub type LoadedSecretShare = Result<SecretShare>;
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct SecretShareKey {
+    pub epoch: u64,
+    pub block_id: HashValue,
+}
 
 pub trait SecretShareStorage: Send + Sync + 'static {
     fn save_self_share(&self, share: &SecretShare) -> Result<()>;
 
-    fn load_self_shares(&self, epoch: u64) -> Result<Vec<LoadedSecretShare>>;
+    fn load_self_shares(&self, epoch: u64) -> Result<Vec<SecretShare>>;
 
     fn prune_before_epoch(&self, epoch: u64) -> Result<()>;
 
-    fn prune_before_round(&self, epoch: u64, round: Round) -> Result<()>;
+    fn prune_self_shares(&self, keys: &[SecretShareKey]) -> Result<()>;
 }
 
 pub(crate) fn storage_key(metadata: &SecretShareMetadata) -> SecretShareKey {
-    (metadata.epoch, metadata.block_id)
+    SecretShareKey {
+        epoch: metadata.epoch,
+        block_id: metadata.block_id,
+    }
 }

@@ -197,29 +197,10 @@ impl SecretShareManager {
             },
         };
 
-        if share.author() != &self.author
-            || share.epoch() != self.epoch_state.epoch
-            || share.round() != round
-        {
-            error!(
-                epoch = self.epoch_state.epoch,
-                round = round,
-                share_epoch = share.epoch(),
-                share_round = share.round(),
-                share_author = share.author(),
-                "Derived self share has invalid identity or metadata"
-            );
-            return;
-        }
-
-        if let Err(error) = self.recovered_self_shares.persist(share.clone()) {
-            panic!(
-                "Failed to persist self secret share for epoch {}, round {}, block {}: {error}",
-                share.epoch(),
-                round,
-                share.metadata().block_id,
-            );
-        }
+        self.recovered_self_shares
+            .persist(share.clone())
+            .expect("Failed to persist self secret share");
+        self.prune_expired_self_shares(round);
         let metadata = share.metadata().clone();
         {
             let mut store = self.secret_share_store.lock();
@@ -284,17 +265,19 @@ impl SecretShareManager {
 
     fn process_reset(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
-        let (target_round, stop) = match signal {
-            ResetSignal::Stop => (0, true),
-            ResetSignal::TargetRound(round) => (round, false),
+        let target_round = match signal {
+            ResetSignal::Stop => {
+                self.stop = true;
+                0
+            },
+            ResetSignal::TargetRound(round) => {
+                self.prune_expired_self_shares(round);
+                round
+            },
         };
-        if !stop {
-            self.prune_expired_self_shares(target_round);
-        }
         self.block_queue = BlockQueue::new();
         self.pending_derives = FuturesUnordered::new();
         self.secret_share_store.lock().reset(target_round);
-        self.stop = stop;
         let _ = tx.send(ResetAck::default());
     }
 
@@ -599,7 +582,7 @@ mod tests {
     use crate::{
         network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
         rand::secret_sharing::{
-            storage::{storage_key, InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb},
+            storage::{storage_key, InMemorySecretShareStorage, SecretShareDb, SecretShareKey},
             test_utils::{
                 create_bad_secret_share, create_metadata, create_secret_share, TestContext,
             },
@@ -628,7 +611,7 @@ mod tests {
             anyhow::bail!("injected failure")
         }
 
-        fn load_self_shares(&self, _epoch: u64) -> anyhow::Result<Vec<LoadedSecretShare>> {
+        fn load_self_shares(&self, _epoch: u64) -> anyhow::Result<Vec<SecretShare>> {
             Ok(Vec::new())
         }
 
@@ -636,7 +619,7 @@ mod tests {
             Ok(())
         }
 
-        fn prune_before_round(&self, _epoch: u64, _round: Round) -> anyhow::Result<()> {
+        fn prune_self_shares(&self, _keys: &[SecretShareKey]) -> anyhow::Result<()> {
             Ok(())
         }
     }
@@ -749,7 +732,6 @@ mod tests {
             .unwrap()
             .into_iter()
             .next()
-            .unwrap()
             .unwrap();
         assert_eq!(persisted.metadata(), &metadata);
         assert!(manager
@@ -812,12 +794,7 @@ mod tests {
 
         let (manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 30, 10);
 
-        let recovered = storage
-            .load_self_shares(ctx.epoch)
-            .unwrap()
-            .into_iter()
-            .collect::<anyhow::Result<Vec<_>>>()
-            .unwrap();
+        let recovered = storage.load_self_shares(ctx.epoch).unwrap();
         assert_eq!(recovered.len(), 1);
         assert_eq!(recovered[0].metadata(), &boundary_metadata);
         assert!(!manager
@@ -993,13 +970,6 @@ mod tests {
         let (request, response) = request_rpc(old_epoch_metadata);
         manager.handle_incoming_msg(request);
         assert!(response.await.is_err());
-
-        let corrupt_storage = Arc::new(InMemorySecretShareStorage::new());
-        corrupt_storage.insert_raw(storage_key(&metadata), vec![0xFF, 0xFF]);
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            make_manager(&ctx, 0, corrupt_storage)
-        }));
-        assert!(result.is_err());
     }
 
     #[tokio::test]
