@@ -76,6 +76,13 @@ int main(int argc, char **argv) {
     if (abi < 1) {
         fail("Landlock is unavailable", NULL);
     }
+    int deny_network = 0;
+    for (int scan = 1; scan < argc; scan++) {
+        if (strcmp(argv[scan], "--deny-network") == 0) {
+            deny_network = 1;
+        }
+    }
+
     // Truncation is a distinct access right, and one the kernel cannot govern
     // before ABI 3: a read-only path could be emptied -- the pristine baseline
     // or the run record among them -- while the policy reported itself intact.
@@ -84,13 +91,22 @@ int main(int argc, char **argv) {
     if (abi < 3) {
         fail("Landlock ABI 3 or later is required to govern truncation", NULL);
     }
+    if (deny_network && abi < 4) {
+        fail("Landlock ABI 4 or later is required to deny TCP networking", NULL);
+    }
 
     // Governing an access the running kernel does not know rejects the ruleset
     // outright. A writable path is granted truncation too, or the agent could
     // not rewrite its own workspace.
     __u64 write_access = WRITE_ACCESS | LANDLOCK_ACCESS_FS_TRUNCATE;
     __u64 handled = READ_ACCESS | write_access;
-    struct landlock_ruleset_attr ruleset = {.handled_access_fs = handled};
+    struct landlock_ruleset_attr ruleset = {
+        .handled_access_fs = handled,
+        .handled_access_net = deny_network
+                                  ? LANDLOCK_ACCESS_NET_BIND_TCP |
+                                        LANDLOCK_ACCESS_NET_CONNECT_TCP
+                                  : 0,
+    };
     int ruleset_fd = syscall(SYS_landlock_create_ruleset, &ruleset,
                              sizeof(ruleset), 0);
     if (ruleset_fd < 0) {
@@ -103,8 +119,11 @@ int main(int argc, char **argv) {
             index++;
             break;
         }
+        if (strcmp(argv[index], "--deny-network") == 0) {
+            continue;
+        }
         if (index + 1 >= argc) {
-            fprintf(stderr, "usage: landlock-exec [--ro PATH|--rw PATH]... -- COMMAND...\n");
+            fprintf(stderr, "usage: landlock-exec [--deny-network] [--ro PATH|--rw PATH]... -- COMMAND...\n");
             return 2;
         }
         __u64 access;

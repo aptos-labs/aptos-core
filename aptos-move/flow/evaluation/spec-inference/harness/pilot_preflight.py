@@ -27,42 +27,78 @@ def preflight(config_path: Path, schedule_dir: Path, sandbox_wrapper: Path) -> d
     config = ExperimentConfig.load(config_path)
     checks: list[dict[str, Any]] = []
     _check_sandbox_wrapper(checks, sandbox_wrapper)
-    _check_versioned_executable(
-        checks,
-        "claude_code",
-        "claude",
-        config.claude_code_version,
-        configured_path=os.environ.get("CLAUDE_CODE_EXECUTABLE"),
-    )
+    if config.agent_runtime == "codex":
+        _check_versioned_executable(
+            checks,
+            "codex_cli",
+            "codex",
+            config.codex_cli_version,
+            configured_path=os.environ.get("MOVE_INFERENCE_CODEX_EXECUTABLE"),
+        )
+        _check_hashed_executable(
+            checks,
+            "codex_code_mode_host",
+            os.environ.get("MOVE_INFERENCE_CODE_MODE_HOST")
+            or shutil.which("codex-code-mode-host"),
+            config.codex_code_mode_host_sha256,
+        )
+    else:
+        _check_versioned_executable(
+            checks,
+            "claude_code",
+            "claude",
+            config.claude_code_version,
+            configured_path=os.environ.get("CLAUDE_CODE_EXECUTABLE"),
+        )
     _check_versioned_executable(checks, "move_flow", "move-flow", None)
     _check_solver_executable(checks, "boogie", "BOOGIE_EXE", "boogie", ("/help",))
     _check_solver_executable(checks, "z3", "Z3_EXE", "z3", ("--version",))
 
-    try:
-        sdk_version = importlib.metadata.version("claude-agent-sdk")
-        _record(
-            checks,
-            "claude_agent_sdk",
-            sdk_version == config.claude_agent_sdk_version,
-            f"expected {config.claude_agent_sdk_version}, found {sdk_version}",
-        )
-    except importlib.metadata.PackageNotFoundError:
-        _record(checks, "claude_agent_sdk", False, "claude-agent-sdk is not installed")
+    if config.agent_runtime == "claude":
+        try:
+            sdk_version = importlib.metadata.version("claude-agent-sdk")
+            _record(
+                checks,
+                "claude_agent_sdk",
+                sdk_version == config.claude_agent_sdk_version,
+                f"expected {config.claude_agent_sdk_version}, found {sdk_version}",
+            )
+        except importlib.metadata.PackageNotFoundError:
+            _record(checks, "claude_agent_sdk", False, "claude-agent-sdk is not installed")
 
     _check_dispatch_abort(checks)
 
-    try:
-        require_provider_auth(config.model, config.provider_base_url)
-        _record(checks, "provider_auth", True, "permitted credential present")
-    except ValueError as error:
-        _record(checks, "provider_auth", False, str(error))
-    endpoint = os.environ.get("ANTHROPIC_BASE_URL")
-    _record(
-        checks,
-        "provider_endpoint",
-        endpoint in (None, config.provider_base_url),
-        f"expected {config.provider_base_url}; environment is {endpoint or 'unset (controller injects expected value)'}",
-    )
+    if config.agent_runtime == "codex":
+        auth_file = Path(
+            os.environ.get(
+                "MOVE_INFERENCE_CODEX_AUTH_FILE", Path.home() / ".codex/auth.json"
+            )
+        ).resolve()
+        _record(
+            checks,
+            "provider_auth",
+            auth_file.is_file(),
+            f"saved Codex login {'present' if auth_file.is_file() else 'missing'}",
+        )
+        _record(
+            checks,
+            "provider_endpoint",
+            config.provider_base_url == "https://chatgpt.com/backend-api",
+            f"expected https://chatgpt.com/backend-api; configured {config.provider_base_url}",
+        )
+    else:
+        try:
+            require_provider_auth(config.model, config.provider_base_url)
+            _record(checks, "provider_auth", True, "permitted credential present")
+        except ValueError as error:
+            _record(checks, "provider_auth", False, str(error))
+        endpoint = os.environ.get("ANTHROPIC_BASE_URL")
+        _record(
+            checks,
+            "provider_endpoint",
+            endpoint in (None, config.provider_base_url),
+            f"expected {config.provider_base_url}; environment is {endpoint or 'unset (controller injects expected value)'}",
+        )
 
     try:
         shape = load_round_shape(schedule_dir)
@@ -250,6 +286,28 @@ def _check_versioned_executable(
     passed = process.returncode == 0 and (expected_version is None or expected_version in version)
     expected = f", expected {expected_version}" if expected_version else ""
     _record(checks, name, passed, f"{path}: {version}{expected}")
+
+
+def _check_hashed_executable(
+    checks: list[dict[str, Any]],
+    name: str,
+    value: str | None,
+    expected_sha256: str | None,
+) -> None:
+    if value is None:
+        _record(checks, name, False, "executable is not configured or on PATH")
+        return
+    path = Path(value).resolve()
+    if not path.is_file() or not os.access(path, os.X_OK):
+        _record(checks, name, False, f"not executable: {path}")
+        return
+    actual = sha256_file(path)
+    _record(
+        checks,
+        name,
+        actual == expected_sha256,
+        f"{path}: sha256={actual}, expected {expected_sha256}",
+    )
 
 
 def _check_solver_executable(

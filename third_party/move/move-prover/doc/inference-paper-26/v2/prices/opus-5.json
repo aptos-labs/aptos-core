@@ -1,0 +1,16 @@
+{
+  "model": "claude-opus-5",
+  "label": "Opus~5",
+  "runtime": "claude",
+  "currency": "USD",
+  "per_million": {
+    "input_tokens": 5,
+    "cache_read_input_tokens": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "output_tokens": 25
+  },
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "retrieved": "2026-09-07",
+  "note": "Thinking is a subset of output. API-equivalent estimate; the round ran on a subscription."
+}

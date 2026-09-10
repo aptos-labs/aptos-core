@@ -49,7 +49,8 @@ mkdir stage
 
 # -- 3. Stage the explicit manifest.
 cp main.tex paper.tex stage/
-cp prelude.tex intro.tex example.tex wp.tex skills.tex evaluation.tex conclusion.tex stage/
+cp prelude.tex intro.tex hybrid.tex example.tex wp.tex skills.tex evaluation.tex conclusion.tex stage/
+mkdir -p stage/tables && cp tables/*.tex stage/tables/
 cp esz.sty neurips_2026_vericode.sty stage/
 cp build/main.bbl stage/main.bbl
 
@@ -57,6 +58,7 @@ cp build/main.bbl stage/main.bbl
 #       pdflatex (no latexmkrc, no aux_dir).
 mkdir stage/_verify
 cp stage/*.tex stage/*.sty stage/main.bbl stage/_verify/
+cp -r stage/tables stage/_verify/
 (
     cd stage/_verify
     for i in 1 2 3; do

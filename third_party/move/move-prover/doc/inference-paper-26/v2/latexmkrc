@@ -9,3 +9,6 @@
   $bibtex_use     = 2;        # run bibtex when needed
   $go_mode        = 2;        # always rerun everything, even if "up to date"
   $clean_ext      = 'synctex.gz synctex.gz(busy) run.xml tex.bak bbl bcf fdb_latexmk run tdo';
+
+  # Never wait for keyboard input on a TeX error: fail the build instead.
+  $pdflatex       = 'pdflatex -interaction=nonstopmode -halt-on-error %O %S';

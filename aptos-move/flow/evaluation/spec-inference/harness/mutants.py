@@ -218,6 +218,26 @@ def _mutate(fragment: str, edit: dict[str, Any], mutant_id: str) -> str:
     raise ValueError(f"mutant {mutant_id} has unknown edit kind `{kind}`")
 
 
+def _mutation_span(
+    fragment: str, edit: dict[str, Any], mutant_id: str
+) -> tuple[int, int, str]:
+    """Return the part of an anchor that an edit actually replaces."""
+    kind = edit["kind"]
+    at = edit.get("at", 0)
+    if kind == "substitute":
+        return at, edit["length"], edit["to"]
+    if kind == "swap":
+        a, sep, b = (
+            edit["a_length"], edit["separator_length"], edit["b_length"]
+        )
+        rest = fragment[at:]
+        first = rest[:a]
+        separator = rest[a:a + sep]
+        second = rest[a + sep:a + sep + b]
+        return at, a + sep + b, second + separator + first
+    raise ValueError(f"mutant {mutant_id} has unknown edit kind `{kind}`")
+
+
 def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
     """Rewrite one exact fragment of the implementation.
 
@@ -237,15 +257,42 @@ def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
     text = source.read_text(encoding="utf-8")
     pristine = (baseline / relative).read_text(encoding="utf-8")
     offset, fragment = _anchored_fragment(pristine, case)
-    at = _implementation_offset(pristine, text, offset)
-    if at is None or not text.startswith(fragment, at):
+    relative_at, length, replacement = _mutation_span(
+        fragment, case["edit"], case["mutant_id"]
+    )
+    candidate_at = _implementation_offset(pristine, text, offset)
+    if candidate_at is not None and text.startswith(fragment, candidate_at):
+        mutated = _mutate(fragment, case["edit"], case["mutant_id"])
+        source.write_text(
+            text[:candidate_at] + mutated + text[candidate_at + len(fragment):],
+            encoding="utf-8",
+        )
+        return
+
+    # Inserting a loop invariant wraps the guard's source line, so the whole
+    # anchor is no longer contiguous even though the expression being mutated
+    # remains unchanged. Align a small local context around the actual edit.
+    # The context prevents an edit to a neighboring operand from being mistaken
+    # for specification text inserted around otherwise identical code.
+    context_start = max(0, relative_at - 2)
+    context_end = min(len(fragment), relative_at + length + 2)
+    pristine_context_at = offset + context_start
+    original_context = fragment[context_start:context_end]
+    candidate_context_at = _implementation_offset(
+        pristine, text, pristine_context_at
+    )
+    if (
+        candidate_context_at is None
+        or not text.startswith(original_context, candidate_context_at)
+    ):
         raise ValueError(
             f"cannot apply mutant {case['mutant_id']}: the implementation it "
             f"rewrites is not present unchanged in {relative}"
         )
-    mutated = _mutate(fragment, case["edit"], case["mutant_id"])
+    candidate_at = candidate_context_at + relative_at - context_start
     source.write_text(
-        text[:at] + mutated + text[at + len(fragment):], encoding="utf-8"
+        text[:candidate_at] + replacement + text[candidate_at + length:],
+        encoding="utf-8",
     )
 
 

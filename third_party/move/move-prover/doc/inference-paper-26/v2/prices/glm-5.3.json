@@ -1,0 +1,16 @@
+{
+  "model": "glm-5.3[1m]",
+  "label": "GLM~5.3",
+  "runtime": "claude",
+  "currency": "USD",
+  "per_million": {
+    "input_tokens": 1.4,
+    "cache_read_input_tokens": 0.26,
+    "cache_write_1h": 0,
+    "cache_write_5m": 0,
+    "output_tokens": 4.4
+  },
+  "source": "Z.ai price list recorded with the round",
+  "retrieved": "2026-09-10",
+  "note": "Served through the Anthropic-compatible Z.ai endpoint by the Claude Code SDK; cache creation is uncharged."
+}

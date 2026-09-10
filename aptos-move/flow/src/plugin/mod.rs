@@ -429,6 +429,12 @@ mod tests {
         // One warned function at a time, reran under a function filter.
         assert!(inf_content.contains("**Handle its diagnostics**"));
         assert!(inf_content.contains("filter: \"module::function\""));
+        assert!(inf_content.contains("Minimize"));
+        assert!(inf_content.contains("inference setup"));
+        assert!(inf_content.contains("an after-edit check"));
+        assert!(inf_content.contains("repeated unchanged read-only"));
+        assert!(inf_content.contains("module: \"module\""));
+        assert!(inf_content.contains("package-wide output"));
         assert!(inf_content.contains("## Final report"));
         // Outside an evaluation a hybrid plugin carries both hybrid tactics,
         // with the rendered one as the default an invocation may override.

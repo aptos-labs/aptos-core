@@ -29,9 +29,11 @@ from .boogie_proxy import BoogieProxy
 from .config import ExperimentConfig, RunSpec
 from .credentials import redact_tree
 from .sdk_metrics import write_sdk_metrics
+from .codex_metrics import write_codex_metrics
+from .codex_otel import write_codex_request_metrics
 
 
-POLICY_VERSION = 4
+POLICY_VERSION = 6
 # Landlock confines the agent process itself to a subset of what the sandbox
 # mounts, so the outer namespace and the inner ruleset are two independent
 # layers rather than one repeated.
@@ -50,6 +52,11 @@ AGENT_PROC_PATHS = (Path("/proc/self"), Path("/proc/stat"), Path("/proc/sys/vm")
 AGENT_BOOGIE = Path("/opt/bin/boogie")
 BOOGIE_PROXY_CLIENT = "boogie-proxy-client.py"
 BOOGIE_PROXY_SOCKET = Path("/tmp/move-inference-boogie.sock")
+AGENT_MCP = Path("/opt/bin/move-flow-mcp")
+AGENT_CODE_MODE_HOST = Path("/opt/bin/codex-code-mode-host")
+AGENT_CODE_MODE_HOST_REAL = Path("/opt/bin/codex-code-mode-host-real")
+MCP_PROXY_CLIENT = "stdio-proxy-client.py"
+MCP_PROXY_SOCKET = Path("/tmp/move-inference-mcp.sock")
 SYSTEM_READ_ONLY = (Path("/usr"), Path("/lib"))
 RESOLVER_INPUTS = (
     Path("/etc/hosts"),
@@ -75,12 +82,16 @@ class Launch:
     claude: Path
     boogie: Path
     boogie_client: Path
+    mcp_client: Path
     z3: Path
     landlock: Path
     feedback_level: str
     #: Mutants the controller refutes an accepted contract against, mounted for
     #: the controller and withheld from the agent by its Landlock ruleset.
     refutation_mutants: Path | None = None
+    agent_runtime: str = "claude"
+    codex: Path | None = None
+    codex_code_mode_host: Path | None = None
 
 
 def main() -> None:
@@ -148,6 +159,7 @@ def preflight() -> dict[str, object]:
             "PATH",
             "/usr/bin:/bin",
             "/opt/bin/landlock-exec",
+            "--deny-network",
             "--ro",
             "/usr",
             "--ro",
@@ -162,7 +174,7 @@ def preflight() -> dict[str, object]:
             (
                 # Landlock governs opening a file rather than stat-ing it, so
                 # the probe reads rather than asks whether the path exists.
-                "import os, pathlib\n"
+                "import errno, os, pathlib, socket\n"
                 f"assert not pathlib.Path({str(sentinel)!r}).exists(), 'host path visible'\n"
                 "pathlib.Path('/proc/self/status').read_text()\n"
                 "try:\n"
@@ -180,6 +192,12 @@ def preflight() -> dict[str, object]:
                 "    pass\n"
                 "else:\n"
                 "    raise SystemExit('a read-only file can be truncated')\n"
+                "try:\n"
+                "    socket.create_connection(('127.0.0.1', 9), timeout=0.1)\n"
+                "except OSError as error:\n"
+                "    assert error.errno in (errno.EACCES, errno.EPERM), error\n"
+                "else:\n"
+                "    raise SystemExit('TCP networking is available')\n"
             ),
         ]
         process = subprocess.run(
@@ -194,7 +212,7 @@ def preflight() -> dict[str, object]:
         f"policy={POLICY_VERSION}, bwrap={bwrap_path}, "
         f"sha256={sha256_file(bwrap_path)}, landlock={landlock}, "
         f"landlock_sha256={sha256_file(landlock)}, "
-        f"host-path-and-agent-proc-isolation={'passed' if passed else 'failed'}"
+        f"host-path-agent-proc-and-network-isolation={'passed' if passed else 'failed'}"
     )
     diagnostics = (process.stderr or process.stdout).strip()
     if diagnostics:
@@ -463,10 +481,30 @@ def parse_launch(argv: list[str]) -> Launch:
             refutation_mutants, (resolved_run.plugin_dir, resolved_run.shared_package)
         )
     move_flow = _required_executable("move-flow")
-    claude = _required_executable("claude", preserve_lookup_path=True)
+    claude = (
+        _required_executable("claude", preserve_lookup_path=True)
+        if experiment_config.agent_runtime == "claude"
+        else Path("/opt/bin/unused-claude")
+    )
+    codex = (
+        _required_executable("codex", preserve_lookup_path=True)
+        if experiment_config.agent_runtime == "codex"
+        else None
+    )
+    codex_code_mode_host = (
+        _required_hashed_executable(
+            os.environ.get("MOVE_INFERENCE_CODE_MODE_HOST")
+            or shutil.which("codex-code-mode-host"),
+            experiment_config.codex_code_mode_host_sha256,
+            "Codex code-mode host",
+        )
+        if experiment_config.agent_runtime == "codex"
+        else None
+    )
     landlock = _required_landlock(evaluation_root)
     boogie = _required_solver("BOOGIE_EXE", "boogie")
     boogie_client = _required_boogie_client(evaluation_root)
+    mcp_client = _required_mcp_client(evaluation_root)
     z3 = _required_solver("Z3_EXE", "z3")
     python_root = _python_environment_root(executable)
     return Launch(
@@ -487,9 +525,13 @@ def parse_launch(argv: list[str]) -> Launch:
         claude=claude,
         boogie=boogie,
         boogie_client=boogie_client,
+        mcp_client=mcp_client,
         z3=z3,
         landlock=landlock,
         refutation_mutants=refutation_mutants,
+        agent_runtime=experiment_config.agent_runtime,
+        codex=codex,
+        codex_code_mode_host=codex_code_mode_host,
     )
 
 
@@ -498,6 +540,29 @@ def _required_boogie_client(evaluation_root: Path) -> Path:
     if not client.is_file() or not os.access(client, os.X_OK):
         raise SystemExit(f"Boogie proxy client is missing or not executable: {client}")
     return client.resolve()
+
+
+def _required_mcp_client(evaluation_root: Path) -> Path:
+    client = evaluation_root / "sandbox" / MCP_PROXY_CLIENT
+    if not client.is_file() or not os.access(client, os.X_OK):
+        raise SystemExit(f"MCP proxy client is missing or not executable: {client}")
+    return client.resolve()
+
+
+def _required_hashed_executable(
+    value: str | None, expected_sha256: str | None, description: str
+) -> Path:
+    if not value:
+        raise SystemExit(f"{description} is not configured or on PATH")
+    path = Path(value).resolve()
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise SystemExit(f"{description} is not executable: {path}")
+    actual = sha256_file(path)
+    if actual != expected_sha256:
+        raise SystemExit(
+            f"{description} digest mismatch: expected {expected_sha256}, found {actual}"
+        )
+    return path
 
 
 def _reject_development_options(command: list[str]) -> None:
@@ -517,8 +582,8 @@ def _reject_development_options(command: list[str]) -> None:
             agent = command[command.index("--agent") + 1]
         except IndexError as error:
             raise SystemExit("--agent is missing its value") from error
-        if agent != "claude":
-            raise SystemExit("production sandbox permits only --agent claude")
+        if agent not in ("claude", "codex"):
+            raise SystemExit("production sandbox permits only --agent claude or codex")
 
 
 def _require_inside_round(
@@ -659,6 +724,8 @@ def run_isolated(launch: Launch) -> int:
         tempfile.mkdtemp(prefix=f"{launch.run_id}.", dir=staging_parent)
     ).resolve()
     (staging / ".sandbox-home").mkdir(mode=0o700)
+    if launch.agent_runtime == "codex":
+        _stage_codex_auth(staging)
     published = launch.artifacts / launch.run_id
     # A dispatch abort terminates this process, and the default disposition for
     # SIGTERM and SIGINT ends it without unwinding -- so the `finally` below
@@ -704,12 +771,32 @@ def preserve_interrupted_run(staged_run: Path, artifacts: Path, reason: str) -> 
             path.unlink()
     redact_tree(staged_run)
     metrics_error = None
-    events = staged_run / "claude-events.jsonl"
-    if events.is_file():
+    claude_events = staged_run / "claude-events.jsonl"
+    codex_events = staged_run / "codex-events.jsonl"
+    if claude_events.is_file():
         try:
-            write_sdk_metrics(events, staged_run / "sdk-metrics.json", allow_incomplete_tail=True)
+            write_sdk_metrics(
+                claude_events,
+                staged_run / "sdk-metrics.json",
+                allow_incomplete_tail=True,
+            )
         except (ValueError, UnicodeDecodeError, KeyError) as error:
             # Keep corrupt raw evidence rather than losing the entire session.
+            metrics_error = type(error).__name__
+    elif codex_events.is_file():
+        try:
+            write_codex_metrics(
+                codex_events,
+                staged_run / "codex-metrics.json",
+                allow_incomplete_tail=True,
+            )
+            request_events = staged_run / "codex-request-usage.jsonl"
+            if request_events.is_file():
+                write_codex_request_metrics(
+                    request_events,
+                    staged_run / "codex-request-metrics.json",
+                )
+        except (ValueError, UnicodeDecodeError, KeyError) as error:
             metrics_error = type(error).__name__
     write_json(staged_run / "interruption.json", {
         "schema_version": 1, "run_id": staged_run.name,
@@ -778,10 +865,23 @@ def build_bwrap_command(launch: Launch, staging: Path) -> list[str]:
     # The agent runs through a wrapper that applies the Landlock ruleset and
     # then execs the real binary, so `claude` on the path is the wrapper.
     mount(launch.landlock, Path("/opt/bin/landlock-exec"))
-    mount(_write_agent_wrapper(launch, staging), Path("/opt/bin/claude"))
-    mount(launch.claude.resolve(), Path("/opt/bin/claude-real"))
+    agent_name = "codex" if launch.agent_runtime == "codex" else "claude"
+    agent_binary = launch.codex if launch.agent_runtime == "codex" else launch.claude
+    if agent_binary is None:
+        raise RuntimeError("Codex launch is missing its executable")
+    mount(_write_agent_wrapper(launch, staging), Path(f"/opt/bin/{agent_name}"))
+    mount(agent_binary.resolve(), Path(f"/opt/bin/{agent_name}-real"))
+    if launch.agent_runtime == "codex":
+        if launch.codex_code_mode_host is None:
+            raise RuntimeError("Codex launch is missing its code-mode host")
+        mount(
+            _write_code_mode_host_wrapper(launch, staging), AGENT_CODE_MODE_HOST
+        )
+        mount(launch.codex_code_mode_host, AGENT_CODE_MODE_HOST_REAL)
     mount(launch.boogie)
     mount(launch.boogie_client, AGENT_BOOGIE)
+    if launch.agent_runtime == "codex":
+        mount(launch.mcp_client, AGENT_MCP)
     mount(launch.z3)
 
     command = [
@@ -874,6 +974,7 @@ def build_bwrap_environment(launch: Launch) -> dict[str, str]:
         "MOVE_INFERENCE_BOOGIE_PROXY": str(BOOGIE_PROXY_SOCKET),
         "MOVE_INFERENCE_BOOGIE_REAL": str(launch.boogie),
         "MOVE_INFERENCE_BOOGIE_AGENT": str(AGENT_BOOGIE),
+        "MOVE_INFERENCE_MCP_PROXY": str(MCP_PROXY_SOCKET),
         # Claude Code launches itself by this path, so the wrapper has to be
         # what it finds rather than only what is first on PATH.
         "CLAUDE_CODE_EXECUTABLE": "/opt/bin/claude",
@@ -884,6 +985,17 @@ def build_bwrap_environment(launch: Launch) -> dict[str, str]:
         # guard.
         "MOVE_INFERENCE_EVAL_SANDBOXED": "1",
     }
+    if launch.agent_runtime == "codex":
+        environment.update(
+            {
+                "CODEX_HOME": str(launch.artifacts / ".sandbox-home" / ".codex"),
+                "MOVE_INFERENCE_CODEX_AUTH_FILE": str(
+                    launch.artifacts / ".sandbox-home" / ".codex" / "auth.json"
+                ),
+                "MOVE_INFERENCE_CODEX_EXECUTABLE": "/opt/bin/codex",
+                "MOVE_INFERENCE_MCP_CLIENT": str(AGENT_MCP),
+            }
+        )
     for name in (
         "ANTHROPIC_AUTH_TOKEN",
         "ANTHROPIC_API_KEY",
@@ -914,26 +1026,27 @@ def agent_landlock_paths(launch: Launch) -> tuple[list[Path], list[Path]]:
         *(path for path in AGENT_PROC_PATHS if path.exists()),
         *(path for path in RESOLVER_INPUTS if path.is_file()),
         launch.plugin,
-        launch.move_flow,
-        # Z3 but not Boogie: `move-flow` execs Z3 itself for its version check
-        # and Z3 is an ordinary binary with no `/proc/self` dependency, while
-        # Boogie reaches the agent only through the proxy client under `/opt`.
-        launch.z3,
     ]
     if Path("/etc/ssl").is_dir():
         readable.append(Path("/etc/ssl"))
     run_dir = launch.artifacts / launch.run_id
-    readable.extend(
-        [
-            # The MCP server runs in this domain. It compares the workspace
-            # against the pristine baseline, reads its runtime configuration,
-            # and loads the plugin: all read-only to it.
-            run_dir / "baseline",
-            run_dir / "mcp.runtime.json",
-            run_dir / "plugin",
-        ]
-    )
-    if launch.feedback_level != "baseline":
+    if launch.agent_runtime == "claude":
+        # Claude has no shell, so the MCP child may run directly inside its
+        # domain. Codex instead gets only the controller-side MCP bridge.
+        readable.extend(
+            (
+                launch.move_flow,
+                launch.z3,
+                run_dir / "baseline",
+                run_dir / "mcp.runtime.json",
+                run_dir / "plugin",
+            )
+        )
+    else:
+        # Codex reads the immutable, run-local skill copy named in its private
+        # config. The real MCP executable and runtime config remain excluded.
+        readable.append(run_dir / "plugin")
+    if launch.agent_runtime == "claude" and launch.feedback_level != "baseline":
         # The task's criteria are the acceptance intervention. The file is
         # written at every level because the judge reads it after the run, but
         # a baseline cell's server is not given it, and neither is the agent.
@@ -949,8 +1062,9 @@ def agent_landlock_paths(launch: Launch) -> tuple[list[Path], list[Path]]:
         # MCP server that writes it inherits this domain, so the controller
         # creates the file first and the rule names that file alone.
         run_dir / "workspace",
-        run_dir / "flow-events.jsonl",
     ]
+    if launch.agent_runtime == "claude":
+        writable.append(run_dir / "flow-events.jsonl")
     return readable, writable
 
 
@@ -966,8 +1080,9 @@ def _write_agent_wrapper(launch: Launch, staging: Path) -> Path:
         arguments.extend(("--ro", str(path)))
     for path in writable:
         arguments.extend(("--rw", str(path)))
-    arguments.extend(("--", "/opt/bin/claude-real"))
-    wrapper = staging / "claude-landlocked"
+    agent_name = "codex" if launch.agent_runtime == "codex" else "claude"
+    arguments.extend(("--", f"/opt/bin/{agent_name}-real"))
+    wrapper = staging / f"{agent_name}-landlocked"
     wrapper.write_text(
         "#!/bin/sh\nset -eu\nexec /opt/bin/landlock-exec {} \"$@\"\n".format(
             " ".join(shlex.quote(argument) for argument in arguments)
@@ -976,6 +1091,42 @@ def _write_agent_wrapper(launch: Launch, staging: Path) -> Path:
     )
     wrapper.chmod(0o755)
     return wrapper
+
+
+def _write_code_mode_host_wrapper(launch: Launch, staging: Path) -> Path:
+    """Deny TCP to commands while Codex itself retains its API connection."""
+    readable, writable = agent_landlock_paths(launch)
+    arguments = ["--deny-network"]
+    for path in readable:
+        arguments.extend(("--ro", str(path)))
+    for path in writable:
+        arguments.extend(("--rw", str(path)))
+    arguments.extend(("--", str(AGENT_CODE_MODE_HOST_REAL)))
+    wrapper = staging / "codex-code-mode-host-landlocked"
+    wrapper.write_text(
+        "#!/bin/sh\nset -eu\nexec /opt/bin/landlock-exec {} \"$@\"\n".format(
+            " ".join(shlex.quote(argument) for argument in arguments)
+        ),
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    return wrapper
+
+
+def _stage_codex_auth(staging: Path) -> None:
+    """Copy saved Codex login state into the private, per-cell home."""
+    source = Path(
+        os.environ.get("MOVE_INFERENCE_CODEX_AUTH_FILE", Path.home() / ".codex/auth.json")
+    ).resolve()
+    if not source.is_file():
+        raise SystemExit(
+            "Codex authentication missing: run `codex login` or set "
+            "MOVE_INFERENCE_CODEX_AUTH_FILE"
+        )
+    destination = staging / ".sandbox-home" / ".codex" / "auth.json"
+    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    shutil.copyfile(source, destination)
+    destination.chmod(0o600)
 
 
 def _missing_parent_directories(paths: Iterable[Path]) -> list[Path]:
