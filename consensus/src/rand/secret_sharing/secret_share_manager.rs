@@ -133,11 +133,21 @@ impl SecretShareManager {
             .load_self_shares(epoch_state.epoch)
             .unwrap_or_else(|error| panic!("Failed to load secret shares at epoch start: {error}"));
         let mut recovered_self_shares = HashMap::new();
-        for loaded_share in loaded_self_shares {
+        for (key, loaded_share) in loaded_self_shares {
             let share = match loaded_share {
                 Ok(share) => share,
                 Err(error) => {
-                    error!("Ignoring invalid persisted secret share: {error}");
+                    error!(
+                        epoch = key.0,
+                        block_id = key.1,
+                        "Deleting invalid persisted secret share: {error}"
+                    );
+                    secret_share_storage.delete_self_share(&key).unwrap_or_else(|delete_error| {
+                        panic!(
+                            "Failed to delete invalid persisted secret share for epoch {}, block {}: {delete_error}",
+                            key.0, key.1
+                        )
+                    });
                     continue;
                 },
             };
@@ -147,11 +157,17 @@ impl SecretShareManager {
                     share_epoch = share.epoch(),
                     expected_author = author,
                     share_author = share.author(),
-                    "Ignoring persisted secret share with invalid identity"
+                    "Deleting persisted secret share with invalid identity"
                 );
+                secret_share_storage.delete_self_share(&key).unwrap_or_else(|delete_error| {
+                    panic!(
+                        "Failed to delete persisted secret share with invalid identity for epoch {}, block {}: {delete_error}",
+                        key.0, key.1
+                    )
+                });
                 continue;
             }
-            recovered_self_shares.insert(storage_key(share.metadata()), RecoveredSelfShare {
+            recovered_self_shares.insert(key, RecoveredSelfShare {
                 share,
                 verified: false,
             });
@@ -341,6 +357,14 @@ impl SecretShareManager {
         };
 
         self.recovered_self_shares.remove(&key);
+        self.secret_share_storage
+            .delete_self_share(&key)
+            .unwrap_or_else(|delete_error| {
+                panic!(
+                    "Failed to delete cryptographically invalid persisted secret share for epoch {}, block {}: {delete_error}",
+                    key.0, key.1
+                )
+            });
         error!(
             epoch = metadata.epoch,
             round = metadata.round,
@@ -719,6 +743,10 @@ mod tests {
             anyhow::bail!("injected failure")
         }
 
+        fn delete_self_share(&self, _key: &SecretShareKey) -> anyhow::Result<()> {
+            Ok(())
+        }
+
         fn load_self_shares(&self, _epoch: u64) -> anyhow::Result<Vec<LoadedSecretShare>> {
             Ok(Vec::new())
         }
@@ -841,6 +869,7 @@ mod tests {
             .into_iter()
             .next()
             .unwrap()
+            .1
             .unwrap();
         assert_eq!(persisted.metadata(), &metadata);
         assert_eq!(
@@ -917,6 +946,7 @@ mod tests {
             .load_self_shares(ctx.epoch)
             .unwrap()
             .into_iter()
+            .map(|(_, share)| share)
             .collect::<anyhow::Result<Vec<_>>>()
             .unwrap();
         assert_eq!(recovered.len(), 1);
@@ -1065,7 +1095,14 @@ mod tests {
         wrong_author_storage
             .save_self_share(&create_secret_share(&ctx, 1, &metadata))
             .unwrap();
-        let (mut manager, _) = make_manager(&ctx, 0, wrong_author_storage);
+        let (mut manager, _) = make_manager(&ctx, 0, wrong_author_storage.clone());
+        assert!(wrong_author_storage
+            .load_self_shares(ctx.epoch)
+            .unwrap()
+            .is_empty());
+        wrong_author_storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
         manager
             .secret_share_store
             .lock()
@@ -1078,7 +1115,7 @@ mod tests {
         bad_crypto_storage
             .save_self_share(&create_bad_secret_share(&ctx, 0, &metadata))
             .unwrap();
-        let (mut manager, _) = make_manager(&ctx, 0, bad_crypto_storage);
+        let (mut manager, _) = make_manager(&ctx, 0, bad_crypto_storage.clone());
         manager
             .secret_share_store
             .lock()
@@ -1092,6 +1129,13 @@ mod tests {
         assert!(!manager
             .recovered_self_shares
             .contains_key(&storage_key(&metadata)));
+        assert!(bad_crypto_storage
+            .load_self_shares(ctx.epoch)
+            .unwrap()
+            .is_empty());
+        bad_crypto_storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
 
         let forged_storage = Arc::new(InMemorySecretShareStorage::new());
         forged_storage
@@ -1115,7 +1159,14 @@ mod tests {
 
         let corrupt_storage = Arc::new(InMemorySecretShareStorage::new());
         corrupt_storage.insert_raw(storage_key(&metadata), vec![0xFF, 0xFF]);
-        let (mut manager, _) = make_manager(&ctx, 0, corrupt_storage);
+        let (mut manager, _) = make_manager(&ctx, 0, corrupt_storage.clone());
+        assert!(corrupt_storage
+            .load_self_shares(ctx.epoch)
+            .unwrap()
+            .is_empty());
+        corrupt_storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
         manager
             .secret_share_store
             .lock()

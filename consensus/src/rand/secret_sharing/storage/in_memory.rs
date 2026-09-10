@@ -50,6 +50,11 @@ impl SecretShareStorage for InMemorySecretShareStorage {
         }
     }
 
+    fn delete_self_share(&self, key: &SecretShareKey) -> Result<()> {
+        self.shares.lock().remove(key);
+        Ok(())
+    }
+
     fn load_self_shares(&self, epoch: u64) -> Result<Vec<LoadedSecretShare>> {
         Ok(self
             .shares
@@ -57,14 +62,17 @@ impl SecretShareStorage for InMemorySecretShareStorage {
             .iter()
             .filter(|((stored_epoch, _), _)| *stored_epoch == epoch)
             .map(|(key, serialized)| {
-                let share = bcs::from_bytes::<SecretShare>(serialized)?;
-                ensure!(
-                    storage_key(share.metadata()) == *key,
-                    "stored key does not match secret share metadata for epoch {}, block {}",
-                    key.0,
-                    key.1
-                );
-                Ok(share)
+                let share = (|| {
+                    let share = bcs::from_bytes::<SecretShare>(serialized)?;
+                    ensure!(
+                        storage_key(share.metadata()) == *key,
+                        "stored key does not match secret share metadata for epoch {}, block {}",
+                        key.0,
+                        key.1
+                    );
+                    Ok(share)
+                })();
+                (*key, share)
             })
             .collect())
     }

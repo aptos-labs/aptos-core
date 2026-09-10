@@ -15,10 +15,12 @@ pub use db::SecretShareDb;
 pub use in_memory::InMemorySecretShareStorage;
 
 pub type SecretShareKey = (u64, HashValue);
-pub type LoadedSecretShare = Result<SecretShare>;
+pub type LoadedSecretShare = (SecretShareKey, Result<SecretShare>);
 
 pub trait SecretShareStorage: Send + Sync + 'static {
     fn save_self_share(&self, share: &SecretShare) -> Result<()>;
+
+    fn delete_self_share(&self, key: &SecretShareKey) -> Result<()>;
 
     fn load_self_shares(&self, epoch: u64) -> Result<Vec<LoadedSecretShare>>;
 
