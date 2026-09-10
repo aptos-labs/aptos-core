@@ -304,7 +304,7 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
-      # Seeds the shared compilation cache that pull request jobs read
+      # When opted in, trusted main jobs populate the cache that PRs read.
       - uses: ./.github/actions/sccache-setup
       - uses: ./.github/actions/prover-tools-setup
       - name: Run rust unit tests

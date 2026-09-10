@@ -5,15 +5,17 @@
 Targeted unit tests use the same affected-package selector for `run` and
 `archive`, including the four existing exclusions. A 64-vCPU job builds the
 archive once. Selections with at most 3,000 tests execute there; larger selections
-use eight 32-vCPU partitions. The threshold and runner sizes are provisional
-until the Linux A/B measurements below are complete. This does not replace
+use eight 32-vCPU partitions. The Linux measurements below support this cutoff
+for the sampled workloads; test count is not a universal runtime predictor. This does not replace
 workspace tests, doctests, VM-feature checks, or smoke tests.
 
 Optional compilation caching and prover tools use GitHub's native cache service. GitHub enforces
-branch access using the job's runtime credentials: pull requests can read the
+branch access using the job's runtime credentials: ordinary `pull_request` jobs can read the
 default/base branch caches, but cannot write into the default branch's scope.
 Changing a key or bypassing this repository's setup action does not grant that
 write access. See [GitHub's cache restrictions](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache).
+Do not run untrusted PR code in a trusted `pull_request_target` or main-dispatch
+context: cache scope follows the job's credentials, not its checkout directory.
 
 Compilation caching is **off by default**. Enable normal CI only by setting the
 repository variable `CI_COMPILATION_CACHE_ENABLED=true` after the quota and
@@ -25,7 +27,8 @@ When enabled, normal cache producers are pushes and manual runs on `main`. Other
 only. `sccache` is pinned, uses only its GHA backend, and includes compiler inputs
 in its keys; its namespace is not rotated weekly. Prover keys include OS,
 architecture, and the hash of `scripts/dev_setup.sh`. The installer checks the
-requested versions after both hits and misses. No cache contains credentials.
+requested versions after both hits and misses. Credential files are not included
+in the configured cache paths.
 
 Setup rejects non-GitHub cache endpoints, including shared cache proxies. Missing
 credentials, download failures, or cache-server initialization failures disable
@@ -72,8 +75,9 @@ gh workflow run lint-test.yaml --ref vk/ci-improve-1 \
   -f benchmark-cache=disabled -f benchmark-e2e=true
 ```
 
-Repeat for `small`, `medium`, and `large`, each with `disabled`, `cold`, and `seeded` cache
-modes. Each dispatch uses three fresh baseline runners and three fresh candidate
+For the compilation-cache rollout, repeat for `small`, `medium`, and `large`,
+each with `disabled`, `cold`, and `seeded` cache modes. Confirm capacity before
+populating a large seed. Each dispatch uses three fresh baseline runners and three fresh candidate
 build runners. Run these experiments sequentially to avoid unnecessary runner
 contention and expense. The fixed suites are:
 
@@ -88,9 +92,11 @@ contention and expense. The fixed suites are:
 Both paths check out the dispatch's exact SHA, select the same packages, and use
 the same nextest profile/retry policy. The baseline retains the original tool
 setup and build-and-run command. The candidate uses the production archive and
-partition workflow. The verifier compares complete test identities and ignore
-status, checks all eight partition inventories, and rejects duplicates or
-omissions. Baseline inventory collection occurs after its timed test command.
+partition workflow. The verifier compares selected test identities and their
+ignore flags, checks all eight partition inventories, and rejects duplicates or
+omissions. Also compare unfiltered baseline/build inventories to check ignored
+tests that do not enter the partitions. Baseline inventory collection occurs
+after its timed test command.
 
 `seeded` populates a separate `benchmark-RUN_ID` cache in the dispatching branch's
 scope, then starts fresh read-only consumers. Its seed time and cost are reported
@@ -148,8 +154,8 @@ Collect and compare:
 
 Before merging, also exercise a fresh Linux inline run and all shards with
 PostgreSQL/prover tools; empty selection; missing artifact; compilation/test
-failure; cancellation; expected/unexpected skip; and failed-jobs reruns. Verify
-that a PR token cannot publish into the main cache scope, including when the
+failure; cancellation; expected/unexpected skip; and failed-jobs reruns. Before
+enabling compilation caching, verify that a PR token cannot publish into the main cache scope, including when the
 workflow's read-only policy is bypassed. Check real default-branch restore
 behavior using a trusted cache entry. Do not weaken the backend boundary to
 perform this test.
@@ -160,12 +166,14 @@ the smaller CLI/API and merge-base runners only after Linux runs pass without
 material timeout or memory regressions. Delete only benchmark artifact/cache IDs
 whose ownership has been verified; never clear repository caches globally.
 
-## Results recorded on 2026-09-09
+## Results recorded on 2026-09-09–10
 
 The branch is published and the comparisons below ran on fresh Linux runners.
 Allocated vCPU-minutes are a compute-allocation proxy, **not billed dollars**.
 Job execution excludes provisioning; check elapsed time below includes scheduling
 and the candidate CLI result gate. Samples include retries and slow image pulls.
+Unit workflow timings exclude the small required-check shim and include
+benchmark-only inventory collection; they are not whole-PR completion times.
 Independent smoke validation and some small experiments overlapped long-running
 builds, each on fresh EC2 instances. Shared service or provider contention is
 therefore part of the observed variation, not a controlled-away factor.
@@ -197,7 +205,7 @@ combined-change validation, not a runner-only comparison.
   the existing SDK's parsed account-address type. Existing retries still cover
   transient epoch-transition errors; production execution logic is unchanged.
 - Sampled host used-memory peaks were about **3.23 GB for CLI** and **1.46 GB
-  for API**, on 16-GB runners. These are one-second host samples, not process RSS
+  for API**, on 16-GiB runners. These are one-second host samples, not process RSS
   or a guarantee about unobserved peaks. Neither runner cgroup peak counter was
   exposed. No out-of-memory failure occurred.
 
@@ -248,7 +256,7 @@ transfer, runner provisioning, and the Runs-On fee have not been measured.
   compute was **256 / 475.2 vCPU-minutes**. Archives were about 126.6 MB each.
   These fast compiler tests did not justify fan-out, so the inline cutoff was
   raised from 1,000 to 3,000. The expanded `large` suite exercises actual slow
-  E2E/API/prover tests; its result must justify retaining the sharded path.
+  E2E/API/prover tests and supports retaining the sharded path for larger selections.
 - The corrected inline path passed all three 2,341-test samples and exact
   inventories in
   [34412913212](https://github.com/aptos-labs/aptos-core/actions/runs/34412913212).
@@ -256,7 +264,37 @@ transfer, runner provisioning, and the Runs-On fee have not been measured.
   allocation **258.1 / 256.0 vCPU-minutes**: essentially neutral, without the
   earlier sharding regression. Candidate execution ranged 219–248 seconds;
   baseline execution ranged 237–260 seconds.
-- That run deliberately failed one shard **after its tests passed**. A
+- The expanded large selection contains **3,609 discovered tests, 3,580 runnable
+  and 29 ignored**. In
+  [34411906659](https://github.com/aptos-labs/aptos-core/actions/runs/34411906659),
+  all three candidates passed all eight shards, with exact disjoint coverage
+  matching both successful baseline inventories. First-attempt results:
+
+  | Sample | Baseline outcome | Baseline check elapsed | Candidate check elapsed | Baseline / candidate vCPU-minutes |
+  | --- | --- | ---: | ---: | ---: |
+  | 1 | Failed after four prover-timeout attempts | 2,367 s | 954 s | 2,491.7 / 1,810.1 |
+  | 2 | Passed, two tests retried | 1,966 s | 991 s | 2,064.0 / 1,893.3 |
+  | 3 | Passed | 1,925 s | 971 s | 2,020.3 / 1,789.3 |
+
+  Three candidate prover tests needed one retry each across the 24 shards;
+  those retries are included. No timeout, baseline, or prover setting was
+  changed to obtain a pass. Sample 1's failed-job rerun passed all 3,580 tests
+  without retries; the final verifier confirmed exact inventories and disjoint
+  partition coverage for all three samples. A separate unfiltered comparison of
+  all three baseline/build pairs matched all **3,609 identities and their ignore
+  flags**, including the 29 ignored tests. That extra baseline job took
+  **2,016 seconds and 2,150.4 vCPU-minutes**, plus 14 seconds on the 2-vCPU
+  verifier. The original failed execution remains in the report.
+  For the two first-attempt successful matched pairs (samples 2 and 3), median
+  check elapsed fell **1,945.5 to 981 seconds (49.6%)**, and allocated compute
+  **2,042.1 to 1,841.3 vCPU-minutes (9.8%)**. These are workload-specific gains,
+  not a claim that the failed baseline sample cost nothing. Candidate
+  shard phases ranged **181.5–377.8 seconds**, with sampled host memory up to
+  **8.35 GB**, versus **23.88 GB** in baseline phases. Each build artifact was
+  about **766.9 MB**. Baselines/builds used 64-vCPU c7i-flex on-demand machines;
+  23 shards used c7a spot machines and one used c7i-flex spot. This is a workflow
+  configuration comparison, not an architecture-controlled CPU benchmark.
+- Medium-suite run 34410026272 deliberately failed one shard **after its tests passed**. A
   failed-jobs rerun successfully downloaded original artifact **10126978793**
   (`candidate-1-tests-1`) without rebuilding. The rerun added 57 seconds on one
   32-vCPU runner, plus inventory verification; it is excluded from the
@@ -272,14 +310,91 @@ entry IDs: 99 entries / 31,916,863 bytes from run 34408401763 and 106 entries /
 run 34412173055. No production cache entries were deleted.
 Repository usage reached about 9.69 GB from other writers; querying its configured
 storage limit requires administrator permission (HTTP 403). Capacity and a real
-main-to-PR restore/write-denial exercise remain external pre-merge checks.
+main-to-PR restore/write-denial exercise remain external checks before enabling
+compilation caching.
 The real missing-artifact download failed as expected in run 34412173055;
 the following assertion required that failure, and the Linux helper tests passed.
+
+### Smoke artifacts and the compiler-cache rollout gate
+
+[34411912604](https://github.com/aptos-labs/aptos-core/actions/runs/34411912604)
+passed both builds and all eight smoke partitions: **143 tests executed, 48
+ignored**. Three tests needed the existing retries (four failed attempts total),
+including consensus/randomness tests; their code and retry policy were unchanged.
+Exact artifact IDs, repository-relative helper paths, the node download path,
+and restored executable permissions all worked.
+Sampled smoke-shard host memory peaked at **31.95 GB** on the existing 32-GiB
+runner allocation: headroom is tight, and these measurements do not justify
+reducing smoke-runner memory. No out-of-memory failure was observed.
+
+The cold-cache node build took **656.28 seconds**. The matched cache-disabled
+node build in
+[34415446932](https://github.com/aptos-labs/aptos-core/actions/runs/34415446932)
+took **314.13 seconds**, on the same application source and 64-vCPU runner
+configuration. This material cold-cache regression is why compilation caching
+is now opt-in, not a default speedup claim. The disabled build's sampled host
+memory peak was **26.98 GB**; it remained within the 128-GiB allocation.
+The helper/archive phases likewise took **462.51 + 394.89 seconds** without
+caching versus **886.89 + 903.83 seconds** with a cold cache. The disabled
+helper build peaked at **44.50 GB**, still within its 128-GiB allocation.
+The uncompressed cache-disabled run passed seven shards but exhausted all four
+attempts of `consensus::batch_v2_rollout::test_batch_v2_tx_rollout` on shard 8:
+one validator did not catch up within the existing 60-second timeout. Three
+other tests passed after one retry each. This failed run is retained as a build
+and transport measurement, not presented as successful end-to-end validation.
+
+The original uncompressed artifacts were **3,223,646,630 bytes** for the node and
+**9,350,248,293 bytes** for the test archive plus helpers. A representative shard
+spent 76 + 229 seconds downloading them. The final workflow uses compression
+level 1 for the raw binaries; its matched run is
+[34416545046](https://github.com/aptos-labs/aptos-core/actions/runs/34416545046).
+Its node artifact is **721,399,552 bytes**, and its helper/archive artifact is
+**2,750,846,401 bytes**: **3.47 GB combined instead of 12.57 GB (72.4% smaller)**.
+Upload steps took 29 / 135 seconds for node / helpers, versus 19 / 52 seconds
+in the cache-disabled uncompressed run. These build jobs run in parallel;
+the upload tradeoff is not a 93-second serial addition to workflow latency.
+Combined downloads across the eight shards fell from a median **319 seconds
+(309–340)** to **100 seconds (82–116)**, a **68.7% reduction**. These timings
+include download and extraction. Final compressed-run shard 8 passed without
+retry, but shard 4 exhausted four attempts of
+`genesis::test_validator_genesis_transaction_and_db_restore_flow`: one restarted
+validator remained behind the others until the existing 180-second timeout.
+That test passed after one retry in the uncompressed comparison. Shard 5 needed
+one randomness-test retry. The failed-job rerun passed all 18 shard-4 tests
+without retries, restoring original artifact IDs **10129442232 / 10129771906**
+without rebuilding. Its additional job took **431 seconds / 114.9 vCPU-minutes**,
+including a **286.85-second** test phase. The final workflow succeeded across
+all eight partitions (143 executed tests, 48 ignored); its original failed
+execution remains in the report. No test code, timeouts, or retry limits were
+changed. These samples do not establish a reliable whole-smoke latency gain.
+Both cold-cache run artifacts were deleted by verified IDs after all consumers passed;
+measurements remain, and build reruns can regenerate the binaries. The three
+obsolete 126.6-MB compiler-suite archives were also deleted after rerun validation.
+The three 766.9-MB large-suite archives were deleted after the final successful
+inventory verification; their measurements remain available.
+The completed cache-disabled uncompressed run's two 12.57-GB combined build
+artifacts were also removed after preserving measurements and failure logs.
+Its failed shard now requires rebuilding to rerun. The final compressed artifacts
+were removed after their successful failed-job rerun; measurements and failure
+logs were retained. A final branch-cache query returned zero entries.
+
+Final cache-gate validation in
+[34416260257](https://github.com/aptos-labs/aptos-core/actions/runs/34416260257)
+passed: normal setup left the compiler wrapper unset, explicit benchmark readers
+enabled it, all helper checks passed, and all three small test inventories matched.
+The repository opt-in variable was confirmed absent; no repository settings were
+changed. Large cold/seeded cache experiments and genuine PR-token scope checks
+remain required **before enabling compilation caching**, not grounds to enable
+it by default in this PR. Actual billed-dollar savings remain unmeasured.
+These were manual candidate-branch validations, not a complete `pull_request`
+workflow run. Normal required PR checks must still pass before merging.
 
 ### Local validation
 
 - `cargo check`, all nine `aptos-cargo-cli` unit tests, package Clippy with
   warnings denied, and package formatting pass.
+- All six Python E2E address-comparison regression tests pass; the changed
+  Python files pass formatting and import checks.
 - Ten Node and thirteen Python CI-helper tests cover cache endpoint/write policy, the checked-in required-check
   shell bodies, cache preflight fallback, threshold boundaries, partition
   completeness, explicit package selection, fail-closed dependency checks,
