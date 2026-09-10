@@ -18,8 +18,10 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use aptos_framework_natives::{
-    cryptography::ristretto255_point::NativeRistrettoPointContext, event::NativeEventContext,
-    object::NativeObjectContext, state_storage::NativeStateStorageContext,
+    cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
+    event::NativeEventContext,
+    object::NativeObjectContext,
+    state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
@@ -524,6 +526,7 @@ fn execute_function_v1(
     extensions.add(NativeStateStorageContext::new(&state_storage_view));
     extensions.add(NativeEventContext::default());
     extensions.add(NativeRistrettoPointContext::new());
+    extensions.add(AlgebraContext::new());
 
     let mut data_cache = TransactionDataCache::empty();
     let output = match MoveVM::execute_loaded_function(
