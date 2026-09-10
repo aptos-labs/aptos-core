@@ -24,7 +24,7 @@ use aptos_executor_benchmark::{
         },
     },
     pipeline::PipelineConfig,
-    BenchmarkWorkload, FeatureFlagOverrides, StorageTestConfig,
+    BenchmarkWorkload, BlockSource, FeatureFlagOverrides, StorageTestConfig,
 };
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
@@ -451,6 +451,19 @@ enum Command {
             value_delimiter = ' ',
             help = "Feature flags to disable on-chain after the init/publish phase and before the measured run, via a governance transaction that reconfigures. Enable / disable flags cannot overlap.")]
         disable_feature_after_init: Vec<FeatureFlag>,
+
+        /// Generate the blocks, write them here, and exit without executing.
+        /// Leaves --checkpoint-dir holding the initialized DB the blocks were
+        /// generated against; pass that as --data-dir when replaying. Feature
+        /// flips are skipped, since each replay applies its own.
+        #[clap(long, value_parser, conflicts_with = "replay_blocks")]
+        dump_blocks: Option<PathBuf>,
+
+        /// Execute blocks recorded by an earlier --dump-blocks run instead of
+        /// generating them, so that two runs execute identical transactions.
+        /// --data-dir must be that run's --checkpoint-dir.
+        #[clap(long, value_parser)]
+        replay_blocks: Option<PathBuf>,
     },
     AddAccounts {
         #[clap(long, value_parser)]
@@ -526,7 +539,16 @@ where
             disable_feature,
             enable_feature_after_init,
             disable_feature_after_init,
+            dump_blocks,
+            replay_blocks,
         } => {
+            let block_source = match (dump_blocks, replay_blocks) {
+                (Some(path), None) => BlockSource::Record(path),
+                (None, Some(path)) => BlockSource::Replay(path),
+                (None, None) => BlockSource::Generate,
+                (Some(_), Some(_)) => unreachable!("clap rejects both"),
+            };
+
             let workload = if transaction_type.is_empty() {
                 BenchmarkWorkload::Transfer {
                     connected_tx_grps: opt.connected_tx_grps,
@@ -573,6 +595,7 @@ where
                     enable: enable_feature_after_init,
                     disable: disable_feature_after_init,
                 },
+                block_source,
             );
         },
         Command::AddAccounts {
