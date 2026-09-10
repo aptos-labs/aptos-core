@@ -364,14 +364,13 @@ impl NativeContext for ProductionNativeContext<'_> {
             8,
             inner.len() as u64,
         )?;
-        // The outer object's descriptor claims one pointer slot per element the
-        // moment it exists, so nothing may allocate before every slot is
-        // written; a GC in that window would trace uninitialized memory. The
-        // element pointers are read after `alloc_vec`, so they account for any
-        // relocation it caused.
+        // `ptr` stays unrooted until `root_object` below, so a GC before the
+        // writes would relocate the object without updating `ptr` and the
+        // writes would land in from-space. The element pointers are read after
+        // `alloc_vec`, so they account for any relocation it caused.
         //
         // SAFETY: `ptr` is a fresh vector with room for `inner.len()` 8-byte
-        // elements, and no GC runs between here and these writes.
+        // elements, and nothing allocates between here and these writes.
         unsafe {
             write_u64(ptr, VEC_LENGTH_OFFSET, inner.len() as u64);
             for (i, elem) in inner.iter().enumerate() {

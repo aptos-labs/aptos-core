@@ -105,10 +105,8 @@ impl ObjectDescriptor {
     /// single 8-byte heap pointer. Producers install one of these at
     /// [`POINTER_VEC_DESCRIPTOR_ID`].
     ///
-    /// The specializer independently publishes a structurally identical
-    /// descriptor for each `vector<T>` whose `T` is a lone pointer. That is
-    /// fine: the verifier and the GC both dispatch on descriptor shape, not
-    /// identity.
+    /// Publishing a vector descriptor of this shape returns the reserved id
+    /// instead of allocating a duplicate.
     pub fn pointer_vec() -> Self {
         Self(ObjectDescriptorInner::Vector {
             elem_size: 8,

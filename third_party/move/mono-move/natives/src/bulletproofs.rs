@@ -200,27 +200,25 @@ pub fn native_verify_batch_range_proof<C: NativeContext>(ctx: &C) -> VMResult<Na
         )
     };
 
-    let mut comm_points = Vec::with_capacity(comms.len() as usize);
-    for i in 0..comms.len() {
-        let comm = comms.get_element(i)?;
-        // SAFETY: the slice is copied into an owned point before any allocation.
-        comm_points.push(compressed_point_from_bytes(unsafe { comm.as_bytes() })?);
-    }
-
     if !is_supported_number_of_bits(num_bits) {
         return Ok(abort(
             NFE_RANGE_NOT_SUPPORTED,
             format!("Range of {num_bits} bits is not supported (must be 8, 16, 32, or 64)"),
         ));
     }
-    if !is_supported_batch_size(comm_points.len()) {
+    let batch_size = comms.len() as usize;
+    if !is_supported_batch_size(batch_size) {
         return Ok(abort(
             NFE_BATCH_SIZE_NOT_SUPPORTED,
-            format!(
-                "Batch size {} is not supported (must be 1, 2, 4, 8, or 16)",
-                comm_points.len()
-            ),
+            format!("Batch size {batch_size} is not supported (must be 1, 2, 4, 8, or 16)"),
         ));
+    }
+
+    let mut comm_points = Vec::with_capacity(batch_size);
+    for i in 0..comms.len() {
+        let comm = comms.get_element(i)?;
+        // SAFETY: the slice is copied into an owned point before any allocation.
+        comm_points.push(compressed_point_from_bytes(unsafe { comm.as_bytes() })?);
     }
 
     let pg = pedersen_gens(ctx, val_base_handle, rand_base_handle)?;
