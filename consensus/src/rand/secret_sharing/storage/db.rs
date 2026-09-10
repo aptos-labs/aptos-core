@@ -3,7 +3,7 @@
 
 use super::{
     schema::{SecretShareSchema, SECRET_SHARE_CF_NAME},
-    storage_key, LoadedSecretShare, SecretShareKey, SecretShareStorage,
+    storage_key, LoadedSecretShare, SecretShareStorage,
 };
 use anyhow::{bail, ensure, Result};
 use aptos_consensus_types::common::Round;
@@ -84,21 +84,19 @@ impl SecretShareStorage for SecretShareDb {
         }
     }
 
-    fn delete_self_share(&self, key: &SecretShareKey) -> Result<()> {
-        let _guard = self.write_lock.lock();
-        let mut batch = SchemaBatch::new();
-        batch.delete::<SecretShareSchema>(key)?;
-        self.db().write_schemas(batch)?;
-        Ok(())
-    }
-
     fn load_self_shares(&self, epoch: u64) -> Result<Vec<LoadedSecretShare>> {
         let mut iter = self.db().iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut shares = Vec::new();
         for entry in iter {
-            let (key, serialized) = entry?;
+            let (key, serialized) = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    shares.push(Err(error.into()));
+                    continue;
+                },
+            };
             if key.0 != epoch {
                 continue;
             }
@@ -112,7 +110,7 @@ impl SecretShareStorage for SecretShareDb {
                 );
                 Ok(share)
             })();
-            shares.push((key, share));
+            shares.push(share);
         }
         Ok(shares)
     }
@@ -210,26 +208,11 @@ mod tests {
             .into_iter()
             .next()
             .unwrap()
-            .1
             .unwrap();
         assert_eq!(
             bcs::to_bytes(&recovered).unwrap(),
             bcs::to_bytes(&share).unwrap()
         );
-    }
-
-    #[test]
-    fn test_delete_self_share() {
-        let temp_path = TempPath::new();
-        let db = SecretShareDb::new(&temp_path);
-        let ctx = TestContext::new(vec![1, 1, 1, 1]);
-        let metadata = create_metadata(ctx.epoch, 10);
-        db.save_self_share(&create_secret_share(&ctx, 0, &metadata))
-            .unwrap();
-
-        db.delete_self_share(&storage_key(&metadata)).unwrap();
-
-        assert!(db.load_self_shares(ctx.epoch).unwrap().is_empty());
     }
 
     #[test]
@@ -250,7 +233,6 @@ mod tests {
             .load_self_shares(ctx.epoch + 1)
             .unwrap()
             .into_iter()
-            .map(|(_, share)| share)
             .collect::<Result<Vec<_>>>()
             .unwrap();
         assert_eq!(recovered.len(), 1);
@@ -274,7 +256,7 @@ mod tests {
             .load_self_shares(ctx.epoch)
             .unwrap()
             .into_iter()
-            .map(|(_, share)| share.unwrap().round())
+            .map(|share| share.unwrap().round())
             .collect::<Vec<_>>();
         recovered_rounds.sort_unstable();
         assert_eq!(recovered_rounds, vec![20, 30]);
@@ -297,13 +279,7 @@ mod tests {
         db.db().write_schemas(batch).unwrap();
 
         let records = db.load_self_shares(ctx.epoch).unwrap();
-        assert_eq!(
-            records.iter().filter(|(_, record)| record.is_ok()).count(),
-            1
-        );
-        assert_eq!(
-            records.iter().filter(|(_, record)| record.is_err()).count(),
-            1
-        );
+        assert_eq!(records.iter().filter(|record| record.is_ok()).count(), 1);
+        assert_eq!(records.iter().filter(|record| record.is_err()).count(), 1);
     }
 }
