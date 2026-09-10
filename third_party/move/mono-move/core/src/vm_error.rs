@@ -22,7 +22,6 @@ pub type VMResult<T> = Result<T, VMInternalError>;
 ///
 /// Subsystem errors remain location-independent. The interpreter attaches a
 /// location when it knows the executing frame.
-// TODO(completeness): add a script variant for errors in scripts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorLocation {
     /// A Move instruction: its module, defining function, and offset in that
@@ -34,6 +33,10 @@ pub enum ErrorLocation {
     },
     /// Code in `module` with no attributable instruction.
     Module(ModuleId),
+    /// A script instruction, by its offset in the script's original bytecode.
+    ScriptInstruction { offset: BytecodeOffset },
+    /// Script code with no attributable instruction.
+    Script,
 }
 
 pub struct VMInternalError(Box<ErrorData>);

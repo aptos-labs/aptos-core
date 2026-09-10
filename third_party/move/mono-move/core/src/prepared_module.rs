@@ -157,6 +157,12 @@ impl PreparedModule {
         self.module_ids[idx.0 as usize]
     }
 
+    /// Returns the interned module IDs of every module handle, this module's
+    /// own included.
+    pub fn module_ids(&self) -> &[InternedModuleId] {
+        &self.module_ids
+    }
+
     /// Returns interned types corresponding to the compiled module's
     /// signature.
     pub fn interned_types_at(&self, idx: SignatureIndex) -> &[InternedType] {

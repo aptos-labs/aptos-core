@@ -267,9 +267,11 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
         | LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. } => TestResult::Unsupported(err.to_string()),
         // Genuine problems: storage/context infrastructure errors, or a VM bug.
-        LoaderError::GlobalContext(_) | LoaderError::InvariantViolation(_) => {
-            TestResult::Error(err.to_string())
-        },
+        // Unit tests never load scripts.
+        LoaderError::GlobalContext(_)
+        | LoaderError::InvariantViolation(_)
+        | LoaderError::ScriptDeserializationFailed { .. }
+        | LoaderError::ScriptVerificationFailed { .. } => TestResult::Error(err.to_string()),
     }
 }
 

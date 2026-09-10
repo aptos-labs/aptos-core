@@ -10,8 +10,8 @@ above this crate.
 - Assume the latest feature set. All on-chain features and the latest gas
   feature version are enabled; supporting only that is sufficient. Do not port
   legacy validation paths, old gas versions, or feature-flag branches.
-- Entry functions are the only supported payload. Anything else is a
-  `TODO(completeness)`.
+- Entry functions and scripts are the only supported payloads. Anything else
+  is a `TODO(completeness)`.
 - Gas is deliberately incomplete: MonoMove's units are uncalibrated, IO gas and
   storage fees are not charged. Do not treat a gas mismatch against the legacy VM
   as a regression.

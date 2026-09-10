@@ -8,6 +8,7 @@ use super::{
     args::call_entry_function,
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
+    script::run_script,
     validation::{run_epilogue, run_prologue, ValidationSigners},
 };
 use crate::{
@@ -19,7 +20,9 @@ use crate::{
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_storage_usage::StateStorageUsage,
-    transaction::{AuxiliaryInfo, EntryFunction, SignedTransaction, TransactionExecutableRef},
+    transaction::{
+        AuxiliaryInfo, EntryFunction, Script, SignedTransaction, TransactionExecutableRef,
+    },
 };
 use mono_move_core::{
     intern_type_tag, native::NativeExtensions, types::InternedTypeList, GasMeter, Interner,
@@ -27,6 +30,7 @@ use mono_move_core::{
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
 use mono_move_runtime::InterpreterContext;
+use move_core_types::language_storage::TypeTag;
 
 impl<'guard> AptosTransactionExecutor<'guard> {
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
@@ -63,22 +67,20 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             .run_checks()
             .map_err(DiscardReason::PreExecutionCheck)?;
 
-        let entry = match txn.payload().executable_ref() {
-            Ok(TransactionExecutableRef::EntryFunction(entry)) => entry,
-            // TODO(completeness): scripts, multisig payloads, encrypted
-            // transactions, module publishing.
-            Ok(TransactionExecutableRef::Script(_))
-            | Ok(TransactionExecutableRef::Encrypted)
-            | Ok(TransactionExecutableRef::Empty)
-            | Err(_) => {
+        let executable = match txn.payload().executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry)) => Executable::EntryFunction(entry),
+            Ok(TransactionExecutableRef::Script(script)) => Executable::Script(script),
+            // TODO(completeness): multisig payloads and encrypted transactions.
+            Ok(TransactionExecutableRef::Encrypted) | Ok(TransactionExecutableRef::Empty) => {
                 return Err(DiscardReason::Unsupported(
-                    "anything but entry-function payloads",
+                    "anything but entry-function and script payloads",
                 ))
             },
+            Err(_) => return Err(DiscardReason::Deprecated("module-bundle payload")),
         };
         // TODO(security): these type arguments are user supplied, so interning
         // them can pollute the global caches. Needs a bound.
-        let interned_ty_args = entry
+        let interned_ty_args = executable
             .ty_args()
             .iter()
             .map(|tag| intern_type_tag(tag, guard))
@@ -126,10 +128,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
         let payload_result = if self.unmetered {
-            interp
-                .unmetered(|interp| self.execute_entry_function(interp, &txn_data, entry, ty_args))
+            interp.unmetered(|interp| self.execute_payload(interp, &txn_data, &executable, ty_args))
         } else {
-            self.execute_entry_function(&mut interp, &txn_data, entry, ty_args)
+            self.execute_payload(&mut interp, &txn_data, &executable, ty_args)
         };
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
@@ -196,6 +197,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // ============================= Output ===============================
         // Hand the side effects back unmaterialized; the coordinator decides
         // when (and whether) to render them into storage formats.
+        //
+        // TODO(completeness): resolve a pending `code::request_publish` into
+        // module writes, as AptosVM does when finishing the session.
         Ok(TxnOutcome::Executed {
             status: execution_status,
             fee_statement,
@@ -203,11 +207,11 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         })
     }
 
-    fn execute_entry_function(
+    fn execute_payload(
         &self,
         interp: &mut InterpreterContext<'guard>,
         txn_data: &TxnMetadata,
-        entry: &EntryFunction,
+        executable: &Executable<'_>,
         ty_args: InternedTypeList,
     ) -> Result<(), MoveExecutionFailure> {
         // TODO(security, completeness): entry-function validation -- `entry`
@@ -216,19 +220,46 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // `transaction_arg_validation`.
 
         // TODO(completeness): multi-agent transactions are untested.
-        let status = call_entry_function(
-            self.guard,
-            interp,
-            &entry.module().address,
-            entry.module().name(),
-            entry.function(),
-            ty_args,
-            &txn_data.sender,
-            &txn_data.secondary_signers,
-            entry.args(),
-        )?;
+        let status = match executable {
+            Executable::EntryFunction(entry) => call_entry_function(
+                self.guard,
+                interp,
+                &entry.module().address,
+                entry.module().name(),
+                entry.function(),
+                ty_args,
+                &txn_data.sender,
+                &txn_data.secondary_signers,
+                entry.args(),
+            )?,
+            Executable::Script(script) => run_script(
+                self.guard,
+                interp,
+                self.env.chain_id(),
+                script.code(),
+                ty_args,
+                &txn_data.sender,
+                &txn_data.secondary_signers,
+                script.args(),
+            )?,
+        };
 
         call_result(status)
+    }
+}
+
+/// The payloads this executor runs.
+enum Executable<'a> {
+    EntryFunction(&'a EntryFunction),
+    Script(&'a Script),
+}
+
+impl Executable<'_> {
+    fn ty_args(&self) -> &[TypeTag] {
+        match self {
+            Executable::EntryFunction(entry) => entry.ty_args(),
+            Executable::Script(script) => script.ty_args(),
+        }
     }
 }
 
