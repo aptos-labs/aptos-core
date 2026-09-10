@@ -9,52 +9,40 @@ use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_schemadb::{batch::SchemaBatch, Options, DB};
 use aptos_types::secret_sharing::SecretShare;
-use std::{
-    path::{Path, PathBuf},
-    sync::OnceLock,
-    time::Instant,
-};
+use std::{path::Path, sync::Arc, time::Instant};
 
 pub const SECRET_SHARE_DB_NAME: &str = "secret_share_db";
 const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 
 pub struct SecretShareDb {
-    path: PathBuf,
-    db: OnceLock<DB>,
+    db: Arc<DB>,
 }
 
 impl SecretShareDb {
     pub fn new<P: AsRef<Path>>(db_root_path: P) -> Self {
-        Self {
-            path: db_root_path.as_ref().join(SECRET_SHARE_DB_NAME),
-            db: OnceLock::new(),
-        }
-    }
-
-    fn db(&self) -> &DB {
-        self.db.get_or_init(|| self.open_db())
-    }
-
-    fn open_db(&self) -> DB {
+        let path = db_root_path.as_ref().join(SECRET_SHARE_DB_NAME);
         let instant = Instant::now();
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
         opts.set_max_total_wal_size(MAX_TOTAL_WAL_SIZE_BYTES);
-        let db = DB::open(
-            self.path.clone(),
-            SECRET_SHARE_DB_NAME,
-            vec![SECRET_SHARE_CF_NAME],
-            opts,
-        )
-        .expect("SecretShareDb open failed; unable to continue");
+        let db = Arc::new(
+            DB::open(
+                path.clone(),
+                SECRET_SHARE_DB_NAME,
+                vec![SECRET_SHARE_CF_NAME],
+                opts,
+            )
+            .expect("SecretShareDb open failed; unable to continue"),
+        );
 
         info!(
             "Opened SecretShareDb at {:?} in {} ms",
-            self.path,
+            path,
             instant.elapsed().as_millis()
         );
-        db
+
+        Self { db }
     }
 }
 
@@ -62,12 +50,12 @@ impl SecretShareStorage for SecretShareDb {
     fn save_self_share(&self, share: &SecretShare) -> Result<()> {
         let mut batch = SchemaBatch::new();
         batch.put::<SecretShareSchema>(&storage_key(share.metadata()), share)?;
-        self.db().write_schemas(batch)?;
+        self.db.write_schemas(batch)?;
         Ok(())
     }
 
     fn load_self_shares(&self, epoch: u64) -> Result<Vec<SecretShare>> {
-        let mut iter = self.db().iter::<SecretShareSchema>()?;
+        let mut iter = self.db.iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut shares = Vec::new();
@@ -88,7 +76,7 @@ impl SecretShareStorage for SecretShareDb {
     }
 
     fn prune_before_epoch(&self, epoch: u64) -> Result<()> {
-        let mut iter = self.db().iter::<SecretShareSchema>()?;
+        let mut iter = self.db.iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut batch = SchemaBatch::new();
@@ -101,7 +89,7 @@ impl SecretShareStorage for SecretShareDb {
             }
         }
         if has_deletes {
-            self.db().write_schemas(batch)?;
+            self.db.write_schemas(batch)?;
         }
         Ok(())
     }
@@ -112,7 +100,7 @@ impl SecretShareStorage for SecretShareDb {
             batch.delete::<SecretShareSchema>(key)?;
         }
         if !keys.is_empty() {
-            self.db().write_schemas(batch)?;
+            self.db.write_schemas(batch)?;
         }
         Ok(())
     }
@@ -125,17 +113,6 @@ mod tests {
         create_metadata, create_secret_share, TestContext,
     };
     use aptos_temppath::TempPath;
-
-    #[test]
-    fn test_database_opens_lazily() {
-        let temp_path = TempPath::new();
-        let db = SecretShareDb::new(&temp_path);
-        assert!(db.db.get().is_none());
-
-        db.load_self_shares(1).unwrap();
-
-        assert!(db.db.get().is_some());
-    }
 
     #[test]
     fn test_overwrite_and_restart() {
@@ -229,7 +206,7 @@ mod tests {
                 0xFF, 0xFF,
             ])
             .unwrap();
-        db.db().write_schemas(batch).unwrap();
+        db.db.write_schemas(batch).unwrap();
 
         assert!(db.load_self_shares(ctx.epoch).is_err());
     }
