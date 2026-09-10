@@ -15,7 +15,7 @@
       "target": "decibel_dex::extracted_base_math::compute_base_needed",
       "task_id": "BA-base-012",
       "threshold_seconds": 20,
-      "wall_seconds": 5.2,
+      "wall_seconds": 34.1,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -31,7 +31,7 @@
       "target": "decibel_dex::extracted_bucket_index::get_bucket_index",
       "task_id": "BK-bucket-016",
       "threshold_seconds": 20,
-      "wall_seconds": 4.7,
+      "wall_seconds": 17.3,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -47,10 +47,10 @@
       "target": "decibel_dex::extracted_liquidation_price::get_liquidation_price",
       "task_id": "LP-price-021",
       "threshold_seconds": 20,
-      "wall_seconds": 5.0,
+      "wall_seconds": 35.1,
       "well_formed": true,
-      "wp_failure_kind": "untrusted_inferred_contract",
-      "wp_hard": true
+      "wp_failure_kind": null,
+      "wp_hard": false
     },
     {
       "apparatus_ok": true,
@@ -63,7 +63,7 @@
       "target": "decibel_dex::extracted_median::get_median_price",
       "task_id": "MD-median-015",
       "threshold_seconds": 20,
-      "wall_seconds": 5.1,
+      "wall_seconds": 23.4,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -79,7 +79,7 @@
       "target": "decibel_dex::extracted_minmax::find_min_value",
       "task_id": "MM-min-013",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 25.6,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -95,7 +95,7 @@
       "target": "decibel_dex::extracted_order_validation::validate_order_input",
       "task_id": "OV-order-006",
       "threshold_seconds": 20,
-      "wall_seconds": 5.2,
+      "wall_seconds": 23.3,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -111,7 +111,7 @@
       "target": "decibel_campaign::extracted_payout_math::compute",
       "task_id": "PM-curve-027",
       "threshold_seconds": 20,
-      "wall_seconds": 5.3,
+      "wall_seconds": 47.9,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -127,7 +127,7 @@
       "target": "decibel_dex::lomuto_partition::partition",
       "task_id": "QP-part-025",
       "threshold_seconds": 20,
-      "wall_seconds": 5.5,
+      "wall_seconds": 24.2,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -143,7 +143,7 @@
       "target": "decibel_dex::selection_machine::select",
       "task_id": "SM-select-022",
       "threshold_seconds": 20,
-      "wall_seconds": 4.4,
+      "wall_seconds": 22.7,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -159,7 +159,7 @@
       "target": "decibel_campaign::extracted_tier_leverage::checked_max_tier_leverage",
       "task_id": "TL-lev-020",
       "threshold_seconds": 20,
-      "wall_seconds": 7.0,
+      "wall_seconds": 19.5,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -175,7 +175,7 @@
       "target": "aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level",
       "task_id": "TR-cancel-026",
       "threshold_seconds": 20,
-      "wall_seconds": 4.7,
+      "wall_seconds": 18.3,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -191,7 +191,7 @@
       "target": "aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels",
       "task_id": "TR-discard-011",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 17.3,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -207,7 +207,7 @@
       "target": "aptos_experimental::extracted_bulk_order_utils::validate_price_ordering",
       "task_id": "TR-order-010",
       "threshold_seconds": 20,
-      "wall_seconds": 4.8,
+      "wall_seconds": 17.1,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -223,10 +223,10 @@
       "target": "decibel_dex::extracted_trial_size::trial_size_for",
       "task_id": "TS-trial-019",
       "threshold_seconds": 20,
-      "wall_seconds": 7.1,
+      "wall_seconds": 23.7,
       "well_formed": true,
-      "wp_failure_kind": "untrusted_inferred_contract",
-      "wp_hard": true
+      "wp_failure_kind": null,
+      "wp_hard": false
     },
     {
       "apparatus_ok": true,
@@ -239,7 +239,7 @@
       "target": "decibel_campaign::extracted_tier_lookup::credits_for_duration_days",
       "task_id": "UC-credits-008",
       "threshold_seconds": 20,
-      "wall_seconds": 4.7,
+      "wall_seconds": 17.3,
       "well_formed": true,
       "wp_failure_kind": "implementation_failure",
       "wp_hard": true
@@ -255,7 +255,7 @@
       "target": "decibel_vault::vault_share_math::convert_new_assets_to_share_count",
       "task_id": "VS-contrib-003",
       "threshold_seconds": 20,
-      "wall_seconds": 8.0,
+      "wall_seconds": 17.4,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -271,10 +271,10 @@
       "target": "decibel_vault::vault_share_math::calculate_unrealized_fees",
       "task_id": "VS-fees-001",
       "threshold_seconds": 20,
-      "wall_seconds": 6.2,
+      "wall_seconds": 20.9,
       "well_formed": true,
-      "wp_failure_kind": null,
-      "wp_hard": false
+      "wp_failure_kind": "implementation_failure",
+      "wp_hard": true
     },
     {
       "apparatus_ok": true,
@@ -287,9 +287,9 @@
       "target": "decibel_vault::vault_share_math::calculate_redemption_funds_and_fee",
       "task_id": "VS-redeem-004",
       "threshold_seconds": 20,
-      "wall_seconds": 5.8,
+      "wall_seconds": 23.0,
       "well_formed": true,
-      "wp_failure_kind": "untrusted_inferred_contract",
+      "wp_failure_kind": "implementation_failure",
       "wp_hard": true
     },
     {
@@ -303,10 +303,10 @@
       "target": "decibel_vault::vault_share_math::convert_existing_shares_to_asset_amount",
       "task_id": "VS-shares-002",
       "threshold_seconds": 20,
-      "wall_seconds": 5.2,
+      "wall_seconds": 19.5,
       "well_formed": true,
-      "wp_failure_kind": "untrusted_inferred_contract",
-      "wp_hard": true
+      "wp_failure_kind": null,
+      "wp_hard": false
     },
     {
       "apparatus_ok": true,
@@ -319,7 +319,7 @@
       "target": "decibel_dex::extracted_work_units::consume_order_match_work_units",
       "task_id": "WU-consume-023",
       "threshold_seconds": 20,
-      "wall_seconds": 5.8,
+      "wall_seconds": 27.4,
       "well_formed": true,
       "wp_failure_kind": null,
       "wp_hard": false
@@ -330,30 +330,30 @@
   "source_commit": "e3e44eee90802fc83a003360fe9913b8507a563d",
   "threshold_seconds": 20,
   "tools": {
-    "experiment_config_sha256": "11f4454b6e233feae1e5411e3639581ecc6d6e1eb5c7720c88158e1fbc83c987",
+    "experiment_config_sha256": "6107010bd06d230fae0f33656a2e11a8daceecb426329f53bbe1c9bc1dd07418",
     "model_independent": true,
     "move_flow": [
       "move-flow"
     ],
-    "move_flow_sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3",
+    "move_flow_sha256": "ad014cb00c39d5a896accb4e9b06096cebbc5ffc9de2559103a444cf90b9ed15",
     "stage_executables": {
       "boogie": {
         "sha256": "9a330d0d1a37d5d169f7ca8ac9236232bdf7979a7a7e23b62668cbb9b5110908"
       },
       "check_candidate": {
-        "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+        "sha256": "ad014cb00c39d5a896accb4e9b06096cebbc5ffc9de2559103a444cf90b9ed15"
       },
       "compile": {
-        "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+        "sha256": "ad014cb00c39d5a896accb4e9b06096cebbc5ffc9de2559103a444cf90b9ed15"
       },
       "enriched_compile": {
-        "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+        "sha256": "ad014cb00c39d5a896accb4e9b06096cebbc5ffc9de2559103a444cf90b9ed15"
       },
       "prover": {
-        "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+        "sha256": "ad014cb00c39d5a896accb4e9b06096cebbc5ffc9de2559103a444cf90b9ed15"
       },
       "wp_inference": {
-        "sha256": "c848120ded288f8b68156e96e0064b16ad43bead4de1520feed7fd3401ccb2e3"
+        "sha256": "ad014cb00c39d5a896accb4e9b06096cebbc5ffc9de2559103a444cf90b9ed15"
       },
       "z3": {
         "sha256": "94be8a622100a4f6e9a77c4e0715b9075d0e36c49eef06d026ae11642f914cbc"
@@ -363,7 +363,6 @@
   "wp_hard": [
     "BA-base-012",
     "BK-bucket-016",
-    "LP-price-021",
     "MM-min-013",
     "QP-part-025",
     "SM-select-022",
@@ -371,9 +370,8 @@
     "TR-cancel-026",
     "TR-discard-011",
     "TR-order-010",
-    "TS-trial-019",
     "UC-credits-008",
-    "VS-redeem-004",
-    "VS-shares-002"
+    "VS-fees-001",
+    "VS-redeem-004"
   ]
 }
