@@ -9,7 +9,7 @@
   "target": "aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level",
   "task_id": "TR-cancel-026",
   "threshold_seconds": 20,
-  "wall_seconds": 14.4,
+  "wall_seconds": 16.1,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true
