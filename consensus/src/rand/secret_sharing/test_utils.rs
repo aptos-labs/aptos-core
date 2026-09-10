@@ -11,13 +11,14 @@ use aptos_types::{
         Digest, MasterSecretKeyShare, SecretShare, SecretShareConfig, SecretShareMetadata,
         SecretSharedKey,
     },
-    validator_verifier::random_validator_verifier_with_voting_power,
+    validator_verifier::{random_validator_verifier_with_voting_power, ValidatorVerifier},
 };
 use std::sync::Arc;
 
 pub struct TestContext {
     pub authors: Vec<Author>,
     pub epoch: u64,
+    pub validator_verifier: Arc<ValidatorVerifier>,
     pub secret_share_config: SecretShareConfig,
     pub msk_shares: Vec<MasterSecretKeyShare>,
 }
@@ -46,8 +47,9 @@ impl TestContext {
             FPTXWeighted::setup_for_testing(8, max_batch_size, num_rounds, &tc)
                 .expect("Failed to setup crypto");
 
+        let validator_verifier = Arc::new(validator_verifier);
         let secret_share_config = SecretShareConfig::new(
-            Arc::new(validator_verifier),
+            validator_verifier.clone(),
             Arc::new(dk),
             msk_shares[0].clone(),
             vks,
@@ -58,6 +60,7 @@ impl TestContext {
         Self {
             authors,
             epoch: 1,
+            validator_verifier,
             secret_share_config,
             msk_shares,
         }
