@@ -23,4 +23,3 @@ move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
-triomphe = { workspace = true }

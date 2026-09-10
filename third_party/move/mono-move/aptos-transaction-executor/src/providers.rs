@@ -1,9 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::state_store::state_key::StateKey;
 use bytes::Bytes;
-use mono_move_core::storage::resource_provider::{ResourceProvider, ResourceProviderError};
+use mono_move_core::storage::resource_provider::{
+    InMemoryStorageKey, ResourceProvider, ResourceProviderError,
+};
 use move_core_types::language_storage::StructTag;
 use std::collections::{BTreeMap, HashMap};
 
@@ -11,10 +12,11 @@ use std::collections::{BTreeMap, HashMap};
 /// handle resource groups.
 pub trait AptosDataProvider: ResourceProvider {
     /// The stored members of the group behind `group_key`, as execution read
-    /// them, or `None` if no group is stored there.
+    /// them, or `None` if no group is stored there. `group_key` must be an
+    /// [`InMemoryStorageKey::ResourceGroup`].
     fn group_members(
         &self,
-        group_key: &StateKey,
+        group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError>;
 }
 
@@ -25,7 +27,7 @@ pub type GroupMembers = BTreeMap<StructTag, Bytes>;
 
 /// The resource groups a transaction assembled during materialization, keyed by
 /// group slot. `None` marks a group the transaction deleted.
-pub type MaterializedGroups = HashMap<StateKey, Option<GroupMembers>>;
+pub type MaterializedGroups = HashMap<InMemoryStorageKey, Option<GroupMembers>>;
 
 /// Decodes a group's stored blob.
 pub fn decode_group_members(blob: &[u8]) -> Result<GroupMembers, ResourceProviderError> {

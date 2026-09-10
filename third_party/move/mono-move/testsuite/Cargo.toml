@@ -47,7 +47,6 @@ smallvec = { workspace = true }
 specializer = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-triomphe = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

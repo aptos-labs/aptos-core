@@ -11,7 +11,7 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_or_gc, deserialize_or_gc,
+        deep_copy_or_gc, deserialize_or_gc, evacuate_session_roots,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         AllocationError, FrozenHeap, Heap, TopFrame,
     },
@@ -567,11 +567,36 @@ impl<'guard> InterpreterContext<'guard> {
     /// effects no longer borrow the guard, so the caller must keep the global
     /// arena that owns their interned types alive until the effects are dropped.
     pub fn finish(self) -> SessionEffects {
+        let Self {
+            loader,
+            mut read_write_set,
+            extensions,
+            heap,
+            ..
+        } = self;
+
+        // What survives a transaction is usually a few hundred bytes, but it
+        // sits in a megabyte-scale session heap that the block then pins until
+        // it ends. Copying it out keeps the pinned memory proportional to the
+        // writes rather than to the number of transactions in the block.
+        let (frozen, result) =
+            evacuate_session_roots(&heap, loader.guard(), &mut read_write_set, &extensions);
+        let heaps = match result {
+            Ok(()) => vec![frozen],
+            // A partial copy leaves the read-write set pointing into both
+            // heaps, so both have to stay alive.
+            //
+            // TODO(correctness): evacuation can only fail on an invariant
+            // violation, which should fail the transaction rather than be
+            // swallowed. Needs `finish` to become fallible.
+            Err(_) => vec![frozen, heap],
+        };
+
         SessionEffects {
-            read_write_set: self.read_write_set,
-            extensions: self.extensions,
+            read_write_set,
+            extensions,
             #[allow(clippy::arc_with_non_send_sync)]
-            heap: std::sync::Arc::new(FrozenHeap::new(self.heap)),
+            heap: std::sync::Arc::new(FrozenHeap::from_heaps(heaps)),
         }
     }
 

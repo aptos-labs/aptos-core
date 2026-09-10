@@ -31,7 +31,9 @@ so a workload that publishes modules could not be set up under it.
 ## What it does not measure
 
 - **Gas.** MonoMove runs unmetered, so its gas metrics are zero.
-- **Parallel execution.** MonoMove is sequential only today.
+- **Parallel execution.** MonoMove runs on Block-STM, but this harness pins both
+  VMs to `--execution-threads 1` so the comparison measures per-transaction cost
+  rather than how well either VM scales.
 - **Publish, script, and multisig workloads.** MonoMove discards those payloads.
 
 ## Output size

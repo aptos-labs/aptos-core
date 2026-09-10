@@ -39,27 +39,45 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
     ) -> TxnOutcome {
-        match self.execute_user_transaction_impl(txn, aux_info) {
-            Ok(outcome) => outcome,
-            Err(reason) => TxnOutcome::Discarded(reason),
+        let txn_data = TxnMetadata::new(txn, aux_info);
+        let (entry, ty_args) = match self.prepare_user_transaction(txn, &txn_data) {
+            Ok(prepared) => prepared,
+            // Nothing was read yet, so there is no read set to hand back.
+            Err(reason) => {
+                return TxnOutcome::Discarded {
+                    reason,
+                    effects: None,
+                }
+            },
+        };
+
+        let mut interp = self.user_session(&txn_data);
+        match self.execute_user_transaction_impl(&mut interp, &txn_data, entry, ty_args) {
+            Ok((status, fee_statement)) => TxnOutcome::Executed {
+                status,
+                fee_statement,
+                effects: interp.finish(),
+            },
+            // The session may already have read global storage, and those reads
+            // have to be validated even though the writes are dropped.
+            Err(reason) => TxnOutcome::Discarded {
+                reason,
+                effects: Some(interp.finish()),
+            },
         }
     }
 
-    /// Actual implementation of the transaction execution flow.
-    fn execute_user_transaction_impl(
+    /// Rejects what this executor cannot execute, before touching any state,
+    /// and resolves the payload's entry function and type arguments.
+    fn prepare_user_transaction<'txn>(
         &self,
-        txn: &SignedTransaction,
-        aux_info: &AuxiliaryInfo,
-    ) -> Result<TxnOutcome, DiscardReason> {
-        let guard = self.guard;
-
-        // ======================== Pre-execution checks ========================
-        // Reject what this executor cannot execute, before touching any state.
-        let txn_data = TxnMetadata::new(txn, aux_info);
+        txn: &'txn SignedTransaction,
+        txn_data: &TxnMetadata,
+    ) -> Result<(&'txn EntryFunction, InternedTypeList), DiscardReason> {
         let gas_params = self.env.gas_params().as_ref().map_err(|e| {
             DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
         })?;
-        PreExecutionChecker::new(gas_params, self.env.gas_feature_version(), &txn_data)
+        PreExecutionChecker::new(gas_params, self.env.gas_feature_version(), txn_data)
             .run_checks()
             .map_err(DiscardReason::PreExecutionCheck)?;
 
@@ -81,55 +99,62 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let interned_ty_args = entry
             .ty_args()
             .iter()
-            .map(|tag| intern_type_tag(tag, guard))
+            .map(|tag| intern_type_tag(tag, self.guard))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| DiscardReason::InvalidTypeArgument(format!("{e:#}")))?;
-        let ty_args = guard.type_list_of(&interned_ty_args);
+        Ok((entry, self.guard.type_list_of(&interned_ty_args)))
+    }
 
-        // ========================== Session setup ===========================
-        // One session hosts the whole transaction: prologue, payload, epilogue.
+    /// One session hosts the whole transaction: prologue, payload, epilogue.
+    fn user_session(&self, txn_data: &TxnMetadata) -> InterpreterContext<'guard> {
         // TODO(completeness): make the loading policy configurable.
         let loader = Loader::new_with_policy(
-            guard,
+            self.guard,
             self.module_provider,
             LoadingPolicy::Lazy(LoweringPolicy::Lazy),
             self.natives,
         );
-
-        let extensions = transaction_extensions(&txn_data, self.usage);
-
-        let max_gas = txn_data.max_gas_amount;
-        let mut interp = InterpreterContext::new(
+        InterpreterContext::new(
             loader,
             // TODO(metering): MonoMove gas units are uncalibrated; budgeting
             // 1:1 against the transaction's gas units is a placeholder.
-            GasMeter::new(max_gas),
+            GasMeter::new(txn_data.max_gas_amount),
             self.data_provider,
             self.natives,
         )
-        .with_extensions(extensions);
+        .with_extensions(transaction_extensions(txn_data, self.usage))
+    }
 
-        let signers = ValidationSigners::new(&txn_data);
+    /// Runs the prologue, payload, and epilogue in an already-opened session.
+    fn execute_user_transaction_impl(
+        &self,
+        interp: &mut InterpreterContext<'guard>,
+        txn_data: &TxnMetadata,
+        entry: &EntryFunction,
+        ty_args: InternedTypeList,
+    ) -> Result<(ExecutionStatus, FeeStatement), DiscardReason> {
+        let guard = self.guard;
+        let max_gas = txn_data.max_gas_amount;
+        let signers = ValidationSigners::new(txn_data);
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
-        run_prologue(&mut interp, guard, &signers, &txn_data).map_err(|failure| {
+        run_prologue(interp, guard, &signers, txn_data).map_err(|failure| {
             DiscardReason::Failure {
                 stage: ExecutionStage::Prologue,
                 failure,
             }
         })?;
         // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
-        checkpoint(&mut interp)?;
+        checkpoint(interp)?;
 
         // ========================== User payload ============================
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
         let payload_result = if self.unmetered {
-            interp
-                .unmetered(|interp| self.execute_entry_function(interp, &txn_data, entry, ty_args))
+            interp.unmetered(|interp| self.execute_entry_function(interp, txn_data, entry, ty_args))
         } else {
-            self.execute_entry_function(&mut interp, &txn_data, entry, ty_args)
+            self.execute_entry_function(interp, txn_data, entry, ty_args)
         };
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
@@ -142,7 +167,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let execution_status = match payload_result {
             Ok(()) => ExecutionStatus::Success,
             Err(failure) => {
-                rollback(&mut interp, 1)?;
+                rollback(interp, 1)?;
                 ExecutionStatus::Failure {
                     stage: ExecutionStage::Payload,
                     failure,
@@ -158,12 +183,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 interp,
                 guard,
                 &signers,
-                &txn_data,
+                txn_data,
                 fee_statement,
                 gas_remaining,
             )
         };
-        let execution_status = match epilogue(&mut interp) {
+        let execution_status = match epilogue(interp) {
             Ok(()) => execution_status,
             // Payload failed + epilogue failed => no choice but to discard.
             // This should not happen unless there is a bug in the executor.
@@ -181,8 +206,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             // TODO(correctness): audit this against the legacy VM, which may
             // discard here instead.
             Err(failure) => {
-                rollback(&mut interp, 1)?;
-                epilogue(&mut interp).map_err(|failure| DiscardReason::Failure {
+                rollback(interp, 1)?;
+                epilogue(interp).map_err(|failure| DiscardReason::Failure {
                     stage: ExecutionStage::EpilogueRetry,
                     failure,
                 })?;
@@ -193,14 +218,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             },
         };
 
-        // ============================= Output ===============================
-        // Hand the side effects back unmaterialized; the coordinator decides
-        // when (and whether) to render them into storage formats.
-        Ok(TxnOutcome::Executed {
-            status: execution_status,
-            fee_statement,
-            effects: interp.finish(),
-        })
+        Ok((execution_status, fee_statement))
     }
 
     fn execute_entry_function(

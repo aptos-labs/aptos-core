@@ -14,7 +14,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
     ///
     /// Unlike the other system transactions, a failure never aborts the block:
     /// the outcome falls back to an empty success carrying the failure, and the
-    /// failed session's effects are dropped.
+    /// failed session's writes are dropped.
     //
     // TODO(completeness): the legacy VM currently ignores the payload's
     // `to_make_hot` keys and emits no hot-state output, and so do we; revisit
@@ -26,7 +26,10 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let fee_distribution = match block_epilogue {
             // V0 carries no fee distribution: nothing runs on-chain.
             BlockEpiloguePayload::V0 { .. } => {
-                return TxnOutcome::ExecutedNoEffects(NoEffectsReason::NothingToExecute)
+                return TxnOutcome::ExecutedNoEffects {
+                    reason: NoEffectsReason::NothingToExecute,
+                    effects: None,
+                }
             },
             BlockEpiloguePayload::V1 {
                 fee_distribution, ..
@@ -44,8 +47,11 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         });
         match result {
             Ok(()) => system_txn_outcome(interp),
-            Err(failure) => {
-                TxnOutcome::ExecutedNoEffects(NoEffectsReason::BlockEpilogueFailed(failure))
+            // The writes are dropped, but the failed session's reads still have
+            // to be validated before this empty success can commit.
+            Err(failure) => TxnOutcome::ExecutedNoEffects {
+                reason: NoEffectsReason::BlockEpilogueFailed(failure),
+                effects: Some(interp.finish()),
             },
         }
     }

@@ -14,20 +14,29 @@ use aptos_types::{
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
 };
 use mono_move_core::{value_layout::LayoutProvider, VMResult};
-use mono_move_runtime::SessionEffects;
+use mono_move_runtime::{ResourceReadWriteSet, SessionEffects};
 
 /// The outcome of one transaction, not yet materialized into a write set.
 /// Intended to be consumed by the block coordinator for efficient handling.
 pub enum TxnOutcome {
-    /// Rejected without side effects.
-    Discarded(DiscardReason),
+    /// Rejected without side effects. The effects are kept when the transaction
+    /// was discarded after its session opened: the writes are thrown away, but
+    /// the reads still have to be validated before the discard can commit.
+    Discarded {
+        reason: DiscardReason,
+        effects: Option<SessionEffects>,
+    },
     /// A system transaction failed unexpectedly: there is no per-transaction
     /// output, and the whole block must be aborted.
     UnexpectedSystemTransactionFailure(SystemTxnFailure),
     /// Committed with no side effects and a zero fee. The reason distinguishes
     /// a transaction that had nothing to do from a block epilogue whose
-    /// failure was absorbed; both render as an empty success.
-    ExecutedNoEffects(NoEffectsReason),
+    /// failure was absorbed; both render as an empty success. The effects are
+    /// kept for the same reason as in [`Self::Discarded`].
+    ExecutedNoEffects {
+        reason: NoEffectsReason,
+        effects: Option<SessionEffects>,
+    },
     /// Executed: the fee is charged and the side effects are real, whether or
     /// not the payload succeeded.
     Executed {
@@ -38,8 +47,19 @@ pub enum TxnOutcome {
 }
 
 impl TxnOutcome {
-    pub fn is_discarded(&self) -> bool {
-        matches!(self, TxnOutcome::Discarded(_))
+    /// The global storage the transaction touched, present whenever it opened a
+    /// session. Only [`Self::Executed`] turns its writes into output; every
+    /// other variant keeps this solely so its reads can be validated.
+    pub fn read_write_set(&self) -> Option<&ResourceReadWriteSet> {
+        match self {
+            TxnOutcome::Executed { effects, .. } => Some(effects.read_write_set()),
+            TxnOutcome::Discarded { effects, .. }
+            | TxnOutcome::ExecutedNoEffects { effects, .. } => {
+                effects.as_ref().map(SessionEffects::read_write_set)
+            },
+            // The block is aborted, so there is nothing left to validate.
+            TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
+        }
     }
 
     /// Whether this transaction emitted a reconfiguration (new-epoch) event. The
@@ -47,9 +67,9 @@ impl TxnOutcome {
     pub fn has_new_epoch_event(&self) -> VMResult<bool> {
         match self {
             TxnOutcome::Executed { effects, .. } => mono_move_output::has_new_epoch_event(effects),
-            TxnOutcome::Discarded(_)
+            TxnOutcome::Discarded { .. }
             | TxnOutcome::UnexpectedSystemTransactionFailure(_)
-            | TxnOutcome::ExecutedNoEffects(_) => Ok(false),
+            | TxnOutcome::ExecutedNoEffects { .. } => Ok(false),
         }
     }
 
@@ -73,7 +93,7 @@ impl TxnOutcome {
         auxiliary_data: TransactionAuxiliaryData,
     ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
         match self {
-            TxnOutcome::Discarded(reason) => Ok((
+            TxnOutcome::Discarded { reason, .. } => Ok((
                 materialize::discarded_output(
                     materialize::discard_to_vm_status(reason).status_code(),
                     auxiliary_data,
@@ -88,7 +108,7 @@ impl TxnOutcome {
                     failure.call, failure.failure
                 )]))
             },
-            TxnOutcome::ExecutedNoEffects(_) => Ok((
+            TxnOutcome::ExecutedNoEffects { .. } => Ok((
                 materialize::empty_success_output(auxiliary_data),
                 MaterializedGroups::new(),
             )),

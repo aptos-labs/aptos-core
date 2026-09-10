@@ -363,6 +363,12 @@ impl GlobalContext {
         }
     }
 
+    /// The number of workers this context was built for. Worker IDs beyond it
+    /// have no arena to lock.
+    pub fn num_execution_workers(&self) -> usize {
+        self.global_arena.num_arenas()
+    }
+
     /// Transitions to execution mode by obtaining an [`ExecutionGuard`] guard
     /// and locking the arena for the given worker. Multiple execution contexts
     /// can be held concurrently across threads for different workers.
