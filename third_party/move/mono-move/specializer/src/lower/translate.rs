@@ -588,7 +588,7 @@ impl<'a> LoweringState<'a> {
         op_name: &'static str,
         vec_ty: InternedType,
     ) -> VMResult<DescriptorId> {
-        self.ctx.descriptor_id(vec_ty).ok_or_else(|| {
+        self.ctx.vec_descriptor_id(vec_ty).ok_or_else(|| {
             VMInternalError::new(LoweringError::VectorTypeNoDescriptor { op: op_name })
         })
     }
@@ -1896,7 +1896,7 @@ impl<'a> LoweringState<'a> {
                 let concrete_ty = self.concrete_ty(*resource_ty)?;
                 let descriptor_id = self
                     .ctx
-                    .descriptor_id(concrete_ty)
+                    .struct_descriptor_id(concrete_ty)
                     .ok_or(LoweringError::ResourceTypeNoDescriptor { op: "MoveTo" })?;
                 let box_ptr = self
                     .ctx

@@ -169,13 +169,6 @@ fn publish_struct_descriptor_for(
     ty: InternedType,
     descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
 ) -> VMResult<()> {
-    // `descriptors` keys vector and struct descriptors alike on the concrete
-    // type. A vector's entry is its `Vector` descriptor; overwriting it with a
-    // `Struct` one would drop the element stride, so the GC would trace only
-    // element 0 and `VecPack` / `VecPushBack` would fail verification.
-    if matches!(view_type(ty), Type::Vector { .. }) {
-        return Ok(());
-    }
     if let Some((size, _)) = ctx.size_and_align(ty)
         && let Ok(ptr_offsets) = type_pointer_offsets(ctx, ty)
     {
@@ -303,12 +296,10 @@ pub(crate) fn resolve_variant_field_access(
 /// discovery pass into lowering.
 #[derive(Default)]
 pub struct LoweringDescriptors {
-    /// Type -> published descriptor id: a `vector<T>` for vector descriptors,
-    /// or a resource struct type for `move_to`/`move_from` descriptors.
-    ///
-    /// TODO(cleanup): rename to a type-generic name now that it also holds struct
-    /// descriptors, and extend to enum descriptors.
-    pub vec: UnorderedMap<InternedType, DescriptorId>,
+    /// Concrete `vector<T>` -> the descriptor published for its element.
+    pub vectors: UnorderedMap<InternedType, DescriptorId>,
+    /// Concrete resource or box type -> its struct descriptor.
+    pub structs: UnorderedMap<InternedType, DescriptorId>,
     /// Concrete enum type -> its descriptor + per-variant field layout.
     pub enum_layouts: UnorderedMap<InternedType, EnumLayout>,
     /// Captured-data layout per `PackClosure`, in IR order; consumed
@@ -378,14 +369,16 @@ pub struct LoweringContext<'a> {
     /// micro-op (`EnumNew` is the only allocator and writes the pointer here
     /// after allocating), so it needs no GC tracking.
     pub enum_ptr_scratch: Option<FrameOffset>,
-    /// Maps a type to the [`DescriptorId`] published for it: a `vector<T>` for
-    /// vector descriptors, or the resource struct type for `move_to`/`move_from`
-    /// descriptors.
+    /// Concrete `vector<T>` -> the descriptor published for its element.
     ///
-    /// Invariant: contains an entry for every vector or resource type used in
-    /// this function.
-    pub descriptors: UnorderedMap<InternedType, DescriptorId>,
-    /// TODO(cleanup): consider reconciling with the descriptors map above.
+    /// Invariant: contains an entry for every vector type used in this
+    /// function.
+    pub vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
+    /// Concrete resource or box type -> its struct descriptor.
+    ///
+    /// Invariant: contains an entry for every resource type used in this
+    /// function.
+    pub struct_descriptors: UnorderedMap<InternedType, DescriptorId>,
     /// Concrete enum type -> its descriptor + per-variant field layout.
     ///
     /// Invariant: contains an entry for every enum type whose concrete
@@ -399,11 +392,16 @@ pub struct LoweringContext<'a> {
 }
 
 impl LoweringContext<'_> {
-    /// `DescriptorId` published for `ty`, or `None` if no entry exists. The key
-    /// is the type itself: a `vector<T>` for vector descriptors, or the resource
-    /// struct type for `move_to`/`move_from` descriptors.
-    pub fn descriptor_id(&self, ty: InternedType) -> Option<DescriptorId> {
-        self.descriptors.get(&ty).copied()
+    /// Descriptor published for the elements of the concrete vector type
+    /// `vec_ty`, or `None` if no entry exists.
+    pub fn vec_descriptor_id(&self, vec_ty: InternedType) -> Option<DescriptorId> {
+        self.vec_descriptors.get(&vec_ty).copied()
+    }
+
+    /// Struct descriptor published for the concrete resource or box type
+    /// `struct_ty`, or `None` if no entry exists.
+    pub fn struct_descriptor_id(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.struct_descriptors.get(&struct_ty).copied()
     }
 
     /// Layout published for the concrete enum type `enum_ty`, or `None` if
@@ -746,7 +744,7 @@ pub fn try_build_context<'a>(
             view_type_list(call_ty_args),
         )
         .iter()
-        .filter_map(|ty| descriptors.vec.get(ty).copied())
+        .filter_map(|ty| descriptors.structs.get(ty).copied())
         .collect();
         call_sites.push(CallSiteInfo {
             callee_module_id,
@@ -781,7 +779,8 @@ pub fn try_build_context<'a>(
         scratch,
         resource_box_slot,
         enum_ptr_scratch,
-        descriptors: descriptors.vec,
+        vec_descriptors: descriptors.vectors,
+        struct_descriptors: descriptors.structs,
         enum_layouts: descriptors.enum_layouts,
         closure_pack_sites,
         closure_call_sites,
@@ -1168,7 +1167,7 @@ fn try_discover_types_for_lowering_in_function_impl(
             ) {
                 discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
                 let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-                publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+                publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.structs)?;
             }
 
             // Here we only need layout, so there is no need to publish the type descriptor.
@@ -1216,7 +1215,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         if let Some(resource_ty) = resource_type_in_instr(instr) {
             discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
             let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.structs)?;
         }
 
         // The walks above don't reach a constant's own type. A vector
@@ -1460,7 +1459,7 @@ fn discover_type_metadata(
                 None
             };
             if let Some(id) = descriptor_id {
-                descriptors.vec.insert(ty, id);
+                descriptors.vectors.insert(ty, id);
             }
             // Publish the vector layout only when both the element layout and
             // the descriptor are available (the same condition the descriptor
