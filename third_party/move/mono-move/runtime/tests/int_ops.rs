@@ -43,7 +43,7 @@ use mono_move_core::{
     MicroOp, ShiftOperand, SizedSlot, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use move_core_types::int256::{I256, U256};
-use num_bigint::{BigInt, Sign};
+use num::BigInt;
 use proptest::{prelude::*, strategy::BoxedStrategy};
 
 // ---------------------------------------------------------------------------
@@ -1231,7 +1231,7 @@ impl_cast_type_native!(i64, IntTy::I64);
 impl_cast_type_native!(i128, IntTy::I128);
 
 macro_rules! impl_cast_type_wide {
-    ($ty:ty, $tag:expr, $bytes_to_big:expr) => {
+    ($ty:ty, $tag:expr) => {
         impl CastType for $ty {
             const TAG: IntTy = $tag;
             const WIDTH: usize = 32;
@@ -1241,23 +1241,15 @@ macro_rules! impl_cast_type_wide {
             }
 
             fn to_bigint(self) -> BigInt {
-                $bytes_to_big(&self.to_le_bytes())
+                BigInt::from(self)
             }
 
             fn range_bigint() -> (BigInt, BigInt) {
-                (
-                    $bytes_to_big(&<$ty>::MIN.to_le_bytes()),
-                    $bytes_to_big(&<$ty>::MAX.to_le_bytes()),
-                )
+                (BigInt::from(<$ty>::MIN), BigInt::from(<$ty>::MAX))
             }
 
-            // Rendered through `BigInt` rather than the type's own `Display`,
-            // which reaches a `ethnum` formatting path that violates Stacked
-            // Borrows and aborts the whole binary under Miri. Decimal output is
-            // identical either way.
             fn decode(bytes: &[u8]) -> String {
-                assert_eq!(bytes.len(), Self::WIDTH);
-                $bytes_to_big(bytes).to_string()
+                <$ty>::from_le_bytes(bytes.try_into().unwrap()).to_string()
             }
 
             fn strategy() -> BoxedStrategy<Self> {
@@ -1267,13 +1259,8 @@ macro_rules! impl_cast_type_wide {
     };
 }
 
-impl_cast_type_wide!(U256, IntTy::U256, |b: &[u8]| BigInt::from_bytes_le(
-    Sign::Plus,
-    b
-));
-impl_cast_type_wide!(I256, IntTy::I256, |b: &[u8]| {
-    BigInt::from_signed_bytes_le(b)
-});
+impl_cast_type_wide!(U256, IntTy::U256);
+impl_cast_type_wide!(I256, IntTy::I256);
 
 /// Run the cast micro-op (from `S` to `D`) using the VM runtime.
 fn cast_runtime<S: CastType, D: CastType>(v: S) -> Option<String> {

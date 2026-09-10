@@ -13125,7 +13125,7 @@ dependencies = [
  "move-core-types",
  "move-value-view",
  "move-value-view-derive",
- "num-bigint 0.3.3",
+ "num 0.4.1",
  "paste",
  "proptest",
  "rand 0.7.3",
