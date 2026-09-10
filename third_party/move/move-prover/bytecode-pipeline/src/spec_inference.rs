@@ -96,7 +96,7 @@
 use crate::{
     data_invariant_instrumentation::INVARIANT_FAILS_MESSAGE as DATA_INVARIANT_FAILS_MESSAGE,
     global_invariant_instrumentation::GLOBAL_INVARIANT_FAILS_MESSAGE,
-    loop_analysis::{LoopInvariantEvidence, LoopsWithInvariants, LoopsWithoutInvariants},
+    loop_analysis::{LoopInvariantEvidence, LoopsWithoutInvariants},
     options::ProverOptions,
     spec_instrumentation::{ABORTS_CODE_NOT_COVERED, ABORTS_IF_FAILS_MESSAGE, ABORT_NOT_COVERED},
     verification_analysis,
@@ -995,31 +995,11 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
         .get::<LoopsWithoutInvariants>()
         .map(|loops| loops.0.as_slice())
         .unwrap_or_default();
-    // An invariant may exist without determining enough of the loop's
-    // carried state to eliminate the quantified WP summary. The presence of
-    // *some* invariant must not silently turn that summary into a trusted
-    // contract. Only report residual quantified clauses, not every loop or
-    // every sathard callee dependency.
-    if has_sathard
-        && fun_env.get_spec().conditions.iter().any(|condition| {
-            matches!(condition.properties.get(&inferred_sym),
-            Some(PropertyValue::Symbol(value)) if *value == sathard_sym)
-                && has_top_level_quantifier(&condition.exp)
-        })
-    {
-        if let Some(loops) = data.annotations.get::<LoopsWithInvariants>() {
-            for loc in &loops.0 {
-                fun_env.module_env.env.diag(
-                    loop_severity,
-                    loc,
-                    "WP retained a quantified loop summary despite the supplied invariant. \
-                     Inference has not established a trusted complete contract. Strengthen \
-                     the invariant to characterize the loop-carried values and mutated state \
-                     relative to entry; a bounds-only invariant may not suffice.",
-                );
-            }
-        }
-    }
+    // A supplied invariant can legitimately produce quantified path summaries
+    // (for example, a witness for the iteration which returns from a search).
+    // `sathard` describes solver cost and does not establish that the loop
+    // invariant is incomplete, so only loops actually recorded as missing an
+    // invariant are diagnosed here.
     if uninvariant.is_empty() {
         // Without loops, a `vacuous` condition has one other source: an
         // opaque callee that returns `&mut` into state it does not model. The

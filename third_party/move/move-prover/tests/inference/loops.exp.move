@@ -331,16 +331,6 @@ warning: WP inferred `vacuous` conditions after this loop without an invariant. 
        head[3]: n > 2 ==> head[3].n == n - 3
    = seek a predicate which includes the entry facts and is preserved by one back-edge; bounded observations are not an invariant or a proof
 
-warning: WP retained a quantified loop summary despite the supplied invariant. Inference has not established a trusted complete contract. Strengthen the invariant to characterize the loop-carried values and mutated state relative to entry; a bounds-only invariant may not suffice.
-    ┌─ tests/inference/loops.move:149:11
-    │
-149 │           } spec {
-    │ ╭───────────^
-150 │ │             invariant i <= n;
-151 │ │             invariant global<Counter>(addr).value == start + i;
-152 │ │         };
-    │ ╰─────────^
-
 warning: WP could not characterize the aborts of `loops::inc_global_with_invariant` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
   = an abort condition did not survive a memory-havocking loop
     ┌─ tests/inference/loops.move:142:5
