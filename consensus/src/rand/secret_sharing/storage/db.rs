@@ -11,44 +11,54 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_schemadb::{batch::SchemaBatch, Options, DB};
 use aptos_types::secret_sharing::SecretShare;
-use std::{path::Path, sync::Arc, time::Instant};
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+    time::Instant,
+};
 
 pub const SECRET_SHARE_DB_NAME: &str = "secret_share_db";
 const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 << 20;
 
 pub struct SecretShareDb {
-    db: Arc<DB>,
+    path: PathBuf,
+    db: OnceLock<DB>,
     write_lock: Mutex<()>,
 }
 
 impl SecretShareDb {
     pub fn new<P: AsRef<Path>>(db_root_path: P) -> Self {
-        let path = db_root_path.as_ref().join(SECRET_SHARE_DB_NAME);
+        Self {
+            path: db_root_path.as_ref().join(SECRET_SHARE_DB_NAME),
+            db: OnceLock::new(),
+            write_lock: Mutex::new(()),
+        }
+    }
+
+    fn db(&self) -> &DB {
+        self.db.get_or_init(|| self.open_db())
+    }
+
+    fn open_db(&self) -> DB {
         let instant = Instant::now();
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
         opts.set_max_total_wal_size(MAX_TOTAL_WAL_SIZE_BYTES);
-        let db = Arc::new(
-            DB::open(
-                path.clone(),
-                SECRET_SHARE_DB_NAME,
-                vec![SECRET_SHARE_CF_NAME],
-                opts,
-            )
-            .expect("SecretShareDb open failed; unable to continue"),
-        );
+        let db = DB::open(
+            self.path.clone(),
+            SECRET_SHARE_DB_NAME,
+            vec![SECRET_SHARE_CF_NAME],
+            opts,
+        )
+        .expect("SecretShareDb open failed; unable to continue");
 
         info!(
             "Opened SecretShareDb at {:?} in {} ms",
-            path,
+            self.path,
             instant.elapsed().as_millis()
         );
-
-        Self {
-            db,
-            write_lock: Mutex::new(()),
-        }
+        db
     }
 }
 
@@ -58,7 +68,7 @@ impl SecretShareStorage for SecretShareDb {
         let serialized = bcs::to_bytes(share)?;
         let _guard = self.write_lock.lock();
 
-        match self.db.get::<SecretShareSchema>(&key)? {
+        match self.db().get::<SecretShareSchema>(&key)? {
             Some(existing) if existing == serialized => Ok(()),
             Some(_) => bail!(
                 "conflicting secret share for epoch {}, block {}",
@@ -68,7 +78,7 @@ impl SecretShareStorage for SecretShareDb {
             None => {
                 let mut batch = SchemaBatch::new();
                 batch.put::<SecretShareSchema>(&key, &serialized)?;
-                self.db.write_schemas(batch)?;
+                self.db().write_schemas(batch)?;
                 Ok(())
             },
         }
@@ -78,12 +88,12 @@ impl SecretShareStorage for SecretShareDb {
         let _guard = self.write_lock.lock();
         let mut batch = SchemaBatch::new();
         batch.delete::<SecretShareSchema>(key)?;
-        self.db.write_schemas(batch)?;
+        self.db().write_schemas(batch)?;
         Ok(())
     }
 
     fn load_self_shares(&self, epoch: u64) -> Result<Vec<LoadedSecretShare>> {
-        let mut iter = self.db.iter::<SecretShareSchema>()?;
+        let mut iter = self.db().iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut shares = Vec::new();
@@ -109,7 +119,7 @@ impl SecretShareStorage for SecretShareDb {
 
     fn prune_before_epoch(&self, epoch: u64) -> Result<()> {
         let _guard = self.write_lock.lock();
-        let mut iter = self.db.iter::<SecretShareSchema>()?;
+        let mut iter = self.db().iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut batch = SchemaBatch::new();
@@ -122,14 +132,14 @@ impl SecretShareStorage for SecretShareDb {
             }
         }
         if has_deletes {
-            self.db.write_schemas(batch)?;
+            self.db().write_schemas(batch)?;
         }
         Ok(())
     }
 
     fn prune_before_round(&self, epoch: u64, round: Round) -> Result<()> {
         let _guard = self.write_lock.lock();
-        let mut iter = self.db.iter::<SecretShareSchema>()?;
+        let mut iter = self.db().iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut batch = SchemaBatch::new();
@@ -147,7 +157,7 @@ impl SecretShareStorage for SecretShareDb {
             }
         }
         if has_deletes {
-            self.db.write_schemas(batch)?;
+            self.db().write_schemas(batch)?;
         }
         Ok(())
     }
@@ -160,6 +170,17 @@ mod tests {
         create_metadata, create_secret_share, TestContext,
     };
     use aptos_temppath::TempPath;
+
+    #[test]
+    fn test_database_opens_lazily() {
+        let temp_path = TempPath::new();
+        let db = SecretShareDb::new(&temp_path);
+        assert!(db.db.get().is_none());
+
+        db.load_self_shares(1).unwrap();
+
+        assert!(db.db.get().is_some());
+    }
 
     #[test]
     fn test_idempotent_write_conflict_and_restart() {
@@ -273,7 +294,7 @@ mod tests {
         batch
             .put::<SecretShareSchema>(&key, &vec![0xFF, 0xFF])
             .unwrap();
-        db.db.write_schemas(batch).unwrap();
+        db.db().write_schemas(batch).unwrap();
 
         let records = db.load_self_shares(ctx.epoch).unwrap();
         assert_eq!(
