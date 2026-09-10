@@ -134,6 +134,38 @@ pub trait NativeContext {
         data: &[u8],
     ) -> VMResult<Vector<'a, Opaque>>;
 
+    /// Allocates a zeroed vector of `count` elements on the heap, where
+    /// `descriptor` is the vector descriptor for the element type and
+    /// `elem_size` its byte stride.
+    ///
+    /// The length is set to `count`, so the result is a well-formed value whose
+    /// elements are all-zero bit patterns. Fill them with
+    /// [`Self::vector_write_elements`] before handing it back to Move.
+    fn new_vector<'a>(
+        &'a self,
+        descriptor: DescriptorId,
+        elem_size: u32,
+        count: u64,
+    ) -> VMResult<Vector<'a, Opaque>>;
+
+    /// Overwrites a vector's elements with `data`, the concatenated flat
+    /// encodings of all of them at a stride of `elem_size`, then replaces every
+    /// heap pointer inside them with a deep copy, so the vector shares nothing
+    /// with wherever `data` came from. Null slots (an empty vector, say) stay
+    /// null.
+    ///
+    /// # Safety
+    ///
+    /// `data` must be a valid representation of the vector's full length in
+    /// elements of its element type, must not overlap the VM heap, and every
+    /// heap pointer it holds must point at a live object.
+    unsafe fn vector_write_elements(
+        &self,
+        vector: &Vector<'_, Opaque>,
+        elem_size: u32,
+        data: &[u8],
+    ) -> VMResult<()>;
+
     /// Moves the elements of `from` at `[removal_position, removal_position + length)`
     /// into `to` at `insert_position`.
     ///

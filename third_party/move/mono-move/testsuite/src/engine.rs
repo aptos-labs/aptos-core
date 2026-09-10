@@ -17,9 +17,9 @@ use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_natives::{
     make_all_bls12381_test_natives, make_all_bulletproofs_test_natives,
-    make_all_ed25519_test_natives, make_all_multi_ed25519_test_natives,
-    make_all_production_natives, make_all_ristretto255_scalar_test_natives, make_all_test_natives,
-    make_all_unit_test_natives,
+    make_all_ed25519_test_natives, make_all_event_test_natives,
+    make_all_multi_ed25519_test_natives, make_all_production_natives,
+    make_all_ristretto255_scalar_test_natives, make_all_test_natives, make_all_unit_test_natives,
 };
 use mono_move_runtime::{
     InterpreterContext, ProductionContextFamily, ProductionNativeRegistry, RuntimeStatus,
@@ -132,6 +132,7 @@ static ALL_NATIVES: LazyLock<ProductionNativeRegistry> = LazyLock::new(|| {
         ProductionContextFamily,
     >());
     natives.extend(make_all_bulletproofs_test_natives::<ProductionContextFamily>());
+    natives.extend(make_all_event_test_natives::<ProductionContextFamily>());
     natives.extend(make_all_production_natives::<ProductionContextFamily>());
     ProductionNativeRegistry::with_natives(natives)
 });

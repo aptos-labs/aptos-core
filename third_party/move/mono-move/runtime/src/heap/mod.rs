@@ -360,6 +360,69 @@ pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
     }
 }
 
+/// Deep-copies each of `sources`, returning the new root pointers in the same
+/// order. Automatically runs GC and retries when out of memory.
+///
+/// All sources are rooted for the whole batch, so a GC triggered partway through
+/// preserves and relocates the not-yet-copied ones. Because `try_deep_copy`
+/// never GCs mid-copy, a *successful* pass builds every result without an
+/// intervening GC, so the already-built results need no root of their own — only
+/// the sources are rooted. Mirrors [`deep_copy_or_gc`]'s single
+/// GC-then-retry-once policy, batched over all sources.
+///
+/// # Safety
+///
+/// Every source must point to the data region of a live object whose header is
+/// at `source - OBJECT_HEADER_SIZE`.
+pub(crate) unsafe fn deep_copy_batch_or_gc<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    sources: &[NonNull<u8>],
+) -> VMResult<Vec<NonNull<u8>>> {
+    // SAFETY: each source is a live object (this function's contract); the
+    // handle keeps it live and relocated across any GC during the batch.
+    let guards = sources
+        .iter()
+        .map(|&src| unsafe { extra_roots.root_object(src.as_ptr()) })
+        .collect::<Vec<_>>();
+
+    // First attempt. On out-of-memory, the partial copies are unrooted garbage;
+    // drop them, GC (which relocates the rooted sources), and retry the whole
+    // batch once.
+    let mut out = Vec::with_capacity(guards.len());
+    let mut needs_gc = false;
+    for guard in &guards {
+        // SAFETY: each root holds a live object; GC keeps `guard.ptr()` valid
+        // and relocated.
+        match unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(guard.ptr())) } {
+            Ok(ptr) => out.push(ptr),
+            Err(AllocationError::RuntimeError(err)) => return Err(VMInternalError::new(err)),
+            Err(AllocationError::OutOfHeapMemory { .. }) => {
+                needs_gc = true;
+                break;
+            },
+        }
+    }
+    if !needs_gc {
+        return Ok(out);
+    }
+
+    gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+    out.clear();
+    for guard in &guards {
+        // SAFETY: as above, after relocation.
+        let ptr = unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(guard.ptr())) }
+            .map_err(|e| VMInternalError::new(e.into_runtime_error()))?;
+        out.push(ptr);
+    }
+    Ok(out)
+}
+
 /// Deserializes `bytes` into `dst` as a value of type `ty`. If the first attempt
 /// runs out of heap, collects garbage once (with the given roots) and retries.
 /// The deserialize counterpart to [`alloc_or_gc`] / [`deep_copy_or_gc`].
