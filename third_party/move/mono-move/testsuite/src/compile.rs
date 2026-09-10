@@ -46,6 +46,18 @@ pub const TEST_UTILS_PATH: &str = concat!(
     "/tests/test_utils/test_utils.move"
 );
 
+/// Named address the benchmark packages under `mono-move/benchmarks` declare
+/// their modules at. Their `Move.toml` maps it, but source text compiled here
+/// has no manifest, so the mapping has to be supplied.
+const BENCH_NAMED_ADDRESS: &str = "bench=0xB0";
+
+/// Stdlib named addresses plus `bench`.
+fn named_addresses() -> Vec<String> {
+    let mut mapping = aptos_move_stdlib::move_stdlib_named_addresses_strings();
+    mapping.push(BENCH_NAMED_ADDRESS.to_string());
+    mapping
+}
+
 /// Compile a Move source file at `path` into all contained modules.
 ///
 /// The full Move stdlib is injected as dependencies.
@@ -112,7 +124,7 @@ pub fn compile_move_source(source: &str) -> Result<Vec<CompiledModule>> {
     run_compiler(Options {
         sources: vec![path.to_string_lossy().into_owned()],
         dependencies,
-        named_address_mapping: aptos_move_stdlib::move_stdlib_named_addresses_strings(),
+        named_address_mapping: named_addresses(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
