@@ -242,17 +242,18 @@ within each block**, so position in the run sequence is not confounded with arm.
 **Session.** `harness/controller.py` drives a multi-turn provider session:
 Claude through the Claude Agent SDK, or Codex through resumable
 `codex exec --json` threads. The runtime and version are pinned in the round
-configuration. Both adapters run the session under fixed limits (controller
+configuration; Codex also pins its paired code-mode host by digest. Both
+adapters run the session under fixed limits (controller
 turns, model turns per controller turn,
 wall seconds, output tokens). The opening turn is `/move-inf` followed by
-`prompts/initial.txt` for Claude and the equivalent `$move-inf` invocation for
-Codex. That prompt is the same text for every arm and carries
+`prompts/initial.txt` for Claude. Codex receives the same scheduled plugin's
+immutable `move-inf` skill text inline because ephemeral non-interactive skill
+registration is not reliable. The task portion is the same text for every arm and carries
 only what the skill cannot know — which target, which package, and that a budget
 bounds the session. Every normative instruction (preserve behavior, preserve
 user-written specifications, finish with a full proof) belongs to the skill, so
 the plugin remains the sole arm boundary and there is one source of truth per
 rule. `harness/state_machine.py` supplies arm-blind follow-ups from
-`harness/state_machine.py` supplies arm-blind follow-ups from
 `prompts/followups.json`, keyed by outcome (compile failure, prover failure,
 timeout, forbidden weakening, no progress). It never learns which arm it is
 prompting. Built-in tools are

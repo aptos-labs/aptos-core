@@ -564,8 +564,16 @@ class Controller:
             target=self.run.spec.target,
             package=".",
         )
-        invocation = "$move-inf" if getattr(self, "agent_kind", "claude") == "codex" else "/move-inf"
-        return invocation + "\n\n" + task
+        if getattr(self, "agent_kind", "claude") == "codex":
+            # Non-interactive Codex does not reliably register a skill that is
+            # supplied only through an ephemeral config layer. Inline the
+            # scheduled plugin's immutable skill copy so the arm instructions
+            # cannot silently disappear while preserving the same content.
+            skill = (self.plugin_dir / "skills/move-inf/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            return "Use the following move-inf skill exactly.\n\n" + skill + "\n\n" + task
+        return "/move-inf\n\n" + task
 
     def _agent_events_path(self) -> Path:
         name = "codex-events.jsonl" if self.agent_kind == "codex" else "claude-events.jsonl"
@@ -801,6 +809,11 @@ class Controller:
                     f"expected {self.config.codex_cli_version}, "
                     f"got {system.get('codex_cli_version')}"
                 )
+            if (
+                system.get("codex_code_mode_host_sha256")
+                != self.config.codex_code_mode_host_sha256
+            ):
+                raise RuntimeError("Codex code-mode host digest mismatch")
             if system.get("reasoning_effort") != self.config.effort:
                 raise RuntimeError(
                     f"Codex effort mismatch: expected {self.config.effort}, "

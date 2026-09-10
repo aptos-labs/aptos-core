@@ -35,6 +35,13 @@ def preflight(config_path: Path, schedule_dir: Path, sandbox_wrapper: Path) -> d
             config.codex_cli_version,
             configured_path=os.environ.get("MOVE_INFERENCE_CODEX_EXECUTABLE"),
         )
+        _check_hashed_executable(
+            checks,
+            "codex_code_mode_host",
+            os.environ.get("MOVE_INFERENCE_CODE_MODE_HOST")
+            or shutil.which("codex-code-mode-host"),
+            config.codex_code_mode_host_sha256,
+        )
     else:
         _check_versioned_executable(
             checks,
@@ -279,6 +286,28 @@ def _check_versioned_executable(
     passed = process.returncode == 0 and (expected_version is None or expected_version in version)
     expected = f", expected {expected_version}" if expected_version else ""
     _record(checks, name, passed, f"{path}: {version}{expected}")
+
+
+def _check_hashed_executable(
+    checks: list[dict[str, Any]],
+    name: str,
+    value: str | None,
+    expected_sha256: str | None,
+) -> None:
+    if value is None:
+        _record(checks, name, False, "executable is not configured or on PATH")
+        return
+    path = Path(value).resolve()
+    if not path.is_file() or not os.access(path, os.X_OK):
+        _record(checks, name, False, f"not executable: {path}")
+        return
+    actual = sha256_file(path)
+    _record(
+        checks,
+        name,
+        actual == expected_sha256,
+        f"{path}: sha256={actual}, expected {expected_sha256}",
+    )
 
 
 def _check_solver_executable(

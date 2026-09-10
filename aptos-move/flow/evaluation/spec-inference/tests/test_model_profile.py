@@ -81,6 +81,10 @@ class ModelProfileTest(unittest.TestCase):
             self.assertEqual(config.effort, "high")
             self.assertEqual(config.agent_runtime, "codex")
             self.assertEqual(config.codex_cli_version, "0.153.2")
+            self.assertEqual(
+                config.codex_code_mode_host_sha256,
+                "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c",
+            )
 
     def test_effort_validation_preserves_history_and_rejects_glm_xhigh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

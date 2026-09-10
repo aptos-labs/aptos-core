@@ -51,6 +51,7 @@ class CodexAgentSessionTest(unittest.TestCase):
                 ExperimentConfig.load(ROOT / "config/default.json"),
                 agent_runtime="codex",
                 codex_cli_version="0.153.2",
+                codex_code_mode_host_sha256="test-host-sha256",
                 model="gpt-5.6-sol",
                 provider_base_url="https://chatgpt.com/backend-api",
                 effort="high",
@@ -83,7 +84,9 @@ class CodexAgentSessionTest(unittest.TestCase):
             generated = (codex_home / "config.toml").read_text(encoding="utf-8")
             self.assertIn('model = "gpt-5.6-sol"', generated)
             self.assertIn('model_reasoning_effort = "high"', generated)
-            self.assertIn('command = "/opt/bin/move-flow-mcp"', generated)
+            self.assertIn("features.code_mode_host = true", generated)
+            self.assertIn('command = "/usr/bin/python3"', generated)
+            self.assertIn('args = ["/opt/bin/move-flow-mcp"', generated)
             self.assertEqual([], stderr)
 
 

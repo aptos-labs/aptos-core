@@ -23,6 +23,7 @@
   "claude_agent_sdk_version": "0.2.139",
   "claude_code_version": "2.1.258",
   "codex_cli_version": null,
+  "codex_code_mode_host_sha256": null,
   "compile_command": [
     "move-flow",
     "experiment",

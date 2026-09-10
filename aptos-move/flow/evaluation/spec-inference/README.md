@@ -40,7 +40,7 @@ This file is the runbook. It says how to run things, not how they work.
 
 The base package has no third-party dependencies. Claude runs use the optional
 SDK pinned to `0.2.139`; Codex runs use the separately installed, pinned Codex
-CLI and need no Python SDK.
+CLI and its digest-pinned, version-paired code-mode host, and need no Python SDK.
 
 ```text
 python3 -m venv .venv
@@ -87,8 +87,8 @@ budgets and source provenance, and refuses to overwrite a config:
 
 `--model sol56` selects `gpt-5.6-sol` through Codex with `high` reasoning
 effort. It uses `codex exec --json`, retains the thread across controller
-follow-ups, loads the rendered `move-inf` skill, and requires the generated
-Move Flow MCP tool allowlist.
+follow-ups, inlines the immutable rendered `move-inf` skill, and requires the
+generated Move Flow MCP tool allowlist.
 
 ```text
 .venv/bin/python -m harness.model_profile select --model opus \

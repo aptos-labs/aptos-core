@@ -249,6 +249,13 @@ def audit_pilot(
             if config.agent_runtime == "codex":
                 if system.get("codex_cli_version") != config.codex_cli_version:
                     issues.append(_issue(spec.run_id, "runtime Codex CLI version mismatch"))
+                if (
+                    system.get("codex_code_mode_host_sha256")
+                    != config.codex_code_mode_host_sha256
+                ):
+                    issues.append(
+                        _issue(spec.run_id, "runtime Codex code-mode host digest mismatch")
+                    )
                 if system.get("reasoning_effort") != config.effort:
                     issues.append(_issue(spec.run_id, "runtime Codex effort mismatch"))
             elif system.get("claude_code_version") != config.claude_code_version:

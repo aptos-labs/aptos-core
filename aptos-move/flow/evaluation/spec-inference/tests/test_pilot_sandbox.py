@@ -110,9 +110,11 @@ class PilotSandboxTest(unittest.TestCase):
         # The security property, asserted unconditionally: this is the only
         # test that runs the real `landlock-exec`, and nothing in CI runs it.
         result = preflight()
-        self.assertEqual(5, result["policy_version"])
+        self.assertEqual(6, result["policy_version"])
         self.assertTrue(result["isolation"], result["detail"])
-        self.assertIn("host-path-and-agent-proc-isolation=passed", result["detail"])
+        self.assertIn(
+            "host-path-agent-proc-and-network-isolation=passed", result["detail"]
+        )
 
     def test_preflight_runs_the_prover_chain_as_an_agent_grandchild(self) -> None:
         # Whether this host can run the solver chain is a separate question,
@@ -231,6 +233,7 @@ class PilotSandboxTest(unittest.TestCase):
         run_dir = launch.artifacts / launch.run_id
         self.assertNotIn(launch.move_flow, readable)
         self.assertNotIn(launch.z3, readable)
+        self.assertIn(launch.artifacts / launch.run_id / "plugin", readable)
         self.assertNotIn(run_dir / "mcp.runtime.json", readable)
         self.assertNotIn(run_dir / "baseline", readable)
         self.assertNotIn(run_dir / "flow-events.jsonl", writable)

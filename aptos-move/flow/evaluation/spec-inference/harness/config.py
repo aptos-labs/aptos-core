@@ -45,12 +45,14 @@ class ExperimentConfig:
     # round configurations and test fixtures readable.
     agent_runtime: str = "claude"
     codex_cli_version: str | None = None
+    codex_code_mode_host_sha256: str | None = None
 
     @classmethod
     def load(cls, path: Path) -> "ExperimentConfig":
         data = load_object(path)
         data.setdefault("agent_runtime", "claude")
         data.setdefault("codex_cli_version", None)
+        data.setdefault("codex_code_mode_host_sha256", None)
         _require_exact_fields(data, cls, path)
         config = cls(**data)
         if config.schema_version != 1:
@@ -60,6 +62,10 @@ class ExperimentConfig:
         if config.agent_runtime == "codex":
             if not config.codex_cli_version:
                 raise ValueError("codex_cli_version is required for Codex runs")
+            if not config.codex_code_mode_host_sha256:
+                raise ValueError(
+                    "codex_code_mode_host_sha256 is required for Codex runs"
+                )
             if config.effort not in ("low", "medium", "high", "xhigh", "max"):
                 raise ValueError("Codex effort must be low, medium, high, xhigh, or max")
         # Keep historical max-effort Claude configs readable. New Opus and

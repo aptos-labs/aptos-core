@@ -11,6 +11,7 @@ import shutil
 import subprocess
 
 from .config import ExperimentConfig
+from .artifacts import sha256_file
 
 
 PROFILES = {
@@ -21,6 +22,7 @@ PROFILES = {
 }
 SUBSCRIPTION_PROFILES = {PROFILES["opus"], PROFILES["sonnet"]}
 CODEX_CLI_VERSION = "0.153.2"
+CODEX_CODE_MODE_HOST_SHA256 = "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c"
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -38,6 +40,9 @@ def select_model(
         ),
         agent_runtime="codex" if model == "sol56" else "claude",
         codex_cli_version=CODEX_CLI_VERSION if model == "sol56" else None,
+        codex_code_mode_host_sha256=(
+            CODEX_CODE_MODE_HOST_SHA256 if model == "sol56" else None
+        ),
         source_commit=source_commit or base_config.source_commit,
         allowed_builtin_tools=(
             ["shell", "apply_patch"]
@@ -103,6 +108,20 @@ def launch(config_path: Path, command: list[str]) -> None:
             raise ValueError(
                 f"expected Codex CLI {config.codex_cli_version}, found {version_output}"
             )
+        code_mode_host = Path(
+            os.environ.get(
+                "MOVE_INFERENCE_CODE_MODE_HOST",
+                str(Path(executable).resolve().with_name("codex-code-mode-host")),
+            )
+        ).resolve()
+        if not code_mode_host.is_file():
+            raise ValueError(f"Codex code-mode host not found: {code_mode_host}")
+        host_sha256 = sha256_file(code_mode_host)
+        if host_sha256 != config.codex_code_mode_host_sha256:
+            raise ValueError(
+                "Codex code-mode host digest mismatch: "
+                f"expected {config.codex_code_mode_host_sha256}, found {host_sha256}"
+            )
         auth_file = Path(
             os.environ.get("MOVE_INFERENCE_CODEX_AUTH_FILE", Path.home() / ".codex/auth.json")
         ).resolve()
@@ -114,9 +133,11 @@ def launch(config_path: Path, command: list[str]) -> None:
         env = dict(os.environ)
         env["MOVE_INFERENCE_CODEX_EXECUTABLE"] = str(Path(executable).resolve())
         env["MOVE_INFERENCE_CODEX_AUTH_FILE"] = str(auth_file)
+        env["MOVE_INFERENCE_CODE_MODE_HOST"] = str(code_mode_host)
         if command == ["--preflight"]:
             print(
-                f"Codex authentication resolved; Codex CLI {version}; model {config.model}"
+                f"Codex authentication resolved; Codex CLI {version}; "
+                f"code-mode host {host_sha256[:16]}; model {config.model}"
             )
             return
         os.execvpe(command[0], command, env)

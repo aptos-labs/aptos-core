@@ -32,7 +32,7 @@ from .sdk_metrics import write_sdk_metrics
 from .codex_metrics import write_codex_metrics
 
 
-POLICY_VERSION = 5
+POLICY_VERSION = 6
 # Landlock confines the agent process itself to a subset of what the sandbox
 # mounts, so the outer namespace and the inner ruleset are two independent
 # layers rather than one repeated.
@@ -52,6 +52,8 @@ AGENT_BOOGIE = Path("/opt/bin/boogie")
 BOOGIE_PROXY_CLIENT = "boogie-proxy-client.py"
 BOOGIE_PROXY_SOCKET = Path("/tmp/move-inference-boogie.sock")
 AGENT_MCP = Path("/opt/bin/move-flow-mcp")
+AGENT_CODE_MODE_HOST = Path("/opt/bin/codex-code-mode-host")
+AGENT_CODE_MODE_HOST_REAL = Path("/opt/bin/codex-code-mode-host-real")
 MCP_PROXY_CLIENT = "stdio-proxy-client.py"
 MCP_PROXY_SOCKET = Path("/tmp/move-inference-mcp.sock")
 SYSTEM_READ_ONLY = (Path("/usr"), Path("/lib"))
@@ -88,6 +90,7 @@ class Launch:
     refutation_mutants: Path | None = None
     agent_runtime: str = "claude"
     codex: Path | None = None
+    codex_code_mode_host: Path | None = None
 
 
 def main() -> None:
@@ -155,6 +158,7 @@ def preflight() -> dict[str, object]:
             "PATH",
             "/usr/bin:/bin",
             "/opt/bin/landlock-exec",
+            "--deny-network",
             "--ro",
             "/usr",
             "--ro",
@@ -169,7 +173,7 @@ def preflight() -> dict[str, object]:
             (
                 # Landlock governs opening a file rather than stat-ing it, so
                 # the probe reads rather than asks whether the path exists.
-                "import os, pathlib\n"
+                "import errno, os, pathlib, socket\n"
                 f"assert not pathlib.Path({str(sentinel)!r}).exists(), 'host path visible'\n"
                 "pathlib.Path('/proc/self/status').read_text()\n"
                 "try:\n"
@@ -187,6 +191,12 @@ def preflight() -> dict[str, object]:
                 "    pass\n"
                 "else:\n"
                 "    raise SystemExit('a read-only file can be truncated')\n"
+                "try:\n"
+                "    socket.create_connection(('127.0.0.1', 9), timeout=0.1)\n"
+                "except OSError as error:\n"
+                "    assert error.errno in (errno.EACCES, errno.EPERM), error\n"
+                "else:\n"
+                "    raise SystemExit('TCP networking is available')\n"
             ),
         ]
         process = subprocess.run(
@@ -201,7 +211,7 @@ def preflight() -> dict[str, object]:
         f"policy={POLICY_VERSION}, bwrap={bwrap_path}, "
         f"sha256={sha256_file(bwrap_path)}, landlock={landlock}, "
         f"landlock_sha256={sha256_file(landlock)}, "
-        f"host-path-and-agent-proc-isolation={'passed' if passed else 'failed'}"
+        f"host-path-agent-proc-and-network-isolation={'passed' if passed else 'failed'}"
     )
     diagnostics = (process.stderr or process.stdout).strip()
     if diagnostics:
@@ -480,6 +490,16 @@ def parse_launch(argv: list[str]) -> Launch:
         if experiment_config.agent_runtime == "codex"
         else None
     )
+    codex_code_mode_host = (
+        _required_hashed_executable(
+            os.environ.get("MOVE_INFERENCE_CODE_MODE_HOST")
+            or shutil.which("codex-code-mode-host"),
+            experiment_config.codex_code_mode_host_sha256,
+            "Codex code-mode host",
+        )
+        if experiment_config.agent_runtime == "codex"
+        else None
+    )
     landlock = _required_landlock(evaluation_root)
     boogie = _required_solver("BOOGIE_EXE", "boogie")
     boogie_client = _required_boogie_client(evaluation_root)
@@ -510,6 +530,7 @@ def parse_launch(argv: list[str]) -> Launch:
         refutation_mutants=refutation_mutants,
         agent_runtime=experiment_config.agent_runtime,
         codex=codex,
+        codex_code_mode_host=codex_code_mode_host,
     )
 
 
@@ -525,6 +546,22 @@ def _required_mcp_client(evaluation_root: Path) -> Path:
     if not client.is_file() or not os.access(client, os.X_OK):
         raise SystemExit(f"MCP proxy client is missing or not executable: {client}")
     return client.resolve()
+
+
+def _required_hashed_executable(
+    value: str | None, expected_sha256: str | None, description: str
+) -> Path:
+    if not value:
+        raise SystemExit(f"{description} is not configured or on PATH")
+    path = Path(value).resolve()
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise SystemExit(f"{description} is not executable: {path}")
+    actual = sha256_file(path)
+    if actual != expected_sha256:
+        raise SystemExit(
+            f"{description} digest mismatch: expected {expected_sha256}, found {actual}"
+        )
+    return path
 
 
 def _reject_development_options(command: list[str]) -> None:
@@ -827,6 +864,13 @@ def build_bwrap_command(launch: Launch, staging: Path) -> list[str]:
         raise RuntimeError("Codex launch is missing its executable")
     mount(_write_agent_wrapper(launch, staging), Path(f"/opt/bin/{agent_name}"))
     mount(agent_binary.resolve(), Path(f"/opt/bin/{agent_name}-real"))
+    if launch.agent_runtime == "codex":
+        if launch.codex_code_mode_host is None:
+            raise RuntimeError("Codex launch is missing its code-mode host")
+        mount(
+            _write_code_mode_host_wrapper(launch, staging), AGENT_CODE_MODE_HOST
+        )
+        mount(launch.codex_code_mode_host, AGENT_CODE_MODE_HOST_REAL)
     mount(launch.boogie)
     mount(launch.boogie_client, AGENT_BOOGIE)
     if launch.agent_runtime == "codex":
@@ -942,6 +986,7 @@ def build_bwrap_environment(launch: Launch) -> dict[str, str]:
                     launch.artifacts / ".sandbox-home" / ".codex" / "auth.json"
                 ),
                 "MOVE_INFERENCE_CODEX_EXECUTABLE": "/opt/bin/codex",
+                "MOVE_INFERENCE_MCP_CLIENT": str(AGENT_MCP),
             }
         )
     for name in (
@@ -990,6 +1035,10 @@ def agent_landlock_paths(launch: Launch) -> tuple[list[Path], list[Path]]:
                 run_dir / "plugin",
             )
         )
+    else:
+        # Codex reads the immutable, run-local skill copy named in its private
+        # config. The real MCP executable and runtime config remain excluded.
+        readable.append(run_dir / "plugin")
     if launch.agent_runtime == "claude" and launch.feedback_level != "baseline":
         # The task's criteria are the acceptance intervention. The file is
         # written at every level because the judge reads it after the run, but
@@ -1027,6 +1076,26 @@ def _write_agent_wrapper(launch: Launch, staging: Path) -> Path:
     agent_name = "codex" if launch.agent_runtime == "codex" else "claude"
     arguments.extend(("--", f"/opt/bin/{agent_name}-real"))
     wrapper = staging / f"{agent_name}-landlocked"
+    wrapper.write_text(
+        "#!/bin/sh\nset -eu\nexec /opt/bin/landlock-exec {} \"$@\"\n".format(
+            " ".join(shlex.quote(argument) for argument in arguments)
+        ),
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    return wrapper
+
+
+def _write_code_mode_host_wrapper(launch: Launch, staging: Path) -> Path:
+    """Deny TCP to commands while Codex itself retains its API connection."""
+    readable, writable = agent_landlock_paths(launch)
+    arguments = ["--deny-network"]
+    for path in readable:
+        arguments.extend(("--ro", str(path)))
+    for path in writable:
+        arguments.extend(("--rw", str(path)))
+    arguments.extend(("--", str(AGENT_CODE_MODE_HOST_REAL)))
+    wrapper = staging / "codex-code-mode-host-landlocked"
     wrapper.write_text(
         "#!/bin/sh\nset -eu\nexec /opt/bin/landlock-exec {} \"$@\"\n".format(
             " ".join(shlex.quote(argument) for argument in arguments)

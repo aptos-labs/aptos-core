@@ -248,11 +248,17 @@ class CodexAgentSession:
         if "move-flow" not in runtime.get("mcpServers", {}):
             raise RuntimeError("runtime MCP config lacks move-flow")
         tools = list(self._manifest["mcp_tools"])
+        mcp_client = os.environ.get(
+            "MOVE_INFERENCE_MCP_CLIENT", "/opt/bin/move-flow-mcp"
+        )
         lines = [
             f"model = {json.dumps(self._config.model)}",
             f"model_reasoning_effort = {json.dumps(self._config.effort)}",
             'approval_policy = "never"',
-            'sandbox_mode = "workspace-write"',
+            # The outer bwrap plus per-process Landlock policy is the sandbox.
+            # The code-mode host receives an additional TCP-denying ruleset;
+            # asking Codex to nest its own bwrap inside that namespace fails.
+            'sandbox_mode = "danger-full-access"',
             'web_search = "disabled"',
             'file_opener = "none"',
             'check_for_update_on_startup = false',
@@ -261,6 +267,12 @@ class CodexAgentSession:
             'analytics.enabled = false',
             'feedback.enabled = false',
             'apps._default.enabled = false',
+            'features.code_mode_host = true',
+            'features.browser_use = false',
+            'features.browser_use_external = false',
+            'features.computer_use = false',
+            'features.goals = false',
+            'features.image_generation = false',
             'features.remote_plugin = false',
             'features.skill_mcp_dependency_install = false',
             '',
@@ -268,15 +280,12 @@ class CodexAgentSession:
             f"path = {json.dumps(str(plugin / 'skills/move-inf'))}",
             'enabled = true',
             '',
-            '[sandbox_workspace_write]',
-            'network_access = false',
-            '',
             '[shell_environment_policy]',
             'inherit = "core"',
             '',
             '[mcp_servers.move-flow]',
-            'command = "/opt/bin/move-flow-mcp"',
-            f"args = {json.dumps([str(mcp_proxy_socket)])}",
+            'command = "/usr/bin/python3"',
+            f"args = {json.dumps([mcp_client, str(mcp_proxy_socket)])}",
             f"enabled_tools = {json.dumps(tools)}",
             'required = true',
             'startup_timeout_sec = 30',
@@ -376,6 +385,7 @@ class CodexAgentSession:
         system = {
             "model": self._config.model,
             "codex_cli_version": self._config.codex_cli_version,
+            "codex_code_mode_host_sha256": self._config.codex_code_mode_host_sha256,
             "reasoning_effort": self._config.effort,
         }
         return AgentTurn(
