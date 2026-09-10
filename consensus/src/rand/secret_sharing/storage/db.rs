@@ -89,7 +89,7 @@ impl SecretShareStorage for SecretShareDb {
             }
         }
         if has_deletes {
-            self.db.write_schemas(batch)?;
+            self.db.write_schemas_relaxed(batch)?;
         }
         Ok(())
     }
@@ -100,7 +100,7 @@ impl SecretShareStorage for SecretShareDb {
             batch.delete::<SecretShareSchema>(key)?;
         }
         if !keys.is_empty() {
-            self.db.write_schemas(batch)?;
+            self.db.write_schemas_relaxed(batch)?;
         }
         Ok(())
     }
