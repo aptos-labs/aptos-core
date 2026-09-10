@@ -56,7 +56,7 @@ impl SecretShareMetadata {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SecretShare {
     pub author: Author,
     pub metadata: SecretShareMetadata,
