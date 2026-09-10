@@ -1199,7 +1199,7 @@ where
 /// to decide whether the transaction must re-execute. Abstracts the concrete
 /// read-set representation so the executor does not depend on a specific VM's form.
 pub trait TxnInput: Send + Sync {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + 'static;
+    type Key: Send + Sync + Clone + Hash + Eq + Debug + 'static;
     type Tag: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Serialize + 'static;
     type Value: SpeculativeValue + 'static;
 
