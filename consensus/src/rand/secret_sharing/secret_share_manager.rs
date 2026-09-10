@@ -12,7 +12,7 @@ use crate::{
         recovered_self_shares::{RecoveredSelfShares, RecoveredShare},
         reliable_broadcast_state::SecretShareAggregateState,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
-        storage::SecretShareStorage,
+        storage::{storage_key, SecretShareKey, SecretShareStorage},
         types::RequestSecretShare,
         verifier::SecretShareVerifier,
     },
@@ -29,10 +29,7 @@ use aptos_logger::{debug, error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
-use aptos_types::{
-    epoch_state::EpochState,
-    secret_sharing::{SecretShare, SecretShareMetadata},
-};
+use aptos_types::{epoch_state::EpochState, secret_sharing::SecretShareMetadata};
 use bytes::Bytes;
 use futures::{
     future::{AbortHandle, Abortable},
@@ -43,7 +40,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -51,6 +48,13 @@ pub type Receiver<T> = UnboundedReceiver<T>;
 
 type PendingDeriveFut =
     Pin<Box<dyn Future<Output = (Round, TaskResult<SecretShareResult>)> + Send>>;
+type PendingRecoveredShareVerificationFut =
+    Pin<Box<dyn Future<Output = (SecretShareKey, anyhow::Result<()>)> + Send>>;
+
+struct PendingRecoveredShareResponse {
+    protocol: ProtocolId,
+    response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
 
 pub struct SecretShareManager {
     author: Author,
@@ -59,6 +63,7 @@ pub struct SecretShareManager {
     verifier: Arc<SecretShareVerifier>,
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
+    bounded_executor: BoundedExecutor,
     secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
@@ -68,6 +73,8 @@ pub struct SecretShareManager {
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
     recovered_self_shares: RecoveredSelfShares,
+    pending_recovered_share_verifications: FuturesUnordered<PendingRecoveredShareVerificationFut>,
+    pending_recovered_share_responses: HashMap<SecretShareKey, Vec<PendingRecoveredShareResponse>>,
     block_queue: BlockQueue,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
@@ -122,6 +129,7 @@ impl SecretShareManager {
             verifier,
             reliable_broadcast,
             network_sender,
+            bounded_executor,
             secret_share_request_delay_ms,
 
             decision_rx,
@@ -129,6 +137,8 @@ impl SecretShareManager {
 
             secret_share_store: dec_store,
             recovered_self_shares,
+            pending_recovered_share_verifications: FuturesUnordered::new(),
+            pending_recovered_share_responses: HashMap::new(),
             block_queue: BlockQueue::new(),
             pending_derives: FuturesUnordered::new(),
         }
@@ -254,25 +264,82 @@ impl SecretShareManager {
         self.recovered_self_shares.advance_retention(latest_round);
     }
 
-    fn get_recovered_self_share(&mut self, metadata: &SecretShareMetadata) -> Option<SecretShare> {
-        let key = crate::rand::secret_sharing::storage::storage_key(metadata);
-        match self.recovered_self_shares.get(metadata)? {
-            RecoveredShare::Verified(share) => Some(share),
-            RecoveredShare::Unverified(share) => match self.verifier.verify(&share, &self.author) {
-                Ok(()) => {
-                    self.recovered_self_shares.mark_verified(&key);
-                    Some(share)
-                },
-                Err(verification_error) => {
-                    self.recovered_self_shares.delete_invalid(&key);
-                    error!(
-                        epoch = metadata.epoch,
-                        round = metadata.round,
-                        block_id = metadata.block_id,
-                        "Rejecting cryptographically invalid persisted secret share: {verification_error}"
-                    );
-                    None
-                },
+    fn process_recovered_share_request(
+        &mut self,
+        metadata: &SecretShareMetadata,
+        protocol: ProtocolId,
+        response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    ) {
+        let key = storage_key(metadata);
+        match self.recovered_self_shares.get(metadata) {
+            Some(RecoveredShare::Verified(share)) => {
+                self.process_response(protocol, response_sender, SecretShareMessage::Share(share));
+            },
+            Some(RecoveredShare::Unverified(share)) => {
+                let responses = self
+                    .pending_recovered_share_responses
+                    .entry(key)
+                    .or_default();
+                // Keep waiters bounded even if one peer repeatedly requests the
+                // same share while its verification is in flight.
+                let max_responses = self.epoch_state.verifier.len();
+                if responses.len() >= max_responses {
+                    return;
+                }
+                responses.push(PendingRecoveredShareResponse {
+                    protocol,
+                    response_sender,
+                });
+                if responses.len() > 1 {
+                    return;
+                }
+
+                let verifier = self.verifier.clone();
+                let author = self.author;
+                let bounded_executor = self.bounded_executor.clone();
+                self.pending_recovered_share_verifications
+                    .push(Box::pin(async move {
+                        let handle = bounded_executor
+                            .spawn_blocking(move || verifier.verify(&share, &author))
+                            .await;
+                        let result = handle
+                            .await
+                            .expect("Recovered secret share verification task panicked");
+                        (key, result)
+                    }));
+            },
+            None => {},
+        }
+    }
+
+    fn process_recovered_share_verification(
+        &mut self,
+        key: SecretShareKey,
+        result: anyhow::Result<()>,
+    ) {
+        let responses = self
+            .pending_recovered_share_responses
+            .remove(&key)
+            .unwrap_or_default();
+        match result {
+            Ok(()) => {
+                if let Some(share) = self.recovered_self_shares.mark_verified(&key) {
+                    for response in responses {
+                        self.process_response(
+                            response.protocol,
+                            response.response_sender,
+                            SecretShareMessage::Share(share.clone()),
+                        );
+                    }
+                }
+            },
+            Err(verification_error) => {
+                self.recovered_self_shares.delete_invalid(&key);
+                error!(
+                    epoch = key.0,
+                    block_id = key.1,
+                    "Rejecting cryptographically invalid persisted secret share: {verification_error}"
+                );
             },
         }
     }
@@ -516,14 +583,7 @@ impl SecretShareManager {
                     return;
                 }
 
-                let recovered_share = self.get_recovered_self_share(request.metadata());
-                if let Some(share) = recovered_share {
-                    self.process_response(
-                        protocol,
-                        response_sender,
-                        SecretShareMessage::Share(share),
-                    );
-                }
+                self.process_recovered_share_request(request.metadata(), protocol, response_sender);
             },
             SecretShareMessage::Share(share) => {
                 info!(LogSchema::new(LogEvent::ReceiveSecretShare)
@@ -577,6 +637,9 @@ impl SecretShareManager {
                 }
                 Some((round, result)) = self.pending_derives.next() => {
                     self.process_completed_derive(round, result);
+                }
+                Some((key, result)) = self.pending_recovered_share_verifications.next() => {
+                    self.process_recovered_share_verification(key, result);
                 }
                 Some(reset) = reset_rx.next() => {
                     let mut dropped = 0;
@@ -639,6 +702,7 @@ mod tests {
         transport::ConnectionMetadata,
     };
     use aptos_temppath::TempPath;
+    use aptos_types::secret_sharing::SecretShare;
     use maplit::hashmap;
     use std::iter::FromIterator;
 
@@ -753,6 +817,15 @@ mod tests {
             },
             response_rx,
         )
+    }
+
+    async fn complete_recovered_share_verification(manager: &mut SecretShareManager) {
+        let (key, result) = manager
+            .pending_recovered_share_verifications
+            .next()
+            .await
+            .expect("expected a pending recovered share verification");
+        manager.process_recovered_share_verification(key, result);
     }
 
     #[tokio::test]
@@ -927,6 +1000,7 @@ mod tests {
 
         let (request, response) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request);
+        complete_recovered_share_verification(&mut manager).await;
         assert!(response.await.unwrap().is_ok());
         assert!(manager
             .recovered_self_shares
@@ -934,7 +1008,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cache_miss_uses_preloaded_share() {
+    async fn test_cache_miss_verification_is_deduplicated() {
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
         let storage = Arc::new(InMemorySecretShareStorage::new());
         let metadata = create_metadata(ctx.epoch, 10);
@@ -950,12 +1024,13 @@ mod tests {
             .is_verified(&storage_key(&metadata)));
         let (request_1, response_1) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_1);
+        let (request_2, response_2) = request_rpc(metadata.clone());
+        manager.handle_incoming_msg(request_2);
+        assert_eq!(manager.pending_recovered_share_verifications.len(), 1);
+        complete_recovered_share_verification(&mut manager).await;
         assert!(manager
             .recovered_self_shares
             .is_verified(&storage_key(&metadata)));
-
-        let (request_2, response_2) = request_rpc(metadata.clone());
-        manager.handle_incoming_msg(request_2);
 
         for response in [response_1, response_2] {
             let bytes = response.await.unwrap().unwrap();
@@ -1009,6 +1084,11 @@ mod tests {
             .contains_key(&storage_key(&metadata)));
         let (request, response) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request);
+        assert_eq!(manager.pending_recovered_share_verifications.len(), 1);
+        assert!(manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&metadata)));
+        complete_recovered_share_verification(&mut manager).await;
         assert!(response.await.is_err());
         assert!(!manager
             .recovered_self_shares
@@ -1102,6 +1182,7 @@ mod tests {
                 .update_highest_known_round(metadata.round);
             let (request, response) = request_rpc(metadata.clone());
             restarted_peer.handle_incoming_msg(request);
+            complete_recovered_share_verification(&mut restarted_peer).await;
 
             let bytes = response.await.unwrap().unwrap();
             let message: ConsensusMsg = ProtocolId::ConsensusRpcBcs.from_bytes(&bytes).unwrap();

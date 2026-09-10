@@ -168,10 +168,10 @@ impl RecoveredSelfShares {
         }
     }
 
-    pub fn mark_verified(&mut self, key: &SecretShareKey) {
-        if let Some(recovered) = self.shares.get_mut(key) {
-            recovered.verified = true;
-        }
+    pub fn mark_verified(&mut self, key: &SecretShareKey) -> Option<SecretShare> {
+        let recovered = self.shares.get_mut(key)?;
+        recovered.verified = true;
+        Some(recovered.share.clone())
     }
 
     pub fn delete_invalid(&mut self, key: &SecretShareKey) {
