@@ -6,7 +6,10 @@ import asyncio
 import dataclasses
 import importlib.metadata
 import json
+import os
 import shutil
+import signal
+import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -194,6 +197,219 @@ class ClaudeAgentSession:
             system_init={"system": self._system_init, "mcp_status": self._mcp_status},
             terminal_reason=result_message.terminal_reason,
             api_error_status=result_message.api_error_status,
+        )
+
+
+class CodexAgentSession:
+    """Multi-turn adapter over Codex's stable non-interactive JSONL interface."""
+
+    def __init__(
+        self,
+        config: ExperimentConfig,
+        workspace: Path,
+        plugin: Path,
+        mcp_config: Path,
+        event_log: JsonlWriter,
+        stderr_sink: Callable[[str], None],
+        mcp_proxy_socket: Path,
+    ):
+        if config.agent_runtime != "codex" or not config.codex_cli_version:
+            raise RuntimeError("Codex session requires a Codex experiment configuration")
+        cli_path = shutil.which("codex")
+        if cli_path is None:
+            raise RuntimeError("the pinned Codex executable is not on PATH")
+        version_output = subprocess.run(
+            [cli_path, "--version"], capture_output=True, text=True, timeout=15,
+            check=True,
+        ).stdout.strip()
+        if version_output.removeprefix("codex-cli ") != config.codex_cli_version:
+            raise RuntimeError(
+                f"Codex CLI version mismatch: expected {config.codex_cli_version}, "
+                f"got {version_output}"
+            )
+        self._config = config
+        self._workspace = workspace
+        self._cli_path = cli_path
+        self._event_log = event_log
+        self._stderr_sink = stderr_sink
+        self._session_id: str | None = None
+        self._process: asyncio.subprocess.Process | None = None
+        self._manifest = json.loads(
+            (plugin / "move-flow-manifest.json").read_text(encoding="utf-8")
+        )
+        self._write_config(plugin, mcp_config, mcp_proxy_socket)
+
+    def _write_config(
+        self, plugin: Path, mcp_config: Path, mcp_proxy_socket: Path
+    ) -> None:
+        codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+        codex_home.mkdir(parents=True, exist_ok=True)
+        runtime = json.loads(mcp_config.read_text(encoding="utf-8"))
+        if "move-flow" not in runtime.get("mcpServers", {}):
+            raise RuntimeError("runtime MCP config lacks move-flow")
+        tools = list(self._manifest["mcp_tools"])
+        mcp_client = os.environ.get(
+            "MOVE_INFERENCE_MCP_CLIENT", "/opt/bin/move-flow-mcp"
+        )
+        lines = [
+            f"model = {json.dumps(self._config.model)}",
+            f"model_reasoning_effort = {json.dumps(self._config.effort)}",
+            'approval_policy = "never"',
+            # The outer bwrap plus per-process Landlock policy is the sandbox.
+            # The code-mode host receives an additional TCP-denying ruleset;
+            # asking Codex to nest its own bwrap inside that namespace fails.
+            'sandbox_mode = "danger-full-access"',
+            'web_search = "disabled"',
+            'file_opener = "none"',
+            'check_for_update_on_startup = false',
+            'history.persistence = "save-all"',
+            'agents.enabled = false',
+            'analytics.enabled = false',
+            'feedback.enabled = false',
+            'apps._default.enabled = false',
+            'features.code_mode_host = true',
+            'features.browser_use = false',
+            'features.browser_use_external = false',
+            'features.computer_use = false',
+            'features.goals = false',
+            'features.image_generation = false',
+            'features.remote_plugin = false',
+            'features.skill_mcp_dependency_install = false',
+            '',
+            '[[skills.config]]',
+            f"path = {json.dumps(str(plugin / 'skills/move-inf'))}",
+            'enabled = true',
+            '',
+            '[shell_environment_policy]',
+            'inherit = "core"',
+            '',
+            '[mcp_servers.move-flow]',
+            'command = "/usr/bin/python3"',
+            f"args = {json.dumps([mcp_client, str(mcp_proxy_socket)])}",
+            f"enabled_tools = {json.dumps(tools)}",
+            'required = true',
+            'startup_timeout_sec = 30',
+            f"tool_timeout_sec = {max(60, self._config.max_wall_seconds)}",
+            'default_tools_approval_mode = "approve"',
+            '',
+        ]
+        (codex_home / "config.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    async def __aenter__(self) -> "CodexAgentSession":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        if self._process is not None and self._process.returncode is None:
+            self._process.terminate()
+            await self._process.wait()
+
+    async def interrupt(self) -> None:
+        if self._process is not None and self._process.returncode is None:
+            self._process.send_signal(signal.SIGINT)
+
+    async def send(self, prompt: str) -> AgentTurn:
+        command = [self._cli_path, "exec"]
+        if self._session_id is not None:
+            command.extend(("resume", self._session_id))
+        command.extend((
+            "--json", "--strict-config", "--skip-git-repo-check",
+        ))
+        if self._session_id is None:
+            command.extend(("--color", "never", "-C", str(self._workspace)))
+        command.append("-")
+        started = time.monotonic_ns()
+        self._event_log.emit("codex_query_start", received_monotonic_ns=started)
+        self._process = await asyncio.create_subprocess_exec(
+            *command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=self._workspace,
+        )
+        stdout, stderr = await self._process.communicate(prompt.encode())
+        duration_ms = (time.monotonic_ns() - started) // 1_000_000
+        if stderr:
+            self._stderr_sink(stderr.decode(errors="replace"))
+        events: list[dict[str, Any]] = []
+        for raw_line in stdout.splitlines():
+            try:
+                event = json.loads(raw_line)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._event_log.emit(
+                    "codex_unparsed_stdout", line=raw_line.decode(errors="replace")
+                )
+                continue
+            if not isinstance(event, dict):
+                continue
+            event = redact_credentials(event)
+            events.append(event)
+            self._event_log.emit(
+                "codex_event", received_monotonic_ns=time.monotonic_ns(), payload=event
+            )
+            if event.get("type") == "thread.started":
+                self._session_id = event.get("thread_id")
+
+        completed = next(
+            (event for event in reversed(events) if event.get("type") == "turn.completed"),
+            None,
+        )
+        error_event = next(
+            (event for event in reversed(events) if event.get("type") == "error"),
+            None,
+        )
+        messages = [
+            str((event.get("item") or {}).get("text") or "")
+            for event in events
+            if event.get("type") == "item.completed"
+            and (event.get("item") or {}).get("type") == "agent_message"
+        ]
+        native_usage = dict((completed or {}).get("usage") or {})
+        visible_output = int(native_usage.get("output_tokens", 0))
+        reasoning_output = int(native_usage.get("reasoning_output_tokens", 0))
+        usage = {
+            "input_tokens": int(native_usage.get("input_tokens", 0)),
+            # The controller's output budget includes hidden reasoning, which
+            # is separately reported by Codex but still consumes model output.
+            "output_tokens": visible_output + reasoning_output,
+            "visible_output_tokens": visible_output,
+            "reasoning_output_tokens": reasoning_output,
+            "cache_read_input_tokens": int(native_usage.get("cached_input_tokens", 0)),
+            "cache_creation_input_tokens": int(
+                native_usage.get("cache_write_input_tokens", 0)
+            ),
+        }
+        is_error = self._process.returncode != 0 or completed is None
+        result = "\n\n".join(message for message in messages if message)
+        if not result and error_event is not None:
+            result = str(error_event.get("message") or error_event)
+        system = {
+            "model": self._config.model,
+            "codex_cli_version": self._config.codex_cli_version,
+            "codex_code_mode_host_sha256": self._config.codex_code_mode_host_sha256,
+            "reasoning_effort": self._config.effort,
+        }
+        return AgentTurn(
+            result=redact_credentials(result),
+            is_error=is_error,
+            session_id=self._session_id,
+            duration_ms=int(duration_ms),
+            duration_api_ms=int(duration_ms),
+            num_turns=1,
+            usage=usage,
+            model_usage={self._config.model: native_usage},
+            total_cost_usd=None,
+            system_init={
+                "system": system,
+                "mcp_status": {
+                    "mcpServers": [{
+                        "name": "move-flow",
+                        "status": "connected" if completed is not None else "failed",
+                        "tools": [{"name": name} for name in self._manifest["mcp_tools"]],
+                    }]
+                },
+            },
+            terminal_reason="api_error" if is_error else "completed",
+            api_error_status=None,
         )
 
 

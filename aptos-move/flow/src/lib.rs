@@ -89,7 +89,8 @@ pub enum FlowCommand {
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
     Claude,
-    // Future: Cursor, Codex
+    Codex,
+    // Future: Cursor
 }
 
 impl Platform {
@@ -97,6 +98,7 @@ impl Platform {
     pub fn display_name(self) -> &'static str {
         match self {
             Platform::Claude => "Claude Code",
+            Platform::Codex => "Codex",
         }
     }
 }

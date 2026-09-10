@@ -11,3 +11,5 @@ Pilot notes (development rounds, never main-arm results):
 
 - [`pilot-merge-005-partition.md`](pilot-merge-005-partition.md) — three arms
   on the Lomuto partition task, with the agents' final reports.
+- [`compact-flow-live-pairs.md`](compact-flow-live-pairs.md) — two-replica AO/HG
+  diagnostics on QP and BA after compact query, WP, and status changes.

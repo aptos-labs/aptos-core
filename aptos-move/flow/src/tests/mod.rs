@@ -25,6 +25,7 @@ use super::*;
 #[test]
 fn test_platform_display_name() {
     assert_eq!(Platform::Claude.display_name(), "Claude Code");
+    assert_eq!(Platform::Codex.display_name(), "Codex");
 }
 
 #[test]

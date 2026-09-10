@@ -11,21 +11,63 @@ import shutil
 import subprocess
 
 from .config import ExperimentConfig
+from .artifacts import sha256_file
 
 
 PROFILES = {
     "glm": ("glm-5.3[1m]", "https://api.z.ai/api/anthropic"),
     "opus": ("claude-opus-5", "https://api.anthropic.com"),
+    "sonnet": ("claude-sonnet-5", "https://api.anthropic.com"),
+    "sol56": ("gpt-5.6-sol", "https://chatgpt.com/backend-api"),
+    "terra56": ("gpt-5.6-terra", "https://chatgpt.com/backend-api"),
 }
+SUBSCRIPTION_PROFILES = {PROFILES["opus"], PROFILES["sonnet"]}
+CODEX_PROFILES = {PROFILES["sol56"], PROFILES["terra56"]}
+CODEX_CLI_VERSION = "0.153.2"
+CODEX_CODE_MODE_HOST_SHA256 = "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c"
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def select_model(base: Path, output: Path, model: str) -> None:
+def select_model(
+    base: Path,
+    output: Path,
+    model: str,
+    source_commit: str | None = None,
+    infrastructure_retries: int | None = None,
+) -> None:
+    if infrastructure_retries is not None and infrastructure_retries < 0:
+        raise ValueError("infrastructure retries cannot be negative")
+    base_config = ExperimentConfig.load(base)
+    codex_profile = PROFILES[model] in CODEX_PROFILES
     config = replace(
-        ExperimentConfig.load(base),
+        base_config,
         model=PROFILES[model][0],
         provider_base_url=PROFILES[model][1],
-        effort="xhigh" if model == "opus" else "max",
+        effort=(
+            "xhigh" if model in ("opus", "sonnet") else
+            "high" if codex_profile else "max"
+        ),
+        agent_runtime="codex" if codex_profile else "claude",
+        codex_cli_version=CODEX_CLI_VERSION if codex_profile else None,
+        codex_code_mode_host_sha256=(
+            CODEX_CODE_MODE_HOST_SHA256 if codex_profile else None
+        ),
+        source_commit=source_commit or base_config.source_commit,
+        infrastructure_retries=(
+            infrastructure_retries
+            if infrastructure_retries is not None
+            else base_config.infrastructure_retries
+        ),
+        allowed_builtin_tools=(
+            ["shell", "apply_patch"]
+            if codex_profile
+            else base_config.allowed_builtin_tools
+        ),
+        denied_builtin_tools=(
+            ["web_search", "agents"]
+            if codex_profile
+            else base_config.denied_builtin_tools
+        ),
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     # A scheduled configuration is immutable; never overwrite an existing one.
@@ -65,13 +107,61 @@ def subscription_environment(config: ExperimentConfig, environment: dict[str, st
 def launch(config_path: Path, command: list[str]) -> None:
     config = ExperimentConfig.load(config_path)
     pair = (config.model, config.provider_base_url)
+    if config.agent_runtime == "codex":
+        if pair not in CODEX_PROFILES:
+            raise ValueError("no Codex credential profile for this model/endpoint pair")
+        executable = os.environ.get("MOVE_INFERENCE_CODEX_EXECUTABLE") or shutil.which("codex")
+        if not executable:
+            raise ValueError("Codex executable not found")
+        version_output = subprocess.run(
+            [executable, "--version"], capture_output=True, text=True, timeout=15,
+            check=True,
+        ).stdout.strip()
+        version = version_output.removeprefix("codex-cli ")
+        if version != config.codex_cli_version:
+            raise ValueError(
+                f"expected Codex CLI {config.codex_cli_version}, found {version_output}"
+            )
+        code_mode_host = Path(
+            os.environ.get(
+                "MOVE_INFERENCE_CODE_MODE_HOST",
+                str(Path(executable).resolve().with_name("codex-code-mode-host")),
+            )
+        ).resolve()
+        if not code_mode_host.is_file():
+            raise ValueError(f"Codex code-mode host not found: {code_mode_host}")
+        host_sha256 = sha256_file(code_mode_host)
+        if host_sha256 != config.codex_code_mode_host_sha256:
+            raise ValueError(
+                "Codex code-mode host digest mismatch: "
+                f"expected {config.codex_code_mode_host_sha256}, found {host_sha256}"
+            )
+        auth_file = Path(
+            os.environ.get("MOVE_INFERENCE_CODEX_AUTH_FILE", Path.home() / ".codex/auth.json")
+        ).resolve()
+        if not auth_file.is_file():
+            raise ValueError(
+                "Codex authentication missing: run `codex login` or set "
+                "MOVE_INFERENCE_CODEX_AUTH_FILE"
+            )
+        env = dict(os.environ)
+        env["MOVE_INFERENCE_CODEX_EXECUTABLE"] = str(Path(executable).resolve())
+        env["MOVE_INFERENCE_CODEX_AUTH_FILE"] = str(auth_file)
+        env["MOVE_INFERENCE_CODE_MODE_HOST"] = str(code_mode_host)
+        if command == ["--preflight"]:
+            print(
+                f"Codex authentication resolved; Codex CLI {version}; "
+                f"code-mode host {host_sha256[:16]}; model {config.model}"
+            )
+            return
+        os.execvpe(command[0], command, env)
     if pair == PROFILES["glm"]:
         env = dict(os.environ)
         env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
         env["MOVE_INFERENCE_CLAUDE_VERSION"] = config.claude_code_version
         wrapper = str(ROOT / "sandbox/with-glm-env.sh")
         os.execve(wrapper, [wrapper, *command], env)
-    if pair != PROFILES["opus"]:
+    if pair not in SUBSCRIPTION_PROFILES:
         raise ValueError("no credential profile for this model/endpoint pair")
     env = subscription_environment(config, dict(os.environ))
     versioned = Path.home() / ".local/share/claude/versions" / config.claude_code_version
@@ -100,13 +190,21 @@ def main() -> None:
     select.add_argument("--model", choices=PROFILES, required=True)
     select.add_argument("--config", type=Path, required=True)
     select.add_argument("--output", type=Path, required=True)
+    select.add_argument("--source-commit")
+    select.add_argument("--infrastructure-retries", type=int)
     run = sub.add_parser("exec")
     run.add_argument("--config", type=Path, required=True)
     run.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.action == "select":
-            select_model(args.config, args.output, args.model)
+            select_model(
+                args.config,
+                args.output,
+                args.model,
+                source_commit=args.source_commit,
+                infrastructure_retries=args.infrastructure_retries,
+            )
         else:
             command = args.command[1:] if args.command[:1] == ["--"] else args.command
             if not command:

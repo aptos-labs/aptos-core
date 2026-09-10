@@ -57,6 +57,30 @@ class ControllerErrorTest(unittest.TestCase):
         self.assertTrue(prompt.startswith("/move-inf\n\n"))
         self.assertIn("Infer 0x42::example::f in .", prompt)
 
+    def test_codex_initial_prompt_inlines_the_scheduled_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prompts = root / "prompts"
+            prompts.mkdir()
+            (prompts / "initial.txt").write_text(
+                "Infer {target} in {package}.", encoding="utf-8"
+            )
+            plugin = root / "plugin/skills/move-inf"
+            plugin.mkdir(parents=True)
+            (plugin / "SKILL.md").write_text("scheduled skill", encoding="utf-8")
+            controller = Controller.__new__(Controller)
+            controller.prompts_dir = prompts
+            controller.plugin_dir = root / "plugin"
+            controller.agent_kind = "codex"
+            controller.run = SimpleNamespace(
+                spec=SimpleNamespace(target="0x42::example::f")
+            )
+
+            prompt = controller._initial_prompt()
+
+        self.assertIn("scheduled skill", prompt)
+        self.assertIn("Infer 0x42::example::f in .", prompt)
+
     def test_statusless_api_error_is_infrastructure(self) -> None:
         error = _agent_infrastructure_error(
             turn(

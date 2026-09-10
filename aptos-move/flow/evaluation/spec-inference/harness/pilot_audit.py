@@ -18,7 +18,6 @@ REQUIRED_FILES = (
     "run.json",
     "judge.json",
     "controller-events.jsonl",
-    "claude-events.jsonl",
     "flow-events.jsonl",
     "stdout.log",
     "stderr.log",
@@ -92,7 +91,12 @@ def audit_pilot(
         if not artifact.is_dir():
             issues.append(_issue(spec.run_id, "missing run artifact directory"))
             continue
+        provider_events_name = (
+            "codex-events.jsonl" if config.agent_runtime == "codex" else "claude-events.jsonl"
+        )
         missing = [name for name in REQUIRED_FILES if not (artifact / name).is_file()]
+        if not (artifact / provider_events_name).is_file():
+            missing.append(provider_events_name)
         if not (artifact / "final").is_dir():
             missing.append("final/")
         if missing:
@@ -103,7 +107,7 @@ def audit_pilot(
             run = load_object(artifact / "run.json")
             judge = load_object(artifact / "judge.json")
             controller = _load_jsonl(artifact / "controller-events.jsonl")
-            claude = _load_jsonl(artifact / "claude-events.jsonl")
+            provider_events = _load_jsonl(artifact / provider_events_name)
             flow = _load_jsonl(artifact / "flow-events.jsonl")
         except Exception as error:
             issues.append(_issue(spec.run_id, f"malformed telemetry: {error}"))
@@ -131,28 +135,41 @@ def audit_pilot(
             issues.append(_issue(spec.run_id, "controller harness identity disagreement"))
         if run.get("controller_prompts_sha256") != expected_prompts_sha256:
             issues.append(_issue(spec.run_id, "controller prompt identity disagreement"))
-        if run.get("sdk_telemetry_schema") == 1:
+        if run.get("codex_telemetry_schema") == 1:
+            try:
+                metrics = load_object(artifact / "codex-metrics.json")
+                completed = [
+                    e for e in provider_events
+                    if e.get("event") == "codex_event"
+                    and (e.get("payload") or {}).get("type") == "turn.completed"
+                ]
+                if len(completed) != metrics.get("turn_count") or not completed:
+                    issues.append(_issue(spec.run_id, "Codex telemetry turn coverage mismatch"))
+            except (OSError, ValueError) as error:
+                issues.append(_issue(spec.run_id, f"missing or invalid Codex metrics: {error}"))
+        elif run.get("sdk_telemetry_schema") == 1:
             try:
                 metrics = load_object(artifact / "sdk-metrics.json")
-                raw_results = [e for e in claude if e.get("event") == "sdk_message"
+                raw_results = [e for e in provider_events if e.get("event") == "sdk_message"
                                and (e.get("message") or {}).get("type") == "result"]
-                typed_results = [e for e in claude if e.get("event") == "claude_message"
+                typed_results = [e for e in provider_events if e.get("event") == "claude_message"
                                  and (e.get("message") or {}).get("type") == "ResultMessage"]
                 if len(raw_results) != metrics.get("result_count") or len(raw_results) < len(typed_results):
                     issues.append(_issue(spec.run_id, "SDK telemetry result coverage mismatch"))
             except (OSError, ValueError) as error:
                 issues.append(_issue(spec.run_id, f"missing or invalid SDK metrics: {error}"))
-        message_types = {
-            event.get("message", {}).get("type")
-            for event in claude
-            if event.get("event") == "claude_message"
-            and isinstance(event.get("message"), dict)
-        }
-        for required_type in ("SystemMessage", "ResultMessage"):
-            if required_type not in message_types:
-                issues.append(
-                    _issue(spec.run_id, f"raw Claude telemetry lacks {required_type}")
-                )
+        if config.agent_runtime == "claude":
+            message_types = {
+                event.get("message", {}).get("type")
+                for event in provider_events
+                if event.get("event") == "claude_message"
+                and isinstance(event.get("message"), dict)
+            }
+            for required_type in ("SystemMessage", "ResultMessage"):
+                if required_type not in message_types:
+                    issues.append(
+                        _issue(spec.run_id, f"raw Claude telemetry lacks {required_type}")
+                    )
         _audit_flow_telemetry(
             flow,
             spec.run_id,
@@ -229,7 +246,19 @@ def audit_pilot(
             system = result.get("system_init", {}).get("system", {})
             if system.get("model") != config.model:
                 issues.append(_issue(spec.run_id, f"runtime model mismatch: {system.get('model')!r}"))
-            if system.get("claude_code_version") != config.claude_code_version:
+            if config.agent_runtime == "codex":
+                if system.get("codex_cli_version") != config.codex_cli_version:
+                    issues.append(_issue(spec.run_id, "runtime Codex CLI version mismatch"))
+                if (
+                    system.get("codex_code_mode_host_sha256")
+                    != config.codex_code_mode_host_sha256
+                ):
+                    issues.append(
+                        _issue(spec.run_id, "runtime Codex code-mode host digest mismatch")
+                    )
+                if system.get("reasoning_effort") != config.effort:
+                    issues.append(_issue(spec.run_id, "runtime Codex effort mismatch"))
+            elif system.get("claude_code_version") != config.claude_code_version:
                 issues.append(_issue(spec.run_id, "runtime Claude Code version mismatch"))
             for timing in ("duration_ms", "duration_api_ms", "num_turns"):
                 if not isinstance(result.get(timing), int) or result[timing] < 0:
