@@ -239,10 +239,14 @@ A round is `tasks × arms × replicates` runs, each an isolated model session.
 `selection_seed + round_id`. Blocks are shuffled, and **arm order is shuffled
 within each block**, so position in the run sequence is not confounded with arm.
 
-**Session.** `harness/controller.py` drives a multi-turn Claude Agent SDK
-session under fixed limits (controller turns, model turns per controller turn,
+**Session.** `harness/controller.py` drives a multi-turn provider session:
+Claude through the Claude Agent SDK, or Codex through resumable
+`codex exec --json` threads. The runtime and version are pinned in the round
+configuration. Both adapters run the session under fixed limits (controller
+turns, model turns per controller turn,
 wall seconds, output tokens). The opening turn is `/move-inf` followed by
-`prompts/initial.txt`. That prompt is the same text for every arm and carries
+`prompts/initial.txt` for Claude and the equivalent `$move-inf` invocation for
+Codex. That prompt is the same text for every arm and carries
 only what the skill cannot know — which target, which package, and that a budget
 bounds the session. Every normative instruction (preserve behavior, preserve
 user-written specifications, finish with a full proof) belongs to the skill, so

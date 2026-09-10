@@ -17,17 +17,38 @@ PROFILES = {
     "glm": ("glm-5.3[1m]", "https://api.z.ai/api/anthropic"),
     "opus": ("claude-opus-5", "https://api.anthropic.com"),
     "sonnet": ("claude-sonnet-5", "https://api.anthropic.com"),
+    "sol56": ("gpt-5.6-sol", "https://chatgpt.com/backend-api"),
 }
 SUBSCRIPTION_PROFILES = {PROFILES["opus"], PROFILES["sonnet"]}
+CODEX_CLI_VERSION = "0.153.2"
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def select_model(base: Path, output: Path, model: str) -> None:
+def select_model(
+    base: Path, output: Path, model: str, source_commit: str | None = None
+) -> None:
+    base_config = ExperimentConfig.load(base)
     config = replace(
-        ExperimentConfig.load(base),
+        base_config,
         model=PROFILES[model][0],
         provider_base_url=PROFILES[model][1],
-        effort="xhigh" if model in ("opus", "sonnet") else "max",
+        effort=(
+            "xhigh" if model in ("opus", "sonnet") else
+            "high" if model == "sol56" else "max"
+        ),
+        agent_runtime="codex" if model == "sol56" else "claude",
+        codex_cli_version=CODEX_CLI_VERSION if model == "sol56" else None,
+        source_commit=source_commit or base_config.source_commit,
+        allowed_builtin_tools=(
+            ["shell", "apply_patch"]
+            if model == "sol56"
+            else base_config.allowed_builtin_tools
+        ),
+        denied_builtin_tools=(
+            ["web_search", "agents"]
+            if model == "sol56"
+            else base_config.denied_builtin_tools
+        ),
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     # A scheduled configuration is immutable; never overwrite an existing one.
@@ -67,6 +88,38 @@ def subscription_environment(config: ExperimentConfig, environment: dict[str, st
 def launch(config_path: Path, command: list[str]) -> None:
     config = ExperimentConfig.load(config_path)
     pair = (config.model, config.provider_base_url)
+    if config.agent_runtime == "codex":
+        if pair != PROFILES["sol56"]:
+            raise ValueError("no Codex credential profile for this model/endpoint pair")
+        executable = os.environ.get("MOVE_INFERENCE_CODEX_EXECUTABLE") or shutil.which("codex")
+        if not executable:
+            raise ValueError("Codex executable not found")
+        version_output = subprocess.run(
+            [executable, "--version"], capture_output=True, text=True, timeout=15,
+            check=True,
+        ).stdout.strip()
+        version = version_output.removeprefix("codex-cli ")
+        if version != config.codex_cli_version:
+            raise ValueError(
+                f"expected Codex CLI {config.codex_cli_version}, found {version_output}"
+            )
+        auth_file = Path(
+            os.environ.get("MOVE_INFERENCE_CODEX_AUTH_FILE", Path.home() / ".codex/auth.json")
+        ).resolve()
+        if not auth_file.is_file():
+            raise ValueError(
+                "Codex authentication missing: run `codex login` or set "
+                "MOVE_INFERENCE_CODEX_AUTH_FILE"
+            )
+        env = dict(os.environ)
+        env["MOVE_INFERENCE_CODEX_EXECUTABLE"] = str(Path(executable).resolve())
+        env["MOVE_INFERENCE_CODEX_AUTH_FILE"] = str(auth_file)
+        if command == ["--preflight"]:
+            print(
+                f"Codex authentication resolved; Codex CLI {version}; model {config.model}"
+            )
+            return
+        os.execvpe(command[0], command, env)
     if pair == PROFILES["glm"]:
         env = dict(os.environ)
         env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
@@ -102,13 +155,16 @@ def main() -> None:
     select.add_argument("--model", choices=PROFILES, required=True)
     select.add_argument("--config", type=Path, required=True)
     select.add_argument("--output", type=Path, required=True)
+    select.add_argument("--source-commit")
     run = sub.add_parser("exec")
     run.add_argument("--config", type=Path, required=True)
     run.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.action == "select":
-            select_model(args.config, args.output, args.model)
+            select_model(
+                args.config, args.output, args.model, source_commit=args.source_commit
+            )
         else:
             command = args.command[1:] if args.command[:1] == ["--"] else args.command
             if not command:

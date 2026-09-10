@@ -16,7 +16,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .agent import AgentSession, AgentTurn, ClaudeAgentSession, FakeAgentSession
+from .agent import (
+    AgentSession,
+    AgentTurn,
+    ClaudeAgentSession,
+    CodexAgentSession,
+    FakeAgentSession,
+)
 from .boogie_proxy import BoogieProxy
 from .artifacts import (
     JsonlWriter,
@@ -32,6 +38,8 @@ from .artifacts import (
 from .config import ARM_TO_TACTIC, ExperimentConfig, ResolvedRunSpec, RunSpec
 from .credentials import redact_tree
 from .sdk_metrics import write_sdk_metrics
+from .codex_metrics import write_codex_metrics
+from .stdio_proxy import StdioProxy
 from .identifiers import resolve_within
 from .judge import Judge, JudgeResult
 from .state_machine import ConversationPolicy
@@ -103,8 +111,8 @@ class Controller:
         attempts = 0
         initial_prompt = self._initial_prompt()
         with JsonlWriter(self.artifact_dir / "controller-events.jsonl") as controller_events, JsonlWriter(
-            self.artifact_dir / "claude-events.jsonl"
-        ) as claude_events:
+            self._agent_events_path()
+        ) as agent_events:
             controller_events.emit(
                 "run_start",
                 run_id=self.run.spec.run_id,
@@ -130,9 +138,11 @@ class Controller:
                 output_tokens_by_attempt.append(0)
                 flow_events_offset = _count_lines(self.flow_events)
                 try:
-                    async with self._agent_boogie_proxy(), self._make_agent(
-                        claude_events, attempts
-                    ) as agent:
+                    async with (
+                        self._agent_boogie_proxy(),
+                        self._agent_mcp_proxy(),
+                        self._make_agent(agent_events, attempts) as agent,
+                    ):
                         for controller_turn in range(1, self.config.max_controller_turns + 1):
                             if self._wall_seconds() >= self.config.max_wall_seconds:
                                 terminal_status = "wall_budget_exhausted"
@@ -529,6 +539,8 @@ class Controller:
             )
         if self.agent_kind == "claude":
             run_record["sdk_telemetry_schema"] = 1
+        elif self.agent_kind == "codex":
+            run_record["codex_telemetry_schema"] = 1
         write_json(self.artifact_dir / "run.json", run_record)
 
     def _refutation_identities(self) -> list[str]:
@@ -552,7 +564,12 @@ class Controller:
             target=self.run.spec.target,
             package=".",
         )
-        return "/move-inf\n\n" + task
+        invocation = "$move-inf" if getattr(self, "agent_kind", "claude") == "codex" else "/move-inf"
+        return invocation + "\n\n" + task
+
+    def _agent_events_path(self) -> Path:
+        name = "codex-events.jsonl" if self.agent_kind == "codex" else "claude-events.jsonl"
+        return self.artifact_dir / name
 
     def _validate_apparatus_identity(
         self, harness_hash: str, move_flow: dict[str, Any]
@@ -670,7 +687,9 @@ class Controller:
         if not binary:
             raise RuntimeError("move-flow is not available on PATH")
         environment["MOVE_FLOW"] = str(Path(binary).resolve())
-        if proxy := os.environ.get("MOVE_INFERENCE_BOOGIE_PROXY"):
+        if self.agent_kind != "codex" and (
+            proxy := os.environ.get("MOVE_INFERENCE_BOOGIE_PROXY")
+        ):
             # Inside the sandbox the agent's prover reaches Boogie through the
             # controller's proxy; see `boogie_proxy.py` for why it cannot run
             # the executable itself.
@@ -681,7 +700,7 @@ class Controller:
     @asynccontextmanager
     async def _agent_boogie_proxy(self):
         """Serve Boogie to the agent for the lifetime of one session."""
-        if self.agent_kind == "fake":
+        if self.agent_kind in ("fake", "codex"):
             yield
             return
         socket_value = os.environ.get("MOVE_INFERENCE_BOOGIE_PROXY")
@@ -692,6 +711,38 @@ class Controller:
             Path(socket_value),
             Path(executable_value),
             (self.workspace_root, Path("/tmp")),
+        ):
+            yield
+
+    @asynccontextmanager
+    async def _agent_mcp_proxy(self):
+        """Keep the real Move Flow executable outside a Codex shell domain."""
+        if self.agent_kind != "codex":
+            yield
+            return
+        socket_value = os.environ.get("MOVE_INFERENCE_MCP_PROXY")
+        if not socket_value:
+            raise RuntimeError("pilot sandbox did not configure the MCP proxy")
+        runtime = json.loads(self.runtime_mcp.read_text(encoding="utf-8"))
+        server = runtime["mcpServers"]["move-flow"]
+        environment = dict(os.environ)
+        environment.update(
+            {str(name): str(value) for name, value in server.get("env", {}).items()}
+        )
+        stderr_path = self.artifact_dir / "stderr.log"
+
+        def stderr_sink(line: str) -> None:
+            with stderr_path.open("a", encoding="utf-8") as stream:
+                stream.write(line)
+                if not line.endswith("\n"):
+                    stream.write("\n")
+
+        async with StdioProxy(
+            Path(socket_value),
+            [server["command"], *server.get("args", [])],
+            environment,
+            self.package,
+            stderr_sink,
         ):
             yield
 
@@ -710,6 +761,16 @@ class Controller:
                 if not line.endswith("\n"):
                     stream.write("\n")
 
+        if self.agent_kind == "codex":
+            return CodexAgentSession(
+                self.config,
+                self.package,
+                self.plugin_dir,
+                self.runtime_mcp,
+                event_log,
+                stderr_sink,
+                Path(os.environ["MOVE_INFERENCE_MCP_PROXY"]),
+            )
         return ClaudeAgentSession(
             self.config,
             self.package,
@@ -733,7 +794,19 @@ class Controller:
             raise RuntimeError(
                 f"model mismatch: expected {self.config.model}, got {system.get('model')}"
             )
-        if system.get("claude_code_version") != self.config.claude_code_version:
+        if self.agent_kind == "codex":
+            if system.get("codex_cli_version") != self.config.codex_cli_version:
+                raise RuntimeError(
+                    "Codex CLI version mismatch: "
+                    f"expected {self.config.codex_cli_version}, "
+                    f"got {system.get('codex_cli_version')}"
+                )
+            if system.get("reasoning_effort") != self.config.effort:
+                raise RuntimeError(
+                    f"Codex effort mismatch: expected {self.config.effort}, "
+                    f"got {system.get('reasoning_effort')}"
+                )
+        elif system.get("claude_code_version") != self.config.claude_code_version:
             raise RuntimeError(
                 "Claude Code version mismatch: "
                 f"expected {self.config.claude_code_version}, got {system.get('claude_code_version')}"
@@ -836,10 +909,16 @@ class Controller:
     def _finalize_with_sdk_metrics(self, result: dict[str, Any]) -> None:
         """Preserve a terminal result even if optional SDK telemetry is malformed."""
         try:
-            write_sdk_metrics(
-                self.artifact_dir / "claude-events.jsonl",
-                self.artifact_dir / "sdk-metrics.json",
-            )
+            if getattr(self, "agent_kind", "claude") == "codex":
+                write_codex_metrics(
+                    self.artifact_dir / "codex-events.jsonl",
+                    self.artifact_dir / "codex-metrics.json",
+                )
+            else:
+                write_sdk_metrics(
+                    self.artifact_dir / "claude-events.jsonl",
+                    self.artifact_dir / "sdk-metrics.json",
+                )
         except (ValueError, UnicodeDecodeError, KeyError) as error:
             # The raw transcript remains available. Its summary is
             # observational and must not strand a completed run in staging.
@@ -1013,7 +1092,7 @@ def main() -> None:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
-    parser.add_argument("--agent", choices=("claude", "fake"), default="claude")
+    parser.add_argument("--agent", choices=("claude", "codex", "fake"))
     parser.add_argument("--fake-script", type=Path)
     parser.add_argument(
         "--refutation-mutants-root",
@@ -1039,17 +1118,23 @@ def main() -> None:
         help="development only: bypass the real-agent OS-sandbox marker check",
     )
     args = parser.parse_args()
+    config = ExperimentConfig.load(args.config.resolve())
+    agent_kind = args.agent or config.agent_runtime
+    if agent_kind != "fake" and agent_kind != config.agent_runtime:
+        raise SystemExit(
+            f"agent runtime mismatch: config pins {config.agent_runtime}, "
+            f"command selected {agent_kind}"
+        )
     if (
-        args.agent == "claude"
+        agent_kind in ("claude", "codex")
         and not args.allow_unsandboxed
         and os.environ.get("MOVE_INFERENCE_EVAL_SANDBOXED") != "1"
     ):
         raise SystemExit(
             "real runs require an OS sandbox; set MOVE_INFERENCE_EVAL_SANDBOXED=1 inside the configured container"
         )
-    config = ExperimentConfig.load(args.config.resolve())
     configured_endpoint = os.environ.get("ANTHROPIC_BASE_URL")
-    if args.agent == "claude" and configured_endpoint not in (None, config.provider_base_url):
+    if agent_kind == "claude" and configured_endpoint not in (None, config.provider_base_url):
         raise SystemExit(
             f"provider endpoint mismatch: config pins {config.provider_base_url}, environment has {configured_endpoint}"
         )
@@ -1075,7 +1160,7 @@ def main() -> None:
         run_spec,
         args.artifacts.resolve() / run_spec.spec.run_id,
         base / "prompts",
-        args.agent,
+        agent_kind,
         args.fake_script.resolve() if args.fake_script else None,
         hidden_mutants,
         refutation_mutants,

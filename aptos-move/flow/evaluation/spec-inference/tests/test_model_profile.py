@@ -71,6 +71,17 @@ class ModelProfileTest(unittest.TestCase):
             self.assertEqual(env["ANTHROPIC_MODEL"], "claude-sonnet-5")
             self.assertEqual(env["CLAUDE_CODE_EFFORT_LEVEL"], "xhigh")
 
+    def test_select_sol56_uses_codex_with_high_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sol56.json"
+            select_model(ROOT / "config/default.json", output, "sol56")
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "gpt-5.6-sol")
+            self.assertEqual(config.provider_base_url, "https://chatgpt.com/backend-api")
+            self.assertEqual(config.effort, "high")
+            self.assertEqual(config.agent_runtime, "codex")
+            self.assertEqual(config.codex_cli_version, "0.153.2")
+
     def test_effort_validation_preserves_history_and_rejects_glm_xhigh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"

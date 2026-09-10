@@ -114,6 +114,14 @@ server's inventory. `config/default.json` allows `Read`, `Glob`, `Grep`, `Edit`,
 `Write`, and the task tools, and denies `Bash`, `WebSearch`, `WebFetch`, `Agent`,
 and `Task`.
 
+Codex needs its local shell to inspect and edit a package. Its own
+workspace-write sandbox disables shell network access, web search is disabled,
+and multi-agent tools are disabled. The real `move-flow` executable is not
+readable in the Codex Landlock domain: the controller starts it with the
+arm-specific configuration and Codex receives only a one-connection Unix-socket
+stdio bridge. A shell therefore cannot recover a withheld WP tool by invoking
+the binary directly.
+
 Denying `Bash` and `WebFetch` matters more than it looks: with them gone, MCP
 tools are the *only* channel out of the process. That makes the MCP inventory a
 security boundary, not just an ergonomics choice — any tool that takes a URL is
@@ -146,6 +154,12 @@ token is in the environment of a process whose `/proc/self` the agent can read.
 **An agent that wants its own credential can obtain it.** The sandbox does not
 try to prevent that; it prevents the credential from *leaving*, by ensuring there
 is no egress channel (see Network and Tools above).
+
+For Codex, saved login state is copied into a private per-cell `CODEX_HOME` and
+removed with the unpublished staging tree. The controller also treats long
+string values from that auth file as credentials during the final exact-value
+redaction sweep. Codex's shell does not receive network access; the parent
+Codex process still reaches the model service.
 
 The controller also sweeps the run's artifacts for the credential's exact
 bytes once the run is over, so an agent that merely echoes it does not put it
