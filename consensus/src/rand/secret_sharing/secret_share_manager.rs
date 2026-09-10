@@ -232,15 +232,46 @@ impl SecretShareManager {
         self.persisted_self_shares.advance_retention(latest_round);
     }
 
-    fn process_recovered_share_request(
+    fn handle_share_request(
         &mut self,
-        metadata: &SecretShareMetadata,
+        request: RequestSecretShare,
         protocol: ProtocolId,
         response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
     ) {
-        if let Some(share) = self
-            .persisted_self_shares
-            .get(metadata, &self.verifier, &self.author)
+        info!(LogSchema::new(LogEvent::ReceiveSecretShareRequest)
+            .author(self.author)
+            .epoch(request.metadata().epoch)
+            .round(request.metadata().round));
+
+        if request.metadata().epoch != self.epoch_state.epoch {
+            warn!(
+                requested_epoch = request.metadata().epoch,
+                current_epoch = self.epoch_state.epoch,
+                "Rejecting secret share request from old or future epoch"
+            );
+            return;
+        }
+
+        let result = self
+            .secret_share_store
+            .lock()
+            .get_self_share(request.metadata());
+        let active_share = match result {
+            Ok(Some(share)) => Some(share),
+            Ok(None) => None,
+            Err(error) => {
+                debug!("Self share not available in active store: {error}");
+                None
+            },
+        };
+        if let Some(share) = active_share {
+            self.process_response(protocol, response_sender, SecretShareMessage::Share(share));
+            return;
+        }
+
+        if let Some(share) =
+            self.persisted_self_shares
+                .get(request.metadata(), &self.verifier, &self.author)
         {
             self.process_response(protocol, response_sender, SecretShareMessage::Share(share));
         }
@@ -458,36 +489,7 @@ impl SecretShareManager {
         } = rpc;
         match msg {
             SecretShareMessage::RequestShare(request) => {
-                if request.metadata().epoch != self.epoch_state.epoch {
-                    warn!(
-                        requested_epoch = request.metadata().epoch,
-                        current_epoch = self.epoch_state.epoch,
-                        "Rejecting secret share request from old or future epoch"
-                    );
-                    return;
-                }
-                let result = self
-                    .secret_share_store
-                    .lock()
-                    .get_self_share(request.metadata());
-                let active_share = match result {
-                    Ok(Some(share)) => Some(share),
-                    Ok(None) => None,
-                    Err(error) => {
-                        debug!("Self share not available in active store: {error}");
-                        None
-                    },
-                };
-                if let Some(share) = active_share {
-                    self.process_response(
-                        protocol,
-                        response_sender,
-                        SecretShareMessage::Share(share),
-                    );
-                    return;
-                }
-
-                self.process_recovered_share_request(request.metadata(), protocol, response_sender);
+                self.handle_share_request(request, protocol, response_sender)
             },
             SecretShareMessage::Share(share) => {
                 info!(LogSchema::new(LogEvent::ReceiveSecretShare)

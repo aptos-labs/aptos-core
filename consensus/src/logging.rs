@@ -61,6 +61,7 @@ pub enum LogEvent {
     ReceiveOptProposal,
     ProcessOptProposal,
     // secret sharing events
+    ReceiveSecretShareRequest,
     ReceiveSecretShare,
     BroadcastSecretShare,
     ReceiveReactiveSecretShare,
