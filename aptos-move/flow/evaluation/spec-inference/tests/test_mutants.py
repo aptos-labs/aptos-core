@@ -82,6 +82,35 @@ class ApplyMutantTest(unittest.TestCase):
             self.assertIn("i <= n", text)
             self.assertIn("aborts_if false;", text, "the candidate's spec survives")
 
+    def test_a_loop_invariant_may_wrap_the_anchored_guard(self) -> None:
+        candidate = SOURCE.replace(
+            "while (i < n) {",
+            """while ({
+            spec {
+                invariant [inferred] i <= n;
+            };
+            i < n
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate)
+            anchor = "while (i < n) {"
+            case = _case(
+                anchor,
+                {
+                    "kind": "substitute",
+                    "at": anchor.index("<"),
+                    "length": 1,
+                    "to": "<=",
+                },
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("invariant [inferred] i <= n;", text)
+            self.assertIn("\n            i <= n\n", text)
+
     def test_a_stale_anchor_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             package, baseline = self._packages(Path(tmp))

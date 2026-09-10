@@ -277,9 +277,17 @@ impl FlowSession {
                                 }),
                             );
                             log::info!("move_package_wp: no specs inferred");
-                            Ok(CallToolResult::success(vec![Content::text(
-                                "inference completed but no specifications were inferred",
-                            )]))
+                            let warnings =
+                                String::from_utf8(error_writer.into_inner()).unwrap_or_default();
+                            let mut msg = "inference completed but no specifications were inferred"
+                                .to_string();
+                            if !warnings.trim().is_empty() {
+                                msg.push_str(&format!("\n{}", warnings.trim_end()));
+                                data.set_diagnostics(DiagnosticSource::Inference, vec![warnings
+                                    .trim_end()
+                                    .to_string()]);
+                            }
+                            Ok(CallToolResult::success(vec![Content::text(msg)]))
                         } else {
                             wrote_files_in.store(true, Ordering::Relaxed);
                             let inferred_conditions = modified_files
