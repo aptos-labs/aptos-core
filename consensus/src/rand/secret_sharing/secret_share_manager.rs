@@ -9,9 +9,10 @@ use crate::{
     rand::secret_sharing::{
         block_queue::{BlockQueue, QueueItem},
         network_messages::{SecretShareMessage, SecretShareRpc},
+        recovered_self_shares::{RecoveredSelfShares, RecoveredShare},
         reliable_broadcast_state::SecretShareAggregateState,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
-        storage::{storage_key, SecretShareKey, SecretShareStorage},
+        storage::SecretShareStorage,
         types::RequestSecretShare,
         verifier::SecretShareVerifier,
     },
@@ -42,7 +43,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -51,11 +52,6 @@ pub type Receiver<T> = UnboundedReceiver<T>;
 type PendingDeriveFut =
     Pin<Box<dyn Future<Output = (Round, TaskResult<SecretShareResult>)> + Send>>;
 
-struct RecoveredSelfShare {
-    share: SecretShare,
-    verified: bool,
-}
-
 pub struct SecretShareManager {
     author: Author,
     epoch_state: Arc<EpochState>,
@@ -63,8 +59,6 @@ pub struct SecretShareManager {
     verifier: Arc<SecretShareVerifier>,
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
-    secret_share_storage: Arc<dyn SecretShareStorage>,
-    retention_rounds: Round,
     secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
@@ -73,7 +67,7 @@ pub struct SecretShareManager {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
-    recovered_self_shares: HashMap<SecretShareKey, RecoveredSelfShare>,
+    recovered_self_shares: RecoveredSelfShares,
     block_queue: BlockQueue,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
@@ -113,65 +107,13 @@ impl SecretShareManager {
             verifier.clone(),
             decision_tx,
         )));
-        if let Err(error) = secret_share_storage.prune_before_epoch(epoch_state.epoch) {
-            error!(
-                epoch = epoch_state.epoch,
-                "Failed to prune old secret shares at epoch start: {error}"
-            );
-        }
-        let oldest_retained_round = highest_committed_round.saturating_sub(retention_rounds);
-        if let Err(error) =
-            secret_share_storage.prune_before_round(epoch_state.epoch, oldest_retained_round)
-        {
-            error!(
-                epoch = epoch_state.epoch,
-                oldest_retained_round = oldest_retained_round,
-                "Failed to prune expired secret shares at epoch start: {error}"
-            );
-        }
-        let loaded_self_shares = secret_share_storage
-            .load_self_shares(epoch_state.epoch)
-            .unwrap_or_else(|error| panic!("Failed to load secret shares at epoch start: {error}"));
-        let mut recovered_self_shares = HashMap::new();
-        for (key, loaded_share) in loaded_self_shares {
-            let share = match loaded_share {
-                Ok(share) => share,
-                Err(error) => {
-                    error!(
-                        epoch = key.0,
-                        block_id = key.1,
-                        "Deleting invalid persisted secret share: {error}"
-                    );
-                    secret_share_storage.delete_self_share(&key).unwrap_or_else(|delete_error| {
-                        panic!(
-                            "Failed to delete invalid persisted secret share for epoch {}, block {}: {delete_error}",
-                            key.0, key.1
-                        )
-                    });
-                    continue;
-                },
-            };
-            if share.epoch() != epoch_state.epoch || share.author() != &author {
-                error!(
-                    expected_epoch = epoch_state.epoch,
-                    share_epoch = share.epoch(),
-                    expected_author = author,
-                    share_author = share.author(),
-                    "Deleting persisted secret share with invalid identity"
-                );
-                secret_share_storage.delete_self_share(&key).unwrap_or_else(|delete_error| {
-                    panic!(
-                        "Failed to delete persisted secret share with invalid identity for epoch {}, block {}: {delete_error}",
-                        key.0, key.1
-                    )
-                });
-                continue;
-            }
-            recovered_self_shares.insert(key, RecoveredSelfShare {
-                share,
-                verified: false,
-            });
-        }
+        let recovered_self_shares = RecoveredSelfShares::new(
+            epoch_state.epoch,
+            author,
+            secret_share_storage,
+            highest_committed_round,
+            retention_rounds,
+        );
 
         Self {
             author,
@@ -180,8 +122,6 @@ impl SecretShareManager {
             verifier,
             reliable_broadcast,
             network_sender,
-            secret_share_storage,
-            retention_rounds,
             secret_share_request_delay_ms,
 
             decision_rx,
@@ -275,7 +215,7 @@ impl SecretShareManager {
             return;
         }
 
-        if let Err(error) = self.secret_share_storage.save_self_share(&share) {
+        if let Err(error) = self.recovered_self_shares.persist(share.clone()) {
             panic!(
                 "Failed to persist self secret share for epoch {}, round {}, block {}: {error}",
                 share.epoch(),
@@ -283,13 +223,6 @@ impl SecretShareManager {
                 share.metadata().block_id,
             );
         }
-        self.recovered_self_shares
-            .insert(storage_key(share.metadata()), RecoveredSelfShare {
-                share: share.clone(),
-                verified: false,
-            });
-        self.prune_expired_self_shares(round);
-
         let metadata = share.metadata().clone();
         {
             let mut store = self.secret_share_store.lock();
@@ -318,60 +251,30 @@ impl SecretShareManager {
     }
 
     fn prune_expired_self_shares(&mut self, latest_round: Round) {
-        let oldest_retained_round = latest_round.saturating_sub(self.retention_rounds);
-        let previous_len = self.recovered_self_shares.len();
-        self.recovered_self_shares
-            .retain(|_, recovered| recovered.share.round() >= oldest_retained_round);
-        if self.recovered_self_shares.len() == previous_len {
-            return;
-        }
-        if let Err(error) = self
-            .secret_share_storage
-            .prune_before_round(self.epoch_state.epoch, oldest_retained_round)
-        {
-            error!(
-                epoch = self.epoch_state.epoch,
-                oldest_retained_round = oldest_retained_round,
-                "Failed to prune expired secret shares: {error}"
-            );
-        }
+        self.recovered_self_shares.advance_retention(latest_round);
     }
 
     fn get_recovered_self_share(&mut self, metadata: &SecretShareMetadata) -> Option<SecretShare> {
-        let key = storage_key(metadata);
-        let verification_error = {
-            let recovered = self.recovered_self_shares.get_mut(&key)?;
-            if recovered.share.metadata() != metadata {
-                return None;
-            }
-            if recovered.verified {
-                return Some(recovered.share.clone());
-            }
-            match self.verifier.verify(&recovered.share, &self.author) {
+        let key = crate::rand::secret_sharing::storage::storage_key(metadata);
+        match self.recovered_self_shares.get(metadata)? {
+            RecoveredShare::Verified(share) => Some(share),
+            RecoveredShare::Unverified(share) => match self.verifier.verify(&share, &self.author) {
                 Ok(()) => {
-                    recovered.verified = true;
-                    return Some(recovered.share.clone());
+                    self.recovered_self_shares.mark_verified(&key);
+                    Some(share)
                 },
-                Err(error) => error,
-            }
-        };
-
-        self.recovered_self_shares.remove(&key);
-        self.secret_share_storage
-            .delete_self_share(&key)
-            .unwrap_or_else(|delete_error| {
-                panic!(
-                    "Failed to delete cryptographically invalid persisted secret share for epoch {}, block {}: {delete_error}",
-                    key.0, key.1
-                )
-            });
-        error!(
-            epoch = metadata.epoch,
-            round = metadata.round,
-            block_id = metadata.block_id,
-            "Rejecting cryptographically invalid persisted secret share: {verification_error}"
-        );
-        None
+                Err(verification_error) => {
+                    self.recovered_self_shares.delete_invalid(&key);
+                    error!(
+                        epoch = metadata.epoch,
+                        round = metadata.round,
+                        block_id = metadata.block_id,
+                        "Rejecting cryptographically invalid persisted secret share: {verification_error}"
+                    );
+                    None
+                },
+            },
+        }
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -715,7 +618,10 @@ mod tests {
     use crate::{
         network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
         rand::secret_sharing::{
-            storage::{InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb},
+            storage::{
+                storage_key, InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb,
+                SecretShareKey,
+            },
             test_utils::{
                 create_bad_secret_share, create_metadata, create_secret_share, TestContext,
             },
@@ -872,22 +778,12 @@ mod tests {
             .1
             .unwrap();
         assert_eq!(persisted.metadata(), &metadata);
-        assert_eq!(
-            manager
-                .recovered_self_shares
-                .get(&storage_key(&metadata))
-                .unwrap()
-                .share
-                .metadata(),
-            &metadata
-        );
-        assert!(
-            !manager
-                .recovered_self_shares
-                .get(&storage_key(&metadata))
-                .unwrap()
-                .verified
-        );
+        assert!(manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&metadata)));
+        assert!(!manager
+            .recovered_self_shares
+            .is_verified(&storage_key(&metadata)));
         assert!(manager
             .secret_share_store
             .lock()
@@ -919,7 +815,7 @@ mod tests {
             .get_self_share(&metadata)
             .unwrap()
             .is_none());
-        assert!(manager.recovered_self_shares.is_empty());
+        assert_eq!(manager.recovered_self_shares.len(), 0);
         assert!(
             tokio::time::timeout(Duration::from_millis(10), network_rx.next())
                 .await
@@ -1032,13 +928,9 @@ mod tests {
         let (request, response) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request);
         assert!(response.await.unwrap().is_ok());
-        assert!(
-            manager
-                .recovered_self_shares
-                .get(&storage_key(&metadata))
-                .unwrap()
-                .verified
-        );
+        assert!(manager
+            .recovered_self_shares
+            .is_verified(&storage_key(&metadata)));
     }
 
     #[tokio::test]
@@ -1053,22 +945,14 @@ mod tests {
             .secret_share_store
             .lock()
             .update_highest_known_round(metadata.round);
-        assert!(
-            !manager
-                .recovered_self_shares
-                .get(&storage_key(&metadata))
-                .unwrap()
-                .verified
-        );
+        assert!(!manager
+            .recovered_self_shares
+            .is_verified(&storage_key(&metadata)));
         let (request_1, response_1) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_1);
-        assert!(
-            manager
-                .recovered_self_shares
-                .get(&storage_key(&metadata))
-                .unwrap()
-                .verified
-        );
+        assert!(manager
+            .recovered_self_shares
+            .is_verified(&storage_key(&metadata)));
 
         let (request_2, response_2) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_2);
