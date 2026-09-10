@@ -23,9 +23,7 @@ pub struct SecretShareKey {
 pub trait SecretShareStorage: Send + Sync + 'static {
     fn save_self_share(&self, share: &SecretShare) -> Result<()>;
 
-    fn load_self_shares(&self, epoch: u64) -> Result<Vec<SecretShare>>;
-
-    fn prune_before_epoch(&self, epoch: u64) -> Result<()>;
+    fn get_all_self_shares(&self) -> Result<Vec<SecretShare>>;
 
     fn prune_self_shares(&self, keys: &[SecretShareKey]) -> Result<()>;
 }

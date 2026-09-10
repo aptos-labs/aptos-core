@@ -54,16 +54,13 @@ impl SecretShareStorage for SecretShareDb {
         Ok(())
     }
 
-    fn load_self_shares(&self, epoch: u64) -> Result<Vec<SecretShare>> {
+    fn get_all_self_shares(&self) -> Result<Vec<SecretShare>> {
         let mut iter = self.db.iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut shares = Vec::new();
         for entry in iter {
             let (key, share) = entry?;
-            if key.epoch != epoch {
-                continue;
-            }
             ensure!(
                 storage_key(share.metadata()) == key,
                 "stored key does not match secret share metadata for epoch {}, block {}",
@@ -73,25 +70,6 @@ impl SecretShareStorage for SecretShareDb {
             shares.push(share);
         }
         Ok(shares)
-    }
-
-    fn prune_before_epoch(&self, epoch: u64) -> Result<()> {
-        let mut iter = self.db.iter::<SecretShareSchema>()?;
-        iter.seek_to_first();
-
-        let mut batch = SchemaBatch::new();
-        let mut has_deletes = false;
-        for entry in iter {
-            let (key, _) = entry?;
-            if key.epoch < epoch {
-                batch.delete::<SecretShareSchema>(&key)?;
-                has_deletes = true;
-            }
-        }
-        if has_deletes {
-            self.db.write_schemas_relaxed(batch)?;
-        }
-        Ok(())
     }
 
     fn prune_self_shares(&self, keys: &[SecretShareKey]) -> Result<()> {
@@ -133,7 +111,7 @@ mod tests {
 
         let reopened = SecretShareDb::new(&temp_path);
         let recovered = reopened
-            .load_self_shares(ctx.epoch)
+            .get_all_self_shares()
             .unwrap()
             .into_iter()
             .next()
@@ -147,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_prune_before_epoch() {
+    fn test_load_all_self_shares() {
         let temp_path = TempPath::new();
         let db = SecretShareDb::new(&temp_path);
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
@@ -158,11 +136,14 @@ mod tests {
         db.save_self_share(&create_secret_share(&ctx, 0, &new_metadata))
             .unwrap();
 
-        db.prune_before_epoch(ctx.epoch + 1).unwrap();
-
-        let recovered = db.load_self_shares(ctx.epoch + 1).unwrap();
-        assert_eq!(recovered.len(), 1);
-        assert_eq!(recovered[0].metadata(), &new_metadata);
+        let mut recovered_epochs = db
+            .get_all_self_shares()
+            .unwrap()
+            .into_iter()
+            .map(|share| share.epoch())
+            .collect::<Vec<_>>();
+        recovered_epochs.sort_unstable();
+        assert_eq!(recovered_epochs, vec![ctx.epoch, ctx.epoch + 1]);
     }
 
     #[test]
@@ -179,7 +160,7 @@ mod tests {
         db.prune_self_shares(&[storage_key(&metadata[0])]).unwrap();
 
         let mut recovered_rounds = db
-            .load_self_shares(ctx.epoch)
+            .get_all_self_shares()
             .unwrap()
             .into_iter()
             .map(|share| share.round())
@@ -208,6 +189,6 @@ mod tests {
             .unwrap();
         db.db.write_schemas(batch).unwrap();
 
-        assert!(db.load_self_shares(ctx.epoch).is_err());
+        assert!(db.get_all_self_shares().is_err());
     }
 }

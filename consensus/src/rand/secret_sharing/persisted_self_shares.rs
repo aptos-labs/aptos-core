@@ -28,16 +28,18 @@ impl PersistedSelfShares {
         highest_committed_round: Round,
         retention_rounds: Round,
     ) -> Self {
-        storage
-            .prune_before_epoch(epoch)
-            .expect("Failed to prune old secret shares at epoch start");
         let oldest_retained_round = highest_committed_round.saturating_sub(retention_rounds);
-        let loaded_self_shares = storage
-            .load_self_shares(epoch)
+        let all_self_shares = storage
+            .get_all_self_shares()
             .expect("Failed to load secret shares at epoch start");
         let mut shares = HashMap::new();
-        let mut expired_keys = Vec::new();
-        for share in loaded_self_shares {
+        let mut keys_to_prune = Vec::new();
+        for share in all_self_shares {
+            let key = storage_key(share.metadata());
+            if share.epoch() < epoch {
+                keys_to_prune.push(key);
+                continue;
+            }
             assert_eq!(
                 share.epoch(),
                 epoch,
@@ -48,9 +50,8 @@ impl PersistedSelfShares {
                 &author,
                 "Persisted secret share has wrong author"
             );
-            let key = storage_key(share.metadata());
             if share.round() < oldest_retained_round {
-                expired_keys.push(key);
+                keys_to_prune.push(key);
                 continue;
             }
             shares.insert(key, CachedSelfShare {
@@ -59,8 +60,8 @@ impl PersistedSelfShares {
             });
         }
         storage
-            .prune_self_shares(&expired_keys)
-            .expect("Failed to prune expired secret shares at epoch start");
+            .prune_self_shares(&keys_to_prune)
+            .expect("Failed to prune stale secret shares at epoch start");
 
         Self {
             storage,

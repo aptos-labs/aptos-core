@@ -32,19 +32,8 @@ impl SecretShareStorage for InMemorySecretShareStorage {
         Ok(())
     }
 
-    fn load_self_shares(&self, epoch: u64) -> Result<Vec<SecretShare>> {
-        Ok(self
-            .shares
-            .lock()
-            .iter()
-            .filter(|(key, _)| key.epoch == epoch)
-            .map(|(_, share)| share.clone())
-            .collect())
-    }
-
-    fn prune_before_epoch(&self, epoch: u64) -> Result<()> {
-        self.shares.lock().retain(|key, _| key.epoch >= epoch);
-        Ok(())
+    fn get_all_self_shares(&self) -> Result<Vec<SecretShare>> {
+        Ok(self.shares.lock().values().cloned().collect())
     }
 
     fn prune_self_shares(&self, keys: &[SecretShareKey]) -> Result<()> {

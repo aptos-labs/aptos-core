@@ -613,12 +613,8 @@ mod tests {
             anyhow::bail!("injected failure")
         }
 
-        fn load_self_shares(&self, _epoch: u64) -> anyhow::Result<Vec<SecretShare>> {
+        fn get_all_self_shares(&self) -> anyhow::Result<Vec<SecretShare>> {
             Ok(Vec::new())
-        }
-
-        fn prune_before_epoch(&self, _epoch: u64) -> anyhow::Result<()> {
-            Ok(())
         }
 
         fn prune_self_shares(&self, _keys: &[SecretShareKey]) -> anyhow::Result<()> {
@@ -730,7 +726,7 @@ mod tests {
         manager.process_completed_derive(metadata.round, Ok(Some(share.clone())));
 
         let persisted = storage
-            .load_self_shares(ctx.epoch)
+            .get_all_self_shares()
             .unwrap()
             .into_iter()
             .next()
@@ -785,8 +781,12 @@ mod tests {
     async fn test_retention_prunes_storage_and_recovery_cache() {
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
         let storage = Arc::new(InMemorySecretShareStorage::new());
+        let previous_epoch_metadata = create_metadata(ctx.epoch - 1, 30);
         let old_metadata = create_metadata(ctx.epoch, 10);
         let boundary_metadata = create_metadata(ctx.epoch, 20);
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &previous_epoch_metadata))
+            .unwrap();
         storage
             .save_self_share(&create_secret_share(&ctx, 0, &old_metadata))
             .unwrap();
@@ -796,9 +796,12 @@ mod tests {
 
         let (manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 30, 10);
 
-        let recovered = storage.load_self_shares(ctx.epoch).unwrap();
+        let recovered = storage.get_all_self_shares().unwrap();
         assert_eq!(recovered.len(), 1);
         assert_eq!(recovered[0].metadata(), &boundary_metadata);
+        assert!(!manager
+            .persisted_self_shares
+            .contains_key(&storage_key(&previous_epoch_metadata)));
         assert!(!manager
             .persisted_self_shares
             .contains_key(&storage_key(&old_metadata)));
@@ -819,7 +822,7 @@ mod tests {
 
         manager.process_completed_derive(21, Ok(None));
 
-        assert!(storage.load_self_shares(ctx.epoch).unwrap().is_empty());
+        assert!(storage.get_all_self_shares().unwrap().is_empty());
         assert!(!manager
             .persisted_self_shares
             .contains_key(&storage_key(&metadata)));
@@ -842,7 +845,7 @@ mod tests {
         });
         rx.await.unwrap();
 
-        assert!(storage.load_self_shares(ctx.epoch).unwrap().is_empty());
+        assert!(storage.get_all_self_shares().unwrap().is_empty());
         assert!(!manager
             .persisted_self_shares
             .contains_key(&storage_key(&metadata)));
