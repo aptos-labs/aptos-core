@@ -4,8 +4,8 @@
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use mono_move_core::native::NativeExtensions;
 use mono_move_natives::{
-    make_all_production_natives, EventStore, ObjectContextExtension, RistrettoPointStore,
-    StorageUsageAtEpochBoundary, TransactionContextExtension,
+    make_all_production_natives, AlgebraStore, EventStore, ObjectContextExtension,
+    RistrettoPointStore, StorageUsageAtEpochBoundary, TransactionContextExtension,
 };
 use mono_move_runtime::{ProductionContextFamily, ProductionNativeRegistry};
 use std::sync::LazyLock;
@@ -34,5 +34,6 @@ pub(crate) fn extensions_with(
     ));
     extensions.add(EventStore::new());
     extensions.add(RistrettoPointStore::new());
+    extensions.add(AlgebraStore::new());
     extensions
 }
