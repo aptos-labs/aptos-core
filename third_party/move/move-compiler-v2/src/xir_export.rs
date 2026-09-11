@@ -460,8 +460,23 @@ fn exported_structs<'env>(
 /// compilation. That detection belongs to the package system, which does not
 /// exist yet; until it does, omission is the honest approximation. It is not
 /// silent: the caller gets a compile error naming the function.
+///
+/// Compiler-generated wrappers are excluded too. `pack$S`, `borrow_mut$S$N`
+/// and `const$NAME` are synthesized during file-format generation to realize
+/// struct visibility and cross-module constant access; a dependent never names
+/// one, the compiler generates its own calls to them, and `$` is not even a
+/// legal Move identifier — so emitting them produces an interface that cannot
+/// be parsed back.
+///
+/// These only exist in a model that has been through the *full* compiler.
+/// A model from `run_checker` alone has none, which is why an
+/// export-and-typecheck sweep cannot discover this and the first modular build
+/// did immediately.
 fn exported_in_interface(fun_env: &FunctionEnv) -> bool {
-    fun_env.visibility() != MoveVisibility::Private && !fun_env.is_inline()
+    fun_env.visibility() != MoveVisibility::Private
+        && !fun_env.is_inline()
+        && !fun_env.is_struct_api()
+        && !fun_env.is_const_accessor()
 }
 
 pub fn export_interface(module: &ModuleEnv) -> Result<XirModule> {

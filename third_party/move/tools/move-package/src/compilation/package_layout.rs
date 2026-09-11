@@ -16,6 +16,10 @@ pub enum CompiledPackageLayout {
     CompiledScripts,
     CompiledDocs,
     CompiledABIs,
+    /// XIR interfaces, one per module: the compilation interface a dependent
+    /// would be built against. Written beside the bytecode rather than instead
+    /// of it — they serve different consumers.
+    CompiledInterfaces,
 }
 
 impl CompiledPackageLayout {
@@ -30,6 +34,7 @@ impl CompiledPackageLayout {
             Self::CompiledScripts => "bytecode_scripts",
             Self::CompiledDocs => "docs",
             Self::CompiledABIs => "abis",
+            Self::CompiledInterfaces => "interfaces",
         };
         Path::new(path)
     }
