@@ -32,6 +32,7 @@ use move_model_exchange::{
     Field, Type as Ty, TypeParameter, Variant, XirAttribute, XirAttributeArg, XirFunction,
     XirModule, XirStruct, XirVisibility,
 };
+use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fs, path::PathBuf};
 use tempfile::TempDir;
 
@@ -115,10 +116,10 @@ pub fn generate_dependency_sources(xir_dependencies: &[String]) -> Result<Genera
             .with_context(|| format!("reading XIR dependency `{dependency}`"))?;
         let source = crate::xir::parse_interface(PathBuf::from(dependency), &json)?;
         let module = source.module();
-        let path = dir.path().join(format!(
-            "{}_{}.move",
-            module.module.address.trim_start_matches("0x"),
-            module.module.name
+        let path = dir.path().join(module_file_name(
+            &module.module.address,
+            &module.module.name,
+            "move",
         ));
         fs::write(&path, xir_module_to_move_source(module)?)
             .with_context(|| format!("writing the interface generated from `{dependency}`"))?;
@@ -130,6 +131,22 @@ pub fn generate_dependency_sources(xir_dependencies: &[String]) -> Result<Genera
         paths,
         sources,
     })
+}
+
+/// A file name for an artifact of module `address::name`: readable, unique per
+/// module, and within the 255-byte file-name limit of common filesystems. A
+/// module name alone may be 255 bytes, so the readable part is cut to fit and a
+/// hash of the full name keeps it unique.
+pub fn module_file_name(address: &str, name: &str, extension: &str) -> String {
+    const NAME_MAX: usize = 255;
+    let hash = format!(
+        "{:x}",
+        Sha256::digest(format!("{address}::{name}").as_bytes())
+    );
+    let hash = &hash[..16];
+    let room = NAME_MAX - hash.len() - extension.len() - 2;
+    let readable: String = name.chars().take(room).collect();
+    format!("{readable}-{hash}.{extension}")
 }
 
 /// Renders `module`'s declarations as Move source.

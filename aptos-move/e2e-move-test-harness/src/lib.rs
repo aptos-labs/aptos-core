@@ -40,15 +40,23 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
 };
-use move_package::package_hooks::register_package_hooks;
+use move_package::{
+    compilation::{compiled_package::compiler_identity, package_layout::CompiledPackageLayout},
+    package_hooks::register_package_hooks,
+};
 use once_cell::sync::Lazy;
 use project_root::get_project_root;
 use proptest::strategy::{BoxedStrategy, Just, Strategy};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
+    fs,
+    hash::{Hash, Hasher},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
 
 // Code representing successful transaction, used for run_block_in_parts_and_check
@@ -60,15 +68,218 @@ static CACHED_BUILT_PACKAGES: Lazy<
     Mutex<HashMap<(PathBuf, BuildOptions), Arc<anyhow::Result<BuiltPackage>>>>,
 > = Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Whether [`shared_build_dir`] holds a built framework.
+fn framework_marker_present(shared: &Path) -> bool {
+    shared
+        .join(CompiledPackageLayout::Root.path())
+        .join("AptosFramework")
+        .join(CompiledPackageLayout::BuildInfo.path())
+        .exists()
+}
+
+/// Builds the framework into [`shared_build_dir`] once, and reports whether it
+/// is there.
+///
+/// Every test package depends on the framework as source, so without this each
+/// process compiles it again — ~14.5 s of a ~17 s test. Building it once means
+/// each process afterwards only *reads* those artifacts, which is what lets the
+/// tests themselves run unlocked and in parallel.
+///
+/// The readiness check is the presence of the framework's `BuildInfo.yaml`, and
+/// that is only sound because [`publish_once`] makes the directory appear
+/// atomically. A build writing in place would create it early and then rewrite
+/// the tree around it, so a concurrent process could read a directory that is
+/// being deleted — the failure the package lock exists to prevent, reappearing
+/// precisely because these tests skip the lock.
+///
+/// A failure is deliberately not fatal: the caller falls back to compiling the
+/// framework itself, which is slower and correct.
+fn framework_prebuilt() -> bool {
+    static PREBUILT: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *PREBUILT.get_or_init(|| {
+        let (Some(shared), Some(root)) = (shared_build_dir(), get_project_root().ok()) else {
+            return false;
+        };
+        if framework_marker_present(&shared) {
+            return true;
+        }
+        let framework = root.join("aptos-move/framework/aptos-framework");
+        publish_once(&shared, |staging| {
+            BuiltPackage::build(framework.clone(), BuildOptions {
+                install_dir: Some(staging.to_path_buf()),
+                modular_compilation: true,
+                ..BuildOptions::default()
+            })
+            .is_ok()
+        }) && framework_marker_present(&shared)
+    })
+}
+
+/// Produces `destination` by building into a private directory and renaming it
+/// into place, so it is never observed half-written.
+///
+/// Readers of a shared cache have no lock, so "exists" has to mean "complete".
+/// `rename` is the only step that makes a directory appear at once; building
+/// straight into `destination` publishes each file as it lands.
+///
+/// The rename fails when `destination` already exists and is non-empty, which
+/// is exactly the case where another process finished first — its copy is as
+/// good as ours, so ours is discarded.
+///
+/// Returns whether `destination` holds a complete build on return.
+fn publish_once(destination: &Path, build: impl FnOnce(&Path) -> bool) -> bool {
+    // Unique per call, not just per process, so concurrent callers within one
+    // process stage into separate directories.
+    static STAGING_SEQ: AtomicUsize = AtomicUsize::new(0);
+    let staging = destination.with_extension(format!(
+        "staging-{}-{}",
+        std::process::id(),
+        STAGING_SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = fs::remove_dir_all(&staging);
+
+    if !build(&staging) {
+        let _ = fs::remove_dir_all(&staging);
+        return false;
+    }
+    match fs::rename(&staging, destination) {
+        Ok(()) => true,
+        Err(_) => {
+            let _ = fs::remove_dir_all(&staging);
+            destination.exists()
+        },
+    }
+}
+
+/// The build directory every e2e test package shares.
+///
+/// One directory for the whole suite is what makes modular compilation worth
+/// anything here: with the default `install_dir: None` each package builds
+/// under its own directory, so the framework is compiled once *per test
+/// package* and reused by none.
+///
+/// It is only ever *read* by a test. Writes go to a private directory per
+/// build, which is what lets the builds run without the package lock — see
+/// [`apply_build_overrides`].
+///
+/// Under `target/` so that `cargo clean` disposes of it, and so it is per
+/// checkout rather than per machine. One subdirectory per compiler build: the
+/// framework there is never replaced, so a rebuilt compiler must not find the
+/// old one.
+fn shared_build_dir() -> Option<PathBuf> {
+    // Resolved here rather than at the call site so that every consumer agrees
+    // on one directory. `framework_prebuilt` checks for the framework and
+    // `apply_build_overrides` points the dependency cache at it; if those two
+    // disagreed, the check would pass against one directory while the build
+    // read an empty one, and the suite would silently lose the speedup.
+    let base = match std::env::var("APTOS_E2E_BUILD_DIR") {
+        Ok(dir) => PathBuf::from(dir),
+        Err(_) => get_project_root()
+            .ok()?
+            .join("target")
+            .join("move-e2e-build"),
+    };
+    let mut hasher = std::hash::DefaultHasher::new();
+    compiler_identity()?.hash(&mut hasher);
+    Some(base.join(format!("{:016x}", hasher.finish())))
+}
+
+/// Compiles e2e test packages against their dependencies' interfaces, reusing
+/// what has not changed.
+///
+/// Every test package depends on the framework as *source*, and recompiling it
+/// per test dominates the suite: a framework-dependent test takes ~17 s against
+/// ~2.7 s for one without, so ~14.5 s of it is the framework.
+///
+/// Three things have to hold together for that to pay off, and each was a
+/// separate failure first:
+///
+/// - **The framework is built once and then only read.**
+///   [`framework_prebuilt`] fills [`shared_build_dir`]; this build reads it
+///   through `dependency_cache_dir` and writes nothing to it.
+/// - **Writes go somewhere private.** Two builds sharing an output directory is
+///   what the package lock exists to prevent, and most packages here are named
+///   `test_package`, so they would collide on one slot that `save_to_disk`
+///   clears on every write. A directory per build removes the collision.
+/// - **Only then can the lock be skipped.** It is machine-global and wraps
+///   compilation, so with it every test in the suite compiles in turn: measured
+///   at ~71 % of the work serialized, and 109 s against 38 s for nine tests.
+///   Skipping it *without* the first two produces exactly the race it guards
+///   against — `No such file or directory`, four failures in the same nine.
+///
+/// On by default. Measured over the whole 398-test suite under `nextest`:
+/// **3574 s to 1945 s**, with two *more* tests passing and two fewer timeouts
+/// than the ordinary build. The timeouts that remain are a subset of the
+/// baseline's and are execution-heavy rather than compile-heavy.
+///
+/// Set `APTOS_E2E_MODULAR_COMPILATION=0` for the ordinary build, which is the
+/// first thing to try if a package build starts misbehaving.
+/// `APTOS_E2E_BUILD_DIR` overrides where the shared artifacts live.
+fn apply_build_overrides(mut options: BuildOptions, private_dir: &Path) -> BuildOptions {
+    if std::env::var("APTOS_E2E_MODULAR_COMPILATION").as_deref() == Ok("0") {
+        return options;
+    }
+    let Some(shared) = shared_build_dir() else {
+        return options;
+    };
+    if !framework_prebuilt() {
+        return options;
+    }
+
+    options.modular_compilation = true;
+    // Read the framework from the shared directory; write this package's own
+    // artifacts somewhere no other process touches. That split is what makes
+    // the build safe to run without the package lock, and skipping the lock is
+    // where the parallelism comes from — it is machine-global and wraps
+    // compilation, so with it every test in the suite compiles in turn.
+    options.dependency_cache_dir = Some(shared);
+    options.install_dir = Some(private_dir.to_path_buf());
+    options.exclusive_build_dir = true;
+    options
+}
+
 fn build_package_cached(path: &Path, options: BuildOptions) -> Arc<anyhow::Result<BuiltPackage>> {
     let key = (path.to_owned(), options.clone());
     let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
     Arc::clone(
         cache
             .entry(key)
-            .or_insert_with(|| Arc::new(BuiltPackage::build(path.to_owned(), options))),
+            .or_insert_with(|| Arc::new(build_package(path, options))),
     )
 }
+
+/// Builds `path` in a private directory that is removed on return.
+///
+/// Private so that concurrent builds cannot collide: most e2e packages share
+/// the name `test_package`. Nothing reads it afterwards. The reusable half
+/// lives in [`shared_build_dir`], and the root is always recompiled, so its
+/// units point at its sources rather than at copies here.
+///
+/// Runs on its own thread with [`BUILD_STACK_SIZE`]: exporting interfaces
+/// renders inline bodies recursively, and a 2 MiB test thread overflows while
+/// building the framework.
+fn build_package(path: &Path, options: BuildOptions) -> anyhow::Result<BuiltPackage> {
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .stack_size(BUILD_STACK_SIZE)
+            .spawn_scoped(scope, || {
+                let private_dir = tempfile::Builder::new()
+                    .prefix("aptos-e2e-build")
+                    .tempdir()?;
+                BuiltPackage::build(
+                    path.to_owned(),
+                    apply_build_overrides(options, private_dir.path()),
+                )
+            })
+            .expect("spawning the build thread")
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+    })
+}
+
+/// The stack CI gives every Rust test (`RUST_MIN_STACK` in
+/// `.github/actions/rust-unit-tests`), which builds the framework.
+const BUILD_STACK_SIZE: usize = 4_297_152;
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -1464,8 +1675,110 @@ impl move_package::package_hooks::PackageHooks for AptosPackageHooks {
 
 #[cfg(test)]
 mod tests {
+    use super::publish_once;
     use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
     use move_core_types::vm_status::AbortLocation;
+    use std::{
+        fs,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc, Barrier,
+        },
+        thread,
+        time::Duration,
+    };
+
+    /// A reader must never see the shared cache half-built.
+    ///
+    /// The e2e harness treats the presence of one file inside the shared
+    /// directory as proof the whole build is there, and then reads it without
+    /// the package lock. That is only safe if the directory appears all at
+    /// once. A build writing in place creates its marker early and keeps
+    /// writing — and, for the root package, deletes and rewrites the tree
+    /// afterwards — so a reader can find the marker over a directory that is
+    /// being removed.
+    ///
+    /// The fake build here reproduces that shape: marker first, payload later.
+    /// Readers assert the invariant the harness depends on — marker present
+    /// implies the build is complete. Against an in-place build this fails.
+    #[test]
+    fn publish_once_never_exposes_a_partial_build() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("cache");
+        let builders = 4;
+        let barrier = Arc::new(Barrier::new(builders));
+        let done = Arc::new(AtomicBool::new(false));
+
+        let readers = (0..2)
+            .map(|_| {
+                let destination = destination.clone();
+                let done = Arc::clone(&done);
+                thread::spawn(move || {
+                    while !done.load(Ordering::Relaxed) {
+                        if destination.join("marker").exists() {
+                            assert!(
+                                destination.join("payload").exists(),
+                                "a reader saw the marker before the build was complete"
+                            );
+                        }
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let publishers = (0..builders)
+            .map(|_| {
+                let destination = destination.clone();
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    publish_once(&destination, |staging| {
+                        fs::create_dir_all(staging).unwrap();
+                        fs::write(staging.join("marker"), b"").unwrap();
+                        // The window an in-place build would leave open.
+                        thread::sleep(Duration::from_millis(50));
+                        fs::write(staging.join("payload"), b"complete").unwrap();
+                        true
+                    })
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for publisher in publishers {
+            assert!(
+                publisher.join().unwrap(),
+                "every caller must report the cache as present"
+            );
+        }
+        done.store(true, Ordering::Relaxed);
+        for reader in readers {
+            reader.join().unwrap();
+        }
+
+        assert!(destination.join("payload").exists());
+        // Staging directories are siblings; none may be left behind.
+        let leftovers = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_name() != "cache")
+            .count();
+        assert_eq!(leftovers, 0, "a staging directory was left behind");
+    }
+
+    /// A failed build must publish nothing.
+    #[test]
+    fn publish_once_publishes_nothing_when_the_build_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("cache");
+        let published = publish_once(&destination, |staging| {
+            fs::create_dir_all(staging).unwrap();
+            fs::write(staging.join("marker"), b"").unwrap();
+            false
+        });
+        assert!(!published);
+        assert!(!destination.exists(), "a failed build must leave no cache");
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
 
     #[test]
     fn test_asserts() {
