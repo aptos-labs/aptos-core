@@ -85,6 +85,46 @@ pub struct BuildConfig {
     #[clap(long = "install-dir", value_parser, global = true)]
     pub install_dir: Option<PathBuf>,
 
+    /// Previously built packages to reuse, read but never written.
+    ///
+    /// A build normally looks for a reusable package only under its own
+    /// `install_dir`, which forces every caller that wants sharing to write to
+    /// one directory — and concurrent builds then collide there. Pointing this
+    /// at a directory built ahead of time separates the two: shared artifacts
+    /// are read-only, and everything this build produces still goes to
+    /// `install_dir`.
+    ///
+    /// Only consulted for *dependencies*. The root package is what this build
+    /// exists to produce, so a copy of it here is never reused.
+    ///
+    /// Only meaningful with [`BuildConfig::modular_compilation`], which is what
+    /// reuses packages individually.
+    #[clap(skip)]
+    // Defaulted so a `BuildInfo.yaml` written before this field existed still
+    // parses; a stale cache should be reusable, not a hard error.
+    #[serde(default)]
+    pub dependency_cache_dir: Option<PathBuf>,
+
+    /// Asserts that no other build running at the same time writes where this
+    /// one does, which lets it skip the machine-global package lock.
+    ///
+    /// Two conditions, both the caller's to guarantee:
+    ///
+    /// - Nothing else writes under this build's `install_dir` while it runs.
+    ///   Two builds sharing one directory is exactly what the lock exists to
+    ///   prevent; `save_to_disk` clears a package directory before writing it,
+    ///   so a concurrent reader sees files vanish.
+    /// - Nothing writes [`BuildConfig::dependency_cache_dir`] while it runs.
+    ///   Reading it is safe only if it is finished.
+    ///
+    /// Left `false`, a build takes the lock and is safe regardless. Setting it
+    /// without meeting the conditions does not fail cleanly: it surfaces as
+    /// `No such file or directory` from a directory another process is
+    /// rewriting.
+    #[clap(skip)]
+    #[serde(default)]
+    pub exclusive_build_dir: bool,
+
     /// Force recompilation of all packages
     #[clap(name = "force-recompilation", long = "force", global = true)]
     pub force_recompilation: bool,
@@ -106,6 +146,17 @@ pub struct BuildConfig {
     /// Skip fetching latest git dependencies
     #[clap(long = "skip-fetch-latest-git-deps", global = true)]
     pub skip_fetch_latest_git_deps: bool,
+
+    /// Compile each package separately, against its dependencies' XIR
+    /// interfaces rather than their sources, reusing cached packages whose
+    /// inputs are unchanged.
+    ///
+    /// Off by default. The monolithic path stays the reference: the modular
+    /// one must produce identical bytecode, and the equivalence tests are what
+    /// say whether it does.
+    #[clap(long = "modular-compilation", global = true)]
+    #[serde(default)]
+    pub modular_compilation: bool,
 
     #[clap(flatten)]
     pub compiler_config: CompilerConfig,
@@ -184,8 +235,9 @@ impl BuildConfig {
     /// failure.
     pub fn compile_package<W: Write>(self, path: &Path, writer: &mut W) -> Result<CompiledPackage> {
         let config = self.compiler_config.clone(); // Need clone because of mut self
+        let exclusive = self.exclusive_build_dir;
         let resolved_graph = self.resolution_graph_for_package(path, writer)?;
-        let mutx = PackageLock::lock();
+        let mutx = PackageLock::lock_unless_exclusive(exclusive);
         let ret = BuildPlan::create(resolved_graph)?.compile(&config, writer);
         mutx.unlock();
         ret
@@ -201,7 +253,7 @@ impl BuildConfig {
         writer: &mut W,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         let config = self.compiler_config.clone(); // Need clone because of mut self
-        let mutx = PackageLock::lock();
+        let mutx = PackageLock::lock_unless_exclusive(self.exclusive_build_dir);
         let ret =
             BuildPlan::create(resolved_graph)?.compile_no_exit(&config, external_checks, writer);
         mutx.unlock();
@@ -218,11 +270,12 @@ impl BuildConfig {
         driver: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         let config = self.compiler_config.clone();
-        let mutx = PackageLock::lock();
+        let mutx = PackageLock::lock_unless_exclusive(self.exclusive_build_dir);
         let ret = BuildPlan::create(resolved_graph)?.compile_with_driver(
             writer,
             &config,
             external_checks,
+            /*model_required*/ true,
             driver,
         );
         mutx.unlock();

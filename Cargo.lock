@@ -3321,6 +3321,7 @@ dependencies = [
  "project-root",
  "proptest",
  "serde",
+ "tempfile",
 ]
 
 [[package]]
@@ -13579,6 +13580,7 @@ dependencies = [
  "move-core-types",
  "move-docgen",
  "move-model",
+ "move-model-exchange",
  "move-stdlib",
  "move-symbol-pool",
  "named-lock",
@@ -13586,6 +13588,7 @@ dependencies = [
  "petgraph 0.6.5",
  "regex",
  "serde",
+ "serde_json",
  "serde_yaml 0.8.26",
  "sha2 0.9.9",
  "tempfile",

@@ -43,6 +43,27 @@ impl PackageLock {
         }
     }
 
+    /// As [`PackageLock::lock`], but skipped when the caller has guaranteed the
+    /// condition the lock exists to enforce.
+    ///
+    /// The lock is machine-global and wraps the whole build, compilation
+    /// included, so every concurrent Move build on the machine serializes —
+    /// measured at roughly half the wall time of an `e2e-move-tests` run. That
+    /// is the price of a blanket guarantee, and it is worth paying by default:
+    /// dropping it without meeting the condition produces `No such file or
+    /// directory` from a build directory another process is rewriting, which is
+    /// a confusing failure far from its cause.
+    ///
+    /// See [`crate::BuildConfig::exclusive_build_dir`] for what the caller must
+    /// guarantee.
+    pub(crate) fn lock_unless_exclusive(exclusive_build_dir: bool) -> PackageLock {
+        if exclusive_build_dir {
+            PackageLock::Inactive
+        } else {
+            Self::lock()
+        }
+    }
+
     /// A strict lock which is also required in a test.
     pub(crate) fn strict_lock() -> PackageLock {
         let thread_lock = PACKAGE_THREAD_MUTEX.lock().unwrap();

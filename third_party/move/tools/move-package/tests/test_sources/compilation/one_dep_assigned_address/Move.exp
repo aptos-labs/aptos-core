@@ -19,11 +19,14 @@ CompiledPackageInfo {
         install_dir: Some(
             "ELIDED_FOR_TEST",
         ),
+        dependency_cache_dir: None,
+        exclusive_build_dir: false,
         force_recompilation: false,
         additional_named_addresses: {},
         forced_named_addresses: {},
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: false,
+        modular_compilation: false,
         compiler_config: CompilerConfig {
             bytecode_version: None,
             known_attributes: {
