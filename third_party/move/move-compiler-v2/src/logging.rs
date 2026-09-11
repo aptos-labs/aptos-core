@@ -147,7 +147,7 @@ fn format_record_file(
         "[{} {}] {}",
         record.level(),
         record.module_path().unwrap_or_default(),
-        &record.args()
+        record.args()
     )
 }
 
@@ -162,7 +162,7 @@ fn format_record_file_ts(
         now.format("%H:%M:%S"),
         record.level(),
         record.module_path().unwrap_or_default(),
-        &record.args()
+        record.args()
     )
 }
 
@@ -178,7 +178,7 @@ fn format_record_colored(
         Level::Debug => "DEBUG".cyan().bold(),
         Level::Trace => "TRACE".normal(),
     };
-    write!(w, "[{}] {}", level_color, &record.args())
+    write!(w, "[{}] {}", level_color, record.args())
 }
 
 fn format_record_colored_ts(
@@ -198,6 +198,6 @@ fn format_record_colored_ts(
         "[{} {}] {}",
         now.format("%H:%M:%S"),
         level_color,
-        &record.args()
+        record.args()
     )
 }

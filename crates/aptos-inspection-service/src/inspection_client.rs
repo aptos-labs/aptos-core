@@ -99,8 +99,8 @@ impl InspectionClient {
                 (Ok(iv), Ok(fv)) => Ok((k, MetricValue::I64orF64(iv, fv))),
                 (Err(_), Err(_)) => Err(anyhow::format_err!(
                     "Failed to parse stat value to i64 or f64 {}: {}",
-                    &k,
-                    &v
+                    k,
+                    v
                 )),
             })
             .collect()

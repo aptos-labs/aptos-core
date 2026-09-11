@@ -259,14 +259,14 @@ fn patch_aptos_governance(
             .ok_or_else(|| {
                 anyhow!(
                     "failed to locate `fun {}`",
-                    &*FUNC_NAME_RESOLVE_MULTI_STEP_PROPOSAL
+                    *FUNC_NAME_RESOLVE_MULTI_STEP_PROPOSAL
                 )
             })?;
         func_def.acquires_global_resources = vec![];
         let code = func_def.code.as_mut().ok_or_else(|| {
             anyhow!(
                 "`fun {}` must have a Move-defined body",
-                &*FUNC_NAME_RESOLVE_MULTI_STEP_PROPOSAL
+                *FUNC_NAME_RESOLVE_MULTI_STEP_PROPOSAL
             )
         })?;
 
