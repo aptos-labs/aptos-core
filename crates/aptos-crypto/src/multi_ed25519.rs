@@ -358,7 +358,7 @@ impl MultiEd25519Signature {
         }
 
         let mut sorted_signatures = signatures;
-        sorted_signatures.sort_by(|a, b| a.1.cmp(&b.1));
+        sorted_signatures.sort_by_key(|a| a.1);
 
         let mut bitmap = [0u8; BITMAP_NUM_OF_BYTES];
 
