@@ -1246,13 +1246,13 @@ impl fmt::Display for ModuleDefinition {
 
 impl fmt::Display for ImportDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "import {} as {}", &self.ident, &self.alias)
+        write!(f, "import {} as {}", self.ident, self.alias)
     }
 }
 
 impl fmt::Display for ModuleDependency {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Dependency({}, ", &self.name)?;
+        write!(f, "Dependency({}, ", self.name)?;
         for sdep in &self.structs {
             writeln!(f, "{}, ", sdep)?
         }
@@ -1273,7 +1273,7 @@ impl fmt::Display for StructDependency {
                 .map(|a| format!("{}", a))
                 .collect::<Vec<_>>()
                 .join(" "),
-            &self.name,
+            self.name,
             format_struct_type_formals(&self.type_formals)
         )
     }
@@ -1281,7 +1281,7 @@ impl fmt::Display for StructDependency {
 
 impl fmt::Display for FunctionDependency {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FunctionDep({}{}", &self.name, &self.signature)
+        write!(f, "FunctionDep({}{}", self.name, self.signature)
     }
 }
 
@@ -1306,7 +1306,7 @@ impl fmt::Display for Constant {
         write!(
             f,
             "const {}: {} = {}",
-            &self.name.0,
+            self.name.0,
             self.signature,
             format_move_value(&self.value)
         )
@@ -1374,7 +1374,7 @@ impl fmt::Display for FunctionBody {
                 }
                 writeln!(f, "]")?;
                 for (label, block) in code {
-                    writeln!(f, "{}:", &label)?;
+                    writeln!(f, "{}:", label)?;
                     for instr in block {
                         writeln!(f, "  {}", instr)?;
                     }
@@ -1702,10 +1702,10 @@ impl fmt::Display for Bytecode_ {
             Bytecode_::Pop => write!(f, "Pop"),
             Bytecode_::Ret => write!(f, "Ret"),
             Bytecode_::Nop(None) => write!(f, "Nop"),
-            Bytecode_::Nop(Some(s)) => write!(f, "Nop {}", &s.0),
-            Bytecode_::BrTrue(lbl) => write!(f, "BrTrue {}", &lbl.0),
-            Bytecode_::BrFalse(lbl) => write!(f, "BrFalse {}", &lbl.0),
-            Bytecode_::Branch(lbl) => write!(f, "Branch {}", &lbl.0),
+            Bytecode_::Nop(Some(s)) => write!(f, "Nop {}", s.0),
+            Bytecode_::BrTrue(lbl) => write!(f, "BrTrue {}", lbl.0),
+            Bytecode_::BrFalse(lbl) => write!(f, "BrFalse {}", lbl.0),
+            Bytecode_::Branch(lbl) => write!(f, "Branch {}", lbl.0),
             Bytecode_::LdU8(u) => write!(f, "LdU8 {}", u),
             Bytecode_::LdU16(u) => write!(f, "LdU16 {}", u),
             Bytecode_::LdU32(u) => write!(f, "LdU32 {}", u),
@@ -1721,7 +1721,7 @@ impl fmt::Display for Bytecode_ {
             Bytecode_::LdTrue => write!(f, "LdTrue"),
             Bytecode_::LdFalse => write!(f, "LdFalse"),
             Bytecode_::LdConst(ty, v) => write!(f, "LdConst<{}> {}", ty, format_move_value(v)),
-            Bytecode_::LdNamedConst(n) => write!(f, "LdNamedConst {}", &n.0),
+            Bytecode_::LdNamedConst(n) => write!(f, "LdNamedConst {}", n.0),
             Bytecode_::CopyLoc(v) => write!(f, "CopyLoc {}", v),
             Bytecode_::MoveLoc(v) => write!(f, "MoveLoc {}", v),
             Bytecode_::StLoc(v) => write!(f, "StLoc {}", v),

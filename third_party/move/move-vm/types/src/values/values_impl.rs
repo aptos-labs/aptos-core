@@ -2384,7 +2384,7 @@ impl ContainerRef {
                         return Err(PartialVMError::new(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                         )
-                        .with_message(format!("cannot borrow vector element {:?}", &v[idx])))
+                        .with_message(format!("cannot borrow vector element {:?}", v[idx])))
                     },
                 }
             },
@@ -2418,7 +2418,7 @@ impl ContainerRef {
                         )
                         .with_message(format!(
                             "cannot borrow struct / locals element {:?}",
-                            &v[idx]
+                            v[idx]
                         )))
                     },
                 }
@@ -2522,7 +2522,7 @@ impl Locals {
 
             Value::ContainerRef(_) | Value::Invalid | Value::IndexedRef(_) => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("cannot borrow local {:?}", &v[idx])),
+                    .with_message(format!("cannot borrow local {:?}", v[idx])),
             ),
         }
     }
@@ -4801,7 +4801,7 @@ impl Display for ContainerRef {
             Self::Global {
                 status,
                 container: _,
-            } => write!(f, "(&container -- {:?})", &*status.borrow()),
+            } => write!(f, "(&container -- {:?})", *status.borrow()),
         }
     }
 }

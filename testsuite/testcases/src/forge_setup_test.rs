@@ -49,7 +49,7 @@ impl NetworkTest for ForgeSetupTest {
             for _ in 0..10 {
                 let query = format!(
                     "{}{{instance=\"{}\",type=\"synced\"}}",
-                    STATE_SYNC_VERSION_COUNTER_NAME, &fullnode_name
+                    STATE_SYNC_VERSION_COUNTER_NAME, fullnode_name
                 );
                 info!("PromQL Query {}", query);
                 let r = swarm.query_metrics(&query, None, None).await?;

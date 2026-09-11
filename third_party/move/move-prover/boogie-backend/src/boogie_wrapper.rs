@@ -1783,14 +1783,14 @@ impl ModelValue {
             )),
             Type::Primitive(PrimitiveType::Address) => {
                 let addr = BigInt::parse_bytes(&self.extract_literal()?.clone().into_bytes(), 10)?;
-                Some(PrettyDoc::text(format!("0x{}", &addr.to_str_radix(16))))
+                Some(PrettyDoc::text(format!("0x{}", addr.to_str_radix(16))))
             },
             Type::Primitive(PrimitiveType::Signer) => {
                 let l = self.extract_list("$signer")?;
                 let addr = BigInt::parse_bytes(&l[0].extract_literal()?.clone().into_bytes(), 10)?;
                 Some(PrettyDoc::text(format!(
                     "signer{{0x{}}}",
-                    &addr.to_str_radix(16)
+                    addr.to_str_radix(16)
                 )))
             },
             Type::Vector(param) => self.pretty_vector(wrapper, model, param),

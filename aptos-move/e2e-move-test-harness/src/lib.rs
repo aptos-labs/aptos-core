@@ -1289,12 +1289,16 @@ macro_rules! assert_abort {
         ));
     }};
     ($s:expr, $c:pat $(,)?) => {{
-        assert!(matches!(
-            $s,
-            aptos_types::transaction::TransactionStatus::Keep(
-                aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
-            ),
-        ));
+        // `$c` is allowed to be `_`, which makes `code: _` redundant with `..`.
+        #[allow(clippy::unneeded_wildcard_pattern)]
+        {
+            assert!(matches!(
+                $s,
+                aptos_types::transaction::TransactionStatus::Keep(
+                    aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
+                ),
+            ));
+        }
     }};
     ($s:expr, $c:ident, $($arg:tt)+) => {{
         assert!(
@@ -1309,15 +1313,19 @@ macro_rules! assert_abort {
         );
     }};
     ($s:expr, $c:pat, $($arg:tt)+) => {{
-        assert!(
-            matches!(
-                $s,
-                aptos_types::transaction::TransactionStatus::Keep(
-                    aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
+        // `$c` is allowed to be `_`, which makes `code: _` redundant with `..`.
+        #[allow(clippy::unneeded_wildcard_pattern)]
+        {
+            assert!(
+                matches!(
+                    $s,
+                    aptos_types::transaction::TransactionStatus::Keep(
+                        aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
+                    ),
                 ),
-            ),
-            $($arg)+
-        );
+                $($arg)+
+            );
+        }
     }};
 }
 

@@ -127,7 +127,7 @@ pub fn run_move_prover(
         bail!(
             "move prover options must not specify sources as those are given \
                      by the package system. Did you meant to prefix `{}` with `-t`?",
-            &options.move_sources[0]
+            options.move_sources[0]
         );
     }
     if !options.move_deps.is_empty() {
