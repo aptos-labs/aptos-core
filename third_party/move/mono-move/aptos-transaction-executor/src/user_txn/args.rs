@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Placing a transaction payload's wire-format arguments -- signer addresses
-//! and BCS blobs -- onto an entry function's parameters.
+//! and BCS blobs -- onto the payload's parameters.
 
 use crate::{
     calls::resolve_function_by_name,
@@ -15,7 +15,7 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 /// Fills the call in parameter order: signer parameters from the sender and
 /// secondary signers, everything else from the transaction's BCS arguments.
-fn place_user_txn_args<'a>(
+pub(super) fn place_user_txn_args<'a>(
     call: &mut CallBuilder<'a, '_>,
     sender: &'a AccountAddress,
     secondary_signers: &'a [AccountAddress],
@@ -72,8 +72,7 @@ fn place_user_txn_args<'a>(
     Ok(())
 }
 
-/// Runs the transaction's entry function on its wire-format arguments,
-/// metered against the transaction's gas budget.
+/// Runs the transaction's entry function, metered against the transaction's gas budget.
 pub(crate) fn call_entry_function<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,

@@ -38,6 +38,8 @@ impl MaterializationError {
 pub enum DiscardReason {
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
+    /// A payload or feature that no VM supports anymore.
+    Deprecated(&'static str),
     /// A pre-execution check failed.
     PreExecutionCheck(PreExecutionCheckFailure),
     /// A type argument failed to resolve.
@@ -125,6 +127,15 @@ pub enum InvalidArguments {
     UndecodableArgument,
 }
 
+/// Why a script was refused before running.
+#[derive(Debug)]
+pub enum ScriptRejection {
+    /// Its compiler marked it unstable, which mainnet does not run.
+    UnstableOnMainnet,
+    /// It emits events, which scripts may not.
+    EmitsEvents,
+}
+
 /// How Move execution failed, whether it was the prologue, the payload, the
 /// epilogue, or the transaction as a whole. What a failure means for the
 /// transaction is the driver's call.
@@ -138,6 +149,8 @@ pub enum MoveExecutionFailure {
     },
     /// The transaction's arguments were rejected.
     InvalidArguments(InvalidArguments),
+    /// The transaction's script was refused before running.
+    RejectedScript(ScriptRejection),
     /// Execution failed with a VM error.
     RuntimeError(VMInternalError),
 }

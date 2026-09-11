@@ -5,7 +5,7 @@
 
 use crate::errors::{
     is_cant_pay_fee_abort, DiscardReason, ExecutionStage, ExecutionStatus, InvalidArguments,
-    MoveExecutionFailure, PreExecutionCheckFailure,
+    MoveExecutionFailure, PreExecutionCheckFailure, ScriptRejection,
 };
 use aptos_types::{
     error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
@@ -121,6 +121,10 @@ fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
 pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
     match reason {
         DiscardReason::Unsupported(msg) => unsupported_status(msg),
+        DiscardReason::Deprecated(what) => VMStatus::error(
+            StatusCode::FEATURE_UNDER_GATING,
+            Some(format!("{what} is no longer supported")),
+        ),
         DiscardReason::PreExecutionCheck(failure) => pre_execution_check_status(failure),
         DiscardReason::InvalidTypeArgument(detail) => {
             VMStatus::error(StatusCode::TYPE_RESOLUTION_FAILURE, Some(detail))
@@ -195,6 +199,19 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
                 None,
             )
         },
+        MoveExecutionFailure::RejectedScript(rejection)
+            if matches!(stage, ExecutionStage::Payload) =>
+        {
+            match rejection {
+                ScriptRejection::UnstableOnMainnet => VMStatus::error(
+                    StatusCode::UNSTABLE_BYTECODE_REJECTED,
+                    Some("script marked unstable cannot be run on mainnet".to_string()),
+                ),
+                ScriptRejection::EmitsEvents => {
+                    VMStatus::error(StatusCode::INVALID_OPERATION_IN_SCRIPT, None)
+                },
+            }
+        },
         MoveExecutionFailure::RuntimeError(err) if matches!(stage, ExecutionStage::Payload) => {
             internal_error_to_status(err)
         },
@@ -235,8 +252,9 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
         MoveExecutionFailure::RuntimeError(err) => {
             return unexpected_validation_error("prologue", err.to_string())
         },
-        // The prologue takes no payload arguments.
-        failure @ MoveExecutionFailure::InvalidArguments(_) => {
+        // The prologue takes no payload arguments and runs no script.
+        failure @ (MoveExecutionFailure::InvalidArguments(_)
+        | MoveExecutionFailure::RejectedScript(_)) => {
             return unexpected_validation_error("prologue", format!("{failure:?}"))
         },
     };
