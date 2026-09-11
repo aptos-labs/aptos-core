@@ -40,7 +40,9 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
 };
-use move_package::package_hooks::register_package_hooks;
+use move_package::{
+    compilation::package_layout::CompiledPackageLayout, package_hooks::register_package_hooks,
+};
 use once_cell::sync::Lazy;
 use project_root::get_project_root;
 use proptest::strategy::{BoxedStrategy, Just, Strategy};
@@ -60,7 +62,155 @@ static CACHED_BUILT_PACKAGES: Lazy<
     Mutex<HashMap<(PathBuf, BuildOptions), Arc<anyhow::Result<BuiltPackage>>>>,
 > = Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Builds the framework into [`shared_build_dir`] once, and reports whether it
+/// is there.
+///
+/// Every test package depends on the framework as source, so without this each
+/// process compiles it again — ~14.5 s of a ~17 s test. Building it here, under
+/// the package lock and behind a `Once`, means each process afterwards only
+/// *reads* those artifacts, which is what lets the tests themselves run
+/// unlocked and in parallel.
+///
+/// The `Once` covers threads in this process; the package lock covers the other
+/// processes `nextest` runs. A loser of that race re-checks the cache, finds it
+/// valid and writes nothing, so the work happens once in practice and is
+/// harmless if it does not.
+///
+/// A failure is deliberately not fatal: the caller falls back to compiling the
+/// framework itself, which is slower and correct.
+fn framework_prebuilt() -> bool {
+    static PREBUILT: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *PREBUILT.get_or_init(|| {
+        let (Some(shared), Some(root)) = (shared_build_dir(), get_project_root().ok()) else {
+            return false;
+        };
+        // Cheap gate: building is a full compile of a 99-module package, and
+        // with a process per test the *check* has to cost nothing. Presence is
+        // enough because it is not what makes the result correct — each test's
+        // own build revalidates these artifacts against their sources, so a
+        // stale directory here costs a rebuild, never a wrong answer.
+        if shared
+            .join(CompiledPackageLayout::Root.path())
+            .join("AptosFramework")
+            .join(CompiledPackageLayout::BuildInfo.path())
+            .exists()
+        {
+            return true;
+        }
+        let framework = root.join("aptos-move/framework/aptos-framework");
+        BuiltPackage::build(framework, BuildOptions {
+            install_dir: Some(shared),
+            modular_compilation: true,
+            ..BuildOptions::default()
+        })
+        .is_ok()
+    })
+}
+
+/// The build directory every e2e test package shares.
+///
+/// One directory for the whole suite is what makes modular compilation worth
+/// anything here: with the default `install_dir: None` each package builds
+/// under its own directory, so the framework is compiled once *per test
+/// package* and reused by none.
+///
+/// It is only ever *read* by a test. Writes go to a private subdirectory per
+/// process, which is what lets the builds run without the package lock — see
+/// [`apply_build_overrides`].
+///
+/// Under `target/` so that `cargo clean` disposes of it, and so it is per
+/// checkout rather than per machine.
+fn shared_build_dir() -> Option<PathBuf> {
+    Some(
+        get_project_root()
+            .ok()?
+            .join("target")
+            .join("move-e2e-build"),
+    )
+}
+
+/// Compiles e2e test packages against their dependencies' interfaces, reusing
+/// what has not changed.
+///
+/// Every test package depends on the framework as *source*, and recompiling it
+/// per test dominates the suite: a framework-dependent test takes ~17 s against
+/// ~2.7 s for one without, so ~14.5 s of it is the framework.
+///
+/// Three things have to hold together for that to pay off, and each was a
+/// separate failure first:
+///
+/// - **The framework is built once and then only read.**
+///   [`framework_prebuilt`] fills [`shared_build_dir`]; this build reads it
+///   through `dependency_cache_dir` and writes nothing to it.
+/// - **Writes go somewhere private.** Two builds sharing an output directory is
+///   what the package lock exists to prevent, and most packages here are named
+///   `test_package`, so they would collide on one slot that `save_to_disk`
+///   clears on every write. A directory per process removes the collision.
+/// - **Only then can the lock be skipped.** It is machine-global and wraps
+///   compilation, so with it every test in the suite compiles in turn: measured
+///   at ~71 % of the work serialized, and 109 s against 38 s for nine tests.
+///   Skipping it *without* the first two produces exactly the race it guards
+///   against — `No such file or directory`, four failures in the same nine.
+///
+/// On by default. Measured over the whole 398-test suite under `nextest`:
+/// **3574 s to 1945 s**, with two *more* tests passing and two fewer timeouts
+/// than the ordinary build. The timeouts that remain are a subset of the
+/// baseline's and are execution-heavy rather than compile-heavy.
+///
+/// Set `APTOS_E2E_MODULAR_COMPILATION=0` for the ordinary build, which is the
+/// first thing to try if a package build starts misbehaving.
+/// `APTOS_E2E_BUILD_DIR` overrides where the shared artifacts live.
+fn apply_build_overrides(mut options: BuildOptions) -> BuildOptions {
+    if std::env::var("APTOS_E2E_MODULAR_COMPILATION").as_deref() == Ok("0") {
+        return options;
+    }
+    let Some(shared) = std::env::var("APTOS_E2E_BUILD_DIR")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(shared_build_dir)
+    else {
+        return options;
+    };
+    if !framework_prebuilt() {
+        return options;
+    }
+
+    options.modular_compilation = true;
+    // Read the framework from the shared directory; write this package's own
+    // artifacts somewhere no other process touches. That split is what makes
+    // the build safe to run without the package lock, and skipping the lock is
+    // where the parallelism comes from — it is machine-global and wraps
+    // compilation, so with it every test in the suite compiles in turn.
+    options.dependency_cache_dir = Some(shared);
+    options.install_dir = Some(private_build_dir().to_path_buf());
+    options.exclusive_build_dir = true;
+    options
+}
+
+/// This process's own build directory, removed when it exits.
+///
+/// Private so that concurrent tests cannot collide — most e2e packages share
+/// the name `test_package`, so one shared directory gives them one slot.
+/// Temporary because the contents are worth ~14 MB per process and are never
+/// read again: the reusable half lives in [`shared_build_dir`], and what lands
+/// here is this package plus copies of its dependencies' artifacts that
+/// `save_to_disk` writes as part of the package layout.
+///
+/// Leaked if the process is killed rather than returning, which is what the
+/// system temporary directory is for.
+fn private_build_dir() -> &'static Path {
+    static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        tempfile::Builder::new()
+            .prefix("aptos-e2e-build")
+            .tempdir()
+            .expect("a temporary build directory")
+    })
+    .path()
+}
+
 fn build_package_cached(path: &Path, options: BuildOptions) -> Arc<anyhow::Result<BuiltPackage>> {
+    let options = apply_build_overrides(options);
     let key = (path.to_owned(), options.clone());
     let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
     Arc::clone(
