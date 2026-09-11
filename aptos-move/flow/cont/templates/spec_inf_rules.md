@@ -10,9 +10,15 @@ Specification inference is a compile-and-prove loop, not a test loop:
   done, and is the only thing that does.
 - `{{ tool(name="move_package_verify") }}` localizes a verification failure
   after the candidate check reports one.
-- `{{ tool(name="move_package_status") }}`,
-  `{{ tool(name="move_package_manifest") }}` and
-  `{{ tool(name="move_package_query") }}` answer questions about the package.
+- `{{ tool(name="move_package_manifest") }}` and targeted
+  `{{ tool(name="move_package_query") }}` calls answer specific questions about
+  package layout or the target's dependencies. Do not run either routinely.
+
+Do not call `{{ tool(name="move_package_status") }}` as inference setup or as
+an after-edit check. WP, verification, and the candidate check already compile
+the package and return the diagnostics needed for their respective steps. If
+you need file or module information, use the manifest or the narrowest
+structural query instead.
 
 Nothing else is part of this task. In particular, running the package's unit
 tests says nothing about whether a specification holds: the prover reasons over
