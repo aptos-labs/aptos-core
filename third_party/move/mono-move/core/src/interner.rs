@@ -11,8 +11,9 @@ use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
+    ident_str,
     identifier::{IdentStr, Identifier},
-    language_storage::{self, StructTag, TypeTag},
+    language_storage::{self, pseudo_script_module_id, StructTag, TypeTag},
 };
 use thiserror::Error;
 
@@ -228,14 +229,34 @@ pub fn type_tag_of(ty: InternedType) -> Option<TypeTag> {
     })
 }
 
-/// The owned [`language_storage::ModuleId`] for an interned module ID, or
-/// [`None`] if the interned name is not a valid identifier.
-pub fn module_id_of(module_id: InternedModuleId) -> Option<language_storage::ModuleId> {
+/// The owned [`language_storage::ModuleId`] for an interned module ID.
+///
+/// Every interning entry point takes an [`IdentStr`], so an interned module
+/// name is always a valid identifier.
+pub fn module_id_of(module_id: InternedModuleId) -> language_storage::ModuleId {
     let module_id = view_module_id(module_id);
-    Some(language_storage::ModuleId::new(
-        *module_id.address(),
-        Identifier::new(view_name(module_id.name())).ok()?,
-    ))
+    let name = view_name(module_id.name());
+    debug_assert!(
+        Identifier::is_valid(name),
+        "interned module name is not a valid identifier"
+    );
+    language_storage::ModuleId::new(*module_id.address(), Identifier::new_unchecked(name))
+}
+
+/// The name of a script's one function, and of the module a script is loaded
+/// as.
+pub const SCRIPT_MAIN: &IdentStr = ident_str!("main");
+
+/// The module ID every loaded script takes.
+pub fn script_module_id(interner: &impl Interner) -> InternedModuleId {
+    interner.module_id_of(&pseudo_script_module_id().address, SCRIPT_MAIN)
+}
+
+/// Whether `module_id` is the one loaded scripts take.
+pub fn is_script_module_id(module_id: InternedModuleId) -> bool {
+    let module_id = view_module_id(module_id);
+    module_id.address() == &pseudo_script_module_id().address
+        && view_name(module_id.name()) == SCRIPT_MAIN.as_str()
 }
 
 /// The [`StructTag`] for an interned nominal (struct/enum) type, or [`None`] if

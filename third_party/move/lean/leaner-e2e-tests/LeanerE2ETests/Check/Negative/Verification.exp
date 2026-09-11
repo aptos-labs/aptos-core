@@ -1,0 +1,4 @@
+LeanerE2ETests/Check/Negative/Verification.lean:12:4: error: the specification clause `ensures result == value` is not established
+LeanerE2ETests/Check/Negative/Verification.lean:19:9: error: leaner verification failed
+LeanerE2ETests/Check/Negative/Verification.lean:16:4: error: the specification clause `ensures result == value + 1` is not established
+LeanerE2ETests/Check/Negative/Verification.lean:20:9: error: leaner verification failed

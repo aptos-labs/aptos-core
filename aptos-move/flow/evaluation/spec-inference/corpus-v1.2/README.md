@@ -1,7 +1,7 @@
 # Move specification-inference corpus
 
 This is the human-inspectable source catalog for the corpus prepared from Aptos
-Core commit `1ffaa408ec8899d19e0933b1680dce339051cd9f`. Every experimental arm receives the same source
+Core commit `950e413e46090d2056740c36dd7a77b1764b6936`. Every experimental arm receives the same source
 hash for a sample; treatment-specific skills and tools are stored separately.
 
 ## Metadata
@@ -12,15 +12,15 @@ hash for a sample; treatment-specific skills and tools are stored separately.
   complete compiler-AST source frame.
 - [`metadata/selection.json`](metadata/selection.json): inclusion, exclusion,
   reserve, and replacement decisions.
-- [`screening/ledger.json`](screening/ledger.json) and
-  [`screening/results/`](screening/results/): compatibility evidence, valid for
-  the current corpus only when its identity is recorded by `manifest.json`.
+- [`screening/summary.json`](screening/summary.json) and
+  [`screening/state-label-repair-005/`](screening/state-label-repair-005/): current
+  compatibility evidence; historical results remain under `screening/results/`.
 
 ## Shared editable framework
 
 [`framework/`](framework/) is the only Move package stored by the corpus. It
 contains 154 modules and
-265 Move source/specification files: the union
+257 Move source/specification files: the union
 of all targets and their source-level transitive dependencies. Named addresses,
 original paths, and the exact module-to-file mapping are in
 [`framework/corpus-modules.json`](framework/corpus-modules.json).

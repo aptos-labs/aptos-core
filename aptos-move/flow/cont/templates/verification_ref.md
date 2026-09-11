@@ -9,7 +9,8 @@
 Call `{{ tool(name="move_package_verify") }}` with `package_path` and an explicit
 timeout. Its optional controls are:
 
-- `filter: "module"` or `"module::function"` for a focused proof;
+- `filter: "module"`, `"module::function"`, or `"address::module::function"`
+  for a focused proof (numeric or named address; bare module names must be unambiguous);
 - `exclude: [...]` to omit known targets temporarily while diagnosing others;
 - `split_vcs_by_assert: true` to identify which assertion in a function is hard
   or false;
@@ -42,6 +43,26 @@ solver chose. Read the notation before drawing conclusions from it.
   ``<some `T`>`` is a function of type `T` the solver picked with nothing
   tying it to a source entity.
 
+### Interpreting abort codes
+
+Before diagnosing an abort-code mismatch, read the dependency's `error.move`
+(in this repository, `aptos-move/framework/move-stdlib/sources/error.move`).
+The `std::error::canonical` contract is deliberately opaque: its `[abstract]`
+postcondition returns only the category, while its `[concrete]` postcondition
+describes the runtime encoding `(category << 16) + reason`.
+
+For example, `error::invalid_argument(40)` encodes `0x10028` at runtime, but
+under that abstract contract the prover sees category `0x1`
+(`error::INVALID_ARGUMENT`). A category-only counterexample is therefore not
+by itself a tool bug or evidence that the runtime reason was lost.
+
+Trace the helper and the contract actually used by the proof before choosing
+an `aborts_if ... with ...` code. Where the abstract contract applies, use its
+category constant; runtime unit tests still use the concrete encoded code.
+Do not apply category decoding to arbitrary module-local abort codes, change
+stdlib contracts, drop abort-code checks, or enable partial abort checking
+just to make a mismatch disappear.
+
 ### Classify before editing
 
 - **Compilation/spec-language error:** fix syntax, name resolution, placement,
@@ -51,7 +72,8 @@ solver chose. Read the notation before drawing conclusions from it.
   or a loop invariant loses the needed fact.
 - **Abort counterexample:** enumerate direct and transitive aborts, including
   arithmetic, indexing, resources, and opaque callees. Complete the exact abort
-  behavior; do not turn on partial abort checking.
+  behavior, retaining inherited partial abort coverage only where the callee
+  contract itself is partial.
 - **Frame failure:** compare executable global writes with `modifies` clauses,
   especially across opaque callees.
 - **Invariant failure:** separately check initialization, preservation, and the
@@ -111,8 +133,8 @@ from the smallest failing function. Preserve contract meaning:
    Put `[weight = N]` on a recursive helper or a `forall ... apply` that the
    analysis names, so the solver stops unrolling or instantiating it on its
    own.
-6. Increase the per-condition timeout only after improving the proof shape, up
-   to {{ args.max_verification_timeout }}.
+6. Increase the per-condition timeout when warranted. The usual retry guidance
+   is {{ args.max_verification_timeout }} seconds, not a hard limit.
 
 Data invariants and global update invariants may help when they express genuine
 properties preserved by **every** constructor or mutator. They create new proof

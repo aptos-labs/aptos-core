@@ -24,12 +24,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from .artifacts import sha256_file
+from .artifacts import _walk, sha256_file, write_json
 from .boogie_proxy import BoogieProxy
 from .config import ExperimentConfig, RunSpec
+from .credentials import redact_tree
+from .sdk_metrics import write_sdk_metrics
 
 
-POLICY_VERSION = 3
+POLICY_VERSION = 4
 # Landlock confines the agent process itself to a subset of what the sandbox
 # mounts, so the outer namespace and the inner ruleset are two independent
 # layers rather than one repeated.
@@ -667,19 +669,59 @@ def run_isolated(launch: Launch) -> int:
     with _cleanup_on_termination():
         try:
             command = build_bwrap_command(launch, staging)
-            process = subprocess.run(command, check=False)
+            process = subprocess.run(
+                command, check=False, env=build_bwrap_environment(launch)
+            )
             staged_run = staging / launch.run_id
-            if staged_run.exists():
+            if (staged_run / "judge.json").is_file():
                 if published.exists():
                     raise RuntimeError(f"refusing to overwrite run artifact: {published}")
                 staged_run.rename(published)
-            return process.returncode
+            elif staged_run.exists():
+                preserve_interrupted_run(staged_run, launch.artifacts, "no terminal judge")
+            return process.returncode if (published / "judge.json").is_file() else (process.returncode or 1)
+        except BaseException as error:
+            staged_run = staging / launch.run_id
+            if staged_run.exists():
+                preserve_interrupted_run(staged_run, launch.artifacts, type(error).__name__)
+            raise
         finally:
             shutil.rmtree(staging, ignore_errors=True)
             try:
                 staging_parent.rmdir()
             except OSError:
                 pass
+
+
+def preserve_interrupted_run(staged_run: Path, artifacts: Path, reason: str) -> Path:
+    """Retain redacted evidence outside the published outcomes and agent mounts.
+
+    This runs after the sandbox child has exited. Never expose sandbox-home or
+    writable symlinks, and never manufacture a terminal judge for partial work.
+    """
+    for path in _walk(staged_run):
+        if path.is_symlink():
+            path.unlink()
+    redact_tree(staged_run)
+    metrics_error = None
+    events = staged_run / "claude-events.jsonl"
+    if events.is_file():
+        try:
+            write_sdk_metrics(events, staged_run / "sdk-metrics.json", allow_incomplete_tail=True)
+        except (ValueError, UnicodeDecodeError, KeyError) as error:
+            # Keep corrupt raw evidence rather than losing the entire session.
+            metrics_error = type(error).__name__
+    write_json(staged_run / "interruption.json", {
+        "schema_version": 1, "run_id": staged_run.name,
+        "status": "interrupted", "reason": reason, "metrics_error": metrics_error,
+        "usage_complete": False,
+    })
+    archive_root = artifacts.parent / "interrupted-runs"
+    archive_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    archive = Path(tempfile.mkdtemp(prefix=f"{staged_run.name}.", dir=archive_root))
+    destination = archive / staged_run.name
+    staged_run.rename(destination)
+    return destination
 
 
 @contextlib.contextmanager
@@ -793,6 +835,22 @@ def build_bwrap_command(launch: Launch, staging: Path) -> list[str]:
             ("--bind" if writable else "--ro-bind", str(source), str(target))
         )
 
+    # Bubblewrap inherits the deliberately minimized environment supplied by
+    # run_isolated.  Do not spell environment values with bwrap --setenv:
+    # command-line inspection would then expose subscription credentials.
+    command.extend(("--chdir", str(launch.evaluation_root), "--"))
+    command.extend(launch.command)
+    return command
+
+
+def build_bwrap_environment(launch: Launch) -> dict[str, str]:
+    """Return the complete environment inherited by bwrap and its child.
+
+    Passing this mapping through subprocess keeps credentials out of the
+    process argument list.  Because bwrap receives only this mapping, its
+    inherited environment is equivalent to the former --clearenv/--setenv
+    policy without exposing values through argv.
+    """
     executable_dirs = _unique(
         [
             str(Path(launch.command[0]).parent),
@@ -820,8 +878,8 @@ def build_bwrap_command(launch: Launch, staging: Path) -> list[str]:
         # what it finds rather than only what is first on PATH.
         "CLAUDE_CODE_EXECUTABLE": "/opt/bin/claude",
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        # This capability marker is deliberately created by the wrapper after
-        # --clearenv.  The parent launcher removes any host-provided value, so
+        # This capability marker is deliberately created in the minimized
+        # environment. The parent launcher removes any host-provided value, so
         # only a controller running inside this policy can pass the real-run
         # guard.
         "MOVE_INFERENCE_EVAL_SANDBOXED": "1",
@@ -829,18 +887,14 @@ def build_bwrap_command(launch: Launch, staging: Path) -> list[str]:
     for name in (
         "ANTHROPIC_AUTH_TOKEN",
         "ANTHROPIC_API_KEY",
+        "CLAUDE_CODE_OAUTH_TOKEN",
         "ANTHROPIC_BASE_URL",
         "SSL_CERT_FILE",
         "SSL_CERT_DIR",
     ):
         if value := os.environ.get(name):
             environment[name] = value
-    command.append("--clearenv")
-    for name, value in environment.items():
-        command.extend(("--setenv", name, value))
-    command.extend(("--chdir", str(launch.evaluation_root), "--"))
-    command.extend(launch.command)
-    return command
+    return environment
 
 
 def agent_landlock_paths(launch: Launch) -> tuple[list[Path], list[Path]]:

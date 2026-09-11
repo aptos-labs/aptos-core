@@ -60,7 +60,8 @@ pub(crate) fn check_output(
     Ok(())
 }
 
-/// Asserts MonoMove's failure, mapped into V1 terms, matches the one V1 reported.
+/// Asserts that MonoMove's mapped status, sub-status, message, and error
+/// location match V1's failure.
 fn check_error_parity(v1: &Output, v2: &Output) -> anyhow::Result<()> {
     let expected = match &v1.parity {
         ParityOutcome::Comparable(expected) => expected,
@@ -80,7 +81,7 @@ fn check_error_parity(v1: &Output, v2: &Output) -> anyhow::Result<()> {
         ParityOutcome::Unmappable => unreachable!("V1 states its own errors"),
     };
     match &v2.parity {
-        ParityOutcome::Comparable(actual) if actual == expected => Ok(()),
+        ParityOutcome::Comparable(actual) if actual.agrees_with(expected) => Ok(()),
         ParityOutcome::Comparable(actual) => bail!(
             "CHECK-ERROR-PARITY mismatch:\n  V1: {}\n  V2: {}",
             expected,

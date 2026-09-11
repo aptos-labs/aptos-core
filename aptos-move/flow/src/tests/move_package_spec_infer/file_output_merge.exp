@@ -3,12 +3,18 @@ inference succeeded, wrote spec files for 1 file(s) (read the files to see the c
 
 === source (untouched) ===
 module 0xCAFE::mergetest {
+    use 0xCAFE::types::External;
+
     fun add_one(x: u64): u64 {
         x + 1
     }
 
     fun double(x: u64): u64 {
         x * 2
+    }
+
+    fun identity(value: External): External {
+        value
     }
 }
 === spec file (merged) ===
@@ -27,6 +33,13 @@ spec 0xCAFE::mergetest {
         pragma opaque = true;
         ensures [inferred] result == x * 2;
         aborts_if [inferred] x * 2 > MAX_U64;
+    }
+
+    spec identity(value: 0xcafe::types::External): 0xcafe::types::External {
+        use 0xcafe::types;
+        pragma opaque = true;
+        ensures [inferred] result == value;
+        aborts_if [inferred] false;
     }
 
 }

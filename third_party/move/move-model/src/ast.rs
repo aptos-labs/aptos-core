@@ -2898,6 +2898,7 @@ impl ExpData {
                         | SingleVec
                         | UpdateVec
                         | ConcatVec
+                        | ReverseVec
                         | IndexOfVec
                         | ContainsVec
                         | InRangeRange
@@ -2998,8 +2999,8 @@ impl ExpData {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
-                    Index | Slice | ConcatVec | EmptyVec | SingleVec | UpdateVec | IndexOfVec
-                    | ContainsVec | InRangeVec | RangeVec => {
+                    Index | Slice | ConcatVec | ReverseVec | EmptyVec | SingleVec | UpdateVec
+                    | IndexOfVec | ContainsVec | InRangeVec | RangeVec => {
                         usage.insert(oper.clone());
                     },
                     _ => {},
@@ -3215,6 +3216,7 @@ fn op_inst_dependent_in_spec(op: &Operation) -> bool {
             | Operation::Index
             | Operation::Slice
             | Operation::ConcatVec
+            | Operation::ReverseVec
             | Operation::SingleVec
             | Operation::UpdateVec
             | Operation::ContainsVec
@@ -3581,6 +3583,7 @@ pub enum Operation {
     SingleVec,
     UpdateVec,
     ConcatVec,
+    ReverseVec,
     IndexOfVec,
     ContainsVec,
     InRangeRange,
@@ -4577,6 +4580,7 @@ impl Operation {
             SingleVec => false,    // Spec
             UpdateVec => false,    // Spec
             ConcatVec => false,    // Spec
+            ReverseVec => false,   // Spec
             IndexOfVec => false,   // Spec
             ContainsVec => false,  // Spec
             InRangeRange => false, // Spec

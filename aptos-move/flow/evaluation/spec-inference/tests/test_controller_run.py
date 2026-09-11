@@ -208,6 +208,7 @@ class ControllerRunTest(unittest.TestCase):
                 script_path,
                 None,
             )
+            self.assertIn("--no-package-cache", controller._move_flow_args())
             # The plugin hash is checked against the run manifest; the fixture
             # manifest is generated here rather than pinned.
             with (

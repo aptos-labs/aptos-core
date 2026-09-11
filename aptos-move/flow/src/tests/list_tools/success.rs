@@ -128,6 +128,64 @@ async fn telemetry_pairs_tool_start_and_end_for_success_and_failure() {
     assert_eq!(records[3]["outcome"], "rpc_error");
 }
 
+#[tokio::test]
+async fn concurrent_tool_calls_are_serialized() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("events.jsonl");
+    let client = common::make_client_with_telemetry(InferenceTactic::HybridGuided, &path).await;
+    let package = common::make_package("serial", &[(
+        "m.move",
+        "module serial::m { public fun f(): u64 { 1 } }",
+    )]);
+    let arguments = serde_json::json!({"package_path": package.path()});
+
+    let calls = tokio::join!(
+        common::call_tool(&client, "move_package_status", arguments.clone()),
+        common::call_tool(&client, "move_package_status", arguments),
+    );
+    assert_ne!(calls.0.is_error, Some(true));
+    assert_ne!(calls.1.is_error, Some(true));
+
+    let events: Vec<String> = std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .filter_map(|record| record["event"].as_str().map(str::to_owned))
+        .filter(|event| matches!(event.as_str(), "tool_start" | "tool_end"))
+        .collect();
+    assert_eq!(events, ["tool_start", "tool_end", "tool_start", "tool_end"]);
+}
+
+#[tokio::test]
+async fn disabled_package_cache_never_reuses_or_watches_a_build() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("events.jsonl");
+    let client =
+        common::make_client_without_package_cache(InferenceTactic::HybridGuided, &path).await;
+    let package = common::make_package("uncached", &[(
+        "m.move",
+        "module uncached::m { public fun f(): u64 { 1 } }",
+    )]);
+    let arguments = serde_json::json!({"package_path": package.path()});
+
+    for _ in 0..2 {
+        let result = common::call_tool(&client, "move_package_status", arguments.clone()).await;
+        assert_ne!(result.is_error, Some(true));
+    }
+
+    let resolves: Vec<serde_json::Value> = std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .filter(|record: &serde_json::Value| record["event"] == "package_resolve")
+        .collect();
+    assert_eq!(resolves.len(), 2);
+    assert!(resolves.iter().all(|record| record["cache_hit"] == false));
+    assert!(resolves
+        .iter()
+        .all(|record| record["watched_directories"] == 0));
+}
+
 #[test]
 fn an_evaluation_session_serves_no_network_egress_tool() {
     // A measured session denies Bash, WebFetch and WebSearch so that MCP tools

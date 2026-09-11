@@ -14,8 +14,9 @@ use crate::{
         boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
         boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
         boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
-        boogie_type, boogie_type_suffix, boogie_value_blob, boogie_variant_field_update,
-        boogie_well_formed_expr, bv_flag_for_type, compute_evaluator_memory_union, MAX_TUPLE_SIZE,
+        boogie_type, boogie_type_for_struct_field, boogie_type_suffix, boogie_value_blob,
+        boogie_variant_field_update, boogie_well_formed_expr, bv_flag_for_type,
+        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     bytecode_translator::has_native_equality,
     options::BoogieOptions,
@@ -2118,6 +2119,7 @@ impl SpecTranslator<'_> {
                 ),
             Operation::UpdateVec => self.translate_primitive_call("UpdateVec", args),
             Operation::ConcatVec => self.translate_primitive_call("ConcatVec", args),
+            Operation::ReverseVec => self.translate_primitive_call("ReverseVec", args),
             Operation::EmptyVec => self.translate_primitive_inst_call(node_id, "$EmptyVec", args),
             Operation::SingleVec => self.translate_primitive_call("MakeVec1", args),
             Operation::IndexOfVec => {
@@ -4368,6 +4370,16 @@ impl SpecTranslator<'_> {
         emit!(self.writer, "({} ", kind);
         let mut quant_vars = HashMap::new();
         let mut resource_vars = HashMap::new();
+        // Constructor patterns keep concrete intermediate values available to
+        // E-matching after projecting a value-state binder onto datatype fields.
+        // Mixed memory/value domains and user triggers retain their original encoding.
+        let expand_value_states = triggers.is_empty()
+            && state_domain_labels.values().all(BTreeSet::is_empty)
+            && ranges
+                .iter()
+                .all(|(_, range)| matches!(self.get_node_type(range.node_id()), Type::StateDomain));
+        let mut state_patterns = vec![];
+        let mut state_patterns_complete = true;
         let mut comma = "";
         for (var, range) in ranges {
             let (_, var_name) = self.require_range_var(var);
@@ -4433,6 +4445,51 @@ impl SpecTranslator<'_> {
                             } else {
                                 format!("{}_val_{}", var_name_str, i)
                             };
+                            if expand_value_states {
+                                if let Type::Struct(mid, sid, inst) = val_ty.skip_reference() {
+                                    let struct_env = self.env.get_struct(mid.qualified(*sid));
+                                    if !struct_env.is_native()
+                                        && !struct_env.is_intrinsic()
+                                        && !struct_env.has_variants()
+                                        && struct_env.get_field_count() > 0
+                                        && struct_env.get_ghost_fields().next().is_none()
+                                    {
+                                        let global_state = self
+                                            .env
+                                            .get_extension::<GlobalNumberOperationState>()
+                                            .expect("global number operation state");
+                                        let mut fields = vec![];
+                                        for field in struct_env.get_fields() {
+                                            let name = self.fresh_var_name("state_field");
+                                            emit!(
+                                                self.writer,
+                                                "{}{}: {}",
+                                                comma,
+                                                name,
+                                                boogie_type_for_struct_field(
+                                                    &global_state,
+                                                    &field,
+                                                    self.env,
+                                                    &field.get_type().instantiate(inst)
+                                                )
+                                            );
+                                            comma = ", ";
+                                            fields.push(name);
+                                        }
+                                        let constructor = format!(
+                                            "{}({})",
+                                            boogie_struct_name(&struct_env, inst, false),
+                                            fields.join(", ")
+                                        );
+                                        state_patterns.push(constructor.clone());
+                                        entries.push((constructor, val_ty.clone()));
+                                        continue;
+                                    }
+                                }
+                            }
+                            // A fallback binder cannot be covered by our constructor
+                            // multi-pattern. Let Boogie infer triggers for the whole quantifier.
+                            state_patterns_complete = false;
                             emit!(
                                 self.writer,
                                 "{}{}: {}",
@@ -4468,7 +4525,9 @@ impl SpecTranslator<'_> {
             emit!(self.writer, "{{:qid \"{}\"}} ", qid);
         }
         // Translate triggers.
-        if !triggers.is_empty() {
+        if state_patterns_complete && !state_patterns.is_empty() {
+            emit!(self.writer, "{{{}}} ", state_patterns.join(", "));
+        } else if !triggers.is_empty() {
             for trigger in triggers {
                 emit!(self.writer, "{");
                 let mut comma = "";

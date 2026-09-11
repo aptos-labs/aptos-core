@@ -1,11 +1,16 @@
 processed 1 task
 task 0 lines 1-27:  publish [import Move]
 Error: compilation errors:
- error: borrow safety error `field`: reference was poisoned by an overlapping write (conflicts with `whole`)
-   ┌─ TEMPFILE:17:5
+ error: cannot write local `whole` since it is borrowed
+   ┌─ TEMPFILE:16:5
    │
+14 │     let field ← &mut inner.value
+   │     ---------------------------- field `value` via field `inner` previously mutably borrowed here
+15 │     let whole ← &mut owner
+16 │     whole := { inner := { value := 1 } }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ write attempted here
 17 │     let result ← *field
-   │     ^^^^^^^^^^^^^^^^^^^
+   │     ------------------- conflicting reference `field` used here
 
 
-exiting with Leaner elaboration errors
+exiting with Leaner stackless-bytecode checks failed

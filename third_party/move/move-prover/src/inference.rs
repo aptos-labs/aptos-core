@@ -1122,7 +1122,13 @@ fn generate_full_spec_block(
         original
     };
 
-    sourcifier.print_fun_spec(fun);
+    // The generated block is inserted into a companion spec module. Imports
+    // emitted inside the block cannot qualify types in the repeated function
+    // signature because the signature is parsed before the block body. Use
+    // absolute module paths there, just as fresh companion files do.
+    let mut signature_tctx = fun.get_type_display_ctx();
+    signature_tctx.fully_qualify_external_types = true;
+    sourcifier.print_fun_spec_with_signature_type_display_ctx(fun, signature_tctx);
 
     // Restore original conditions.
     fun.get_mut_spec().conditions = original_conditions;

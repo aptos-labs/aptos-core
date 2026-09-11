@@ -1002,8 +1002,10 @@ pub fn try_lower_function(
     // net for now.
     safe_points.sort_by_key(|e| e.code_offset.0);
 
-    // Per-parameter (offset, size, align), in declaration order.
+    // Per-parameter (offset, size, align) and substituted type, in
+    // declaration order.
     let param_slots = ctx.home_slots[..func_ir.num_params as usize].to_vec();
+    let param_tys = view_type_list(ctx.home_types)[..func_ir.num_params as usize].to_vec();
     let param_and_local_sizes_sum = ctx.frame_data_size as usize;
     let extended_frame_size = ctx
         .call_sites
@@ -1028,6 +1030,7 @@ pub fn try_lower_function(
         code: Code::with_origins(code, origins),
         entry_gas,
         param_slots,
+        param_tys,
         param_region_size: derived.param_region_size as usize,
         param_and_local_sizes_sum,
         extended_frame_size,

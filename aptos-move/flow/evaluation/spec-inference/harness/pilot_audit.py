@@ -131,6 +131,17 @@ def audit_pilot(
             issues.append(_issue(spec.run_id, "controller harness identity disagreement"))
         if run.get("controller_prompts_sha256") != expected_prompts_sha256:
             issues.append(_issue(spec.run_id, "controller prompt identity disagreement"))
+        if run.get("sdk_telemetry_schema") == 1:
+            try:
+                metrics = load_object(artifact / "sdk-metrics.json")
+                raw_results = [e for e in claude if e.get("event") == "sdk_message"
+                               and (e.get("message") or {}).get("type") == "result"]
+                typed_results = [e for e in claude if e.get("event") == "claude_message"
+                                 and (e.get("message") or {}).get("type") == "ResultMessage"]
+                if len(raw_results) != metrics.get("result_count") or len(raw_results) < len(typed_results):
+                    issues.append(_issue(spec.run_id, "SDK telemetry result coverage mismatch"))
+            except (OSError, ValueError) as error:
+                issues.append(_issue(spec.run_id, f"missing or invalid SDK metrics: {error}"))
         message_types = {
             event.get("message", {}).get("type")
             for event in claude

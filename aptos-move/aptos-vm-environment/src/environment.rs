@@ -10,7 +10,9 @@ use crate::{
     },
 };
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
+use aptos_gas_schedule::{
+    AptosGasParameters, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
@@ -253,7 +255,7 @@ impl Environment {
             get_gas_parameters(&mut sha3_256, &features, state_view);
         let (native_gas_params, misc_gas_params, ty_builder) = match &gas_params {
             Ok(gas_params) => {
-                let ty_builder = aptos_prod_ty_builder(gas_feature_version, gas_params);
+                let ty_builder = aptos_prod_ty_builder(gas_feature_version, &features, gas_params);
                 (
                     gas_params.natives.clone(),
                     gas_params.vm.misc.clone(),
@@ -261,7 +263,7 @@ impl Environment {
                 )
             },
             Err(_) => {
-                let ty_builder = aptos_default_ty_builder(true, true);
+                let ty_builder = aptos_default_ty_builder(LATEST_GAS_FEATURE_VERSION, &features);
                 (
                     NativeGasParameters::zeros(),
                     MiscGasParameters::zeros(),

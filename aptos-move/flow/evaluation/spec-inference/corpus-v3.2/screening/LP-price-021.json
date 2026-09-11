@@ -9,7 +9,7 @@
   "target": "decibel_dex::extracted_liquidation_price::get_liquidation_price",
   "task_id": "LP-price-021",
   "threshold_seconds": 20,
-  "wall_seconds": 5.2,
+  "wall_seconds": 3.2,
   "well_formed": true,
   "wp_failure_kind": "untrusted_inferred_contract",
   "wp_hard": true

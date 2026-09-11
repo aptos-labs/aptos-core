@@ -5046,6 +5046,8 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-table-extension",
+ "move-value-view",
+ "move-value-view-derive",
  "move-vm-types",
  "num-bigint 0.3.3",
  "num-derive",
@@ -8916,6 +8918,7 @@ dependencies = [
  "rstest",
  "serde",
  "sha3 0.9.1",
+ "tempfile",
  "test-case",
  "thousands",
  "tokio",
@@ -12933,7 +12936,6 @@ dependencies = [
 name = "mono-move-aptos-transaction-executor"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas-algebra",
@@ -12951,8 +12953,10 @@ dependencies = [
  "mono-move-natives",
  "mono-move-output",
  "mono-move-runtime",
+ "move-binary-format",
  "move-core-types",
- "serde",
+ "move-model",
+ "move-value-view",
  "thiserror 1.0.69",
  "triomphe",
 ]
@@ -12989,8 +12993,32 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.5",
+ "sha3 0.9.1",
  "shared-dsa",
  "specializer",
+]
+
+[[package]]
+name = "mono-move-lean-link"
+version = "0.1.0"
+dependencies = [
+ "aptos-move-stdlib",
+ "bytes",
+ "codespan-reporting",
+ "legacy-move-compiler",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-model",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -13001,6 +13029,8 @@ dependencies = [
  "mono-move-core",
  "mono-move-global-context",
  "mono-move-testsuite",
+ "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "shared-dsa",
  "specializer",
@@ -13048,6 +13078,7 @@ dependencies = [
  "mono-move-loader",
  "mono-move-natives",
  "mono-move-runtime",
+ "move-binary-format",
  "move-core-types",
  "move-vm-types",
  "thiserror 1.0.69",
@@ -13092,6 +13123,8 @@ dependencies = [
  "mono-move-global-context",
  "mono-move-loader",
  "move-core-types",
+ "move-value-view",
+ "move-value-view-derive",
  "num-bigint 0.3.3",
  "paste",
  "proptest",
@@ -13900,6 +13933,22 @@ dependencies = [
  "regex",
  "tempfile",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "move-value-view"
+version = "0.1.0"
+dependencies = [
+ "move-core-types",
+]
+
+[[package]]
+name = "move-value-view-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

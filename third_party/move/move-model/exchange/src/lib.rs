@@ -71,6 +71,7 @@
 //! one operation family whose only difference is the range consulted, so the
 //! type is always carried.
 
+pub mod ast;
 pub mod check;
 
 use serde::{Deserialize, Serialize};
@@ -84,7 +85,7 @@ pub const XIR_SCHEMA: &str = "move-xir-module";
 /// `is_native` function flag and permits bodyless native declarations;
 /// version 4 transports source spans for declarations and stackless code;
 /// version 5 adds user-facing local names.
-pub const XIR_VERSION: u64 = 5;
+pub const XIR_VERSION: u64 = 6;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -161,6 +162,12 @@ pub struct XirModule {
     /// the local function count.
     #[serde(default)]
     pub external_functions: Vec<XirExternalFunction>,
+    /// Structs and enums of other modules whose types this module mentions.
+    /// Struct ids greater than or equal to `structs.len()` index this table
+    /// after subtracting the local struct count.  Only the type is referenced:
+    /// its declaration belongs to the other module.
+    #[serde(default)]
+    pub external_structs: Vec<XirExternalStruct>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,13 +178,25 @@ pub struct XirExternalFunction {
     pub function: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirExternalStruct {
+    pub address: String,
+    pub module: String,
+    pub name: String,
+}
+
 impl XirModule {
     /// Checks the deployable wrapper's schema and version.
     pub fn check_version(&self) -> Result<(), String> {
         if self.schema != XIR_SCHEMA {
             return Err(format!("unsupported XIR schema `{}`", self.schema));
         }
-        if self.version != 3 && self.version != 4 && self.version != XIR_VERSION {
+        if self.version != 3
+            && self.version != 4
+            && self.version != 5
+            && self.version != XIR_VERSION
+        {
             return Err(format!("unsupported XIR version {}", self.version));
         }
         Ok(())
@@ -707,6 +726,15 @@ pub enum Oper {
     /// `"borrow_vec_elem"` — borrow the element at a dynamic index
     /// (reference to a vector, index).
     BorrowVecElem,
+    /// `{"borrow_variant_field": [[variants], field]}` — borrow the field at
+    /// offset `field` of an enum referent that is one of the listed variants
+    /// (`Bytecode::BorrowVariantField`; aborts for any other variant).
+    BorrowVariantField(Vec<usize>, FieldOffset),
+    BorrowVariantFieldInst(Vec<usize>, FieldOffset, Vec<Type>),
+    /// `{"test_variant_ref": variant}` — test the variant of an enum
+    /// referent (`Bytecode::TestVariant` on a reference).
+    TestVariantRef(usize),
+    TestVariantRefInst(usize, Vec<Type>),
     ReadRef,
     WriteRef,
     FreezeRef,

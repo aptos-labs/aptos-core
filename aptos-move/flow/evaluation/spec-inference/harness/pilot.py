@@ -672,9 +672,29 @@ def _source_commit_durability(commit: str) -> dict[str, Any]:
         )
         if probe.returncode == 0:
             reachable.append(ref)
+    remote_probe = subprocess.run(
+        [
+            "git",
+            "for-each-ref",
+            "--contains",
+            commit,
+            "--format=%(refname:short)",
+            "refs/remotes",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).resolve().parent.parent,
+    )
+    preserved = [] if remote_probe.returncode else sorted(
+        ref
+        for ref in remote_probe.stdout.splitlines()
+        if ref not in reachable and not ref.endswith("/HEAD")
+    )
     return {
         "commit": commit,
         "landed_on": reachable,
+        "preserved_on": preserved,
+        "resolvable": bool(reachable or preserved),
         # Durable means: reachable from a mainline branch, so it survives the
         # deletion of whatever branch proposed it.
         "durable": bool(reachable),
@@ -933,11 +953,19 @@ def main() -> None:
                 "runs": result["runs"],
                 "scoring_mode": result["scoring_mode"],
                 "source_commit_durable": provenance["durable"],
+                "source_commit_resolvable": provenance["resolvable"],
             },
             sort_keys=True,
         )
     )
-    if not provenance["durable"]:
+    if not provenance["durable"] and provenance["preserved_on"]:
+        print(
+            f"warning: source commit {provenance['commit'][:12]} is preserved on "
+            f"{', '.join(provenance['preserved_on'])}, but is not mainline-durable; "
+            "retain that remote branch for published round provenance.",
+            file=sys.stderr,
+        )
+    elif not provenance["durable"]:
         # Not fatal: a pilot runs before its apparatus lands. But a round whose
         # results get published needs a commit that outlives its branch, and
         # this repository squash-merges, so a branch tip will not.

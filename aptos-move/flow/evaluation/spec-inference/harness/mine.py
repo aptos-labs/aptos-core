@@ -260,7 +260,8 @@ def _session_totals(controller: list[dict[str, Any]]) -> tuple[Counter, int, int
         result = event.get("result") or {}
         model_turns += int(result.get("num_turns") or 0)
         session_api_ms = int(result.get("duration_api_ms") or 0)
-        session_cost = sum(
+        reported_cost = result.get("total_cost_usd")
+        session_cost = float(reported_cost) if reported_cost is not None else sum(
             float(model.get("costUSD") or 0.0)
             for model in (result.get("model_usage") or {}).values()
         )

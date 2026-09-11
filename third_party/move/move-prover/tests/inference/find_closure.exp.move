@@ -31,8 +31,20 @@ module 0x42::find_closure {
 }
 /*
 Inference diagnostics:
+warning: WP retained a quantified loop summary despite the supplied invariant. Inference has not established a trusted complete contract. Strengthen the invariant to characterize the loop-carried values and mutated state relative to entry; a bounds-only invariant may not suffice.
+   ┌─ tests/inference/find_closure.move:17:11
+   │
+17 │           } spec {
+   │ ╭───────────^
+18 │ │             invariant [inferred] i <= n;
+19 │ │             invariant [inferred] n == len(v);
+20 │ │             invariant [inferred] forall j: u64 where j < i: !result_of<pred>(v[j]);
+21 │ │             invariant [inferred] forall j: u64 where j < i: !aborts_of<pred>(v[j]);
+22 │ │         };
+   │ ╰─────────^
+
 warning: WP could not characterize the aborts of `find_closure::find` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition did not survive a memory-havocking loop
+  = a dynamic call has no trusted complete abort summary
   = a callee's `aborts_of` behavior is not accounted for
    ┌─ tests/inference/find_closure.move:9:5
    │

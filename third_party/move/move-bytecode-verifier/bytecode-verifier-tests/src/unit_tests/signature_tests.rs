@@ -3,8 +3,9 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use move_binary_format::file_format::{
-    Bytecode::*, CompiledModule, SignatureToken::*, Visibility::Public, *,
+use move_binary_format::{
+    errors::VMResult,
+    file_format::{Bytecode::*, CompiledModule, SignatureToken::*, Visibility::Public, *},
 };
 use move_bytecode_verifier::{verify_module, verify_module_with_config_for_test, VerifierConfig};
 use move_core_types::{
@@ -191,6 +192,97 @@ fn big_signature_test() {
     )
     .unwrap_err();
     assert_eq!(res.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+}
+
+/// Builds a module whose only declared function takes `parameter`.
+fn module_with_function_type_parameter(parameter: SignatureToken) -> CompiledModule {
+    let mut module = empty_module();
+    module.identifiers.push(Identifier::new("f").unwrap());
+    module.signatures.push(Signature(vec![parameter]));
+    module.function_handles.push(FunctionHandle {
+        module: ModuleHandleIndex(0),
+        name: IdentifierIndex(1),
+        return_: SignatureIndex(0),
+        parameters: SignatureIndex(1),
+        type_parameters: vec![],
+        access_specifiers: None,
+        attributes: vec![],
+    });
+    module.function_defs.push(FunctionDefinition {
+        function: FunctionHandleIndex(0),
+        visibility: Public,
+        is_entry: false,
+        acquires_global_resources: vec![],
+        code: Some(CodeUnit {
+            locals: SignatureIndex(0),
+            code: vec![Ret],
+        }),
+    });
+    module
+}
+
+fn verify_function_type_abilities(module: &CompiledModule) -> VMResult<()> {
+    verify_module_with_config_for_test(
+        "function_type_abilities",
+        &VerifierConfig::production(),
+        module,
+    )
+}
+
+/// Rejects `key`, which no function value can carry, in top-level and nested function types.
+#[test]
+fn function_type_abilities_are_bounded_by_public_functions() {
+    let excess = AbilitySet::ALL;
+    assert!(!excess.is_subset(AbilitySet::PUBLIC_FUNCTIONS));
+
+    for parameter in [
+        Function(vec![], vec![], excess),
+        Vector(Box::new(Function(vec![], vec![], excess))),
+        Function(
+            vec![Function(vec![], vec![], excess)],
+            vec![],
+            AbilitySet::PUBLIC_FUNCTIONS,
+        ),
+    ] {
+        let module = module_with_function_type_parameter(parameter);
+        let err = verify_function_type_abilities(&module).unwrap_err();
+        assert_eq!(err.major_status(), StatusCode::CONSTRAINT_NOT_SATISFIED);
+    }
+}
+
+/// Accepts representative valid function ability sets. Top-level parameters require `drop` because
+/// the helper function returns without consuming them, so `EMPTY` is tested in a nested position.
+#[test]
+fn legal_function_type_abilities_still_verify() {
+    for parameter in [
+        Function(vec![], vec![], AbilitySet::FUNCTIONS),
+        Function(vec![], vec![], AbilitySet::PRIVATE_FUNCTIONS),
+        Function(vec![], vec![], AbilitySet::PUBLIC_FUNCTIONS),
+        Function(
+            vec![Function(vec![], vec![], AbilitySet::EMPTY)],
+            vec![],
+            AbilitySet::PUBLIC_FUNCTIONS,
+        ),
+        Vector(Box::new(Function(
+            vec![],
+            vec![],
+            AbilitySet::PUBLIC_FUNCTIONS,
+        ))),
+    ] {
+        let module = module_with_function_type_parameter(parameter);
+        verify_function_type_abilities(&module).unwrap();
+    }
+}
+
+/// Allows excess function abilities when the verifier check is disabled.
+#[test]
+fn excess_function_type_abilities_verify_when_the_check_is_disabled() {
+    let module = module_with_function_type_parameter(Function(vec![], vec![], AbilitySet::ALL));
+    let config = VerifierConfig {
+        check_function_type_abilities: false,
+        ..VerifierConfig::production()
+    };
+    verify_module_with_config_for_test("function_type_abilities", &config, &module).unwrap();
 }
 
 #[test]

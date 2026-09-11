@@ -12,7 +12,7 @@ use crate::{
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
+    errors::{excess_function_type_abilities_error, PartialVMError, PartialVMResult},
     file_format::{
         SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
@@ -1058,8 +1058,7 @@ impl fmt::Display for Type {
     }
 }
 
-/// Controls creation of runtime types, i.e., methods offered by this struct
-/// should be the only way to construct any type.
+/// Constructs runtime types while enforcing configured size and depth limits.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct TypeBuilder {
     // Maximum number of nodes a fully-instantiated type has.
@@ -1073,6 +1072,8 @@ pub struct TypeBuilder {
     pub count_function_type_node: bool,
     ref_ty_count_decrement: u64,
     ref_ty_depth_increment: u64,
+    // Enables function-ability validation for `TypeTag` inputs.
+    check_function_type_abilities: bool,
 }
 
 impl TypeBuilder {
@@ -1081,6 +1082,7 @@ impl TypeBuilder {
         max_ty_depth: u64,
         check_depth_on_type_counts_v2: bool,
         count_function_type_node: bool,
+        check_function_type_abilities: bool,
     ) -> Self {
         Self {
             max_ty_size,
@@ -1095,6 +1097,7 @@ impl TypeBuilder {
             // successfully.
             ref_ty_count_decrement: if check_depth_on_type_counts_v2 { 1 } else { 0 },
             ref_ty_depth_increment: if check_depth_on_type_counts_v2 { 0 } else { 1 },
+            check_function_type_abilities,
         }
     }
 
@@ -1668,6 +1671,9 @@ impl TypeBuilder {
                     results,
                     abilities,
                 } = fun.as_ref();
+                if self.check_function_type_abilities && !abilities.is_valid_for_function_type() {
+                    return Err(excess_function_type_abilities_error());
+                }
                 let mut to_list = |ts: &[FunctionParamOrReturnTag]| {
                     ts.iter()
                         .map(|t| {
@@ -1884,6 +1890,134 @@ mod unit_tests {
     use claims::{assert_err, assert_matches, assert_ok};
     use move_binary_format::file_format::StructHandleIndex;
 
+    #[test]
+    fn unknown_function_ability_bits_satisfy_known_ability_constraints() {
+        let expected = AbilitySet::from_u8(0x07).expect("0x07 is a valid ability set");
+        let malformed =
+            bcs::from_bytes::<AbilitySet>(&[0x17]).expect("Deserialize accepts any ability byte");
+        let function_type = Type::Function {
+            args: vec![],
+            results: vec![],
+            abilities: malformed,
+        };
+
+        assert_ne!(expected, malformed);
+        assert!(expected.is_subset(malformed));
+        assert!(Type::verify_ty_arg_abilities([&expected], &[function_type]).is_ok());
+    }
+
+    fn function_tag_with_abilities(abilities_byte: u8) -> TypeTag {
+        TypeTag::Function(Box::new(FunctionTag {
+            args: vec![],
+            results: vec![],
+            abilities: bcs::from_bytes::<AbilitySet>(&[abilities_byte])
+                .expect("Deserialize accepts any ability byte"),
+        }))
+    }
+
+    #[test]
+    fn create_ty_rejects_function_types_with_excess_abilities() {
+        let ty_builder = TypeBuilder::with_limits(11, 5, true, true, true);
+        let no_op = |_: &StructTag| unreachable!("Should not be called");
+
+        // 0x08 and 0x0f include `key`; 0x10, 0x17, and 0xff include undefined bits.
+        for abilities_byte in [0x0F, 0x08, 0x17, 0x10, 0xFF] {
+            let err = assert_err!(
+                ty_builder.create_ty(&function_tag_with_abilities(abilities_byte), no_op)
+            );
+            assert_eq!(
+                err.major_status(),
+                StatusCode::CONSTRAINT_NOT_SATISFIED,
+                "expected ability byte {:#x} to be rejected",
+                abilities_byte
+            );
+        }
+
+        // Representative subsets of `PUBLIC_FUNCTIONS` remain valid.
+        for abilities_byte in [0x00, 0x01, 0x02, 0x03, 0x04, 0x07] {
+            assert_ok!(ty_builder.create_ty(&function_tag_with_abilities(abilities_byte), no_op));
+        }
+    }
+
+    /// Rejects excess abilities in nested function types as well as top-level tags.
+    #[test]
+    fn create_ty_rejects_nested_function_types_with_excess_abilities() {
+        let ty_builder = TypeBuilder::with_limits(20, 10, true, true, true);
+        let no_op = |_: &StructTag| unreachable!("Should not be called");
+
+        let bad = function_tag_with_abilities(0x0F);
+        let nested = [
+            TypeTag::Vector(Box::new(bad.clone())),
+            TypeTag::Vector(Box::new(TypeTag::Vector(Box::new(bad.clone())))),
+            TypeTag::Function(Box::new(FunctionTag {
+                args: vec![FunctionParamOrReturnTag::Value(bad.clone())],
+                results: vec![],
+                abilities: AbilitySet::PUBLIC_FUNCTIONS,
+            })),
+            TypeTag::Function(Box::new(FunctionTag {
+                args: vec![],
+                results: vec![FunctionParamOrReturnTag::Reference(bad)],
+                abilities: AbilitySet::PUBLIC_FUNCTIONS,
+            })),
+        ];
+
+        for ty_tag in nested {
+            let err = assert_err!(ty_builder.create_ty(&ty_tag, no_op));
+            assert_eq!(
+                err.major_status(),
+                StatusCode::CONSTRAINT_NOT_SATISFIED,
+                "nested function type must be rejected in {:?}",
+                ty_tag
+            );
+        }
+    }
+
+    /// Retains raw ability bytes when function-ability validation is disabled.
+    #[test]
+    fn create_ty_preserves_excess_abilities_when_the_check_is_disabled() {
+        let ty_builder = TypeBuilder::with_limits(11, 5, true, true, false);
+        let no_op = |_: &StructTag| unreachable!("Should not be called");
+
+        for abilities_byte in [0x0F, 0x17] {
+            let ty = assert_ok!(
+                ty_builder.create_ty(&function_tag_with_abilities(abilities_byte), no_op)
+            );
+            assert_eq!(assert_ok!(ty.abilities()).into_u8(), abilities_byte);
+        }
+    }
+
+    /// Subset-based type-argument checks accept a function type that claims `key`. Because `0x0f`
+    /// is a valid `AbilitySet` encoding, encoding validation alone cannot prevent this.
+    #[test]
+    fn function_type_claiming_key_satisfies_a_key_constraint() {
+        let claims_key = AbilitySet::from_u8(0x0F).expect("0x0F is a well-formed ability set");
+        assert!(claims_key.has_key());
+        assert!(!claims_key.is_subset(AbilitySet::PUBLIC_FUNCTIONS));
+
+        let function_type = Type::Function {
+            args: vec![],
+            results: vec![],
+            abilities: claims_key,
+        };
+        assert_eq!(function_type.abilities().unwrap(), claims_key);
+
+        let key_constraint = AbilitySet::singleton(Ability::Key);
+        assert_ok!(Type::verify_ty_arg_abilities(
+            [&key_constraint],
+            std::slice::from_ref(&function_type)
+        ));
+        assert_ok!(function_type.paranoid_check_abilities(key_constraint));
+
+        let honest_function_type = Type::Function {
+            args: vec![],
+            results: vec![],
+            abilities: AbilitySet::PUBLIC_FUNCTIONS,
+        };
+        assert_err!(Type::verify_ty_arg_abilities([&key_constraint], &[
+            honest_function_type
+        ]));
+    }
+
     fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
             idx: StructNameIndex::new(0),
@@ -1949,7 +2083,7 @@ mod unit_tests {
     fn test_num_nodes_in_subst() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(11, 5, true, true);
+        let ty_builder = TypeBuilder::with_limits(11, 5, true, true, true);
         let cases: Vec<(Type, Vec<Type>, usize, usize)> = vec![
             (TyParam(0), vec![Bool], 1, 1),
             (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2, 2),
@@ -1984,7 +2118,7 @@ mod unit_tests {
     fn test_substitution_large_depth() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(11, 5, true, true);
+        let ty_builder = TypeBuilder::with_limits(11, 5, true, true, true);
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
@@ -1999,7 +2133,7 @@ mod unit_tests {
     fn test_substitution_large_count() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(11, 5, true, true);
+        let ty_builder = TypeBuilder::with_limits(11, 5, true, true, true);
 
         let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
         let ty = struct_instantiation_ty_for_test(ty_params);
@@ -2028,7 +2162,7 @@ mod unit_tests {
         use Type::*;
 
         // Limits are irrelevant here.
-        let ty_builder = TypeBuilder::with_limits(1, 1, true, true);
+        let ty_builder = TypeBuilder::with_limits(1, 1, true, true, true);
 
         assert_eq!(ty_builder.create_u8_ty(), U8);
         assert_eq!(ty_builder.create_u16_ty(), U16);
@@ -2045,8 +2179,8 @@ mod unit_tests {
         let ability_info = AbilityInfo::struct_(AbilitySet::EMPTY);
 
         // Limits are not relevant here.
-        let struct_ty =
-            TypeBuilder::with_limits(1, 1, true, true).create_struct_ty(idx, ability_info.clone());
+        let struct_ty = TypeBuilder::with_limits(1, 1, true, true, true)
+            .create_struct_ty(idx, ability_info.clone());
         assert_matches!(struct_ty, Type::Struct { .. });
     }
 
@@ -2058,7 +2192,7 @@ mod unit_tests {
         let ty_params = [TyParam(0), Bool, TyParam(1)];
 
         // Should succeed, type size limit is 5, and we have 5 nodes.
-        let ty_builder = TypeBuilder::with_limits(5, 100, true, true);
+        let ty_builder = TypeBuilder::with_limits(5, 100, true, true, true);
         let ty_args = [Bool, Vector(TriompheArc::new(Bool))];
         assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
@@ -2075,7 +2209,7 @@ mod unit_tests {
         // Should succeed, type depth limit is 4, and we have 4 nodes (3 in type parameter + struct).
         let nested_vec = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
         let ty_args = vec![Bool, nested_vec.clone()];
-        let ty_builder = TypeBuilder::with_limits(100, 4, true, true);
+        let ty_builder = TypeBuilder::with_limits(100, 4, true, true, true);
         assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
         // Should fail, we have depth of 5 now.
@@ -2089,7 +2223,7 @@ mod unit_tests {
     #[test]
     fn test_create_vec_ty() {
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth, true, true);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth, true, true, true);
 
         let mut depth = 1;
         let mut ty = Type::Bool;
@@ -2108,7 +2242,7 @@ mod unit_tests {
         // a type builder with smaller than depth size limit must return a different
         // error code.
         let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true, true);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true, true, true);
         let err = assert_err!(ty_builder.create_vec_ty(&ty));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
@@ -2117,7 +2251,7 @@ mod unit_tests {
     fn test_create_ref_ty() {
         let limit = 5;
 
-        let ty_builder = TypeBuilder::with_limits(100, limit, true, true);
+        let ty_builder = TypeBuilder::with_limits(100, limit, true, true, true);
 
         let mut depth = 1;
         let mut ty = Type::Bool;
@@ -2129,7 +2263,7 @@ mod unit_tests {
         let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
         assert_matches!(ref_ty, Type::Reference(_));
 
-        let ty_builder = TypeBuilder::with_limits(limit, 100, true, true);
+        let ty_builder = TypeBuilder::with_limits(limit, 100, true, true, true);
 
         let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
         assert_matches!(ref_ty, Type::Reference(_));
@@ -2139,7 +2273,7 @@ mod unit_tests {
     fn test_create_mut_ref_ty() {
         let limit = 5;
 
-        let ty_builder = TypeBuilder::with_limits(100, limit, true, true);
+        let ty_builder = TypeBuilder::with_limits(100, limit, true, true, true);
 
         let mut depth = 1;
         let mut ty = Type::Bool;
@@ -2151,7 +2285,7 @@ mod unit_tests {
         let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
         assert_matches!(ref_ty, Type::MutableReference(_));
 
-        let ty_builder = TypeBuilder::with_limits(limit, 100, true, true);
+        let ty_builder = TypeBuilder::with_limits(limit, 100, true, true, true);
 
         let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
         assert_matches!(ref_ty, Type::MutableReference(_));
@@ -2163,7 +2297,7 @@ mod unit_tests {
         use Type::*;
 
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth, true, true);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth, true, true, true);
 
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U8)), U8);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U16)), U16);
@@ -2197,7 +2331,7 @@ mod unit_tests {
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
 
         let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true, true);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true, true, true);
 
         for size in [max_ty_size - 1, max_ty_size] {
             let (expected_ty, vec_tok, _) = nested_vec_for_test(size);
@@ -2236,7 +2370,7 @@ mod unit_tests {
 
         let max_ty_size = 11;
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, max_ty_depth, true, true);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, max_ty_depth, true, true, true);
 
         let no_op = |_: &StructTag| unreachable!("Should not be called");
 
@@ -2268,7 +2402,7 @@ mod unit_tests {
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
 
         let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true, true);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true, true, true);
 
         for size in [max_ty_size - 1, max_ty_size] {
             let (expected_ty, _, vec_tag) = nested_vec_for_test(size);

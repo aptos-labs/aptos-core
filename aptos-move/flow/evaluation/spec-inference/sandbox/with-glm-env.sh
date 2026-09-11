@@ -27,6 +27,7 @@ fi
 # required by the Z.ai Anthropic-compatible endpoint.
 unset CLAUDE_CODE_USE_FOUNDRY ANTHROPIC_FOUNDRY_RESOURCE ANTHROPIC_FOUNDRY_BASE_URL
 unset ANTHROPIC_API_KEY
+unset CLAUDE_CODE_OAUTH_TOKEN
 
 export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
 export ANTHROPIC_AUTH_TOKEN="$ZAI_API_KEY"

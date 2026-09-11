@@ -66,6 +66,8 @@ behavioral condition, invent a restrictive `requires`, enable partial abort
 coverage, omit a frame, or skip verification. Replace a condition only with a
 semantically equivalent, complete form.
 
+### Inherited partiality
+
 Partial abort coverage has one narrow exception. A caller is verified against
 its opaque callees' contracts rather than their bodies, so when one of those
 contracts is itself partial there is no exact abort condition left for the
@@ -75,6 +77,8 @@ inference for the callee, or already present in the tree you started from.
 Partiality you wrote yourself does not — marking a helper partial and then
 citing it would excuse any contract at all, and the check rejects that. When
 the exception applies, say in the contract which callee it comes from.
+The caller must remain partial while that callee remains partial; this warning
+is not a repair obligation on the caller and does not require repeated WP calls.
 
 ### Loop abstractions
 

@@ -44,6 +44,7 @@ fn ref_self_copy() {
         code: Code::from_vec(code),
         entry_gas: 0,
         param_slots: vec![],
+        param_tys: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 32 + FRAME_METADATA_SIZE,
@@ -53,8 +54,8 @@ fn ref_self_copy() {
     };
     let result =
         common::with_test_interpreter(&function, u64::MAX, NativeExtensions::new(), |ctx| {
-            ctx.run().unwrap();
-            ctx.root_result()
+            ctx.build_call(&function).unwrap().run().unwrap();
+            ctx.root_result_u64_for_test()
         });
 
     assert_eq!(

@@ -175,12 +175,12 @@
           "type": "string"
         },
         "filter": {
-          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are verified.",
+          "description": "Optional filter: `module_name`, `module_name::function_name`, or\n`address::module_name::function_name` (numeric or named address).\nA module name without an address must be unambiguous.\nWhen omitted, all target modules are verified.",
           "type": "string",
           "nullable": true
         },
         "exclude": {
-          "description": "Optional list of targets to exclude from verification.\nEach entry follows the same format as `filter`: `module_name` or\n`module_name::function_name`. Exclusions take precedence over the filter scope.",
+          "description": "Optional list of targets to exclude from verification.\nEach entry follows the same format as `filter`.\nExclusions take precedence over the filter scope.",
           "type": "array",
           "items": {
             "type": "string"
@@ -218,7 +218,7 @@
   },
   {
     "name": "move_package_wp",
-    "description": "Raw WP engine — output requires loop-invariant synthesis and simplification that only the /move-inf skill workflow provides. Do not call directly.",
+    "description": "WP specification inference. Use through /move-inf; repair any reported missing loop invariants or incomplete callee contracts and rerun.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "MovePackageSpecInferParams",
@@ -229,7 +229,7 @@
           "type": "string"
         },
         "filter": {
-          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are inferred.",
+          "description": "Optional filter: `module_name`, `module_name::function_name`, or\n`address::module_name::function_name` (numeric or named address).\nA module name without an address must be unambiguous.\nWhen omitted, all target modules are inferred.",
           "type": "string",
           "nullable": true
         },

@@ -80,6 +80,9 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
         loop_invariant_evidence,
     };
     inf_options.setup_logging_for_test();
+    let reject_incomplete =
+        !extract_test_directives(path, "// reject-incomplete-inference:")?.is_empty();
+    inf_options.prover.uninvariant_loop_is_error = reject_incomplete;
     inf_options.prover.stable_test_output = true;
     inf_options.backend.stable_test_output = true;
 
@@ -101,6 +104,12 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
     // Collect inference-phase diagnostics (shown at the end in a comment).
     let mut diags = String::new();
     let inference_failed = result.is_err();
+    if reject_incomplete {
+        anyhow::ensure!(
+            inference_failed,
+            "expected incomplete inference to be rejected"
+        );
+    }
     match result {
         Ok(()) => {},
         Err(err) => {
@@ -148,6 +157,7 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
             inference_unified_suffix: "enriched.move".to_string(),
             loop_invariant_evidence: None,
         };
+        control_options.prover.uninvariant_loop_is_error = reject_incomplete;
         control_options.setup_logging_for_test();
         control_options.prover.stable_test_output = true;
         control_options.backend.stable_test_output = true;
@@ -226,6 +236,42 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
         })();
 
         verify_result?;
+
+        // A verified inferred contract can still be vacuous. Fixtures may
+        // require it to reject a particular implementation-only mutation.
+        for mutation in extract_test_directives(path, "// inference-reject-mutation:")? {
+            anyhow::ensure!(!file_output, "mutation checks require unified output");
+            let (from, to) = mutation
+                .split_once(" => ")
+                .ok_or_else(|| anyhow::anyhow!("mutation must be FROM => TO"))?;
+            let source = std::fs::read_to_string(&enriched_path)?
+                .lines()
+                .filter(|line| {
+                    !line
+                        .trim_start()
+                        .starts_with("// inference-reject-mutation:")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            anyhow::ensure!(
+                source.matches(from).count() == 1,
+                "mutation anchor must be unique"
+            );
+            let mutant = enriched_dir.path().join("mutant.move");
+            std::fs::write(&mutant, source.replacen(from, to, 1))?;
+            let mut options = make_options(&mutant, &extra_sources)?;
+            options.prover.stable_test_output = true;
+            options.backend.stable_test_output = true;
+            let mut writer = Buffer::no_color();
+            let result = run_move_prover_v2(&mut writer, options, vec![]);
+            let diagnostics = String::from_utf8_lossy(&writer.into_inner()).into_owned();
+            anyhow::ensure!(
+                result.is_err() && diagnostics.contains("post-condition does not hold"),
+                "inferred contract did not reject the mutation with a postcondition failure: {}",
+                diagnostics
+            );
+            diags += "Mutation: Rejected by postcondition.\n";
+        }
     }
 
     // ── Step 3: Append diagnostics as a block comment ───────────────

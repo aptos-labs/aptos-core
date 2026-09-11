@@ -214,6 +214,7 @@ members = [
     "third_party/move/mono-move/aptos-transaction-executor",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/global-context",
+    "third_party/move/mono-move/lean-link",
     "third_party/move/mono-move/loader",
     "third_party/move/mono-move/natives",
     "third_party/move/mono-move/orchestrator",
@@ -250,6 +251,8 @@ members = [
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
+    "third_party/move/move-value-view",
+    "third_party/move/move-value-view-derive",
     "third_party/move/move-vm/integration-tests",
     "third_party/move/move-vm/metrics",
     "third_party/move/move-vm/profiler",
@@ -910,6 +913,7 @@ mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/apto
 mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
+mono-move-lean-link = { path = "third_party/move/mono-move/lean-link" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-natives = { path = "third_party/move/mono-move/natives" }
 mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
@@ -928,6 +932,8 @@ move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytec
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
+move-value-view = { path = "third_party/move/move-value-view" }
+move-value-view-derive = { path = "third_party/move/move-value-view-derive" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }

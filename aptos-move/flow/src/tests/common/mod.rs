@@ -61,7 +61,7 @@ pub async fn make_client() -> rmcp::service::RunningService<rmcp::RoleClient, ()
 pub async fn make_client_for_tactic(
     tactic: InferenceTactic,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
-    make_client_for_config(tactic, None).await
+    make_client_for_config(tactic, None, false).await
 }
 
 /// Create an in-process MCP client which writes tool telemetry to `path`.
@@ -69,7 +69,15 @@ pub async fn make_client_with_telemetry(
     tactic: InferenceTactic,
     path: &Path,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
-    make_client_for_config(tactic, Some(path)).await
+    make_client_for_config(tactic, Some(path), false).await
+}
+
+/// Create a cache-free client which writes tool telemetry to `path`.
+pub async fn make_client_without_package_cache(
+    tactic: InferenceTactic,
+    path: &Path,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_client_for_config(tactic, Some(path), true).await
 }
 
 /// Create an evaluation-mode client whose candidate check reads `config`.
@@ -93,6 +101,7 @@ pub async fn make_evaluation_client_at_level(
         Some(candidate_check.to_path_buf()),
         true,
         feedback_level,
+        false,
     )
     .await
 }
@@ -102,12 +111,13 @@ pub async fn make_client_at_level(
     tactic: InferenceTactic,
     feedback_level: FeedbackLevel,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
-    make_session_client(tactic, None, None, false, feedback_level).await
+    make_session_client(tactic, None, None, false, feedback_level, false).await
 }
 
 async fn make_client_for_config(
     tactic: InferenceTactic,
     telemetry_path: Option<&Path>,
+    no_package_cache: bool,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     make_session_client(
         tactic,
@@ -115,6 +125,7 @@ async fn make_client_for_config(
         None,
         false,
         FeedbackLevel::Acceptance,
+        no_package_cache,
     )
     .await
 }
@@ -125,6 +136,7 @@ async fn make_session_client(
     candidate_check: Option<PathBuf>,
     evaluation_mode: bool,
     feedback_level: FeedbackLevel,
+    no_package_cache: bool,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     // Suppress movefmt so baselines are deterministic across platforms.
     // SAFETY: test-only; each test process is single-threaded at this point.
@@ -139,6 +151,7 @@ async fn make_session_client(
         language_version: LanguageVersion::latest(),
         experiments: vec![],
         tool_timeout: 120,
+        no_package_cache,
         telemetry_jsonl: None,
     };
     let global = GlobalOpts {

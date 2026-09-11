@@ -7,6 +7,7 @@ use crate::{
 use aptos_logger::{info, warn};
 use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
+    error::PanicError,
     fee_statement::FeeStatement,
     on_chain_config::BlockGasLimitType,
     transaction::block_epilogue::{BlockEndInfo, TBlockEndInfoExt},
@@ -37,7 +38,7 @@ pub struct BlockGasLimitProcessor<K, T> {
 
 impl<K, T> BlockGasLimitProcessor<K, T>
 where
-    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + 'static,
+    K: Send + Sync + Clone + Hash + Eq + Debug + 'static,
     T: Eq + Hash + Debug + 'static,
 {
     pub fn new(
@@ -299,7 +300,14 @@ where
         self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
-    pub(crate) fn get_block_end_info(&self) -> TBlockEndInfoExt<K> {
+    pub(crate) fn get_block_end_info<O, F>(
+        &self,
+        convert: F,
+    ) -> Result<TBlockEndInfoExt<O>, PanicError>
+    where
+        O: Debug + Ord,
+        F: Fn(&K) -> Result<O, PanicError>,
+    {
         let inner = BlockEndInfo::V0 {
             block_gas_limit_reached: self
                 .block_gas_limit()
@@ -318,22 +326,25 @@ where
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         };
 
-        let to_make_hot = self.get_keys_to_make_hot();
+        let to_make_hot = self.get_keys_to_make_hot(convert)?;
         if self.hot_state_op_accumulator.is_some() {
             counters::HOT_STATE_PROMOTIONS_PER_BLOCK.observe(to_make_hot.len() as f64);
         }
-        TBlockEndInfoExt::new(inner, to_make_hot)
+        Ok(TBlockEndInfoExt::new(inner, to_make_hot))
     }
 
-    fn get_keys_to_make_hot(&self) -> BTreeSet<K> {
-        if self.hot_state_op_accumulator.is_none() {
-            warn!("BlockHotStateOpAccumulator is not set.");
+    fn get_keys_to_make_hot<O, F>(&self, convert: F) -> Result<BTreeSet<O>, PanicError>
+    where
+        O: Ord,
+        F: Fn(&K) -> Result<O, PanicError>,
+    {
+        match self.hot_state_op_accumulator.as_ref() {
+            Some(acc) => acc.get_keys_to_make_hot(convert),
+            None => {
+                warn!("BlockHotStateOpAccumulator is not set.");
+                Ok(BTreeSet::new())
+            },
         }
-
-        self.hot_state_op_accumulator
-            .as_ref()
-            .map(|x| x.get_keys_to_make_hot())
-            .unwrap_or_default()
     }
 }
 

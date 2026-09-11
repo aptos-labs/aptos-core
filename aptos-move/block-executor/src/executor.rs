@@ -104,9 +104,6 @@ where
     L: TransactionCommitHook<CommittedOutput<E>>,
     TP: TxnProvider<T, A> + Sync,
     A: AuxiliaryInfoTrait,
-    // The block epilogue persists the hot keys as storage keys; the in-memory key
-    // converts to the storage key at that boundary (identity for the legacy VM).
-    <T as BlockExecutableTransaction>::Key: From<E::Key>,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -1432,7 +1429,12 @@ where
                 )));
             }
 
+            let executor = maybe_executor.as_ref().ok_or_else(|| {
+                code_invariant_error("Block epilogue txn requires executor to be initialized")
+            })?;
+
             if let Some(epilogue_txn) = self.generate_block_epilogue_if_needed(
+                executor,
                 signature_verified_block,
                 transaction_slice_metadata,
                 final_results.dereference().iter(),
@@ -1461,10 +1463,6 @@ where
                     // Fallback if no transactions in block
                     A::new_empty()
                 };
-
-                let executor = maybe_executor.as_ref().ok_or_else(|| {
-                    code_invariant_error("Block epilogue txn requires executor to be initialized")
-                })?;
 
                 let module_cache = shared_sync_params.global_module_cache;
                 let runtime_environment = environment.runtime_environment();
@@ -1875,7 +1873,7 @@ where
         signature_verified_block: &TP,
         outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
         epilogue_txn_idx: TxnIndex,
-        block_end_info: TBlockEndInfoExt<E::Key>,
+        block_end_info: TBlockEndInfoExt<T::Key>,
         features: &Features,
     ) -> Result<T, PanicError> {
         // TODO(grao): Remove this check once AIP-88 is fully enabled.
@@ -1943,12 +1941,7 @@ where
             }
         }
         let fee_distribution = FeeDistribution::new(amount);
-        // Convert the in-memory hot keys to storage keys for the on-chain epilogue.
         let (inner, to_make_hot) = block_end_info.into_parts();
-        let to_make_hot = to_make_hot
-            .into_iter()
-            .map(<T::Key>::from)
-            .collect::<BTreeSet<_>>();
         if self.config.onchain.hotness_in_epilogue() {
             Ok(T::block_epilogue_v2(
                 block_id,
@@ -2295,12 +2288,14 @@ where
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
                     if !has_reconfig {
+                        let block_end_info = block_limit_processor
+                            .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
                         block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
                             signature_verified_block,
                             ret.iter(),
                             idx as TxnIndex,
-                            block_limit_processor.get_block_end_info(),
+                            block_end_info,
                             module_cache_manager_guard.environment().features(),
                         )?);
                     } else {
@@ -2446,6 +2441,7 @@ where
     /// changes are either all applied to shared state or will never be applied.
     fn generate_block_epilogue_if_needed<'a>(
         &self,
+        executor: &E,
         block: &TP,
         transaction_slice_metadata: &TransactionSliceMetadata,
         outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
@@ -2457,12 +2453,15 @@ where
         // like state sync or replay, the BlockEpilogue txn should already in the input
         // and we don't need to add one here.
         if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
+            let block_end_info = block_limit_processor
+                .acquire()
+                .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
             let epilogue_txn = self.gen_block_epilogue(
                 block_id,
                 block,
                 outputs,
                 epilogue_txn_idx,
-                block_limit_processor.acquire().get_block_end_info(),
+                block_end_info,
                 environment.features(),
             )?;
 

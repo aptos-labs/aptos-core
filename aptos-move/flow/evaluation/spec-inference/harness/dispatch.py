@@ -20,8 +20,8 @@ from .credentials import redact
 
 
 INFRASTRUCTURE_TERMINAL_STATUS = "invalid_infrastructure_failure"
-#: Cells that must report an infrastructure failure before the batch is
-#: abandoned.
+#: Distinct tasks that must report infrastructure failures before the batch
+#: is abandoned. Replicates of one difficult mutant are not a global outage.
 #:
 #: The signal is derived from telemetry the agent's own MCP server writes, and
 #: that file is in the agent's writable set, so one cell can produce it at
@@ -77,13 +77,15 @@ async def dispatch_round(
     launch_command: Callable[[Path], list[str]],
     concurrency: int,
     cwd: Path,
+    *,
+    acknowledged_failures: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """Launch each `(run_id, manifest)` cell, stopping at the first outage.
 
-    A terminal infrastructure failure means the controller already exhausted its
-    configured retry, so the cause is external. Every queued cell would record
-    the same invalid observation, and the randomized order would be spent on it,
-    so the batch closes instead of draining.
+    Terminal infrastructure failures on distinct tasks corroborate an outage.
+    Repeated failures on one task stay invalid observations but do not alone
+    stop unrelated work. Explicitly acknowledged historical failures remain in
+    the report without counting against this continuation's outage threshold.
     """
     if concurrency < 1:
         raise ValueError("concurrency must be positive")
@@ -91,11 +93,27 @@ async def dispatch_round(
     semaphore = asyncio.Semaphore(concurrency)
     abort_batch = asyncio.Event()
     infrastructure_failures: set[str] = set()
+    failure_tasks: set[str] = set()
+    task_ids: dict[str, str] = {}
+    for run_id, manifest in cells:
+        try:
+            task_id = json.loads(manifest.read_text()).get("task_id")
+        except (OSError, ValueError):
+            task_id = None
+        task_ids[run_id] = task_id if isinstance(task_id, str) and task_id else run_id
+    existing_failures = {
+        run_id for run_id, _ in cells
+        if (artifacts_dir / run_id / "judge.json").is_file()
+        and read_terminal_status(artifacts_dir / run_id) == INFRASTRUCTURE_TERMINAL_STATUS
+    }
+    if not acknowledged_failures <= existing_failures:
+        raise ValueError("only existing terminal infrastructure failures may be acknowledged")
     running: set[asyncio.subprocess.Process] = set()
 
     def record_infrastructure_failure(run_id: str) -> None:
         infrastructure_failures.add(run_id)
-        if len(infrastructure_failures) >= INFRASTRUCTURE_ABORT_THRESHOLD:
+        failure_tasks.add(task_ids[run_id])
+        if len(failure_tasks) >= INFRASTRUCTURE_ABORT_THRESHOLD:
             abort_batch.set()
 
     async def launch(run_id: str, manifest: Path) -> dict[str, Any]:
@@ -103,12 +121,14 @@ async def dispatch_round(
         if (artifact / "judge.json").is_file():
             terminal_status = read_terminal_status(artifact)
             if terminal_status == INFRASTRUCTURE_TERMINAL_STATUS:
-                record_infrastructure_failure(run_id)
+                if run_id not in acknowledged_failures:
+                    record_infrastructure_failure(run_id)
                 return {
                     "run_id": run_id,
                     "status": "existing_infrastructure_failure",
                     "returncode": None,
                     "terminal_status": terminal_status,
+                    "acknowledged": run_id in acknowledged_failures,
                 }
             return {"run_id": run_id, "status": "already_complete", "returncode": 0}
         if artifact.exists():
@@ -123,6 +143,7 @@ async def dispatch_round(
                     "run_id": run_id,
                     "status": "batch_aborted",
                     "returncode": None,
+                    "started": False,
                 }
             process = await asyncio.create_subprocess_exec(
                 *launch_command(manifest),
@@ -156,6 +177,7 @@ async def dispatch_round(
                         "run_id": run_id,
                         "status": "batch_aborted",
                         "returncode": None,
+                        "started": True,
                     }
                 abort.cancel()
                 stdout, stderr = communicate.result()
@@ -220,6 +242,9 @@ async def dispatch_round(
         "schema_version": 1,
         "scheduled_runs": len(cells),
         "concurrency": concurrency,
+        "acknowledged_failures": sorted(acknowledged_failures),
+        "infrastructure_failures": sorted(infrastructure_failures),
+        "infrastructure_failure_tasks": sorted(failure_tasks),
         "aborted": abort_batch.is_set(),
         "complete": not abort_batch.is_set()
         and all(result["status"] in COMPLETED_STATUSES for result in results),

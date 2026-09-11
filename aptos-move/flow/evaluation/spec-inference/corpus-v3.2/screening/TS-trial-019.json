@@ -9,7 +9,7 @@
   "target": "decibel_dex::extracted_trial_size::trial_size_for",
   "task_id": "TS-trial-019",
   "threshold_seconds": 20,
-  "wall_seconds": 7.1,
+  "wall_seconds": 5.0,
   "well_formed": true,
   "wp_failure_kind": "untrusted_inferred_contract",
   "wp_hard": true

@@ -99,24 +99,32 @@ pub(crate) fn resolve_filter(
         Some(f) => f,
     };
 
-    if let Some(pos) = filter.rfind("::") {
-        // Function filter: "module::function"
-        let module_part = module_part_of(filter);
-        let func_part = &filter[pos + 2..];
+    let module_part = module_part_of(filter);
+    let mut modules = env
+        .get_modules()
+        .filter(|m| m.is_target() && m.matches_name(module_part));
+    let module = modules.next().ok_or_else(|| {
+        rmcp::ErrorData::invalid_params(
+            format!(
+                "no module matching `{}` found in target modules",
+                module_part
+            ),
+            None,
+        )
+    })?;
+    if modules.next().is_some() {
+        return Err(rmcp::ErrorData::invalid_params(
+            format!(
+                "module `{}` is ambiguous; use `address::module::function` to select a target",
+                module_part
+            ),
+            None,
+        ));
+    }
 
-        let module_sym = env.symbol_pool().make(module_part);
-        let module = env
-            .find_module_by_name(module_sym)
-            .filter(|m| m.is_target())
-            .ok_or_else(|| {
-                rmcp::ErrorData::invalid_params(
-                    format!(
-                        "no module matching `{}` found in target modules",
-                        module_part
-                    ),
-                    None,
-                )
-            })?;
+    if let Some(pos) = filter.rfind("::") {
+        // Function filter: "module::function" or "address::module::function".
+        let func_part = &filter[pos + 2..];
         let func_sym = env.symbol_pool().make(func_part);
         let func = module.find_function(func_sym).ok_or_else(|| {
             rmcp::ErrorData::invalid_params(
@@ -131,16 +139,6 @@ pub(crate) fn resolve_filter(
         ))
     } else {
         // Module filter: "module_name"
-        let module_sym = env.symbol_pool().make(filter);
-        let module = env
-            .find_module_by_name(module_sym)
-            .filter(|m| m.is_target())
-            .ok_or_else(|| {
-                rmcp::ErrorData::invalid_params(
-                    format!("no module matching `{}` found in target modules", filter),
-                    None,
-                )
-            })?;
         Ok((
             VerifiedScope::Module(module.get_id()),
             VerificationScope::OnlyModule(filter.to_string()),

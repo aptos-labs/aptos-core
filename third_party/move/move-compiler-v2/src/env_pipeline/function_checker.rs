@@ -511,6 +511,7 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::SingleVec
             | Operation::UpdateVec
             | Operation::ConcatVec
+            | Operation::ReverseVec
             | Operation::IndexOfVec
             | Operation::ContainsVec
             | Operation::InRangeRange

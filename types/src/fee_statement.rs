@@ -3,6 +3,7 @@
 
 use crate::move_utils::move_event_v2::MoveEventV2Type;
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_value_view_derive::MoveValueView;
 use serde::{Deserialize, Serialize};
 
 /// Breakdown of fee charge and refund for a transaction.
@@ -26,7 +27,7 @@ use serde::{Deserialize, Serialize};
 /// This is meant to emitted as a module event.
 ///
 /// (keep this doc in sync with the `struct FeeStatement` in Move.)
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, MoveValueView)]
 pub struct FeeStatement {
     /// Total gas charge.
     total_charge_gas_units: u64,

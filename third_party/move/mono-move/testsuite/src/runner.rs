@@ -33,14 +33,15 @@ use aptos_types::{
 };
 use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
-use mono_move_core::{native::NativeExtensions, VMInternalError};
+use mono_move_core::{native::NativeExtensions, BytecodeOffset, VMInternalError};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_loader::LoaderError;
 use mono_move_natives::EventStore;
 use mono_move_output::{
     to_contract_events_from_store,
     v1_error::{self, V1Equivalent},
 };
-use move_binary_format::{errors::Location, CompiledModule};
+use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
@@ -60,7 +61,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
-use std::{path::Path, sync::OnceLock};
+use std::{fmt, path::Path, sync::OnceLock};
 
 /// Execution output from a VM as a normalized display string.
 pub(crate) struct Output {
@@ -72,7 +73,7 @@ pub(crate) struct Output {
 /// nothing to compare.
 pub(crate) enum ParityOutcome {
     /// The step failed, and the failure can be stated in V1 terms.
-    Comparable(String),
+    Comparable(V1Failure),
     /// The step failed, but the error has no V1 mapping to state it through.
     Unmappable,
     /// The step ended in a Move abort, which carries no VM error to state.
@@ -97,10 +98,39 @@ impl Output {
     }
 }
 
-/// Renders a failure as the status, sub-status, and message V1 reports for it.
-/// Both VMs render through this, so `CHECK-ERROR-PARITY` compares like with
-/// like.
-fn render_v1_error(status: StatusCode, sub_status: Option<u64>, message: Option<&str>) -> String {
+/// A failure stated in V1 terms for `CHECK-ERROR-PARITY`.
+pub(crate) struct V1Failure {
+    /// The status, sub-status, and message.
+    pub(crate) failure: String,
+    /// The error location. [`None`] where MonoMove attributes the failure
+    /// differently by design, so the directive does not compare it.
+    pub(crate) location: Option<String>,
+}
+
+impl V1Failure {
+    /// Whether `self` (MonoMove's failure) agrees with `expected` (V1's). The
+    /// location is compared only when both sides state one.
+    pub(crate) fn agrees_with(&self, expected: &Self) -> bool {
+        self.failure == expected.failure
+            && match (&self.location, &expected.location) {
+                (Some(actual), Some(expected)) => actual == expected,
+                (None, _) | (_, None) => true,
+            }
+    }
+}
+
+impl fmt::Display for V1Failure {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} | ", self.failure)?;
+        match &self.location {
+            Some(location) => write!(formatter, "{}", location),
+            None => write!(formatter, "location not compared"),
+        }
+    }
+}
+
+/// Renders a failure's V1 status, sub-status, and message.
+fn render_v1_failure(status: StatusCode, sub_status: Option<u64>, message: Option<&str>) -> String {
     format!(
         "{:?} | sub-status {} | {}",
         status,
@@ -109,20 +139,60 @@ fn render_v1_error(status: StatusCode, sub_status: Option<u64>, message: Option<
     )
 }
 
+/// Renders a failure's V1 error location and faulting instruction.
+fn render_v1_location(
+    location: &Location,
+    offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
+) -> String {
+    format!(
+        "in {} at {}",
+        render_error_location(location),
+        offset.map_or_else(
+            || "no offset".to_string(),
+            |(def_idx, code_offset)| format!("function {} offset {}", def_idx.0, code_offset)
+        ),
+    )
+}
+
+/// Renders an error location as `undefined`, `script`, or a module ID.
+pub(crate) fn render_error_location(location: &Location) -> String {
+    match location {
+        Location::Undefined => "undefined".to_string(),
+        Location::Script => "script".to_string(),
+        Location::Module(module_id) => render_module_location(module_id),
+    }
+}
+
 /// MonoMove's failure in V1 terms, when it can be stated in them at all.
-/// A failure that cannot be is not comparable with V1's.
+/// A failure that cannot be stated, including one that was never located, is
+/// not comparable with V1's.
 fn describe_v2_error_as_v1(err: &VMInternalError) -> ParityOutcome {
-    let V1Equivalent::Described(descriptor) = v1_error::describe(err) else {
+    let V1Equivalent::Described(v1_info) = v1_error::describe(err) else {
         return ParityOutcome::Unmappable;
     };
-    if !descriptor.message.is_comparable() || !descriptor.sub_status.is_comparable() {
+    if !v1_info.message.is_comparable() || !v1_info.sub_status.is_comparable() {
         return ParityOutcome::Unmappable;
     }
-    ParityOutcome::Comparable(render_v1_error(
-        descriptor.status,
-        descriptor.sub_status.known(),
-        descriptor.message.text(),
-    ))
+    let location = if err.downcast_ref::<LoaderError>().is_some() {
+        // Attributed differently by design, see `V1Failure::location`.
+        None
+    } else {
+        // A missing location attachment is not equivalent to V1's explicit
+        // `Location::Undefined` and cannot be compared as agreement.
+        let Some(location) = err.location() else {
+            return ParityOutcome::Unmappable;
+        };
+        let (location, offset) = v1_error::v1_location(Some(location));
+        Some(render_v1_location(&location, offset))
+    };
+    ParityOutcome::Comparable(V1Failure {
+        failure: render_v1_failure(
+            v1_info.status,
+            v1_info.sub_status.known(),
+            v1_info.message.text(),
+        ),
+        location,
+    })
 }
 
 /// A [`StateStorageView`] over empty storage that serves a fixed usage, for
@@ -559,25 +629,28 @@ fn execute_function_v1(
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
             let code = err.sub_status().unwrap();
-            let location = match err.location() {
-                Location::Module(module_id) => render_module_location(module_id),
-                Location::Script => "script".to_string(),
-                Location::Undefined => "undefined".to_string(),
-            };
             Output::aborted(render_abort(
                 code,
                 err.message().map(String::as_str),
-                &location,
+                &render_error_location(err.location()),
             ))
         },
         // V1 is the reference, so its own failure is the expected value.
         Err(err) => Output {
             display: format!("error: {}", err),
-            parity: ParityOutcome::Comparable(render_v1_error(
-                err.major_status(),
-                err.sub_status(),
-                err.message().map(String::as_str),
-            )),
+            parity: ParityOutcome::Comparable(V1Failure {
+                failure: render_v1_failure(
+                    err.major_status(),
+                    err.sub_status(),
+                    err.message().map(String::as_str),
+                ),
+                location: Some(render_v1_location(
+                    err.location(),
+                    // The V1 interpreter records only the failing instruction's offset, so
+                    // `offsets` is empty or a single entry. So using `last()`.
+                    err.offsets().last().copied(),
+                )),
+            }),
         },
     };
     V1Output {
@@ -615,16 +688,19 @@ fn execute_function_v2(
         extensions,
         heap_size,
         |runner| {
+            // Split the directive's arguments in order: signers back the
+            // entry's signer parameters, the rest are placed as typed values.
+            let mut signers = Vec::new();
+            let mut values = Vec::new();
+            for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
+                match kind.to_move_value(arg) {
+                    MoveValue::Signer(addr) => signers.push(addr),
+                    value => values.push(value),
+                }
+            }
             let result = runner.run(
-                |interpreter| {
-                    let mut offset: u32 = 0;
-                    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
-                        offset = mono_move_core::align_up_u32(offset, kind.align());
-                        let bytes = kind.parse_to_bytes(arg);
-                        interpreter.set_root_arg(offset, &bytes);
-                        offset += kind.size();
-                    }
-                },
+                &signers,
+                |call, index| call.arg(&values[index]),
                 |interpreter| {
                     let mut ret_off: u32 = 0;
                     let mut vals = Vec::with_capacity(return_kinds.len());
@@ -859,76 +935,7 @@ impl PrimitiveKind {
         }
     }
 
-    /// Parse `s` into the raw little-endian byte representation that
-    /// mono-move stores in a frame slot.
-    fn parse_to_bytes(self, s: &str) -> Vec<u8> {
-        match self {
-            PrimitiveKind::Bool => vec![parse_bool_arg(s) as u8],
-            PrimitiveKind::U8 => vec![s.parse::<u8>().expect("invalid u8 literal")],
-            PrimitiveKind::U16 => s
-                .parse::<u16>()
-                .expect("invalid u16 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U32 => s
-                .parse::<u32>()
-                .expect("invalid u32 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U64 => s
-                .parse::<u64>()
-                .expect("invalid u64 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U128 => s
-                .parse::<u128>()
-                .expect("invalid u128 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::U256 => s
-                .parse::<U256>()
-                .expect("invalid u256 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I8 => (s.parse::<i8>().expect("invalid i8 literal") as u8)
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I16 => s
-                .parse::<i16>()
-                .expect("invalid i16 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I32 => s
-                .parse::<i32>()
-                .expect("invalid i32 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I64 => s
-                .parse::<i64>()
-                .expect("invalid i64 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I128 => s
-                .parse::<i128>()
-                .expect("invalid i128 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::I256 => s
-                .parse::<I256>()
-                .expect("invalid i256 literal")
-                .to_le_bytes()
-                .to_vec(),
-            PrimitiveKind::Address | PrimitiveKind::Signer => AccountAddress::from_hex_literal(s)
-                .expect("invalid address literal")
-                .into_bytes()
-                .to_vec(),
-            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector | PrimitiveKind::U64Vector => {
-                unreachable!("String / vector are return-only kinds")
-            },
-        }
-    }
-
-    /// Format `bytes` (in the same layout produced by `parse_to_bytes`) as a
+    /// Format the raw little-endian frame bytes of a returned scalar as a
     /// decimal string (or hex for addresses).
     fn format_bytes(self, bytes: &[u8]) -> String {
         match self {

@@ -23,7 +23,7 @@ module 0x42::partial_abort_fallback {
 /*
 Inference diagnostics:
 warning: WP could not characterize the aborts of `partial_abort_fallback::caller` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition did not survive a memory-havocking loop
+  = callee `0x42::partial_abort_fallback::maybe_abort` has no trusted complete abort summary
    ┌─ tests/inference/partial_abort_fallback.move:14:5
    │
 14 │ ╭     fun caller() {

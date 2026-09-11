@@ -1390,7 +1390,8 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     self.builder.global_env().diag_with_labels(
                         Severity::Error,
                         &loc,
-                        "`old(..)` applied to expression which does not depend on state",
+                        "`old(..)` applied to expression which does not depend on state; \
+                         remove `old(..)` to use the state-independent value",
                         labels,
                     )
                 }
@@ -1485,18 +1486,12 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 )
                 .into_exp(),
             ),
-            // Memory mutation ops within a `WithStateAnchor` scope: an
-            // unlabeled pre-state range means "the pre-state of the
-            // enclosing scope". Outside of anchors that is function entry,
-            // which the backend realizes as Boogie-native `old(..)`; inside
-            // an anchor it is the anchored program point, so the range is
-            // relabeled to the anchor label (like `old(Global)` reads
-            // above). Without this, a mutation op derived from an anchored
-            // lambda would compare against function entry, wrongly failing
-            // when memory of the same resource changed before the anchor.
-            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range)
-                if range.pre.is_none() && self.current_anchor.is_some() =>
-            {
+            // Snapshot the enclosing pre-state explicitly, just as for old
+            // reads. It is function entry for a definition, but call entry
+            // for a callee contract and the anchor point for an inline spec.
+            // Boogie-native old() would incorrectly use the caller's entry
+            // when the resource changed before an opaque call.
+            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range) if range.pre.is_none() => {
                 let label = self.save_memory(self.builder.get_memory_of_node(id));
                 let new_range = MemoryRange {
                     pre: Some(label),
@@ -1580,8 +1575,9 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     None
                 }
             },
-            // Behavior with labels already set: leave as-is
-            Behavior(_, range) if !range.is_default() => None,
+            // An explicit post label does not supply the implicit entry state.
+            // Save that entry state for `..S` just as for an unlabeled call.
+            Behavior(_, range) if range.pre.is_some() => None,
             // Behavior that needs a pre-state label. When the whole
             // evaluator is under `old(..)`, both of its states are the old
             // state: leaving `post` unlabeled would let `result_of` and other
@@ -1597,6 +1593,9 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                         mid.qualified(*fid),
                         &inst,
                     );
+                    if range.post.is_some() && used_memory.is_empty() {
+                        return None;
+                    }
                     let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
@@ -1615,6 +1614,9 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     let struct_env = env.get_module(*smid).into_struct(*sid);
                     let field_sym = field_id.symbol();
                     let memory = collect_field_access_memory(env, &struct_env, field_sym);
+                    if range.post.is_some() && memory.is_empty() {
+                        return None;
+                    }
                     let label = self.save_memory_shared(&memory, self.type_args);
                     let new_range = MemoryRange {
                         pre: Some(label),
@@ -1630,6 +1632,9 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     // the function's spec_used_memory / spec_old_memory, so
                     // this fallback covers the fun-param case too.
                     let used_memory = self.fun_env.get_spec_used_memory().clone();
+                    if range.post.is_some() && used_memory.is_empty() {
+                        return None;
+                    }
                     let label = self.save_memory_shared(&used_memory, self.type_args);
                     let new_range = MemoryRange {
                         pre: Some(label),

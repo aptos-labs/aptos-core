@@ -90,6 +90,42 @@ class PilotRunTest(unittest.TestCase):
                 sum(result["status"] == "batch_aborted" for result in report["results"]),
             )
 
+    def test_resume_archives_report_and_keeps_historical_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            schedule = root / "schedule" / "runs"
+            schedule.mkdir(parents=True)
+            (schedule / "old.json").write_text('{"task_id":"task-1"}')
+            artifacts = root / "artifacts"
+            cell = artifacts / "old"
+            cell.mkdir(parents=True)
+            judge = '{"preserved":true}\n'
+            (cell / "judge.json").write_text(judge)
+            (cell / "controller-events.jsonl").write_text(
+                '{"event":"run_end","terminal_status":"invalid_infrastructure_failure"}\n'
+            )
+            report_path = root / "report.json"
+            previous = '{"previous":true}\n'
+            report_path.write_text(previous)
+            with (
+                patch("harness.pilot_run.preflight", return_value={"ready": True, "checks": []}),
+                patch("harness.pilot_run.load_round_shape", return_value=SimpleNamespace(runs=1)),
+                patch("harness.pilot_run.RunSpec.load", return_value=SimpleNamespace(run_id="old", block=1, order=1)),
+                patch("harness.dispatch.asyncio.create_subprocess_exec") as launch,
+            ):
+                report = asyncio.run(run_pilot(
+                    root / "schedule", artifacts, root / "config.json", root / "wrapper",
+                    3, report_path, resume=True,
+                ))
+            launch.assert_not_called()
+            self.assertFalse(report["complete"])
+            self.assertFalse(report["aborted"])
+            self.assertEqual(["old"], report["acknowledged_failures"])
+            self.assertEqual(judge, (cell / "judge.json").read_text())
+            archives = list(root.glob("report.before-resume-*.json"))
+            self.assertEqual(1, len(archives))
+            self.assertEqual(previous, archives[0].read_text())
+
     def test_failed_preflight_prevents_any_launch_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

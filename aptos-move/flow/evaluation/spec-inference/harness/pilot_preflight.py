@@ -17,7 +17,7 @@ from typing import Any
 
 from .artifacts import sha256_file, tree_hash, write_json
 from .config import ExperimentConfig, RunSpec
-from .credentials import CREDENTIAL_VARIABLES, configured_credentials
+from .credentials import require_provider_auth
 from .dispatch import INFRASTRUCTURE_ABORT_THRESHOLD, rehearse_abort
 from .materialize import materialize_task
 from .pilot import load_round_shape
@@ -51,13 +51,11 @@ def preflight(config_path: Path, schedule_dir: Path, sandbox_wrapper: Path) -> d
 
     _check_dispatch_abort(checks)
 
-    configured_auth = configured_credentials()
-    _record(
-        checks,
-        "provider_auth",
-        bool(configured_auth),
-        "credential present" if configured_auth else f"none of {', '.join(CREDENTIAL_VARIABLES)} is set",
-    )
+    try:
+        require_provider_auth(config.model, config.provider_base_url)
+        _record(checks, "provider_auth", True, "permitted credential present")
+    except ValueError as error:
+        _record(checks, "provider_auth", False, str(error))
     endpoint = os.environ.get("ANTHROPIC_BASE_URL")
     _record(
         checks,

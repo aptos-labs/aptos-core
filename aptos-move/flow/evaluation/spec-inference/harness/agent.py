@@ -7,6 +7,7 @@ import dataclasses
 import importlib.metadata
 import json
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -14,6 +15,8 @@ from typing import Any, Callable, Protocol
 from .artifacts import JsonlWriter
 from .config import ExperimentConfig
 from .credentials import redact as redact_credentials
+from .credentials import require_provider_auth
+from .sdk_metrics import recording_transport
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,7 @@ class ClaudeAgentSession:
         baseline_package: Path,
         move_flow_args: str,
     ):
+        require_provider_auth(config.model, config.provider_base_url)
         try:
             installed = importlib.metadata.version("claude-agent-sdk")
         except importlib.metadata.PackageNotFoundError as error:
@@ -92,6 +96,7 @@ class ClaudeAgentSession:
             strict_mcp_config=True,
             setting_sources=[],
             permission_mode="dontAsk",
+            include_partial_messages=True,
             env={
                 "MOVE_FLOW_TELEMETRY_JSONL": str(flow_telemetry),
                 # The plugin's MCP entry expands `${MOVE_FLOW_ARGS:-mcp}`
@@ -111,7 +116,7 @@ class ClaudeAgentSession:
             },
             stderr=stderr_sink,
         )
-        self._client = ClaudeSDKClient(options=options)
+        self._client = ClaudeSDKClient(options=options, transport=recording_transport(options, event_log))
         self._event_log = event_log
         self._mcp_status: dict[str, Any] | None = None
         # Session identity, not turn identity. The SDK announces `system/init`
@@ -135,12 +140,18 @@ class ClaudeAgentSession:
 
     async def send(self, prompt: str) -> AgentTurn:
         from claude_agent_sdk import ResultMessage, SystemMessage
+        from claude_agent_sdk.types import StreamEvent
 
+        self._event_log.emit("sdk_query_start", received_monotonic_ns=time.monotonic_ns())
         await self._client.query(prompt)
         result_message: Any | None = None
         announced_init = False
         thinking_tokens = 0
         async for message in self._client.receive_response():
+            if isinstance(message, StreamEvent):
+                # The transport logs stream metadata and compact payload receipt
+                # timings. Completed content is logged as AssistantMessage below.
+                continue
             # The SDK reports extended thinking as one event per token. Logging
             # each verbatim cost 14.7 MB of a 16 MB transcript on a single hard
             # cell -- 38,270 lines carrying an incrementing counter -- plus a

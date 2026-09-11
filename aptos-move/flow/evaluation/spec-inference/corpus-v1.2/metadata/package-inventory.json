@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "package": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/framework",
+  "package": "/home/wrw/aptos-core/.worktrees/corpus12-repair/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/framework",
   "candidates": [
     {
       "source_root": "corpus-package",
@@ -74602,8 +74602,8 @@
       "target_functions": [
         "check_upgradability"
       ],
-      "source_sha256": "ce3fe44920d687c1d45cfa4ebdb2bd59488d90b4173c0643d4a38e5baba72bbb",
-      "source_loc": 14,
+      "source_sha256": "f2314d178d9ab615dd06a5a14094a595e90b99be510d03f7cf2a2cf82317a414",
+      "source_loc": 17,
       "function_count": 1,
       "loops": 1,
       "branches": 4,
@@ -75783,8 +75783,8 @@
       "target_functions": [
         "publish_package"
       ],
-      "source_sha256": "5ecc1573283592d8d7a877e4230fd9f69c3b277ca30a3d16c3dbb0d0422767e8",
-      "source_loc": 65,
+      "source_sha256": "35d0e6cba9b770286471ac519ed8e0ec3fa8c8075f019439bc62d606918b7864",
+      "source_loc": 72,
       "function_count": 1,
       "loops": 3,
       "branches": 9,
@@ -76114,7 +76114,7 @@
         "0x1::voting"
       ],
       "mutable_references": true,
-      "higher_order": true,
+      "higher_order": false,
       "global_state": true,
       "global_resource_mutation": true,
       "global_resource_types": [
@@ -76127,7 +76127,6 @@
       ],
       "feature_strata": [
         "loop",
-        "higher-order",
         "mutable-reference",
         "global-state",
         "global-write",
@@ -320080,8 +320079,12 @@
         "0x1::vector::swap"
       ],
       "called_function_dependencies": [
-        "0x1::simple_map::add_all",
-        "0x1::simple_map::new"
+        "0x1::simple_map::add",
+        "0x1::simple_map::new",
+        "0x1::vector::destroy_empty",
+        "0x1::vector::length",
+        "0x1::vector::pop_back",
+        "0x1::vector::reverse"
       ],
       "spec_function_dependencies": [
         "0x1::simple_map::spec_contains_key",
@@ -323312,12 +323315,15 @@
         "0x1::vector::swap"
       ],
       "called_function_dependencies": [
-        "0x1::simple_map::add_all",
+        "0x1::simple_map::add",
         "0x1::simple_map::new",
         "0x1::table_with_length::borrow",
         "0x1::vector::borrow",
+        "0x1::vector::destroy_empty",
         "0x1::vector::length",
-        "0x1::vector::push_back"
+        "0x1::vector::pop_back",
+        "0x1::vector::push_back",
+        "0x1::vector::reverse"
       ],
       "spec_function_dependencies": [
         "0x1::simple_map::spec_contains_key",
@@ -484556,7 +484562,7 @@
       "target_functions": [
         "take_ready_price_move_up_orders"
       ],
-      "source_sha256": "9705b6187091da6943d43400163bbde58f808d39e84de24c505dc50fcdb3d713",
+      "source_sha256": "bef979ada31e89bf0881eae4e6c676ef3693f0a2491561f5a59e88ec10c3ddc8",
       "source_loc": 24,
       "function_count": 1,
       "loops": 1,
@@ -506259,8 +506265,8 @@
         "upgrade_policy_compat",
         "upgrade_policy_immutable"
       ],
-      "source_sha256": "20778f9c2bc8ee52665ad6befc35177d615f9a82385a06ca28d0a8058f4ef7cb",
-      "source_loc": 390,
+      "source_sha256": "ac1f06b30b34585e8c8db693afdb6e7e8008d030926313f34df672d36c76acc8",
+      "source_loc": 400,
       "function_count": 13,
       "loops": 11,
       "branches": 30,
@@ -523369,7 +523375,6 @@
         "0x1::option::none",
         "0x1::option::some",
         "0x1::simple_map::add",
-        "0x1::simple_map::add_all",
         "0x1::simple_map::new",
         "0x1::simple_map::to_vec_pair",
         "0x1::vector::borrow",
@@ -523625,7 +523630,7 @@
         "0x1::math64::max",
         "0x1::option::none",
         "0x1::option::some",
-        "0x1::simple_map::add_all",
+        "0x1::simple_map::add",
         "0x1::simple_map::new",
         "0x1::smart_table::add",
         "0x1::smart_table::borrow",
@@ -538179,7 +538184,7 @@
         "take_ready_price_move_up_orders",
         "take_ready_time_based_orders"
       ],
-      "source_sha256": "7f4db355562ad8a46eb7cc8c85b2b4ed3d2c76fbbdff1ad31405e4693767ca10",
+      "source_sha256": "35f53351f33e9a31bf70cc047b94fe5a757341c4a815fe1ce366f143231c25bc",
       "source_loc": 214,
       "function_count": 7,
       "loops": 4,

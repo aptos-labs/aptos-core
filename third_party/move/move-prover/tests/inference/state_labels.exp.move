@@ -411,7 +411,7 @@ warning: WP could not characterize the aborts of `state_labels::publish_resource
    │ ╰─────^
 
 warning: WP could not characterize the aborts of `state_labels::call_publish` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition did not survive a memory-havocking loop
+  = callee `0x42::state_labels::publish_resource` has no trusted complete abort summary
    ┌─ tests/inference/state_labels.move:59:5
    │
 59 │ ╭     fun call_publish(account: &signer, value: u64) {
@@ -466,7 +466,7 @@ warning: WP could not characterize the aborts of `state_labels::create_then_read
     │ ╰─────^
 
 warning: WP could not characterize the aborts of `state_labels::nested_publish` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition did not survive a memory-havocking loop
+  = callee `0x42::state_labels::publish_resource` has no trusted complete abort summary
     ┌─ tests/inference/state_labels.move:206:5
     │
 206 │ ╭     fun nested_publish(account1: &signer, account2: &signer, v1: u64, v2: u64) {

@@ -2918,12 +2918,12 @@ impl Substitution {
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
-                    // For structs, also pass on `variance`, not `sub_variance`, to inherit
-                    // shallow processing to fields.
+                    // Shallow variance does not apply to struct type arguments. Bytecode
+                    // assignability requires complete struct instantiations to be equal.
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(context, variance, order, None, ts1, ts2)
+                        self.unify_vec(context, sub_variance, order, None, ts1, ts2)
                             .map_err(TypeUnificationError::lift(order, t1, t2))?,
                     ));
                 }

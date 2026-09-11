@@ -196,6 +196,18 @@ pub fn run(global: &GlobalOpts) -> Result<()> {
 
 /// Core check logic (testable without stdin/filesystem).
 pub(crate) fn check(path: &str, source: &str) -> CheckResult {
+    check_impl(path, source, true)
+}
+
+/// Validate a file after WP inference has injected specifications. Legacy
+/// syntax elsewhere in the file predates the generated output and is not
+/// actionable for the inference agent, so retain parse/AST validation while
+/// omitting the edit hook's migration lint.
+pub(crate) fn check_inferred_output(path: &str, source: &str) -> CheckResult {
+    check_impl(path, source, false)
+}
+
+fn check_impl(path: &str, source: &str, include_deprecation_lints: bool) -> CheckResult {
     let file_hash = FileHash::new(source);
     let file_name = Symbol::from(path);
     let mut files: FilesSourceText = HashMap::new();
@@ -211,9 +223,9 @@ pub(crate) fn check(path: &str, source: &str) -> CheckResult {
         all_diags.extend(ast_diags);
     }
 
-    // Text checks always run
-    let text_diags = text_checks(source, file_hash);
-    all_diags.extend(text_diags);
+    if include_deprecation_lints {
+        all_diags.extend(text_checks(source, file_hash));
+    }
 
     let has_errors = has_parse_errors || !all_diags.is_empty();
 

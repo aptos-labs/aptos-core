@@ -1,0 +1,27 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:26:9
+   │
+26 │ ╭         ensures exists S in *:
+27 │ │             (..S |~ small(c)) && (S.. |~ small(c));
+   │ ╰───────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:19: inc_twice
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:20: inc_twice
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:15: inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:16: inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:15: inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:21: inc_twice
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:15: inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:16: inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:15: inc
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:19: inc_twice
+   =         c = <redacted>
+   =     at tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:26: inc_twice (spec)

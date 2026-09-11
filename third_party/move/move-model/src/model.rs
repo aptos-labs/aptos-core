@@ -101,6 +101,9 @@ pub const SCRIPT_BYTECODE_FUN_NAME: &str = "<SELF>";
 /// A prefix used for structs which are backing specification ("ghost") memory.
 pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 
+/// A marker in the source-map name of a local which identifies it as compiler-generated.
+pub const TEMPORARY_LOCAL_MARKER: &str = "tmp#$";
+
 // =================================================================================================
 /// # Locations
 
@@ -3598,9 +3601,31 @@ impl<'env> ModuleEnv<'env> {
         &self.data.name
     }
 
-    /// Returns true if either the full name or simple name of this module matches the given string
+    /// Match a simple module name or an address-qualified name. Addresses may
+    /// be hexadecimal literals or aliases from the model's address map.
     pub fn matches_name(&self, name: &str) -> bool {
-        self.get_full_name_str() == name || self.get_name().display(self.env).to_string() == name
+        if self.get_full_name_str() == name {
+            return true;
+        }
+        if let Some((address, module)) = name.split_once("::") {
+            let address = if address.starts_with("0x") {
+                AccountAddress::from_hex_literal(address).ok()
+            } else {
+                self.env
+                    .get_address_alias_map()
+                    .get(&self.env.symbol_pool().make(address))
+                    .copied()
+            };
+            address.is_some_and(|a| self.get_name().addr() == &Address::Numerical(a))
+                && self
+                    .get_name()
+                    .name()
+                    .display(self.env.symbol_pool())
+                    .to_string()
+                    == module
+        } else {
+            self.get_name().display(self.env).to_string() == name
+        }
     }
 
     /// Returns the location of this module.
@@ -6315,7 +6340,7 @@ impl<'env> FunctionEnv<'env> {
                     // where <num> seems to be generated non-deterministically.
                     // Substitute this by a deterministic name which the backend accepts.
                     let clean_ident = if ident.contains("%#") {
-                        format!("tmp#${}", idx)
+                        format!("{}{}", TEMPORARY_LOCAL_MARKER, idx)
                     } else {
                         ident
                     };
@@ -6333,7 +6358,11 @@ impl<'env> FunctionEnv<'env> {
             return Some(true);
         }
         let name = self.get_local_name(idx);
-        Some(self.symbol_pool().string(name).contains("tmp#$"))
+        Some(
+            self.symbol_pool()
+                .string(name)
+                .contains(TEMPORARY_LOCAL_MARKER),
+        )
     }
 
     /// Gets the number of proper locals of this function, if there is a bytecode module attached.
@@ -6460,9 +6489,17 @@ impl<'env> FunctionEnv<'env> {
         self.is_pragma_true(VERIFY_PRAGMA, default)
     }
 
-    /// Returns true if either the name or simple name of this function matches the given string
+    /// Match a simple function name, `module::function`, or
+    /// `address::module::function` (including named address aliases).
     pub fn matches_name(&self, name: &str) -> bool {
-        name.eq(&*self.get_simple_name_string()) || name.eq(&*self.get_name_string())
+        if name == &*self.get_name_string() {
+            return true;
+        }
+        if let Some((module, function)) = name.rsplit_once("::") {
+            self.module_env.matches_name(module) && function.eq(&*self.get_simple_name_string())
+        } else {
+            name.eq(&*self.get_simple_name_string())
+        }
     }
 
     /// Determine whether this function is explicitly deactivated for verification.

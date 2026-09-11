@@ -366,7 +366,13 @@ jobs:
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
       SEND_RESULTS_TO_TRUNK: true
   
-  # Run forge framework upgradability test. This is a PR required job.
+  # Run forge framework upgradability test. Forge only runs when the
+  # CICD:run-framework-upgrade-test label is present; otherwise SKIP_JOB short-circuits it.
+  # The `if:` below deliberately stays broad so the job still materializes and reports a
+  # (skipped) check -- this job is a PR required check, and a check that never runs would
+  # leave auto-merge PRs waiting forever. There is no workflow_dispatch arm: dispatch has no
+  # PR labels, so SKIP_JOB would always be true and the job would only ever skip. Manual and
+  # scheduled runs live in .github/workflows/forge-framework-upgrade.yaml instead.
   forge-framework-upgrade-test:
     needs:
       - permission-check
@@ -376,11 +382,9 @@ jobs:
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
-      - test-target-determinator
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
-        github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null
       )
@@ -393,7 +397,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.test-target-determinator.outputs.run_framework_upgrade_test == 'false') }}
+      SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') }}
       SEND_RESULTS_TO_TRUNK: true
 
   forge-consensus-only-perf-test:
