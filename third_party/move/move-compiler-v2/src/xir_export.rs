@@ -18,21 +18,24 @@
 //! A full-fidelity exporter can be built on this code later by adding body
 //! translation.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use move_binary_format::file_format::Visibility as MoveVisibility;
 use move_core_types::ability::{Ability, AbilitySet};
 use move_model::{
-    ast::{Attribute, AttributeValue, Value},
-    model::{FunctionEnv, ModuleEnv, ModuleId, QualifiedId, StructEnv, StructId},
+    ast::{Address, Attribute, AttributeValue, Spec, SpecBlockTarget, SpecFunDecl, Value},
+    exp_rewriter::ExpRewriterFunctions,
+    model::{FunctionEnv, ModuleEnv, ModuleId, NamedConstantEnv, QualifiedId, StructEnv, StructId},
+    sourcifier::Sourcifier,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_model_exchange::{
-    Field, Type as Ty, TypeParameter as TypeParameterDecl, Variant, XirAttribute, XirAttributeArg,
-    XirDialect, XirExternalStruct, XirFunction, XirModule, XirModuleMetadata, XirModuleRef,
-    XirStruct, XirVisibility, XIR_SCHEMA, XIR_VERSION,
+    Field, Type as Ty, TypeParameter as TypeParameterDecl, Value as XirValue, Variant,
+    XirAttribute, XirAttributeArg, XirConstant, XirDialect, XirExternalStruct, XirFunction,
+    XirModule, XirModuleMetadata, XirModuleRef, XirSpecDeclaration, XirStruct, XirUse,
+    XirUseMember, XirVisibility, XIR_SCHEMA, XIR_VERSION,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Accumulates the tables that give foreign declarations an index.
 ///
@@ -400,7 +403,15 @@ fn export_function(refs: &mut References, fun_env: &FunctionEnv) -> Result<XirFu
         acquires,
         params: locals.len(),
         locals,
-        local_names: vec![],
+        // Parameter names are not decoration here. Move's receiver syntax
+        // (`v.length()`) resolves only against a function whose first
+        // parameter is named `self`, so dropping names turns every receiver
+        // call on a dependency into "undeclared receiver function".
+        local_names: fun_env
+            .get_parameters_ref()
+            .iter()
+            .map(|parameter| Some(pool.string(parameter.0).to_string()))
+            .collect(),
         returns,
         blocks: vec![],
         entry: 0,
@@ -413,6 +424,7 @@ fn export_function(refs: &mut References, fun_env: &FunctionEnv) -> Result<XirFu
         },
         attributes: export_attributes(module, fun_env.get_attributes())?,
         source_map: None,
+        source: inline_source(fun_env)?,
     })
 }
 
@@ -445,23 +457,222 @@ fn exported_structs<'env>(
 ///
 /// Private functions are excluded because a dependent cannot name them.
 ///
-/// Inline functions are excluded because a dependent cannot link them either —
-/// and unlike a private function, exporting one would be an active lie. An
-/// inline function has no entry in the deployed module (it is expanded at each
-/// call site and never reaches file-format generation), while the interface
-/// declares every function `native`. A dependent compiled against such an
-/// interface would emit a call to a function that does not exist, failing at
-/// *runtime* with `FUNCTION_RESOLUTION_FAILURE` rather than at compile time.
-/// Omitting it turns that into an unbound-function error at the call site.
+/// Inline functions **are** included, but they are the one case a declaration
+/// cannot describe. A dependent does not link an inline function, it expands
+/// it, and an inline function has no entry in the deployed module at all — it
+/// never reaches file-format generation. Declaring one `native`, as this
+/// exporter does for every other function, would therefore be an active lie:
+/// the dependent would emit a call to a function that does not exist and fail
+/// at *runtime* with `FUNCTION_RESOLUTION_FAILURE`. So an inline function
+/// carries its rendered body in [`XirFunction::source`] instead — see
+/// [`inline_source`] — and the interface generator emits that rather than a
+/// stub.
 ///
-/// This is not full handling. Cross-package inlining is out of scope
-/// (`MODULAR_COMPILATION.md` §4), and the intended treatment is for a package
-/// whose interface uses inline functions to fall back to monolithic
-/// compilation. That detection belongs to the package system, which does not
-/// exist yet; until it does, omission is the honest approximation. It is not
-/// silent: the caller gets a compile error naming the function.
+/// Omitting them, which this function used to do, was the safe half-measure:
+/// it moved the failure to compile time, at the cost of making every framework
+/// package unusable as an interface, since all three export non-private inline
+/// functions.
+///
+/// Compiler-generated wrappers are excluded too. `pack$S`, `borrow_mut$S$N`
+/// and `const$NAME` are synthesized during file-format generation to realize
+/// struct visibility and cross-module constant access; a dependent never names
+/// one, the compiler generates its own calls to them, and `$` is not even a
+/// legal Move identifier — so emitting them produces an interface that cannot
+/// be parsed back.
+///
+/// These only exist in a model that has been through the *full* compiler.
+/// A model from `run_checker` alone has none, which is why an
+/// export-and-typecheck sweep cannot discover this and the first modular build
+/// did immediately.
 fn exported_in_interface(fun_env: &FunctionEnv) -> bool {
-    fun_env.visibility() != MoveVisibility::Private && !fun_env.is_inline()
+    fun_env.visibility() != MoveVisibility::Private
+        && !fun_env.is_struct_api()
+        && !fun_env.is_const_accessor()
+}
+
+/// Empties every `spec { }` block in an expression, leaving its structure.
+///
+/// An interface carries declarations; it does not carry the module's spec file.
+/// A rendered body that mentions a spec function therefore names something the
+/// dependent cannot resolve — `vector::map_ref`'s loop invariants call
+/// `spec_map_ref`, which lives in `vector.spec.move`. Spec blocks contribute no
+/// bytecode, so emptying them removes exactly what a dependent cannot compile
+/// and nothing it needs. Verification is unaffected: the prover runs against
+/// sources, never against a generated interface.
+struct StripSpecs;
+
+impl ExpRewriterFunctions for StripSpecs {
+    fn rewrite_spec(&mut self, _target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
+        let is_empty = spec.conditions.is_empty()
+            && spec.update_map.is_empty()
+            && spec.on_impl.is_empty()
+            && spec.proof.is_none();
+        (!is_empty).then(|| Spec {
+            loc: spec.loc.clone(),
+            ..Default::default()
+        })
+    }
+}
+
+/// The Move source of an `inline` function, for [`XirFunction::source`].
+///
+/// A declaration is enough for anything a dependent *links* against; an inline
+/// function is expanded instead, so the dependent needs the body. `Sourcifier`
+/// renders it — including lambdas, which is what makes this viable where a
+/// typed-AST route is not.
+///
+/// Safe to hand to a dependent because a non-private inline function may only
+/// call what its callers can reach: `check_inline_callee_visibility` warns
+/// otherwise, and the framework produces no such warning.
+fn inline_source(fun_env: &FunctionEnv) -> Result<Option<String>> {
+    if !fun_env.is_inline() {
+        return Ok(None);
+    }
+
+    // `Sourcifier` renders an attribute as its bare name, dropping arguments —
+    // `#[expected_failure(abort_code = 1)]` becomes `#[expected_failure]`. For
+    // a declaration that is harmless, because the generator emits `attributes`
+    // from XIR, which keeps them; for a rendered body it is the whole output,
+    // so the arguments would be lost with nothing to notice.
+    //
+    // No non-private inline function in the framework has an attribute at all,
+    // so this rejects nothing today. Reported rather than dropped, on the same
+    // grounds as a non-private constant below: an interface that quietly says
+    // less than the module is worse than one that refuses to exist.
+    if let Some(attribute) = fun_env
+        .get_attributes()
+        .iter()
+        .find(|attribute| match attribute {
+            // A bare `#[name]` survives the rendering intact.
+            Attribute::Apply(_, _, args) => !args.is_empty(),
+            Attribute::Assign(..) => true,
+        })
+    {
+        let pool = fun_env.module_env.env.symbol_pool();
+        bail!(
+            "inline function `{}` carries attribute `{}` with arguments, which its rendered \
+             source cannot represent; this package must be compiled monolithically",
+            fun_env.get_full_name_str(),
+            pool.string(attribute.name())
+        )
+    }
+
+    // `amend` is what makes the rendering *recompilable*. The AST reaching here
+    // has been desugared, so it holds synthesized locals named `$t`, `$lb` and
+    // the like; `$` is not a Move identifier character, and rendering them
+    // verbatim produces source no dependent can parse. Amending rewrites them.
+    // The rendering lands in a generated file with no `use` declarations, so
+    // every external name must carry its address.
+    let sourcifier = Sourcifier::new(fun_env.module_env.env, /*amend*/ true)
+        .with_fully_qualified_external_names();
+    let def = fun_env
+        .get_def()
+        .map(|def| StripSpecs.rewrite_exp(def.clone()));
+    sourcifier.print_fun(fun_env.get_qualified_id(), def.as_ref());
+    Ok(Some(sourcifier.result()))
+}
+
+/// Whether a specification function is one this module *declares*.
+///
+/// Two kinds of entry are not:
+///
+/// - `is_move_fun` marks a Move function lifted into specification space rather
+///   than a `spec fun` declaration. The real function is already exported, and
+///   re-emitting it would declare the name twice.
+/// - **Clones left by inlining.** Expanding a `public inline` function copies
+///   the specification functions its body mentions into the *calling* module,
+///   once per expansion. `vector::map_ref`'s loop invariant calls
+///   `spec_map_ref`, and `confidential_balance` calls `map_ref` twelve times,
+///   so that module's table holds a dozen `spec_map_ref` entries that its
+///   source never wrote. Emitting them produces duplicate declarations.
+///
+/// A clone keeps the location it was cloned from, so it is recognised by the
+/// file it points into: one that belongs to a different module. A module's own
+/// `.spec.move` file is not any module's declaration site, so this leaves those
+/// alone.
+fn exported_spec_fun(decl: &SpecFunDecl, foreign_files: &BTreeSet<codespan::FileId>) -> bool {
+    !decl.is_move_fun && !foreign_files.contains(&decl.loc.file_id())
+}
+
+/// The files other modules are declared in — see [`exported_spec_fun`].
+fn foreign_declaration_files(module: &ModuleEnv) -> BTreeSet<codespan::FileId> {
+    module
+        .env
+        .get_modules()
+        .filter(|other| other.get_id() != module.get_id())
+        .map(|other| other.get_loc().file_id())
+        .collect()
+}
+
+/// The declaration's original source text, for [`XirSpecDeclaration::source`].
+///
+/// Copied verbatim rather than rendered from the AST, which is the opposite of
+/// what [`inline_source`] does, and deliberately. `Sourcifier` targets the Move
+/// *implementation* language and loses fidelity on specification constructs: it
+/// expands `self.borrow()` to `borrow(&self)`, which specifications reject, and
+/// prints a named constant in `abort EOPTION_NOT_SET` as a bare literal that
+/// then types as `u256`. Both were caught by the framework sweep on the first
+/// attempt. Copying cannot have such gaps — the text already compiled once.
+///
+/// The cost is that the text keeps the module's `use` aliases, which is why the
+/// generated interface re-emits those declarations.
+///
+/// Two spellings reach here: `spec fun f(..)` when written at module level, and
+/// `fun f(..)` when written inside a `spec <module> { .. }` block. Normalized to
+/// the latter, since the generator wraps the result in `spec module { .. }`.
+fn spec_declaration_source(module: &ModuleEnv, loc: &move_model::model::Loc) -> Result<String> {
+    let text = module
+        .env
+        .get_source(loc)
+        .map_err(|err| anyhow!("cannot read the declaration's source text: {err}"))?
+        .trim();
+    Ok(match text.strip_prefix("spec ") {
+        Some(rest) => rest.trim_start().to_string(),
+        None => text.to_string(),
+    })
+}
+
+/// Converts a constant's value to the format's representation.
+fn export_value(value: &Value) -> Result<XirValue> {
+    Ok(match value {
+        Value::Bool(value) => XirValue::Bool(*value),
+        Value::Number(value) => XirValue::Num(value.to_string()),
+        Value::Address(address) => XirValue::Address(address.expect_numerical().to_hex_literal()),
+        // A byte array is a `vector<u8>`; the format has no separate form, and
+        // the declared type already says the width.
+        Value::ByteArray(bytes) => XirValue::Vector(
+            bytes
+                .iter()
+                .map(|byte| XirValue::Num(byte.to_string()))
+                .collect(),
+        ),
+        Value::AddressArray(addresses) => XirValue::Vector(
+            addresses
+                .iter()
+                .map(|address| XirValue::Address(address.expect_numerical().to_hex_literal()))
+                .collect(),
+        ),
+        Value::Vector(values) => {
+            XirValue::Vector(values.iter().map(export_value).collect::<Result<_>>()?)
+        },
+        // Not expressible as a Move constant, so reaching this means the model
+        // holds something a constant declaration could not have produced.
+        Value::Tuple(_) => bail!("a constant cannot hold a tuple"),
+    })
+}
+
+fn export_constant(refs: &mut References, constant: &NamedConstantEnv) -> Result<XirConstant> {
+    let pool = constant.module_env.env.symbol_pool();
+    Ok(XirConstant {
+        name: pool.string(constant.get_name()).to_string(),
+        ty: export_type(refs, &constant.get_type())?,
+        value: export_value(&constant.get_value())?,
+        visibility: match constant.get_visibility() {
+            MoveVisibility::Private => None,
+            MoveVisibility::Public => Some(XirVisibility::Public),
+            MoveVisibility::Friend => Some(XirVisibility::Friend),
+        },
+    })
 }
 
 pub fn export_interface(module: &ModuleEnv) -> Result<XirModule> {
@@ -485,26 +696,93 @@ pub fn export_interface(module: &ModuleEnv) -> Result<XirModule> {
         })
         .collect::<Result<Vec<_>>>()?;
 
-    // A non-private constant is part of the module's interface — Move 2.5
-    // allows `public`/`package`/`friend` on constants, and `M::PUB` resolves
-    // across modules — but `XirModule` has no constant table, so an interface
-    // cannot carry one.
-    //
-    // Report it instead of exporting a silently incomplete interface. The
-    // dependent would otherwise fail with an unbound-name error far from the
-    // cause. This is the conservative fallback the design calls for: a package
-    // using a feature the interface format cannot express compiles
-    // monolithically. Adding a constant table is the proper fix.
-    if let Some(constant) = module
+    // Every constant, including private ones — see `XirModule::constants` for
+    // why visibility is the wrong filter here.
+    let constants = module
         .get_named_constants()
-        .find(|constant| constant.get_visibility() != MoveVisibility::Private)
-    {
-        bail!(
-            "constant `{}` is not private, and XIR interfaces cannot yet carry constants; \
-             this package must be compiled monolithically",
-            pool.string(constant.get_name())
-        )
+        .map(|constant| {
+            export_constant(&mut refs, &constant)
+                .with_context(|| format!("on constant `{}`", pool.string(constant.get_name())))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let foreign_files = foreign_declaration_files(module);
+    let mut spec_declarations = module
+        .get_spec_funs()
+        .filter(|(_, decl)| exported_spec_fun(decl, &foreign_files))
+        .map(|(_, decl)| {
+            Ok(XirSpecDeclaration {
+                name: pool.string(decl.name).to_string(),
+                source: spec_declaration_source(module, &decl.loc).with_context(|| {
+                    format!("on specification function `{}`", pool.string(decl.name))
+                })?,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    // Schemas are expanded away during model building, so unlike specification
+    // functions they have no table of their own; the record that survives is
+    // the spec block's location, which is all that copying needs.
+    for info in module.get_spec_block_infos() {
+        let SpecBlockTarget::Schema(module_id, schema_id, _) = &info.target else {
+            continue;
+        };
+        if *module_id != module.get_id() || foreign_files.contains(&info.loc.file_id()) {
+            continue;
+        }
+        let name = pool.string(schema_id.symbol()).to_string();
+        spec_declarations.push(XirSpecDeclaration {
+            source: spec_declaration_source(module, &info.loc)
+                .with_context(|| format!("on specification schema `{name}`"))?,
+            name,
+        });
     }
+
+    // Only the copied specification text needs these; see `XirModule::uses`.
+    let uses = if spec_declarations.is_empty() {
+        vec![]
+    } else {
+        module
+            .get_use_decls()
+            .iter()
+            .map(|decl| {
+                // A `use` records the address as written, which is often a
+                // named one — `use std::option` keeps `std` symbolically. The
+                // generated interface has to give the numerical address: it is
+                // compiled on its own, where no package assigns `std` a value.
+                //
+                // Resolution goes through the environment, by id when the
+                // declaration was resolved and by simple name otherwise, since
+                // a symbolic `std::option` never compares equal to the
+                // environment's `0x1::option`.
+                let name = decl
+                    .module_id
+                    .map(|id| module.env.get_module(id))
+                    .or_else(|| module.env.find_module_by_name(decl.module_name.name()))
+                    .map(|resolved| resolved.get_name().clone())
+                    .unwrap_or_else(|| decl.module_name.clone());
+                XirUse {
+                    // Not `expect_numerical`: a model built by the checker alone
+                    // keeps named addresses symbolic, and `std::vector` resolves
+                    // there exactly as written.
+                    address: match name.addr() {
+                        Address::Numerical(address) => address.to_hex_literal(),
+                        Address::Symbolic(symbol) => pool.string(*symbol).to_string(),
+                    },
+                    module: pool.string(name.name()).to_string(),
+                    alias: decl.alias.map(|alias| pool.string(alias).to_string()),
+                    members: decl
+                        .members
+                        .iter()
+                        .map(|(_, name, alias)| XirUseMember {
+                            name: pool.string(*name).to_string(),
+                            alias: alias.map(|alias| pool.string(alias).to_string()),
+                        })
+                        .collect(),
+                }
+            })
+            .collect::<Vec<_>>()
+    };
 
     let friends = module
         .get_friend_decls()
@@ -526,6 +804,9 @@ pub fn export_interface(module: &ModuleEnv) -> Result<XirModule> {
         structs,
         functions,
         friends,
+        constants,
+        spec_declarations,
+        uses,
         // Empty by construction: with no bodies there are no calls, so this
         // interface names no foreign functions. A full exporter would fill it.
         external_functions: vec![],
