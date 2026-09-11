@@ -423,7 +423,7 @@ impl<'a> Assembler<'a> {
                     }
                 })
                 .collect();
-            locals.sort_by(|e1, e2| e1.0.cmp(&e2.0));
+            locals.sort_by_key(|e| e.0);
             let res = self
                 .builder
                 .signature_index(locals.into_iter().map(|(_, ty)| ty).collect());
