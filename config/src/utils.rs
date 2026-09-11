@@ -96,14 +96,14 @@ fn try_bind(port: Option<u16>) -> ::std::io::Result<u16> {
 fn lock_path() -> String {
     format!(
         "/tmp/aptos-port-counter.{}.lock",
-        &NEXTEST_RUN_ID.clone().unwrap()
+        NEXTEST_RUN_ID.clone().unwrap()
     )
 }
 
 fn counter_path() -> String {
     format!(
         "/tmp/aptos-port-counter.{}",
-        &NEXTEST_RUN_ID.clone().unwrap()
+        NEXTEST_RUN_ID.clone().unwrap()
     )
 }
 
