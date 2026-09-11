@@ -13,6 +13,9 @@
 #       Run the benches twice on the current checkout (identical code both times)
 #       and report the runner's noise floor, to pick threshold_percent in config.json.
 #
+# The gate reads hardware counters (Linux perf_event), so both commands refuse
+# to run where the counters cannot be opened rather than report a hollow pass.
+#
 # Because `ab` checks out other refs in the repo, run this script from a COPY
 # placed OUTSIDE the working tree (e.g. $RUNNER_TEMP/perf), or the checkout will
 # replace the script while it executes. CWD must be inside the target git repo.
@@ -23,6 +26,9 @@
 # hand. The gate still protects every unchanged bench.
 
 set -euo pipefail
+
+# Make the bench binaries abort instead of skipping a counter they cannot open.
+export MONO_MOVE_BENCH_REQUIRE_COUNTERS=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel)"

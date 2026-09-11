@@ -54,6 +54,9 @@ datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }
 walkdir = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+perf-event = { workspace = true }
+
 [[test]]
 name = "differential"
 harness = false

@@ -48,6 +48,13 @@ jobs:
              third_party/move/mono-move/testsuite/benches/perf/config.json \
              "$RUNNER_TEMP/perf/"
 
+      # The gate counts retired instructions through perf_event; record what the
+      # runner allows so a counter failure in the logs is easy to place.
+      - name: Show hardware counter access
+        run: |
+          echo "kernel.perf_event_paranoid=$(cat /proc/sys/kernel/perf_event_paranoid)"
+          grep -m1 'model name' /proc/cpuinfo || true
+
       - name: Run A/B benchmark gate
         id: gate
         run: |
@@ -80,5 +87,5 @@ jobs:
       - name: Fail on regression
         if: ${{ steps.gate.outputs.exit_code != '0' }}
         run: |
-          echo "mono-move benchmark gate failed: regression beyond the noise band." >&2
+          echo "mono-move benchmark gate failed: instruction count regressed beyond the threshold, or the benches could not run." >&2
           exit 1
