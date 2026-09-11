@@ -404,33 +404,6 @@ pub fn is_signer_or_signer_immut_ref(ty: InternedType) -> bool {
 }
 
 impl Type {
-    /// The short kind word for this type (`"u64"`, `"vector"`, `"struct"`, ...).
-    /// Mirrors the legacy VM's `TypeTag::to_short_string`.
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            Type::Bool => "bool",
-            Type::U8 => "u8",
-            Type::U16 => "u16",
-            Type::U32 => "u32",
-            Type::U64 => "u64",
-            Type::U128 => "u128",
-            Type::U256 => "u256",
-            Type::I8 => "i8",
-            Type::I16 => "i16",
-            Type::I32 => "i32",
-            Type::I64 => "i64",
-            Type::I128 => "i128",
-            Type::I256 => "i256",
-            Type::Address => "address",
-            Type::Signer => "signer",
-            Type::Vector { .. } => "vector",
-            Type::Nominal { .. } => "struct",
-            Type::Function { .. } => "function",
-            Type::ImmutRef { .. } | Type::MutRef { .. } => "reference",
-            Type::TypeParam { .. } => "type parameter",
-        }
-    }
-
     /// True iff this is `Type::U64`. Used by the specializer to gate the
     /// u64-specialized micro-op fast paths.
     #[inline(always)]
@@ -487,9 +460,8 @@ pub const SIGNER_TY: InternedType = GlobalArenaPtr::from_static(&SIGNER);
 pub const EMPTY_TYPE_LIST: InternedTypeList =
     InternedTypeList(GlobalArenaPtr::from_static(&EMPTY_LIST));
 
-/// Writes a textual representation of an interned type. Nominals print
-/// just their name — IR variants that carry `ty_args` show them
-/// separately. Inherits the arena safety contract on [`view_type`].
+/// Writes a textual representation of an interned type. Inherits the arena
+/// safety contract on [`view_type`].
 pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result {
     match view_type(ty) {
         Type::Bool => write!(f, "bool"),
@@ -545,14 +517,14 @@ pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result
         } => {
             write!(f, "|")?;
             display_type_list(f, *args)?;
-            write!(f, "|")?;
+            write!(f, "|(")?;
             display_type_list(f, *results)?;
-            write!(f, "{}", abilities.display_postfix())
+            write!(f, "){}", abilities.display_postfix())
         },
     }
 }
 
-/// Renders an interned type to its textual representation (see [`display_type`]).
+/// Renders an interned type to a string (see [`display_type`]).
 //
 // TODO(metering): this traversal is unbounded; replace with a metered, depth-bounded
 // version.

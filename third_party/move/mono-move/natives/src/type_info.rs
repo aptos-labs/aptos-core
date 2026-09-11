@@ -8,25 +8,26 @@ use crate::{
     NativeEntry,
 };
 use mono_move_core::{
-    native::{NativeContext, NativeContextFamily, NativeStatus, RootPool, VMValue, Vector},
-    types::{type_to_string, view_name, view_type, view_type_list, Type},
+    native::{
+        native_invariant_violation, NativeContext, NativeContextFamily, NativeStatus, RootPool,
+        VMValue, Vector,
+    },
+    type_tag_of,
+    types::type_to_string,
     VMResult,
 };
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 
 /// `0x1::type_info::type_name<T>(): String`
 ///
-/// Returns the fully-qualified name of `T` as a string.
+/// Returns the canonical type name of `T`.
 //
 // TODO(metering): charge gas for the (currently unbounded) type traversal.
-//
-// TODO(correctness, metering): `type_to_string` is a placeholder — check it against the canonical
-// string format the legacy VM uses.
 //
 // TODO(completeness): with monomorphization the name is known at specialization time, so the
 // specializer could write it directly rather than going through a native.
 pub fn native_type_name<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
-    let name = type_to_string(ctx.ty_arg(0)?);
+    let name = type_tag_of_arg(ctx, 0)?.to_canonical_string();
     let bytes = ctx.new_byte_vector(name.as_bytes())?;
     // SAFETY: structs are flattened inline rather than heap-boxed, so the
     // single-field `String { bytes: vector<u8> }` has the same representation as
@@ -34,6 +35,17 @@ pub fn native_type_name<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // separate struct header.
     unsafe { ctx.set_return(0, bytes)? };
     Ok(NativeStatus::Success)
+}
+
+/// The [`TypeTag`] of the native's type argument at `index`.
+fn type_tag_of_arg<C: NativeContext>(ctx: &C, index: usize) -> VMResult<TypeTag> {
+    let ty = ctx.ty_arg(index)?;
+    type_tag_of(ty).ok_or_else(|| {
+        native_invariant_violation(format!(
+            "type argument has no type tag: {}",
+            type_to_string(ty)
+        ))
+    })
 }
 
 /// Abort code raised when `type_of` is given a non-struct type. Matches the
@@ -86,50 +98,32 @@ impl<'a> VMValue<'a> for TypeInfo<'a> {
 //
 // TODO(completeness): with monomorphization `T` is fully known at specialization time, so the
 // specializer could synthesize this `TypeInfo` directly rather than via a native.
-//
-// TODO(correctness): double check that the result matches the legacy VM's completely.
 pub fn native_type_of<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
-    let (address, module_name, struct_name) = match view_type(ctx.ty_arg(0)?) {
-        Type::Nominal {
-            module_id,
-            name,
-            ty_args,
-            ..
-        } => {
-            // SAFETY: interned ids are valid for the executable's lifetime.
-            let module_id = unsafe { module_id.as_ref_unchecked() };
-            let mut struct_name = view_name(*name).to_string();
-            let ty_args = view_type_list(*ty_args);
-            if !ty_args.is_empty() {
-                struct_name.push('<');
-                for (i, arg) in ty_args.iter().enumerate() {
-                    if i > 0 {
-                        struct_name.push_str(", ");
-                    }
-                    struct_name.push_str(&type_to_string(*arg));
-                }
-                struct_name.push('>');
-            }
-            (
-                *module_id.address(),
-                view_name(module_id.name()),
-                struct_name,
-            )
-        },
-        other => {
-            return Ok(NativeStatus::Abort {
-                code: EXPECTED_STRUCT_ABORT_CODE,
-                message: Some(format!(
-                    "Expected a struct type, found: {}",
-                    other.short_name()
-                )),
-            })
-        },
+    let type_tag = type_tag_of_arg(ctx, 0)?;
+    let TypeTag::Struct(struct_tag) = type_tag else {
+        return Ok(NativeStatus::Abort {
+            code: EXPECTED_STRUCT_ABORT_CODE,
+            message: Some(format!(
+                "Expected a struct type, found: {}",
+                type_tag.to_short_string()
+            )),
+        });
     };
-    let module_name = ctx.new_byte_vector(module_name.as_bytes())?;
+    let struct_name = if struct_tag.type_args.is_empty() {
+        struct_tag.name.to_string()
+    } else {
+        let type_args = struct_tag
+            .type_args
+            .iter()
+            .map(TypeTag::to_canonical_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{}<{}>", struct_tag.name, type_args)
+    };
+    let module_name = ctx.new_byte_vector(struct_tag.module.as_bytes())?;
     let struct_name = ctx.new_byte_vector(struct_name.as_bytes())?;
     let info = TypeInfo {
-        account_address: address,
+        account_address: struct_tag.address,
         module_name,
         struct_name,
     };
