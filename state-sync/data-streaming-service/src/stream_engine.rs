@@ -2223,6 +2223,10 @@ fn create_data_notification(
         // The number of states is consumed internally by the engine for chunk
         // planning; it is never surfaced to the consumer as a notification.
         ResponsePayload::NumberOfStates(_) => invalid_response_type!(client_response_type),
+        // Hot state values are not streamed yet.
+        ResponsePayload::HotStateValuesWithProof(_) => {
+            invalid_response_type!(client_response_type)
+        },
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
         },
