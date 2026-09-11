@@ -1,11 +1,12 @@
 {% if once(name="core_tools") %}
 ## Inspecting a Move package
 
-- Call only the tool which answers a concrete question you have. Do not begin
-  with a routine status/manifest/query sequence, and do not repeat an unchanged
-  read-only query.
-- Do not call `{{ tool(name="move_package_status") }}` as setup or after edits
-  when the next operation is inference, verification, or a candidate check;
+- Call only the tool which answers a concrete question you have. Avoid a
+  routine status/manifest/query sequence and repeated unchanged read-only
+  queries.
+- Minimize `{{ tool(name="move_package_status") }}` calls. Skip routine setup
+  and after-edit status calls when the next operation is inference,
+  verification, or a candidate check;
   those operations already compile the package and report compilation
   diagnostics. Reserve package status for a standalone compiler-diagnostic
   request when no such operation is otherwise needed.
@@ -16,9 +17,10 @@
   answers a specific unresolved question. Prefer the narrowest query:
   - `function_usage` with `function: "module::function"` for the direct and
     transitive calls and closure captures relevant to one function;
-  - `module_summary` for signatures and declarations;
+  - `module_summary` with `module: "module"` for signatures and declarations;
   - `facts` only when detailed attributes or source locations are necessary;
-    it is package-wide and can be large;
+    set `module: "module"` whenever possible because package-wide output can
+    be large;
   - `dep_graph` for module dependencies;
   - `call_graph` for package-wide calls;
 
