@@ -1,0 +1,575 @@
+% FMCAD'26 talk: Formal Verification of Imperative First-Class Functions in Move
+% Build: latexmk talk.tex   (esz.sty is picked up from .. via latexmkrc)
+% Timing: ~15 min talk + 5 min discussion; backup slides after \appendix.
+\documentclass[aspectratio=169,10pt]{beamer}
+\usetheme[progressbar=frametitle,numbering=fraction,block=fill]{metropolis}
+\input{prelude-talk.tex}
+
+\setbeamerfont{frametitle}{size=\large}
+\setbeamersize{text margin left=1.5em,text margin right=1.5em}
+% No footline: content is centered in the whole space below the title.  The
+% frame number is drawn in the bottom-right corner via the navigation-symbols
+% slot, which overlays the frame instead of reserving a footer strip.
+\setbeamertemplate{footline}{}
+\setbeamertemplate{navigation symbols}{%
+  \usebeamerfont{page number in head/foot}\usebeamercolor[fg]{page number in head/foot}%
+  \insertframenumber/\inserttotalframenumber\hspace*{1em}\vspace*{0.8em}}
+
+\title{Formal Verification of Imperative\\First-Class Functions in Move}
+\subtitle{FMCAD 2026}
+\author{Wolfgang Grieskamp \and Teng Zhang \and Vineeth Kashyap \and Jake Silverman}
+\institute{Aptos Labs, Palo Alto, USA}
+\date{}
+
+\begin{document}
+
+\maketitle
+\note{Title.  Move Prover extension for higher-order functions.  Total budget 15 minutes plus 5 minutes discussion.}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{The Move Prover}
+  \centering
+  From Meta to Aptos Labs
+  \medskip
+
+  \begin{tikzpicture}[
+      aspect/.style={draw=mDarkTeal, thick, rounded corners, fill=mDarkTeal!8,
+                     inner sep=4pt, text width=2.3cm, align=center, font=\small}]
+    % Architecture diagram from the TACAS'22 talk (page 11 of tacas-talk.pdf).
+    \node[inner sep=0] (arch)
+      {\includegraphics[viewport=14 8 676 366,clip,width=0.62\textwidth]{mvp-architecture.pdf}};
+    \node[aspect, anchor=east] at ([xshift=-2mm, yshift=19mm]arch.west) {Specs first-class citizens of code};
+    \node[aspect, anchor=east] at ([xshift=-2mm, yshift=-19mm]arch.west) {Verifies bytecode after the compiler};
+    \node[aspect, anchor=west] at ([xshift=2mm, yshift=19mm]arch.east) {Detailed diagnostics, supporting AI feedback loop};
+    \node[aspect, anchor=west] at ([xshift=2mm, yshift=-19mm]arch.east) {Fast and reliable encoding, runs in CI (TACAS'22)};
+  \end{tikzpicture}
+  \note{One-minute recap for people who did not see the TACAS'22 talk.  Production tool, not a research prototype; response times like a linter.  Key encodings from TACAS'22: reference elimination, monomorphization, fine-grained invariant injection.  Verifies staking, metering, code deployment, data structures.  This paper's extension sits in the bytecode pipeline and the Boogie backend.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile,c]{Move went higher-order}
+  \vspace{2.5ex}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{itemize}
+        \item Function types \lstinline!|T1,..,Tn|T!, closures with captured values.
+        \item A closure can be part of a struct and be persisted in global storage.
+        \item Persisted function values are Move's principled account of \textbf{dynamic dispatch}.
+      \end{itemize}
+      \medskip
+      Use cases: callbacks, extensible asset managers, dispatchable permissions, fold/map/filter.
+    \end{column}
+    \begin{column}{0.5\textwidth}
+\begin{Move}
+// Liquidity pool of an automated market
+// maker (AMM), as in Uniswap v2 (Ethereum)
+struct Pool {
+  reserve_x: u64, reserve_y: u64,
+  // (reserve_in, reserve_out, amt) = out
+  $pricing: |u64, u64, u64|u64$
+}
+
+// Extract of the AMM's core functionality
+fun swap(pool: &mut Pool, amt: u64): u64 {
+  let out = $(pool.pricing)$(
+    pool.reserve_x, pool.reserve_y, amt);
+  pool.reserve_x += amt;
+  pool.reserve_y -= out;
+  out
+}
+\end{Move}
+    \end{column}
+  \end{columns}
+  \note{Shipped late 2025.  Running example introduced right away: an AMM whose pricing curve is a closure stored in the pool.  Whoever calls swap does not know which pricing function runs.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{The challenge}
+  \MVP is modular: a call site looks up the callee's spec.
+  With dynamic dispatch there is no callee to look up.
+  \medskip
+
+  \textbf{This paper}
+  \begin{enumerate}
+    \item \textbf{Behavioral predicates}: $\abortsof{f}{\bar x}$, $\ensuresof{f}{\bar x,\bar y}$, $\resultof{f}{\bar x}$ allow to reason about some function value $f$ 
+    \item \textbf{State labels}: name intermediate states, $\slabeled{S_1..S_2}{\phi}$.
+    \item \textbf{Encoding}: discriminate over the function values that can reach a call site.
+    \item \textbf{Specification inference} for higher-order code.
+  \end{enumerate}
+  \note{The caller's spec must speak abstractly about its function-value arguments, and the verifier must reconcile that with whichever function arrives: fast, and without trigger instability.  The talk follows the four items in order.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Running example: what may a pricing function do?}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+\begin{MoveSmall}
+spec Pool {
+  reads_of<self.pricing> *;
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S |~ !aborts_of<self.pricing>(ri, ro, a);
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S.. |~ result_of<self.pricing>(ri, ro, a) <= ro;
+
+  invariant forall S in *, ri: u64, ro: u64,
+                   a1: u64, a2: u64:
+    S.. |~ a1 <= a2 ==>
+      result_of<self.pricing>(ri, ro, a1)
+        <= result_of<self.pricing>(ri, ro, a2);
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S.. |~ (ri + a)
+           * (ro - result_of<self.pricing>(ri, ro, a))
+           >= ri * ro;
+}
+\end{MoveSmall}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      A data invariant on |Pool| constrains \emph{any} closure stored in |pricing|:
+      \begin{enumerate}
+        \item never aborts,
+        \item output bounded by output reserve,
+        \item monotone in the input,
+        \item product of reserves never decreases.
+      \end{enumerate}
+      \medskip
+      |aborts_of|, |result_of|: behavior of the stored function value; |S|: a state label over all reachable states.
+      \medskip
+
+      Checked when a |Pool| is built, assumed wherever a |Pool| is used.
+    \end{column}
+  \end{columns}
+  \note{Walk through the four invariants.  Monotonicity relates two invocations of the same function value: a relational property; result\_of is a mathematical function per state, so this is just a first-order formula.  Pack time is the proof-obligation point; use sites like swap get the invariants for free.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Behavioral predicates}
+  For a function value |f| with arguments $\bar x$ and results $\bar y$:
+  \begin{center}
+    \begin{tabular}{ll}
+      $\requiresof{f}{\bar x}$ & precondition holds \\
+      $\abortsof{f}{\bar x}$   & the call aborts \\
+      $\ensuresof{f}{\bar x,\bar y}$ & postcondition holds (two-state) \\
+      $\resultof{f}{\bar x}$   & the result of the call (two-state) \\[1ex]
+      $\Zpreop{reads\_of}\langle f\rangle\ R$ & memory the call may read \\
+      $\modifiesof{f}(\bar x)\ R[a]$ & memory the call may write \\
+    \end{tabular}
+  \end{center}
+  \medskip
+  \begin{itemize}
+    \item On a known function they unfold to its spec.
+    \item On a parameter or a stored closure they stay abstract.
+  \end{itemize}
+  \note{Total over all variants of the function type.  reads\_of star includes an abstract unknown memory map for soundness, so g(x) is not assumed equal across states.  No modifies\_of wildcard: it would destroy the frame condition; see backup.  Without behavioral predicates, one would inline every possible callee's conditions at every call site.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{State labels}
+  \begin{itemize}
+    \item $\slabeled{S}{p}$: evaluate $p$ in state $S$.
+    \item $\slabeled{S..}{q}$: $S$ is the pre-state of a call; $\slabeled{S_1..S_2}{q}$ names both ends.
+    \item |forall S in *| for invariants, |exists S in *| to witness an intermediate state:
+  \end{itemize}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+\lstset{xleftmargin=3em}
+\begin{Move}
+fun followed_by(f: |&mut A|,
+                g: |&mut A|,
+                x: &mut A) {
+  f(x); g(x)
+}
+spec followed_by {
+  reads_of<f> *; reads_of<g> *;
+  ensures exists S in *:
+    (..S |~ ensures_of<f>(x)) &&
+    (S.. |~ ensures_of<g>(x))
+}
+\end{Move}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      The post-state of |f| becomes the pre-state of |g|, without threading values through the spec.
+    \end{column}
+  \end{columns}
+  \note{A state at S is global memory plus locals reachable via references.  Works for concrete callees too: compose callee specs instead of duplicating them.  Contrast with Dafny: labels but no quantification over them, and no state-modifying function values.  Verus: state-passing style with state as an explicit argument.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Application side: \texttt{swap}}
+\begin{Move}
+spec swap {
+  aborts_if pool.reserve_x + amt > MAX_U64;
+  ensures result == old(result_of<pool.pricing>(pool.reserve_x, pool.reserve_y, amt));
+  ensures pool.reserve_x * pool.reserve_y >= old(pool.reserve_x * pool.reserve_y);
+}
+\end{Move}
+  \medskip
+  \begin{itemize}
+    \item Pricing cannot abort by (1), |reserve_y - out| cannot underflow by (2): only the overflow abort remains.
+    \item Product preservation follows from (4).
+  \end{itemize}
+  \takeaway{With dynamic dispatch, the application side is no harder than first-order code.}
+  \note{Nothing about the concrete pricing function is known here.  aborts\_if is a biconditional in Move: the prover would report the underflow abort if invariant 2 were absent.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Compliance side: building a pool}
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+\begin{MoveSmall}
+// fee-free constant product: verifies
+fun product(ri: u64, ro: u64, a: u64): u64 { .. }
+
+struct Fee {bps: u64}
+fun with_fee(owner: address,
+             ri: u64, ro: u64, a: u64): u64 {
+  let b = (a as u128)
+    * (10000 - Fee[owner].bps as u128) / 10000;
+  product(ri, ro, b as u64)
+}
+spec with_fee {
+  aborts_if !exists<Fee>(owner);
+  aborts_if Fee[owner].bps > 10000; ..
+}
+Pool{..,
+  pricing: |ri, ro, a| with_fee(owner, ri, ro, a)}
+// error: data invariant does not hold
+\end{MoveSmall}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      Storing $f$ where $p$ is expected requires, for all inputs,
+      \[
+        \begin{array}{l}
+          \requiresof{p}{\bar x} \implies \requiresof{f}{\bar x} \\
+          \abortsof{f}{\bar x} \iff \abortsof{p}{\bar x} \\
+          \ensuresof{f}{\bar x,\bar y} \implies \ensuresof{p}{\bar x,\bar y}
+        \end{array}
+      \]
+      \begin{itemize}
+        \item |with_fee| violates the no-abort invariant; a guarded variant with a default fee verifies.
+        \item The nonlinear fee variants need a one- or two-line proof hint.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \note{Pack time is the proof-obligation point.  Subtlety: product has no underflow on subtraction in the CP invariant because of the output-bound invariant.  Hints: a case split and a stepping-stone assertion.  Be honest about scalability: compliance proofs are universal properties of functions; harder cases will need substantial hints or trusted assumptions.  The application side is routine, the compliance side is where proof effort concentrates.}
+\end{frame}
+
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Encoding: which function values can reach a call site?}
+  After monomorphization this is known statically.
+  Per function type $\tau$, one datatype with a constructor per source:
+  \begin{ivl}
+    \DATATYPE \tau\ \{\\
+    \t1 C_{f}(\sq{c : T}), \ldots, P_{f,x}(), \ldots, F_{\sigma.x}(n : \nat), \ldots \\
+    \}
+  \end{ivl}
+  \begin{itemize}
+    \item $C_f(\sq c)$: closure of function $f$ with captured values $\sq c$.
+    \item $P_{f,x}$: function-typed parameter $x$ of a verification target $f$.
+    \item $F_{\sigma.x}(n)$: struct field $x$ of $\sigma$; the discriminator $n$ lets two locations hold distinct closures.
+  \end{itemize}
+  \medskip
+  \textbf{A VC only sees the function values derivable from the program.}
+  \note{Mono-analysis records the three sets.  Parameter variants are nullary: a skolem constant pinned to its variant at entry.  The field variant is where dynamic dispatch lives; without one, the representation is narrowed further.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Encoding: invoking a function value}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \begin{ivl}
+        \PROC invoke_\tau(x: \tau, \sq{p:T}) \RETURNS (\sq{r: T}) \\
+        \t1 \IF x \IS\ C_{f}(\sq{c}) \\
+        \t2    \sq{r} := \CALL f(\sq{c}, \sq{p}) \\
+        \t1 \ELSE \\
+        \t2    \ASSERT requires_\tau(x, \Mem_\tau, \sq{p}) \\
+        \t2    \IF\ aborts_\tau(x, \Mem_\tau, \sq{p}) \\
+        \t3       abort\_flag := \TRUE \\
+        \t2    \ELSE \\
+        \t3       \LET \Mem'_\tau := \Mem_\tau \\
+        \t3       \HAVOC \Mod_\tau(\sq{p}),\ \bar{r} \\
+        \t3       \ASSUME ensures_\tau(x, \Mem'_\tau, \Mem_\tau, \sq{p}, \sq{r})
+      \end{ivl}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{itemize}
+        \item Known closure: call the function.
+        \item Otherwise: the usual opaque-call schema, driven by the behavioral predicates.
+        \item $\Mem_\tau$, $\Mod_\tau$: read and write footprints of $\tau$.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \note{No new machinery: for an opaque f both branches coincide.  Footprints come from code for closures and from reads\_of and modifies\_of for parameters and fields.  The novelty is what feeds the schema: behavioral predicates that are total over the datatype.}
+\end{frame}
+
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Encoding: intermediate state labels}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+\begin{MoveSmall}
+struct R(u64);
+spec foo(f: |address|, g: |address|,
+         a: address) {
+  aborts_if aborts_of<f>(a);
+  ensures ..S |~ ensures_of<f>(a);
+  ensures S |~ R[a].0 > 0;
+  aborts_if S |~ aborts_of<g>(a);
+  ensures S.. |~ ensures_of<g>(a);
+}
+\end{MoveSmall}
+      \medskip
+      The state at |S| becomes an existentially quantified memory snapshot $\Mem^S$.
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{ivl}
+        \FUN aborts_{C_{foo}}[\Mem', \Mem](a) \\
+        \t1 aborts_\tau(f,\Mem',a) \\
+        \t1 \lor (\exists \Mem^S @ ensures_\tau(f,\Mem',\Mem^S,a) \\
+        \t2 \land R[\Mem^S][a].0 > 0 \\
+        \t2 \land aborts_{\tau'}(g,\Mem^S,a))
+      \end{ivl}
+      An abort at |S| needs |S| established first: the ensures reaching |S| are conjoined with the abort condition; pre-state aborts are disjoined in front.
+      \medskip
+
+      Sound since a verified function satisfies $\bigvee \sq A \lor \bigwedge \sq P$.
+    \end{column}
+  \end{columns}
+  \note{The ensures predicate is analogous, with the ensures of g in place of the abort.  Chains of labels nest the same scheme; the implementation uses one flat existential over all labels and keeps only label-defining conjuncts in the body, which is sound by the validity invariant.}
+\end{frame}
+
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Specification inference as a test oracle}
+  \MVP also has the reverse path: \WP-based \emph{specification inference} derives specs from code, using behavioral predicates for calls.
+  Inferred specs are complete and are expected to verify.
+  \medskip
+
+  \centering
+  \begin{tikzpicture}[
+      node distance=5mm,
+      data/.style={draw, rounded corners, fill=mDarkTeal!10, minimum height=9mm, text width=2.1cm, align=center, font=\footnotesize},
+      alg/.style={draw, thick, fill=mLightBrown!25, minimum height=9mm, text width=2.0cm, align=center, font=\footnotesize},
+      arr/.style={-{Latex[length=2mm]}, thick},
+      back/.style={-{Latex[length=2mm]}, thick, dashed, mDarkTeal}]
+    \node[data] (corpus) {Corpus of higher-order Move code};
+    \node[alg, right=of corpus] (infer) {Spec inference};
+    \node[data, right=of infer] (enriched) {Code with inferred specs};
+    \node[alg, right=of enriched] (verify) {Higher-order verification};
+    \node[data, right=of verify] (verdict) {Verdict};
+    \draw[arr] (corpus) -- (infer);
+    \draw[arr] (infer) -- (enriched);
+    \draw[arr] (enriched) -- (verify);
+    \draw[arr] (verify) -- (verdict);
+    \draw[back] (verdict.south) -- ++(0,-4mm) -| (verify.south);
+    \draw[back] (verdict.south) -- ++(0,-8mm) -| (infer.south);
+    \node[font=\footnotesize, mDarkTeal, anchor=north] at ([yshift=-8.5mm]enriched.south) {failure: a bug in one of the two};
+  \end{tikzpicture}
+  \medskip
+
+  \raggedright
+  Two independent algorithms are unlikely to agree on a bug.
+  The current test suite covers 550 verification conditions.
+  \note{Inference reverses invoke: a call becomes its behavioral predicates in the WP; precise and complete apart from loop invariants.  Inference and verification meet only at the semantics of the new constructs.  Categories: direct calls, mutual recursion, higher-order parameters, stored-closure dispatch, state labels (backup table).  Also makes compliance machine-readable, e.g. the aborts conditions of with\_fee are inferred.  Closure test suite: 19 modules, about 240 verified functions, 66 expected errors; CI under 5 minutes.  Shipped in the production prover; no large HOF corpus exists yet since higher-order Move only shipped in late 2025.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Related work}
+  \begin{itemize}
+    \item \textbf{Dafny}: behavioral predicates and labels, but function values cannot modify state, and labels are not quantified.
+    \item \textbf{Verus}, \textbf{Prusti}: closure specs by state passing or separation logic; Move's alias-free references and resource-separated memory avoid both.
+    \item \textbf{\fstar}: effectful higher-order code with \WP in the type system; heap separation is reasoned about in the logic, whereas Move separates memory at compile time.
+    \item \textbf{Solidity verifiers} (\certora and others): dispatch by enumerating callees; our datatype makes the case split explicit and falls back to behavioral predicates.
+  \end{itemize}
+  \note{Relational tradition: VDM, Z, B; state labels add intermediate snapshots and composition.  Lean and other ITPs require encoding the language.  Keep to 45 seconds; the paper has the detailed comparison.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Conclusion}
+  \begin{itemize}
+    \item Behavioral predicates and state labels make function specs first-class.
+    \item The encoding discriminates on the variant reaching a call site: concrete effect when known, behavioral predicates otherwise.
+    \item \MVP's routine, counterexample-driven verification now covers dynamic dispatch; inference validates the encoding.
+  \end{itemize}
+  \medskip
+  \textbf{Future work}
+  \begin{itemize}
+    \item Quantifying over \emph{sequences} of state labels for fold-style contracts.
+    \item Better automation for the nonlinear compliance proofs.
+    \item Encoding and verification of the schema in Lean.
+  \end{itemize}
+  \note{Also: inferring loop invariants that involve function values.  Shipped in the Aptos toolchain; examples and test suite are in aptos-core.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[standout]
+  Thank you
+  \vspace{1em}
+
+  \small
+  Prover, examples, and tests: \texttt{github.com/aptos-labs/aptos-core}
+
+  \footnotesize
+  Paper examples: \url{https://github.com/aptos-labs/aptos-core/tree/28f82080e3/third_party/move/move-prover/doc/higher-order-paper-26/examples}
+\end{frame}
+
+% ===========================================================================
+\appendix
+
+\begin{frame}[fragile]{Backup: higher-order loops, \texttt{find}}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+\begin{MoveSmall}
+fun find<T>(v: &vector<T>, pred: |&T|bool): u64 {
+  let i = 0; let n = v.length();
+  while (i < n) {
+    if (pred(v[i])) return i;
+    i += 1;
+  } spec {
+    invariant i <= n;
+    invariant no_match_before(v, pred, i);
+  };
+  n
+}
+spec find {
+  ensures result <= len(v);
+  ensures no_match_before(v, pred, result);
+  ensures result < len(v)
+            ==> result_of<pred>(v[result])
+}
+\end{MoveSmall}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+\begin{MoveSmall}
+spec fun no_match_before<T>(v: vector<T>,
+    pred: |&T|bool, end: u64): bool
+{ forall j in 0..end: !result_of<pred>(v[j]) }
+
+fun find_zero_lambda(v: &vector<u64>): u64 {
+  find(v, |x| x == 0
+           spec { ensures result == (x == 0) })
+}
+spec find_zero_lambda {
+  ensures result < len(v) ==> v[result] == 0
+    && (forall j in 0..result: v[j] != 0);
+  ensures result == len(v)
+    ==> (forall j in 0..len(v): v[j] != 0);
+}
+\end{MoveSmall}
+      \medskip
+      The loop invariant is written once; callers verify from |find|'s spec and the lambda's contract.
+    \end{column}
+  \end{columns}
+  \note{find is opaque, so callers use its spec only.  no\_match\_before is a spec function parametric in a behavioral predicate, reused in loop invariant and postcondition.  The lambda body is never inspected at the caller.  Users of find, map, reduce rarely write loop invariants.}
+\end{frame}
+
+\begin{frame}[fragile]{Backup: memory access sets}
+\begin{Move}
+spec foo(f: |address|, g: |T|S) {
+  reads_of<f> R;                   // f may read resource R
+  reads_of<g> *;                   // g may read anything in scope, plus unknown memory
+  modifies_of<f>(a: address) R[a]; // f may write R[a]; default is no writes
+}
+\end{Move}
+  \begin{itemize}
+    \item $\Mem_\tau = \Mem_{C_f} \cup \Mem_{P_{f,x}} \cup \Mem_{F_{\sigma.x}}$: derived from code for closures, declared via |reads_of| for parameters and fields.
+    \item |reads_of<g> *| adds an abstract map for unknown memory, so $g(x)$ is not assumed equal across states.
+    \item $\Mod_\tau$ likewise, from |modifies| and |modifies_of|; no wildcard, since it would leave no frame.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Backup: encoding determinism}
+  $ensures_\tau$ switches over the variant and adds the frame condition (backup).
+  It is a relation; Move functions are deterministic.
+  \medskip
+
+  Introduce an uninterpreted $result_\tau$ and tie it to $ensures_\tau$:
+  \begin{ivl}
+    \FUN result_\tau[\Mem', \Mem](x: \tau, \sq{p: T}) \fun \sq{U} \\
+    \AXIOM \forall x, \sq{p} @ \{result_\tau[\Mem', \Mem](x, \sq{p})\} \\
+    \t1 \LET \sq{r} := result_\tau[\Mem', \Mem](x, \sq{p}) @
+        ensures_\tau[\Mem', \Mem](x, \sq{p}, \sq{r})
+  \end{ivl}
+  \begin{itemize}
+    \item One direction only: a biconditional would force all solutions of a weak |ensures| to coincide.
+    \item For parameter and field variants, $ensures$ is \emph{defined} as the graph of an uninterpreted $result$.
+  \end{itemize}
+  \note{The result tuple also includes post-values of mutable-reference parameters.  Compliance: where a concrete closure flows into an abstract position, the conditions assumed on the definition side are asserted and reduce to the closure's spec via the per-variant extraction.}
+\end{frame}
+
+\begin{frame}{Backup: ensures with frame condition}
+  The caller havoced all of $\Mod_\tau$; the variant only constrains $\Mod_x$:
+  \begin{ivl}
+    \FUN ensures_\tau[\Mem', \Mem](x: \tau, \sq{p: T}, \sq{r: U}): \BOOL \\
+    \t1  \bigwedge_{(\rho, a) \in \Mod_\tau}( \\
+    \t2    \IF \rho \notin \Type(\Mod_x) \\
+    \t3       \Mem(\rho) = \Mem'(\rho) \\
+    \t2    \ELSE \\
+    \t3       (\bigwedge_{(\rho, a') \in \Mod_x} a' \neq a) \\
+    \t4          \implies \Mem(\rho)[a] = \Mem'(\rho)[a] \\
+    \t1  ) \land ensures_x[\Mem'_x, \Mem_x](p, r)
+  \end{ivl}
+  Modification addresses are symbolic and may alias, hence the pairwise disequalities.
+\end{frame}
+
+\begin{frame}[fragile]{Backup: making it fast}
+  \begin{itemize}
+    \item Predicates as IVL functions \emph{with bodies} time out: Boogie unfolds eagerly.
+    \item Instead: \emph{uninterpreted} predicates, connected by axioms with per-variant triggers.
+  \end{itemize}
+  \begin{ivl}
+    \AXIOM \forall \sq{c}, \sq{p}, \sq{r} @ \{ensures_\tau(C_f(\sq{c}), \sq{p}, \sq{r})\} \\
+    \t1  ensures_\tau(C_f(\sq{c}), \sq{p}, \sq{r}) \iff ensures_{C_f(\sq{c})}(\sq{p}, \sq{r}) \\
+    \AXIOM \forall \sq{p}, \sq{r} @ \{ensures_\tau(P_{f,x}(), \sq{p}, \sq{r})\} \\
+    \t1  ensures_\tau(P_{f,x}(), \sq{p}, \sq{r}) \iff ensures_{P_{f,x}}(\sq{p}, \sq{r}) \\
+    \AXIOM \forall f, \sq{p}, \sq{r} @ \{ensures_\tau(f, \sq{p}, \sq{r})\} \\
+    \t1  f \IS F_{\sigma.x} \implies (ensures_\tau(f, \sq{p}, \sq{r}) \iff ensures_{F_{\sigma.x}}(f.n, \sq{p}, \sq{r}))
+  \end{ivl}
+  \medskip
+  \textbf{Axioms fire only where the variant is syntactically present in the proof context.}
+  \note{Every quantifier inside an unfolded body fires at every call site: combinatorial blowup.  Field variants have no constructor term at the call site, since the value is loaded from memory; the guard pins the variant and the discriminator goes through the selector.  General discipline for modular Boogie encodings, not specific to closures.  Test suite runs in CI with a 40 s per-VC timeout.}
+\end{frame}
+
+\begin{frame}[fragile]{Backup: inference test categories}
+  \small
+  \begin{tabular}{p{0.3\textwidth}p{0.65\textwidth}}
+    \textbf{Category} & \textbf{Representative cases} \\
+    \hline
+    Direct calls & Chained calls to a spec'd helper; inferred specs use |ensures_of| and |aborts_of| instead of inlining the body. \\
+    Mutual recursion & |is_even| and |is_odd|; each spec is phrased via the other's behavioral predicate. \\
+    Higher-order parameters & Closure applied by the callee; spec abstracts via predicates on the parameter. \\
+    Stored-closure dispatch (enum) & Calculator with a closure-carrying enum variant. \\
+    Stored-closure dispatch (field) & Vault with a |Strategy| closure field on Aptos framework types; |modifies_of| inferred for the field. \\
+    Pre/post state labels & |move_to|, |move_from|, mutable resource indexing; |@pre| versus post-state memory. \\
+    Intermediate state labels & Sequenced state-modifying calls; existentially quantified labels pinned to defining predicates. \\
+  \end{tabular}
+\end{frame}
+
+\begin{frame}{Backup: how the implementation was built}
+  Developed in close collaboration with AI coding assistants (primarily Claude Code; Codex as a second opinion).
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Went well}
+      \begin{itemize}
+        \item Frontend extensions largely AI-produced, human review only.
+        \item Root-cause diagnosis once inference surfaced a failing example.
+        \item Timeout diagnosis via Boogie, SMT, and Z3 instantiation logs.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{Went less well}
+      \begin{itemize}
+        \item The encoding itself needed substantial human guidance; soundness calls were human.
+        \item Dozens of iterations in the hard parts; effort approached manual implementation.
+        \item Token cost.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \medskip
+  Key enabler: the inference-then-verify pipeline gave an unambiguous correctness signal independent of human review.
+\end{frame}
+
+\end{document}

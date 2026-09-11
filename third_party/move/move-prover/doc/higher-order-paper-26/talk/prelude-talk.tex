@@ -1,0 +1,122 @@
+% Slide-deck prelude.
+% Mirrors the listing and IVL definitions of ../prelude.tex, minus the
+% article-specific packages (enumitem, captions, floats) which clash
+% with beamer.  Keep the Move language and the literate table in sync
+% with ../prelude.tex.
+
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{inconsolata}
+\usepackage{relsize}
+\usepackage{amsmath,amssymb,array}
+\usepackage{esz}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.misc,calc,fit}
+
+% Abbreviations
+\newcommand{\MVP}[0]{\textsf{MVP}\xspace}
+\newcommand{\MSL}[0]{\textsf{MSL}\xspace}
+\newcommand{\WP}[0]{\textsf{WP}\xspace}
+\newcommand{\solidity}[0]{\textsf{Solidity}\xspace}
+\newcommand{\fstar}[0]{\textsf{F*}\xspace}
+\newcommand{\verus}[0]{\textsf{Verus}\xspace}
+\newcommand{\certora}[0]{\textsf{Certora}\xspace}
+
+% IVL (based on esz.sty)
+\newenvironment{ivl}{\small\zedindent=1ex\begin{zed}}{\end{zed}}
+
+\newcommand{\requiresof}[2]{\Zpreop{requires\_of}\langle#1\rangle(#2)}
+\newcommand{\abortsof}[2]{\Zpreop{aborts\_of}\langle#1\rangle(#2)}
+\newcommand{\ensuresof}[2]{\Zpreop{ensures\_of}\langle#1\rangle(#2)}
+\newcommand{\resultof}[2]{\Zpreop{result\_of}\langle#1\rangle(#2)}
+\newcommand{\modifiesof}[1]{\Zpreop{modifies\_of}\langle#1\rangle}
+
+\newcommand{\Clo}{\mathcal{C}}
+\newcommand{\Par}{\mathcal{P}}
+\newcommand{\Fld}{\mathcal{F}}
+\newcommand{\Addr}{\Zpreop{address}}
+\newcommand{\Mem}{\mathcal{M}}
+\newcommand{\Mod}{\Delta}
+\newcommand{\Type}{\mathcal{T}}
+\newcommand{\Expr}{\mathcal{E}}
+
+\newcommand{\PROC}{\Zkeyword{proc}}
+\newcommand{\FUN}{\Zkeyword{fun}}
+\newcommand{\AXIOM}{\Zkeyword{axiom}}
+\newcommand{\RETURNS}{\Zinrel{returns}}
+\newcommand{\HAVOC}{\Zkeyword{havoc}}
+\newcommand{\ASSUME}{\Zkeyword{assume}}
+\newcommand{\ASSERT}{\Zkeyword{assert}}
+\newcommand{\DATATYPE}{\Zkeyword{datatype}}
+\newcommand{\IS}{\Zinrel{is}}
+\newcommand{\TRUE}{\Zkeyword{true}}
+\newcommand{\BOOL}{\Zpreop{bool}}
+\newcommand{\CALL}{\Zpreop{call}}
+
+\newcommand{\sat}{\mathrel{{\scriptstyle\vert}\mkern-1mu{\scriptstyle\sim}}}
+\newcommand{\slabeled}[2]{#1 \sat #2}
+\newcommand{\sq}[1]{\overline{#1}}
+
+% Code
+\lstdefinestyle{MoveStyle}{
+    basicstyle=\ttfamily,
+    keywordstyle=\color{black},
+    commentstyle=\color{gray}\normalfont\itshape,
+    escapechar=@,
+    breaklines=true,
+    literate={|~}{{$\sat$\,}}1
+        {<=}{{$\leq$}}2
+        {>=}{{$\geq$}}2
+        {==}{{$=$}}2
+        {!=}{{$\neq$}}2
+        {==>}{{$\Longrightarrow$}}3
+        {forall}{{$\forall$}}1
+        {exists}{{$\exists$}}1,
+}
+
+\lstdefinelanguage{Move}{
+    morekeywords={
+        abort, aborts_if, aborts_of, acquires, address, as, assert, assume,
+        borrow_global, borrow_global_mut, break, const, continue, copy,
+        copyable, define, drop, else, ensures, ensures_of, exists, false,
+        forall, friend, fun, global, has, havoc, if, in, include, invariant,
+        key, let, loop, match, modifies, modifies_of, module, move, move_from,
+        move_to, mut, native, num, old, onabort, pragma, proof, public,
+        reads_of, requires, requires_of, resource, result_of, return, schema,
+        script, signer, spec, split, store, struct, true, u8, u64, u128, u256,
+        update, use, with, where, while},
+    sensitive=true,
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+}
+
+% Only | as short inline delimiter; ! would clash with prose on slides.
+\lstMakeShortInline[language=Move,style=MoveStyle]|
+
+% Text between $...$ in a listing is set in bold (for emphasis on slides).
+\lstnewenvironment{Move}{
+    \lstset{language=Move, style=MoveStyle,
+        basicstyle=\footnotesize\ttfamily, keywordstyle=\color{blue},
+        moredelim=**[is][\bfseries]{\$}{\$}}
+}{}
+
+\lstnewenvironment{MoveSmall}{
+    \lstset{language=Move, style=MoveStyle,
+        basicstyle=\scriptsize\ttfamily, keywordstyle=\color{blue},
+        moredelim=**[is][\bfseries]{\$}{\$}}
+}{}
+
+\lstnewenvironment{MoveDiag}{
+    \lstset{style=MoveStyle, basicstyle=\scriptsize\ttfamily}
+}{}
+
+% Highlight box for take-aways.
+\newcommand{\takeaway}[1]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node[draw=mDarkTeal, thick, rounded corners, inner sep=6pt,
+          text width=0.9\textwidth, fill=mDarkTeal!8]{#1};
+  \end{tikzpicture}
+  \end{center}}
