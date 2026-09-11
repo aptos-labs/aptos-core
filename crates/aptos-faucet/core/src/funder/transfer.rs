@@ -362,7 +362,7 @@ pub struct MinimumFunds(pub u64);
 
 impl std::fmt::Display for MinimumFunds {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -382,7 +382,7 @@ pub struct AmountToFund(pub u64);
 
 impl std::fmt::Display for AmountToFund {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", self.0)
     }
 }
 

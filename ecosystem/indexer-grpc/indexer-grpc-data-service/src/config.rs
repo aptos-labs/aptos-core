@@ -161,7 +161,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
 
         println!(
             ">>>> Starting Redis connection: {:?}",
-            &self.redis_read_replica_address.0
+            self.redis_read_replica_address.0
         );
         let redis_conn = redis::Client::open(self.redis_read_replica_address.0.clone())?
             .get_tokio_connection_manager()
@@ -189,7 +189,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .send_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Zstd)
             .accept_compressed(CompressionEncoding::Gzip);
-        println!(">>>> Starting gRPC server: {:?}", &svc);
+        println!(">>>> Starting gRPC server: {:?}", svc);
 
         let svc_clone = svc.clone();
         let reflection_service_clone = reflection_service.clone();

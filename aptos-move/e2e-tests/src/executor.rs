@@ -1587,7 +1587,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 .unwrap_or_else(|e| {
                     panic!(
                         "Error calling {}.{}: {}",
-                        &module_id,
+                        module_id,
                         function_name,
                         e.into_vm_status()
                     )

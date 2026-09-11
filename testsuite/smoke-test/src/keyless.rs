@@ -1103,7 +1103,7 @@ async fn print_account_resource<T: DeserializeOwned + Debug>(
         .await;
 
     let rsrc = maybe_response.unwrap().into_inner();
-    println!("{}: {:?}", message, &rsrc);
+    println!("{}: {:?}", message, rsrc);
 
     rsrc
 }

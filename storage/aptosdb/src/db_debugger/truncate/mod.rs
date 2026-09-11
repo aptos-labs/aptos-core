@@ -45,7 +45,7 @@ impl Cmd {
                 !backup_checkpoint_dir.exists(),
                 "Backup dir already exists."
             );
-            println!("Creating backup at: {:?}", &backup_checkpoint_dir);
+            println!("Creating backup at: {:?}", backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
             AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir)?;
             println!("Done!");

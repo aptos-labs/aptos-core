@@ -124,27 +124,27 @@ async fn check_stateful_set_status(
                                 if let Some(waiting_reason) = &waiting.reason {
                                     match waiting_reason.as_str() {
                                         "ImagePullBackOff" => {
-                                            info!("Pod {} has ImagePullBackOff", &pod_name);
+                                            info!("Pod {} has ImagePullBackOff", pod_name);
                                             return Err(WorkloadScalingError::FinalError(
                                                 "ImagePullBackOff".to_string(),
                                             ));
                                         },
                                         "CrashLoopBackOff" => {
-                                            info!("Pod {} has CrashLoopBackOff", &pod_name);
+                                            info!("Pod {} has CrashLoopBackOff", pod_name);
                                             return Err(WorkloadScalingError::FinalError(
                                                 "CrashLoopBackOff".to_string(),
                                             ));
                                         },
                                         "ErrImagePull" => {
-                                            info!("Pod {} has ErrImagePull", &pod_name);
+                                            info!("Pod {} has ErrImagePull", pod_name);
                                             return Err(WorkloadScalingError::FinalError(
                                                 "ErrImagePull".to_string(),
                                             ));
                                         },
                                         _ => {
-                                            info!("Waiting for pod {}", &pod_name);
+                                            info!("Waiting for pod {}", pod_name);
                                             return Err(WorkloadScalingError::RetryableError(
-                                                format!("Waiting for pod {}", &pod_name),
+                                                format!("Waiting for pod {}", pod_name),
                                             ));
                                         },
                                     }
@@ -154,16 +154,16 @@ async fn check_stateful_set_status(
                     }
                 }
                 if let Some(phase) = status.phase.as_ref() {
-                    info!("Pod {} at phase {}", &pod_name, phase)
+                    info!("Pod {} at phase {}", pod_name, phase)
                 }
                 Err(WorkloadScalingError::RetryableError(format!(
                     "Retry due to pod {} status {:?}",
-                    &pod_name, status
+                    pod_name, status
                 )))
             } else {
                 Err(WorkloadScalingError::FinalError(format!(
                     "Pod {} status not found",
-                    &pod_name
+                    pod_name
                 )))
             }
         },
@@ -191,7 +191,7 @@ pub async fn set_stateful_set_image_tag(
     let image_repo = get_stateful_set_image(&sts)?.name;
 
     // replace the image tag
-    let new_image = format!("{}:{}", &image_repo, &image_tag);
+    let new_image = format!("{}:{}", image_repo, image_tag);
 
     // set the image using kubectl
     // patching the node spec may not work
@@ -201,8 +201,8 @@ pub async fn set_stateful_set_image_tag(
             &kube_namespace,
             "set",
             "image",
-            &format!("statefulset/{}", &stateful_set_name),
-            &format!("{}={}", &container_name, &new_image),
+            &format!("statefulset/{}", stateful_set_name),
+            &format!("{}={}", container_name, new_image),
         ])
         .status()
         .expect("Failed to set image for StatefulSet");
@@ -294,7 +294,7 @@ pub async fn check_for_container_restart(
                             bail!(
                                 "Container {} in pod {} restarted {} times ",
                                 container_status.name,
-                                &pod_name,
+                                pod_name,
                                 container_status.restart_count
                             );
                         }
