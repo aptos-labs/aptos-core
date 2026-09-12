@@ -47,6 +47,16 @@ spec aptos_std::ed25519 {
         ensures result == spec_signature_verify_strict_internal(signature.bytes, public_key.bytes, message);
     }
 
+    spec batch_signature_verify_strict(
+        signatures: vector<Signature>,
+        public_keys: vector<UnvalidatedPublicKey>,
+        messages: vector<vector<u8>>
+    ): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_signature_batch_verify_strict_internal(signatures, public_keys, messages);
+    }
+
     spec signature_verify_strict_t<T: drop>(
         signature: &Signature,
         public_key: &UnvalidatedPublicKey,
@@ -102,12 +112,28 @@ spec aptos_std::ed25519 {
         ensures result == spec_signature_verify_strict_internal(signature, public_key, message);
     }
 
+    spec signature_batch_verify_strict_internal(
+        signatures: vector<Signature>,
+        public_keys: vector<UnvalidatedPublicKey>,
+        messages: vector<vector<u8>>
+    ): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_signature_batch_verify_strict_internal(signatures, public_keys, messages);
+    }
+
     /// # Helper functions
 
     spec fun spec_signature_verify_strict_internal(
         signature: vector<u8>,
         public_key: vector<u8>,
         message: vector<u8>
+    ): bool;
+
+    spec fun spec_signature_batch_verify_strict_internal(
+        signatures: vector<Signature>,
+        public_keys: vector<UnvalidatedPublicKey>,
+        messages: vector<vector<u8>>
     ): bool;
 
     spec fun spec_public_key_validate_internal(bytes: vector<u8>): bool;

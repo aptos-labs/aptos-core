@@ -137,6 +137,20 @@ module aptos_std::ed25519 {
         signature_verify_strict_internal(signature.bytes, public_key.bytes, message)
     }
 
+    /// Verifies a batch of purported Ed25519 signatures under unvalidated public keys on the specified messages.
+    /// Returns `true` iff all triples `(signatures[i], public_keys[i], messages[i])` verify.
+    /// Returns `false` if:
+    /// - any input vector is empty,
+    /// - the input vectors have mismatched lengths,
+    /// - any element is malformed, or any signature fails verification.
+    public fun batch_signature_verify_strict(
+        signatures: vector<Signature>,
+        public_keys: vector<UnvalidatedPublicKey>,
+        messages: vector<vector<u8>>
+    ): bool {
+        signature_batch_verify_strict_internal(signatures, public_keys, messages)
+    }
+
     /// This function is used to verify a signature on any BCS-serializable type T. For now, it is used to verify the
     /// proof of private key ownership when rotating authentication keys.
     public fun signature_verify_strict_t<T: drop>(signature: &Signature, public_key: &UnvalidatedPublicKey, data: T): bool {
@@ -223,6 +237,14 @@ module aptos_std::ed25519 {
         message: vector<u8>
     ): bool;
 
+    /// Return true iff all `signatures[i]` on `messages[i]` verify against `public_keys[i]`.
+    /// Does not abort. Returns false on any malformed input or length mismatch.
+    native fun signature_batch_verify_strict_internal(
+        signatures: vector<Signature>,
+        public_keys: vector<UnvalidatedPublicKey>,
+        messages: vector<vector<u8>>
+    ): bool;
+
     #[test_only]
     /// Generates an Ed25519 key pair.
     native fun generate_keys_internal(): (vector<u8>, vector<u8>);
@@ -234,6 +256,56 @@ module aptos_std::ed25519 {
     //
     // Tests
     //
+
+    #[test]
+    fun test_batch_signature_verify_strict_happy_path() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        // Prepare a batch of messages and signatures
+        let messages: vector<vector<u8>> = vector[];
+        let signatures = vector[];
+        let public_keys = vector[];
+
+        let i = 0;
+        while (i < 12) {
+            let msg: vector<u8> = vector[104, 101, 108, 108, 111, 32, 97, 112, 116, 111, 115, 32, 48 + (i as u8)]; // "hello aptos 0.."
+            let sig = sign_arbitrary_bytes(&sk, *&msg);
+            messages.push_back(msg);
+            signatures.push_back(sig);
+            public_keys.push_back(pk);
+            i = i + 1;
+        };
+
+        assert!(batch_signature_verify_strict(signatures, public_keys, messages), std::error::invalid_state(1));
+    }
+
+    #[test]
+    fun test_batch_signature_verify_strict_mismatched_lengths() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        let messages: vector<vector<u8>> = vector[b"m1", b"m2"];
+        let signatures = vector[sign_arbitrary_bytes(&sk, b"m1"), sign_arbitrary_bytes(&sk, b"m2")];
+        let public_keys = vector[pk];
+
+        assert!(!batch_signature_verify_strict(signatures, public_keys, messages), std::error::invalid_state(2));
+    }
+
+    #[test]
+    fun test_batch_signature_verify_strict_detects_invalid_sig() {
+        let (sk, vpk) = generate_keys();
+        let pk = public_key_into_unvalidated(vpk);
+
+        // two messages, but second signature is for a different message
+        let messages: vector<vector<u8>> = vector[b"hello", b"world"];
+        let sig1 = sign_arbitrary_bytes(&sk, b"hello");
+        let sig2 = sign_arbitrary_bytes(&sk, b"mismatch");
+        let signatures = vector[ sig1, sig2 ];
+        let public_keys = vector[ pk, pk ];
+
+        assert!(!batch_signature_verify_strict(signatures, public_keys, messages), std::error::invalid_state(3));
+    }
 
     #[test_only]
     struct TestMessage has copy, drop {

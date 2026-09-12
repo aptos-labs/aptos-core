@@ -8,8 +8,8 @@ use aptos_crypto::test_utils::KeyPair;
 use aptos_crypto::{ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, traits::*};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
-    SafeNativeResult,
+    safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
+    SafeNativeError, SafeNativeResult,
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use curve25519_dalek::edwards::CompressedEdwardsY;
@@ -17,7 +17,10 @@ use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
 };
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    values::{Struct, Value},
+};
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
@@ -142,6 +145,103 @@ fn native_signature_verify_strict(
     Ok(smallvec![Value::bool(verify_result)])
 }
 
+/// Pops a `Vec<T>` off the argument stack and converts it to a `Vec<Vec<u8>>` by reading the first
+/// field of `T`, which is expected to be a `Vec<u8>` field named `bytes`.
+fn pop_as_vec_of_vec_u8(arguments: &mut VecDeque<Value>) -> SafeNativeResult<Vec<Vec<u8>>> {
+    let structs = safely_pop_vec_arg!(arguments, Struct);
+    let mut v = Vec::with_capacity(structs.len());
+
+    for s in structs {
+        let field = s.unpack()?.next().ok_or_else(|| {
+            move_binary_format::errors::PartialVMError::new(
+                move_core_types::vm_status::StatusCode::INTERNAL_TYPE_ERROR,
+            )
+        })?;
+
+        v.push(field.value_as::<Vec<u8>>()?);
+    }
+
+    Ok(v)
+}
+
+/***************************************************************************************************
+ * native fun signature_batch_verify_strict_internal
+ *
+ *   gas cost: base_cost
+ *              + per_pubkey_deserialize_cost * n
+ *              +? per_sig_deserialize_cost * n
+ *              +? ( per_sig_strict_verify_cost * n
+ *                   + per_msg_hashing_base_cost * n
+ *                   + per_msg_byte_hashing_cost * total_msg_bytes )
+ *
+ * where +? indicates that the expression stops evaluating there if the previous gas-charging step
+ * failed
+ **************************************************************************************************/
+fn native_signature_batch_verify_strict(
+    context: &mut SafeNativeContext,
+    _ty_args: &[Type],
+    mut arguments: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(arguments.len() == 3);
+
+    // Arguments are popped in reverse order
+    let messages: Vec<Vec<u8>> = safely_pop_vec_arg!(arguments, Vec<u8>);
+    let public_keys_bytes = pop_as_vec_of_vec_u8(&mut arguments)?;
+    let signatures_bytes = pop_as_vec_of_vec_u8(&mut arguments)?;
+
+    context.charge(ED25519_BASE)?;
+
+    // Validate lengths
+    let n = signatures_bytes.len();
+    if n == 0 || public_keys_bytes.len() != n || messages.len() != n {
+        return Ok(smallvec![Value::bool(false)]);
+    }
+
+    // Charge deserialization costs up-front for all elements
+    context.charge(ED25519_PER_PUBKEY_DESERIALIZE * NumArgs::new(n as u64))?;
+    let mut public_keys = Vec::with_capacity(n);
+    for pk_bytes in public_keys_bytes {
+        match ed25519::Ed25519PublicKey::try_from(pk_bytes.as_slice()) {
+            Ok(pk) => public_keys.push(pk),
+            Err(_) => return Ok(smallvec![Value::bool(false)]),
+        }
+    }
+
+    context.charge(ED25519_PER_SIG_DESERIALIZE * NumArgs::new(n as u64))?;
+    let mut signatures = Vec::with_capacity(n);
+    for sig_bytes in signatures_bytes {
+        match ed25519::Ed25519Signature::try_from(sig_bytes.as_slice()) {
+            Ok(sig) => signatures.push(sig),
+            Err(_) => return Ok(smallvec![Value::bool(false)]),
+        }
+    }
+
+    // Compute total message bytes
+    let total_msg_bytes = messages
+        .iter()
+        .fold(NumBytes::new(0), |sum, m| sum + NumBytes::new(m.len() as u64));
+
+    // Charge verification costs (modeled as n individual strict verifications)
+    context.charge(
+        ED25519_PER_SIG_STRICT_VERIFY * NumArgs::new(n as u64)
+            + ED25519_PER_MSG_HASHING_BASE * NumArgs::new(n as u64)
+            + ED25519_PER_MSG_BYTE_HASHING * total_msg_bytes,
+    )?;
+
+    // Verify all signatures; return false on first failure
+    for i in 0..n {
+        if signatures[i]
+            .verify_arbitrary_msg(messages[i].as_slice(), &public_keys[i])
+            .is_err()
+        {
+            return Ok(smallvec![Value::bool(false)]);
+        }
+    }
+
+    Ok(smallvec![Value::bool(true)])
+}
+
 /***************************************************************************************************
  * module
  *
@@ -170,6 +270,10 @@ pub fn make_all(
         (
             "signature_verify_strict_internal",
             native_signature_verify_strict,
+        ),
+        (
+            "signature_batch_verify_strict_internal",
+            native_signature_batch_verify_strict,
         ),
     ]);
 
