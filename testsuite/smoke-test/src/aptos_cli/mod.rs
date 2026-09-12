@@ -4,6 +4,7 @@
 #![allow(unexpected_cfgs)]
 
 mod account;
+mod governance_bundle;
 #[cfg(feature = "cli-framework-test-move")]
 mod r#move;
 pub mod validator;

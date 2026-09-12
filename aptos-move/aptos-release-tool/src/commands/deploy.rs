@@ -21,7 +21,7 @@
 //! hash approval, and execution are all signed by the validator; execution is
 //! permissionless on-chain, the validator is just a convenient funded sender.
 
-use crate::commands::verify;
+use crate::commands::verify_bundle;
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_cli_common::PromptOptions;
@@ -100,7 +100,7 @@ pub async fn run(
     dry_run: bool,
 ) -> Result<()> {
     // 1. Bundle integrity, and by default the full sign-off.
-    verify::run(bundle_path, !skip_signoff)?;
+    verify_bundle::run(bundle_path, !skip_signoff)?;
 
     // The metadata location recorded on-chain is informational only; nothing
     // fetches it. The on-chain limit is 256 bytes; check here rather than
@@ -279,7 +279,7 @@ async fn run_governance(
     .await
     .context("failed to increase the validator's lockup")?;
 
-    let metadata = fs::read(bundle_path.join(crate::bundle::METADATA_JSON))
+    let metadata = fs::read(bundle_path.join(aptos_governance_bundle::METADATA_JSON))
         .context("failed to read the bundle's metadata.json")?;
     let first = scripts
         .first()
@@ -613,7 +613,7 @@ async fn ledger_timestamp_secs(client: &Client) -> Result<u64> {
 /// Load the bundle's compiled scripts (in execution order) and hash each blob.
 /// Nothing is recompiled.
 fn load_bundle_scripts(bundle_path: &Path) -> Result<Vec<BundleScript>> {
-    Ok(crate::bundle::load_compiled_scripts(bundle_path)?
+    Ok(aptos_governance_bundle::load_compiled_scripts(bundle_path)?
         .into_iter()
         .map(|(name, blob)| {
             let hash = HashValue::sha3_256_of(&blob);
