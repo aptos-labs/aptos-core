@@ -10,14 +10,19 @@ use mono_move_natives::{EventKind, EventStore};
 use mono_move_runtime::{serialize, SessionEffects};
 
 /// Materializes the emitted events into [`ContractEvent`]s, in emission order.
-/// The effects retain every backing allocation reachable from the event values
-/// and the originating layout provider needed to BCS-serialize them.
-pub fn to_contract_events(effects: &SessionEffects<'_>) -> VMResult<Vec<ContractEvent>> {
+/// The effects retain every backing allocation reachable from the event values;
+/// `layouts` must describe those values' interned types.
+//
+// TODO(security): prove at compile time that the execution guard backing
+// `layouts` is held.
+pub fn to_contract_events<L: LayoutProvider + ?Sized>(
+    effects: &SessionEffects,
+    layouts: &L,
+) -> VMResult<Vec<ContractEvent>> {
     let store = effects.extension::<EventStore>()?;
-    let layouts = effects.layout_provider();
 
-    // SAFETY: the effects retain their frozen local heap, originating resource
-    // provider, and matching layout provider; no GC can run after execution.
+    // SAFETY: the effects retain their frozen local heap and `layouts` describes
+    // the event values' types; no GC can run after execution.
     unsafe { to_contract_events_from_store(&store, layouts) }
 }
 
