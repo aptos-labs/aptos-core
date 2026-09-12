@@ -1,5 +1,7 @@
 # Corpus 3.2 run 8: GPT-5.6 Sol with Codex
 
+> **Historical pricing correction (2026-09-12):** the `$118.5750` estimate below applied the 272K surcharge at an aggregated controller-turn boundary and is not request-exact. [Run 11](corpus3.2-run11-codex-sol56-high-exact-cost.md) captured every underlying request, observed no request above 272K, and measured `$83.0532` for its independent rerun. Use run 11 for the current Sol cost comparison; run 8 remains a historical quality sample.
+
 This round evaluated the full selected corpus-v3.2 set with `gpt-5.6-sol`,
 Codex CLI, high reasoning effort, 20 tasks, three arms, and four replicas: 240
 cells. Generation received acceptance feedback only. Withheld mutants were a
