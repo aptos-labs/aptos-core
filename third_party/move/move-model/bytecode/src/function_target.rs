@@ -74,6 +74,9 @@ pub struct FunctionData {
     pub loop_unrolling: BTreeMap<AttrId, usize>,
     /// The set of inline asserts that represent loop invariants
     pub loop_invariants: BTreeSet<AttrId>,
+    /// Well-formed assumptions for mutable references after loop-target havoc. These assumptions
+    /// describe only type validity and must not be strengthened with data invariants.
+    pub shallow_wellformed_assumes: BTreeSet<AttrId>,
     /// The map from loop invariants (represented by the AttrId of the first invariant) to corresponding borrow information
     /// Used to instrument write-back actions for borrowed values
     pub loop_invariant_write_back_map: BTreeMap<AttrId, (BorrowInfo, BTreeSet<BorrowNode>)>,
@@ -536,6 +539,7 @@ impl FunctionData {
             loop_unrolling,
             loop_invariant_write_back_map: Default::default(),
             loop_invariants,
+            shallow_wellformed_assumes: Default::default(),
             debug_comments: Default::default(),
             vc_infos: Default::default(),
             annotations: Default::default(),
