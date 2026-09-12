@@ -5534,6 +5534,7 @@ pub(crate) struct DeserializationSeed<'c, L> {
     pub(crate) ctx: &'c ValueSerDeContext<'c>,
     // Layout to guide deserialization.
     pub(crate) layout: L,
+    pub(crate) depth: u64,
 }
 
 impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLayout> {
@@ -5545,6 +5546,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
     ) -> Result<Self::Value, D::Error> {
         use MoveTypeLayout as L;
 
+        self.ctx.check_depth(self.depth).map_err(D::Error::custom)?;
         match self.layout {
             // Primitive types.
             L::Bool => bool::deserialize(deserializer).map(Value::bool),
@@ -5570,6 +5572,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                     let seed = DeserializationSeed {
                         ctx: self.ctx,
                         layout: &MoveStructLayout::signer_serialization_layout(),
+                        depth: self.depth,
                     };
                     Ok(Value::struct_(seed.deserialize(deserializer)?))
                 }
@@ -5580,6 +5583,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                 let seed = DeserializationSeed {
                     ctx: self.ctx,
                     layout: struct_layout.as_ref(),
+                    depth: self.depth,
                 };
                 Ok(Value::struct_(seed.deserialize(deserializer)?))
             },
@@ -5604,6 +5608,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                     let seed = DeserializationSeed {
                         ctx: self.ctx,
                         layout,
+                        depth: self.depth + 1,
                     };
                     let vector = deserializer.deserialize_seq(VectorElementVisitor(seed))?;
                     Value::Container(Container::Vec(NestedValues::new(vector)))
@@ -5615,6 +5620,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                 let seed = DeserializationSeed {
                     ctx: self.ctx,
                     layout: (),
+                    depth: self.depth,
                 };
                 let closure = deserializer.deserialize_seq(ClosureVisitor(seed))?;
                 Ok(Value::ClosureValue(closure))
@@ -5631,6 +5637,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                         let value = DeserializationSeed {
                             ctx: &self.ctx.clone_without_delayed_fields(),
                             layout: layout.as_ref(),
+                            depth: self.depth,
                         }
                         .deserialize(deserializer)?;
                         let id = match delayed_fields_extension.mapping {
@@ -5680,7 +5687,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
             MoveStructLayout::Runtime(field_layouts) => {
                 let fields = deserializer.deserialize_tuple(
                     field_layouts.len(),
-                    StructFieldVisitor(self.ctx, field_layouts),
+                    StructFieldVisitor(self.ctx, field_layouts, self.depth),
                 )?;
                 Ok(Struct::pack(fields))
             },
@@ -5693,7 +5700,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
                 let fields = deserializer.deserialize_enum(
                     value::MOVE_ENUM_NAME,
                     variant_names,
-                    StructVariantVisitor(self.ctx, variants),
+                    StructVariantVisitor(self.ctx, variants, self.depth),
                 )?;
                 Ok(Struct::pack(fields))
             },
@@ -5723,6 +5730,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for VectorElementVisitor<'c, 'l> {
         while let Some(elem) = seq.next_element_seed(DeserializationSeed {
             ctx: self.0.ctx,
             layout: self.0.layout,
+            depth: self.0.depth,
         })? {
             vals.push(elem)
         }
@@ -5730,7 +5738,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for VectorElementVisitor<'c, 'l> {
     }
 }
 
-struct StructFieldVisitor<'c, 'l>(&'c ValueSerDeContext<'c>, &'l [MoveTypeLayout]);
+struct StructFieldVisitor<'c, 'l>(&'c ValueSerDeContext<'c>, &'l [MoveTypeLayout], u64);
 
 impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l> {
     type Value = Vec<Value>;
@@ -5748,6 +5756,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l> {
             if let Some(elem) = seq.next_element_seed(DeserializationSeed {
                 ctx: self.0,
                 layout: field_layout,
+                depth: self.2 + 1,
             })? {
                 val.push(elem)
             } else {
@@ -5758,7 +5767,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l> {
     }
 }
 
-struct StructVariantVisitor<'c, 'l>(&'c ValueSerDeContext<'c>, &'l [Vec<MoveTypeLayout>]);
+struct StructVariantVisitor<'c, 'l>(&'c ValueSerDeContext<'c>, &'l [Vec<MoveTypeLayout>], u64);
 
 impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructVariantVisitor<'c, 'l> {
     type Value = Vec<Value>;
@@ -5786,13 +5795,16 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructVariantVisitor<'c, 'l> {
                     values.push(rest.newtype_variant_seed(DeserializationSeed {
                         ctx: self.0,
                         layout: &fields[0],
+                        depth: self.2 + 1,
                     })?);
                     Ok(values)
                 },
                 _ => {
                     values.append(
-                        &mut rest
-                            .tuple_variant(fields.len(), StructFieldVisitor(self.0, fields))?,
+                        &mut rest.tuple_variant(
+                            fields.len(),
+                            StructFieldVisitor(self.0, fields, self.2),
+                        )?,
                     );
                     Ok(values)
                 },
@@ -5812,6 +5824,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructVariantVisitor<'c, 'l> {
         let variant_tag = match seq.next_element_seed(DeserializationSeed {
             ctx: self.0,
             layout: &MoveTypeLayout::U16,
+            depth: self.2,
         })? {
             Some(elem) => {
                 let variant_tag = if let Ok(tag) = elem.value_as::<u16>() {
@@ -5838,6 +5851,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructVariantVisitor<'c, 'l> {
             if let Some(elem) = seq.next_element_seed(DeserializationSeed {
                 ctx: self.0,
                 layout: field_layout,
+                depth: self.2 + 1,
             })? {
                 val.push(elem)
             } else {
@@ -5890,7 +5904,7 @@ impl Value {
         let layout = Self::constant_sig_token_to_layout(&constant.type_)?;
         // INVARIANT:
         //   For constants, layout depth is bounded and cannot contain function values. Hence,
-        //   serialization depth is bounded. We still enable depth checks as a precaution.
+        //   value depth is bounded. We still enable depth checks as a precaution.
         ValueSerDeContext::new(Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
             .deserialize(&constant.data, &layout)
     }

@@ -97,7 +97,7 @@ pub struct ValueSerDeContext<'a> {
     pub(crate) function_extension: Option<FunctionValueExtensionWithContext<'a>>,
     pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
     pub(crate) legacy_signer: bool,
-    /// Maximum allowed depth of a VM value. Enforced by serializer.
+    /// Maximum allowed depth of a VM value. Enforced during (de)serialization.
     pub(crate) max_value_nested_depth: Option<u64>,
     /// If true, serialization of any value containing a closure fails.
     pub(crate) closure_serialization_disabled: bool,
@@ -248,7 +248,11 @@ impl<'a> ValueSerDeContext<'a> {
 
     /// Deserializes the bytes using the provided layout into a Move [Value].
     pub fn deserialize(self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
-        let seed = DeserializationSeed { ctx: &self, layout };
+        let seed = DeserializationSeed {
+            ctx: &self,
+            layout,
+            depth: 1,
+        };
         bcs::from_bytes_seed(seed, bytes).ok()
     }
 
@@ -259,7 +263,11 @@ impl<'a> ValueSerDeContext<'a> {
         bytes: &[u8],
         layout: &MoveTypeLayout,
     ) -> PartialVMResult<Value> {
-        let seed = DeserializationSeed { ctx: &self, layout };
+        let seed = DeserializationSeed {
+            ctx: &self,
+            layout,
+            depth: 1,
+        };
         bcs::from_bytes_seed(seed, bytes).map_err(|e| {
             PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_RESOURCE)
                 .with_message(format!("deserializer error: {}", e))
