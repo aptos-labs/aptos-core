@@ -93,6 +93,7 @@ impl ProposalMsg {
         opt_qs_v2_rx_enabled: bool,
         max_batch_txns: u64,
         max_batch_bytes: u64,
+        max_num_batch_entries: u64,
     ) -> Result<()> {
         if let Some(proposal_author) = self.proposal.author() {
             ensure!(
@@ -112,6 +113,7 @@ impl ProposalMsg {
                         opt_qs_v2_rx_enabled,
                         max_batch_txns,
                         max_batch_bytes,
+                        max_num_batch_entries,
                     )
                 })
             },
