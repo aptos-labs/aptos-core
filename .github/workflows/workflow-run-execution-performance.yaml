@@ -115,7 +115,7 @@ jobs:
     outputs:
       run_execution_performance_test: ${{ steps.determine_test_targets.outputs.run_execution_performance_test }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.GIT_SHA }}
           fetch-depth: 0
@@ -129,7 +129,7 @@ jobs:
     timeout-minutes: 120
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.GIT_SHA }}
         if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}
@@ -149,7 +149,7 @@ jobs:
 
       - name: Post to Slack on failure
         if: ${{ failure() && inputs.NOTIFY_SLACK }}
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
         with:
           webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook

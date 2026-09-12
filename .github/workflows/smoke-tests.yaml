@@ -21,12 +21,12 @@ jobs:
     if: inputs.only_docs_changed != 'true'
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Build aptos-node
         run: cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
         shell: bash
       - name: Save aptos-node binary to cache
-        uses: runs-on/cache/save@v4
+        uses: runs-on/cache/save@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
         with:
           path: target/release/aptos-node
           key: smoke-aptos-node-${{ github.run_id }}
@@ -36,7 +36,7 @@ jobs:
     if: inputs.only_docs_changed != 'true'
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Build smoke test archive and helper binaries
         run: |
           # Build helper binaries needed by smoke tests
@@ -47,7 +47,7 @@ jobs:
           LOCAL_SWARM_NODE_RELEASE=1 cargo nextest archive --locked --release --package smoke-test --archive-file smoke-test-archive.tar.zst
         shell: bash
       - name: Save smoke test artifacts to cache
-        uses: runs-on/cache/save@v4
+        uses: runs-on/cache/save@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
         with:
           path: |
             target/release/aptos
@@ -65,7 +65,7 @@ jobs:
       matrix:
         partition: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Run postgres database
         run: docker run --detach -p 5432:5432 cimg/postgres:14.2
@@ -73,14 +73,14 @@ jobs:
 
       # Restore pre-built artifacts from both parallel build jobs
       - name: Restore aptos-node binary from cache
-        uses: runs-on/cache/restore@v4
+        uses: runs-on/cache/restore@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
         with:
           path: target/release/aptos-node
           key: smoke-aptos-node-${{ github.run_id }}
           fail-on-cache-miss: true
 
       - name: Restore smoke test archive and helper binaries from cache
-        uses: runs-on/cache/restore@v4
+        uses: runs-on/cache/restore@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
         with:
           path: |
             target/release/aptos
@@ -105,7 +105,7 @@ jobs:
       # Upload logs on failure for debugging.
       - name: Upload smoke test logs for failed and flaky tests
         if: ${{ failure() || success() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: failed-smoke-test-logs-${{ matrix.partition }}
           include-hidden-files: true
