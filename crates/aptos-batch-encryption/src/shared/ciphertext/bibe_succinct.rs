@@ -11,7 +11,8 @@ use crate::{
     errors::MissingEvalProofError,
     group::{Fr, G1Affine, G2Affine, PairingOutput, PairingSetting},
     shared::{
-        ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext},
+        blst_ops,
+        ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext, PreparedG2},
         digest::{Digest, EvalProof},
         encryption_key::AugmentedEncryptionKey,
         ids::Id,
@@ -58,12 +59,12 @@ impl InnerCiphertext for BIBESuccinctCiphertext {
         _digest: &Digest,
         eval_proof: &EvalProof,
     ) -> PreparedBIBECiphertext {
-        let pairing_output = PairingSetting::pairing(**eval_proof, self.ct_g2[1]);
+        let pairing_output = blst_ops::pairing(eval_proof, &self.ct_g2[1]);
 
         PreparedBIBECiphertext {
             id: self.id,
             pairing_output,
-            ct_g2: self.ct_g2[0].into(),
+            ct_g2: PreparedG2::new(self.ct_g2[0]),
             padded_key: self.padded_key.clone(),
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
         }

@@ -121,6 +121,18 @@ pub fn multi_point_eval<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     recurse(f, &mult_tree, mult_tree.len() - 1, 0)
 }
 
+/// `[1, x, x^2, ..., x^(n-1)]`, i.e. the scalars that evaluate a degree-`n-1`
+/// polynomial at `x` when paired with its coefficients in an MSM.
+pub fn powers_of<F: FftField>(x: &F, n: usize) -> Vec<F> {
+    let mut result = Vec::with_capacity(n);
+    let mut x_power = F::one();
+    for _ in 0..n {
+        result.push(x_power);
+        x_power *= x;
+    }
+    result
+}
+
 pub fn multi_point_eval_naive<
     F: FftField,
     T: DomainCoeff<F> + Mul<F, Output = T> + VariableBaseMSM<ScalarField = F>,
@@ -132,15 +144,7 @@ pub fn multi_point_eval_naive<
     // number of x coords
     let powers = x_coords
         .into_par_iter()
-        .map(|x| {
-            let mut result = Vec::new();
-            let mut x_power = F::one();
-            for _i in 0..f.len() {
-                result.push(x_power);
-                x_power *= x;
-            }
-            result
-        })
+        .map(|x| powers_of(x, f.len()))
         .collect::<Vec<Vec<F>>>();
 
     powers
