@@ -13,6 +13,8 @@ pub mod print_sections;
 pub mod programs;
 pub mod resource_provider;
 pub mod runner;
+pub mod transactional_adapter;
+pub mod transactional_session;
 pub mod unit_test;
 pub mod v1_test_natives;
 
@@ -27,3 +29,5 @@ pub use engine::{
 pub use module_provider::InMemoryModuleProvider;
 pub use resource_provider::InMemoryResourceProvider;
 pub use runner::{finalize_events_v1, finalize_events_v2};
+pub use transactional_adapter::{run_transactional_test, supports_source};
+pub use transactional_session::{PublishError, TransactionalSession};

@@ -33,11 +33,13 @@ mono-move-output = { workspace = true }
 mono-move-runtime = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
+move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
 move-prover-test-utils = { workspace = true }
+move-transactional-test-runner = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
@@ -52,10 +54,15 @@ thiserror = { workspace = true }
 criterion = { workspace = true }
 datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }
+move-transactional-test-matrix = { workspace = true }
 walkdir = { workspace = true }
 
 [[test]]
 name = "differential"
+harness = false
+
+[[test]]
+name = "transactional"
 harness = false
 
 [[bench]]

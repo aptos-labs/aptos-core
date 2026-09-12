@@ -8,39 +8,10 @@
 use itertools::Itertools;
 use libtest_mimic::{Arguments, Trial};
 use move_compiler_v2::logging;
-use move_transactional_test_matrix::{
-    CompilerV2Payload, MatrixConfig, Resolution, VmBackend, COMPILER_V2,
-};
-use move_transactional_test_runner::{
-    tasks::SyntaxChoice, vm_test_harness, vm_test_harness::TestRunConfig,
-};
+use move_transactional_test_matrix::{CompilerV2Payload, MatrixConfig, VmBackend, COMPILER_V2};
+use move_transactional_test_runner::vm_test_harness;
 use std::{fs, path::Path, process::Command};
 use walkdir::WalkDir;
-
-/// Builds the settings a (source, config) trial runs with.
-fn test_run_config(resolution: &Resolution<'static, CompilerV2Payload>) -> TestRunConfig {
-    let experiments = resolution
-        .config
-        .experiments
-        .iter()
-        .map(|(name, value)| (name.to_string(), *value))
-        .collect_vec();
-    let mut vm_test_config = TestRunConfig::new(resolution.config.language_version, experiments)
-        .with_runtime_ref_checks();
-    // Cross-compiled output depends on compiler settings, so it always uses a
-    // config-qualified baseline.
-    if resolution.effective_payload.cross_compile {
-        vm_test_config = vm_test_config.cross_compile_into(
-            SyntaxChoice::Source,
-            true,
-            resolution
-                .canonical_exp_suffix
-                .clone()
-                .or_else(|| Some(format!("{}.exp", resolution.config.name))),
-        );
-    }
-    vm_test_config
-}
 
 fn run(
     identity: &str,
@@ -51,7 +22,7 @@ fn run(
         .resolve(config, identity, VmBackend::V1)
         .expect("the trial was registered, so the config selects its source");
     vm_test_harness::run_test_with_config_and_exp_suffix(
-        test_run_config(&resolution),
+        resolution.test_run_config(),
         Path::new(identity),
         &resolution.canonical_exp_suffix,
     )
