@@ -22,7 +22,7 @@
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
-    heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationResult, Heap},
+    heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationError, AllocationResult, Heap},
     memory::{read_enum_tag, read_ptr, read_vec_len, write_ptr},
     types::VEC_DATA_OFFSET,
 };
@@ -365,8 +365,21 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             })?;
             let elem_size = elem_layout.size as usize;
 
-            // An OOM here propagates as `AllocationError::OutOfHeapMemory`.
-            let vec_ptr = alloc_vec_no_gc(heap, *descriptor_id, elem_layout.size, len)?;
+            // Lengths exceeding the maximum allocation size are invalid BCS input;
+            // insufficient remaining heap is a VM resource error.
+            let vec_ptr =
+                alloc_vec_no_gc(heap, *descriptor_id, elem_layout.size, len).map_err(|err| {
+                    match err {
+                        AllocationError::RuntimeError(
+                            RuntimeError::AllocationTooLarge { .. }
+                            | RuntimeError::VecAllocSizeOverflow,
+                        ) => {
+                            AllocationError::RuntimeError(RuntimeError::BCSSequenceTooLong { len })
+                        },
+                        other @ (AllocationError::OutOfHeapMemory { .. }
+                        | AllocationError::RuntimeError(_)) => other,
+                    }
+                })?;
             // The allocation checked this product against overflow.
             let data_size = len as usize * elem_size;
 
@@ -417,12 +430,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
             if tag >= variants.len() as u64 {
-                return Err(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag,
-                        variant_count: variants.len(),
-                    },
-                )
+                return Err(RuntimeError::BCSInvalidEnumTag {
+                    tag,
+                    variant_count: variants.len(),
+                }
                 .into());
             }
 
