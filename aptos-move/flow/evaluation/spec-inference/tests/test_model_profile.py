@@ -83,7 +83,7 @@ class ModelProfileTest(unittest.TestCase):
             self.assertEqual(config.codex_cli_version, "0.153.2")
             self.assertEqual(
                 config.codex_code_mode_host_sha256,
-                "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c",
+                "883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1",
             )
 
     def test_select_terra56_uses_codex_with_high_effort_and_no_retries(self) -> None:
@@ -104,7 +104,7 @@ class ModelProfileTest(unittest.TestCase):
             self.assertEqual(config.codex_cli_version, "0.153.2")
             self.assertEqual(
                 config.codex_code_mode_host_sha256,
-                "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c",
+                "883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1",
             )
 
     def test_select_rejects_negative_infrastructure_retries(self) -> None:
