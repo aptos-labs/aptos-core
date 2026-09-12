@@ -9,9 +9,28 @@ runs:
   using: composite
   steps:
     # The source code must be checked out by the workflow that invokes this action.
-    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+    #
+    # Do not use rust-setup here: merge-base only builds aptos-cargo-cli. rust-setup
+    # installs LLVM, Move Prover, PostgreSQL, Node, and protoc plugins.
+
+    - name: Set up Rust toolchain
+      uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # pin@v1
+
+    - name: Restore Cargo registry cache
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
       with:
-        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+        cache-bin: false
+        cache-targets: false
+        save-if: false
+
+    - name: Setup git credentials
+      if: inputs.GIT_CREDENTIALS != ''
+      shell: bash
+      env:
+        MERGE_BASE_GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+      run: |
+        git config --global credential.helper store
+        printf '%s\n' "$MERGE_BASE_GIT_CREDENTIALS" > ~/.git-credentials
 
     # Check the freshness of the merge base
     - name: Check the freshness of the merge base

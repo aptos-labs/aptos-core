@@ -2,16 +2,19 @@ name: File Change Determinator
 description: Runs the file change determinator (to identify which files changed in a pull request)
 outputs:
   only_docs_changed:
-    description: "Returns true if only docs files were changed in the pull request"
+    description: "Returns true if only docs/packer/dashboard files were changed in the pull request"
     value: ${{ steps.doc_change_determinator.outputs.should_skip }}
 
 runs:
   using: composite
   steps:
-    # Run the docs only change determinator
+    # Skip heavy jobs when the diff cannot affect Rust, Docker images, or Forge.
+    # Do not ignore terraform/** or docker/**: forge.Dockerfile copies terraform/helm
+    # into the Forge image, and only_docs_changed sets SKIP_JOB on Forge/e2e workflows.
+    # Do not ignore `.github/**`: workflow-only PRs still need jobs to execute.
     - id: doc_change_determinator
       continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
       uses: fkirc/skip-duplicate-actions@v5
       with:
         skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
-        paths_ignore: '["**/*.md"]'
+        paths_ignore: '["**/*.md", "buildtools/**", "dashboards/**", "developer-docs-site/**"]'

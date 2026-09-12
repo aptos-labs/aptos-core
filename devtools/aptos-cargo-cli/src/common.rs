@@ -30,19 +30,30 @@ const DEVTOOL_TARGET_DIRECTORY: &str = "target/aptos-x-tool";
 
 // File types in `aptos-core` that are not relevant to the rust build and test process.
 // Note: this is a best effort list and will need to be updated as time goes on.
-const IGNORED_DETERMINATOR_FILE_TYPES: [&str; 1] = ["*.md"];
+//
+// These globs are passed to cargo-guppy's determinator. Unmatched paths default to
+// marking *every* workspace package as changed, so nested docs/infra files must use
+// recursive `**` patterns (e.g. `**/*.md`, not `*.md`).
+pub(crate) const IGNORED_DETERMINATOR_FILE_TYPES: [&str; 1] = ["**/*.md"];
 
 // Paths in `aptos-core` that are not relevant to the rust build and test process.
 // Note: this is a best effort list and will need to be updated as time goes on.
-const IGNORED_DETERMINATOR_PATHS: [&str; 8] = [
-    ".assets/*",
-    ".github/*",
-    ".vscode/*",
-    "dashboards/*",
-    "developer-docs-site/*",
-    "docker/*",
-    "scripts/*",
-    "terraform/*",
+//
+// Use `/**` so nested files are ignored. A glob like `docker/*` does not match
+// `docker/builder/foo` and would otherwise invalidate the entire workspace.
+pub(crate) const IGNORED_DETERMINATOR_PATHS: [&str; 12] = [
+    ".assets/**",
+    ".claude/**",
+    ".cursor/**",
+    ".github/**",
+    ".vscode/**",
+    "buildtools/**",
+    "dashboards/**",
+    "developer-docs-site/**",
+    "docker/**",
+    "scripts/**",
+    "terraform/**",
+    "CODEOWNERS",
 ];
 
 // The maximum number of days allowed since the merge-base commit for the branch.
