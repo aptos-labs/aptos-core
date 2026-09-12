@@ -317,6 +317,7 @@ fn test_db_indexer_data() {
         ident_str!("optional_aggregator"),
         ident_str!("permissioned_signer"),
         ident_str!("transaction_context"),
+        ident_str!("authorized_allowance"),
         ident_str!("confidential_balance"),
         ident_str!("epoch_timeout_config"),
         ident_str!("jwk_consensus_config"),
