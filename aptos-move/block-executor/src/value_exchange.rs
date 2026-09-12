@@ -191,24 +191,46 @@ where
         >,
     > {
         if value.is_deletion() {
-            None
-        } else {
-            self.does_value_need_exchange(value, layout, delayed_write_set_ids)
-                .map_or_else(
-                    |e| Some(Err(e)),
-                    |needs_exchange| {
-                        needs_exchange.then(|| {
-                            Ok((
-                                key.clone(),
-                                (
-                                    value.as_state_value_metadata().unwrap().clone(),
-                                    value.write_op_size().write_len().unwrap(),
-                                    layout.clone(),
-                                ),
-                            ))
-                        })
-                    },
-                )
+            return None;
+        }
+        match self.does_value_need_exchange(value, layout, delayed_write_set_ids) {
+            Err(e) => Some(Err(e)),
+            Ok(false) => None,
+            Ok(true) => {
+                // The delayed field ids in this value were created under the
+                // layout the key's base value was pinned under. Exchanging under
+                // a layout that is not compatible with the base would move a
+                // delayed field's byte offset or width and tear the value. The
+                // ptr_eq fast path skips the walk when the exchange layout is the
+                // base layout itself, which is the common self-consistent case.
+                //
+                // TODO: instead of discarding the block on a layout mismatch,
+                // rerun it sequentially with delayed field optimization turned
+                // off, the way the resource group bcs fallback works. With the
+                // optimization off there is no exchange step, so the mismatch
+                // cannot happen again. This needs a fresh AptosEnvironment::new
+                // and an empty module cache (a throwaway
+                // AptosModuleCacheManagerGuard::None). The aptos-vm caller has to
+                // build that environment, because the generic state view type
+                // here does not implement the StateView trait that
+                // AptosEnvironment::new needs.
+                if let Some(base) = self.base_value_layout(key) {
+                    if !TriompheArc::ptr_eq(layout, &base) && !layout.is_compatible_with(&base) {
+                        return Some(Err(code_invariant_error(format!(
+                            "Exchange layout is not compatible with the base layout for key {:?}",
+                            key
+                        ))));
+                    }
+                }
+                Some(Ok((
+                    key.clone(),
+                    (
+                        value.as_state_value_metadata().unwrap().clone(),
+                        value.write_op_size().write_len().unwrap(),
+                        layout.clone(),
+                    ),
+                )))
+            },
         }
     }
 }
