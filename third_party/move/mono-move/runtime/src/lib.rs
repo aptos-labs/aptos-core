@@ -27,6 +27,6 @@ pub use native_context::{
     ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
     ProductionNativeRegistry,
 };
-pub use types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
+pub use types::{DEFAULT_HEAP_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use value_conv::bcs::{deserialize_into, serialize};
 pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};

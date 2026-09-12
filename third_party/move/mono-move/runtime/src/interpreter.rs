@@ -43,11 +43,12 @@ use mono_move_core::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
     },
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
-    FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
-    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    BytecodeOffset, CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex,
+    ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
+    PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -290,8 +291,15 @@ impl<'a> CallBuilder<'a, '_> {
     ///
     /// On error, the parameter slot is left partially written and the call
     /// must be abandoned.
+    // TODO(completeness): place reference arguments as V1 does, decoding the
+    // target into the heap and passing a pointer; until then they are rejected.
+    // Only direct callers such as the test harnesses need this: transactions
+    // reject reference parameters at entry validation.
     pub fn arg_bcs(&mut self, bytes: &[u8]) -> VMResult<()> {
         let (dst, ty) = self.next_slot()?;
+        if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
+            return Err(RuntimeError::Unsupported("reference parameters").into());
+        }
         let guard = self.interp.loader.guard();
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
@@ -316,6 +324,18 @@ fn abort_location(module_id: InternedModuleId) -> AbortLocation {
         return AbortLocation::Script;
     }
     AbortLocation::Module(module_id_of(module_id))
+}
+
+/// The bytecode instruction the micro-op at `pc` originates from, or `None`
+/// when `pc` is past the end of the code.
+fn bytecode_origin(
+    func: &Function,
+    pc: usize,
+) -> Option<(FunctionDefinitionIndex, BytecodeOffset)> {
+    func.code
+        .origins()
+        .get(pc)
+        .map(|&offset| (func.def_idx, offset))
 }
 
 /// Materializes the [`AbortLocation`] naming a native's own module from its
@@ -1524,6 +1544,7 @@ impl InterpreterContext<'_> {
                                 code,
                                 message,
                                 location,
+                                offset: None,
                             };
                         }
                     },
@@ -1774,6 +1795,7 @@ impl InterpreterContext<'_> {
                             code,
                             message: None,
                             location: abort_location(func.module_id),
+                            offset: bytecode_origin(func, regs.pc),
                         };
                     },
 
@@ -1806,6 +1828,7 @@ impl InterpreterContext<'_> {
                             code,
                             message: Some(message),
                             location: abort_location(func.module_id),
+                            offset: bytecode_origin(func, regs.pc),
                         };
                     },
 
