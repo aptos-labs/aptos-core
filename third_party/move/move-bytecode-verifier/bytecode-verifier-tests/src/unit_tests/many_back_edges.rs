@@ -90,7 +90,7 @@ fn many_backedges() {
 
     let result = move_bytecode_verifier::verify_module_with_config_for_test(
         "many_backedges",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &m,
     );
     assert_eq!(

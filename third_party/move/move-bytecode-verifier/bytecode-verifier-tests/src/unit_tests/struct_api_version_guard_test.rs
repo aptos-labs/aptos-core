@@ -129,7 +129,7 @@ fn make_module_with_bad_pack_bytecode(version: u32) -> CompiledModule {
 #[test]
 fn test_struct_api_version_guard_v9_passes() {
     let module = make_module_with_bad_pack_bytecode(VERSION_9);
-    let result = verify_module_with_config(&VerifierConfig::production(), &module);
+    let result = verify_module_with_config(&VerifierConfig::production_testing(), &module);
     assert!(
         result.is_ok(),
         "expected v9 module to pass (struct API checker skipped), got: {:?}",
@@ -142,7 +142,7 @@ fn test_struct_api_version_guard_v9_passes() {
 #[test]
 fn test_struct_api_version_guard_v10_fails() {
     let module = make_module_with_bad_pack_bytecode(VERSION_10);
-    let result = verify_module_with_config(&VerifierConfig::production(), &module);
+    let result = verify_module_with_config(&VerifierConfig::production_testing(), &module);
     assert_eq!(
         result.unwrap_err().major_status(),
         StatusCode::INVALID_STRUCT_API_CODE,

@@ -134,7 +134,7 @@ fn test_bicliques() {
 
     let result = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_bicliques",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &m,
     );
     assert_eq!(
@@ -263,7 +263,7 @@ fn test_merge_state_large_graph() {
 
     let res = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_merge_state_large_graph",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &m,
     );
     assert_eq!(
@@ -357,7 +357,7 @@ fn test_merge_state() {
 
     let res = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_merge_state",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &m,
     );
     assert_eq!(
@@ -441,7 +441,7 @@ fn test_copyloc_pop() {
 
     let result = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_copyloc_pop",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &m,
     );
     assert_eq!(

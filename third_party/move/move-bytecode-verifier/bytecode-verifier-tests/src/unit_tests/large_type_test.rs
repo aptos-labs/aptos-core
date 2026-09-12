@@ -159,7 +159,7 @@ fn test_large_types() {
 
     let result = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_large_types",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &m,
     );
     assert_eq!(
