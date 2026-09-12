@@ -1,0 +1,8 @@
+# WASM build configuration for move-decompiler-wasm
+
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
+
+[build]
+# Default to wasm32 target for this crate
+# target = "wasm32-unknown-unknown"  # Uncomment if you want wasm32 as default
