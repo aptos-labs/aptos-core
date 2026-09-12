@@ -193,7 +193,7 @@ fun capture_one() {
     7: SlotBorrow [24] <- &[8] @8
     8: StoreImm8 [40] <- #30 @9
     9: VecPushBack [24].push([40], size=8, desc=0) @10
-    10: PackClosure [16] <- func_ref=Unresolved(len_plus), mask=1, captured_desc=2, captured=[[8](8)] @12
+    10: PackClosure [16] <- func_ref=Unresolved(len_plus), mask=1, captured_desc=3, captured=[[8](8)] @12
     11: CallClosure closure=[16], provided_args=[[0](8)] @16
     12: Move8 [40] <- [72] @16
     13: Move8 [0] <- [40] @17
@@ -226,7 +226,7 @@ fun capture_two() {
     14: SlotBorrow [32] <- &[16] @16
     15: StoreImm8 [48] <- #5 @17
     16: VecPushBack [32].push([48], size=8, desc=0) @18
-    17: PackClosure [24] <- func_ref=Unresolved(len_sum), mask=11, captured_desc=3, captured=[[8](8), [16](8)] @21
+    17: PackClosure [24] <- func_ref=Unresolved(len_sum), mask=11, captured_desc=4, captured=[[8](8), [16](8)] @21
     18: CallClosure closure=[24], provided_args=[[0](8)] @25
     19: Move8 [48] <- [80] @25
     20: Move8 [0] <- [48] @26

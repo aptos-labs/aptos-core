@@ -16,7 +16,7 @@ fun read_x_a() {
   code:
     0: StoreImm1 [8] <- #0 @0
     1: StoreImm1 [9] <- #7 @1
-    2: EnumNew [0] desc=2 tag #0 @2
+    2: EnumNew [0] desc=3 tag #0 @2
     3: HeapMoveTo [0]+8 <- [8] (size=1) @2
     4: HeapMoveTo [0]+9 <- [9] (size=1) @2
     5: SlotBorrow [48] <- &[0] @4
@@ -33,7 +33,7 @@ fun read_x_b() {
   code:
     0: StoreImm8 [8] <- #256 @0
     1: StoreImm1 [16] <- #9 @1
-    2: EnumNew [0] desc=2 tag #1 @2
+    2: EnumNew [0] desc=3 tag #1 @2
     3: HeapMoveTo8 [0]+8 <- [8] @2
     4: HeapMoveTo [0]+16 <- [16] (size=1) @2
     5: SlotBorrow [56] <- &[0] @4

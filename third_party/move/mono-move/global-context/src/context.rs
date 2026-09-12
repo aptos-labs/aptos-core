@@ -56,7 +56,7 @@ use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
     FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeSubstitutionError, ValueLayout, TRIVIAL_DESCRIPTOR_ID,
+    TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
@@ -214,11 +214,12 @@ impl Descriptors {
     }
 }
 
-/// Initial descriptor table: the two reserved entries.
+/// Returns the initial descriptor table with the reserved entries.
 fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
     let table = boxcar::Vec::new();
     table.push(ObjectDescriptor::trivial());
     table.push(ObjectDescriptor::closure());
+    table.push(ObjectDescriptor::pointer_vec());
     table
 }
 
@@ -563,6 +564,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
     ) -> DescriptorId {
         if elem_ptr_offsets.is_empty() {
             return TRIVIAL_DESCRIPTOR_ID;
+        }
+        if elem_size == 8 && elem_ptr_offsets == [FrameOffset(0)] {
+            return POINTER_VEC_DESCRIPTOR_ID;
         }
         // Fast path: existing entry returns without touching the shard
         // write-lock.

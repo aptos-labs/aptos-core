@@ -8,14 +8,14 @@ fun make_e() {
     0: JumpIntCmp @8 [0] != u64 #0 gas_taken=79 gas_fallthrough=76 @1
     1: StoreImm1 [8] <- #1 @4
     2: StoreImm1 [9] <- #0 @5
-    3: EnumNew [16] desc=2 tag #0 @6
+    3: EnumNew [16] desc=3 tag #0 @6
     4: HeapMoveTo [16]+8 <- [8] (size=1) @6
     5: HeapMoveTo [16]+9 <- [9] (size=1) @6
     6: Move8 [0] <- [16] @7
     7: Return @7
     8: StoreImm2 [24] <- #2 @8
     9: StoreImm1 [9] <- #0 @9
-    10: EnumNew [16] desc=2 tag #1 @10
+    10: EnumNew [16] desc=3 tag #1 @10
     11: HeapMoveTo [16]+8 <- [24] (size=2) @10
     12: HeapMoveTo [16]+10 <- [9] (size=1) @10
     13: Move8 [0] <- [16] @11
@@ -31,13 +31,13 @@ fun make_f() {
   code:
     0: JumpIntCmp @6 [0] != u64 #0 gas_taken=76 gas_fallthrough=69 @1
     1: StoreImm1 [8] <- #1 @4
-    2: EnumNew [16] desc=3 tag #0 @5
+    2: EnumNew [16] desc=4 tag #0 @5
     3: HeapMoveTo [16]+8 <- [8] (size=1) @5
     4: Move8 [0] <- [16] @6
     5: Return @6
     6: StoreImm1 [8] <- #1 @7
     7: StoreImm1 [24] <- #7 @8
-    8: EnumNew [16] desc=3 tag #1 @9
+    8: EnumNew [16] desc=4 tag #1 @9
     9: HeapMoveTo [16]+8 <- [8] (size=1) @9
     10: HeapMoveTo [16]+9 <- [24] (size=1) @9
     11: Move8 [0] <- [16] @10
