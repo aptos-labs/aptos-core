@@ -60,6 +60,46 @@ pub struct Corpus<P: 'static> {
     /// Adjusts a config's payload for the VM backend that will run it. The
     /// identity function when this corpus has no backend-dependent settings.
     pub effective_payload: fn(&P, VmBackend) -> P,
+    /// Sources whose MonoMove output is known to differ from the canonical
+    /// baseline. Their trials run against MonoMove-owned override baselines
+    /// (see [`mono_move_override_path`]) instead of the canonical ones.
+    pub mono_move_divergences: &'static [MonoMoveDivergence],
+}
+
+/// Why a source's MonoMove output differs from the canonical baseline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DivergenceCategory {
+    /// MonoMove or its test adapter lacks a feature the source needs.
+    Unsupported,
+    /// MonoMove behaves differently from V1.
+    Semantic,
+}
+
+/// A recorded divergence of MonoMove from a source's canonical baseline.
+#[derive(Debug, PartialEq, Eq)]
+pub struct MonoMoveDivergence {
+    /// Source identity relative to the corpus root, e.g. `tests/misc/x.move`.
+    pub source: &'static str,
+    pub category: DivergenceCategory,
+    pub reason: &'static str,
+}
+
+impl MonoMoveDivergence {
+    pub const fn unsupported(source: &'static str, reason: &'static str) -> Self {
+        Self {
+            source,
+            category: DivergenceCategory::Unsupported,
+            reason,
+        }
+    }
+
+    pub const fn semantic(source: &'static str, reason: &'static str) -> Self {
+        Self {
+            source,
+            category: DivergenceCategory::Semantic,
+            reason,
+        }
+    }
 }
 
 /// One column of a corpus's matrix.
@@ -92,6 +132,13 @@ impl<P> Corpus<P> {
         self.separate_baseline
             .iter()
             .any(|entry| identity.contains(entry))
+    }
+
+    /// The recorded MonoMove divergence of `identity`, if any.
+    pub fn mono_move_divergence(&self, identity: &str) -> Option<&'static MonoMoveDivergence> {
+        self.mono_move_divergences
+            .iter()
+            .find(|divergence| divergence.source == identity)
     }
 
     /// Resolves one (source, config, VM backend) cell, or [`None`] when the

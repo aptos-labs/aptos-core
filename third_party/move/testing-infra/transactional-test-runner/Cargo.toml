@@ -22,6 +22,7 @@ either = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true, features = ["testing"] }
+move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }

@@ -13,7 +13,7 @@ pub use mono_move_core::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 
 pub(crate) const DEFAULT_STACK_SIZE: usize = 1024 * 1024; // 1 MiB
 
-pub(crate) const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
+pub const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
 /// Initial capacity, in elements, of a vector allocated lazily on its first
 /// `push_back`.

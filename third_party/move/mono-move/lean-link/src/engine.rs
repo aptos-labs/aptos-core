@@ -22,12 +22,11 @@ use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
 use mono_move_aptos_transaction_executor::production_natives;
 use mono_move_core::{
-    interner::InternedIdentifier,
-    types::{view_type_list, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    types::{view_type_list, EMPTY_TYPE_LIST},
     ExecutionErrorKind, GasMeter, Interner, IntoExecutionError, NoResourceProvider,
     VMInternalError, VMResult,
 };
-use mono_move_global_context::{ExecutionGuard, FunctionIrLookup, GlobalContext, LoadedModule};
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleProvider};
 use mono_move_runtime::{
     error::RuntimeError, InterpreterContext, InterpreterOptions, ProductionNativeRegistry,
@@ -251,14 +250,22 @@ fn run_call<'guard>(
                 .read_set()
                 .get_loaded(guard.arena_ref_for_module_id(module_id))
             {
-                Ok(loaded) => match return_types(guard, loaded, function_id, EMPTY_TYPE_LIST) {
-                    Ok(returns) => returns,
-                    Err(error) => {
-                        return Outcome::Error {
-                            stage: Stage::Run,
-                            message: format!("failed to derive return types: {error:#}"),
-                        }
-                    },
+                Ok(loaded) => {
+                    match loaded.function_return_types(guard, function_id, EMPTY_TYPE_LIST) {
+                        Some(Ok(returns)) => view_type_list(returns),
+                        Some(Err(error)) => {
+                            return Outcome::Error {
+                                stage: Stage::Run,
+                                message: format!("failed to derive return types: {error}"),
+                            }
+                        },
+                        None => {
+                            return Outcome::Error {
+                                stage: Stage::Run,
+                                message: "function has no IR in its loaded module".to_string(),
+                            }
+                        },
+                    }
                 },
                 Err(error) => {
                     return Outcome::Error {
@@ -267,7 +274,7 @@ fn run_call<'guard>(
                     }
                 },
             };
-            match read_root_results(&interp, &returns) {
+            match read_root_results(&interp, returns) {
                 Ok(values) => Outcome::Returned {
                     values,
                     gas_used,
@@ -283,6 +290,7 @@ fn run_call<'guard>(
             code,
             message,
             location,
+            ..
         }) => Outcome::Aborted {
             code,
             location: Some(location.to_string()),
@@ -327,28 +335,6 @@ fn run_call<'guard>(
             }
         },
     }
-}
-
-/// The return types of a loaded module's function, instantiated with
-/// `ty_args`.
-fn return_types(
-    guard: &ExecutionGuard<'_>,
-    loaded: &LoadedModule,
-    function: InternedIdentifier,
-    ty_args: InternedTypeList,
-) -> Result<Vec<InternedType>, String> {
-    let FunctionIrLookup::Ir(ir) = loaded.get_function_ir(function) else {
-        return Err("function has no IR in its loaded module".to_string());
-    };
-    let returns = loaded
-        .ir()
-        .module
-        .function_signature_at(ir.handle_idx)
-        .returns;
-    let returns = guard
-        .subst_type_list(returns, ty_args)
-        .map_err(|error| error.to_string())?;
-    Ok(view_type_list(returns).to_vec())
 }
 
 /// Parses `0x…::module::function`.
