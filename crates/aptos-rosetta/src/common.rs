@@ -256,11 +256,9 @@ pub async fn get_block_index_from_request(
     partial_block_identifier: Option<PartialBlockIdentifier>,
 ) -> ApiResult<u64> {
     Ok(match partial_block_identifier {
-        // If Index and hash are provided, we use index, because it's easier to use.
-        // Note, we don't handle if they mismatch.
-        //
-        // This is required.  Rosetta originally only took one or the other, and this failed in
-        // integration testing.
+        // If index and hash are both provided, prefer index and ignore hash.
+        // Rosetta clients may send both; validating agreement broke integration testing
+        // historically, so hash is intentionally not checked when index is present.
         Some(PartialBlockIdentifier {
             index: Some(block_index),
             hash: Some(_),
