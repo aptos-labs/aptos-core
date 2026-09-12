@@ -4,6 +4,7 @@ module aptos_framework::init {
     use std::features;
     use std::hash;
     use std::option::{Self, Option};
+    use std::signer;
     use aptos_std::from_bcs;
     use aptos_framework::create_signer;
     use aptos_framework::object::{Self, ObjectCore};
@@ -19,6 +20,9 @@ module aptos_framework::init {
     /// Lazy module initialization is not enabled (see the `LAZY_MODULE_INITIALIZATION` feature).
     const ELAZY_MODULE_INITIALIZATION_NOT_ENABLED: u64 = 0x3;
 
+    /// Only the current owner of an object can record the deploy owner of its modules.
+    const ENOT_OBJECT_OWNER: u64 = 0x4;
+
     /// Opaque representation of module names.
     struct ModuleId has store, copy, drop {
         hash: u128
@@ -29,7 +33,8 @@ module aptos_framework::init {
     /// `only_once` is the flag first passed at initialization: `none` before init, `some(false)`
     /// re-inits after each upgrade (cleared by `reset_initialized`), `some(true)` inits only once.
     /// `deploy_owner` is the object's transitive root owner recorded at this module's last publish
-    /// and gates object self-init (see `assert_may_self_initialize`); `none` for account addresses.
+    /// through `code::publish_package_to_object` and gates object self-init (see
+    /// `assert_may_self_initialize`); `none` for account addresses.
     struct ModuleState has store, copy, drop {
         only_once: Option<bool>,
         deploy_owner: Option<address>
@@ -90,27 +95,39 @@ module aptos_framework::init {
         if (modules.contains(&module_id)) modules.borrow(&module_id).deploy_owner else option::none()
     }
 
-    /// Records `owner` as the object root owner of the module named `module_name` at (re)publish, to
-    /// gate its later self-init (see `assert_may_self_initialize`). Called per module by
-    /// `code::publish_package` for object addresses only.
-    package fun record_deploy_owner(addr: address, module_name: vector<u8>, owner: address) {
+    /// Records the current root owner of the object at `addr` for the module named `module_name`,
+    /// to gate its later self-init (see `assert_may_self_initialize`). `owner` must own the object
+    /// at this moment: a code object signer obtained before an ownership transfer cannot refresh
+    /// the record. Called per module by `code::publish_package_to_object`.
+    package fun record_deploy_owner(owner: &signer, addr: address, module_name: vector<u8>) {
+        let object = object::address_to_object<ObjectCore>(addr);
+        assert!(
+            object::is_owner(object, signer::address_of(owner)),
+            error::permission_denied(ENOT_OBJECT_OWNER),
+        );
         let module_id = module_id_from_name(module_name);
         ensure_module_state(addr, module_id);
-        InitializationState[addr].modules.borrow_mut(&module_id).deploy_owner = option::some(owner);
+        InitializationState[addr].modules.borrow_mut(&module_id).deploy_owner =
+            option::some(object.root_owner());
     }
 
-    /// Called on code upgrade to request re-run of initialization for the named module. Skipped for
-    /// modules that used `only_once = true` when first initialized. Keeps the recorded deploy owner.
-    package fun reset_initialized(addr: address, module_name: vector<u8>) {
+    /// Requests re-run of initialization for the named modules after an upgrade. Skipped for modules
+    /// that used `only_once = true` when first initialized. Keeps the recorded deploy owner.
+    ///
+    /// Called by the VM once the upgraded code is live, after the publishing transaction's Move
+    /// execution; resetting earlier would let the old code consume the reset.
+    fun reset_initialized(addr: address, module_names: vector<vector<u8>>) {
         if (exists<InitializationState>(addr)) {
             let modules = &mut InitializationState[addr].modules;
-            let module_id = module_id_from_name(module_name);
-            if (modules.contains(&module_id)) {
-                let state = modules.borrow_mut(&module_id);
-                if (state.only_once == option::some(false)) {
-                    state.only_once = option::none();
+            module_names.for_each_ref(|name| {
+                let module_id = module_id_from_name(*name);
+                if (modules.contains(&module_id)) {
+                    let state = modules.borrow_mut(&module_id);
+                    if (state.only_once == option::some(false)) {
+                        state.only_once = option::none();
+                    }
                 }
-            }
+            });
         }
     }
 
@@ -164,7 +181,8 @@ module aptos_framework::init {
 
     #[test_only]
     fun record_current_owner(addr: address, module_name: vector<u8>) {
-        record_deploy_owner(addr, module_name, object::address_to_object<ObjectCore>(addr).root_owner());
+        let owner = object::address_to_object<ObjectCore>(addr).owner();
+        record_deploy_owner(&create_signer::create_signer(owner), addr, module_name);
     }
 
     #[test_only]
@@ -231,6 +249,21 @@ module aptos_framework::init {
         record_current_owner(addr, b"m");
         object::delete(object::generate_delete_ref(&cref));
         assert_may_init(addr, b"m");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x5_0004, location = Self)]
+    fun record_deploy_owner_rejects_non_owner() {
+        let addr = object::address_from_constructor_ref(&object::create_object(@0xcafe));
+        record_deploy_owner(&create_signer::create_signer(@0xbeef), addr, b"m");
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x5_0004, location = Self)]
+    fun record_deploy_owner_rejects_object_own_signer() {
+        // The code object's own signer does not own the object and cannot record for it.
+        let addr = object::address_from_constructor_ref(&object::create_object(@0xcafe));
+        record_deploy_owner(&create_signer::create_signer(addr), addr, b"m");
     }
 
     #[test]

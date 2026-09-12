@@ -91,3 +91,11 @@ pub static TRANSACTION_VALIDATION_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 
 pub const VERSIONED_PROLOGUE_NAME: &IdentStr = ident_str!("versioned_prologue");
 pub const VERSIONED_EPILOGUE_NAME: &IdentStr = ident_str!("versioned_epilogue");
+
+pub static INIT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("init").to_owned(),
+    )
+});
+pub const RESET_INITIALIZED: &IdentStr = ident_str!("reset_initialized");
