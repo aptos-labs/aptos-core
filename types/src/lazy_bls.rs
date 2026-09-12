@@ -1,7 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Lazy wire type for BLS aggregate/multi-signatures.
+//! Lazy wire types for BLS public keys and aggregate/multi-signatures.
+//!
+//! `LazyBlsPublicKey` carries the same on-wire encoding as
+//! `aptos_crypto::bls12381::PublicKey` but leaves its compressed G1 point as
+//! bytes until an authenticated validator set is accepted. This keeps a forged
+//! `EpochChangeProof` from forcing one curve decompression per advertised
+//! validator during network deserialization.
 //!
 //! `LazyBlsSignature` carries the same on-wire encoding as
 //! `aptos_crypto::bls12381::Signature` but skips the expensive G2-point
@@ -43,6 +49,157 @@ use std::{fmt, sync::OnceLock};
 /// The serde data-model name used by `bls12381::Signature`'s `SerializeKey`
 /// derive. Must match so the on-wire encoding (and traced format) is identical.
 const SIGNATURE_NAME: &str = "Signature";
+
+/// The serde data-model name used by `bls12381::PublicKey`'s `SerializeKey`
+/// derive. Must match so the on-wire encoding (and traced format) is identical.
+const PUBLIC_KEY_NAME: &str = "PublicKey";
+
+/// Compressed-bytes form of a `bls12381::PublicKey`. Wire-identical to
+/// `bls12381::PublicKey`, but decoding does not decompress the G1 point.
+#[derive(Clone)]
+pub struct LazyBlsPublicKey {
+    /// The compressed 48-byte wire encoding. This is the canonical identity of
+    /// the key: the only field serialized, compared, or hashed.
+    bytes: [u8; bls12381::PublicKey::LENGTH],
+    /// Lazily-populated decompressed point. Locally constructed keys seed the
+    /// cache, while peer-supplied keys remain compressed until verification.
+    decompressed: OnceLock<Box<bls12381::PublicKey>>,
+}
+
+impl LazyBlsPublicKey {
+    /// Capture a known-valid key and retain its already-decompressed point.
+    pub fn from_public_key(public_key: &bls12381::PublicKey) -> Self {
+        let decompressed = OnceLock::new();
+        let _ = decompressed.set(Box::new(public_key.clone()));
+        Self {
+            bytes: public_key.to_bytes(),
+            decompressed,
+        }
+    }
+
+    /// Decompress and curve-check the key on first use, then cache it.
+    pub fn decompress(&self) -> Result<&bls12381::PublicKey, CryptoMaterialError> {
+        if self.decompressed.get().is_none() {
+            let public_key = bls12381::PublicKey::try_from(self.bytes.as_slice())?;
+            // Ignore a race where another thread cached the same deterministic
+            // value first.
+            let _ = self.decompressed.set(Box::new(public_key));
+        }
+        Ok(self
+            .decompressed
+            .get()
+            .expect("a valid BLS public key was cached above"))
+    }
+
+    /// Return the compressed wire bytes without decompressing the point.
+    pub fn to_bytes(&self) -> [u8; bls12381::PublicKey::LENGTH] {
+        self.bytes
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn from_raw_bytes_for_test(bytes: [u8; bls12381::PublicKey::LENGTH]) -> Self {
+        Self {
+            bytes,
+            decompressed: OnceLock::new(),
+        }
+    }
+}
+
+impl From<bls12381::PublicKey> for LazyBlsPublicKey {
+    fn from(public_key: bls12381::PublicKey) -> Self {
+        Self::from_public_key(&public_key)
+    }
+}
+
+impl PartialEq for LazyBlsPublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.bytes == other.bytes
+    }
+}
+
+impl Eq for LazyBlsPublicKey {}
+
+impl std::hash::Hash for LazyBlsPublicKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.bytes.hash(state);
+    }
+}
+
+impl fmt::Debug for LazyBlsPublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.bytes))
+    }
+}
+
+impl Serialize for LazyBlsPublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&format!("0x{}", hex::encode(self.bytes)))
+        } else {
+            serializer.serialize_newtype_struct(
+                PUBLIC_KEY_NAME,
+                serde_bytes::Bytes::new(self.bytes.as_slice()),
+            )
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for LazyBlsPublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        fn to_array<E: de::Error>(bytes: &[u8]) -> Result<[u8; bls12381::PublicKey::LENGTH], E> {
+            <[u8; bls12381::PublicKey::LENGTH]>::try_from(bytes).map_err(|_| {
+                E::custom(format!(
+                    "invalid BLS public key length: {} (expected {})",
+                    bytes.len(),
+                    bls12381::PublicKey::LENGTH
+                ))
+            })
+        }
+
+        if deserializer.is_human_readable() {
+            let encoded = <String>::deserialize(deserializer)?;
+            let stripped = encoded
+                .strip_prefix(bls12381::PublicKey::AIP_80_PREFIX)
+                .unwrap_or(&encoded);
+            let stripped = stripped.strip_prefix("0x").unwrap_or(stripped);
+            let bytes = hex::decode(stripped).map_err(de::Error::custom)?;
+            Ok(Self {
+                bytes: to_array(&bytes)?,
+                decompressed: OnceLock::new(),
+            })
+        } else {
+            #[derive(Deserialize)]
+            #[serde(rename = "PublicKey")]
+            struct Value<'a>(&'a [u8]);
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(Self {
+                bytes: to_array(value.0)?,
+                decompressed: OnceLock::new(),
+            })
+        }
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl proptest::arbitrary::Arbitrary for LazyBlsPublicKey {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        proptest::arbitrary::any::<bls12381::PublicKey>()
+            .prop_map(|key| Self::from_public_key(&key))
+            .boxed()
+    }
+}
 
 /// Compressed-bytes form of a `bls12381::Signature`. Wire-identical to
 /// `bls12381::Signature`, but decoding does not decompress the G2 point.
@@ -207,6 +364,53 @@ impl<'de> Deserialize<'de> for LazyBlsSignature {
 mod tests {
     use super::*;
     use aptos_crypto::{bls12381::PrivateKey, test_utils::TestAptosCrypto, SigningKey, Uniform};
+
+    fn sample_public_key() -> bls12381::PublicKey {
+        let mut rng = rand::thread_rng();
+        let sk = PrivateKey::generate(&mut rng);
+        bls12381::PublicKey::from(&sk)
+    }
+
+    #[test]
+    fn lazy_public_key_wire_compat_bcs_and_json() {
+        for _ in 0..16 {
+            let public_key = sample_public_key();
+            let lazy = LazyBlsPublicKey::from_public_key(&public_key);
+
+            let public_key_bcs = bcs::to_bytes(&public_key).unwrap();
+            let lazy_bcs = bcs::to_bytes(&lazy).unwrap();
+            assert_eq!(public_key_bcs, lazy_bcs);
+
+            let decoded: LazyBlsPublicKey = bcs::from_bytes(&public_key_bcs).unwrap();
+            assert_eq!(decoded, lazy);
+            assert_eq!(decoded.decompress().unwrap(), &public_key);
+
+            let public_key_json = serde_json::to_string(&public_key).unwrap();
+            let lazy_json = serde_json::to_string(&lazy).unwrap();
+            assert_eq!(public_key_json, lazy_json);
+            let decoded: LazyBlsPublicKey = serde_json::from_str(&public_key_json).unwrap();
+            assert_eq!(decoded.decompress().unwrap(), &public_key);
+        }
+    }
+
+    #[test]
+    fn invalid_public_key_is_rejected_only_when_materialized() {
+        let invalid = LazyBlsPublicKey::from_raw_bytes_for_test([0u8; bls12381::PublicKey::LENGTH]);
+        let bytes = bcs::to_bytes(&invalid).unwrap();
+
+        let decoded: LazyBlsPublicKey = bcs::from_bytes(&bytes).unwrap();
+        assert!(decoded.decompress().is_err());
+        assert!(bcs::from_bytes::<bls12381::PublicKey>(&bytes).is_err());
+    }
+
+    #[test]
+    fn uncached_public_key_footprint_is_small() {
+        let size = std::mem::size_of::<LazyBlsPublicKey>();
+        assert!(
+            size <= 64,
+            "LazyBlsPublicKey grew to {size} bytes; its decompressed cache must remain boxed",
+        );
+    }
 
     fn sample_signature() -> bls12381::Signature {
         let mut rng = rand::thread_rng();

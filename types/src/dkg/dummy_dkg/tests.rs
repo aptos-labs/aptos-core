@@ -26,7 +26,7 @@ impl DealerState {
     fn as_validator_consensus_info(&self) -> ValidatorConsensusInfo {
         ValidatorConsensusInfo {
             address: self.addr,
-            public_key: self.pk.clone(),
+            public_key: self.pk.clone().into(),
             voting_power: self.voting_power,
         }
     }
@@ -44,7 +44,7 @@ impl NewValidatorState {
     fn as_validator_consensus_info(&self) -> ValidatorConsensusInfo {
         ValidatorConsensusInfo {
             address: self.addr,
-            public_key: self.pk.clone(),
+            public_key: self.pk.clone().into(),
             voting_power: self.voting_power,
         }
     }
