@@ -188,6 +188,7 @@ pub(crate) fn call_result(status: RuntimeStatus) -> Result<(), MoveExecutionFail
             code,
             message,
             location,
+            ..
         } => Err(MoveExecutionFailure::Abort {
             code,
             message,

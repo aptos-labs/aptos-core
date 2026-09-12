@@ -106,6 +106,7 @@ impl<'guard> MonoRunner<'guard> {
                 code,
                 message,
                 location,
+                ..
             }) => RunResult::Aborted {
                 code,
                 message,

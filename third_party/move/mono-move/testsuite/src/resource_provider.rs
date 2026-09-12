@@ -1,83 +1,95 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! An in-memory [`ResourceProvider`] shared by the MonoMove test harnesses.
+//! The in-memory [`ResourceProvider`] shared by the MonoMove test harnesses.
 //!
-//! Resources and table items are held as BCS bytes and materialized (BCS ->
-//! flat) into a long-lived heap on first access, then served as a pointer.
-//! Materialization is lazy because a type's layout is only published once the
+//! Resources are held as BCS bytes in V1's [`InMemoryStorage`] and
+//! materialized (BCS -> flat) into an arena the provider owns on first access,
+//! then served as a pointer that pins the arena. Materialization is lazy
+//! because a type's layout and GC descriptor are only published once the
 //! function that accesses it has been lowered.
 
 use mono_move_core::{
+    nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
     types::InternedType,
-    FrameOffset, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
+    LayoutProvider, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, SharedArena};
-use move_core_types::account_address::AccountAddress;
+use mono_move_runtime::{deserialize_into, Heap, SharedArena, DEFAULT_HEAP_SIZE};
+use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::resolver::ResourceResolver;
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
 
-/// Serves resources and table items to MonoMove, materializing each on first access.
-pub struct InMemoryResourceProvider<'guard, 'ctx> {
+/// Size of a provider's materialization arena: the interpreter's, so a value
+/// that fit when it was written fits when it is read back.
+const MATERIALIZATION_HEAP_SIZE: usize = DEFAULT_HEAP_SIZE;
+
+/// Serves the resources of V1's [`InMemoryStorage`] to MonoMove, looking each
+/// up by the struct tag of its interned type and materializing it on first
+/// access.
+pub(crate) struct InMemoryResourceProvider<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
-    /// BCS bytes of each resource, keyed by address and interned type.
-    resources: HashMap<(AccountAddress, InternedType), Vec<u8>>,
-    /// BCS bytes of each table item, keyed by table handle and serialized key.
-    table_items: HashMap<(AccountAddress, Vec<u8>), Vec<u8>>,
+    storage: &'guard InMemoryStorage,
     materialized: RefCell<Materialized>,
 }
 
 struct Materialized {
-    /// Long-lived arena holding the flat representation of materialized
-    /// resources. Shared so each read can pin the source heap where the read
-    /// points to; never reset between runs.
+    /// Holds the flat representation of materialized values. Shared so each
+    /// read pins it; never reset, so every interpreter reading a value keeps
+    /// it alive.
     arena: Arc<SharedArena>,
     cache: HashMap<InMemoryStorageKey, NonNull<u8>>,
 }
 
 impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
-    /// Creates an empty provider whose materialization arena is `heap_size` bytes.
-    pub fn new(guard: &'guard ExecutionGuard<'ctx>, heap_size: usize) -> Self {
+    /// Creates a provider over `storage`.
+    pub(crate) fn new(
+        guard: &'guard ExecutionGuard<'ctx>,
+        storage: &'guard InMemoryStorage,
+    ) -> Self {
         Self {
             guard,
-            resources: HashMap::new(),
-            table_items: HashMap::new(),
+            storage,
             materialized: RefCell::new(Materialized {
                 #[allow(clippy::arc_with_non_send_sync)]
-                arena: Arc::new(SharedArena::new(heap_size)),
+                arena: Arc::new(SharedArena::new(MATERIALIZATION_HEAP_SIZE)),
                 cache: HashMap::new(),
             }),
         }
     }
 
-    /// Adds a resource of interned type `ty` published at `address`, given its BCS bytes.
-    pub fn add_resource(&mut self, address: AccountAddress, ty: InternedType, bytes: Vec<u8>) {
-        self.resources.insert((address, ty), bytes);
+    /// The value already materialized for `key`, if any.
+    fn cached(&self, key: &InMemoryStorageKey) -> Option<StorageRead> {
+        let materialized = self.materialized.borrow();
+        materialized
+            .cache
+            .get(key)
+            .map(|&ptr| StorageRead::ExternalHeap {
+                ptr,
+                version: 0,
+                pin: materialized.arena.clone(),
+            })
     }
 
-    /// Adds a table item at `handle_address` keyed by serialized `key`, given its BCS bytes.
-    pub fn add_table_item(&mut self, handle_address: AccountAddress, key: Vec<u8>, bytes: Vec<u8>) {
-        self.table_items.insert((handle_address, key), bytes);
-    }
-
-    /// Returns the raw blob and the type to materialize it as, or `None` if the key isn't present.
-    fn entry(&self, key: &InMemoryStorageKey) -> Option<(&Vec<u8>, InternedType)> {
-        match key {
-            InMemoryStorageKey::Resource { address, ty } => {
-                Some((self.resources.get(&(*address, *ty))?, *ty))
-            },
-            InMemoryStorageKey::TableItem {
-                handle,
-                key,
-                value_ty,
-            } => Some((
-                self.table_items.get(&(handle.address(), key.to_vec()))?,
-                *value_ty,
-            )),
-        }
+    /// Materializes `blob` as a value of type `ty` and caches it under `key`.
+    fn materialize(
+        &self,
+        key: &InMemoryStorageKey,
+        ty: InternedType,
+        blob: &[u8],
+    ) -> Result<StorageRead, ResourceProviderError> {
+        let mut materialized = self.materialized.borrow_mut();
+        let arena = materialized.arena.clone();
+        let ptr = arena.with_heap_mut(|heap| materialize_one(heap, self.guard, ty, blob))?;
+        materialized.cache.insert(key.clone(), ptr);
+        Ok(StorageRead::ExternalHeap {
+            ptr,
+            version: 0,
+            pin: arena,
+        })
     }
 }
 
@@ -87,92 +99,57 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
         key: &InMemoryStorageKey,
         _group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
-        // Cache hit?
-        {
-            let materialized = self.materialized.borrow();
-            if let Some(&ptr) = materialized.cache.get(key) {
-                return Ok(StorageRead::ExternalHeap {
-                    ptr,
-                    version: 0,
-                    pin: materialized.arena.clone(),
-                });
-            }
+        if let Some(read) = self.cached(key) {
+            return Ok(read);
         }
-
-        let Some((blob, ty)) = self.entry(key) else {
-            return Ok(StorageRead::DoesNotExist);
-        };
-
-        let mut materialized = self.materialized.borrow_mut();
-        let arena = materialized.arena.clone();
-        match arena.with_heap_mut(|heap| materialize_one(heap, self.guard, ty, blob)) {
-            Some(ptr) => {
-                materialized.cache.insert(key.clone(), ptr);
-                Ok(StorageRead::ExternalHeap {
-                    ptr,
-                    version: 0,
-                    pin: arena,
-                })
+        match key {
+            InMemoryStorageKey::Resource { address, ty } => {
+                let tag = nominal_tag(*ty)
+                    .map_err(|err| ResourceProviderError::InvariantViolation(format!("{err:#}")))?;
+                let (blob, _) = self
+                    .storage
+                    .get_resource_bytes_with_metadata_and_layout(address, &tag, &[], None)
+                    .map_err(|err| ResourceProviderError::InvariantViolation(err.to_string()))?;
+                match blob {
+                    Some(blob) => self.materialize(key, *ty, &blob),
+                    None => Ok(StorageRead::DoesNotExist),
+                }
             },
-            None => Ok(StorageRead::DoesNotExist),
+            // TODO(testing): serve table items from the storage's tables once the
+            // session commits table writes, so transactional sources can keep tables
+            // across tasks.
+            InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist),
         }
     }
 }
 
-/// Materializes one resource of type `ty` from its BCS `blob` into `heap`, returning a pointer to
-/// the flat object (header at the preceding bytes). Returns `None` if the layout is unavailable
-/// (the accessing function wasn't lowered) or the arena is full.
 fn materialize_one(
     heap: &mut Heap,
     guard: &ExecutionGuard,
     ty: InternedType,
     blob: &[u8],
-) -> Option<NonNull<u8>> {
-    let layout = guard.layout_by_ty(ty)?;
-    let size = layout.size as usize;
-
-    // The GC descriptor records which payload slots are heap pointers. Lowering already published
-    // it for this resource type; `publish_struct_descriptor` is idempotent and returns that one
-    // (our offsets are a fallback that is ignored on the fast path).
-    let mut offsets = vec![];
-    collect_pointer_offsets(guard, layout, 0, &mut offsets);
-    let frame_offsets: Vec<FrameOffset> = offsets.into_iter().map(FrameOffset).collect();
-    let descriptor = guard.publish_struct_descriptor(ty, layout.size, &frame_offsets);
-
-    let obj = heap.alloc_object(OBJECT_HEADER_SIZE + size, descriptor)?;
-    // SAFETY: `obj` is a freshly reserved object with `size` payload bytes; `deserialize_into`
-    // writes the flat value there and boxes any nested vectors in `heap`.
-    unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }.ok()?;
-    Some(obj)
-}
-
-/// Collects the byte offsets (within the payload) of 8-byte heap-pointer slots, matching what
-/// MonoMove's lowering computes for an object descriptor.
-fn collect_pointer_offsets(
-    guard: &ExecutionGuard,
-    layout: &ValueLayout,
-    base: u32,
-    out: &mut Vec<u32>,
-) {
-    if layout.has_no_pointers_no_padding() {
-        return;
-    }
-    match &layout.kind {
-        LayoutKind::Vector { .. }
-        | LayoutKind::Function
-        | LayoutKind::Ref
-        | LayoutKind::FrozenEnum { .. } => out.push(base),
-        LayoutKind::Struct { fields } => {
-            for field in fields.iter() {
-                if let Some(sub) = guard.layout(field.id) {
-                    collect_pointer_offsets(guard, sub, base + field.offset, out);
-                }
-            }
-        },
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address
-        | LayoutKind::Signer => {},
-    }
+) -> Result<NonNull<u8>, ResourceProviderError> {
+    let layout = guard.layout_by_ty(ty).ok_or_else(|| {
+        ResourceProviderError::InvariantViolation("no layout for a stored value's type".to_string())
+    })?;
+    // Lowering the accessing function published the descriptor, as in
+    // production.
+    let descriptor = guard.struct_descriptor(ty).ok_or_else(|| {
+        ResourceProviderError::InvariantViolation(
+            "no GC descriptor for a stored value's type".to_string(),
+        )
+    })?;
+    let obj = heap
+        .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
+        .ok_or_else(|| {
+            ResourceProviderError::InvariantViolation(
+                "the materialization heap is exhausted".to_string(),
+            )
+        })?;
+    // SAFETY: `obj` is a fresh allocation of the type's size, and `blob` is
+    // the BCS encoding of a value of type `ty`.
+    unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }.map_err(|err| {
+        ResourceProviderError::InvariantViolation(format!("a stored value does not decode: {err}"))
+    })?;
+    Ok(obj)
 }
