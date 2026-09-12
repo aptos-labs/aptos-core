@@ -30,6 +30,7 @@ from .config import ExperimentConfig, RunSpec
 from .credentials import redact_tree
 from .sdk_metrics import write_sdk_metrics
 from .codex_metrics import write_codex_metrics
+from .codex_otel import write_codex_request_metrics
 
 
 POLICY_VERSION = 6
@@ -789,6 +790,12 @@ def preserve_interrupted_run(staged_run: Path, artifacts: Path, reason: str) -> 
                 staged_run / "codex-metrics.json",
                 allow_incomplete_tail=True,
             )
+            request_events = staged_run / "codex-request-usage.jsonl"
+            if request_events.is_file():
+                write_codex_request_metrics(
+                    request_events,
+                    staged_run / "codex-request-metrics.json",
+                )
         except (ValueError, UnicodeDecodeError, KeyError) as error:
             metrics_error = type(error).__name__
     write_json(staged_run / "interruption.json", {

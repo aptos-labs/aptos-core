@@ -39,6 +39,7 @@ from .config import ARM_TO_TACTIC, ExperimentConfig, ResolvedRunSpec, RunSpec
 from .credentials import redact_tree
 from .sdk_metrics import write_sdk_metrics
 from .codex_metrics import write_codex_metrics
+from .codex_otel import CodexOtelCollector, write_codex_request_metrics
 from .stdio_proxy import StdioProxy
 from .identifiers import resolve_within
 from .judge import Judge, JudgeResult
@@ -141,7 +142,10 @@ class Controller:
                     async with (
                         self._agent_boogie_proxy(),
                         self._agent_mcp_proxy(),
-                        self._make_agent(agent_events, attempts) as agent,
+                        self._codex_otel_collector(attempts) as request_telemetry,
+                        self._make_agent(
+                            agent_events, attempts, request_telemetry
+                        ) as agent,
                     ):
                         for controller_turn in range(1, self.config.max_controller_turns + 1):
                             if self._wall_seconds() >= self.config.max_wall_seconds:
@@ -541,6 +545,7 @@ class Controller:
             run_record["sdk_telemetry_schema"] = 1
         elif self.agent_kind == "codex":
             run_record["codex_telemetry_schema"] = 1
+            run_record["codex_request_telemetry_schema"] = 1
         write_json(self.artifact_dir / "run.json", run_record)
 
     def _refutation_identities(self) -> list[str]:
@@ -754,7 +759,23 @@ class Controller:
         ):
             yield
 
-    def _make_agent(self, event_log: JsonlWriter, attempt: int = 1) -> AgentSession:
+    @asynccontextmanager
+    async def _codex_otel_collector(self, attempt: int):
+        """Collect request-level usage at Codex's pricing boundary."""
+        if self.agent_kind != "codex":
+            yield None
+            return
+        async with CodexOtelCollector(
+            self.artifact_dir / "codex-request-usage.jsonl", attempt
+        ) as collector:
+            yield collector
+
+    def _make_agent(
+        self,
+        event_log: JsonlWriter,
+        attempt: int = 1,
+        request_telemetry: CodexOtelCollector | None = None,
+    ) -> AgentSession:
         if self.agent_kind == "fake":
             if self.fake_script is None:
                 raise ValueError("--fake-script is required for --agent=fake")
@@ -778,6 +799,7 @@ class Controller:
                 event_log,
                 stderr_sink,
                 Path(os.environ["MOVE_INFERENCE_MCP_PROXY"]),
+                request_telemetry,
             )
         return ClaudeAgentSession(
             self.config,
@@ -926,6 +948,10 @@ class Controller:
                 write_codex_metrics(
                     self.artifact_dir / "codex-events.jsonl",
                     self.artifact_dir / "codex-metrics.json",
+                )
+                write_codex_request_metrics(
+                    self.artifact_dir / "codex-request-usage.jsonl",
+                    self.artifact_dir / "codex-request-metrics.json",
                 )
             else:
                 write_sdk_metrics(

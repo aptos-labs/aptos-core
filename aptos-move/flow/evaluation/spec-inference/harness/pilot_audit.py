@@ -135,6 +135,7 @@ def audit_pilot(
             issues.append(_issue(spec.run_id, "controller harness identity disagreement"))
         if run.get("controller_prompts_sha256") != expected_prompts_sha256:
             issues.append(_issue(spec.run_id, "controller prompt identity disagreement"))
+        request_metrics: dict[str, Any] | None = None
         if run.get("codex_telemetry_schema") == 1:
             try:
                 metrics = load_object(artifact / "codex-metrics.json")
@@ -147,6 +148,22 @@ def audit_pilot(
                     issues.append(_issue(spec.run_id, "Codex telemetry turn coverage mismatch"))
             except (OSError, ValueError) as error:
                 issues.append(_issue(spec.run_id, f"missing or invalid Codex metrics: {error}"))
+            if run.get("codex_request_telemetry_schema") == 1:
+                try:
+                    request_metrics = load_object(
+                        artifact / "codex-request-metrics.json"
+                    )
+                    if not request_metrics.get("complete"):
+                        issues.append(
+                            _issue(spec.run_id, "incomplete request-level Codex telemetry")
+                        )
+                except (OSError, ValueError) as error:
+                    issues.append(
+                        _issue(
+                            spec.run_id,
+                            f"missing or invalid request-level Codex metrics: {error}",
+                        )
+                    )
         elif run.get("sdk_telemetry_schema") == 1:
             try:
                 metrics = load_object(artifact / "sdk-metrics.json")
@@ -258,6 +275,13 @@ def audit_pilot(
                     )
                 if system.get("reasoning_effort") != config.effort:
                     issues.append(_issue(spec.run_id, "runtime Codex effort mismatch"))
+                if run.get("codex_request_telemetry_schema") == 1 and (
+                    system.get("request_usage_telemetry")
+                    != "otel_response_completed"
+                ):
+                    issues.append(
+                        _issue(spec.run_id, "request-level Codex telemetry was not active")
+                    )
             elif system.get("claude_code_version") != config.claude_code_version:
                 issues.append(_issue(spec.run_id, "runtime Claude Code version mismatch"))
             for timing in ("duration_ms", "duration_api_ms", "num_turns"):
@@ -294,6 +318,28 @@ def audit_pilot(
                 issues.append(_issue(spec.run_id, f"session ID reused from {owner}"))
         if judge.get("total_output_tokens") != per_run["output_tokens"]:
             issues.append(_issue(spec.run_id, "controller/output-token reconciliation failed"))
+        if request_metrics is not None:
+            request_tokens = request_metrics.get("token_totals", {}).get(
+                "turn_request", {}
+            )
+            request_totals = {
+                "input_tokens": int(request_tokens.get("input_tokens", 0)),
+                "cache_read_input_tokens": int(
+                    request_tokens.get("cached_input_tokens", 0)
+                ),
+                "cache_creation_input_tokens": int(
+                    request_tokens.get("cache_write_input_tokens", 0)
+                ),
+                "output_tokens": int(request_tokens.get("output_tokens", 0))
+                + int(request_tokens.get("reasoning_output_tokens", 0)),
+            }
+            if request_totals != per_run:
+                issues.append(
+                    _issue(
+                        spec.run_id,
+                        "request-level/turn-level token reconciliation failed",
+                    )
+                )
         for field, value in per_run.items():
             totals[field] += value
         run_tokens.append(sum(per_run.values()))

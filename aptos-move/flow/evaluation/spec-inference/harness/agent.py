@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .artifacts import JsonlWriter
+from .codex_otel import CodexOtelCollector
 from .config import ExperimentConfig
 from .credentials import redact as redact_credentials
 from .credentials import require_provider_auth
@@ -212,6 +213,7 @@ class CodexAgentSession:
         event_log: JsonlWriter,
         stderr_sink: Callable[[str], None],
         mcp_proxy_socket: Path,
+        request_telemetry: CodexOtelCollector | None = None,
     ):
         if config.agent_runtime != "codex" or not config.codex_cli_version:
             raise RuntimeError("Codex session requires a Codex experiment configuration")
@@ -234,6 +236,8 @@ class CodexAgentSession:
         self._stderr_sink = stderr_sink
         self._session_id: str | None = None
         self._process: asyncio.subprocess.Process | None = None
+        self._request_telemetry = request_telemetry
+        self._turn_index = 0
         self._manifest = json.loads(
             (plugin / "move-flow-manifest.json").read_text(encoding="utf-8")
         )
@@ -293,6 +297,20 @@ class CodexAgentSession:
             'default_tools_approval_mode = "approve"',
             '',
         ]
+        if self._request_telemetry is not None:
+            if self._request_telemetry.endpoint is None:
+                raise RuntimeError("Codex OTel collector has not started")
+            lines.extend([
+                '[otel]',
+                'environment = "move-inference-evaluation"',
+                'exporter = { otlp-http = { '
+                f'endpoint = {json.dumps(self._request_telemetry.endpoint)}, '
+                'protocol = "json", headers = {} } }',
+                'metrics_exporter = "none"',
+                'trace_exporter = "none"',
+                'log_user_prompt = false',
+                '',
+            ])
         (codex_home / "config.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     async def __aenter__(self) -> "CodexAgentSession":
@@ -308,6 +326,12 @@ class CodexAgentSession:
             self._process.send_signal(signal.SIGINT)
 
     async def send(self, prompt: str) -> AgentTurn:
+        self._turn_index += 1
+        telemetry_marker = (
+            self._request_telemetry.begin_turn(self._turn_index)
+            if self._request_telemetry is not None
+            else None
+        )
         command = [self._cli_path, "exec"]
         if self._session_id is not None:
             command.extend(("resume", self._session_id))
@@ -364,6 +388,13 @@ class CodexAgentSession:
             and (event.get("item") or {}).get("type") == "agent_message"
         ]
         native_usage = dict((completed or {}).get("usage") or {})
+        telemetry_error = None
+        if self._request_telemetry is not None and telemetry_marker is not None:
+            telemetry_matched, telemetry_error = self._request_telemetry.reconcile_turn(
+                telemetry_marker, native_usage
+            )
+        else:
+            telemetry_matched = True
         visible_output = int(native_usage.get("output_tokens", 0))
         reasoning_output = int(native_usage.get("reasoning_output_tokens", 0))
         usage = {
@@ -378,15 +409,24 @@ class CodexAgentSession:
                 native_usage.get("cache_write_input_tokens", 0)
             ),
         }
-        is_error = self._process.returncode != 0 or completed is None
+        is_error = (
+            self._process.returncode != 0
+            or completed is None
+            or not telemetry_matched
+        )
         result = "\n\n".join(message for message in messages if message)
         if not result and error_event is not None:
             result = str(error_event.get("message") or error_event)
+        if telemetry_error is not None:
+            result = "\n\n".join(part for part in (result, telemetry_error) if part)
         system = {
             "model": self._config.model,
             "codex_cli_version": self._config.codex_cli_version,
             "codex_code_mode_host_sha256": self._config.codex_code_mode_host_sha256,
             "reasoning_effort": self._config.effort,
+            "request_usage_telemetry": (
+                "otel_response_completed" if self._request_telemetry is not None else None
+            ),
         }
         return AgentTurn(
             result=redact_credentials(result),
