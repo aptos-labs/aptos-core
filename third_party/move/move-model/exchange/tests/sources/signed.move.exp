@@ -1,0 +1,125 @@
+{
+  "version": 11,
+  "structs": [],
+  "funs": [
+    {
+      "name": "arith",
+      "params": 2,
+      "locals": ["i64", "i64", "i64", "i64", "i64", "i64", "i64", "i64", "i64", "i64", "i64", "i64", "i64"],
+      "returns": ["i64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [2, 0]},
+            {"assign": [3, 1]},
+            {"call": [[4], {"add": "i64"}, [2, 3]]},
+            {"assign": [5, 1]},
+            {"call": [[6], {"sub": "i64"}, [4, 5]]},
+            {"assign": [7, 1]},
+            {"call": [[8], {"mul": "i64"}, [6, 7]]},
+            {"assign": [9, 1]},
+            {"call": [[10], {"div": "i64"}, [8, 9]]},
+            {"assign": [11, 1]},
+            {"call": [[12], {"mod": "i64"}, [10, 11]]}
+          ],
+          "term": {"ret": [12]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "casts",
+      "params": 2,
+      "locals": ["i64", "u64", "i64", "i32", "u64", "u32", "i64", "i128"],
+      "returns": ["i32", "u32", "i128"],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [2, 0]},
+            {"call": [[3], {"cast": "i32"}, [2]]},
+            {"assign": [4, 1]},
+            {"call": [[5], {"cast": "u32"}, [4]]},
+            {"assign": [6, 0]},
+            {"call": [[7], {"cast": "i128"}, [6]]}
+          ],
+          "term": {"ret": [3, 5, 7]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "compare",
+      "params": 2,
+      "locals": ["i64", "i64", "i64", "i64", "bool", "i64", "i64", "bool", "i64", "i64", "bool", "bool"],
+      "returns": ["bool"],
+      "blocks": [
+        {
+          "instrs": [{"assign": [2, 0]}, {"assign": [3, 1]}, {"call": [[4], "lt", [3, 2]]}],
+          "term": {"branch": [4, 1, 2]}
+        },
+        {
+          "instrs": [
+            {"assign": [5, 0]},
+            {"assign": [6, 1]},
+            {"call": [[11], "eq", [5, 6]]},
+            {"call": [[7], "not", [11]]}
+          ],
+          "term": {"ret": [7]}
+        },
+        {
+          "instrs": [{"assign": [8, 0]}, {"assign": [9, 1]}, {"call": [[10], "le", [8, 9]]}],
+          "term": {"ret": [10]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "literals",
+      "params": 0,
+      "locals": ["i64", "i64", "i64", "i64", "i64", "i64", "i64"],
+      "returns": ["i64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"load": [1, {"num": "-5"}]},
+            {"load": [6, {"num": "0"}]},
+            {"call": [[2], {"sub": "i64"}, [6, 1]]},
+            {"assign": [0, 2]},
+            {"load": [3, {"num": "-5"}]},
+            {"assign": [4, 0]},
+            {"call": [[5], {"add": "i64"}, [3, 4]]}
+          ],
+          "term": {"ret": [5]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "negate",
+      "params": 1,
+      "locals": ["i64", "i64", "i64", "i64"],
+      "returns": ["i64"],
+      "blocks": [
+        {
+          "instrs": [{"assign": [1, 0]}, {"load": [3, {"num": "0"}]}, {"call": [[2], {"sub": "i64"}, [3, 1]]}],
+          "term": {"ret": [2]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "widths",
+      "params": 6,
+      "locals": ["i8", "i16", "i32", "i64", "i128", "i256", "i256"],
+      "returns": ["i256"],
+      "blocks": [{"instrs": [{"assign": [6, 5]}], "term": {"ret": [6]}}],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    }
+  ]
+}
