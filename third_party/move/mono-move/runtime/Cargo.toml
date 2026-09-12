@@ -28,7 +28,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 move-value-view-derive = { workspace = true }
-num-bigint = { workspace = true }
+num = { workspace = true }
 paste = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }

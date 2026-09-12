@@ -79,6 +79,7 @@ SKIP_PACKAGES=(
   "mono-move-aptos-state-view-providers:has no tests"
   "mono-move-aptos-transaction-executor:e2e tests need genesis and a 64MiB arena"
   "mono-move-replay-benchmark:links rocksdb, jemalloc, and zstd"
+  "mono-move-lean-link:unit tests reach no unsafe code; integration tests compile Move source and shell out to cargo and nm"
 )
 
 # Fail if a package under mono-move/ is in neither list. Without this, a new

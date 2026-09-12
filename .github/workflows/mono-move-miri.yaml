@@ -18,6 +18,9 @@ on:
     types: [labeled, opened, synchronize, reopened]
     paths:
       - "third_party/move/mono-move/**"
+      # The wrapper's decimal formatter is the Miri-verified path that the
+      # mono-move-runtime tests print through.
+      - "third_party/move/move-core/types/src/int256.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".cargo/config.toml"
