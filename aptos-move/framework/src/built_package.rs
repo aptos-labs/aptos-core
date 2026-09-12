@@ -103,6 +103,11 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
+    /// Compile each package separately against its dependencies' XIR
+    /// interfaces, reusing packages whose inputs are unchanged.
+    #[clap(long)]
+    #[serde(default)]
+    pub modular_compilation: bool,
     #[clap(long)]
     pub bytecode_version: Option<u32>,
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
@@ -141,6 +146,7 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
+            modular_compilation: false,
             bytecode_version: None,
             compiler_version: None,
             language_version: None,
@@ -278,6 +284,9 @@ fn make_model_build_config(
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
+        // Framework model building stays monolithic; modular compilation is
+        // opt-in from the package system, not from model construction.
+        modular_compilation: false,
         compiler_config: CompilerConfig {
             bytecode_version,
             compiler_version,
@@ -338,6 +347,7 @@ impl BuiltPackage {
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
+            modular_compilation: options.modular_compilation,
             compiler_config: CompilerConfig {
                 bytecode_version,
                 compiler_version,

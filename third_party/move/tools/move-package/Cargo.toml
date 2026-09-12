@@ -28,6 +28,7 @@ once_cell = { workspace = true }
 petgraph = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
@@ -37,6 +38,7 @@ whoami = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
+move-model-exchange = { workspace = true }
 move-stdlib = { path = "../../move-stdlib" }
 
 [[test]]

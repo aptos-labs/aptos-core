@@ -84,6 +84,33 @@ fn compile_with_xir_dependencies(
             }
             let interface = xir_export::export_interface(&module)
                 .unwrap_or_else(|e| panic!("exporting `{}`: {:#}", module.get_full_name_str(), e));
+
+            // No compiler-generated wrapper reaches the interface. `pack$S`,
+            // `borrow$S$N` and friends are synthesized during file-format
+            // generation to realize struct visibility; a dependent derives its
+            // own handles for them from the *struct declaration*, so carrying
+            // them would be both redundant and unparseable — `$` is not a Move
+            // identifier, and the interface is consumed as Move source.
+            //
+            // This assertion cannot fail *here*: dependencies are modelled with
+            // `run_checker`, which stops before file-format generation, so the
+            // wrappers do not exist in this model to begin with. It is kept as
+            // documentation of the invariant, and because a future change to
+            // model dependencies with a full compile would make it bite. The
+            // filter is actually enforced by `move-package`'s modular build
+            // tests, whose models *have* been through the whole compiler.
+            if let Some(generated) = interface
+                .functions
+                .iter()
+                .find(|function| function.name.contains('$'))
+            {
+                panic!(
+                    "`{}` exported the compiler-generated wrapper `{}`",
+                    module.get_full_name_str(),
+                    generated.name
+                );
+            }
+
             let path = dir.join(format!(
                 "dep{index}_{}.xir.json",
                 module.get_full_name_str().replace("::", "_")
@@ -133,6 +160,12 @@ module 0xcafe::dep {
     friend 0xcafe::helper;
 
     friend struct Token has drop { v: u64 }
+
+    /// Packed and read *directly* by the target, across the package boundary.
+    /// That is what drives the compiler to synthesize `pack$Slot` and
+    /// `borrow$Slot$N` handles from this declaration alone, since an interface
+    /// carries no such functions.
+    public struct Slot has copy, drop, store { a: u64, b: bool }
 
     struct Box<T: store> has store, drop { item: T, tag: u8 }
     struct Marker<phantom P> has copy, drop, store { id: u256 }
@@ -210,7 +243,14 @@ module 0xcafe::client {
         total = total + (dep::widen(2) as u64);
         let m: dep::Marker<bool> = dep::marker();
         let _ = m;
-        total
+        // Pack, read a field of, and unpack a foreign struct directly. Each is
+        // a compiler-generated wrapper (`pack$Slot`, `borrow$Slot$0`,
+        // `unpack$Slot`) that the interface does not carry and the dependent
+        // must derive from the struct declaration.
+        let slot = dep::Slot { a: 4, b: true };
+        total = total + slot.a;
+        let dep::Slot { a, b: _ } = slot;
+        total + a
     }
 }
 "#;

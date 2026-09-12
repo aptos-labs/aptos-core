@@ -107,6 +107,17 @@ pub struct BuildConfig {
     #[clap(long = "skip-fetch-latest-git-deps", global = true)]
     pub skip_fetch_latest_git_deps: bool,
 
+    /// Compile each package separately, against its dependencies' XIR
+    /// interfaces rather than their sources, reusing cached packages whose
+    /// inputs are unchanged.
+    ///
+    /// Off by default. The monolithic path stays the reference: the modular
+    /// one must produce identical bytecode, and the equivalence tests are what
+    /// say whether it does.
+    #[clap(long = "modular-compilation", global = true)]
+    #[serde(default)]
+    pub modular_compilation: bool,
+
     #[clap(flatten)]
     pub compiler_config: CompilerConfig,
 }

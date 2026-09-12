@@ -17,6 +17,7 @@ pub mod pipeline;
 pub mod plan_builder;
 pub mod xir;
 pub mod xir_export;
+pub mod xir_hash;
 pub mod xir_interface_generator;
 
 use crate::{
