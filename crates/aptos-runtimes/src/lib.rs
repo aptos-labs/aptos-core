@@ -10,10 +10,25 @@ use tokio::runtime::{Builder, Runtime};
 /// we need to leave space for the thread IDs.
 const MAX_THREAD_NAME_LENGTH: usize = 12;
 
+pub const DEFAULT_MAX_BLOCKING_THREADS: usize = 64;
+
 /// Returns a tokio runtime with named threads.
 /// This is useful for tracking threads when debugging.
 pub fn spawn_named_runtime(thread_name: String, num_worker_threads: Option<usize>) -> Runtime {
     spawn_named_runtime_with_start_hook(thread_name, num_worker_threads, || {})
+}
+
+pub fn spawn_named_runtime_with_blocking_threads(
+    thread_name: String,
+    num_worker_threads: Option<usize>,
+    max_blocking_threads: Option<usize>,
+) -> Runtime {
+    spawn_named_runtime_with_start_hook_and_blocking_threads(
+        thread_name,
+        num_worker_threads,
+        max_blocking_threads,
+        || {},
+    )
 }
 
 pub fn spawn_named_runtime_with_start_hook<F>(
@@ -24,8 +39,23 @@ pub fn spawn_named_runtime_with_start_hook<F>(
 where
     F: Fn() + Send + Sync + 'static,
 {
-    const MAX_BLOCKING_THREADS: usize = 64;
+    spawn_named_runtime_with_start_hook_and_blocking_threads(
+        thread_name,
+        num_worker_threads,
+        None,
+        on_thread_start,
+    )
+}
 
+pub fn spawn_named_runtime_with_start_hook_and_blocking_threads<F>(
+    thread_name: String,
+    num_worker_threads: Option<usize>,
+    max_blocking_threads: Option<usize>,
+    on_thread_start: F,
+) -> Runtime
+where
+    F: Fn() + Send + Sync + 'static,
+{
     // Verify the given name has an appropriate length
     if thread_name.len() > MAX_THREAD_NAME_LENGTH {
         panic!(
@@ -47,7 +77,7 @@ where
         .disable_lifo_slot()
         // Limit concurrent blocking tasks from spawn_blocking(), in case, for example, too many
         // Rest API calls overwhelm the node.
-        .max_blocking_threads(MAX_BLOCKING_THREADS)
+        .max_blocking_threads(max_blocking_threads.unwrap_or(DEFAULT_MAX_BLOCKING_THREADS))
         .enable_all();
     if let Some(num_worker_threads) = num_worker_threads {
         builder.worker_threads(num_worker_threads);
