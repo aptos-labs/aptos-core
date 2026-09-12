@@ -1047,3 +1047,37 @@ async fn test_storage_refund_exceeds_gas_fee() {
         "Net should equal storage_refund - gas_fee"
     );
 }
+
+#[tokio::test]
+async fn test_extract_transfer_rejects_negative_deposit() {
+    use crate::types::{Amount, Operation, OperationIdentifier, Transfer};
+
+    let context = test_rosetta_context().await;
+    let sender = AccountAddress::ONE;
+    let receiver = AccountAddress::TWO;
+
+    let op = |index: u64, op_type: OperationType, account: AccountAddress, value: &str| Operation {
+        operation_identifier: OperationIdentifier { index },
+        operation_type: op_type.to_string(),
+        status: None,
+        account: Some(AccountIdentifier::base_account(account)),
+        amount: Some(Amount {
+            value: value.to_string(),
+            currency: native_coin(),
+        }),
+        metadata: None,
+    };
+
+    // Signs flipped: the withdraw is positive and the deposit is negative.
+    let operations = vec![
+        op(0, OperationType::Withdraw, sender, "5"),
+        op(1, OperationType::Deposit, receiver, "-5"),
+    ];
+
+    let result = Transfer::extract_transfer(&context, &operations);
+    assert!(
+        result.is_err(),
+        "negative deposit amount must be rejected, got {:?}",
+        result.map(|t| t.amount.0)
+    );
+}
