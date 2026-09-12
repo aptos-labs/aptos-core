@@ -9,7 +9,30 @@ use aptos_framework::{
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
-use std::{collections::BTreeMap, fmt, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    ffi::OsStr,
+    fmt, fs,
+    path::{Component, Path},
+};
+
+/// On-chain package metadata names (the package name and each module name) are not
+/// constrained to Move identifiers, so a published package can carry a name such as
+/// `../../evil`. Reject anything that is not a single, non-traversing path component
+/// before it is joined onto an output directory, so writing a downloaded package can
+/// never escape that directory.
+pub(crate) fn ensure_safe_name(name: &str) -> anyhow::Result<()> {
+    let mut components = Path::new(name).components();
+    let single_component = matches!(
+        (components.next(), components.next()),
+        (Some(Component::Normal(component)), None) if component == OsStr::new(name)
+    );
+    if single_component {
+        Ok(())
+    } else {
+        bail!("unsafe name in package metadata: {:?}", name)
+    }
+}
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
 // we need to use tables for the package registry.
@@ -170,6 +193,7 @@ impl CachedPackageMetadata<'_> {
                     println!("module without code: {}", module.name);
                 },
                 false => {
+                    ensure_safe_name(&module.name)?;
                     let source = unzip_metadata_str(&module.source)?;
                     fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
                 },
@@ -184,6 +208,7 @@ impl CachedPackageMetadata<'_> {
         module_name: &str,
         bytecode: &[u8],
     ) -> anyhow::Result<()> {
+        ensure_safe_name(module_name)?;
         let bytecode_dir = path.join(CompiledPackageLayout::CompiledModules.path());
         fs::create_dir_all(&bytecode_dir)?;
         fs::write(bytecode_dir.join(format!("{}.mv", module_name)), bytecode)?;
@@ -252,5 +277,74 @@ impl CachedModuleMetadata<'_> {
 
     pub fn zipped_source_map_raw(&self) -> &[u8] {
         &self.metadata.source_map
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_framework::zip_metadata_str;
+
+    fn package(modules: Vec<ModuleMetadata>) -> PackageMetadata {
+        PackageMetadata {
+            name: "pkg".to_string(),
+            upgrade_policy: UpgradePolicy { policy: 1 },
+            upgrade_number: 0,
+            source_digest: String::new(),
+            manifest: zip_metadata_str("[package]\nname = \"pkg\"\n").unwrap(),
+            modules,
+            deps: vec![],
+            extension: None,
+        }
+    }
+
+    #[test]
+    fn ensure_safe_name_accepts_plain_names() {
+        for name in ["pkg", "my_module", "Module1", "my.pkg"] {
+            assert!(ensure_safe_name(name).is_ok(), "{name} should be allowed");
+        }
+    }
+
+    #[test]
+    fn ensure_safe_name_rejects_traversal() {
+        for name in ["..", "../evil", "a/b", "/abs", "", ".", "sub/../../evil"] {
+            assert!(ensure_safe_name(name).is_err(), "{name} should be rejected");
+        }
+    }
+
+    #[test]
+    fn save_bytecode_to_disk_refuses_traversal() {
+        let pkg = package(vec![]);
+        let cached = CachedPackageMetadata { metadata: &pkg };
+        let dir = tempfile::tempdir().unwrap();
+
+        // A malicious on-chain module name must not escape the destination directory.
+        assert!(cached
+            .save_bytecode_to_disk(dir.path(), "../../escape", b"payload")
+            .is_err());
+
+        // A normal name still writes under the destination.
+        cached
+            .save_bytecode_to_disk(dir.path(), "counter", b"payload")
+            .unwrap();
+        assert!(dir
+            .path()
+            .join(CompiledPackageLayout::CompiledModules.path())
+            .join("counter.mv")
+            .exists());
+    }
+
+    #[test]
+    fn save_package_to_disk_refuses_module_name_traversal() {
+        let pkg = package(vec![ModuleMetadata {
+            name: "../../evil".to_string(),
+            source: zip_metadata_str("module {}").unwrap(),
+            source_map: vec![],
+            extension: None,
+        }]);
+        let cached = CachedPackageMetadata { metadata: &pkg };
+        let dir = tempfile::tempdir().unwrap();
+
+        assert!(cached.save_package_to_disk(dir.path()).is_err());
     }
 }
