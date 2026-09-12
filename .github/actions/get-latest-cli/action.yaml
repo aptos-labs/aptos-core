@@ -17,5 +17,7 @@ runs:
         curl -fsSL "https://aptos.dev/scripts/install_cli.py" > install_cli.py
     - name: Run installation script
       shell: bash
+      env:
+        DESTINATION_DIRECTORY: ${{ inputs.destination_directory }}
       run: |
-        python3 install_cli.py --bin-dir ${{ inputs.destination_directory }}
+        python3 install_cli.py --bin-dir "$DESTINATION_DIRECTORY"
