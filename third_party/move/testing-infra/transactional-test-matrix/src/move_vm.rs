@@ -170,4 +170,5 @@ pub static MOVE_VM: Corpus<MoveVmPayload> = Corpus {
     separate_baseline: SEPARATE_BASELINE,
     // Applicable configs run the same payload on V1 and MonoMove.
     effective_payload: |payload, _backend| payload.clone(),
+    mono_move_divergences: &[],
 };
