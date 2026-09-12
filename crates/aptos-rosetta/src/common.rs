@@ -3,6 +3,7 @@
 
 use crate::{
     error::{ApiError, ApiResult},
+    node_client::NodeClient,
     types::{
         Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
         APTOS_COIN_MODULE, APTOS_COIN_RESOURCE,
@@ -22,7 +23,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashSet, convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
-/// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
+/// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations.
+///
+/// Aptos genesis timestamps are ~0, so anything older than this is clamped up to it.
+/// See docs/SPEC_DEVIATIONS.md §3.
 pub const Y2K_MS: u64 = 946713600000;
 pub const BLOCKCHAIN: &str = "aptos";
 
@@ -99,7 +103,7 @@ where
 
 /// Retrieves an account's information by its address
 pub async fn get_account(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &dyn NodeClient,
     address: AccountAddress,
 ) -> ApiResult<Response<Account>> {
     rest_client
@@ -108,16 +112,13 @@ pub async fn get_account(
         .map_err(|_| ApiError::AccountNotFound(Some(address.to_string())))
 }
 
-/// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
+/// Converts an Aptos microsecond timestamp to a Rosetta millisecond timestamp.
+///
+/// Rosetta requires timestamps at or after the year 2000; older values are clamped
+/// up to [`Y2K_MS`]. See docs/SPEC_DEVIATIONS.md §3.
 pub fn get_timestamp(timestamp_usecs: u64) -> u64 {
-    // note: timestamps are in microseconds, so we convert to milliseconds
-    let mut timestamp = timestamp_usecs / 1000;
-
-    // Rosetta doesn't like timestamps before 2000
-    if timestamp < Y2K_MS {
-        timestamp = Y2K_MS;
-    }
-    timestamp
+    let timestamp_ms = timestamp_usecs / 1000;
+    timestamp_ms.max(Y2K_MS)
 }
 
 /// Strips the `0x` prefix on hex strings
@@ -151,7 +152,9 @@ const APT_DECIMALS: u8 = 8;
 
 /// Provides the [Currency] for 0x1::aptos_coin::AptosCoin aka APT
 ///
-/// Note that 0xA is the address for FA, but it has to be skipped in order to have backwards compatibility
+/// Note that 0xA is APT's FA metadata address, but `fa_address` is deliberately left
+/// `None` here for backwards compatibility (integrators keyed off `move_type`).
+/// [`is_native_coin`] still recognizes `0xA` as APT. See docs/SPEC_DEVIATIONS.md §5.
 pub fn native_coin() -> Currency {
     Currency {
         symbol: APT_SYMBOL.to_string(),
@@ -173,6 +176,11 @@ pub fn native_coin_tag() -> TypeTag {
     }))
 }
 
+/// Whether an FA metadata address is APT's (`0xA`).
+///
+/// APT is exposed as a coin currency (see [`native_coin`]), but its FA store uses the
+/// `0xA` metadata address; this short-circuits FA lookups back to APT.
+/// See docs/SPEC_DEVIATIONS.md §5.
 #[inline]
 pub fn is_native_coin(fa_address: AccountAddress) -> bool {
     fa_address == AccountAddress::TEN
@@ -183,6 +191,9 @@ const USDC_DECIMALS: u8 = 6;
 const USDC_ADDRESS: &str = "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b";
 const USDC_TESTNET_ADDRESS: &str =
     "0x69091fbab5f7d635ee7ac5098cf0c1efbe31d68fec0f2cd565e8d168daf52832";
+/// The hardcoded mainnet USDC [Currency] (added automatically by chain).
+///
+/// See docs/SPEC_DEVIATIONS.md §5.
 pub fn usdc_currency() -> Currency {
     Currency {
         symbol: USDC_SYMBOL.to_string(),
@@ -194,6 +205,9 @@ pub fn usdc_currency() -> Currency {
     }
 }
 
+/// The hardcoded testnet USDC [Currency] (added automatically by chain).
+///
+/// See docs/SPEC_DEVIATIONS.md §5.
 pub fn usdc_testnet_currency() -> Currency {
     Currency {
         symbol: USDC_SYMBOL.to_string(),
@@ -205,6 +219,9 @@ pub fn usdc_testnet_currency() -> Currency {
     }
 }
 
+/// Finds a supported [Currency] whose `move_type` matches the given coin type tag.
+///
+/// Coin currencies are keyed by their Move type. See docs/SPEC_DEVIATIONS.md §5.
 pub fn find_coin_currency(currencies: &HashSet<Currency>, type_tag: &TypeTag) -> Option<Currency> {
     currencies
         .iter()
@@ -221,6 +238,10 @@ pub fn find_coin_currency(currencies: &HashSet<Currency>, type_tag: &TypeTag) ->
         })
         .cloned()
 }
+/// Finds a supported [Currency] whose `fa_address` matches the given FA metadata address.
+///
+/// `0xA` short-circuits to APT ([`native_coin`]) since APT is exposed as a coin currency.
+/// FA currencies are keyed by their metadata address. See docs/SPEC_DEVIATIONS.md §5.
 pub fn find_fa_currency(
     currencies: &HashSet<Currency>,
     metadata_address: AccountAddress,
@@ -248,9 +269,12 @@ pub fn find_fa_currency(
     }
 }
 
-/// Determines which block to pull for the request
+/// Determines which block to pull for the request.
 ///
-/// Inputs can give hash, index, or both
+/// A [`PartialBlockIdentifier`] may carry an index, a hash, both, or neither. Unlike
+/// the spec (which expects one or the other), this accepts both and silently prefers
+/// `index` without checking the two agree; a missing identifier resolves to the latest
+/// block. See docs/SPEC_DEVIATIONS.md §2.
 pub async fn get_block_index_from_request(
     server_context: &RosettaContext,
     partial_block_identifier: Option<PartialBlockIdentifier>,
@@ -294,7 +318,7 @@ pub async fn get_block_index_from_request(
 /// BlockHash is not actually the block hash!  This was a hack put in, since we don't actually have
 /// [BlockHash] indexable.  Instead, it just returns the combination of [ChainId] and the block_height (aka index).
 ///
-/// The [BlockHash] string format is `chain_id-block_height`
+/// The [BlockHash] string format is `chain_id-block_height`. See docs/SPEC_DEVIATIONS.md §2.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BlockHash {
     chain_id: ChainId,
