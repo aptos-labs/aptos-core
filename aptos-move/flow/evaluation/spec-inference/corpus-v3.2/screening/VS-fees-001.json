@@ -9,7 +9,7 @@
   "target": "decibel_vault::vault_share_math::calculate_unrealized_fees",
   "task_id": "VS-fees-001",
   "threshold_seconds": 20,
-  "wall_seconds": 2.7,
+  "wall_seconds": 2.8,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true
