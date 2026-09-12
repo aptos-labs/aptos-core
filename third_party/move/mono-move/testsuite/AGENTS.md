@@ -25,3 +25,14 @@ Each input with a `--print` section has a `<name>.exp` baseline. Baselines are v
 cargo test -p mono-move-testsuite --test differential          # verify against baselines
 UPBL=1 cargo test -p mono-move-testsuite --test differential   # update baselines
 ```
+
+## Transactional Tests
+
+`tests/transactional.rs` runs the compiler-v2 transactional corpus on MonoVM through the shared framework (`move-transactional-test-runner`), against V1-vm's canonical `.exp` baselines, which this suite cannot update. Trial selection comes from `move-transactional-test-matrix`.
+
+A source whose MonoVM output legitimately differs is listed in the matrix crate's `mono_move_divergences` (with a category and reason) and runs against a MonoVM-owned override under `transactional-baselines/<corpus>/<path>.<config>.exp`. The manifest entry authorizes the override: add the entry, then run with `UB=1` to create or refresh the file. Startup rejects override files without an entry or an active trial, entries with no active trial, and overrides identical to the canonical baseline (the divergence has closed; remove both).
+
+```bash
+cargo test -p mono-move-testsuite --test transactional          # verify
+UB=1 cargo test -p mono-move-testsuite --test transactional     # create or refresh overrides
+```

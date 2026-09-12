@@ -6,8 +6,10 @@
 //! gets wrong is a failure.
 
 use crate::{
-    engine::build_natives, extensions::seed_extensions, module_provider::InMemoryModuleProvider,
-    resource_provider::InMemoryResourceProvider,
+    engine::build_natives,
+    extensions::seed_extensions,
+    module_provider::InMemoryModuleProvider,
+    resource_provider::{InMemoryResourceProvider, MATERIALIZATION_HEAP_SIZE},
 };
 use aptos_types::on_chain_config::{Features, OnChainConfig};
 use legacy_move_compiler::unit_test::{ExpectedFailure, NamedOrBytecodeModule, TestCase};
@@ -95,10 +97,6 @@ fn module_of(info: &NamedOrBytecodeModule) -> &CompiledModule {
     }
 }
 
-/// Heap for the seeded `Features` resource. Only that one small resource lives
-/// here, so a modest fixed size is plenty.
-const RESOURCE_HEAP_SIZE: usize = 1 << 20;
-
 /// Builds a resource provider publishing the framework `Features` resource at
 /// `0x1`, initialized to [`Features::default_for_tests`].
 fn seed_features<'guard, 'ctx>(
@@ -110,7 +108,7 @@ fn seed_features<'guard, 'ctx>(
     let ty = guard.nominal_of(module_id, name, guard.type_list_of(&[]));
     let bytes = bcs::to_bytes(&Features::default_for_tests()).expect("Features serializes");
 
-    let mut provider = InMemoryResourceProvider::new(guard, RESOURCE_HEAP_SIZE);
+    let mut provider = InMemoryResourceProvider::new(guard, MATERIALIZATION_HEAP_SIZE);
     provider.add_resource(struct_tag.address, ty, bytes);
     provider
 }
@@ -206,6 +204,7 @@ fn execute(
             code,
             message,
             location,
+            ..
         }) => TestResult::Failure(MoveError(
             StatusCode::ABORTED,
             Some(code),

@@ -24,6 +24,7 @@ use move_binary_format::{
     file_format::CompiledScript,
     CompiledModule,
 };
+use move_bytecode_utils::layout::TypeLayoutBuilder;
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
     address::{NumericalAddress, ParsedAddress},
@@ -313,11 +314,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 merge_output(trace_str, rendered_return_value)
             },
             Err(err) => {
-                let err = anyhow!(
-                    "Function execution failed with VMError: {}",
-                    err.format_test_output(move_test_debug() || verbose)
-                );
-                let err_str = Some(format!("Error: {}", err));
+                let err_str = Some(format!(
+                    "Error: {}",
+                    function_execution_error(&err, verbose)
+                ));
                 merge_output(trace_str, err_str)
             },
         }
@@ -330,25 +330,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        let tag = StructTag {
-            address: *module.address(),
-            module: module.name().to_owned(),
-            name: resource.to_owned(),
-            type_args,
-        };
-        match self
-            .storage
-            .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
-            .unwrap()
-            .0
-        {
-            None => Ok("[No Resource Exists]".to_owned()),
-            Some(data) => {
-                let annotated =
-                    MoveValueAnnotator::new(self.storage.clone()).view_resource(&tag, &data)?;
-                Ok(format!("{}", annotated))
-            },
-        }
+        view_resource(&self.storage, address, module, resource, type_args)
     }
 
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
@@ -367,6 +349,72 @@ pub fn publish_error(module_id: &ModuleId, err: &VMError, verbose: bool) -> anyh
         module_id,
         err.format_test_output(move_test_debug() || verbose)
     )
+}
+
+/// Formats a function execution failure for transactional test baselines.
+pub fn function_execution_error(err: &VMError, verbose: bool) -> anyhow::Error {
+    anyhow!(
+        "Function execution failed with VMError: {}",
+        err.format_test_output(move_test_debug() || verbose)
+    )
+}
+
+/// Renders the resource of type `module::resource<type_args>` at `address`
+/// from `storage`.
+pub fn view_resource(
+    storage: &InMemoryStorage,
+    address: AccountAddress,
+    module: &ModuleId,
+    resource: &IdentStr,
+    type_args: Vec<TypeTag>,
+) -> Result<String> {
+    let tag = StructTag {
+        address: *module.address(),
+        module: module.name().to_owned(),
+        name: resource.to_owned(),
+        type_args,
+    };
+    match storage
+        .get_resource_bytes_with_metadata_and_layout(&address, &tag, &[], None)
+        .unwrap()
+        .0
+    {
+        None => Ok("[No Resource Exists]".to_owned()),
+        Some(data) => {
+            let annotated = MoveValueAnnotator::new(storage.clone()).view_resource(&tag, &data)?;
+            Ok(format!("{}", annotated))
+        },
+    }
+}
+
+/// The runtime layout of `tag`, resolving struct definitions through
+/// `storage`. The builder refuses `signer`, which a test function may still
+/// return, so signers and the vectors around them are built here.
+// TODO(completeness): the builder also rejects enums and signer- or
+// function-typed fields, which V1's loader-derived layouts render.
+pub fn type_layout(storage: &InMemoryStorage, tag: &TypeTag) -> Result<MoveTypeLayout> {
+    match tag {
+        TypeTag::Signer => Ok(MoveTypeLayout::Signer),
+        TypeTag::Vector(elem) => Ok(MoveTypeLayout::Vector(Box::new(type_layout(
+            storage, elem,
+        )?))),
+        TypeTag::Bool
+        | TypeTag::U8
+        | TypeTag::U16
+        | TypeTag::U32
+        | TypeTag::U64
+        | TypeTag::U128
+        | TypeTag::U256
+        | TypeTag::I8
+        | TypeTag::I16
+        | TypeTag::I32
+        | TypeTag::I64
+        | TypeTag::I128
+        | TypeTag::I256
+        | TypeTag::Address
+        | TypeTag::Struct(_)
+        | TypeTag::Function(_) => TypeLayoutBuilder::build_runtime(tag, storage),
+    }
 }
 
 /// Deserializes a value using `storage` to resolve function argument types
