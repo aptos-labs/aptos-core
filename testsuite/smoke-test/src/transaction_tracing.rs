@@ -179,9 +179,10 @@ async fn test_transaction_tracing() {
 
         // Every populated `*_ms` per-stage field must be a plain JSON number
         // (not an array — the schema emits scalars for the first pipeline
-        // pass only). Most stages use the local clock and are non-negative;
-        // `block_proposed_ms` can be negative due to cross-validator clock
-        // skew. We also assert no value exceeds `total_latency_ms` (the
+        // pass only). Most stages use the local clock and are non-negative.
+        // API stages before MempoolInsert are negative by definition, while
+        // block proposal timestamps can be negative due to cross-validator
+        // clock skew. We also assert no stage value exceeds `total_latency_ms` (the
         // structured scalars only cover attempt 1; for a retried trace,
         // total_latency reflects later attempts and stays >= scalar max).
         for (key, val) in trace.as_object().expect("trace must be object").iter() {
@@ -192,22 +193,31 @@ async fn test_transaction_tracing() {
                 Some(n) => n,
                 None => panic!("{} must be i64, got {}", key, val),
             };
-            // Most stages use local clocks and are non-negative;
-            // `block_proposed_ms` and `parent_block_proposed_ms` record
-            // foreign-block timestamps (proposer's clock for the child and
-            // parent blocks) and can be negative due to cross-validator
-            // clock skew.
-            if key != "block_proposed_ms" && key != "parent_block_proposed_ms" {
+            // API stages before MempoolInsert and foreign block timestamps
+            // are the only absolute stage latencies allowed to be negative.
+            let can_be_negative = matches!(
+                key.as_str(),
+                "api_handler_enter_ms"
+                    | "api_transaction_decoded_ms"
+                    | "api_mempool_submit_ms"
+                    | "block_proposed_ms"
+                    | "parent_block_proposed_ms"
+            );
+            if !can_be_negative {
                 assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
             }
-            assert!(
-                d <= total_latency_ms,
-                "{} = {} exceeds total_latency_ms = {} (hash={})",
-                key,
-                d,
-                total_latency_ms,
-                hash
-            );
+            // api_to_mempool_ms is an interval preceding the mempool-relative
+            // total and can legitimately be larger than that total.
+            if key != "api_to_mempool_ms" {
+                assert!(
+                    d <= total_latency_ms,
+                    "{} = {} exceeds total_latency_ms = {} (hash={})",
+                    key,
+                    d,
+                    total_latency_ms,
+                    hash
+                );
+            }
         }
 
         if outcome == "committed" {

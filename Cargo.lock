@@ -464,6 +464,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-storage-interface",
  "aptos-transaction-filters",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-vm",
  "bcs 0.1.4",
