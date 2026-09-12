@@ -4,16 +4,19 @@
 
 """Compare mono-move criterion benches against a baseline and gate on regressions.
 
-This reads the JSON criterion writes under `target/criterion/<id>/`:
+Every mono bench is measured several ways; `config.json` lists the metrics and
+names the one that gates. criterion writes each measurement under
+`target/criterion/<bench id>/<metric>/`:
   - `change/estimates.json` exists after a `--baseline <name>` run and holds the
     relative change of this run vs the baseline. Its `mean`/`median` values are
-    ratios (`new/old - 1`), so `+0.05` means 5% slower.
-  - `new/estimates.json` holds the current run's absolute estimates, in
-    nanoseconds per iteration.
+    ratios (`new/old - 1`), so `+0.05` means 5% more.
+  - `new/estimates.json` and `<baseline>/estimates.json` hold absolute
+    per-iteration estimates: nanoseconds for `time`, plain counts otherwise.
 
-The verdict uses the `mean` estimate's confidence interval: a regression needs the
-whole CI above the noise threshold `T`, an improvement needs it below `-T`,
-otherwise the change is within noise.
+The verdict uses the gate metric's `mean` confidence interval: a regression
+needs the whole CI above the noise threshold `T`, an improvement needs it below
+`-T`, otherwise the change is within noise. The other metrics are shown for
+context and never fail the gate.
 """
 
 import argparse
@@ -30,11 +33,15 @@ NOISE = "noise"
 NEW = "new"
 ABSENT = "absent"
 
+BASELINE = "main"
+
 
 def load_config(path):
     with open(path) as f:
         cfg = json.load(f)
-    # `threshold_percent` is a percentage (3.0 == 3%); the CI bounds are ratios.
+    if cfg["gate_metric"] not in cfg["metrics"]:
+        sys.exit(f"config: gate_metric {cfg['gate_metric']!r} is not in metrics {cfg['metrics']}")
+    # `threshold_percent` is a percentage (1.0 == 1%); the CI bounds are ratios.
     cfg["threshold"] = cfg["threshold_percent"] / 100.0
     return cfg
 
@@ -47,12 +54,10 @@ def read_estimates(path):
 
 
 def fmt_pct(ratio):
-    return f"{ratio * 100:+.1f}%"
+    return f"{ratio * 100:+.2f}%"
 
 
 def fmt_ns(ns):
-    if ns is None:
-        return "n/a"
     if ns < 1_000.0:
         return f"{ns:.1f}ns"
     if ns < 1_000_000.0:
@@ -62,57 +67,73 @@ def fmt_ns(ns):
     return f"{ns / 1_000_000_000.0:.2f}s"
 
 
-def classify(change, threshold):
-    """Verdict for a change `mean` estimate: regression if the whole CI is above
+def fmt_count(count):
+    if count < 1_000.0:
+        return f"{count:.0f}"
+    if count < 1_000_000.0:
+        return f"{count / 1_000.0:.2f}K"
+    if count < 1_000_000_000.0:
+        return f"{count / 1_000_000.0:.3f}M"
+    return f"{count / 1_000_000_000.0:.3f}G"
+
+
+def fmt_value(metric, value):
+    if value is None:
+        return "n/a"
+    return fmt_ns(value) if metric == "time" else fmt_count(value)
+
+
+def read_metric(criterion_dir, bench_id, metric):
+    """One bench's estimates for one metric, or None if it produced no results."""
+    metric_dir = criterion_dir / bench_id / metric
+    new = read_estimates(metric_dir / "new" / "estimates.json")
+    if new is None:
+        return None
+    base = read_estimates(metric_dir / BASELINE / "estimates.json")
+    change = read_estimates(metric_dir / "change" / "estimates.json")
+    result = {
+        "new_median": new["median"]["point_estimate"],
+        "base_median": base["median"]["point_estimate"] if base else None,
+        "mean_pct": None,
+        "ci_lo": None,
+        "ci_hi": None,
+    }
+    if change is not None:
+        ci = change["mean"]["confidence_interval"]
+        result["mean_pct"] = change["mean"]["point_estimate"]
+        result["ci_lo"] = ci["lower_bound"]
+        result["ci_hi"] = ci["upper_bound"]
+    return result
+
+
+def classify(metric, threshold):
+    """Verdict for a metric's change: regression if the whole CI is above
     `threshold`, improvement if below `-threshold`, else noise.
     """
-    ci = change["mean"]["confidence_interval"]
-    lo = ci["lower_bound"]
-    hi = ci["upper_bound"]
-    if lo > threshold:
+    if metric["ci_lo"] > threshold:
         return REGRESSION
-    if hi < -threshold:
+    if metric["ci_hi"] < -threshold:
         return IMPROVEMENT
     return NOISE
 
 
 def evaluate(cfg, criterion_dir):
     """Evaluate every configured mono bench id; return a list of result dicts."""
-    threshold = cfg["threshold"]
     results = []
     for entry in cfg["mono_benches"]:
         bench_id = entry["id"]
-        id_dir = criterion_dir / bench_id
-        change = read_estimates(id_dir / "change" / "estimates.json")
-        new = read_estimates(id_dir / "new" / "estimates.json")
-        base = read_estimates(id_dir / "main" / "estimates.json")
-
-        new_median = new["median"]["point_estimate"] if new else None
-        base_median = base["median"]["point_estimate"] if base else None
-
-        if change is not None:
-            verdict = classify(change, threshold)
-            mean_pct = change["mean"]["point_estimate"]
-            ci = change["mean"]["confidence_interval"]
-            ci_lo, ci_hi = ci["lower_bound"], ci["upper_bound"]
-        elif new is not None:
+        metrics = {m: read_metric(criterion_dir, bench_id, m) for m in cfg["metrics"]}
+        gate = metrics[cfg["gate_metric"]]
+        if gate is None:
+            # Configured bench produced no results (removed, renamed, not run,
+            # or the counter could not be opened).
+            verdict = ABSENT
+        elif gate["mean_pct"] is None:
             # Ran but no baseline to compare against -- a bench new to this PR.
             verdict = NEW
-            mean_pct = ci_lo = ci_hi = None
         else:
-            # Configured bench produced no results (removed, renamed, or not run).
-            verdict = ABSENT
-            mean_pct = ci_lo = ci_hi = None
-
-        results.append({
-            "id": bench_id,
-            "verdict": verdict,
-            "mean_pct": mean_pct,
-            "ci_lo": ci_lo,
-            "ci_hi": ci_hi,
-            "base_median_ns": base_median,
-            "new_median_ns": new_median,
-        })
+            verdict = classify(gate, cfg["threshold"])
+        results.append({"id": bench_id, "verdict": verdict, "metrics": metrics})
     return results
 
 
@@ -125,8 +146,19 @@ VERDICT_CELL = {
 }
 
 
+def fmt_medians(metric, m, with_delta):
+    if m is None:
+        return "n/a"
+    cell = f"{fmt_value(metric, m['base_median'])} → {fmt_value(metric, m['new_median'])}"
+    if with_delta and m["mean_pct"] is not None:
+        cell += f" ({fmt_pct(m['mean_pct'])})"
+    return cell
+
+
 def render_markdown(results, cfg):
+    gate_metric = cfg["gate_metric"]
     threshold_percent = cfg["threshold_percent"]
+    others = [m for m in cfg["metrics"] if m != gate_metric]
     n_reg = sum(1 for r in results if r["verdict"] == REGRESSION)
     n_imp = sum(1 for r in results if r["verdict"] == IMPROVEMENT)
     n_ok = sum(1 for r in results if r["verdict"] == NOISE)
@@ -134,44 +166,49 @@ def render_markdown(results, cfg):
     n_absent = sum(1 for r in results if r["verdict"] == ABSENT)
 
     if n_reg:
-        headline = f"{n_reg} regression(s) beyond ±{threshold_percent:g}% noise band"
+        headline = f"{n_reg} regression(s): `{gate_metric}` beyond ±{threshold_percent:g}%"
     else:
-        headline = f"No regressions beyond ±{threshold_percent:g}% noise band"
+        headline = f"No regressions: `{gate_metric}` within ±{threshold_percent:g}%"
 
+    others_list = ", ".join(f"`{m}`" for m in others)
     lines = [
         "### mono-move benchmark gate",
         "",
         headline,
         "",
         f"`{n_ok} ok · {n_imp} improved · {n_new} new · {n_absent} absent` "
-        f"(threshold T = ±{threshold_percent:g}%, criterion mean CI vs `main`)",
+        f"(gate: criterion mean CI of `{gate_metric}` per iteration vs `{BASELINE}`, "
+        f"T = ±{threshold_percent:g}%; {others_list} are informational)",
         "",
-        "| Benchmark | mean Δ | 95% CI | median (main → PR) | Verdict |",
-        "| --- | ---: | :---: | :---: | :--- |",
+        f"| Benchmark | {gate_metric} Δ | 95% CI | {gate_metric} ({BASELINE} → PR) | "
+        + " | ".join(f"{m} ({BASELINE} → PR)" for m in others)
+        + " | Verdict |",
+        "| --- | ---: | :---: | :---: | " + " | ".join(":---:" for _ in others) + " | :--- |",
     ]
     for r in results:
-        if r["mean_pct"] is None:
-            mean_cell = "n/a"
+        gate = r["metrics"][gate_metric]
+        if gate is None or gate["mean_pct"] is None:
+            delta_cell = "n/a"
             ci_cell = "n/a"
         else:
-            mean_cell = fmt_pct(r["mean_pct"])
-            ci_cell = f"[{fmt_pct(r['ci_lo'])}, {fmt_pct(r['ci_hi'])}]"
-        median_cell = f"{fmt_ns(r['base_median_ns'])} → {fmt_ns(r['new_median_ns'])}"
-        lines.append(
-            f"| `{r['id']}` | {mean_cell} | {ci_cell} | {median_cell} | "
-            f"{VERDICT_CELL[r['verdict']]} |"
-        )
+            delta_cell = fmt_pct(gate["mean_pct"])
+            ci_cell = f"[{fmt_pct(gate['ci_lo'])}, {fmt_pct(gate['ci_hi'])}]"
+        cells = [f"`{r['id']}`", delta_cell, ci_cell, fmt_medians(gate_metric, gate, False)]
+        cells += [fmt_medians(m, r["metrics"][m], True) for m in others]
+        cells.append(VERDICT_CELL[r["verdict"]])
+        lines.append("| " + " | ".join(cells) + " |")
     lines.append("")
     if n_imp:
         lines.append(
-            "> Improvements are not failures. `main` rebaselines on merge, so the "
-            "next PR compares against the faster code automatically."
+            f"> Improvements are not failures. `{BASELINE}` rebaselines on merge, so the "
+            "next PR compares against the improved code automatically."
         )
         lines.append("")
     if n_absent:
         lines.append(
-            "> `absent` means a configured bench produced no results (removed, or "
-            "not run). Update `benches/perf/config.json` if a bench was renamed."
+            f"> `absent` means `{gate_metric}` produced no results for a configured bench "
+            "(removed, not run, or the hardware counter could not be opened). Update "
+            "`benches/perf/config.json` if a bench was renamed."
         )
         lines.append("")
     return "\n".join(lines) + "\n"
@@ -183,13 +220,20 @@ def emit_json_lines(results, cfg):
             "grep": "grep_json_mono_move_bench",
             "id": r["id"],
             "verdict": r["verdict"],
-            "mean_pct": None if r["mean_pct"] is None else r["mean_pct"] * 100.0,
-            "ci_lo_pct": None if r["ci_lo"] is None else r["ci_lo"] * 100.0,
-            "ci_hi_pct": None if r["ci_hi"] is None else r["ci_hi"] * 100.0,
-            "base_median_ns": r["base_median_ns"],
-            "new_median_ns": r["new_median_ns"],
+            "gate_metric": cfg["gate_metric"],
             "threshold_percent": cfg["threshold_percent"],
         }
+        for metric, m in r["metrics"].items():
+            if m is None:
+                line[metric] = None
+                continue
+            line[metric] = {
+                "mean_pct": None if m["mean_pct"] is None else m["mean_pct"] * 100.0,
+                "ci_lo_pct": None if m["ci_lo"] is None else m["ci_lo"] * 100.0,
+                "ci_hi_pct": None if m["ci_hi"] is None else m["ci_hi"] * 100.0,
+                "base_median": m["base_median"],
+                "new_median": m["new_median"],
+            }
         print(json.dumps(line))
 
 
@@ -213,27 +257,30 @@ def cmd_calibrate_noise(args, cfg):
     """Report the runner's observed noise floor from a `main`-vs-`main` A/B.
 
     With identical code on both sides every change should be ~0; the largest CI
-    bound magnitude across benches is the floor `T` must sit above.
+    bound magnitude across benches is the floor `T` must sit above. Every
+    metric is reported, but only the gate metric drives the suggestion.
     """
     criterion_dir = Path(args.criterion_dir)
-    floor = 0.0
-    print(f"{'benchmark':<28} {'mean Δ':>9} {'|CI| max':>9}")
+    metrics = cfg["metrics"]
+    floors = {m: 0.0 for m in metrics}
+    print(f"{'benchmark':<28}" + "".join(f" {m + ' |CI| max':>22}" for m in metrics))
     for entry in cfg["mono_benches"]:
-        bench_id = entry["id"]
-        change = read_estimates(criterion_dir / bench_id / "change" / "estimates.json")
-        if change is None:
-            print(f"{bench_id:<28} {'n/a':>9} {'n/a':>9}")
-            continue
-        ci = change["mean"]["confidence_interval"]
-        ci_max = max(abs(ci["lower_bound"]), abs(ci["upper_bound"]))
-        floor = max(floor, ci_max)
-        print(f"{bench_id:<28} {fmt_pct(change['mean']['point_estimate']):>9} "
-              f"{fmt_pct(ci_max):>9}")
+        row = f"{entry['id']:<28}"
+        for metric in metrics:
+            m = read_metric(criterion_dir, entry["id"], metric)
+            if m is None or m["mean_pct"] is None:
+                row += f" {'n/a':>22}"
+                continue
+            ci_max = max(abs(m["ci_lo"]), abs(m["ci_hi"]))
+            floors[metric] = max(floors[metric], ci_max)
+            row += f" {fmt_pct(ci_max):>22}"
+        print(row)
     # Suggest T as the floor rounded up to the next 0.5%, plus a 0.5% margin.
-    floor_pct = floor * 100.0
+    gate_metric = cfg["gate_metric"]
+    floor_pct = floors[gate_metric] * 100.0
     suggested = math.ceil(floor_pct / 0.5) * 0.5 + 0.5
     print()
-    print(f"observed noise floor: {floor_pct:.2f}%")
+    print(f"observed {gate_metric} noise floor: {floor_pct:.3f}%")
     print(f"suggested threshold_percent: {suggested:.1f}  (set in config.json)")
     return 0
 
