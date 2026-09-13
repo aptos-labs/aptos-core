@@ -157,6 +157,7 @@ Run 11 is an independent stochastic sample, so its token totals cannot retroacti
 
 ## Evidence
 
+- [Sol-versus-Terra QP and retry-penalty analysis](corpus3.2-sol56-terra56-qp-penalty-comparison.md)
 - [Opus 5 report](corpus3.2-run9-opus5-foundry.md) and [archive](corpus3.2-run9-opus5-foundry.tar.gz)
 - [Sol 5.6 exact report](corpus3.2-run11-codex-sol56-high-exact-cost.md) and [archive](corpus3.2-run11-codex-sol56-high-exact-cost.tar.gz)
 - [Terra 5.6 exact report](corpus3.2-run10-codex-terra56-high-exact-cost.md) and [archive](corpus3.2-run10-codex-terra56-high-exact-cost.tar.gz)
