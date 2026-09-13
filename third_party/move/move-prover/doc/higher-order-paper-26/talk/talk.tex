@@ -1,0 +1,698 @@
+% FMCAD'26 talk: Formal Verification of Imperative First-Class Functions in Move
+% Build: latexmk talk.tex   (esz.sty is picked up from .. via latexmkrc)
+% Timing: ~15 min talk + 5 min discussion; backup slides after \appendix.
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme[progressbar=frametitle,numbering=fraction,block=fill]{metropolis}
+\input{prelude-talk.tex}
+
+\setbeamercolor{frametitle}{bg=mNavy, fg=white}
+\setbeamercolor{progress bar}{fg=mBlue!70!white, bg=mBlue!15}
+\makeatletter\setlength{\metropolis@progressinheadfoot@linewidth}{2.5pt}\makeatother
+\setbeamercolor{palette primary}{bg=mNavy, fg=white}
+\setbeamercolor{normal text}{fg=mBlue!25!black}
+\setbeamercolor{alerted text}{fg=mBlue}
+\setbeamerfont{frametitle}{size=\large}
+% Metropolis sizes the title page to \paperheight, which overfills the frame by
+% a fixed amount; use \textheight instead.
+\makeatletter
+\setbeamertemplate{title page}{
+  \begin{minipage}[b][\dimexpr\textheight-12pt\relax]{\textwidth}
+    \ifx\inserttitlegraphic\@empty\else\usebeamertemplate*{title graphic}\fi
+    \vfill%
+    \ifx\inserttitle\@empty\else\usebeamertemplate*{title}\fi
+    \ifx\insertsubtitle\@empty\else\usebeamertemplate*{subtitle}\fi
+    \usebeamertemplate*{title separator}
+    \ifx\beamer@shortauthor\@empty\else\usebeamertemplate*{author}\fi
+    \ifx\insertdate\@empty\else\usebeamertemplate*{date}\fi
+    \ifx\insertinstitute\@empty\else\usebeamertemplate*{institute}\fi
+    \vfill
+  \end{minipage}
+}
+\makeatother
+% Centered cover: title, subtitle, authors, and affiliation.
+\setbeamertemplate{title}{\centering\linespread{1.0}\inserttitle\par\vspace*{0.5em}}
+\setbeamertemplate{subtitle}{\centering\insertsubtitle\par\vspace*{0.5em}}
+\setbeamertemplate{author}{\vspace*{2em}\centering\insertauthor\par\vspace*{0.25em}}
+\setbeamertemplate{institute}{\vspace*{3mm}\centering\insertinstitute\par}
+\setbeamersize{text margin left=1.5em,text margin right=1.5em}
+% No footline; the frame number sits right-aligned in the title bar, so it
+% never collides with content.  Backup frames are numbered separately.
+\setbeamertemplate{footline}{}
+\setbeamertemplate{navigation symbols}{}
+\usepackage{appendixnumberbeamer}
+\makeatletter
+% Metropolis resets the frametitle template at \appendix, so the template is
+% wrapped in a macro and re-applied there.
+\newcommand{\talkframetitle}{%
+  \setbeamertemplate{frametitle}{%
+    \nointerlineskip%
+  \begin{beamercolorbox}[wd=\paperwidth, sep=0pt,
+      leftskip=\metropolis@frametitle@padding, rightskip=\metropolis@frametitle@padding]{frametitle}%
+  \metropolis@frametitlestrut@start%
+  \insertframetitle%
+  \nolinebreak%
+  \hfill{\normalfont\small\insertframenumber/\inserttotalframenumber}%
+  \metropolis@frametitlestrut@end%
+  \end{beamercolorbox}%
+  }%
+  \addtobeamertemplate{frametitle}{}{\usebeamertemplate*{progress bar in head/foot}}%
+}
+\makeatother
+\talkframetitle
+
+\title{Formal Verification of\\Imperative First-Class Functions in Move}
+\subtitle{FMCAD 2026}
+\author{Wolfgang Grieskamp \and Teng Zhang \and Vineeth Kashyap \and Jake Silverman}
+\institute{Aptos Labs, Palo Alto, USA}
+\date{}
+
+\begin{document}
+
+% Cover in the same style as the closing standout frame: blue canvas, white text.
+{
+  \setbeamercolor{background canvas}{bg=mNavy}
+  \setbeamercolor{normal text}{fg=white}
+  \setbeamercolor{title separator}{fg=mNavy!40!white}
+  \usebeamercolor[fg]{normal text}
+  \maketitle
+}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Why Formal Methods for Smart Contracts}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item Large assets, irreversible transactions.
+        \item Well-resourced adversaries: state actors took \$2B in 2025.
+        \item \emph{Billions per year} lost to bugs and attacks.
+      \end{itemize}
+      \medskip
+      \hspace*{1.2em}%
+      {\footnotesize
+      \begin{tabular}{@{}lccccc@{}}
+        \hline
+        Stolen & 2022 & 2023 & 2024 & 2025 & H1\,2026 \\
+        \hline
+        & \$3.7B & \$1.7B & \$2.2B & \$3.4B & \$1.0--1.3B \\
+        \hline
+      \end{tabular}}
+      \par\smallskip
+      \hspace*{1.2em}{\footnotesize\emph{Sources: Chainalysis, TRM Labs, CertiK}}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \textbf{Contract-level bugs a prover targets}
+      \begin{itemize}
+        \item \textbf{Cetus} (Move, 2025): \$223M, flawed overflow check.
+        \item \textbf{Balancer} (2025): \$128M, rounding error.
+        \item \textbf{Euler} (2023): \$197M, missing health check.
+        \item \textbf{Nomad} (2022): \$190M, zero root trusted.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \takeaway{Blockchains are high assurance systems.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{The Move Prover: From Meta to Aptos Labs in 2022}
+  % Architecture, redrawn in the deck palette from the TACAS'22 talk diagram.
+  % Rounded boxes are processes, sharp boxes are artifacts.
+  \begingroup\centering
+  \begin{tikzpicture}[
+      font=\footnotesize, x=1cm, y=1cm,
+      proc/.style={draw=mBlue, thick, rounded corners=3pt, fill=mBlue!15,
+                   minimum height=8mm, minimum width=1.75cm, align=center},
+      user/.style={proc, fill=white},
+      ext/.style={proc, draw=black!55, fill=black!10},
+      art/.style={draw=mBlue, thick, fill=white, minimum height=8mm,
+                  minimum width=1.75cm, align=center},
+      artext/.style={art, draw=black!55, fill=black!10},
+      arr/.style={-{Latex[length=2mm]}, thick, mNavy},
+      feed/.style={arr, dotted},
+      lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
+      swatch/.style={draw=mBlue, thick, minimum height=3mm, minimum width=3mm, inner sep=0pt},
+      legend/.style={font=\scriptsize, anchor=west, inner sep=2pt}]
+    % row 1: results flowing back to the user
+    \node[user] (code)     at (0,1.4)     {Move\\Code};
+    \node[user] (usr)      at (3.2,1.4)   {{\color{mNavy}\faUser}\hspace{4pt}User};
+    \node[art]  (diag)     at (6.1,1.4)   {Diagnosis};
+    \node[proc] (analyzer) at (9.0,1.4)   {Model\\Analyzer};
+    \node[artext] (smt)    at (11.9,1.4)  {SMT\\Model};
+    % row 2: main pipeline
+    \node[proc] (parser)   at (0,0)       {Move\\Parser};
+    \node[proc] (model)    at (3.2,0)     {Move\\Model};
+    \node[proc] (pcomp)    at (6.1,0)     {Prover\\Compiler};
+    \node[ext]  (boogie)   at (9.0,0)     {Boogie};
+    \node[ext]  (solver)   at (11.9,0)    {Z3 / CVC5\\SMT Solver};
+    % row 3: compiler and the bytecode pipeline excerpt
+    \node[proc] (compiler) at (0,-1.4)    {Move\\Compiler};
+    \node[font=\scriptsize, mNavy] (pipetitle) at (7.6,-1.5) {Bytecode transformation pipeline (excerpt)};
+    \node[proc, minimum width=2.1cm] (refelim) at (5.2,-2.2) {Reference\\Elimination};
+    \node[proc, minimum width=2.1cm] (specinj) at (7.6,-2.2) {Specification\\Injection};
+    \node[proc, minimum width=2.1cm] (mono)    at (10.0,-2.2) {Mono-\\morphization};
+    \node[draw=mBlue, dashed, rounded corners=4pt, inner sep=5pt,
+          fit=(pipetitle) (refelim) (specinj) (mono)] (pipe) {};
+    % edges
+    \draw[arr] (code) -- (parser);
+    \draw[arr] (parser) -- node[lbl, above=1pt] {Spec AST} (model);
+    \draw[arr] (parser) -- (compiler);
+    \draw[arr] (compiler.east) -- node[lbl, sloped, above=1pt, pos=0.55] {Bytecode} (model.south west);
+    \draw[arr] (model) -- (pcomp);
+    \draw[arr] (pcomp) -- (boogie);
+    \draw[arr] (boogie) -- (solver);
+    \draw[arr] (solver) -- (smt);
+    \draw[arr] (smt) -- (analyzer);
+    \draw[arr] (analyzer) -- (diag);
+    \draw[feed] (diag) -- (usr);
+    \draw[feed] (usr) -- (code);
+    \draw[feed] (pcomp.south) -- (pipe.north);
+    \draw[arr] (refelim) -- (specinj);
+    \draw[arr] (specinj) -- (mono);
+    % legend
+    \node[swatch, fill=white]     (l1) at (7.6,2.65) {};
+    \node[legend] at (l1.east) {User};
+    \node[swatch, fill=mBlue!15]  (l2) at (8.7,2.65) {};
+    \node[legend] at (l2.east) {Move Prover};
+    \node[swatch, draw=black!55, fill=black!10] (l3) at (10.9,2.65) {};
+    \node[legend] at (l3.east) {External (OSS)};
+  \end{tikzpicture}
+  \par\endgroup
+  \smallskip
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{itemize}\setlength{\itemsep}{1pt}
+        \item Specs are first-class citizens of code.
+        \item Verifies bytecode after the compiler.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \begin{itemize}\setlength{\itemsep}{1pt}
+        \item Detailed diagnostics.
+        \item Fast and reliable encoding~(TACAS'22).
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile,c]{Move went higher-order in 2025}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+      \begin{itemize}
+        \item Function types $T_1 \times \cdots \times T_n \to T$, closures with captured values.
+        \item A closure can be part of a struct and be persisted in global storage.
+        \item Persisted function values are Move's principled account of \textbf{dynamic dispatch}.
+      \end{itemize}
+      \medskip
+      Use cases: callbacks, extensible asset managers, dispatchable permissions, fold/map/filter.
+    \end{column}
+    \begin{column}{0.5\textwidth}
+\begin{Move}
+// Liquidity pool of an automated market
+// maker (AMM), as in Uniswap v2 (Ethereum)
+struct Pool {
+  reserve_x: u64, reserve_y: u64,
+  // (reserve_in, reserve_out, amt) = out
+  $pricing: u64 @\ftimes@ u64 @\ftimes@ u64 @\fto@ u64$
+}
+
+// Extract of the AMM's core functionality
+fun swap(pool: &mut Pool, amt: u64): u64 {
+  let out = $(pool.pricing)$(
+    pool.reserve_x, pool.reserve_y, amt);
+  pool.reserve_x += amt;
+  pool.reserve_y -= out;
+  out
+}
+\end{Move}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Contributions}
+  \textbf{Challenge}: \MVP is modular: a call site looks up the callee's spec.
+  With dynamic dispatch there is no callee to look up. Solutions:
+  \medskip
+
+  \begin{enumerate}
+    \item \textbf{Behavioral predicates}: $\requiresof{f}{\bar x}$, $\abortsof{f}{\bar x}$, $\ensuresof{f}{\bar x,\bar y}$ allow to reason about a function value $f$, making function specs first-class constructs.
+    \item \textbf{State labels}: name intermediate states, e.g.
+      \[ \exists S \bullet \slabeled{..S}{\ensuresof{f}{\bar x}} \land \slabeled{S..}{\ensuresof{g}{\bar x}} \]
+    \item \textbf{Encoding}: discriminate over the function values that can reach a call site.
+  \end{enumerate}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Running example: what may a pricing function do?}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+\begin{MoveSmall}
+spec Pool {
+  // Invariants of struct Pool
+  reads_of<self.pricing> *;
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S |~ !aborts_of<self.pricing>(ri, ro, a);
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S.. |~ result_of<self.pricing>(ri, ro, a) <= ro;
+
+  invariant forall S in *, ri: u64, ro: u64,
+                   a1: u64, a2: u64:
+    S.. |~ a1 <= a2 ==>
+      result_of<self.pricing>(ri, ro, a1)
+        <= result_of<self.pricing>(ri, ro, a2);
+  ..
+}
+\end{MoveSmall}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      A data invariant on |Pool| constrains \emph{any} closure stored in |pricing|:
+      \begin{enumerate}
+        \item never aborts,
+        \item output bounded by output reserve,
+        \item monotone in the input,
+        \item .. and more
+      \end{enumerate}
+      \medskip
+
+      Checked when a |Pool| is built, assumed wherever a |Pool| is used.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Behavioral predicates}
+  For a function value |f| with arguments $\bar x$ and results $\bar y$:
+  \begin{center}
+    \begin{tabular}{ll}
+      $\requiresof{f}{\bar x}$ & precondition holds \\
+      $\abortsof{f}{\bar x}$   & the call aborts \\
+      $\ensuresof{f}{\bar x,\bar y}$ & postcondition holds (two-state) \\
+      $\resultof{f}{\bar x}$   & the result of the call (two-state) \\[1ex]
+      $\Zpreop{reads\_of}\langle f\rangle\ R$ & memory the call may read \\
+      $\modifiesof{f}(\bar x)\ R[e_{\bar x}]$ & memory the call may write ($R[e_{\bar x}]$: global resource) \\
+    \end{tabular}
+  \end{center}
+  \medskip
+  \begin{itemize}
+    \item On a known function they unfold to its definition.
+    \item On a parameter or a stored closure they stay abstract, constrained by specs.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{State labels}
+  \begin{itemize}
+    \item $\slabeled{S}{p}$: evaluate $p$ in state $S$.
+    \item $\slabeled{S..}{q}$: $S$ is the pre-state of a call; $\slabeled{S_1..S_2}{q}$ names both ends.
+    \item |forall S in *|, |exists S in *|: quantification over all states:
+  \end{itemize}
+  \begin{columns}[c]
+    \begin{column}{0.48\textwidth}
+\lstset{xleftmargin=3em}
+\begin{Move}
+fun followed_by(f: &mut A @\fto@ (),
+                g: &mut A @\fto@ (),
+                x: &mut A) {
+  f(x); g(x)
+}
+spec followed_by {
+  reads_of<f> *; reads_of<g> *;
+  ensures exists S in *:
+    (..S |~ ensures_of<f>(x)) &&
+    (S.. |~ ensures_of<g>(x))
+}
+\end{Move}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      The post-state of |f| becomes the pre-state of |g|, without threading values through the spec.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Application side: \texttt{swap}}
+\begin{Move}
+spec swap {
+  aborts_if pool.reserve_x + amt > MAX_U64;
+  ensures result == old(result_of<pool.pricing>(pool.reserve_x, pool.reserve_y, amt));
+  ensures pool.reserve_x * pool.reserve_y >= old(pool.reserve_x * pool.reserve_y);
+}
+\end{Move}
+  \medskip
+  \begin{itemize}
+    \item Pricing cannot abort by (1), |reserve_y - out| cannot underflow by (2): only the overflow abort remains.
+    \item Product preservation follows from (4).
+  \end{itemize}
+  \takeaway{Problem reduced to first-order: the application side is no harder than first-order code.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Compliance side: building a pool}
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+\begin{MoveSmall}
+// fee-free constant product: verifies
+fun product(ri: u64, ro: u64, a: u64): u64 { .. }
+
+struct Fee {bps: u64}
+fun with_fee(owner: address,
+             ri: u64, ro: u64, a: u64): u64 {
+  let b = (a as u128)
+    * (10000 - Fee[owner].bps as u128) / 10000;
+  product(ri, ro, b as u64)
+}
+spec with_fee {
+  // non-compliant aborts:
+  aborts_if !@{\color{mBlue}exists}@<Fee>(owner);
+  aborts_if Fee[owner].bps > 10000; ..
+}
+Pool{..,
+  pricing: |ri, ro, a| with_fee(owner, ri, ro, a)}
+// error: data invariant does not hold
+\end{MoveSmall}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      Storing $f$ where $p$ is expected requires, for all inputs,
+      \[
+        \begin{array}{l}
+          \requiresof{p}{\bar x} \implies \requiresof{f}{\bar x} \\
+          \abortsof{f}{\bar x} \iff \abortsof{p}{\bar x} \\
+          \ensuresof{f}{\bar x,\bar y} \implies \ensuresof{p}{\bar x,\bar y}
+        \end{array}
+      \]
+      \begin{itemize}
+        \item |with_fee| violates the no-abort invariant; a guarded variant with a default fee verifies.
+        \item The nonlinear fee variants need a one- or two-line proof hint.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Encoding: which function values can reach a call site?}
+  After monomorphization this is known statically.
+  Per function type $\tau$, one datatype with a constructor per source:
+  \vspace{1.5ex}
+  \begin{center}
+  $\begin{array}{@{}l@{\qquad}l@{}}
+      \multicolumn{2}{@{}l}{\DATATYPE \tau\ \{} \\
+      \quad C_{f}(\sq{c : T}), \ldots & \text{closure of function $f$ with captured values $\sq c$} \\
+      \quad P_{f,x}(), \ldots & \text{function-typed parameter $x$ of a verification target $f$} \\
+      \quad F_{\sigma.x}(n : \nat), \ldots & \text{struct field $x$ of $\sigma$; discriminator $n$ separates locations} \\
+      \multicolumn{2}{@{}l}{\}}
+    \end{array}$
+  \end{center}
+  \takeaway{A VC only sees the function values derivable from the program.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Encoding: invoking a function value}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \begin{ivl}
+        \PROC invoke_\tau(x: \tau, \sq{p:T}) \RETURNS (\sq{r: T}) \\
+        \t1 \IF x \IS\ C_{f}(\sq{c}) \\
+        \t2    \sq{r} := \CALL f(\sq{c}, \sq{p}) \\
+        \t1 \ELSE \\
+        \t2    \ASSERT requires_\tau(x, \Mem_\tau, \sq{p}) \\
+        \t2    \IF\ aborts_\tau(x, \Mem_\tau, \sq{p}) \\
+        \t3       abort\_flag := \TRUE \\
+        \t2    \ELSE \\
+        \t3       \LET \Mem'_\tau := \Mem_\tau \\
+        \t3       \HAVOC \Mod_\tau(\sq{p}),\ \bar{r} \\
+        \t3       \ASSUME ensures_\tau(x, \Mem'_\tau, \Mem_\tau, \sq{p}, \sq{r})
+      \end{ivl}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{itemize}
+        \item Known closure: call the function.
+        \item Otherwise: the usual opaque-call schema, driven by the behavioral predicates.
+        \item $\Mem_\tau$, $\Mod_\tau$: read and write footprints of $\tau$.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Encoding: intermediate state labels}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+\begin{MoveSmall}
+struct R(u64);
+spec foo(f: address @\fto@ (), g: address @\fto@ (),
+         a: address) {
+  aborts_if aborts_of<f>(a);
+  ensures ..S |~ ensures_of<f>(a);
+  ensures S |~ R[a].0 > 0;
+  aborts_if S |~ aborts_of<g>(a);
+  ensures S.. |~ ensures_of<g>(a);
+}
+\end{MoveSmall}
+      \medskip
+      The state at |S| becomes an existentially quantified memory snapshot $\Mem^S$.
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{ivl}
+        \FUN aborts_{C_{foo}}[\Mem', \Mem](a) \\
+        \t1 aborts_\tau(f,\Mem',a) \\
+        \t1 \lor (\exists \Mem^S @ ensures_\tau(f,\Mem',\Mem^S,a) \\
+        \t2 \land R[\Mem^S][a].0 > 0 \\
+        \t2 \land aborts_{\tau'}(g,\Mem^S,a))
+      \end{ivl}
+      An abort at |S| needs |S| established first: the ensures reaching |S| are conjoined with the abort condition; pre-state aborts are disjoined in front.
+      \medskip
+
+      Sound since a verified function satisfies
+      \[ \bigvee \sq A \lor \bigwedge \sq P. \]
+    \end{column}
+  \end{columns}
+\end{frame}
+
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Specification inference as a test oracle}
+  \MVP also has the reverse path: \WP-based \emph{specification inference} derives specs from code, using behavioral predicates for calls.
+  Inferred specs are complete and are expected to verify.
+  \medskip
+
+  \centering
+  \begin{tikzpicture}[
+      node distance=5mm,
+      data/.style={draw, rounded corners, fill=mBlue!10, minimum height=9mm, text width=2.1cm, align=center, font=\footnotesize},
+      alg/.style={draw, thick, fill=mBlue!30, minimum height=9mm, text width=2.0cm, align=center, font=\footnotesize},
+      arr/.style={-{Latex[length=2mm]}, thick},
+      back/.style={-{Latex[length=2mm]}, thick, dashed, mBlue}]
+    \node[data] (corpus) {Corpus of higher-order Move code};
+    \node[alg, right=of corpus] (infer) {Spec inference};
+    \node[data, right=of infer] (enriched) {Code with inferred specs};
+    \node[alg, right=of enriched] (verify) {Higher-order verification};
+    \node[data, right=of verify] (verdict) {Verdict};
+    \draw[arr] (corpus) -- (infer);
+    \draw[arr] (infer) -- (enriched);
+    \draw[arr] (enriched) -- (verify);
+    \draw[arr] (verify) -- (verdict);
+    \draw[back] (verdict.south) -- ++(0,-4mm) -| (verify.south);
+    \draw[back] (verdict.south) -- ++(0,-8mm) -| (infer.south);
+    \node[font=\footnotesize, mBlue, anchor=north] at ([yshift=-8.5mm]enriched.south) {failure: a bug in one of the two};
+  \end{tikzpicture}
+  \medskip
+
+  \raggedright
+  Two independent algorithms are unlikely to agree on a bug.
+  The current test suite covers 550 verification conditions.
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Related work}
+  \begin{itemize}
+    \item \textbf{Dafny}: behavioral predicates and labels, but function values cannot modify state, and labels are not quantified.
+    \item \textbf{Verus}, \textbf{Prusti}: closure specs by state passing or separation logic; Move's alias-free references and resource-separated memory avoid both.
+    \item \textbf{\fstar}: effectful higher-order code with \WP in the type system; heap separation is reasoned about in the logic, whereas Move separates memory at compile time.
+    \item \textbf{Solidity verifiers} (\certora and others): dispatch by enumerating callees; our datatype makes the case split explicit and falls back to behavioral predicates.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Conclusion}
+  \begin{itemize}
+    \item Behavioral predicates and state labels make function specs first-class.
+    \item The encoding discriminates on the variant reaching a call site: concrete effect when known, behavioral predicates otherwise.
+    \item \MVP's routine, counterexample-driven verification now covers dynamic dispatch; inference validates the encoding.
+  \end{itemize}
+  \medskip
+  \textbf{Future work}
+  \begin{itemize}
+    \item Quantifying over \emph{sequences} of state labels for fold-style contracts.
+    \item Better automation for the nonlinear compliance proofs.
+    \item Encoding and verification of the schema in Lean.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[standout]
+  Thank you
+  \vspace{0.5em}
+
+  \small
+  Prover, examples, and tests: \texttt{github.com/aptos-labs/aptos-core}
+
+  \footnotesize
+  Paper examples: \texttt{third\_party/move/move-prover/doc/higher-order-paper-26/examples}
+  \vspace{0.8em}
+
+  {\color{white}\qrcode[height=2.2cm]{https://github.com/aptos-labs/aptos-core/tree/28f82080e3/third_party/move/move-prover/doc/higher-order-paper-26/examples}}
+\end{frame}
+
+% ===========================================================================
+\appendix
+\talkframetitle
+
+\begin{frame}[fragile]{Backup: higher-order loops, \texttt{find}}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+\begin{MoveSmall}
+fun find<T>(v: &vector<T>, pred: &T @\fto@ bool): u64 {
+  let i = 0; let n = v.length();
+  while (i < n) {
+    if (pred(v[i])) return i;
+    i += 1;
+  } spec {
+    invariant i <= n;
+    invariant no_match_before(v, pred, i);
+  };
+  n
+}
+spec find {
+  ensures result <= len(v);
+  ensures no_match_before(v, pred, result);
+  ensures result < len(v)
+            ==> result_of<pred>(v[result])
+}
+\end{MoveSmall}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+\begin{MoveSmall}
+spec fun no_match_before<T>(v: vector<T>,
+    pred: &T @\fto@ bool, end: u64): bool
+{ forall j in 0..end: !result_of<pred>(v[j]) }
+fun find_zero_lambda(v: &vector<u64>): u64 {
+  find(v, |x| x == 0
+           spec { ensures result == (x == 0) })
+}
+spec find_zero_lambda {
+  ensures result < len(v) ==> v[result] == 0
+    && (forall j in 0..result: v[j] != 0);
+  ensures result == len(v)
+    ==> (forall j in 0..len(v): v[j] != 0);
+}
+\end{MoveSmall}
+      The loop invariant is written once; callers verify from |find|'s spec and the lambda's contract.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Backup: memory access sets}
+\begin{Move}
+spec foo(f: address @\fto@ (), g: T @\fto@ S) {
+  reads_of<f> R;                   // f may read resource R
+  reads_of<g> *;                   // g may read anything in scope, plus unknown memory
+  modifies_of<f>(a: address) R[a]; // f may write R[a]; default is no writes
+}
+\end{Move}
+  \begin{itemize}
+    \item $\Mem_\tau = \Mem_{C_f} \cup \Mem_{P_{f,x}} \cup \Mem_{F_{\sigma.x}}$: derived from code for closures, declared via |reads_of| for parameters and fields.
+    \item |reads_of<g> *| adds an abstract map for unknown memory, so $g(x)$ is not assumed equal across states.
+    \item $\Mod_\tau$ likewise, from |modifies| and |modifies_of|; no wildcard, since it would leave no frame.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Backup: encoding determinism}
+  $ensures_\tau$ switches over the variant and adds the frame condition (backup).
+  It is a relation; Move functions are deterministic.
+  Introduce an uninterpreted $result_\tau$ and tie it to $ensures_\tau$:
+  \begin{ivl}
+    \FUN result_\tau[\Mem', \Mem](x: \tau, \sq{p: T}) \fun \sq{U} \\
+    \AXIOM \forall x, \sq{p} @ \{result_\tau[\Mem', \Mem](x, \sq{p})\} \\
+    \t1 \LET \sq{r} := result_\tau[\Mem', \Mem](x, \sq{p}) @
+        ensures_\tau[\Mem', \Mem](x, \sq{p}, \sq{r})
+  \end{ivl}
+  \begin{itemize}
+    \item One direction only: a biconditional would force all solutions of a weak |ensures| to coincide.
+    \item For parameter and field variants, $ensures$ is \emph{defined} as the graph of an uninterpreted $result$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Backup: ensures with frame condition}
+  The caller havoced all of $\Mod_\tau$; the variant only constrains $\Mod_x$:
+  \begin{ivl}
+    \FUN ensures_\tau[\Mem', \Mem](x: \tau, \sq{p: T}, \sq{r: U}): \BOOL \\
+    \t1  \bigwedge_{(\rho, a) \in \Mod_\tau}( \\
+    \t2    \IF \rho \notin \Type(\Mod_x) \\
+    \t3       \Mem(\rho) = \Mem'(\rho) \\
+    \t2    \ELSE \\
+    \t3       (\bigwedge_{(\rho, a') \in \Mod_x} a' \neq a) \\
+    \t4          \implies \Mem(\rho)[a] = \Mem'(\rho)[a] \\
+    \t1  ) \land ensures_x[\Mem'_x, \Mem_x](p, r)
+  \end{ivl}
+  Modification addresses are symbolic and may alias, hence the pairwise disequalities.
+\end{frame}
+
+\begin{frame}[fragile]{Backup: making it fast}
+  \begin{itemize}
+    \item Predicates as IVL functions \emph{with bodies} time out: Boogie unfolds eagerly.
+    \item Instead: \emph{uninterpreted} predicates, connected by axioms with per-variant triggers.
+  \end{itemize}
+  \begin{ivl}
+    \AXIOM \forall \sq{c}, \sq{p}, \sq{r} @ \{ensures_\tau(C_f(\sq{c}), \sq{p}, \sq{r})\} \\
+    \t1  ensures_\tau(C_f(\sq{c}), \sq{p}, \sq{r}) \iff ensures_{C_f(\sq{c})}(\sq{p}, \sq{r}) \\
+    \AXIOM \forall \sq{p}, \sq{r} @ \{ensures_\tau(P_{f,x}(), \sq{p}, \sq{r})\} \\
+    \t1  ensures_\tau(P_{f,x}(), \sq{p}, \sq{r}) \iff ensures_{P_{f,x}}(\sq{p}, \sq{r}) \\
+    \AXIOM \forall f, \sq{p}, \sq{r} @ \{ensures_\tau(f, \sq{p}, \sq{r})\} \\
+    \t1  f \IS F_{\sigma.x} \implies (ensures_\tau(f, \sq{p}, \sq{r}) \iff ensures_{F_{\sigma.x}}(f.n, \sq{p}, \sq{r}))
+  \end{ivl}
+  \takeaway{Axioms fire only where the variant is syntactically present in the VC.}
+\end{frame}
+
+\begin{frame}[fragile]{Backup: inference test categories}
+  \footnotesize
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.7\textwidth}@{}}
+    \textbf{Category} & \textbf{Representative cases} \\
+    \hline
+    Direct calls & Chained calls to a spec'd helper; inferred specs use |ensures_of| and |aborts_of| instead of inlining the body. \\
+    Mutual recursion & |is_even| and |is_odd|; each spec is phrased via the other's behavioral predicate. \\
+    Higher-order parameters & Closure applied by the callee; spec abstracts via predicates on the parameter. \\
+    Stored-closure dispatch (enum) & Calculator with a closure-carrying enum variant. \\
+    Stored-closure dispatch (field) & Vault with a |Strategy| closure field on Aptos framework types; |modifies_of| inferred for the field. \\
+    Pre/post state labels & |move_to|, |move_from|, mutable resource indexing; |@pre| versus post-state memory. \\
+    Intermediate state labels & Sequenced state-modifying calls; existentially quantified labels pinned to defining predicates. \\
+  \end{tabular}
+\end{frame}
+
+\begin{frame}{Backup: how the implementation was built}
+  Developed in close collaboration with AI coding assistants (primarily Claude Code; Codex as a second opinion).
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Went well}
+      \begin{itemize}
+        \item Frontend extensions largely AI-produced, human review only.
+        \item Root-cause diagnosis once inference surfaced a failing example.
+        \item Timeout diagnosis via Boogie, SMT, and Z3 instantiation logs.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{Went less well}
+      \begin{itemize}
+        \item The encoding itself needed substantial human guidance; soundness calls were human.
+        \item Dozens of iterations in the hard parts; effort approached manual implementation.
+        \item Token cost.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  Key enabler: the inference-then-verify pipeline gave an unambiguous correctness signal independent of human review.
+\end{frame}
+
+\end{document}
