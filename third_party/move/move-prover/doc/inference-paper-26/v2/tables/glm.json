@@ -1,0 +1,94 @@
+{
+  "round": "corpus3.2-run6-glm",
+  "model": "glm-5.3[1m]",
+  "tasks": 20,
+  "replicates": 4,
+  "arms": {
+    "agent_only": {
+      "cells": 80,
+      "recorded": 79,
+      "operational": 77,
+      "scored": 0,
+      "pending": 77,
+      "complete": 0,
+      "first_attempt_failures": 2,
+      "verdicts": {
+        "forbidden_weakening": 1,
+        "prover_failure": 1
+      },
+      "total_cost": 21.59,
+      "mean_cost": 0.274,
+      "ci95_mean_cost": [
+        0.2394,
+        0.3103
+      ],
+      "mean_input_k": 591.7,
+      "mean_output_k": 17.03,
+      "edits": 279,
+      "verifies": 157,
+      "wp_calls": 0
+    },
+    "hybrid_guided": {
+      "cells": 80,
+      "recorded": 80,
+      "operational": 79,
+      "scored": 0,
+      "pending": 79,
+      "complete": 0,
+      "first_attempt_failures": 1,
+      "verdicts": {
+        "forbidden_weakening": 1
+      },
+      "total_cost": 23.3,
+      "mean_cost": 0.2913,
+      "ci95_mean_cost": [
+        0.2631,
+        0.3369
+      ],
+      "mean_input_k": 609.2,
+      "mean_output_k": 19.44,
+      "edits": 257,
+      "verifies": 155,
+      "wp_calls": 144,
+      "ratio_vs_agent": {
+        "estimate": 1.063,
+        "ci95": [
+          0.908,
+          1.313
+        ]
+      },
+      "cheaper_on_tasks": 8
+    },
+    "hybrid_flexible": {
+      "cells": 80,
+      "recorded": 80,
+      "operational": 78,
+      "scored": 0,
+      "pending": 78,
+      "complete": 0,
+      "first_attempt_failures": 2,
+      "verdicts": {
+        "forbidden_weakening": 2
+      },
+      "total_cost": 22.18,
+      "mean_cost": 0.2772,
+      "ci95_mean_cost": [
+        0.2457,
+        0.3119
+      ],
+      "mean_input_k": 584.7,
+      "mean_output_k": 17.96,
+      "edits": 240,
+      "verifies": 161,
+      "wp_calls": 121,
+      "ratio_vs_agent": {
+        "estimate": 1.012,
+        "ci95": [
+          0.873,
+          1.18
+        ]
+      },
+      "cheaper_on_tasks": 8
+    }
+  }
+}

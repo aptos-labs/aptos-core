@@ -1,0 +1,89 @@
+{
+  "round": "corpus3.2-run5-opus",
+  "model": "claude-opus-5",
+  "tasks": 20,
+  "replicates": 4,
+  "arms": {
+    "agent_only": {
+      "cells": 80,
+      "recorded": 80,
+      "operational": 76,
+      "scored": 76,
+      "pending": 0,
+      "complete": 76,
+      "first_attempt_failures": 4,
+      "verdicts": {
+        "weak_contract": 4
+      },
+      "total_cost": 55.56,
+      "mean_cost": 0.6945,
+      "ci95_mean_cost": [
+        0.6715,
+        0.7202
+      ],
+      "mean_input_k": 328.5,
+      "mean_output_k": 9.03,
+      "edits": 131,
+      "verifies": 105,
+      "wp_calls": 0
+    },
+    "hybrid_guided": {
+      "cells": 80,
+      "recorded": 80,
+      "operational": 80,
+      "scored": 80,
+      "pending": 0,
+      "complete": 80,
+      "first_attempt_failures": 0,
+      "verdicts": {},
+      "total_cost": 71.71,
+      "mean_cost": 0.8964,
+      "ci95_mean_cost": [
+        0.8517,
+        0.9433
+      ],
+      "mean_input_k": 546.4,
+      "mean_output_k": 10.6,
+      "edits": 182,
+      "verifies": 160,
+      "wp_calls": 150,
+      "ratio_vs_agent": {
+        "estimate": 1.291,
+        "ci95": [
+          1.219,
+          1.371
+        ]
+      },
+      "cheaper_on_tasks": 5
+    },
+    "hybrid_flexible": {
+      "cells": 80,
+      "recorded": 80,
+      "operational": 80,
+      "scored": 80,
+      "pending": 0,
+      "complete": 80,
+      "first_attempt_failures": 0,
+      "verdicts": {},
+      "total_cost": 70.65,
+      "mean_cost": 0.8831,
+      "ci95_mean_cost": [
+        0.8458,
+        0.9215
+      ],
+      "mean_input_k": 502.0,
+      "mean_output_k": 10.82,
+      "edits": 177,
+      "verifies": 174,
+      "wp_calls": 108,
+      "ratio_vs_agent": {
+        "estimate": 1.271,
+        "ci95": [
+          1.203,
+          1.346
+        ]
+      },
+      "cheaper_on_tasks": 1
+    }
+  }
+}
