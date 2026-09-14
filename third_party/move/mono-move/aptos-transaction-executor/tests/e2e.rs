@@ -1112,6 +1112,333 @@ fn object_check_bound_matches_v1() {
     assert_kept_with_code_like_v1(&fx, &alice, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
 }
 
+/// Public structs and enums, and entry functions taking them. A struct is
+/// public when its module has a `pack$` function for it; `Partial` has one
+/// for only one variant, `Private` has none, and `Keyed` may not have one.
+const PUBLIC_STRUCT_FUNCTIONS: &str = r#"
+module 0xcafe::pubs
+use 0x1::string
+use 0x1::option
+use 0x1::object
+
+struct Bar has copy+drop
+  n: u64
+
+struct Foo has copy+drop
+  x: string::String
+  y: Bar
+
+enum Shape has copy+drop
+  Circle
+    r: u64
+  Label
+    s: string::String
+
+enum Partial has copy+drop
+  A
+    v: u64
+  B
+    w: u64
+
+struct Private has copy+drop
+  v: u64
+
+struct Keyed has key+copy+drop
+  v: u64
+
+struct NoCopy has drop
+  v: u64
+
+struct Box<T> has copy+drop
+  t: T
+
+#[pack] public fun pack$Bar(l0: u64): Bar
+    move_loc l0
+    pack Bar
+    ret
+
+#[pack] public fun pack$Foo(l0: string::String, l1: Bar): Foo
+    move_loc l0
+    move_loc l1
+    pack Foo
+    ret
+
+#[pack_variant(0)] public fun pack$Shape$Circle(l0: u64): Shape
+    move_loc l0
+    pack_variant Shape, Circle
+    ret
+
+#[pack_variant(1)] public fun pack$Shape$Label(l0: string::String): Shape
+    move_loc l0
+    pack_variant Shape, Label
+    ret
+
+#[pack_variant(0)] public fun pack$Partial$A(l0: u64): Partial
+    move_loc l0
+    pack_variant Partial, A
+    ret
+
+#[pack] public fun pack$NoCopy(l0: u64): NoCopy
+    move_loc l0
+    pack NoCopy
+    ret
+
+#[pack] public fun pack$Box<T>(l0: T): Box<T>
+    move_loc l0
+    pack Box<T>
+    ret
+
+entry public fun takes_foo(f: Foo)
+    ret
+
+entry public fun takes_foos(v: vector<Foo>)
+    ret
+
+entry public fun takes_opt_foo(o: option::Option<Foo>)
+    ret
+
+entry public fun takes_shape(s: Shape)
+    ret
+
+entry public fun takes_partial(p: Partial)
+    ret
+
+entry public fun takes_private(p: Private)
+    ret
+
+entry public fun takes_keyed(k: Keyed)
+    ret
+
+entry public fun takes_nocopy(n: NoCopy)
+    ret
+
+entry public fun takes_box_string(b: Box<string::String>)
+    ret
+
+entry public fun takes_box_private(b: Box<Private>)
+    ret
+
+entry public fun takes_boxed_objects(v: vector<Box<object::Object<object::ObjectCore>>>)
+    ret
+"#;
+
+/// The BCS of `Foo { x, y: Bar { n } }`.
+fn foo_bytes(x: &[u8], n: u64) -> Vec<u8> {
+    [
+        bcs::to_bytes(&x.to_vec()).unwrap(),
+        bcs::to_bytes(&n).unwrap(),
+    ]
+    .concat()
+}
+
+/// Asserts that v1 runs `txn` while v2 keeps it with the miscellaneous error
+/// `code`.
+fn assert_v1_runs_and_v2_rejects(fx: &FakeExecutor, txn: SignedTransaction, code: StatusCode) {
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 did not run the transaction: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
+    );
+}
+
+/// A public struct argument runs like on v1.
+#[test]
+fn public_struct_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_foo", vec![foo_bytes(
+        b"hi", 7,
+    )]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A malformed `String` field of a public struct is refused.
+#[test]
+fn malformed_string_in_public_struct_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_foo", vec![foo_bytes(
+        &[0xFF, 0xFE],
+        7,
+    )]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "string",
+        1,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// A malformed `String` in the second of two public structs in a vector is
+/// refused.
+#[test]
+fn malformed_string_in_vector_of_public_structs_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_foos", vec![[
+        vec![0x02],
+        foo_bytes(b"hi", 7),
+        foo_bytes(&[0xFF, 0xFE], 8),
+    ]
+    .concat()]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "string",
+        1,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// An `Option` of a public struct runs like on v1, whether `Some` or `None`.
+#[test]
+fn option_of_public_struct_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+
+    let txn = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![[
+        vec![0x01],
+        foo_bytes(b"hi", 7),
+    ]
+    .concat()]);
+    assert_success_like_v1(&fx, &alice, txn);
+
+    let txn = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![vec![0x00]]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A public enum argument runs like on v1, for each variant.
+#[test]
+fn public_enum_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+
+    let circle = [vec![0x00], bcs::to_bytes(&1u64).unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![circle]);
+    assert_success_like_v1(&fx, &alice, txn);
+
+    let label = [vec![0x01], bcs::to_bytes("hi").unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![label]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A malformed `String` field of a public enum variant is refused.
+#[test]
+fn malformed_string_in_public_enum_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![vec![
+        0x01, 0x02, 0xFF, 0xFE,
+    ]]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "string",
+        1,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// An enum tag naming no variant is refused like on v1.
+#[test]
+fn public_enum_bad_tag_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![[
+        vec![0x02],
+        bcs::to_bytes(&1u64).unwrap(),
+    ]
+    .concat()]);
+    assert_kept_with_code_like_v1(&fx, &alice, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// An enum missing a variant's pack function is refused whatever the value,
+/// where v1 refuses only a value of the variant that lacks it.
+#[test]
+fn partially_packable_enum_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+
+    let a = [vec![0x00], bcs::to_bytes(&5u64).unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_partial", vec![a]);
+    assert_v1_runs_and_v2_rejects(&fx, txn, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+
+    let b = [vec![0x01], bcs::to_bytes(&5u64).unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_partial", vec![b]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// Structs a transaction may not construct are refused like on v1: one
+/// without a pack function, one with `key`, one without `copy`, and a public
+/// struct wrapping the first.
+#[test]
+fn unconstructible_structs_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    for function in [
+        "takes_private",
+        "takes_keyed",
+        "takes_nocopy",
+        "takes_box_private",
+    ] {
+        let txn = call_txn(&alice, address, "pubs", function, vec![bcs::to_bytes(
+            &5u64,
+        )
+        .unwrap()]);
+        assert_kept_with_code_like_v1(
+            &fx,
+            &alice,
+            txn,
+            StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+        );
+    }
+}
+
+/// A generic public struct instantiated with an allowed type runs like on v1.
+#[test]
+fn generic_public_struct_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_box_string", vec![
+        bcs::to_bytes("hi").unwrap(),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// An `Object<T>` nested in a public struct inside a vector is checked.
+#[test]
+fn object_in_public_struct_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_boxed_objects", vec![[
+        vec![0x02],
+        bcs::to_bytes(&apt_metadata_object()).unwrap(),
+        bcs::to_bytes(alice.address()).unwrap(),
+    ]
+    .concat()]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "object",
+        0x60002,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
 /// Transactions violating the pre-execution gas bounds expressible by the
 /// fixture's gas schedule are discarded with the same status code as V1,
 /// before touching any state.

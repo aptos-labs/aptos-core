@@ -4,7 +4,7 @@
 //! Running a script payload.
 
 use super::{
-    arg_check::check_arg_values,
+    arg_check::{check_arg_values, check_param_types},
     args::{check_arg_counts, leading_signer_params, place_user_txn_args},
 };
 use crate::errors::{MoveExecutionFailure, ScriptRejection};
@@ -47,6 +47,7 @@ pub(crate) fn run_script<'a>(
     // values.
     let signer_params =
         leading_signer_params(&func.param_tys).map_err(MoveExecutionFailure::InvalidArguments)?;
+    check_param_types(guard, interp, &func.param_tys[signer_params..])?;
     let args = convert_txn_args(args);
     check_arg_counts(&func.param_tys, signer_params, secondary_signers, &args)
         .map_err(MoveExecutionFailure::InvalidArguments)?;
