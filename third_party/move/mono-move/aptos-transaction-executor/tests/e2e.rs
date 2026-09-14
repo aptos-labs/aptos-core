@@ -706,6 +706,18 @@ fn call_txn(
     function: &str,
     args: Vec<Vec<u8>>,
 ) -> SignedTransaction {
+    call_txn_with_sequence_number(sender, address, module, function, args, 10)
+}
+
+/// Like `call_txn`, at the given sequence number.
+fn call_txn_with_sequence_number(
+    sender: &AccountData,
+    address: move_core_types::account_address::AccountAddress,
+    module: &str,
+    function: &str,
+    args: Vec<Vec<u8>>,
+    sequence_number: u64,
+) -> SignedTransaction {
     use aptos_types::transaction::{EntryFunction, TransactionPayload};
     use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 
@@ -718,10 +730,31 @@ fn call_txn(
             vec![],
             args,
         )))
-        .sequence_number(10)
+        .sequence_number(sequence_number)
         .gas_unit_price(100)
         .max_gas_amount(1_000_000)
         .sign()
+}
+
+/// Asserts that v1 keeps `txn` with `status`, and that v2 agrees on the status
+/// and, modulo gas, on the output.
+fn assert_kept_like_v1(
+    fx: &FakeExecutor,
+    sender: &AccountData,
+    txn: SignedTransaction,
+    status: ExecutionStatus,
+) {
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(status),
+        "v1 did not keep the transaction as expected"
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *sender.address());
 }
 
 /// Asserts that v1 keeps `txn` with the miscellaneous error `code`, and that
@@ -732,15 +765,54 @@ fn assert_kept_with_code_like_v1(
     txn: SignedTransaction,
     code: StatusCode,
 ) {
-    let v1_output = fx.execute_transaction(txn.clone());
-    assert_eq!(
-        v1_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code))),
-        "v1 did not keep the transaction with {code:?}"
+    assert_kept_like_v1(
+        fx,
+        sender,
+        txn,
+        ExecutionStatus::MiscellaneousError(Some(code)),
     );
+}
 
+/// Asserts that v1 keeps `txn` with a Move abort of `code` in the framework
+/// module `module`, and that v2 agrees on the status and, modulo gas, on the
+/// output.
+fn assert_aborts_like_v1(
+    fx: &FakeExecutor,
+    sender: &AccountData,
+    txn: SignedTransaction,
+    module: &str,
+    code: u64,
+) {
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+        vm_status::AbortLocation,
+    };
+
+    let expected_location = AbortLocation::Module(ModuleId::new(
+        AccountAddress::ONE,
+        Identifier::new(module).unwrap(),
+    ));
+    // The abort info is not compared: the executor does not resolve it yet,
+    // see `p2p_transfer_insufficient_balance_aborts_like_v1`.
+    let assert_aborts = |output: &TransactionOutput, vm: &str| {
+        assert!(
+            matches!(
+                output.status(),
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location,
+                    code: actual,
+                    ..
+                }) if *location == expected_location && *actual == code
+            ),
+            "{vm} did not abort in 0x1::{module} with {code}: {:?}",
+            output.status()
+        );
+    };
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_aborts(&v1_output, "v1");
     let v2_output = execute_v2(fx.get_state_view(), &txn);
-    assert_eq!(v2_output.status(), v1_output.status());
+    assert_aborts(&v2_output, "v2");
 
     compare_outputs(&v1_output, &v2_output, *sender.address());
 }
@@ -888,6 +960,250 @@ fn native_function_rejected_like_v1() {
         txn,
         StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED,
     );
+}
+
+/// Entry functions taking the framework types a transaction may pass.
+/// Assembled from MASM like `UNCALLABLE_ENTRY_FUNCTIONS`.
+const ARGUMENT_ENTRY_FUNCTIONS: &str = r#"
+module 0xcafe::args
+use 0x1::object
+use 0x1::option
+use 0x1::string
+
+entry public fun takes_string(s: string::String)
+    ret
+
+entry public fun takes_option_string(o: option::Option<string::String>)
+    ret
+
+entry public fun takes_vector_string(v: vector<string::String>)
+    ret
+
+entry public fun takes_object(o: object::Object<object::ObjectCore>)
+    ret
+
+entry public fun takes_option_vector_u64(o: option::Option<vector<u64>>)
+    ret
+"#;
+
+/// Publishes `ARGUMENT_ENTRY_FUNCTIONS` straight into `fx`'s state, returning
+/// the module's address.
+fn publish_args_module(fx: &mut FakeExecutor) -> move_core_types::account_address::AccountAddress {
+    let (module, blob) =
+        aptos_language_e2e_tests::compile::compile_module(ARGUMENT_ENTRY_FUNCTIONS);
+    fx.add_module(&module.self_id(), blob.into_inner());
+    *module.self_id().address()
+}
+
+/// A `String` argument is deserialized and the call runs like on v1.
+#[test]
+fn string_argument_matches_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txn = call_txn(&alice, address, "args", "takes_string", vec![
+        bcs::to_bytes("hi").unwrap(),
+    ]);
+    assert_kept_like_v1(&fx, &alice, txn, ExecutionStatus::Success);
+}
+
+/// A `String` argument that is not valid UTF-8 aborts in `0x1::string` like on
+/// v1.
+#[test]
+fn invalid_utf8_string_aborts_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txn = call_txn(&alice, address, "args", "takes_string", vec![vec![
+        0x02, 0xFF, 0xFE,
+    ]]);
+    assert_aborts_like_v1(&fx, &alice, txn, "string", 1);
+}
+
+/// Invalid UTF-8 inside a `Some` aborts in `0x1::string` like on v1.
+#[test]
+fn invalid_utf8_in_option_aborts_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txn = call_txn(&alice, address, "args", "takes_option_string", vec![vec![
+        0x01, 0x02, 0xFF, 0xFE,
+    ]]);
+    assert_aborts_like_v1(&fx, &alice, txn, "string", 1);
+}
+
+/// A `vector<String>` argument is deserialized and the call runs like on v1.
+#[test]
+fn vector_of_strings_matches_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txn = call_txn(&alice, address, "args", "takes_vector_string", vec![
+        bcs::to_bytes(&vec!["a".to_string(), "b".to_string()]).unwrap(),
+    ]);
+    assert_kept_like_v1(&fx, &alice, txn, ExecutionStatus::Success);
+}
+
+/// An `Option<vector<u64>>` argument is deserialized and the call runs like
+/// on v1.
+#[test]
+fn option_of_vector_matches_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txn = call_txn(&alice, address, "args", "takes_option_vector_u64", vec![
+        bcs::to_bytes(&Some(vec![1u64, 2, 3])).unwrap(),
+    ]);
+    assert_kept_like_v1(&fx, &alice, txn, ExecutionStatus::Success);
+}
+
+/// An `Object<T>` argument naming an address without an object aborts in
+/// `0x1::object` like on v1.
+#[test]
+fn object_at_plain_address_aborts_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txn = call_txn(&alice, address, "args", "takes_object", vec![
+        bcs::to_bytes(alice.address()).unwrap(),
+    ]);
+    // `error::not_found(EOBJECT_DOES_NOT_EXIST)`.
+    assert_aborts_like_v1(&fx, &alice, txn, "object", 0x6_0002);
+}
+
+/// An `Object<ObjectCore>` argument naming the APT metadata object, if genesis
+/// created it, runs like on v1; either way both VMs agree.
+#[test]
+fn object_argument_matches_v1() {
+    use move_core_types::account_address::AccountAddress;
+
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let apt_metadata = AccountAddress::from_hex_literal("0xa").unwrap();
+    let txn = call_txn(&alice, address, "args", "takes_object", vec![
+        bcs::to_bytes(&apt_metadata).unwrap(),
+    ]);
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+    if v1_output.status() == &TransactionStatus::Keep(ExecutionStatus::Success) {
+        compare_outputs(&v1_output, &v2_output, *alice.address());
+    }
+}
+
+/// An `Option` holding two values is refused. v1 aborts constructing it in
+/// `0x1::option`; here the bytes fail to deserialize.
+#[test]
+fn overlong_option_refused() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txn = call_txn(&alice, address, "args", "takes_option_vector_u64", vec![
+        vec![0x02, 0x00, 0x00],
+    ]);
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_ne!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+        )))
+    );
+}
+
+/// A `None` for an `Option` of a private struct is refused: the type has no
+/// deserializer, whatever the value. v1 admits the type and runs the call.
+#[test]
+fn none_of_private_struct_refused() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    let txn = call_txn(
+        &alice,
+        address,
+        "uncallable",
+        "takes_option_of_private",
+        vec![vec![0x00]],
+    );
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
+        )))
+    );
+}
+
+/// A large primitive vector is deserialized in Move, element by element, and
+/// the call runs like on v1. Prints the time each VM takes.
+#[test]
+fn large_vector_argument_matches_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    // v1 runs out of the fixture's gas above roughly 1000 elements.
+    let elements: Vec<u64> = (0..1_000).collect();
+    let txn = call_txn(&alice, address, "args", "takes_option_vector_u64", vec![
+        bcs::to_bytes(&Some(elements)).unwrap(),
+    ]);
+
+    let start = std::time::Instant::now();
+    let v1_output = fx.execute_transaction(txn.clone());
+    let v1_elapsed = start.elapsed();
+    let start = std::time::Instant::now();
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    let v2_elapsed = start.elapsed();
+    println!("vector<u64> x 1000: v1 {v1_elapsed:?}, v2 {v2_elapsed:?}");
+
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
+    assert_eq!(v2_output.status(), v1_output.status());
+    compare_outputs(&v1_output, &v2_output, *alice.address());
+}
+
+/// The same entry function called twice through one global context, hitting
+/// the trampoline and deserializer caches the second time, behaves like on v1
+/// both times.
+#[test]
+fn repeated_call_matches_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_args_module(&mut fx);
+    let txns = [
+        call_txn_with_sequence_number(
+            &alice,
+            address,
+            "args",
+            "takes_string",
+            vec![bcs::to_bytes("first").unwrap()],
+            10,
+        ),
+        call_txn_with_sequence_number(
+            &alice,
+            address,
+            "args",
+            "takes_string",
+            vec![bcs::to_bytes("second").unwrap()],
+            11,
+        ),
+    ];
+
+    let v2_outputs = execute_v2_sequence(fx.get_state_view(), &txns);
+    for (txn, v2_output) in txns.iter().zip(&v2_outputs) {
+        let v1_output = fx.execute_and_apply(txn.clone());
+        assert_eq!(
+            v1_output.status(),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
+            "v1 rejected the call: {:?}",
+            v1_output.status()
+        );
+        assert_eq!(v2_output.status(), v1_output.status());
+        compare_outputs(&v1_output, v2_output, *alice.address());
+    }
 }
 
 /// Transactions violating the pre-execution gas bounds expressible by the

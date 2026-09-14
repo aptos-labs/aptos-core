@@ -305,6 +305,31 @@ pub fn is_script_module_id(module_id: InternedModuleId) -> bool {
         && view_name(module_id.name()) == SCRIPT_MAIN.as_str()
 }
 
+/// The address of the modules the VM provides itself, one below the script
+/// address. The loader serves them ahead of storage, so nothing published
+/// there is ever reached.
+pub const VM_MODULE_ADDRESS: AccountAddress = AccountAddress::new({
+    let mut bytes = [0xFF; AccountAddress::LENGTH];
+    bytes[AccountAddress::LENGTH - 1] = 0xFE;
+    bytes
+});
+
+/// The name of the VM-provided module that deserializes transaction
+/// arguments.
+pub const TXN_ARG_MODULE: &IdentStr = ident_str!("txn_arg");
+
+/// The module ID of the VM-provided transaction-argument deserializers.
+pub fn txn_arg_module_id(interner: &impl Interner) -> InternedModuleId {
+    interner.module_id_of(&VM_MODULE_ADDRESS, TXN_ARG_MODULE)
+}
+
+/// Whether `module_id` is the VM-provided transaction-argument module.
+pub fn is_txn_arg_module_id(module_id: InternedModuleId) -> bool {
+    let module_id = view_module_id(module_id);
+    module_id.address() == &VM_MODULE_ADDRESS
+        && view_name(module_id.name()) == TXN_ARG_MODULE.as_str()
+}
+
 /// The [`StructTag`] for an interned nominal (struct/enum) type, or [`None`] if
 /// `ty` is not nominal.
 pub fn struct_tag_of(ty: InternedType) -> Option<StructTag> {

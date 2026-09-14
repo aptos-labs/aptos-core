@@ -9,4 +9,6 @@ mod execute;
 mod metadata;
 mod pre_execution_checks;
 mod script;
+mod trampoline;
+mod txn_arg;
 mod validation;

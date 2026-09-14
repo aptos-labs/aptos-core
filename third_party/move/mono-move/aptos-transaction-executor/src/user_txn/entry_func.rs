@@ -1,37 +1,36 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Running an entry-function payload.
+//! Running an entry-function payload: a generated script deserializes the
+//! arguments in Move and calls the function.
 
-use super::args::{leading_signer_params, place_user_txn_args};
+use super::{
+    args::{check_arg_counts, leading_signer_params},
+    trampoline::trampoline_for,
+    txn_arg,
+};
 use crate::{
     calls::resolve_function_by_name,
     errors::{InvalidArguments, MoveExecutionFailure},
 };
-use mono_move_core::{
-    interner::{view_module_id, InternedIdentifier, InternedModuleId},
-    types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    Function, PreparedModule,
-};
+use mono_move_core::{types::InternedTypeList, Function, PreparedModule, VMInternalError};
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_binary_format::access::ModuleAccess;
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
+};
+use specializer::NotATransactionArgument;
 
 /// Checks that `func` is allowed to be called by a user transaction, returning
 /// the number of leading signer parameters.
 /// - It must be an entry function.
 /// - It must not return values.
 /// - All signers must be in leading positions.
-/// - All other parameters must be of the allowed types.
-//
-// TODO(security, completeness): the current checks are INCOMPLETE:
-// - Certain framework types require additional checks during creation.
-//   - String: must be valid UTF-8.
-//   - Object: an `ObjectCore` resource must exist at the address, and
-//     a resource of type `T` must also exist under the same address.
-// - Public structs and enums are not yet supported.
+///
+/// Whether the other parameters have types a transaction may supply is
+/// decided by loading their deserializers.
 fn check_callable_by_user_txn(
     func: &Function,
     module: &PreparedModule,
@@ -44,72 +43,14 @@ fn check_callable_by_user_txn(
     if !module.interned_types_at(handle.return_).is_empty() {
         return Err(InvalidArguments::ReturnsValues);
     }
-    let signer_params = leading_signer_params(&func.param_tys)?;
-    if func.param_tys[signer_params..]
-        .iter()
-        .any(|&ty| !is_allowed_arg_type(ty))
-    {
-        return Err(InvalidArguments::DisallowedParameterType);
-    }
-    Ok(signer_params)
+    leading_signer_params(&func.param_tys)
 }
 
-/// Whether a type can be allowed as a transaction argument.
-fn is_allowed_arg_type(ty: InternedType) -> bool {
-    match view_type(ty) {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::U128
-        | Type::U256
-        | Type::I8
-        | Type::I16
-        | Type::I32
-        | Type::I64
-        | Type::I128
-        | Type::I256
-        | Type::Address => true,
-        Type::Vector { elem } => is_allowed_arg_type(*elem),
-        Type::Nominal {
-            module_id,
-            name,
-            ty_args,
-        } => is_allowed_framework_struct(*module_id, *name, *ty_args),
-        Type::Signer
-        | Type::ImmutRef { .. }
-        | Type::MutRef { .. }
-        | Type::Function { .. }
-        | Type::TypeParam { .. } => false,
-    }
-}
-
-/// Whether the given type is a framework struct allowed to be constructed as a
-/// transaction argument.
-fn is_allowed_framework_struct(
-    module_id: InternedModuleId,
-    name: InternedIdentifier,
-    ty_args: InternedTypeList,
-) -> bool {
-    let module_id = view_module_id(module_id);
-    if *module_id.address() != AccountAddress::ONE {
-        return false;
-    }
-    match (view_name(module_id.name()), view_name(name)) {
-        // An `Object<T>` argument is only an address, so `T` is unrestricted.
-        ("string", "String")
-        | ("object", "Object")
-        | ("fixed_point32", "FixedPoint32")
-        | ("fixed_point64", "FixedPoint64") => true,
-        ("option", "Option") => view_type_list(ty_args)
-            .iter()
-            .all(|&ty| is_allowed_arg_type(ty)),
-        _ => false,
-    }
-}
-
-/// Runs the transaction's entry function, metered against the transaction's gas budget.
+/// Runs the transaction's entry function, metered against the transaction's
+/// gas budget.
+//
+// TODO(completeness): public structs and enums, and signed integers, have no
+// deserializer yet and are refused.
 pub(crate) fn call_entry_function<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
@@ -146,9 +87,53 @@ pub(crate) fn call_entry_function<'a>(
         .map_err(MoveExecutionFailure::RuntimeError)?;
     let signer_params =
         check_callable_by_user_txn(func, module).map_err(MoveExecutionFailure::InvalidArguments)?;
-    let mut call = interp
-        .build_call(func)
+    check_arg_counts(&func.param_tys, signer_params, secondary_signers, args)
+        .map_err(MoveExecutionFailure::InvalidArguments)?;
+    // Refuse a parameter type no transaction may supply before running
+    // anything, as AptosVM does.
+    for &ty in &func.param_tys[signer_params..] {
+        txn_arg::load_deserializer(guard, interp, ty).map_err(construction_failure)?;
+    }
+
+    let trampoline = trampoline_for(module, func.def_idx);
+    let main = interp
+        .load_trusted_script(&trampoline, ty_args)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    place_user_txn_args(&mut call, signer_params, sender, secondary_signers, args)?;
-    call.run().map_err(MoveExecutionFailure::RuntimeError)
+    let mut call = interp
+        .build_call(main)
+        .map_err(MoveExecutionFailure::RuntimeError)?;
+    // The sender fills the first signer parameter, secondary signers the
+    // rest. Placing a signer can only fail on a bug.
+    for signer in std::iter::once(sender)
+        .chain(secondary_signers)
+        .take(signer_params)
+    {
+        call.signer(signer)
+            .map_err(MoveExecutionFailure::RuntimeError)?;
+    }
+    for arg in args {
+        call.arg(arg.as_slice())
+            .map_err(MoveExecutionFailure::RuntimeError)?;
+    }
+    match call.run().map_err(construction_failure)? {
+        // The argument module aborts only on bytes that do not encode the
+        // parameter's type.
+        RuntimeStatus::Aborted {
+            location: AbortLocation::Module(module_id),
+            ..
+        } if txn_arg::is_txn_arg_module(&module_id) => Err(MoveExecutionFailure::InvalidArguments(
+            InvalidArguments::UndecodableArgument,
+        )),
+        status => Ok(status),
+    }
+}
+
+/// A failure while loading or running argument deserializers. A type no
+/// transaction may supply surfaces as a lowering error.
+fn construction_failure(err: VMInternalError) -> MoveExecutionFailure {
+    if err.downcast_ref::<NotATransactionArgument>().is_some() {
+        MoveExecutionFailure::InvalidArguments(InvalidArguments::DisallowedParameterType)
+    } else {
+        MoveExecutionFailure::RuntimeError(err)
+    }
 }

@@ -9,6 +9,7 @@ use super::{
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
     script::run_script,
+    txn_arg,
     validation::{run_epilogue, run_prologue, ValidationSigners},
 };
 use crate::{
@@ -96,7 +97,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             self.module_provider,
             LoadingPolicy::Lazy(LoweringPolicy::Lazy),
             self.natives,
-        );
+        )
+        .with_builtin_modules(&txn_arg::BUILTIN_MODULES);
 
         let extensions = transaction_extensions(&txn_data, self.usage);
 

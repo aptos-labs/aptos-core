@@ -1,0 +1,9 @@
+[package]
+name = "TxnArg"
+version = "0.0.1"
+
+[addresses]
+txn_arg = "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }

@@ -6,7 +6,7 @@
 //! Builds frame layout information (slot offsets/sizes) needed by the lowerer.
 //! All lookups are O(1) via indexed Vecs — no maps.
 
-use super::LoweringError;
+use super::{txn_arg, LoweringError};
 use crate::{
     lower::{
         gc_layout::{
@@ -441,6 +441,31 @@ fn callee_identity(
     )
 }
 
+/// Whether `module` defines `func_name` with a signature that, instantiated
+/// with `ty_args`, is exactly `(params, returns)`.
+#[cfg(debug_assertions)]
+fn intrinsic_target_signature_matches(
+    module: &PreparedModule,
+    interner: &impl Interner,
+    func_name: InternedIdentifier,
+    ty_args: InternedTypeList,
+    params: InternedTypeList,
+    returns: InternedTypeList,
+) -> bool {
+    let Some(def) = module.function_defs().iter().find(|def| {
+        module.interned_identifier_at(module.function_handle_at(def.function).name) == func_name
+    }) else {
+        return false;
+    };
+    match instantiate_callee_signature(module, interner, def.function, ty_args) {
+        Ok((target_params, target_returns)) => {
+            view_type_list(target_params) == view_type_list(params)
+                && view_type_list(target_returns) == view_type_list(returns)
+        },
+        Err(_) => false,
+    }
+}
+
 /// Callee `(params, returns)` from its handle signature, substituted under
 /// `ty_args`. The substitution is a no-op when `ty_args` is empty.
 fn instantiate_callee_signature(
@@ -723,6 +748,32 @@ pub fn try_build_context<'a>(
             CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
         };
         let (callee_module_id, callee_func_name) = callee_identity(&module_ir.module, handle_idx);
+        // A call to the argument-deserialization intrinsic targets the
+        // deserializer for its concrete type argument instead. The slots above
+        // stay valid because the target's signature is the intrinsic's.
+        let (callee_module_id, callee_func_name, call_ty_args) = match txn_arg::resolve_intrinsic(
+            interner,
+            module_ir.module.id(),
+            callee_module_id,
+            callee_func_name,
+            call_ty_args,
+        )? {
+            Some((module_id, func_name, ty_args)) => {
+                debug_assert!(
+                    intrinsic_target_signature_matches(
+                        &module_ir.module,
+                        interner,
+                        func_name,
+                        ty_args,
+                        param_list,
+                        ret_list
+                    ),
+                    "intrinsic target signature diverges from the call site"
+                );
+                (module_id, func_name, ty_args)
+            },
+            None => (callee_module_id, callee_func_name, call_ty_args),
+        };
         // TODO(correctness): The native registry is trusted unconditionally
         // here. Consider cross-checking against the callee module's
         // `is_native` flag so a registered impl cannot shadow a Move-body

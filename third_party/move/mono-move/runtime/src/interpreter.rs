@@ -499,6 +499,22 @@ impl<'guard> InterpreterContext<'guard> {
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
+    /// Loads a script the VM generated itself, unverified.
+    pub fn load_trusted_script(
+        &mut self,
+        code: &[u8],
+        ty_args: InternedTypeList,
+    ) -> VMResult<&'guard Function> {
+        let ptr = self.loader.load_trusted_script(
+            &mut self.read_set,
+            &mut self.gas_meter,
+            code,
+            ty_args,
+        )?;
+        // SAFETY: the function lives in an arena the guard keeps alive.
+        Ok(unsafe { ptr.as_ref_unchecked() })
+    }
+
     /// The module `func` was loaded from.
     pub fn module_of(&self, func: &Function) -> VMResult<&'guard PreparedModule> {
         self.prepared_module(func.module_id)
