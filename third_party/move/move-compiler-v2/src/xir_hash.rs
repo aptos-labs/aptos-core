@@ -95,6 +95,32 @@ pub struct CanonicalModule {
     pub structs: Vec<CanonicalStruct>,
     /// Sorted by name.
     pub functions: Vec<CanonicalFunction>,
+    /// Sorted by name.
+    ///
+    /// A constant's *value* is included, not just its name and type: a
+    /// dependent's specifications read the value, so changing `3` to `4`
+    /// changes what they mean even though nothing about the declaration moves.
+    pub constants: Vec<CanonicalConstant>,
+    /// Sorted by name.
+    ///
+    /// Specification function bodies are included for the same reason inline
+    /// function bodies are (see [`CanonicalFunction::source`]): a dependent
+    /// compiles against the body, not merely the signature.
+    pub spec_declarations: Vec<CanonicalSpecDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CanonicalConstant {
+    pub name: String,
+    pub visibility: String,
+    pub ty: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CanonicalSpecDeclaration {
+    pub name: String,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -153,6 +179,14 @@ pub struct CanonicalFunction {
     pub acquires: Vec<String>,
     /// Sorted.
     pub attributes: Vec<String>,
+    /// The rendered body of an `inline` function, and nothing otherwise.
+    ///
+    /// This is the one place a *body* belongs in the hash. An inline function
+    /// is expanded into its callers rather than linked to, so its body is
+    /// literally part of what dependents compile — changing it changes their
+    /// bytecode, and they must rebuild. Every other function's body is excluded
+    /// for exactly the symmetric reason.
+    pub source: Option<String>,
 }
 
 /// Builds the canonical projection.
@@ -192,11 +226,42 @@ pub fn canonical_interface(module: &XirModule) -> Result<CanonicalModule> {
         .collect::<Result<Vec<_>>>()?;
     functions.sort_by(|a, b| a.name.cmp(&b.name));
 
+    let mut constants = module
+        .constants
+        .iter()
+        .map(|decl| {
+            Ok(CanonicalConstant {
+                name: decl.name.clone(),
+                visibility: match decl.visibility {
+                    None | Some(XirVisibility::Private) => "private",
+                    Some(XirVisibility::Public) => "public",
+                    Some(XirVisibility::Friend) => "friend",
+                }
+                .to_owned(),
+                ty: names.ty(&decl.ty)?,
+                value: format!("{:?}", decl.value),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    constants.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut spec_declarations = module
+        .spec_declarations
+        .iter()
+        .map(|decl| CanonicalSpecDeclaration {
+            name: decl.name.clone(),
+            source: decl.source.clone(),
+        })
+        .collect::<Vec<_>>();
+    spec_declarations.sort_by(|a, b| a.name.cmp(&b.name));
+
     Ok(CanonicalModule {
         module: format!("{}::{}", module.module.address, module.module.name),
         friends,
         structs,
         functions,
+        constants,
+        spec_declarations,
     })
 }
 
@@ -332,6 +397,7 @@ impl<'a> Names<'a> {
             returns: self.ty_list(&decl.returns)?,
             acquires,
             attributes: attributes(&decl.attributes),
+            source: decl.source.clone(),
         })
     }
 }

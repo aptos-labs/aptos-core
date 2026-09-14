@@ -94,8 +94,12 @@ pub fn build_test_plan_for_package<W: Write + Send>(
     // then save it, before resuming the rest of the compilation and returning the results and
     // control back to the Move package system.
     let (mut diag_writer, diag_buffer) = build_config.compiler_config.error_writer();
-    let compile_result =
-        build_plan.compile_with_driver(writer, &build_config.compiler_config, vec![], |options| {
+    let compile_result = build_plan.compile_with_driver(
+        writer,
+        &build_config.compiler_config,
+        vec![],
+        /*model_required*/ false,
+        |options| {
             let (files, units, env) = make_no_exit_v2_driver_to(&mut diag_writer)(options)?;
             let root_package_in_model = env.symbol_pool().make(root_package.deref());
             let built_test_plan =
@@ -103,7 +107,8 @@ pub fn build_test_plan_for_package<W: Write + Send>(
 
             test_plan = Some((built_test_plan, files.clone(), units.clone()));
             Ok((files, units, env))
-        });
+        },
+    );
     if let Some(buf) = &diag_buffer {
         writer.write_all(buf.lock().unwrap().as_slice())?;
     }

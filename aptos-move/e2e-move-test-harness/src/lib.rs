@@ -60,7 +60,25 @@ static CACHED_BUILT_PACKAGES: Lazy<
     Mutex<HashMap<(PathBuf, BuildOptions), Arc<anyhow::Result<BuiltPackage>>>>,
 > = Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Experiment hook: lets a run turn on modular compilation and point every
+/// package at one shared build directory, without editing 40 call sites.
+///
+/// Off unless both variables are set, so an ordinary test run is unaffected.
+/// The shared directory is the point of the exercise — with the default
+/// `install_dir: None` each package builds under its own directory, so the
+/// framework is compiled once *per test package* and nothing is reused.
+fn apply_build_overrides(mut options: BuildOptions) -> BuildOptions {
+    if std::env::var("APTOS_E2E_MODULAR_COMPILATION").as_deref() == Ok("1") {
+        options.modular_compilation = true;
+    }
+    if let Ok(dir) = std::env::var("APTOS_E2E_BUILD_DIR") {
+        options.install_dir = Some(PathBuf::from(dir));
+    }
+    options
+}
+
 fn build_package_cached(path: &Path, options: BuildOptions) -> Arc<anyhow::Result<BuiltPackage>> {
+    let options = apply_build_overrides(options);
     let key = (path.to_owned(), options.clone());
     let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
     Arc::clone(

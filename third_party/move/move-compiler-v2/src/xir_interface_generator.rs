@@ -25,10 +25,11 @@
 //! consumers do not mistake a stub for a genuine native.
 
 use anyhow::{bail, Context, Result};
+use itertools::Itertools;
 use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 use move_model_exchange::{
-    Field, Type as Ty, TypeParameter, Variant, XirAttribute, XirAttributeArg, XirFunction,
-    XirModule, XirStruct, XirVisibility,
+    Field, Type as Ty, TypeParameter, Value, Variant, XirAttribute, XirAttributeArg, XirConstant,
+    XirFunction, XirModule, XirStruct, XirVisibility,
 };
 use std::{fs, path::PathBuf};
 use tempfile::TempDir;
@@ -89,6 +90,32 @@ pub fn xir_module_to_move_source(module: &XirModule) -> Result<String> {
         module.module.address, module.module.name
     ));
 
+    // Only the copied specification text speaks in aliases; everything else is
+    // emitted fully qualified. See `XirModule::uses`.
+    for use_decl in &module.uses {
+        let path = format!("{}::{}", use_decl.address, use_decl.module);
+        if use_decl.members.is_empty() {
+            let alias = match &use_decl.alias {
+                Some(alias) => format!(" as {alias}"),
+                None => String::new(),
+            };
+            out.push_str(&format!("    use {path}{alias};\n"));
+        } else {
+            let members = use_decl
+                .members
+                .iter()
+                .map(|member| match &member.alias {
+                    Some(alias) => format!("{} as {}", member.name, alias),
+                    None => member.name.clone(),
+                })
+                .join(", ");
+            out.push_str(&format!("    use {path}::{{{members}}};\n"));
+        }
+    }
+    if !module.uses.is_empty() {
+        out.push('\n');
+    }
+
     for friend in &module.friends {
         out.push_str(&format!(
             "    friend {}::{};\n",
@@ -96,6 +123,20 @@ pub fn xir_module_to_move_source(module: &XirModule) -> Result<String> {
         ));
     }
     if !module.friends.is_empty() {
+        out.push('\n');
+    }
+
+    // Before the types, because a constant may appear in a type's or a
+    // function's declaration — `vector<u8>` lengths and the like — and Move
+    // resolves names within a module regardless of order anyway.
+    for decl in &module.constants {
+        out.push_str(
+            &interface
+                .constant_source(decl)
+                .with_context(|| format!("on constant `{}`", decl.name))?,
+        );
+    }
+    if !module.constants.is_empty() {
         out.push('\n');
     }
 
@@ -114,6 +155,25 @@ pub fn xir_module_to_move_source(module: &XirModule) -> Result<String> {
                 .function_source(decl)
                 .with_context(|| format!("on function `{}`", decl.name))?,
         );
+        out.push('\n');
+    }
+
+    // Last, because a specification may name anything above it.
+    //
+    // Emitted at module level with a `spec` prefix — `spec fun f ..`, `spec
+    // schema S ..` — rather than inside one `spec module { .. }` block. Both
+    // forms are valid for a function, but a *schema* is only accepted at module
+    // level, and the two have to be emitted the same way since one table holds
+    // both.
+    for decl in &module.spec_declarations {
+        for (index, line) in decl.source.lines().enumerate() {
+            out.push_str("    ");
+            if index == 0 {
+                out.push_str("spec ");
+            }
+            out.push_str(line);
+            out.push('\n');
+        }
         out.push('\n');
     }
 
@@ -302,7 +362,47 @@ impl<'a> Interface<'a> {
         ))
     }
 
+    /// Renders a constant declaration.
+    ///
+    /// A private constant is emitted private, matching the original: Move's
+    /// specification language reaches another module's private constants, and
+    /// promoting it to `public` here would change what ordinary code may name.
+    fn constant_source(&self, decl: &XirConstant) -> Result<String> {
+        let visibility = match decl.visibility {
+            None | Some(XirVisibility::Private) => "",
+            Some(XirVisibility::Public) => "public ",
+            Some(XirVisibility::Friend) => "friend ",
+        };
+        Ok(format!(
+            "    {}const {}: {} = {};\n",
+            visibility,
+            decl.name,
+            self.ty(&decl.ty, &[])?,
+            value_source(&decl.value, &decl.ty)?
+        ))
+    }
+
     fn function_source(&self, decl: &XirFunction) -> Result<String> {
+        // An `inline` function travels as rendered source, because a dependent
+        // expands its body rather than linking to it. Emit that verbatim: it is
+        // already a complete declaration, and it must stay `inline` rather than
+        // becoming a `native` stub — there is nothing in the deployed module for
+        // such a stub to resolve to.
+        //
+        // The rendering carries its own attributes, so `decl.attributes` is not
+        // emitted here; it would duplicate them. That rendering keeps only
+        // attribute *names*, which is why the exporter refuses to produce
+        // `source` for a function whose attributes have arguments.
+        if let Some(source) = &decl.source {
+            let mut out = String::new();
+            for line in source.lines() {
+                out.push_str("    ");
+                out.push_str(line);
+                out.push('\n');
+            }
+            return Ok(out);
+        }
+
         let mut out = String::new();
         for attribute in &decl.attributes {
             out.push_str(&format!("    {}\n", attribute_source(attribute)?));
@@ -394,6 +494,33 @@ fn type_parameter_source(params: &[TypeParameter]) -> String {
     format!("<{}>", rendered.join(", "))
 }
 
+/// Renders a constant's value as a Move literal.
+///
+/// The declared type carries the width, so an integer needs no suffix. A
+/// `vector<u8>` is written element-wise rather than as a byte string: the
+/// format stores the elements, and `vector[1, 2]` is valid wherever `b"..."`
+/// would be, without having to decide whether the bytes are printable.
+fn value_source(value: &Value, ty: &Ty) -> Result<String> {
+    Ok(match value {
+        Value::Bool(value) => value.to_string(),
+        Value::Num(value) => value.clone(),
+        Value::Address(address) => format!("@{address}"),
+        Value::Vector(values) => {
+            let element = match ty {
+                Ty::Vector(element) => element.as_ref(),
+                // Only a vector type can hold a vector value; anything else
+                // means the constant's type and value disagree.
+                other => bail!("a vector constant declared as `{other:?}`"),
+            };
+            let elements = values
+                .iter()
+                .map(|value| value_source(value, element))
+                .collect::<Result<Vec<_>>>()?;
+            format!("vector[{}]", elements.join(", "))
+        },
+    })
+}
+
 fn attribute_source(attribute: &XirAttribute) -> Result<String> {
     Ok(format!(
         "#[{}]",
@@ -442,6 +569,9 @@ mod tests {
             structs,
             functions,
             friends: vec![],
+            constants: vec![],
+            spec_declarations: vec![],
+            uses: vec![],
             external_functions: vec![],
             external_structs: vec![],
         }
