@@ -13132,6 +13132,7 @@ dependencies = [
  "serde",
  "shared-dsa",
  "thiserror 1.0.69",
+ "triomphe",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use std::ptr::NonNull;
+use std::{ptr::NonNull, sync::Arc};
 use thiserror::Error;
 
 /// Version of the read value (which can come from storage or from other
@@ -130,17 +130,26 @@ impl IntoExecutionError for ResourceProviderError {
     }
 }
 
+/// Marks an arena as safe to hand out pointers into: implementing it asserts
+/// that allocations never move and are never freed while the arena is alive.
+/// Implemented by a storage provider's cache arena and by another transaction's
+/// frozen heap.
+///
+/// A [`StorageRead::ExternalHeap`] holds an `Arc<dyn ReadPin>` on the arena its
+/// pointer points into, so that arena outlives the read.
+//
+// TODO(cleanup): give this a method (or supertrait) once read-set validation
+// needs to inspect the backing allocation.
+pub trait ReadPin {}
+
 /// Storage read returned to the VM. Every VM execution records reads of any
 /// value coming from global storage.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone)]
 pub enum StorageRead {
     /// Value does not exist at this key.
     DoesNotExist,
     /// Value is allocated in some other arena or cache. For example, it can be
     /// a cached DB read or a write from soe transaction at lower version.
-    // TODO(cleanup):
-    //   Figure out how to enforce compile-time guarantees here that owning
-    //   arena is alive.
     ExternalHeap {
         /// Just like any other VM value, the pointer points to the start of
         /// the value allocation. Value's header is at negative offset.
@@ -148,6 +157,8 @@ pub enum StorageRead {
         ptr: NonNull<u8>,
         /// Version of this read from Block-STM. Used for read-set validation.
         version: Version,
+        /// Keeps the arena `ptr` points into alive while this read is retained.
+        pin: Arc<dyn ReadPin>,
     },
 }
 
