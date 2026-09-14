@@ -1,23 +1,30 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Synthetic programs for benchmarking the mono-move runtime.
+//! Programs for benchmarking the mono-move runtime.
 //!
-//! Each module defines a program in two flavors:
-//! - **Native Rust** — reference implementation / bench baseline.
-//! - **Move source** — run through the mono-move pipeline (and the legacy
-//!   MoveVM). The canonical `.move` files under
-//!   `tests/test_cases/differential/programs/` double as the correctness
-//!   (differential) tests; the benches in `benches/` `include_str!` the same
-//!   files and drive them through the shared [`crate::engine`].
+//! Every module exposes Move source, run through the mono-move pipeline and
+//! through the legacy MoveVM. The micro-kernels also carry a native Rust
+//! mirror used as a bench control.
+//!
+//! Sources are referenced in place, never copied. The micro-kernels live under
+//! `tests/test_cases/differential/programs/` and double as the differential
+//! tests. The larger workloads live under `mono-move/benchmarks/` as standalone
+//! Move packages with their own unit tests.
 
+pub mod bounce;
 pub mod bst;
+pub mod exchange2;
 pub mod fib;
 pub mod int_arith_loop;
 pub mod match_sum;
 pub mod merge_sort;
 pub mod nested_loop;
+pub mod pathtracer;
+pub mod queens;
+pub mod sieve;
 pub mod testing;
+pub mod towers;
 
 use move_binary_format::file_format::CompiledModule;
 
@@ -43,4 +50,9 @@ pub(crate) fn compile_one(source: &str) -> CompiledModule {
         .into_iter()
         .next()
         .expect("no module in compiled output")
+}
+
+/// Compile a multi-module Move program source into all its modules.
+pub(crate) fn compile_all(source: &str) -> Vec<CompiledModule> {
+    crate::compile::compile_move_source(source).expect("Move compilation failed")
 }
