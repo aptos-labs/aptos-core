@@ -6,17 +6,20 @@
 use super::args::{leading_signer_params, place_user_txn_args};
 use crate::{
     calls::resolve_function_by_name,
-    errors::{InvalidArguments, MoveExecutionFailure},
+    errors::{invariant_violation, InvalidArguments, MoveExecutionFailure},
 };
 use mono_move_core::{
     interner::{view_module_id, InternedIdentifier, InternedModuleId},
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    Function, PreparedModule,
+    FieldTypes, Function, Interner, PreparedModule, VMResult,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{FunctionAttribute, StructFieldInformation, VariantIndex, Visibility},
+};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 /// Checks that `func` is allowed to be called by a user transaction, returning
@@ -25,33 +28,43 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 /// - It must not return values.
 /// - All signers must be in leading positions.
 /// - All other parameters must be of the allowed types.
-//
-// TODO(completeness): admit public structs and enums as argument types.
-fn check_callable_by_user_txn(
+fn check_callable_by_user_txn<'a>(
+    guard: &ExecutionGuard<'a>,
+    interp: &mut InterpreterContext<'a>,
     func: &Function,
     module: &PreparedModule,
-) -> Result<usize, InvalidArguments> {
+) -> Result<usize, MoveExecutionFailure> {
     let def = module.function_def_at(func.def_idx);
     if !def.is_entry {
-        return Err(InvalidArguments::NotEntryFunction);
+        return Err(MoveExecutionFailure::InvalidArguments(
+            InvalidArguments::NotEntryFunction,
+        ));
     }
     let handle = module.function_handle_at(def.function);
     if !module.interned_types_at(handle.return_).is_empty() {
-        return Err(InvalidArguments::ReturnsValues);
+        return Err(MoveExecutionFailure::InvalidArguments(
+            InvalidArguments::ReturnsValues,
+        ));
     }
-    let signer_params = leading_signer_params(&func.param_tys)?;
-    if func.param_tys[signer_params..]
-        .iter()
-        .any(|&ty| !is_allowed_arg_type(ty))
-    {
-        return Err(InvalidArguments::DisallowedParameterType);
+    let signer_params =
+        leading_signer_params(&func.param_tys).map_err(MoveExecutionFailure::InvalidArguments)?;
+    for &ty in &func.param_tys[signer_params..] {
+        if !is_allowed_arg_type(guard, interp, ty).map_err(MoveExecutionFailure::RuntimeError)? {
+            return Err(MoveExecutionFailure::InvalidArguments(
+                InvalidArguments::DisallowedParameterType,
+            ));
+        }
     }
     Ok(signer_params)
 }
 
 /// Whether a type can be allowed as a transaction argument.
-fn is_allowed_arg_type(ty: InternedType) -> bool {
-    match view_type(ty) {
+fn is_allowed_arg_type<'a>(
+    guard: &ExecutionGuard<'a>,
+    interp: &mut InterpreterContext<'a>,
+    ty: InternedType,
+) -> VMResult<bool> {
+    Ok(match view_type(ty) {
         Type::Bool
         | Type::U8
         | Type::U16
@@ -66,42 +79,120 @@ fn is_allowed_arg_type(ty: InternedType) -> bool {
         | Type::I128
         | Type::I256
         | Type::Address => true,
-        Type::Vector { elem } => is_allowed_arg_type(*elem),
+        Type::Vector { elem } => is_allowed_arg_type(guard, interp, *elem)?,
         Type::Nominal {
             module_id,
             name,
             ty_args,
-        } => is_allowed_framework_struct(*module_id, *name, *ty_args),
+        } => {
+            let id = view_module_id(*module_id);
+            if *id.address() == AccountAddress::ONE {
+                match (view_name(id.name()), view_name(*name)) {
+                    // An `Object<T>` argument is only an address, so `T` is
+                    // unrestricted.
+                    ("string", "String")
+                    | ("object", "Object")
+                    | ("fixed_point32", "FixedPoint32")
+                    | ("fixed_point64", "FixedPoint64") => return Ok(true),
+                    ("option", "Option") => return are_allowed_arg_types(guard, interp, *ty_args),
+                    _ => {},
+                }
+            }
+            is_public_struct(guard, interp, *module_id, *name, *ty_args)?
+        },
         Type::Signer
         | Type::ImmutRef { .. }
         | Type::MutRef { .. }
         | Type::Function { .. }
         | Type::TypeParam { .. } => false,
-    }
+    })
 }
 
-/// Whether the given type is a framework struct allowed to be constructed as a
-/// transaction argument.
-fn is_allowed_framework_struct(
+/// Whether every type in `tys` can be allowed as a transaction argument.
+fn are_allowed_arg_types<'a>(
+    guard: &ExecutionGuard<'a>,
+    interp: &mut InterpreterContext<'a>,
+    tys: InternedTypeList,
+) -> VMResult<bool> {
+    for &ty in view_type_list(tys) {
+        if !is_allowed_arg_type(guard, interp, ty)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Whether a struct or enum outside the framework whitelist can be allowed as
+/// a transaction argument, loading its defining module if needed.
+/// - Its definition must declare `copy` and not `key`.
+/// - It must be packed by a public pack function: `pack$S` for a struct `S`,
+///   `pack$S$V` for every variant `V` of an enum `S`.
+/// - Its field types, instantiated with `ty_args`, must all be allowed.
+fn is_public_struct<'a>(
+    guard: &ExecutionGuard<'a>,
+    interp: &mut InterpreterContext<'a>,
     module_id: InternedModuleId,
     name: InternedIdentifier,
     ty_args: InternedTypeList,
-) -> bool {
-    let module_id = view_module_id(module_id);
-    if *module_id.address() != AccountAddress::ONE {
-        return false;
+) -> VMResult<bool> {
+    let module = interp.load_module(module_id)?;
+    let Some(handle) = module.nominal_handle(module_id, name) else {
+        return Ok(false);
+    };
+    if !handle.abilities.has_copy() || handle.abilities.has_key() {
+        return Ok(false);
     }
-    match (view_name(module_id.name()), view_name(name)) {
-        // An `Object<T>` argument is only an address, so `T` is unrestricted.
-        ("string", "String")
-        | ("object", "Object")
-        | ("fixed_point32", "FixedPoint32")
-        | ("fixed_point64", "FixedPoint64") => true,
-        ("option", "Option") => view_type_list(ty_args)
-            .iter()
-            .all(|&ty| is_allowed_arg_type(ty)),
-        _ => false,
+    let Some(def_idx) = module.interned_nominal_type_def_idx(name) else {
+        return Ok(false);
+    };
+    let has_pack_function = |function_name: &str, attribute: FunctionAttribute| {
+        module.function_defs().iter().any(|def| {
+            let handle = module.function_handle_at(def.function);
+            module.identifier_at(handle.name).as_str() == function_name
+                && def.visibility == Visibility::Public
+                && handle.attributes.contains(&attribute)
+        })
+    };
+    let struct_name = view_name(name);
+    let mut field_tys = Vec::new();
+    match module.interned_field_types(name) {
+        Some(FieldTypes::Struct(fields)) => {
+            if !has_pack_function(&format!("pack${struct_name}"), FunctionAttribute::Pack) {
+                return Ok(false);
+            }
+            field_tys.extend_from_slice(fields);
+        },
+        Some(FieldTypes::Enum(variants)) => {
+            let StructFieldInformation::DeclaredVariants(variant_defs) =
+                &module.struct_def_at(def_idx).field_information
+            else {
+                return Ok(false);
+            };
+            for (tag, (variant, fields)) in variant_defs.iter().zip(variants).enumerate() {
+                let Ok(tag) = VariantIndex::try_from(tag) else {
+                    return Ok(false);
+                };
+                let variant_name = module.identifier_at(variant.name);
+                if !has_pack_function(
+                    &format!("pack${struct_name}${variant_name}"),
+                    FunctionAttribute::PackVariant(tag),
+                ) {
+                    return Ok(false);
+                }
+                field_tys.extend_from_slice(fields);
+            }
+        },
+        None => return Ok(false),
     }
+    for field_ty in field_tys {
+        let field_ty = guard
+            .subst_type(field_ty, ty_args)
+            .map_err(|err| invariant_violation(err.to_string()))?;
+        if !is_allowed_arg_type(guard, interp, field_ty)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// Runs the transaction's entry function, metered against the transaction's gas budget.
@@ -139,8 +230,7 @@ pub(crate) fn call_entry_function<'a>(
     let module = interp
         .module_of(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    let signer_params =
-        check_callable_by_user_txn(func, module).map_err(MoveExecutionFailure::InvalidArguments)?;
+    let signer_params = check_callable_by_user_txn(guard, interp, func, module)?;
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;

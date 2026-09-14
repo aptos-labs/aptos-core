@@ -617,6 +617,17 @@ impl<'guard> InterpreterContext<'guard> {
         self.prepared_module(func.module_id)
     }
 
+    /// The module `module_id`, loaded and charged if this transaction has not
+    /// loaded it yet.
+    pub fn load_module(&mut self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        if self.read_set.get(arena_ref).is_none() {
+            self.loader
+                .load_module(&mut self.read_set, &mut self.gas_meter, arena_ref)?;
+        }
+        self.prepared_module(module_id)
+    }
+
     /// A module some loaded function came from. Loading the function loaded
     /// its module into the read set, so a miss is an invariant violation.
     fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {

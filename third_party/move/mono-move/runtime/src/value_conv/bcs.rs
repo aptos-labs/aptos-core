@@ -688,7 +688,7 @@ mod tests {
     };
     use mono_move_core::{
         align_up_u32,
-        types::{U128_TY, U64_TY, U8_TY},
+        types::{U128_TY, U16_TY, U64_TY, U8_TY},
         value_layout::{
             ADDRESS_LAYOUT_ID, BOOL_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID,
             U8_LAYOUT_ID,
@@ -1059,6 +1059,50 @@ mod tests {
         assert_eq!(recorder.0[0].1, [9u8; 32]);
         assert!(recorder.0[1].0 == U64_TY);
         assert_eq!(recorder.0[1].1, bytes);
+    }
+
+    #[test]
+    fn hook_sees_struct_nested_in_blittable_vector_element() {
+        let mut table = ValueLayoutTable::new();
+        let inner = push_object_like_struct(&mut table);
+        // A one-field wrapper around the object-like struct, itself blittable,
+        // published under the dummy type `U16_TY`.
+        let outer = build_struct_layout(&table, 32, vec![(0, inner)]);
+        assert!(outer.all_byte_patterns_valid());
+        let oid = table.push(U16_TY, outer);
+        let vid = table.push(U8_TY, vector_layout(oid));
+        let layout = table.layout(vid).unwrap();
+        let mut bytes = vec![0x02u8];
+        bytes.extend_from_slice(&[3u8; 32]);
+        bytes.extend_from_slice(&[4u8; 32]);
+        let mut heap = Heap::new(4096);
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let mut recorder = Recorder(vec![]);
+        unsafe {
+            deserialize_impl_with_hook(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+                &mut recorder,
+            )
+            .unwrap()
+        };
+        assert_eq!(cursor, bytes.len());
+        // Neither the element bulk copy nor the wrapper blit was taken: each
+        // element reports its inner value, then the wrapper.
+        assert_eq!(recorder.0.len(), 4);
+        assert!(recorder.0[0].0 == U128_TY);
+        assert_eq!(recorder.0[0].1, [3u8; 32]);
+        assert!(recorder.0[1].0 == U16_TY);
+        assert_eq!(recorder.0[1].1, [3u8; 32]);
+        assert!(recorder.0[2].0 == U128_TY);
+        assert_eq!(recorder.0[2].1, [4u8; 32]);
+        assert!(recorder.0[3].0 == U16_TY);
+        assert_eq!(recorder.0[3].1, [4u8; 32]);
     }
 
     #[test]

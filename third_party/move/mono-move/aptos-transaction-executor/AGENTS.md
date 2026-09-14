@@ -25,8 +25,6 @@ above this crate.
 Still open before the transaction executor can be wired to the block
 coordinator:
 
-- Public struct and enum arguments are not admitted. See the
-  `TODO(completeness)` in `user_txn/entry_func.rs`.
 - Multi-agent transactions are untested.
 
 ## Conventions
