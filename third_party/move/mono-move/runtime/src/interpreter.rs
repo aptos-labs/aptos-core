@@ -294,6 +294,56 @@ impl<'a> CallBuilder<'a, '_> {
         unsafe { value_conv::bcs::deserialize_into(guard, &mut self.interp.heap, ty, bytes, dst) }
     }
 
+    /// Places a BCS-encoded argument, running `check` on every typed nominal
+    /// value decoded from it with the value's type and bytes. A failing check
+    /// fails the placement with the check's error.
+    ///
+    /// On error, the parameter slot is left partially written and the call
+    /// must be abandoned.
+    pub fn arg_bcs_with(
+        &mut self,
+        bytes: &[u8],
+        check: impl FnMut(&mut StorageReader<'_, '_>, InternedType, &[u8]) -> VMResult<()>,
+    ) -> VMResult<()> {
+        let (dst, ty) = self.next_slot()?;
+        let InterpreterContext {
+            loader,
+            read_set,
+            gas_meter,
+            resource_provider,
+            heap,
+            read_write_set,
+            ..
+        } = &mut *self.interp;
+        let mut hook = CheckHook {
+            storage: StorageReader {
+                loader,
+                read_set,
+                gas_meter,
+                resource_provider: *resource_provider,
+                read_write_set,
+            },
+            check,
+            failure: None,
+        };
+        // SAFETY: `dst` and `ty` come from the function's own signature, so
+        // the slot is writable for the type's in-memory size.
+        let result = unsafe {
+            value_conv::bcs::deserialize_into_with_hook(
+                loader.guard(),
+                heap,
+                ty,
+                bytes,
+                dst,
+                &mut hook,
+            )
+        };
+        match hook.failure {
+            Some(failure) => Err(failure),
+            None => result,
+        }
+    }
+
     /// Runs the call once all parameters have been filled.
     pub fn run(self) -> VMResult<RuntimeStatus> {
         if self.next_param != self.func.param_slots.len() {
@@ -303,6 +353,69 @@ impl<'a> CallBuilder<'a, '_> {
         }
         self.interp.prepare_call(self.func);
         self.interp.run()
+    }
+}
+
+/// Global-storage reads available to an argument check while the argument is
+/// being placed.
+pub struct StorageReader<'a, 'guard> {
+    loader: &'a Loader<'guard, 'guard>,
+    read_set: &'a mut ModuleReadSet<'guard>,
+    gas_meter: &'a mut GasMeter,
+    resource_provider: &'guard dyn ResourceProvider,
+    read_write_set: &'a mut ResourceReadWriteSet,
+}
+
+impl StorageReader<'_, '_> {
+    /// Whether a resource of type `ty` exists at `address`, recording the
+    /// read. Publishes the type's layout and loads its module if lowered code
+    /// has not done so yet.
+    pub fn resource_exists(&mut self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
+        let Type::Nominal {
+            module_id, name, ..
+        } = view_type(ty)
+        else {
+            invariant_violation!(Unreachable(
+                "resource type must be a nominal type".to_string()
+            ));
+        };
+        let guard = self.loader.guard();
+        if guard.layout_id_for(ty).is_none() || guard.struct_descriptor(ty).is_none() {
+            self.loader
+                .publish_resource_type(self.read_set, self.gas_meter, ty)?;
+        }
+        let arena_ref = guard.arena_ref_for_module_id(*module_id);
+        let group = self.read_set.get_loaded(arena_ref)?.resource_group_of(name);
+        Ok(self.read_write_set.exists(
+            self.resource_provider,
+            &InMemoryStorageKey::resource(address, ty),
+            group,
+        )?)
+    }
+}
+
+/// Runs an argument check as a decode hook, keeping the check's error for the
+/// caller since the decoder can only carry a `RuntimeError`.
+struct CheckHook<'a, 'guard, F> {
+    storage: StorageReader<'a, 'guard>,
+    check: F,
+    failure: Option<VMInternalError>,
+}
+
+impl<F> value_conv::bcs::DecodeHook for CheckHook<'_, '_, F>
+where
+    F: FnMut(&mut StorageReader<'_, '_>, InternedType, &[u8]) -> VMResult<()>,
+{
+    const OBSERVES: bool = true;
+
+    fn on_nominal(&mut self, ty: InternedType, bytes: &[u8]) -> Result<(), RuntimeError> {
+        match (self.check)(&mut self.storage, ty, bytes) {
+            Ok(()) => Ok(()),
+            Err(failure) => {
+                self.failure = Some(failure);
+                Err(RuntimeError::BCSRefusedByHook)
+            },
+        }
     }
 }
 

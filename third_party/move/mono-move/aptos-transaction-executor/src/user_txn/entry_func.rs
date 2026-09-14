@@ -26,12 +26,7 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 /// - All signers must be in leading positions.
 /// - All other parameters must be of the allowed types.
 //
-// TODO(security, completeness): the current checks are INCOMPLETE:
-// - Certain framework types require additional checks during creation.
-//   - String: must be valid UTF-8.
-//   - Object: an `ObjectCore` resource must exist at the address, and
-//     a resource of type `T` must also exist under the same address.
-// - Public structs and enums are not yet supported.
+// TODO(completeness): admit public structs and enums as argument types.
 fn check_callable_by_user_txn(
     func: &Function,
     module: &PreparedModule,
@@ -149,6 +144,13 @@ pub(crate) fn call_entry_function<'a>(
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    place_user_txn_args(&mut call, signer_params, sender, secondary_signers, args)?;
+    place_user_txn_args(
+        guard,
+        &mut call,
+        signer_params,
+        sender,
+        secondary_signers,
+        args,
+    )?;
     call.run().map_err(MoveExecutionFailure::RuntimeError)
 }

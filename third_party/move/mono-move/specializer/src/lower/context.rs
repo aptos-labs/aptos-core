@@ -1072,6 +1072,27 @@ pub fn try_discover_types_for_lowering_in_module(
     Ok(descriptors)
 }
 
+/// Publishes the layout and struct descriptor of the closed resource type
+/// `ty`, as lowering does for the resource types a function's storage
+/// operations reach, so the type can be read from storage.
+pub fn try_publish_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+) -> VMResult<()> {
+    let mut visited = UnorderedSet::new();
+    let mut descriptors = LoweringDescriptors::default();
+    discover_type_metadata(
+        ctx,
+        interner,
+        ty,
+        EMPTY_TYPE_LIST,
+        &mut visited,
+        &mut descriptors,
+    )?;
+    publish_struct_descriptor_for(ctx, ty, &mut descriptors.vec)
+}
+
 /// Per-function variant of [`try_discover_types_for_lowering_in_module`]. Returns
 /// the descriptor maps discovered for this function's type/closure set.
 pub fn try_discover_types_for_lowering_in_function(

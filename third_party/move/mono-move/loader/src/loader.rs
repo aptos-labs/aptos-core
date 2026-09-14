@@ -43,7 +43,7 @@ use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
         try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
-        try_lower_function, LoweringOutcome, SpecializerContext,
+        try_lower_function, try_publish_resource_type, LoweringOutcome, SpecializerContext,
     },
     ModuleIR,
 };
@@ -257,6 +257,23 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let (function, function_ms) =
             self.lower_function_with_ty_args(read_set, gas_meter, module, func_name, ty_args)?;
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
+    }
+
+    /// Publishes the layout and GC descriptor of the resource type `ty` so it
+    /// can be read from storage outside lowered code, loading and charging the
+    /// modules the type needs.
+    pub fn publish_resource_type(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        ty: InternedType,
+    ) -> VMResult<()> {
+        let mut loading_ctx = LoweringContext::new(self, read_set);
+        try_publish_resource_type(&mut loading_ctx, self.guard, ty)?;
+        let discovered = Arc::<[LoadedModuleSlot]>::from(loading_ctx.discovered);
+        self.record_loaded_and_charge_slots(read_set, gas_meter, &discovered, |_, _| {
+            invariant_violation!(UnexpectedReadSetMiss);
+        })
     }
 
     /// Loads a script from its bytes and returns its `main` instantiated with

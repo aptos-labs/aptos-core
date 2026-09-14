@@ -768,15 +768,88 @@ entry public fun takes_option_of_private(o: option::Option<Private>)
     ret
 "#;
 
+/// Entry functions taking the framework types a transaction argument may
+/// construct, so their values can be checked.
+const CALLABLE_ENTRY_FUNCTIONS: &str = r#"
+module 0xcafe::callable
+use 0x1::string
+use 0x1::option
+use 0x1::object
+use 0x1::fungible_asset
+
+entry public fun takes_string(s: string::String)
+    ret
+
+entry public fun takes_option_string(o: option::Option<string::String>)
+    ret
+
+entry public fun takes_strings(v: vector<string::String>)
+    ret
+
+entry public fun takes_object(o: object::Object<object::ObjectCore>)
+    ret
+
+entry public fun takes_store_object(o: object::Object<fungible_asset::FungibleStore>)
+    ret
+
+entry public fun takes_option_u64(o: option::Option<u64>)
+    ret
+"#;
+
+/// Publishes the MASM module `source` straight into `fx`'s state, returning
+/// the module's address.
+fn publish_module(
+    fx: &mut FakeExecutor,
+    source: &str,
+) -> move_core_types::account_address::AccountAddress {
+    let (module, blob) = aptos_language_e2e_tests::compile::compile_module(source);
+    fx.add_module(&module.self_id(), blob.into_inner());
+    *module.self_id().address()
+}
+
 /// Publishes `UNCALLABLE_ENTRY_FUNCTIONS` straight into `fx`'s state,
 /// returning the module's address.
 fn publish_uncallable_module(
     fx: &mut FakeExecutor,
 ) -> move_core_types::account_address::AccountAddress {
-    let (module, blob) =
-        aptos_language_e2e_tests::compile::compile_module(UNCALLABLE_ENTRY_FUNCTIONS);
-    fx.add_module(&module.self_id(), blob.into_inner());
-    *module.self_id().address()
+    publish_module(fx, UNCALLABLE_ENTRY_FUNCTIONS)
+}
+
+/// Asserts that v1 keeps `txn` with a failure and that v2 keeps it with the
+/// miscellaneous error `code`. For values v1 refuses by aborting in a
+/// framework constructor, where v2 reports its own status.
+fn assert_rejected_by_both(fx: &FakeExecutor, txn: SignedTransaction, code: StatusCode) {
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert!(
+        matches!(
+            v1_output.status(),
+            TransactionStatus::Keep(status) if !matches!(status, ExecutionStatus::Success)
+        ),
+        "v1 did not refuse the transaction: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
+    );
+}
+
+/// Asserts that both VMs run `txn` successfully with the same effects.
+fn assert_succeeds_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedTransaction) {
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 refused the transaction: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *sender.address());
 }
 
 /// A public function that is not `entry` is refused like on v1.
@@ -888,6 +961,101 @@ fn native_function_rejected_like_v1() {
         txn,
         StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED,
     );
+}
+
+/// A `String` argument that is valid UTF-8 runs like on v1.
+#[test]
+fn valid_string_argument_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_string", vec![
+        bcs::to_bytes("hello").unwrap(),
+    ]);
+    assert_succeeds_like_v1(&fx, &alice, txn);
+}
+
+/// A `String` argument that is not valid UTF-8 is refused. v1 aborts in
+/// `string::utf8`; v2 faults the argument.
+#[test]
+fn malformed_string_argument_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_string", vec![
+        bcs::to_bytes(&[0xFFu8, 0xFE].as_slice()).unwrap(),
+    ]);
+    assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// A malformed `String` nested in `Some` is refused.
+#[test]
+fn malformed_string_in_option_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_option_string", vec![
+        bcs::to_bytes(&Some([0xFFu8, 0xFE].as_slice())).unwrap(),
+    ]);
+    assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// A malformed `String` nested in a vector is refused, past valid elements.
+#[test]
+fn malformed_string_in_vector_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_strings", vec![
+        bcs::to_bytes(&[b"ok".as_slice(), [0xFFu8].as_slice()]).unwrap(),
+    ]);
+    assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// An `Object<T>` argument naming an address with no object is refused. v1
+/// aborts in `object::address_to_object`; v2 faults the argument.
+#[test]
+fn object_argument_without_object_rejected() {
+    let (mut fx, alice, bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_object", vec![
+        bcs::to_bytes(bob.address()).unwrap(),
+    ]);
+    assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// The APT fungible-asset metadata object genesis creates.
+const APT_METADATA_OBJECT: move_core_types::account_address::AccountAddress =
+    move_core_types::account_address::AccountAddress::TEN;
+
+/// An `Object<T>` argument naming an object holding a `T` runs like on v1.
+#[test]
+fn object_argument_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_object", vec![
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
+    ]);
+    assert_succeeds_like_v1(&fx, &alice, txn);
+}
+
+/// An `Object<T>` argument naming an object without a `T` is refused.
+#[test]
+fn object_argument_without_resource_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_store_object", vec![
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
+    ]);
+    assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// An `Option` holding two values is refused. v1 aborts in
+/// `option::from_vec`; v2 rejects the enum tag while decoding.
+#[test]
+fn overlong_option_argument_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
+    let txn = call_txn(&alice, address, "callable", "takes_option_u64", vec![
+        bcs::to_bytes(&[7u64, 8]).unwrap(),
+    ]);
+    assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
 }
 
 /// Transactions violating the pre-execution gas bounds expressible by the

@@ -31,6 +31,27 @@ use mono_move_core::{
     ENUM_DATA_OFFSET,
 };
 
+/// Observes each typed nominal value as it is decoded, with its type and the
+/// bytes it was decoded from.
+pub(crate) trait DecodeHook {
+    /// Whether nominal values are observed at all. When false, a struct may be
+    /// decoded by one copy without visiting its parts.
+    const OBSERVES: bool;
+
+    fn on_nominal(&mut self, ty: InternedType, bytes: &[u8]) -> Result<(), RuntimeError>;
+}
+
+/// The hook that observes nothing.
+pub(crate) struct NoHook;
+
+impl DecodeHook for NoHook {
+    const OBSERVES: bool = false;
+
+    fn on_nominal(&mut self, _ty: InternedType, _bytes: &[u8]) -> Result<(), RuntimeError> {
+        Ok(())
+    }
+}
+
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
 /// is data-dependent (e.g., for vectors, enums, function values, etc.).
 pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
@@ -234,6 +255,24 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     bytes: &[u8],
     dst: *mut u8,
 ) -> AllocationResult<()> {
+    // SAFETY: forwarded to the caller.
+    unsafe { deserialize_with_hook(layouts, heap, ty, bytes, dst, &mut NoHook) }
+}
+
+/// Like [`deserialize`], reporting each typed nominal value to `hook` as it is
+/// decoded.
+///
+/// # Safety
+///
+/// Same as [`deserialize`].
+pub(crate) unsafe fn deserialize_with_hook<T: LayoutProvider + ?Sized, H: DecodeHook>(
+    layouts: &T,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+    hook: &mut H,
+) -> AllocationResult<()> {
     let layout = layouts.layout_by_ty(ty).ok_or({
         RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
     })?;
@@ -244,7 +283,7 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
 
     let mut cursor = 0usize;
     // SAFETY: caller must enforce the safety precondition.
-    unsafe { deserialize_impl(layouts, heap, layout, bytes, &mut cursor, dst)? };
+    unsafe { deserialize_impl_with_hook(layouts, heap, layout, bytes, &mut cursor, dst, hook)? };
     if cursor != bytes.len() {
         return Err(RuntimeError::BCSRemainingInput {
             remaining: bytes.len().saturating_sub(cursor),
@@ -270,13 +309,32 @@ pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
     dst: *mut u8,
 ) -> VMResult<()> {
     // SAFETY: forwarded to the caller.
-    unsafe { deserialize(layouts, heap, ty, bytes, dst) }
+    unsafe { deserialize_into_with_hook(layouts, heap, ty, bytes, dst, &mut NoHook) }
+}
+
+/// Like [`deserialize_into`], reporting each typed nominal value to `hook` as
+/// it is decoded.
+///
+/// # Safety
+///
+/// Same as [`deserialize_into`].
+pub(crate) unsafe fn deserialize_into_with_hook<T: LayoutProvider + ?Sized, H: DecodeHook>(
+    layouts: &T,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+    hook: &mut H,
+) -> VMResult<()> {
+    // SAFETY: forwarded to the caller.
+    unsafe { deserialize_with_hook(layouts, heap, ty, bytes, dst, hook) }
         .map_err(|e| VMInternalError::new(e.into_runtime_error()))
 }
 
 /// # Safety
 ///
 /// `dst` must be writable for `layout.size` bytes.
+#[cfg(test)]
 unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
     heap: &mut Heap,
@@ -284,6 +342,46 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     bytes: &[u8],
     cursor: &mut usize,
     dst: *mut u8,
+) -> AllocationResult<()> {
+    // SAFETY: forwarded to the caller.
+    unsafe { deserialize_impl_with_hook(layouts, heap, layout, bytes, cursor, dst, &mut NoHook) }
+}
+
+/// Whether a value of `layout` may be decoded by one copy of its BCS bytes.
+/// With an observing hook, a struct is walked instead so its typed parts are
+/// reported.
+fn blittable<H: DecodeHook>(layout: &ValueLayout) -> bool {
+    layout.all_byte_patterns_valid()
+        && !(H::OBSERVES && matches!(layout.kind, LayoutKind::Struct { .. }))
+}
+
+/// Reports a decoded nominal value to `hook` if its layout has a type.
+fn observe<H: DecodeHook>(
+    hook: &mut H,
+    layout: &ValueLayout,
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+) -> Result<(), RuntimeError> {
+    if H::OBSERVES {
+        if let Some(ty) = layout.ty {
+            hook.on_nominal(ty, &bytes[start..end])?;
+        }
+    }
+    Ok(())
+}
+
+/// # Safety
+///
+/// `dst` must be writable for `layout.size` bytes.
+unsafe fn deserialize_impl_with_hook<T: LayoutProvider + ?Sized, H: DecodeHook>(
+    layouts: &T,
+    heap: &mut Heap,
+    layout: &ValueLayout,
+    bytes: &[u8],
+    cursor: &mut usize,
+    dst: *mut u8,
+    hook: &mut H,
 ) -> AllocationResult<()> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
@@ -294,7 +392,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     // TODO(correctness): breaks on big-endian hosts. This writes the
     // little-endian BCS bytes verbatim, but the in-memory representation is
     // native-endian, so the two only match on little-endian hosts.
-    if layout.all_byte_patterns_valid() {
+    if blittable::<H>(layout) {
         let n = layout.size as usize;
         let src = read_slice(bytes, cursor, n)?;
         // SAFETY: caller ensures `n` bytes can be written to `dst` and it is
@@ -303,6 +401,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
         return Ok(());
     }
 
+    let start = *cursor;
     match &layout.kind {
         LayoutKind::Bool => {
             // BCS encodes a `bool` as a single canonical byte: `0` or `1`. Any
@@ -332,16 +431,18 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 // and are within bounds. `dst` is correctly sized so there is
                 // enough space to write all fields.
                 unsafe {
-                    deserialize_impl(
+                    deserialize_impl_with_hook(
                         layouts,
                         heap,
                         field_layout,
                         bytes,
                         cursor,
                         dst.add(field.offset as usize),
+                        hook,
                     )?
                 };
             }
+            observe(hook, layout, bytes, start, *cursor)?;
             Ok(())
         },
         LayoutKind::Vector {
@@ -370,7 +471,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // The allocation checked this product against overflow.
             let data_size = len as usize * elem_size;
 
-            if elem_layout.all_byte_patterns_valid() {
+            if blittable::<H>(elem_layout) {
                 // If every element byte pattern is valid, element bytes equal
                 // their BCS bytes. A `bool` element is excluded so each byte is
                 // validated by the per-element walk below.
@@ -399,7 +500,15 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                     // element layout, as guaranteed by the precondition of the
                     // function.
                     unsafe {
-                        deserialize_impl(layouts, heap, elem_layout, bytes, cursor, elem_ptr)?
+                        deserialize_impl_with_hook(
+                            layouts,
+                            heap,
+                            elem_layout,
+                            bytes,
+                            cursor,
+                            elem_ptr,
+                            hook,
+                        )?
                     };
                 }
             }
@@ -417,12 +526,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
             if tag >= variants.len() as u64 {
-                return Err(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag,
-                        variant_count: variants.len(),
-                    },
-                )
+                return Err(RuntimeError::BCSInvalidEnumTag {
+                    tag,
+                    variant_count: variants.len(),
+                }
                 .into());
             }
 
@@ -440,15 +547,17 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // SAFETY: variant body lives at the specified offset. The maximum
             // size was allocated so there is enough space to deserialize into.
             unsafe {
-                deserialize_impl(
+                deserialize_impl_with_hook(
                     layouts,
                     heap,
                     variant_layout,
                     bytes,
                     cursor,
                     obj_ptr.add(ENUM_DATA_OFFSET),
+                    hook,
                 )?
             };
+            observe(hook, layout, bytes, start, *cursor)?;
 
             // SAFETY: `dst` has space to write the 8-byte enum pointer as
             // guaranteed by the caller.
@@ -500,7 +609,7 @@ fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
 /// if:
 /// - data is not a valid ULEB128,
 /// - end of input is unexpectedly reached.
-fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
+pub fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
     let mut result = 0u64;
     let mut shift = 0u32;
     loop {
@@ -579,9 +688,10 @@ mod tests {
     };
     use mono_move_core::{
         align_up_u32,
-        types::U64_TY,
+        types::{U128_TY, U64_TY, U8_TY},
         value_layout::{
-            BOOL_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID,
+            ADDRESS_LAYOUT_ID, BOOL_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID,
+            U8_LAYOUT_ID,
         },
         DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
     };
@@ -810,6 +920,175 @@ mod tests {
                 RuntimeError::BCSRemainingInput { remaining: 1 }
             ))
         ));
+    }
+
+    /// Records every nominal value the decoder reports.
+    struct Recorder(Vec<(InternedType, Vec<u8>)>);
+
+    impl DecodeHook for Recorder {
+        const OBSERVES: bool = true;
+
+        fn on_nominal(&mut self, ty: InternedType, bytes: &[u8]) -> Result<(), RuntimeError> {
+            self.0.push((ty, bytes.to_vec()));
+            Ok(())
+        }
+    }
+
+    /// A one-address struct, published as if it were `0x1::object::Object<T>`,
+    /// under the dummy type `U128_TY`.
+    fn push_object_like_struct(table: &mut ValueLayoutTable) -> LayoutId {
+        let layout = build_struct_layout(table, 32, vec![(0, ADDRESS_LAYOUT_ID)]);
+        assert!(layout.all_byte_patterns_valid(), "the struct is blittable");
+        table.push(U128_TY, layout)
+    }
+
+    #[test]
+    fn hook_sees_blittable_struct_at_top_level() {
+        let mut table = ValueLayoutTable::new();
+        let id = push_object_like_struct(&mut table);
+        let layout = table.layout(id).unwrap();
+        let bytes = [7u8; 32];
+        let mut heap = Heap::new(64);
+
+        // Without a hook the struct is blitted; with one it is walked and
+        // reported. Both leave the same value in the slot.
+        let mut unhooked = [0u8; 32];
+        let mut cursor = 0;
+        unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                unhooked.as_mut_ptr(),
+            )
+            .unwrap()
+        };
+        let mut hooked = [0u8; 32];
+        let mut cursor = 0;
+        let mut recorder = Recorder(vec![]);
+        unsafe {
+            deserialize_impl_with_hook(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                hooked.as_mut_ptr(),
+                &mut recorder,
+            )
+            .unwrap()
+        };
+        assert_eq!(unhooked, bytes);
+        assert_eq!(hooked, bytes);
+        assert_eq!(cursor, 32);
+        assert_eq!(recorder.0.len(), 1);
+        assert!(recorder.0[0].0 == U128_TY);
+        assert_eq!(recorder.0[0].1, bytes);
+    }
+
+    #[test]
+    fn hook_sees_every_struct_element_of_vector() {
+        let mut table = ValueLayoutTable::new();
+        let sid = push_object_like_struct(&mut table);
+        let vid = table.push(U8_TY, vector_layout(sid));
+        let layout = table.layout(vid).unwrap();
+        let mut bytes = vec![0x02u8];
+        bytes.extend_from_slice(&[1u8; 32]);
+        bytes.extend_from_slice(&[2u8; 32]);
+        let mut heap = Heap::new(4096);
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let mut recorder = Recorder(vec![]);
+        unsafe {
+            deserialize_impl_with_hook(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+                &mut recorder,
+            )
+            .unwrap()
+        };
+        assert_eq!(cursor, bytes.len());
+        // The bulk copy was bypassed: each element was visited.
+        assert_eq!(recorder.0.len(), 2);
+        assert!(recorder.0.iter().all(|(ty, _)| *ty == U128_TY));
+        assert_eq!(recorder.0[0].1, [1u8; 32]);
+        assert_eq!(recorder.0[1].1, [2u8; 32]);
+        // The vector itself is not a nominal value.
+        let data =
+            unsafe { std::slice::from_raw_parts((slot as *const u8).add(VEC_DATA_OFFSET), 64) };
+        assert_eq!(&data[..32], &[1u8; 32]);
+        assert_eq!(&data[32..], &[2u8; 32]);
+    }
+
+    #[test]
+    fn hook_sees_struct_inside_enum_variant_then_the_enum() {
+        let mut table = ValueLayoutTable::new();
+        let sid = push_object_like_struct(&mut table);
+        // `None` and `Some { e: Object }`, published as if it were an `Option`.
+        let eid = build_enum_layout(&mut table, vec![(0, vec![]), (32, vec![(0, sid)])]);
+        let layout = table.layout(eid).unwrap();
+        let mut bytes = vec![0x01u8];
+        bytes.extend_from_slice(&[9u8; 32]);
+        let mut heap = Heap::new(4096);
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let mut recorder = Recorder(vec![]);
+        unsafe {
+            deserialize_impl_with_hook(
+                &table,
+                &mut heap,
+                layout,
+                &bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+                &mut recorder,
+            )
+            .unwrap()
+        };
+        assert_eq!(cursor, 33);
+        // Inner value first, with its own bytes; then the enum with all of them.
+        // The variant body has no type and is not reported.
+        assert_eq!(recorder.0.len(), 2);
+        assert!(recorder.0[0].0 == U128_TY);
+        assert_eq!(recorder.0[0].1, [9u8; 32]);
+        assert!(recorder.0[1].0 == U64_TY);
+        assert_eq!(recorder.0[1].1, bytes);
+    }
+
+    #[test]
+    fn deserialize_rejects_out_of_range_enum_tag_as_decode_error() {
+        let mut table = ValueLayoutTable::new();
+        let eid = build_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, U64_LAYOUT_ID)])]);
+        let layout = table.layout(eid).unwrap();
+        let mut heap = Heap::new(4096);
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &[0x02u8],
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+            )
+        };
+        match result {
+            Err(AllocationError::RuntimeError(err)) => {
+                assert!(matches!(err, RuntimeError::BCSInvalidEnumTag {
+                    tag: 2,
+                    variant_count: 2
+                }));
+                assert!(err.is_bcs_decode_error());
+            },
+            other => panic!("expected a decode error, got {other:?}"),
+        }
     }
 
     #[test]
@@ -1376,7 +1655,7 @@ mod tests {
         for (size, fields) in variants {
             max_data = max_data.max(size);
             let layout = build_struct_layout(table, size, fields);
-            variant_ids.push(table.push(U64_TY, layout));
+            variant_ids.push(table.push_anonymous(layout));
         }
         let max_size_across_variants = align_up_u32(8 + max_data, 8);
         let layout = ValueLayout::frozen_enum(

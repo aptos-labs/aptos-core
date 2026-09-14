@@ -114,6 +114,13 @@ pub enum RuntimeError {
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
 
+    #[error("BCS deserialize: enum tag {tag} out of range for {variant_count} variants")]
+    BCSInvalidEnumTag { tag: u64, variant_count: usize },
+
+    /// A decode hook refused a value; the hook holds the reason.
+    #[error("BCS deserialize: value refused by the decode hook")]
+    BCSRefusedByHook,
+
     #[error("unsupported: {0}")]
     Unsupported(&'static str),
 }
@@ -135,9 +142,11 @@ impl RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
-            | BCSSignerNotDeserializable => true,
+            | BCSSignerNotDeserializable
+            | BCSInvalidEnumTag { .. } => true,
 
-            ArithmeticOverflow { .. }
+            BCSRefusedByHook
+            | ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }
             | DivisionByZero { .. }
             | ShiftAmountOutOfRange { .. }
@@ -197,7 +206,9 @@ impl IntoExecutionError for RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
-            | BCSSignerNotDeserializable => ExecutionErrorKind::InvalidOperation,
+            | BCSSignerNotDeserializable
+            | BCSInvalidEnumTag { .. }
+            | BCSRefusedByHook => ExecutionErrorKind::InvalidOperation,
 
             Unsupported(_) => ExecutionErrorKind::InvariantViolation,
 

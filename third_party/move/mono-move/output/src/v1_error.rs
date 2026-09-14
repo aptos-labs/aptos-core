@@ -294,7 +294,14 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSSequenceTooLong { .. }
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
-        | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
+        | E::BCSSignerNotDeserializable
+        | E::BCSInvalidEnumTag { .. } => return V1Equivalent::V1StatusUnknown,
+
+        // Never surfaces: the placement that installed the hook replaces it
+        // with the hook's own error.
+        E::BCSRefusedByHook => {
+            V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
+        },
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.
         E::Unsupported(_) => return V1Equivalent::NoV1Failure,
