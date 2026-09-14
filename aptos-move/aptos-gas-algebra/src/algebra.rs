@@ -16,11 +16,14 @@ pub type InternalGasPerAbstractValueUnit = GasQuantity<UnitDiv<InternalGasUnit, 
 
 pub type AbstractValueSizePerArg = GasQuantity<UnitDiv<AbstractValueUnit, Arg>>;
 
-/// Unit of the pseudo gas charged when the VM builds a type tag
+/// Unit of type tag pseudo gas -- an internal budget bounding how large a type tag may get, not
+/// part of the transaction's gas. See `ty_tag_pseudo_gas_cost` in the Move VM for the formula.
 pub enum TypeTagPseudoGasUnit {}
 
+/// Pseudo gas cost of a type tag, i.e. a measure of its size.
 pub type NumTypeTagPseudoGasUnits = GasQuantity<TypeTagPseudoGasUnit>;
 
+/// Rate converting a type tag's pseudo gas cost into abstract value units.
 pub type AbstractValueSizePerTypeTagPseudoGasUnit =
     GasQuantity<UnitDiv<AbstractValueUnit, TypeTagPseudoGasUnit>>;
 

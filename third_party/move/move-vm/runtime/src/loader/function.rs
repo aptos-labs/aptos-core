@@ -283,7 +283,7 @@ pub(crate) enum LazyLoadedFunctionState {
 }
 
 impl LazyLoadedFunction {
-    pub(crate) fn ty_args_pseudo_gas_cost(
+    pub(crate) fn compute_ty_args_pseudo_gas_cost(
         runtime_environment: &RuntimeEnvironment,
         ty_args: &[TypeTag],
     ) -> u64 {
@@ -359,7 +359,8 @@ impl LazyLoadedFunction {
             _ => None,
         };
 
-        let ty_args_pseudo_gas_cost = Self::ty_args_pseudo_gas_cost(runtime_environment, &ty_args);
+        let ty_args_pseudo_gas_cost =
+            Self::compute_ty_args_pseudo_gas_cost(runtime_environment, &ty_args);
         Ok(Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
                 fun,
@@ -384,7 +385,8 @@ impl LazyLoadedFunction {
             .iter()
             .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let ty_args_pseudo_gas_cost = Self::ty_args_pseudo_gas_cost(runtime_environment, &ty_args);
+        let ty_args_pseudo_gas_cost =
+            Self::compute_ty_args_pseudo_gas_cost(runtime_environment, &ty_args);
         Ok(Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
                 fun,

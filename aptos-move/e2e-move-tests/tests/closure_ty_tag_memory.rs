@@ -1,25 +1,19 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! ATT017 regression. A generic closure used to cost a flat 40 abstract units
-//! (`misc.abs_val.closure`) no matter how large its type arguments were, even
-//! though those type arguments are materialized as `TypeTag`s and re-serialized
-//! on every BCS round trip. The abstract memory quota is 10,000,000 units, so a
-//! single transaction could hold 250,000 closures whose tags were hundreds of
-//! kilobytes each.
-//!
-//! `TimedFeatureFlag::MeterClosureTypeArguments` adds the type arguments'
-//! pseudo-gas cost to the closure's abstract size. The tests below measure the
-//! charge with the flag off and on and check it against the pricing formula.
-//!
-//! Note this moves the abstract memory charge, not gas used: the quota is a
-//! separate meter, so `gas_used` is the same either way.
+//! Regression tests for closure type argument metering. A closure used to cost
+//! a flat abstract size no matter how large its type arguments were;
+//! `TimedFeatureFlag::MeterClosureTypeArguments` adds their pseudo-gas cost to
+//! that size. This moves the abstract memory quota, not `gas_used`.
 //!
 //! Run with:
 //!   RUST_MIN_STACK=1073741824 cargo test -p e2e-move-tests \
 //!       --test closure_ty_tag_memory -- --nocapture --test-threads=1
 
 use aptos_framework::BuildOptions;
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_49, AbstractValueSizeGasParameters, InitialGasSchedule,
+};
 use aptos_package_builder::PackageBuilder;
 use aptos_transaction_simulation::Account;
 use aptos_types::{
@@ -47,8 +41,11 @@ const STRUCT_LEN: usize = 240;
 const TYPE_BASE_COST: u64 = 100;
 const TYPE_BYTE_COST: u64 = 1;
 
-/// `misc.abs_val.closure`, the flat part of a closure's abstract size.
-const CLOSURE_BASE: u64 = 40;
+/// The flat part of a closure's abstract size at the gas version the harness
+/// pins.
+fn closure_base() -> u64 {
+    u64::from(AbstractValueSizeGasParameters::initial().closure)
+}
 
 struct Shape {
     label: &'static str,
@@ -63,7 +60,7 @@ impl Shape {
     /// struct node.
     fn expected_charge(&self, metered: bool) -> u64 {
         if !metered {
-            return CLOSURE_BASE;
+            return closure_base();
         }
         let per_ty_arg = if self.nest == 0 {
             // `bool` is a single node with no identifiers.
@@ -73,7 +70,7 @@ impl Shape {
                 + TYPE_BYTE_COST * (AccountAddress::LENGTH + MODULE_LEN + STRUCT_LEN) as u64;
             self.nest as u64 * per_struct_node
         };
-        CLOSURE_BASE + self.num_ty_args as u64 * per_ty_arg
+        closure_base() + self.num_ty_args as u64 * per_ty_arg
     }
 }
 
@@ -195,6 +192,7 @@ const LARGE: u64 = 30;
 fn harness(metered: bool) -> MoveHarness {
     let mut h = MoveHarness::new_testnet();
     h.max_gas_per_txn = 2_000_000;
+    h.modify_gas_schedule_raw(|schedule| schedule.feature_version = RELEASE_V1_49);
     h.set_timed_feature(TimedFeatureFlag::MeterClosureTypeArguments, metered);
     h
 }
@@ -343,7 +341,7 @@ fn closure_charge_scales_with_type_argument_size() {
     }
 
     // The shapes are listed in increasing order of tag size.
-    assert!(unmetered.iter().all(|c| *c == CLOSURE_BASE));
+    assert!(unmetered.iter().all(|c| *c == closure_base()));
     assert!(metered.windows(2).all(|w| w[0] < w[1]));
 
     // A closure with no type arguments is unaffected.

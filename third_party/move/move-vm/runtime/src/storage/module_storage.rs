@@ -569,7 +569,7 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
         &self,
         data: SerializedFunctionData,
     ) -> PartialVMResult<Box<dyn AbstractFunction>> {
-        let ty_args_pseudo_gas_cost = LazyLoadedFunction::ty_args_pseudo_gas_cost(
+        let ty_args_pseudo_gas_cost = LazyLoadedFunction::compute_ty_args_pseudo_gas_cost(
             self.module_storage.runtime_environment(),
             &data.ty_args,
         );

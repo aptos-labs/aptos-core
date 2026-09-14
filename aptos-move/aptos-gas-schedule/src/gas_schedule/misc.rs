@@ -49,7 +49,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
         [closure: AbstractValueSize, { RELEASE_V1_33.. => "closure" }, 40],
-        [closure_new: AbstractValueSize, { RELEASE_V1_50.. => "closure_new" }, 200],
+        [closure_v2: AbstractValueSize, { RELEASE_V1_50.. => "closure_v2" }, 200],
         [
             closure_per_ty_tag_unit: AbstractValueSizePerTypeTagPseudoGasUnit,
             { RELEASE_V1_50.. => "closure_per_ty_tag_unit" },
@@ -82,16 +82,16 @@ crate::gas_schedule::macros::define_gas_parameters!(
     ]
 );
 
-// Used below 1.50, where `closure_per_ty_tag_unit` is not yet on chain. Same
-// value as that parameter, so moving to 1.50 only changes the base.
-const CLOSURE_PER_TY_TAG_UNIT_LEGACY: AbstractValueSizePerTypeTagPseudoGasUnit =
+// `MeterClosureTypeArguments` can turn metering on before 1.50 puts
+// `closure_per_ty_tag_unit` on chain. Same value, so the switch does not
+// change pricing.
+const CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50: AbstractValueSizePerTypeTagPseudoGasUnit =
     AbstractValueSizePerTypeTagPseudoGasUnit::new(1);
 
-/// Returns the abstract size of a closure node itself, excluding the captured arguments.
+/// Returns the abstract size of a closure value node itself, excluding the captured arguments.
 ///
-/// Every visitor that prices a closure must go through here. The memory tracker charges and
-/// releases quota with different visitors, so a closure that costs more on the way in than it
-/// refunds on the way out would leak quota.
+/// Invariant: every `visit_closure` must get the size from here. The memory tracker charges quota
+/// with one visitor and releases it with another, so two visitors that disagree would leak quota.
 fn closure_abstract_size(
     params: &AbstractValueSizeGasParameters,
     feature_version: u64,
@@ -99,9 +99,9 @@ fn closure_abstract_size(
 ) -> AbstractValueSize {
     let units = NumTypeTagPseudoGasUnits::new(ty_args_pseudo_gas_cost);
     if feature_version >= RELEASE_V1_50 {
-        params.closure_new + params.closure_per_ty_tag_unit * units
+        params.closure_v2 + params.closure_per_ty_tag_unit * units
     } else {
-        params.closure + CLOSURE_PER_TY_TAG_UNIT_LEGACY * units
+        params.closure + CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50 * units
     }
 }
 
