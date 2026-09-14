@@ -25,12 +25,23 @@ above this crate.
 Still open before the transaction executor can be wired to the block
 coordinator:
 
-- Argument validation is missing two things AptosVM does through its argument
-  constructors: value checks on the whitelisted framework types (`String`
-  UTF-8 validity, `Option` length, `Object<T>` existence), and public struct
-  and enum arguments. See the `TODO(security, completeness)` in
-  `user_txn/entry_func.rs`.
+- Argument deserialization has no deserializer yet for signed integers, so
+  entry functions taking them are refused. Script payloads still decode their
+  arguments natively, without the value checks.
 - Multi-agent transactions are untested.
+
+## Transaction arguments
+
+An entry function's arguments are deserialized in Move by the VM-provided
+`txn_arg` module (`txn_arg/`, compiled into `src/user_txn/txn_arg.mv`), whose
+`deserialize<T>` the specializer resolves per concrete `T`. The executor
+generates a script per entry function that deserializes each argument and
+calls it (`user_txn/trampoline.rs`), so a transaction is one root call.
+Framework constructors run as part of deserialization, so a bad `String` or
+`Object<T>` aborts where AptosVM's would. Public structs and enums are
+deserialized by a module the loader generates per defining module, calling
+their `pack$` functions. A parameter type with no deserializer fails to lower,
+which the executor reports as `INVALID_MAIN_FUNCTION_SIGNATURE`.
 
 ## Conventions
 

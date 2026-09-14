@@ -21,15 +21,17 @@ use crate::{
     error::LoaderError,
     invariant_violation,
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
+    txn_arg_gen,
 };
 use mono_move_core::{
     interner::{
-        script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
+        generated_deserializers_source, is_vm_module_id, script_module_id, view_module_id,
+        InternedIdentifier, InternedModuleId, SCRIPT_MAIN, VM_MODULE_ADDRESS,
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
-    LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
+    LayoutProvider, MicroOp, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -39,13 +41,14 @@ use move_binary_format::{
     access::ScriptAccess, file_format::CompiledScript, module_script_conversion::script_into_module,
 };
 use move_bytecode_verifier::VerifierConfig;
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
         try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
         try_lower_function, LoweringOutcome, SpecializerContext,
     },
-    ModuleIR,
+    ModuleIR, NotATransactionArgument,
 };
 use std::sync::Arc;
 
@@ -102,6 +105,25 @@ pub struct Loader<'guard, 'ctx> {
     module_provider: &'guard dyn ModuleProvider,
     policy: LoadingPolicy,
     natives: &'guard dyn NativeResolver,
+    builtin_modules: &'guard [BuiltinModule],
+}
+
+/// The struct or enum type the missing generated deserializer `func_name` of
+/// `module_id` would have deserialized.
+fn not_deserializable_type(module_id: InternedModuleId, func_name: InternedIdentifier) -> String {
+    let name = view_name(func_name);
+    let struct_name = name.strip_prefix("deserialize$").unwrap_or(name);
+    match generated_deserializers_source(view_name(view_module_id(module_id).name())) {
+        Some(source) => format!("{}::{struct_name}", source.short_str_lossless()),
+        None => struct_name.to_string(),
+    }
+}
+
+/// A module the VM provides itself, served ahead of storage.
+pub struct BuiltinModule {
+    pub address: AccountAddress,
+    pub name: &'static str,
+    pub bytes: &'static [u8],
 }
 
 impl<'guard, 'ctx> Loader<'guard, 'ctx> {
@@ -121,7 +143,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             module_provider,
             policy,
             natives,
+            builtin_modules: &[],
         }
+    }
+
+    /// Serves `modules` from the VM itself instead of storage.
+    pub fn with_builtin_modules(mut self, modules: &'guard [BuiltinModule]) -> Self {
+        self.builtin_modules = modules;
+        self
     }
 
     /// Returns the execution guard this loader is bound to.
@@ -142,6 +171,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> VMResult<&'guard LoadedModule> {
+        // A generated module is built from its source module, which must be
+        // loaded first.
+        if id.address() == &VM_MODULE_ADDRESS {
+            if let Some(source) = generated_deserializers_source(id.name()) {
+                let source = self.guard.module_id_of(source.address(), source.name());
+                self.get_or_load_module(read_set, gas_meter, source)?;
+            }
+        }
         match &self.policy {
             LoadingPolicy::Lazy(lowering) => {
                 use LoweringPolicy::*;
@@ -161,6 +198,57 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     // 2. A missing native function impl only triggers an error when it's actually being called, not
     //    during load time.
     pub fn load_function(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> VMResult<FunctionPtr> {
+        if !is_vm_module_id(module_id) {
+            return self.load_function_impl(read_set, gas_meter, module_id, func_name, ty_args);
+        }
+        let function =
+            match self.load_function_impl(read_set, gas_meter, module_id, func_name, ty_args) {
+                Ok(function) => function,
+                // A generated module defines deserializers only for the types
+                // a transaction may supply.
+                Err(err)
+                    if matches!(
+                        err.downcast_ref::<LoaderError>(),
+                        Some(LoaderError::FunctionNotFound { .. })
+                    ) && generated_deserializers_source(view_name(
+                        view_module_id(module_id).name(),
+                    ))
+                    .is_some() =>
+                {
+                    return Err(VMInternalError::new(NotATransactionArgument {
+                        ty: not_deserializable_type(module_id, func_name),
+                    }));
+                },
+                Err(err) => return Err(err),
+            };
+        // An argument deserializer is loaded together with the deserializers
+        // it calls, so a type no transaction may supply fails to load rather
+        // than to run.
+        // SAFETY: the function lives in an arena the guard keeps alive.
+        let ops = unsafe { function.as_ref_unchecked() }.code.ops();
+        for op in ops {
+            if let MicroOp::CallIndirect {
+                module_id,
+                func_name,
+                ty_args,
+            } = op
+            {
+                if is_vm_module_id(*module_id) {
+                    self.load_function(read_set, gas_meter, *module_id, *func_name, *ty_args)?;
+                }
+            }
+        }
+        Ok(function)
+    }
+
+    fn load_function_impl(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
@@ -274,6 +362,29 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         script_code: &[u8],
         ty_args: InternedTypeList,
     ) -> VMResult<FunctionPtr> {
+        self.load_script_with(read_set, gas_meter, script_code, ty_args, true)
+    }
+
+    /// Like `load_script`, for a script the VM generated itself: it is not
+    /// verified, so it may call functions Move code could not.
+    pub fn load_trusted_script(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        script_code: &[u8],
+        ty_args: InternedTypeList,
+    ) -> VMResult<FunctionPtr> {
+        self.load_script_with(read_set, gas_meter, script_code, ty_args, false)
+    }
+
+    fn load_script_with(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        script_code: &[u8],
+        ty_args: InternedTypeList,
+        verify: bool,
+    ) -> VMResult<FunctionPtr> {
         let module_id = script_module_id(self.guard);
         let id = self.guard.arena_ref_for_module_id(module_id);
         read_set.record_pending_loading(id)?;
@@ -294,7 +405,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             },
             // TODO(perf): evaluate whether waiting for a concurrent insertion
             // beats every thread verifying the script itself.
-            None => self.build_and_insert_script(read_set, gas_meter, hash, script_code)?,
+            None => self.build_and_insert_script(read_set, gas_meter, hash, script_code, verify)?,
         };
         read_set.record_ready_for_lowering(id, module)?;
         gas_meter.charge(module.cost())?;
@@ -303,14 +414,15 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         self.load_function(read_set, gas_meter, module_id, main, ty_args)
     }
 
-    /// Deserializes, verifies, and links `script_code` against its
-    /// dependencies, then caches it as a module.
+    /// Deserializes, verifies unless told not to, and links `script_code`
+    /// against its dependencies, then caches it as a module.
     fn build_and_insert_script(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         hash: ScriptHash,
         script_code: &[u8],
+        verify: bool,
     ) -> VMResult<&'guard LoadedModule> {
         // TODO(correctness): use the on-chain deserializer and verifier
         // configs instead of the defaults.
@@ -319,11 +431,13 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 message: err.to_string(),
             })
         })?;
-        move_bytecode_verifier::verify_script(&script).map_err(|err| {
-            VMInternalError::new(LoaderError::ScriptVerificationFailed {
-                status: err.major_status(),
-            })
-        })?;
+        if verify {
+            move_bytecode_verifier::verify_script(&script).map_err(|err| {
+                VMInternalError::new(LoaderError::ScriptVerificationFailed {
+                    status: err.major_status(),
+                })
+            })?;
+        }
         let dependencies = script
             .immediate_dependencies_iter()
             .map(|(address, name)| {
@@ -331,18 +445,20 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 self.get_or_load_module(read_set, gas_meter, module_id)
             })
             .collect::<VMResult<Vec<_>>>()?;
-        move_bytecode_verifier::dependencies::verify_script(
-            &VerifierConfig::default(),
-            &script,
-            dependencies
-                .iter()
-                .map(|dependency| &*dependency.ir().module),
-        )
-        .map_err(|err| {
-            VMInternalError::new(LoaderError::ScriptVerificationFailed {
-                status: err.major_status(),
-            })
-        })?;
+        if verify {
+            move_bytecode_verifier::dependencies::verify_script(
+                &VerifierConfig::default(),
+                &script,
+                dependencies
+                    .iter()
+                    .map(|dependency| &*dependency.ir().module),
+            )
+            .map_err(|err| {
+                VMInternalError::new(LoaderError::ScriptVerificationFailed {
+                    status: err.major_status(),
+                })
+            })?;
+        }
 
         // TODO(metering): placeholder cost model, as for modules.
         let cost = script_code.len() as u64;
@@ -719,17 +835,51 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         id: ArenaRef<'guard, ModuleId>,
     ) -> VMResult<(ModuleIR, u64)> {
-        let bytes = self
-            .module_provider
-            .get_module_bytes(id.address(), id.name())?
-            .ok_or_else(|| LoaderError::ModuleNotFound {
-                address: *id.address(),
-                name: id.name().to_string(),
-            })?;
+        let builtin = self
+            .builtin_modules
+            .iter()
+            .find(|module| module.address == *id.address() && module.name == id.name());
+        let generated = if id.address() == &VM_MODULE_ADDRESS {
+            generated_deserializers_source(id.name())
+        } else {
+            None
+        };
+        let owned_bytes;
+        let bytes: &[u8] = match (builtin, generated) {
+            (Some(module), _) => module.bytes,
+            // `load_module` loaded the source into the cache first.
+            (None, Some(source)) => {
+                let source_id = self.guard.module_id_of(source.address(), source.name());
+                let source_module = self
+                    .guard
+                    .get_module(self.guard.arena_ref_for_module_id(source_id))
+                    .ok_or_else(|| LoaderError::ModuleNotFound {
+                        address: *source.address(),
+                        name: source.name().to_string(),
+                    })?;
+                let name = IdentStr::new(id.name()).map_err(|_| LoaderError::ModuleNotFound {
+                    address: *id.address(),
+                    name: id.name().to_string(),
+                })?;
+                owned_bytes = txn_arg_gen::generate(&source_module.ir().module, name);
+                &owned_bytes
+            },
+            (None, None) => {
+                owned_bytes = self
+                    .module_provider
+                    .get_module_bytes(id.address(), id.name())?
+                    .ok_or_else(|| LoaderError::ModuleNotFound {
+                        address: *id.address(),
+                        name: id.name().to_string(),
+                    })?
+                    .to_vec();
+                &owned_bytes
+            },
+        };
         // TODO(metering): placeholder cost model — byte length of the module. Replace
         // with a proper cost function (bucketed by size, verifier cost, etc.).
         let cost = bytes.len() as u64;
-        let compiled_module = self.module_provider.deserialize_module(&bytes)?;
+        let compiled_module = self.module_provider.deserialize_module(bytes)?;
         self.module_provider.verify_module(&compiled_module)?;
         // TODO(cleanup):
         //   This can run verification twice because destack runs it and we verified before.

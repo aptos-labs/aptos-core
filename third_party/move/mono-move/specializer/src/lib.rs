@@ -9,5 +9,6 @@ pub mod lower;
 pub mod validate;
 
 pub use destack::destack;
+pub use lower::txn_arg::NotATransactionArgument;
 pub use stackless_exec_ir::{FunctionIR, ModuleIR};
 pub use validate::{validate_module, ValidationError, ValidationResult};

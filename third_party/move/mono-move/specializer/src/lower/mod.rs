@@ -11,6 +11,7 @@ pub mod gc_layout;
 mod lower_utils;
 mod parallel_copy;
 mod translate;
+pub mod txn_arg;
 
 pub use context::{try_build_context, BuildContextOutcome, LoweringContext, LoweringOutcome};
 

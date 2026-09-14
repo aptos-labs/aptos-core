@@ -24,8 +24,9 @@
 mod error;
 mod loader;
 mod read_set;
+mod txn_arg_gen;
 
 pub use error::{LoaderError, LoaderInvariantViolation};
-pub use loader::{Loader, LoadingPolicy, LoweringPolicy};
+pub use loader::{BuiltinModule, Loader, LoadingPolicy, LoweringPolicy};
 pub use mono_move_core::ModuleProvider;
 pub use read_set::{ModuleRead, ModuleReadSet, ModuleState};

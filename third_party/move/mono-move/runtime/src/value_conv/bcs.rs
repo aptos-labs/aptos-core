@@ -417,12 +417,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
             if tag >= variants.len() as u64 {
-                return Err(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag,
-                        variant_count: variants.len(),
-                    },
-                )
+                return Err(RuntimeError::BCSInvalidEnumTag {
+                    tag,
+                    variant_count: variants.len(),
+                }
                 .into());
             }
 
