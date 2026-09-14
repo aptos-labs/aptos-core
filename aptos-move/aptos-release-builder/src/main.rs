@@ -218,6 +218,14 @@ pub enum InputOptions {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // TODO(completeness): Remove when MonoMove is production-ready.
+    if aptos_types::on_chain_config::mono_move_env_enabled() {
+        anyhow::bail!(
+            "{} is set; refusing to generate release artifacts",
+            aptos_types::on_chain_config::MONO_MOVE_ENV
+        );
+    }
+
     let args = Argument::parse();
     initialize_aptos_core_path(args.aptos_core_path.clone());
 
