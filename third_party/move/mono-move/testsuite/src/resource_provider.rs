@@ -77,6 +77,9 @@ impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
                 self.table_items.get(&(handle.address(), key.to_vec()))?,
                 *value_ty,
             )),
+            // Resource groups are a storage-layer concern; this provider serves
+            // members directly by their own key.
+            InMemoryStorageKey::ResourceGroup { .. } => None,
         }
     }
 }
@@ -93,14 +96,14 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
             if let Some(&ptr) = materialized.cache.get(key) {
                 return Ok(StorageRead::ExternalHeap {
                     ptr,
-                    version: 0,
+                    version: None,
                     pin: materialized.arena.clone(),
                 });
             }
         }
 
         let Some((blob, ty)) = self.entry(key) else {
-            return Ok(StorageRead::DoesNotExist);
+            return Ok(StorageRead::DoesNotExist { version: None });
         };
 
         let mut materialized = self.materialized.borrow_mut();
@@ -110,11 +113,11 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
                 materialized.cache.insert(key.clone(), ptr);
                 Ok(StorageRead::ExternalHeap {
                     ptr,
-                    version: 0,
+                    version: None,
                     pin: arena,
                 })
             },
-            None => Ok(StorageRead::DoesNotExist),
+            None => Ok(StorageRead::DoesNotExist { version: None }),
         }
     }
 }

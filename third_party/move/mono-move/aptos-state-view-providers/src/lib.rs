@@ -158,11 +158,8 @@ struct ProviderState {
     /// the pair keeps a `#[resource_group_member]` add or remove between
     /// executions from serving the other placement's value.
     values: FxHashMap<(InMemoryStorageKey, Option<InternedType>), StorageRead>,
-    /// Members of each resource group read so far, keyed by the group's state key.
-    ///
-    /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
-    /// gets hashed by its crypto digest.
-    groups: FxHashMap<StateKey, Option<GroupMembers>>,
+    /// Members of each resource group read so far, keyed by the group's slot.
+    groups: FxHashMap<InMemoryStorageKey, Option<GroupMembers>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
@@ -205,8 +202,7 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
                     .map(|value| value.bytes().clone()))
             },
             Some(group_ty) => {
-                let tag = nominal_tag(group_ty)?;
-                let group_key = StateKey::resource_group(&key.address(), &tag);
+                let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_tag = nominal_tag(key.value_ty())?;
                 Ok(self
                     .group_members(&group_key)?
@@ -233,11 +229,12 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
             .fetch_bytes(key, group)
             .map_err(|e| internal(e.to_string()))?
         else {
+            let read = StorageRead::DoesNotExist { version: None };
             self.inner
                 .borrow_mut()
                 .values
-                .insert(cache_key, StorageRead::DoesNotExist);
-            return Ok(StorageRead::DoesNotExist);
+                .insert(cache_key, read.clone());
+            return Ok(read);
         };
 
         // Materialize the value (BCS → flat) into the provider's arena.
@@ -267,7 +264,7 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         })?;
         let read = StorageRead::ExternalHeap {
             ptr: obj,
-            version: 0,
+            version: None,
             pin: arena,
         };
         inner.values.insert(cache_key, read.clone());
@@ -283,12 +280,15 @@ impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
     //   and should avoid full copies.
     fn group_members(
         &self,
-        group_key: &StateKey,
+        group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError> {
         if let Some(members) = self.inner.borrow().groups.get(group_key) {
             return Ok(members.clone());
         }
-        let members = match self.state_view.get_state_value(group_key).map_err(|e| {
+        let state_key = group_key
+            .as_state_key()
+            .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))?;
+        let members = match self.state_view.get_state_value(&state_key).map_err(|e| {
             ResourceProviderError::InvariantViolation(format!("group read failed: {e}"))
         })? {
             Some(value) => Some(decode_group_members(value.bytes())?),

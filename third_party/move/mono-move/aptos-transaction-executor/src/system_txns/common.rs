@@ -5,7 +5,7 @@
 
 use crate::{
     calls::call_system_function_unmetered,
-    errors::{call_result, ExecutionStatus, MoveExecutionFailure},
+    errors::{call_result, ExecutionStatus, MoveExecutionFailure, SystemTxnFailure},
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
@@ -20,7 +20,7 @@ use mono_move_core::{GasMeter, Interner, VMInternalError};
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
-use mono_move_runtime::{CallBuilder, InterpreterContext};
+use mono_move_runtime::{CallBuilder, InterpreterContext, SessionEffects};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
 
 const BLOCK: &IdentStr = ident_str!("block");
@@ -96,12 +96,28 @@ impl<'a> AptosTransactionExecutor<'a> {
 }
 
 /// The outcome of a completed system transaction: fee-free and successful.
-pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>) -> TxnOutcome {
-    TxnOutcome::Executed {
-        status: ExecutionStatus::Success,
-        fee_statement: FeeStatement::zero(),
-        effects: interp.finish(),
+pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>, call: &'static str) -> TxnOutcome {
+    match finish_system_session(interp, call) {
+        Ok(effects) => TxnOutcome::Executed {
+            status: ExecutionStatus::Success,
+            fee_statement: FeeStatement::zero(),
+            effects,
+        },
+        Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(failure),
     }
+}
+
+/// Closes a system session. A failure is an executor bug and leaves nothing
+/// behind to commit or to validate, so the block has to abort even where a
+/// failed framework call would not.
+pub(super) fn finish_system_session(
+    interp: InterpreterContext<'_>,
+    call: &'static str,
+) -> Result<SessionEffects, SystemTxnFailure> {
+    interp.finish().map_err(|e| SystemTxnFailure {
+        call,
+        failure: MoveExecutionFailure::RuntimeError(e),
+    })
 }
 
 /// Calls `0x1::block::<function>` as the VM, with `place` filling the call

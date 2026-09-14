@@ -466,6 +466,7 @@ dependencies = [
  "aptos-transaction-filters",
  "aptos-types",
  "aptos-vm",
+ "aptos-vm-environment",
  "bcs 0.1.4",
  "bytes",
  "fail",
@@ -475,6 +476,8 @@ dependencies = [
  "itertools 0.13.0",
  "mime",
  "mini-moka",
+ "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-package",
  "num_cpus",
@@ -3441,7 +3444,6 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
- "mono-move-core",
  "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
@@ -13139,7 +13141,6 @@ dependencies = [
  "serde",
  "shared-dsa",
  "thiserror 1.0.69",
- "triomphe",
 ]
 
 [[package]]

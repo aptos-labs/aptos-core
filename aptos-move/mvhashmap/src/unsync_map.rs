@@ -10,12 +10,11 @@ use aptos_aggregator::types::DelayedFieldValue;
 use aptos_types::{
     block_executor::value::SpeculativeValue,
     error::{code_invariant_error, PanicError},
-    state_store::state_key::StateKey,
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use bytes::Bytes;
-use mono_move_runtime::SharedArena;
+use mono_move_runtime::SegmentedArena;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_runtime::{Module, Script};
@@ -57,13 +56,13 @@ pub struct UnsyncMap<K, T, V, I> {
     /// dropped together with the map.
     ///
     /// Set to [`None`] if MonoMove is not used.
-    arena: Option<RefCell<Arc<SharedArena>>>,
+    arena: Option<SegmentedArena>,
     /// Current members of each resource group touched this block, initialized
     /// from storage on the first touch and then overwritten when transaction
     /// commits.
     // TODO(perf): consider using interned type and an unordered map here.
     // TODO(cleanup): unify with grpup cache used by V1 VM.
-    groups: RefCell<HashMap<StateKey, ResourceGroupEntry>>,
+    groups: RefCell<HashMap<K, ResourceGroupEntry>>,
 }
 
 impl<K, T, V, I> UnsyncMap<K, T, V, I>
@@ -73,12 +72,6 @@ where
     V: SpeculativeValue,
     I: Hash + Clone + Copy + Eq,
 {
-    /// Size of arena used by MonoMove to deserialize BCS values from storage
-    /// into MonoMove memory representation.
-    // TODO(completeness): make this configurable, rewrite arena so it can grow
-    // dynamically.
-    const RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
-
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -96,9 +89,7 @@ where
 
     pub fn with_mono_move_arena(mut self, enabled: bool) -> Self {
         if enabled {
-            #[allow(clippy::arc_with_non_send_sync)]
-            let arena = Arc::new(SharedArena::new(Self::RESOURCE_ARENA_BYTES));
-            self.arena = Some(RefCell::new(arena));
+            self.arena = Some(SegmentedArena::new());
         }
         self
     }
@@ -316,19 +307,19 @@ where
     }
 
     /// Returns the reference to the MonoMove arena.
-    pub fn resource_arena(&self) -> Option<Arc<SharedArena>> {
-        self.arena.as_ref().map(|arena| arena.borrow().clone())
+    pub fn resource_arena(&self) -> Option<&SegmentedArena> {
+        self.arena.as_ref()
     }
 
     /// Returns the group if exists in the cache.
-    pub fn get_group(&self, key: &StateKey) -> Option<ResourceGroupEntry> {
+    pub fn get_group(&self, key: &K) -> Option<ResourceGroupEntry> {
         self.groups.borrow().get(key).cloned()
     }
 
     /// Returns the group member's bytes if the group is cached. The outer
     /// option tells whether the group is cached, the inner one whether it has
     /// this member.
-    pub fn get_group_member(&self, key: &StateKey, tag: &StructTag) -> Option<Option<Bytes>> {
+    pub fn get_group_member(&self, key: &K, tag: &StructTag) -> Option<Option<Bytes>> {
         self.groups
             .borrow()
             .get(key)
@@ -336,7 +327,7 @@ where
     }
 
     /// Initializes or overwrites the group.
-    pub fn insert_group(&self, key: StateKey, members: ResourceGroupEntry) {
+    pub fn insert_group(&self, key: K, members: ResourceGroupEntry) {
         self.groups.borrow_mut().insert(key, members);
     }
 }

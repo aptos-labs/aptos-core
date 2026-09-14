@@ -6,11 +6,12 @@ use crate::{
     combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockOutput, MockTask},
+        mono_mock_executor::MonoMockExecutor,
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams, MAX_GAS_PER_TXN},
     },
     executor::BlockExecutor,
-    single_transaction_executor::LegacyTransactionExecutor,
-    task::ExecutorTask,
+    single_transaction_executor::{LegacyTransactionExecutor, SingleTransactionExecutor},
+    task::TxnOutput,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
@@ -89,7 +90,7 @@ pub(crate) fn populate_guard_with_modules(
     }
 }
 
-pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
+pub(crate) fn execute_block_parallel<TxnType, ExecutorType, ViewType, Provider>(
     block_gas_limit: Option<u64>,
     txn_provider: &Provider,
     data_view: &ViewType,
@@ -98,21 +99,23 @@ pub(crate) fn execute_block_parallel<TxnType, ViewType, Provider>(
 ) -> Result<BlockOutput<TxnType, MockOutput<KeyType<[u8; 32]>, MockEvent>>, ()>
 where
     TxnType: Transaction<Key = KeyType<[u8; 32]>> + Debug + Clone + Send + Sync + 'static,
+    ExecutorType: SingleTransactionExecutor<Txn = TxnType, AuxiliaryInfo = AuxiliaryInfo>,
+    ExecutorType::Output: TxnOutput<CommittedOutput = MockOutput<KeyType<[u8; 32]>, MockEvent>>,
     ViewType: TStateView<Key = TxnType::Key> + Sync + 'static,
     Provider: TxnProvider<TxnType, AuxiliaryInfo> + Sync + 'static,
-    MockTask<KeyType<[u8; 32]>, MockEvent>: ExecutorTask<Txn = TxnType>,
 {
-    let mut guard = AptosModuleCacheManagerGuard::none();
+    let concurrency_level = num_cpus::get();
+    let mut guard = AptosModuleCacheManagerGuard::none_with_workers(concurrency_level);
 
     // If all_module_ids is provided, populate the guard with empty modules
     if let Some(module_ids) = all_module_ids {
         populate_guard_with_modules(&mut guard, module_ids);
     }
 
-    let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), block_gas_limit);
+    let config = BlockExecutorConfig::new_maybe_block_limit(concurrency_level, block_gas_limit);
     let block_executor = BlockExecutor::<
         TxnType,
-        LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
+        ExecutorType,
         ViewType,
         NoOpTransactionCommitHook<usize>,
         Provider,
@@ -164,7 +167,7 @@ pub(crate) fn generate_universe_and_transactions(
     (universe, transaction_gen)
 }
 
-pub(crate) fn run_transactions_resources(
+pub(crate) fn run_transactions_resources<ExecutorType>(
     universe_size: usize,
     transaction_count: usize,
     abort_count: usize,
@@ -173,7 +176,13 @@ pub(crate) fn run_transactions_resources(
     is_dynamic: bool,
     num_executions: usize,
     num_random_generations: usize,
-) {
+) where
+    ExecutorType: SingleTransactionExecutor<
+        Txn = MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+        AuxiliaryInfo = AuxiliaryInfo,
+    >,
+    ExecutorType::Output: TxnOutput<CommittedOutput = MockOutput<KeyType<[u8; 32]>, MockEvent>>,
+{
     let mut runner = TestRunner::default();
 
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
@@ -230,6 +239,7 @@ pub(crate) fn run_transactions_resources(
                 for block_stm_v2 in [false, true] {
                     let output = execute_block_parallel::<
                         MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                        ExecutorType,
                         MockStateView<KeyType<[u8; 32]>>,
                         DefaultTxnProvider<
                             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
@@ -270,7 +280,38 @@ fn resource_transaction_tests(
     num_random_generations: usize,
     num_executions: usize,
 ) {
-    run_transactions_resources(
+    run_transactions_resources::<LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>>(
+        universe_size,
+        transaction_count,
+        abort_count,
+        skip_rest_count,
+        use_gas_limit,
+        is_dynamic,
+        num_executions,
+        num_random_generations,
+    );
+}
+
+#[test_matrix(
+    100, 1000, 0, 0, [false, true], [false, true], 3, 2; "varying_incarnation_behavior_gas_limit"
+)]
+#[test_matrix(
+    50, 500, [0, 3, 200], [0, 3, 50], [false, true], [false, true], 2, 2; "with_mixed_abort_skip_rest"
+)]
+#[test_matrix(
+    [10, 20], 500, 0, 0, [false, true], [false, true], 4, 2; "contended"
+)]
+fn mono_resource_transaction_tests(
+    universe_size: usize,
+    transaction_count: usize,
+    abort_count: usize,
+    skip_rest_count: usize,
+    use_gas_limit: bool,
+    is_dynamic: bool,
+    num_random_generations: usize,
+    num_executions: usize,
+) {
+    run_transactions_resources::<MonoMockExecutor>(
         universe_size,
         transaction_count,
         abort_count,
