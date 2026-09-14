@@ -1,5 +1,7 @@
 {
-  "threshold_percent": 3.0,
+  "gate_metric": "instructions",
+  "threshold_percent": 1.0,
+  "metrics": ["instructions", "time", "cycles"],
   "mono_benches": [
     { "id": "fib/mono" },
     { "id": "nested_loop/mono" },
