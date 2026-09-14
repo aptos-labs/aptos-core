@@ -57,9 +57,6 @@ pub(super) fn place_user_txn_args<'a>(
         call.signer(signer)
             .map_err(MoveExecutionFailure::RuntimeError)?;
     }
-    // TODO(security, completeness): check that `String` arguments are valid
-    // UTF-8 and `Object<T>` arguments point at existing objects, including
-    // when nested in vectors and options.
     for arg in args {
         // Only a decode failure faults the argument's bytes; anything else
         // (a non-decodable parameter type, an exhausted heap) is the VM's.

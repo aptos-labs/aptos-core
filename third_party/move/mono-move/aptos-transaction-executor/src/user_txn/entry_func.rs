@@ -10,7 +10,7 @@ use crate::{
 };
 use mono_move_core::{
     interner::{view_module_id, InternedIdentifier, InternedModuleId},
-    types::{view_name, view_type, InternedType, InternedTypeList, Type},
+    types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
     Function, PreparedModule,
 };
 use mono_move_global_context::ExecutionGuard;
@@ -25,6 +25,13 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 /// - It must not return values.
 /// - All signers must be in leading positions.
 /// - All other parameters must be of the allowed types.
+//
+// TODO(security, completeness): the current checks are INCOMPLETE:
+// - Certain framework types require additional checks during creation.
+//   - String: must be valid UTF-8.
+//   - Object: an `ObjectCore` resource must exist at the address, and
+//     a resource of type `T` must also exist under the same address.
+// - Public structs and enums are not yet supported.
 fn check_callable_by_user_txn(
     func: &Function,
     module: &PreparedModule,
@@ -48,8 +55,6 @@ fn check_callable_by_user_txn(
 }
 
 /// Whether a type can be allowed as a transaction argument.
-//
-// TODO(completeness): support construction of public structs and enums.
 fn is_allowed_arg_type(ty: InternedType) -> bool {
     match view_type(ty) {
         Type::Bool
@@ -68,8 +73,10 @@ fn is_allowed_arg_type(ty: InternedType) -> bool {
         | Type::Address => true,
         Type::Vector { elem } => is_allowed_arg_type(*elem),
         Type::Nominal {
-            module_id, name, ..
-        } => is_allowed_framework_struct(*module_id, *name),
+            module_id,
+            name,
+            ty_args,
+        } => is_allowed_framework_struct(*module_id, *name, *ty_args),
         Type::Signer
         | Type::ImmutRef { .. }
         | Type::MutRef { .. }
@@ -78,21 +85,28 @@ fn is_allowed_arg_type(ty: InternedType) -> bool {
     }
 }
 
-/// Whether the given type is a framework struct allowed to be constructed as a transaction argument.
-fn is_allowed_framework_struct(module_id: InternedModuleId, name: InternedIdentifier) -> bool {
+/// Whether the given type is a framework struct allowed to be constructed as a
+/// transaction argument.
+fn is_allowed_framework_struct(
+    module_id: InternedModuleId,
+    name: InternedIdentifier,
+    ty_args: InternedTypeList,
+) -> bool {
     let module_id = view_module_id(module_id);
-    matches!(
-        (
-            *module_id.address(),
-            view_name(module_id.name()),
-            view_name(name)
-        ),
-        (AccountAddress::ONE, "string", "String")
-            | (AccountAddress::ONE, "object", "Object")
-            | (AccountAddress::ONE, "option", "Option")
-            | (AccountAddress::ONE, "fixed_point32", "FixedPoint32")
-            | (AccountAddress::ONE, "fixed_point64", "FixedPoint64")
-    )
+    if *module_id.address() != AccountAddress::ONE {
+        return false;
+    }
+    match (view_name(module_id.name()), view_name(name)) {
+        // An `Object<T>` argument is only an address, so `T` is unrestricted.
+        ("string", "String")
+        | ("object", "Object")
+        | ("fixed_point32", "FixedPoint32")
+        | ("fixed_point64", "FixedPoint64") => true,
+        ("option", "Option") => view_type_list(ty_args)
+            .iter()
+            .all(|&ty| is_allowed_arg_type(ty)),
+        _ => false,
+    }
 }
 
 /// Runs the transaction's entry function, metered against the transaction's gas budget.

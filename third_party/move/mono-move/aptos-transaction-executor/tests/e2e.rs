@@ -749,6 +749,10 @@ fn assert_kept_with_code_like_v1(
 /// MASM, since the framework has none and the Move compiler would refuse some.
 const UNCALLABLE_ENTRY_FUNCTIONS: &str = r#"
 module 0xcafe::uncallable
+use 0x1::option
+
+struct Private has drop
+  x: u64
 
 entry public fun returns_value(): u64
     ld_u64 0
@@ -758,6 +762,9 @@ entry public fun takes_ref(x: &u64)
     ret
 
 entry public fun signer_after_arg(x: u64, s: &signer)
+    ret
+
+entry public fun takes_option_of_private(o: option::Option<Private>)
     ret
 "#;
 
@@ -835,6 +842,29 @@ fn signer_after_argument_rejected_like_v1() {
     let txn = call_txn(&alice, address, "uncallable", "signer_after_arg", vec![
         bcs::to_bytes(&0u64).unwrap(),
     ]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// An entry function taking an `Option` of a private struct is refused like on
+/// v1.
+#[test]
+fn option_of_private_struct_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    // `Some(Private { x: 0 })`: v1 admits the type but fails to construct the
+    // value, so it would accept a `None`.
+    let txn = call_txn(
+        &alice,
+        address,
+        "uncallable",
+        "takes_option_of_private",
+        vec![bcs::to_bytes(&vec![0u64]).unwrap()],
+    );
     assert_kept_with_code_like_v1(
         &fx,
         &alice,
