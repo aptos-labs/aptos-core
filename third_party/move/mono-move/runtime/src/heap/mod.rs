@@ -251,7 +251,7 @@ impl Heap {
     ///
     /// The caller must ensure no live references into the heap remain (reset the interpreter's frame
     /// and root set first, via [`InterpreterContext::reset`](crate::InterpreterContext::reset)).
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.bump_ptr = self.buffer.as_ptr();
         self.gc_count = 0;
     }

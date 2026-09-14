@@ -130,10 +130,13 @@ impl IntoExecutionError for ResourceProviderError {
     }
 }
 
-/// Keeps a read's backing allocation alive. A [`StorageRead::ExternalHeap`]
-/// points into an arena owned by whoever produced the read: a storage provider,
-/// or another transaction's frozen heap. Retaining the pin keeps that arena
-/// from being freed while the read is held.
+/// Marks an arena as safe to hand out pointers into: implementing it asserts
+/// that allocations never move and are never freed while the arena is alive.
+/// Implemented by a storage provider's cache arena and by another transaction's
+/// frozen heap.
+///
+/// A [`StorageRead::ExternalHeap`] holds an `Arc<dyn ReadPin>` on the arena its
+/// pointer points into, so that arena outlives the read.
 //
 // TODO(cleanup): give this a method (or supertrait) once read-set validation
 // needs to inspect the backing allocation.

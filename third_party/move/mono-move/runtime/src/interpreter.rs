@@ -46,9 +46,9 @@ use mono_move_core::{
     },
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
     FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
-    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand, VMInternalError,
+    VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -581,11 +581,10 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. No execution can follow, so the heap is frozen: it moves
-    /// into an `Arc` and every heap pointer inside the read-write set and
-    /// extensions stays valid for as long as the returned effects live. The
-    /// effects no longer borrow the guard, so the caller must keep the global
-    /// arena that owns their interned types alive until the effects are dropped.
+    /// publication. The session heap is frozen into the effects, so every heap
+    /// pointer they hold stays valid for as long as they live. Their interned
+    /// types are not: the effects do not borrow the guard, so the caller must
+    /// keep the global arena alive until the effects are dropped.
     pub fn finish(self) -> SessionEffects {
         SessionEffects {
             read_write_set: self.read_write_set,

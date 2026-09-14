@@ -91,7 +91,7 @@ fn execute_v2_with<S: StateView>(
 fn execute_v2_in<S: StateView>(
     guard: &ExecutionGuard<'_>,
     state: &S,
-    run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome<'guard>,
+    run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome,
 ) -> TransactionOutput {
     let natives = production_natives();
     let module_provider = StateViewModuleProvider::new(state);
@@ -108,7 +108,7 @@ fn execute_v2_in<S: StateView>(
     );
     run(&executor)
         .materialize(
-            &guard,
+            guard,
             &data_provider,
             env.features(),
             TransactionAuxiliaryData::default(),
