@@ -25,10 +25,9 @@ above this crate.
 Still open before the transaction executor can be wired to the block
 coordinator:
 
-- Argument deserialization has no deserializer yet for public structs and
-  enums or for signed integers, so entry functions taking them are refused.
-  Script payloads still decode their arguments natively, without the value
-  checks.
+- Argument deserialization has no deserializer yet for signed integers, so
+  entry functions taking them are refused. Script payloads still decode their
+  arguments natively, without the value checks.
 - Multi-agent transactions are untested.
 
 ## Transaction arguments
@@ -39,9 +38,10 @@ An entry function's arguments are deserialized in Move by the VM-provided
 generates a script per entry function that deserializes each argument and
 calls it (`user_txn/trampoline.rs`), so a transaction is one root call.
 Framework constructors run as part of deserialization, so a bad `String` or
-`Object<T>` aborts where AptosVM's would. A parameter type with no
-deserializer fails to lower, which the executor reports as
-`INVALID_MAIN_FUNCTION_SIGNATURE`.
+`Object<T>` aborts where AptosVM's would. Public structs and enums are
+deserialized by a module the loader generates per defining module, calling
+their `pack$` functions. A parameter type with no deserializer fails to lower,
+which the executor reports as `INVALID_MAIN_FUNCTION_SIGNATURE`.
 
 ## Conventions
 

@@ -17,10 +17,11 @@ The stackless execution IR is then lowered into monomorphic micro-ops, when all 
 `lower/txn_arg.rs` resolves calls to the VM-provided `txn_arg::deserialize<T>`
 at lowering, when `T` is concrete, into the module's deserializer for `T`'s
 shape (`deserialize_vector<E>`, `deserialize_option<E>`, `deserialize_string`,
-...). The rewrite happens where call sites are built in `lower/context.rs`; it
-is sound because `CallIndirect` targets by name and every target has the
-intrinsic's signature. A type with no deserializer fails lowering with
-`NotATransactionArgument`.
+...), or for any other struct or enum into `deserialize$S` of the module the
+loader generates for `S`'s defining module. The rewrite happens where call
+sites are built in `lower/context.rs`; it is sound because `CallIndirect`
+targets by name and every target has the intrinsic's signature. A type with no
+deserializer fails lowering or loading with `NotATransactionArgument`.
 
 ## Test Infrastructure
 

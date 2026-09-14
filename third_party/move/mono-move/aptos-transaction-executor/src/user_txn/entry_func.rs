@@ -49,8 +49,8 @@ fn check_callable_by_user_txn(
 /// Runs the transaction's entry function, metered against the transaction's
 /// gas budget.
 //
-// TODO(completeness): public structs and enums, and signed integers, have no
-// deserializer yet and are refused.
+// TODO(completeness): signed integers have no deserializer yet and are
+// refused.
 pub(crate) fn call_entry_function<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
@@ -116,12 +116,12 @@ pub(crate) fn call_entry_function<'a>(
             .map_err(MoveExecutionFailure::RuntimeError)?;
     }
     match call.run().map_err(construction_failure)? {
-        // The argument module aborts only on bytes that do not encode the
-        // parameter's type.
+        // The VM's argument modules abort only on bytes that do not encode
+        // the parameter's type.
         RuntimeStatus::Aborted {
             location: AbortLocation::Module(module_id),
             ..
-        } if txn_arg::is_txn_arg_module(&module_id) => Err(MoveExecutionFailure::InvalidArguments(
+        } if txn_arg::is_vm_module(&module_id) => Err(MoveExecutionFailure::InvalidArguments(
             InvalidArguments::UndecodableArgument,
         )),
         status => Ok(status),

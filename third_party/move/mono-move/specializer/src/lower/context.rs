@@ -441,8 +441,9 @@ fn callee_identity(
     )
 }
 
-/// Whether `module` defines `func_name` with a signature that, instantiated
-/// with `ty_args`, is exactly `(params, returns)`.
+/// Whether `module`'s `func_name`, if it defines one, has a signature that,
+/// instantiated with `ty_args`, is exactly `(params, returns)`. A missing
+/// target is the loader's to report.
 #[cfg(debug_assertions)]
 fn intrinsic_target_signature_matches(
     module: &PreparedModule,
@@ -455,7 +456,7 @@ fn intrinsic_target_signature_matches(
     let Some(def) = module.function_defs().iter().find(|def| {
         module.interned_identifier_at(module.function_handle_at(def.function).name) == func_name
     }) else {
-        return false;
+        return true;
     };
     match instantiate_callee_signature(module, interner, def.function, ty_args) {
         Ok((target_params, target_returns)) => {
@@ -759,15 +760,18 @@ pub fn try_build_context<'a>(
             call_ty_args,
         )? {
             Some((module_id, func_name, ty_args)) => {
+                // Only a target in this module can be checked here; a generated
+                // deserializer's signature is fixed by its generator.
                 debug_assert!(
-                    intrinsic_target_signature_matches(
-                        &module_ir.module,
-                        interner,
-                        func_name,
-                        ty_args,
-                        param_list,
-                        ret_list
-                    ),
+                    module_id != module_ir.module.id()
+                        || intrinsic_target_signature_matches(
+                            &module_ir.module,
+                            interner,
+                            func_name,
+                            ty_args,
+                            param_list,
+                            ret_list
+                        ),
                     "intrinsic target signature diverges from the call site"
                 );
                 (module_id, func_name, ty_args)

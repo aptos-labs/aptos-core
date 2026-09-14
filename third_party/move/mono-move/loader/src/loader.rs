@@ -21,11 +21,12 @@ use crate::{
     error::LoaderError,
     invariant_violation,
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
+    txn_arg_gen,
 };
 use mono_move_core::{
     interner::{
-        is_txn_arg_module_id, script_module_id, view_module_id, InternedIdentifier,
-        InternedModuleId, SCRIPT_MAIN,
+        generated_deserializers_source, is_vm_module_id, script_module_id, view_module_id,
+        InternedIdentifier, InternedModuleId, SCRIPT_MAIN, VM_MODULE_ADDRESS,
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
@@ -40,14 +41,14 @@ use move_binary_format::{
     access::ScriptAccess, file_format::CompiledScript, module_script_conversion::script_into_module,
 };
 use move_bytecode_verifier::VerifierConfig;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
         try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
         try_lower_function, LoweringOutcome, SpecializerContext,
     },
-    ModuleIR,
+    ModuleIR, NotATransactionArgument,
 };
 use std::sync::Arc;
 
@@ -107,6 +108,17 @@ pub struct Loader<'guard, 'ctx> {
     builtin_modules: &'guard [BuiltinModule],
 }
 
+/// The struct or enum type the missing generated deserializer `func_name` of
+/// `module_id` would have deserialized.
+fn not_deserializable_type(module_id: InternedModuleId, func_name: InternedIdentifier) -> String {
+    let name = view_name(func_name);
+    let struct_name = name.strip_prefix("deserialize$").unwrap_or(name);
+    match generated_deserializers_source(view_name(view_module_id(module_id).name())) {
+        Some(source) => format!("{}::{struct_name}", source.short_str_lossless()),
+        None => struct_name.to_string(),
+    }
+}
+
 /// A module the VM provides itself, served ahead of storage.
 pub struct BuiltinModule {
     pub address: AccountAddress,
@@ -159,6 +171,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> VMResult<&'guard LoadedModule> {
+        // A generated module is built from its source module, which must be
+        // loaded first.
+        if id.address() == &VM_MODULE_ADDRESS {
+            if let Some(source) = generated_deserializers_source(id.name()) {
+                let source = self.guard.module_id_of(source.address(), source.name());
+                self.get_or_load_module(read_set, gas_meter, source)?;
+            }
+        }
         match &self.policy {
             LoadingPolicy::Lazy(lowering) => {
                 use LoweringPolicy::*;
@@ -185,24 +205,43 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> VMResult<FunctionPtr> {
+        if !is_vm_module_id(module_id) {
+            return self.load_function_impl(read_set, gas_meter, module_id, func_name, ty_args);
+        }
         let function =
-            self.load_function_impl(read_set, gas_meter, module_id, func_name, ty_args)?;
+            match self.load_function_impl(read_set, gas_meter, module_id, func_name, ty_args) {
+                Ok(function) => function,
+                // A generated module defines deserializers only for the types
+                // a transaction may supply.
+                Err(err)
+                    if matches!(
+                        err.downcast_ref::<LoaderError>(),
+                        Some(LoaderError::FunctionNotFound { .. })
+                    ) && generated_deserializers_source(view_name(
+                        view_module_id(module_id).name(),
+                    ))
+                    .is_some() =>
+                {
+                    return Err(VMInternalError::new(NotATransactionArgument {
+                        ty: not_deserializable_type(module_id, func_name),
+                    }));
+                },
+                Err(err) => return Err(err),
+            };
         // An argument deserializer is loaded together with the deserializers
         // it calls, so a type no transaction may supply fails to load rather
         // than to run.
-        if is_txn_arg_module_id(module_id) {
-            // SAFETY: the function lives in an arena the guard keeps alive.
-            let ops = unsafe { function.as_ref_unchecked() }.code.ops();
-            for op in ops {
-                if let MicroOp::CallIndirect {
-                    module_id,
-                    func_name,
-                    ty_args,
-                } = op
-                {
-                    if is_txn_arg_module_id(*module_id) {
-                        self.load_function(read_set, gas_meter, *module_id, *func_name, *ty_args)?;
-                    }
+        // SAFETY: the function lives in an arena the guard keeps alive.
+        let ops = unsafe { function.as_ref_unchecked() }.code.ops();
+        for op in ops {
+            if let MicroOp::CallIndirect {
+                module_id,
+                func_name,
+                ty_args,
+            } = op
+            {
+                if is_vm_module_id(*module_id) {
+                    self.load_function(read_set, gas_meter, *module_id, *func_name, *ty_args)?;
                 }
             }
         }
@@ -800,18 +839,41 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             .builtin_modules
             .iter()
             .find(|module| module.address == *id.address() && module.name == id.name());
-        let storage_bytes;
-        let bytes: &[u8] = match builtin {
-            Some(module) => module.bytes,
-            None => {
-                storage_bytes = self
+        let generated = if id.address() == &VM_MODULE_ADDRESS {
+            generated_deserializers_source(id.name())
+        } else {
+            None
+        };
+        let owned_bytes;
+        let bytes: &[u8] = match (builtin, generated) {
+            (Some(module), _) => module.bytes,
+            // `load_module` loaded the source into the cache first.
+            (None, Some(source)) => {
+                let source_id = self.guard.module_id_of(source.address(), source.name());
+                let source_module = self
+                    .guard
+                    .get_module(self.guard.arena_ref_for_module_id(source_id))
+                    .ok_or_else(|| LoaderError::ModuleNotFound {
+                        address: *source.address(),
+                        name: source.name().to_string(),
+                    })?;
+                let name = IdentStr::new(id.name()).map_err(|_| LoaderError::ModuleNotFound {
+                    address: *id.address(),
+                    name: id.name().to_string(),
+                })?;
+                owned_bytes = txn_arg_gen::generate(&source_module.ir().module, name);
+                &owned_bytes
+            },
+            (None, None) => {
+                owned_bytes = self
                     .module_provider
                     .get_module_bytes(id.address(), id.name())?
                     .ok_or_else(|| LoaderError::ModuleNotFound {
                         address: *id.address(),
                         name: id.name().to_string(),
-                    })?;
-                &storage_bytes
+                    })?
+                    .to_vec();
+                &owned_bytes
             },
         };
         // TODO(metering): placeholder cost model — byte length of the module. Replace

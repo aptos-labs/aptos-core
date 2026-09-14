@@ -24,6 +24,7 @@
 mod error;
 mod loader;
 mod read_set;
+mod txn_arg_gen;
 
 pub use error::{LoaderError, LoaderInvariantViolation};
 pub use loader::{BuiltinModule, Loader, LoadingPolicy, LoweringPolicy};

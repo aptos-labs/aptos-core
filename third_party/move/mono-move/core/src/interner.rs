@@ -330,6 +330,51 @@ pub fn is_txn_arg_module_id(module_id: InternedModuleId) -> bool {
         && view_name(module_id.name()) == TXN_ARG_MODULE.as_str()
 }
 
+/// Whether `module_id` is a module the VM provides or generates itself.
+pub fn is_vm_module_id(module_id: InternedModuleId) -> bool {
+    view_module_id(module_id).address() == &VM_MODULE_ADDRESS
+}
+
+const GENERATED_PREFIX: &str = "gen$";
+
+/// The name of the VM-generated module that deserializes the public structs
+/// and enums `source` defines.
+pub fn generated_deserializers_module_name(source: &language_storage::ModuleId) -> Identifier {
+    let name = format!(
+        "{GENERATED_PREFIX}{}${}",
+        source.address().to_hex(),
+        source.name()
+    );
+    Identifier::new(name).expect("a hex address and a module name form an identifier")
+}
+
+/// The module whose public structs and enums the VM-generated module `name`
+/// deserializes, or `None` if `name` is not a generated module's.
+pub fn generated_deserializers_source(name: &str) -> Option<language_storage::ModuleId> {
+    let (address, module) = name.strip_prefix(GENERATED_PREFIX)?.split_once('$')?;
+    Some(language_storage::ModuleId::new(
+        AccountAddress::from_hex(address).ok()?,
+        Identifier::new(module).ok()?,
+    ))
+}
+
+/// The ID of the VM-generated module that deserializes the public structs and
+/// enums `source` defines.
+pub fn generated_deserializers_module_id(
+    interner: &impl Interner,
+    source: InternedModuleId,
+) -> InternedModuleId {
+    let name = generated_deserializers_module_name(&module_id_of(source));
+    interner.module_id_of(&VM_MODULE_ADDRESS, &name)
+}
+
+/// The name of the generated function deserializing the struct or enum
+/// `struct_name`.
+pub fn deserializer_name(struct_name: &str) -> Identifier {
+    Identifier::new(format!("deserialize${struct_name}"))
+        .expect("a struct name with a prefix is an identifier")
+}
+
 /// The [`StructTag`] for an interned nominal (struct/enum) type, or [`None`] if
 /// `ty` is not nominal.
 pub fn struct_tag_of(ty: InternedType) -> Option<StructTag> {

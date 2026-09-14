@@ -28,9 +28,10 @@ pub(crate) static BUILTIN_MODULES: [BuiltinModule; 1] = [BuiltinModule {
 
 const DESERIALIZE_ARG: &IdentStr = ident_str!("deserialize_arg");
 
-/// Whether `module_id` is the VM's argument module.
-pub(crate) fn is_txn_arg_module(module_id: &ModuleId) -> bool {
-    module_id.address() == &VM_MODULE_ADDRESS && module_id.name() == TXN_ARG_MODULE
+/// Whether `module_id` is a module the VM provides or generates: the
+/// argument module or a deserializer module for public structs and enums.
+pub(crate) fn is_vm_module(module_id: &ModuleId) -> bool {
+    module_id.address() == &VM_MODULE_ADDRESS
 }
 
 /// Loads `deserialize_arg<ty>`, and with it the deserializers of every type
@@ -77,7 +78,8 @@ mod tests {
     fn txn_arg_module_is_the_reserved_module() {
         let module =
             CompiledModule::deserialize(TXN_ARG_MODULE_BYTES).expect("the module deserializes");
-        assert!(is_txn_arg_module(&module.self_id()));
+        assert!(is_vm_module(&module.self_id()));
+        assert_eq!(module.self_id().name(), TXN_ARG_MODULE);
         assert_eq!(BUILTIN_MODULES[0].name, TXN_ARG_MODULE.as_str());
     }
 }

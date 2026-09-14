@@ -89,7 +89,9 @@ module txn_arg::txn_arg {
         vector::slice(&stream.data, cur, cur + len)
     }
 
-    fun deserialize_uleb128(stream: &mut BCSStream): u64 {
+    /// Reads a ULEB128 length or enum tag. Public for the generated
+    /// deserializers of public structs and enums.
+    public fun deserialize_uleb128(stream: &mut BCSStream): u64 {
         let res = 0;
         let shift = 0;
         while (stream.cur < vector::length(&stream.data)) {

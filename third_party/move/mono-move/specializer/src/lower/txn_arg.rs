@@ -9,7 +9,10 @@
 //! monomorphization.
 
 use mono_move_core::{
-    interner::{txn_arg_module_id, view_module_id, InternedIdentifier, InternedModuleId},
+    interner::{
+        deserializer_name, generated_deserializers_module_id, is_vm_module_id, txn_arg_module_id,
+        view_module_id, InternedIdentifier, InternedModuleId,
+    },
     types::{
         type_to_string, view_name, view_type, view_type_list, InternedType, InternedTypeList, Type,
         EMPTY_TYPE_LIST,
@@ -35,8 +38,8 @@ impl IntoExecutionError for NotATransactionArgument {
     }
 }
 
-/// The call target replacing a call to the intrinsic from inside the
-/// `txn_arg` module, or `None` if the call is to anything else.
+/// The call target replacing a call to the intrinsic from inside a VM module,
+/// or `None` if the call is to anything else.
 pub fn resolve_intrinsic(
     interner: &impl Interner,
     enclosing_module: InternedModuleId,
@@ -45,7 +48,7 @@ pub fn resolve_intrinsic(
     ty_args: InternedTypeList,
 ) -> VMResult<Option<(InternedModuleId, InternedIdentifier, InternedTypeList)>> {
     let txn_arg = txn_arg_module_id(interner);
-    if enclosing_module != txn_arg
+    if !is_vm_module_id(enclosing_module)
         || callee_module_id != txn_arg
         || callee_func_name != interner.identifier_of(DESERIALIZE)
     {
@@ -56,34 +59,33 @@ pub fn resolve_intrinsic(
             ty: "<malformed intrinsic call>".to_string(),
         }));
     };
-    let (name, ty_args) = deserializer_for(interner, ty)?;
-    Ok(Some((txn_arg, interner.identifier_of(name), ty_args)))
+    deserializer_for(interner, txn_arg, ty).map(Some)
 }
 
-/// Whether `ty` has a deserializer, at this level of the type only.
-pub fn is_deserializable(interner: &impl Interner, ty: InternedType) -> bool {
-    deserializer_for(interner, ty).is_ok()
-}
-
+/// The deserializer of `ty`: one of the `txn_arg` module's for the framework
+/// types it knows, otherwise the generated one for a public struct or enum,
+/// which exists only if the type is eligible.
 fn deserializer_for(
     interner: &impl Interner,
+    txn_arg: InternedModuleId,
     ty: InternedType,
-) -> VMResult<(&'static IdentStr, InternedTypeList)> {
+) -> VMResult<(InternedModuleId, InternedIdentifier, InternedTypeList)> {
     let not_an_argument = || {
         VMInternalError::new(NotATransactionArgument {
             ty: type_to_string(ty),
         })
     };
+    let in_txn_arg = |name: &IdentStr, ty_args| (txn_arg, interner.identifier_of(name), ty_args);
     Ok(match view_type(ty) {
-        Type::Bool => (ident_str!("deserialize_bool"), EMPTY_TYPE_LIST),
-        Type::U8 => (ident_str!("deserialize_u8"), EMPTY_TYPE_LIST),
-        Type::U16 => (ident_str!("deserialize_u16"), EMPTY_TYPE_LIST),
-        Type::U32 => (ident_str!("deserialize_u32"), EMPTY_TYPE_LIST),
-        Type::U64 => (ident_str!("deserialize_u64"), EMPTY_TYPE_LIST),
-        Type::U128 => (ident_str!("deserialize_u128"), EMPTY_TYPE_LIST),
-        Type::U256 => (ident_str!("deserialize_u256"), EMPTY_TYPE_LIST),
-        Type::Address => (ident_str!("deserialize_address"), EMPTY_TYPE_LIST),
-        Type::Vector { elem } => (
+        Type::Bool => in_txn_arg(ident_str!("deserialize_bool"), EMPTY_TYPE_LIST),
+        Type::U8 => in_txn_arg(ident_str!("deserialize_u8"), EMPTY_TYPE_LIST),
+        Type::U16 => in_txn_arg(ident_str!("deserialize_u16"), EMPTY_TYPE_LIST),
+        Type::U32 => in_txn_arg(ident_str!("deserialize_u32"), EMPTY_TYPE_LIST),
+        Type::U64 => in_txn_arg(ident_str!("deserialize_u64"), EMPTY_TYPE_LIST),
+        Type::U128 => in_txn_arg(ident_str!("deserialize_u128"), EMPTY_TYPE_LIST),
+        Type::U256 => in_txn_arg(ident_str!("deserialize_u256"), EMPTY_TYPE_LIST),
+        Type::Address => in_txn_arg(ident_str!("deserialize_address"), EMPTY_TYPE_LIST),
+        Type::Vector { elem } => in_txn_arg(
             ident_str!("deserialize_vector"),
             interner.type_list_of(&[*elem]),
         ),
@@ -92,21 +94,30 @@ fn deserializer_for(
             name,
             ty_args,
         } => {
-            let module_id = view_module_id(*module_id);
-            if *module_id.address() != AccountAddress::ONE {
-                return Err(not_an_argument());
-            }
-            match (view_name(module_id.name()), view_name(*name)) {
-                ("option", "Option") => (ident_str!("deserialize_option"), *ty_args),
-                ("string", "String") => (ident_str!("deserialize_string"), EMPTY_TYPE_LIST),
-                ("object", "Object") => (ident_str!("deserialize_object"), *ty_args),
-                ("fixed_point32", "FixedPoint32") => {
-                    (ident_str!("deserialize_fixed_point32"), EMPTY_TYPE_LIST)
+            let module = view_module_id(*module_id);
+            let framework = match (
+                *module.address() == AccountAddress::ONE,
+                view_name(module.name()),
+                view_name(*name),
+            ) {
+                (true, "option", "Option") => Some(ident_str!("deserialize_option")),
+                (true, "string", "String") => Some(ident_str!("deserialize_string")),
+                (true, "object", "Object") => Some(ident_str!("deserialize_object")),
+                (true, "fixed_point32", "FixedPoint32") => {
+                    Some(ident_str!("deserialize_fixed_point32"))
                 },
-                ("fixed_point64", "FixedPoint64") => {
-                    (ident_str!("deserialize_fixed_point64"), EMPTY_TYPE_LIST)
+                (true, "fixed_point64", "FixedPoint64") => {
+                    Some(ident_str!("deserialize_fixed_point64"))
                 },
-                _ => return Err(not_an_argument()),
+                _ => None,
+            };
+            match framework {
+                Some(deserializer) => in_txn_arg(deserializer, *ty_args),
+                None => (
+                    generated_deserializers_module_id(interner, *module_id),
+                    interner.identifier_of(&deserializer_name(view_name(*name))),
+                    *ty_args,
+                ),
             }
         },
         // TODO(completeness): signed integers, which AptosVM accepts.
