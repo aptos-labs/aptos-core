@@ -773,8 +773,16 @@ entry public fun takes_option_of_private(o: option::Option<Private>)
 fn publish_uncallable_module(
     fx: &mut FakeExecutor,
 ) -> move_core_types::account_address::AccountAddress {
-    let (module, blob) =
-        aptos_language_e2e_tests::compile::compile_module(UNCALLABLE_ENTRY_FUNCTIONS);
+    publish_module(fx, UNCALLABLE_ENTRY_FUNCTIONS)
+}
+
+/// Assembles the MASM module `code` and publishes it straight into `fx`'s
+/// state, returning the module's address.
+fn publish_module(
+    fx: &mut FakeExecutor,
+    code: &str,
+) -> move_core_types::account_address::AccountAddress {
+    let (module, blob) = aptos_language_e2e_tests::compile::compile_module(code);
     fx.add_module(&module.self_id(), blob.into_inner());
     *module.self_id().address()
 }
@@ -888,6 +896,220 @@ fn native_function_rejected_like_v1() {
         txn,
         StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED,
     );
+}
+
+/// Entry functions taking the framework types whose values the argument
+/// constructors check.
+const CONSTRUCTED_ARGUMENT_FUNCTIONS: &str = r#"
+module 0xcafe::constructed
+use 0x1::string
+use 0x1::option
+use 0x1::object
+use 0x1::fungible_asset
+
+entry public fun takes_string(s: string::String)
+    ret
+
+entry public fun takes_option_string(o: option::Option<string::String>)
+    ret
+
+entry public fun takes_strings(v: vector<string::String>)
+    ret
+
+entry public fun takes_object(o: object::Object<object::ObjectCore>)
+    ret
+
+entry public fun takes_objects(v: vector<object::Object<object::ObjectCore>>)
+    ret
+
+entry public fun takes_store(o: object::Object<fungible_asset::FungibleStore>)
+    ret
+"#;
+
+/// The APT fungible-asset metadata object, created at genesis.
+fn apt_metadata_object() -> move_core_types::account_address::AccountAddress {
+    move_core_types::account_address::AccountAddress::from_hex_literal("0xa").unwrap()
+}
+
+/// Asserts that v1 keeps `txn` with a Move abort raised in the framework
+/// module `v1_module` with `v1_code`, and that v2 keeps it with the
+/// miscellaneous error `v2_code`: v2 checks the value itself instead of
+/// running the framework's constructor.
+fn assert_constructor_abort_on_v1_and_code_on_v2(
+    fx: &FakeExecutor,
+    txn: SignedTransaction,
+    v1_module: &str,
+    v1_code: u64,
+    v2_code: StatusCode,
+) {
+    use move_core_types::vm_status::AbortLocation;
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert!(
+        matches!(
+            v1_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: AbortLocation::Module(module),
+                code,
+                ..
+            }) if module.name().as_str() == v1_module && *code == v1_code
+        ),
+        "v1 did not abort in {v1_module} with {v1_code}: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(v2_code)))
+    );
+
+    // Write sets are not compared: the statuses differ by design.
+}
+
+/// Asserts that both VMs run `txn` successfully with the same output.
+fn assert_success_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedTransaction) {
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 did not run the transaction: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *sender.address());
+}
+
+/// Valid `String` arguments run like on v1.
+#[test]
+fn valid_strings_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_strings", vec![
+        bcs::to_bytes(&vec!["hi", "yo"]).unwrap(),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A `String` argument that is not valid UTF-8 is refused.
+#[test]
+fn malformed_string_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_string", vec![
+        bcs::to_bytes(&vec![0xFFu8, 0xFE]).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "string",
+        1,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// A malformed `String` nested in a `Some` is refused.
+#[test]
+fn malformed_string_in_option_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    // `Some("\xff")`: the tag, then a one-byte string.
+    let txn = call_txn(&alice, address, "constructed", "takes_option_string", vec![
+        vec![0x01, 0x01, 0xFF],
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "string",
+        1,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// An `Option` argument holding two values is refused.
+#[test]
+fn over_long_option_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    // Two strings where `None` or `Some` should be.
+    let txn = call_txn(&alice, address, "constructed", "takes_option_string", vec![
+        bcs::to_bytes(&vec!["a", "b"]).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "option",
+        0x40002,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// An `Object<T>` argument naming an existing object of type `T` runs like on
+/// v1.
+#[test]
+fn existing_object_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_object", vec![
+        bcs::to_bytes(&apt_metadata_object()).unwrap(),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// An `Object<T>` argument naming an address holding no object is refused.
+#[test]
+fn object_at_plain_address_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_object", vec![
+        bcs::to_bytes(alice.address()).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "object",
+        0x60002,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// An `Object<T>` argument naming an object that holds no `T` is refused.
+#[test]
+fn object_lacking_resource_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_store", vec![
+        bcs::to_bytes(&apt_metadata_object()).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(
+        &fx,
+        txn,
+        "object",
+        0x60007,
+        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+    );
+}
+
+/// An argument holding as many objects as one argument may check runs like on
+/// v1, and one more is refused like on v1.
+#[test]
+fn object_check_bound_matches_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let objects = |n: usize| bcs::to_bytes(&vec![apt_metadata_object(); n]).unwrap();
+
+    let txn = call_txn(&alice, address, "constructed", "takes_objects", vec![
+        objects(32),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+
+    let txn = call_txn(&alice, address, "constructed", "takes_objects", vec![
+        objects(33),
+    ]);
+    assert_kept_with_code_like_v1(&fx, &alice, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
 }
 
 /// Transactions violating the pre-execution gas bounds expressible by the

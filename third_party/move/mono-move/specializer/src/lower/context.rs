@@ -1095,6 +1095,31 @@ pub fn try_discover_types_for_lowering_in_function(
     Ok(descriptors)
 }
 
+/// Publishes the layout and struct descriptor of the resource type `ty`, so a
+/// global-storage read of it can be materialized outside lowered code. Returns
+/// whether the layout could be published.
+pub fn publish_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+) -> VMResult<bool> {
+    let mut visited = UnorderedSet::new();
+    let mut descriptors = LoweringDescriptors::default();
+    let published = discover_type_metadata(
+        ctx,
+        interner,
+        ty,
+        EMPTY_TYPE_LIST,
+        &mut visited,
+        &mut descriptors,
+    )?
+    .is_some();
+    if published {
+        publish_struct_descriptor_for(ctx, ty, &mut descriptors.vec)?;
+    }
+    Ok(published)
+}
+
 fn try_discover_types_for_lowering_in_function_impl(
     ctx: &mut impl SpecializerContext,
     interner: &impl Interner,

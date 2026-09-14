@@ -3,7 +3,10 @@
 
 //! Running an entry-function payload.
 
-use super::args::{leading_signer_params, place_user_txn_args};
+use super::{
+    arg_check::check_arg_values,
+    args::{check_arg_counts, leading_signer_params, place_user_txn_args},
+};
 use crate::{
     calls::resolve_function_by_name,
     errors::{InvalidArguments, MoveExecutionFailure},
@@ -26,12 +29,8 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 /// - All signers must be in leading positions.
 /// - All other parameters must be of the allowed types.
 //
-// TODO(security, completeness): the current checks are INCOMPLETE:
-// - Certain framework types require additional checks during creation.
-//   - String: must be valid UTF-8.
-//   - Object: an `ObjectCore` resource must exist at the address, and
-//     a resource of type `T` must also exist under the same address.
-// - Public structs and enums are not yet supported.
+// TODO(completeness): public structs and enums are not yet admitted as
+// argument types.
 fn check_callable_by_user_txn(
     func: &Function,
     module: &PreparedModule,
@@ -146,6 +145,9 @@ pub(crate) fn call_entry_function<'a>(
         .map_err(MoveExecutionFailure::RuntimeError)?;
     let signer_params =
         check_callable_by_user_txn(func, module).map_err(MoveExecutionFailure::InvalidArguments)?;
+    check_arg_counts(&func.param_tys, signer_params, secondary_signers, args)
+        .map_err(MoveExecutionFailure::InvalidArguments)?;
+    check_arg_values(guard, interp, &func.param_tys[signer_params..], args)?;
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;

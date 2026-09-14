@@ -25,11 +25,8 @@ above this crate.
 Still open before the transaction executor can be wired to the block
 coordinator:
 
-- Argument validation is missing two things AptosVM does through its argument
-  constructors: value checks on the whitelisted framework types (`String`
-  UTF-8 validity, `Option` length, `Object<T>` existence), and public struct
-  and enum arguments. See the `TODO(security, completeness)` in
-  `user_txn/entry_func.rs`.
+- Public struct and enum arguments are not admitted. See the
+  `TODO(completeness)` in `user_txn/entry_func.rs`.
 - Multi-agent transactions are untested.
 
 ## Conventions

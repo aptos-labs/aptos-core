@@ -532,6 +532,20 @@ impl<'guard> InterpreterContext<'guard> {
         resolve_resource_group!(self, ty)
     }
 
+    /// Whether a resource of type `ty` exists at `address`, recording the read.
+    /// Loads the type's defining module and publishes its layout if this
+    /// transaction has not yet.
+    pub fn resource_exists(&mut self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
+        self.loader
+            .publish_resource_type(&mut self.read_set, &mut self.gas_meter, ty)?;
+        let group = self.resource_group_of(ty)?;
+        Ok(self.read_write_set.exists(
+            self.resource_provider,
+            &InMemoryStorageKey::resource(address, ty),
+            group,
+        )?)
+    }
+
     /// Returns the transaction's read-set.
     pub fn read_set(&self) -> &ModuleReadSet<'guard> {
         &self.read_set

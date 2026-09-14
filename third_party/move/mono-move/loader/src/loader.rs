@@ -42,8 +42,9 @@ use move_bytecode_verifier::VerifierConfig;
 use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
-        try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
-        try_lower_function, LoweringOutcome, SpecializerContext,
+        publish_resource_type, try_discover_types_for_lowering_in_function,
+        try_discover_types_for_lowering_in_module, try_lower_function, LoweringOutcome,
+        SpecializerContext,
     },
     ModuleIR,
 };
@@ -377,6 +378,29 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// Runs the lowering pipeline for a single function with the given
     /// substitution table. Returns a fresh `FunctionSlot` containing the
     /// lowered code and its mandatory-dependency set.
+    /// Publishes the layout and GC descriptor of the resource type `ty`, so a
+    /// read of it can be materialized outside lowered code, charging for the
+    /// modules its definition pulls in.
+    pub fn publish_resource_type(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        ty: InternedType,
+    ) -> VMResult<()> {
+        let mut ctx = LoweringContext::new(self, read_set);
+        let published = publish_resource_type(&mut ctx, self.guard, ty)?;
+        let discovered = Arc::<[LoadedModuleSlot]>::from(ctx.discovered);
+        self.record_loaded_and_charge_slots(read_set, gas_meter, &discovered, |_, _| {
+            invariant_violation!(UnexpectedReadSetMiss);
+        })?;
+        if !published {
+            return Err(VMInternalError::new(LoaderError::LoweringSkipped {
+                reason: "the resource type's layout is not derivable",
+            }));
+        }
+        Ok(())
+    }
+
     fn lower_function_with_ty_args(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
