@@ -68,7 +68,9 @@ build {
       // Verify installations
       "gcloud --version",
       "kubectl version --client",
-      "gke-gcloud-auth-plugin --version"
+      "gke-gcloud-auth-plugin --version",
+      // cargo-sort 1.0.7 is installed by dev_setup.sh -t (install_cargo_sort).
+      "sudo -u runner /home/runner/.cargo/bin/cargo-sort --version"
     ]
   }
 }

@@ -13,9 +13,16 @@ runs:
     # Run the pre-commit checks
     - uses: pre-commit/action@v3.0.0
 
-    # Run the rust linters and cargo checks
+    # Run the rust linters and cargo checks.
+    # cargo-sort 1.0.7 is baked into the aptos-ubuntu-x64 image by packer via
+    # scripts/dev_setup.sh -t. Do not cargo-install it on every lint job.
     - name: Run cargo sort and rust lint checks
       shell: bash
       run: |
-        cargo install cargo-sort --version 1.0.7  # Fix the version to avoid unexpected changes
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
+        if ! command -v cargo-sort >/dev/null; then
+          echo "cargo-sort is missing from the RunsOn image. Rebuild aptos-ubuntu-x64 with packer (dev_setup.sh -t installs 1.0.7)." >&2
+          exit 1
+        fi
         scripts/rust_lint.sh --check
