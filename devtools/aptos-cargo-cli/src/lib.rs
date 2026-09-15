@@ -10,7 +10,7 @@ use cargo::Cargo;
 use clap::{Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
 use determinator::Utf8Paths0;
-use log::{debug, trace};
+use log::{debug, trace, warn};
 
 // Useful package name constants for targeted tests
 const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
@@ -282,6 +282,8 @@ impl AptosCargoCommand {
                 // Start by calculating the affected packages.
                 let (direct_args, push_through_args, affected_package_paths) =
                     self.get_args_and_affected_packages(package_args)?;
+                let dry_run = targeted_unit_tests_dry_run(&direct_args);
+                let direct_args = without_dry_run(direct_args);
 
                 // Filter out the ignored packages
                 let mut packages_to_test = vec![];
@@ -300,19 +302,29 @@ impl AptosCargoCommand {
                     }
                 }
 
-                // Create and run the command if we found packages to test
-                if !packages_to_test.is_empty() {
-                    println!("Running the targeted unit tests...");
-                    return run_targeted_unit_tests(
-                        packages_to_test,
-                        direct_args,
-                        push_through_args,
+                if packages_to_test.is_empty() {
+                    write_github_output("skip_tests", "true");
+                    println!(
+                        "Skipping targeted unit tests because no test packages were affected!"
                     );
+                    return Ok(());
                 }
 
-                // Otherwise, skip the targeted unit tests
-                println!("Skipping targeted unit tests because no test packages were affected!");
-                Ok(())
+                write_github_output("skip_tests", "false");
+                if dry_run {
+                    println!(
+                        "Dry-run: {} package(s) would be tested; not compiling.",
+                        packages_to_test.len()
+                    );
+                    return Ok(());
+                }
+
+                if nextest_subcommand(&direct_args) == "archive" {
+                    println!("Archiving the targeted unit tests...");
+                } else {
+                    println!("Running the targeted unit tests...");
+                }
+                run_targeted_unit_tests(packages_to_test, direct_args, push_through_args)
             },
             _ => {
                 // Otherwise, we need to parse and run the command.
@@ -460,6 +472,49 @@ fn run_targeted_compiler_v2_tests(
     Ok(())
 }
 
+/// Returns `archive` when `--archive-file` is present so CI can compile once
+/// and run nextest partitions against the resulting archive.
+fn nextest_subcommand(direct_args: &[String]) -> &'static str {
+    if direct_args.iter().any(|arg| arg == "--archive-file") {
+        "archive"
+    } else {
+        "run"
+    }
+}
+
+fn targeted_unit_tests_dry_run(direct_args: &[String]) -> bool {
+    direct_args.iter().any(|arg| arg == "--dry-run")
+}
+
+fn without_dry_run(direct_args: Vec<String>) -> Vec<String> {
+    direct_args
+        .into_iter()
+        .filter(|arg| arg != "--dry-run")
+        .collect()
+}
+
+/// Appends `key=value` to `$GITHUB_OUTPUT` when running in GitHub Actions.
+fn write_github_output(key: &str, value: &str) {
+    let Ok(path) = std::env::var("GITHUB_OUTPUT") else {
+        return;
+    };
+    use std::io::Write;
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            if let Err(error) = writeln!(file, "{key}={value}") {
+                warn!("Failed to write GitHub output {key}: {error:?}");
+            }
+        },
+        Err(error) => {
+            warn!("Failed to open GITHUB_OUTPUT file {:?}: {:?}", path, error);
+        },
+    }
+}
+
 /// Runs the targeted unit tests
 fn run_targeted_unit_tests(
     packages_to_test: Vec<String>,
@@ -472,10 +527,14 @@ fn run_targeted_unit_tests(
         direct_args.push(package);
     }
 
-    // Create the command to run the unit tests
+    // Create the command to run or archive the unit tests
+    let subcommand = nextest_subcommand(&direct_args);
     let mut command = Cargo::command("nextest");
-    command.args(["run"]);
-    command.args(["--no-tests=warn"]); // Don't fail if no tests are run!
+    command.args([subcommand]);
+    // `nextest archive` does not accept run-only flags.
+    if subcommand == "run" {
+        command.args(["--no-tests=warn"]); // Don't fail if no tests are run!
+    }
     command.args(direct_args).pass_through(push_through_args);
 
     // Run the unit tests
@@ -749,5 +808,42 @@ mod tests {
                 .any(|glob| glob.starts_with("buildtools")),
             "buildtools/** must be ignored by the unit-test determinator"
         );
+    }
+
+    #[test]
+    fn nextest_subcommand_archives_when_archive_file_is_set() {
+        assert_eq!(nextest_subcommand(&[]), "run");
+        assert_eq!(
+            nextest_subcommand(&["--profile".into(), "ci".into()]),
+            "run"
+        );
+        assert_eq!(
+            nextest_subcommand(&[
+                "--profile".into(),
+                "ci".into(),
+                "--archive-file".into(),
+                "unit-test-archive.tar.zst".into(),
+            ]),
+            "archive"
+        );
+    }
+
+    #[test]
+    fn dry_run_flag_is_stripped_from_nextest_args() {
+        assert!(!targeted_unit_tests_dry_run(&[]));
+        assert!(targeted_unit_tests_dry_run(&["--dry-run".into()]));
+        let stripped = without_dry_run(vec![
+            "--profile".to_string(),
+            "ci".to_string(),
+            "--dry-run".to_string(),
+            "--archive-file".to_string(),
+            "unit-test-archive.tar.zst".to_string(),
+        ]);
+        assert_eq!(stripped, vec![
+            "--profile".to_string(),
+            "ci".to_string(),
+            "--archive-file".to_string(),
+            "unit-test-archive.tar.zst".to_string(),
+        ]);
     }
 }
