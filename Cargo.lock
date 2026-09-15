@@ -677,6 +677,7 @@ dependencies = [
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "bcs 0.1.4",
+ "blst",
  "criterion",
  "ed25519-dalek 2.1.1",
  "generic-array",
