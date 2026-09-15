@@ -30,7 +30,8 @@ pub type Version = u64;
 /// The key is "in-memory" because it embeds interned, arena-backed data that
 /// must not outlive the current execution. It is not a stable, serializable
 /// storage key.
-#[derive(Clone, Eq, PartialEq, Hash)]
+// TODO(security): Debug derivation is not safe! Remove before production.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum InMemoryStorageKey {
     /// Every resource can be identified in storage by the address where it is
     /// published and its struct/enum type.
