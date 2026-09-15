@@ -749,7 +749,7 @@ pub fn try_build_context<'a>(
         // Descriptor IDs for the native's resource types (published by the
         // discovery pass, keyed on the concrete type); e.g. `add_box` uses its
         // entry to box the inserted value.
-        let required_descriptors: Vec<DescriptorId> = resource_types_for_native(
+        let required_descriptors = resource_types_for_native(
             interner,
             callee_module_id,
             callee_func_name,
@@ -757,8 +757,14 @@ pub fn try_build_context<'a>(
             view_type_list(call_ty_args),
         )
         .iter()
-        .filter_map(|ty| descriptors.structs.get(ty).copied())
-        .collect();
+        .filter_map(|ty| {
+            if matches!(view_type(*ty), Type::Vector { .. }) {
+                descriptors.vectors.get(ty).copied()
+            } else {
+                descriptors.structs.get(ty).copied()
+            }
+        })
+        .collect::<Vec<_>>();
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,
