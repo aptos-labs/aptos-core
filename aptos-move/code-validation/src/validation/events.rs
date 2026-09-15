@@ -35,7 +35,7 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// Validate event metadata on modules one by one:
 /// * Extract the event metadata
 /// * Verify all changes are compatible upgrades (existing event attributes cannot be removed)
-pub(crate) fn validate_module_events(
+pub fn validate_module_events(
     features: &Features,
     module_storage: &impl ModuleStorage,
     traversal_context: &TraversalContext,
@@ -97,7 +97,7 @@ pub(crate) fn validate_module_events(
 ///    0x1::event::emit<Event>();
 /// }
 /// ```
-pub(crate) fn validate_emit_calls(
+pub fn validate_emit_calls(
     event_structs: &HashSet<String>,
     module: &CompiledModule,
 ) -> VMResult<()> {
@@ -255,9 +255,7 @@ pub(crate) fn validate_emit_calls(
 }
 
 /// Given a module id extract all event metadata
-pub(crate) fn extract_event_metadata(
-    metadata: &RuntimeModuleMetadataV1,
-) -> VMResult<HashSet<String>> {
+pub fn extract_event_metadata(metadata: &RuntimeModuleMetadataV1) -> VMResult<HashSet<String>> {
     let mut event_structs = HashSet::new();
     for (struct_, attrs) in &metadata.struct_attributes {
         for attr in attrs {
@@ -288,7 +286,7 @@ pub(crate) fn extract_event_metadata(
 /// ```
 ///
 /// This is ok to fail here, as event emission should be done by the module where event is defined.
-pub(crate) fn verify_no_event_emission_in_compiled_script(script: &CompiledScript) -> VMResult<()> {
+pub fn verify_no_event_emission_in_compiled_script(script: &CompiledScript) -> VMResult<()> {
     for func_handle in &script.function_handles {
         if is_event_emit_call(BinaryIndexedView::Script(script), func_handle) {
             debug_assert!(func_handle.type_parameters.len() == 1);
