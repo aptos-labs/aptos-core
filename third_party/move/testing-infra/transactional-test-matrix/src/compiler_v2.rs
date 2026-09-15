@@ -4,7 +4,7 @@
 //! The Compiler V2 transactional-test corpus: Move sources compiled by
 //! Compiler V2 and run on the VM, plus Lean sources under `tests/leaner/`.
 
-use crate::{Applicability, Corpus, MatrixConfig, Resolution, VmBackend};
+use crate::{Applicability, Corpus, MatrixConfig, MonoMoveDivergence, Resolution, VmBackend};
 use move_command_line_common::testing::EXP_EXT;
 use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
@@ -306,6 +306,84 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/testing-constant/",
 ];
 
+/// Sources whose MonoMove output differs from the canonical baseline; each
+/// runs against its override baseline.
+const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
+    MonoMoveDivergence::unsupported(
+        "tests/misc/struct_assign_swap.move",
+        "multiple return values",
+    ),
+    MonoMoveDivergence::unsupported("tests/misc/tuple_swap.move", "multiple return values"),
+    MonoMoveDivergence::unsupported(
+        "tests/more-v1/parser/return_not_binary.move",
+        "reference arguments",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/calculator.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/capturing_generic_option.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/closure_equality_operand_order.move",
+        "function value equality",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/closure_equality_widened.move",
+        "function value equality",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/funs_as_storage_key.move",
+        "function types as resource type arguments",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/fv_enum.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/misc_1.move",
+        "function value serialization",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/persistent.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy_local.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy_module_lock.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy_nested.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/registry.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/resolve_from_storage.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/storage_examples.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/fv_as_keys.move",
+        "function types as resource type arguments",
+    ),
+];
+
 pub static COMPILER_V2: Corpus<CompilerV2Payload> = Corpus {
     name: "compiler-v2",
     root: "third_party/move/move-compiler-v2/transactional-tests",
@@ -313,4 +391,5 @@ pub static COMPILER_V2: Corpus<CompilerV2Payload> = Corpus {
     configs: CONFIGS,
     separate_baseline: SEPARATE_BASELINE,
     effective_payload,
+    mono_move_divergences: MONO_MOVE_DIVERGENCES,
 };

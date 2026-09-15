@@ -12,7 +12,7 @@ use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
     types::{InternedType, InternedTypeList},
-    Function, FunctionDefinitionIndex, FunctionPtr, Interner,
+    Function, FunctionDefinitionIndex, FunctionPtr, Interner, TypeSubstitutionError,
 };
 use move_binary_format::access::ModuleAccess;
 use move_core_types::identifier::IdentStr;
@@ -292,6 +292,21 @@ impl LoadedModule {
             Some(ir) => FunctionIrLookup::Ir(ir),
             None => FunctionIrLookup::Native,
         }
+    }
+
+    /// The return types of the named function instantiated with `ty_args`, or
+    /// [`None`] when the function is native or not defined here.
+    pub fn function_return_types(
+        &self,
+        interner: &impl Interner,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> Option<Result<InternedTypeList, TypeSubstitutionError>> {
+        let FunctionIrLookup::Ir(ir) = self.get_function_ir(name) else {
+            return None;
+        };
+        let returns = self.ir.module.function_signature_at(ir.handle_idx).returns;
+        Some(interner.subst_type_list(returns, ty_args))
     }
 
     /// Definition index of the named function in this module. Covers natives

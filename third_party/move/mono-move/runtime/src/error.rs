@@ -3,7 +3,10 @@
 
 //! Interpreter-internal error types.
 
-use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError};
+use mono_move_core::{
+    BytecodeOffset, ExecutionErrorKind, FunctionDefinitionIndex, IntTy, IntoExecutionError,
+    ResourceProviderError,
+};
 use move_core_types::{
     account_address::AccountAddress,
     int256::{I256, U256},
@@ -111,6 +114,9 @@ pub enum RuntimeError {
     #[error("BCS deserialize: non-canonical bool byte {byte}")]
     BCSInvalidBool { byte: u8 },
 
+    #[error("BCS deserialize: enum tag {tag} out of range for {variant_count} variants")]
+    BCSInvalidEnumTag { tag: u64, variant_count: usize },
+
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
 
@@ -135,6 +141,7 @@ impl RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
+            | BCSInvalidEnumTag { .. }
             | BCSSignerNotDeserializable => true,
 
             ArithmeticOverflow { .. }
@@ -197,6 +204,7 @@ impl IntoExecutionError for RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
+            | BCSInvalidEnumTag { .. }
             | BCSSignerNotDeserializable => ExecutionErrorKind::InvalidOperation,
 
             Unsupported(_) => ExecutionErrorKind::InvariantViolation,
@@ -457,6 +465,8 @@ pub enum RuntimeStatus {
         /// The module that raised the abort.
         /// TODO(completeness): extend with aborts in scripts.
         location: AbortLocation,
+        /// The aborting instruction. `None` for a native abort.
+        offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
     },
 }
 

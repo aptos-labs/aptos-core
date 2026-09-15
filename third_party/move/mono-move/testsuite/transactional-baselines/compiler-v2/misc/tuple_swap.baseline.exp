@@ -1,0 +1,24 @@
+processed 12 tasks
+task 0 lines 1-106:  publish [module 0xc0ffee::m {]
+task 1 lines 108-108:  run 0xc0ffee::m::test1
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 2 lines 110-110:  run 0xc0ffee::m::test2
+Error: the MonoVM transactional session cannot return 4 values from one call
+task 3 lines 112-112:  run 0xc0ffee::m::test3
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 4 lines 114-114:  run 0xc0ffee::m::test4
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 5 lines 116-116:  run 0xc0ffee::m::swap5
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 6 lines 118-118:  run 0xc0ffee::m::test6
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 7 lines 120-120:  run 0xc0ffee::m::test7
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 8 lines 122-122:  run 0xc0ffee::m::test8
+Error: the MonoVM transactional session cannot return 4 values from one call
+task 9 lines 124-124:  run 0xc0ffee::m::swap9
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 10 lines 126-126:  run 0xc0ffee::m::test10
+Error: the MonoVM transactional session cannot return 2 values from one call
+task 11 lines 128-128:  run 0xc0ffee::m::swap11
+Error: the MonoVM transactional session cannot return 2 values from one call
