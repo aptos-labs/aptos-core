@@ -1829,28 +1829,20 @@ impl InterpreterContext<'_> {
                         checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div)
                             .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Div })?
                     },
-                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
-                    // cannot trigger Rust's div-by-zero panic. Asserted below in
-                    // debug builds as a defensive check.
+                    // INVARIANT: lowering guarantees `imm != 0`; zero divisors
+                    // use the checked `IntDiv`.
                     MicroOp::DivU64Imm { dst, src, imm } => {
-                        debug_assert!(
-                            imm != 0,
-                            "DivU64Imm: imm must be non-zero (verifier invariant)"
-                        );
+                        debug_assert!(imm != 0, "DivU64Imm: imm must be non-zero");
                         imm_op_u64(fp, dst, src, imm, |s, i| s / i)
                     },
                     MicroOp::ModU64 { dst, lhs, rhs } => {
                         checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem)
                             .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Mod })?
                     },
-                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
-                    // cannot trigger Rust's div-by-zero panic. Asserted below in
-                    // debug builds as a defensive check.
+                    // INVARIANT: lowering guarantees `imm != 0`; zero divisors
+                    // use the checked `IntMod`.
                     MicroOp::ModU64Imm { dst, src, imm } => {
-                        debug_assert!(
-                            imm != 0,
-                            "ModU64Imm: imm must be non-zero (verifier invariant)"
-                        );
+                        debug_assert!(imm != 0, "ModU64Imm: imm must be non-zero");
                         imm_op_u64(fp, dst, src, imm, |s, i| s % i)
                     },
 
@@ -1875,11 +1867,10 @@ impl InterpreterContext<'_> {
                         shift_amount,
                         bit_width: 64,
                     })?,
-                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
-                    // cannot wrap or trigger UB. Asserted below in debug builds as a
-                    // defensive check.
+                    // INVARIANT: lowering guarantees `imm < 64`; larger shift
+                    // amounts use the checked `IntShl`.
                     MicroOp::ShlU64Imm { dst, src, imm } => {
-                        debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
+                        debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64");
                         imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
                     },
                     MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| {
@@ -1891,11 +1882,10 @@ impl InterpreterContext<'_> {
                         shift_amount,
                         bit_width: 64,
                     })?,
-                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
-                    // cannot wrap or trigger UB. Asserted below in debug builds as a
-                    // defensive check.
+                    // INVARIANT: lowering guarantees `imm < 64`; larger shift
+                    // amounts use the checked `IntShr`.
                     MicroOp::ShrU64Imm { dst, src, imm } => {
-                        debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
+                        debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64");
                         imm_op_u64(fp, dst, src, imm as u64, |s, i| s >> i)
                     },
 
