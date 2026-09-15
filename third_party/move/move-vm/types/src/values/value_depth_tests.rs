@@ -5,7 +5,10 @@
 
 use crate::{
     value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-    values::{AbstractFunction, GlobalValue, SerializedFunctionData, Struct, StructRef, Value},
+    values::{
+        AbstractFunction, GlobalValue, SerializedFunctionData, Struct, StructRef, Value,
+        DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
+    },
 };
 use better_any::{Tid, TidAble, TidExt};
 use claims::{assert_err, assert_none, assert_ok, assert_some};
@@ -175,6 +178,92 @@ fn test_serialization() {
         assert_none!(assert_ok!(ctx(1).serialize(v, l)));
         assert_err!(ctx(1).serialized_size(v, l));
     }
+}
+
+#[test]
+fn test_deserialization() {
+    use MoveStructLayout::Runtime;
+    use MoveTypeLayout as L;
+
+    let mut extension = MockFunctionValueExtension::new();
+    extension
+        .expect_get_serialization_data()
+        .returning(move |af| Ok(af.downcast_ref::<MockFunction>().unwrap().data.clone()));
+    extension
+        .expect_create_from_serialization_data()
+        .returning(|data| Ok(Box::new(MockFunction { data })));
+
+    let cases = [
+        (
+            Value::vector_unchecked(vec![Value::vector_u8(vec![0, 1])]).unwrap(),
+            L::Vector(Box::new(L::Vector(Box::new(L::U8)))),
+            2,
+        ),
+        (
+            Value::struct_(Struct::pack(vec![Value::vector_u8(vec![0, 1])])),
+            L::new_struct(Runtime(vec![L::Vector(Box::new(L::U8))])),
+            2,
+        ),
+        (
+            MockFunction::closure(
+                ClosureMask::new_for_leading(1).expect("capturing one argument should not fail"),
+                vec![Value::u16(0)],
+                vec![L::U16],
+            ),
+            L::Function,
+            2,
+        ),
+    ];
+
+    for (value, layout, depth) in cases {
+        let bytes = assert_some!(assert_ok!(ValueSerDeContext::new(None)
+            .with_func_args_deserialization(&extension)
+            .serialize(&value, &layout)));
+        let deserialize = |max_depth| {
+            ValueSerDeContext::new(Some(max_depth))
+                .with_func_args_deserialization(&extension)
+                .deserialize(&bytes, &layout)
+        };
+        assert_some!(deserialize(depth));
+        assert_some!(deserialize(depth + 1));
+        assert_none!(deserialize(depth - 1));
+    }
+}
+
+#[test]
+fn test_deserialization_default_depth_boundary() {
+    fn nested_vector(depth: u64) -> (Value, MoveTypeLayout) {
+        let mut value = Value::vector_u8(vec![0]);
+        let mut layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8));
+        for _ in 1..depth {
+            value = Value::vector_unchecked(vec![value]).unwrap();
+            layout = MoveTypeLayout::Vector(Box::new(layout));
+        }
+        (value, layout)
+    }
+
+    for depth in [
+        DEFAULT_MAX_VM_VALUE_NESTED_DEPTH - 1,
+        DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
+    ] {
+        let (value, layout) = nested_vector(depth);
+        let bytes = assert_some!(assert_ok!(
+            ValueSerDeContext::new(None).serialize(&value, &layout)
+        ));
+        assert_some!(
+            ValueSerDeContext::new(Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+                .deserialize(&bytes, &layout)
+        );
+    }
+
+    let (value, layout) = nested_vector(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH + 1);
+    let bytes = assert_some!(assert_ok!(
+        ValueSerDeContext::new(None).serialize(&value, &layout)
+    ));
+    assert_none!(
+        ValueSerDeContext::new(Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+            .deserialize(&bytes, &layout)
+    );
 }
 
 fn test_binop_with_max_depth<F, T>(f: F)
