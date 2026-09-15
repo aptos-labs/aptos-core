@@ -78,6 +78,8 @@ pub struct ValueLayout {
     pub flags: LayoutFlags,
     /// Describes layout's shape.
     pub kind: LayoutKind,
+    /// The type this layout was published for, if any.
+    pub ty: Option<InternedType>,
 }
 
 impl fmt::Display for ValueLayout {
@@ -172,6 +174,7 @@ impl ValueLayout {
             fixed_bcs_size,
             flags,
             kind,
+            ty: None,
         }
     }
 
@@ -202,6 +205,7 @@ impl ValueLayout {
             fixed_bcs_size: Some(1),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::Bool,
+            ty: None,
         }
     }
 
@@ -273,6 +277,7 @@ impl ValueLayout {
             fixed_bcs_size: Some(32),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::Address,
+            ty: None,
         }
     }
 
@@ -286,6 +291,7 @@ impl ValueLayout {
             // per-byte path, which rejects `signer` instead of copying the bytes.
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
             kind: LayoutKind::Signer,
+            ty: None,
         }
     }
 
@@ -297,6 +303,7 @@ impl ValueLayout {
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::Ref,
+            ty: None,
         }
     }
 
@@ -308,6 +315,7 @@ impl ValueLayout {
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::Function,
+            ty: None,
         }
     }
 
@@ -325,6 +333,7 @@ impl ValueLayout {
                 elem_id,
                 descriptor_id,
             },
+            ty: None,
         }
     }
 
@@ -346,6 +355,7 @@ impl ValueLayout {
             fixed_bcs_size,
             flags,
             kind: LayoutKind::Struct { fields },
+            ty: None,
         }
     }
 
@@ -365,6 +375,7 @@ impl ValueLayout {
                 variants,
                 max_size_across_variants,
             },
+            ty: None,
         }
     }
 
@@ -375,6 +386,7 @@ impl ValueLayout {
             fixed_bcs_size: Some(size),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::UnsignedInt,
+            ty: None,
         }
     }
 
@@ -385,6 +397,7 @@ impl ValueLayout {
             fixed_bcs_size: Some(size),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::SignedInt,
+            ty: None,
         }
     }
 }
@@ -543,10 +556,19 @@ impl ValueLayoutTable {
         }
     }
 
-    pub fn push(&mut self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+    /// Publishes `layout` for `ty`.
+    pub fn push(&mut self, ty: InternedType, mut layout: ValueLayout) -> LayoutId {
+        layout.ty = Some(ty);
+        let id = self.push_anonymous(layout);
+        self.by_ty.insert(ty, id);
+        id
+    }
+
+    /// Publishes a layout that is not a type's own, such as an enum variant
+    /// body.
+    pub fn push_anonymous(&mut self, layout: ValueLayout) -> LayoutId {
         let id = LayoutId::from_usize(self.table.len());
         self.table.push(layout);
-        self.by_ty.insert(ty, id);
         id
     }
 }

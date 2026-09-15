@@ -200,7 +200,11 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
                     InvalidArguments::SignerCountMismatch => {
                         StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
                     },
-                    InvalidArguments::UndecodableArgument => {
+                    InvalidArguments::UndecodableArgument
+                    | InvalidArguments::MalformedString
+                    | InvalidArguments::ObjectDoesNotExist
+                    | InvalidArguments::ObjectLacksResource
+                    | InvalidArguments::TooManyObjects => {
                         StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
                     },
                 },

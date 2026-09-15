@@ -294,7 +294,16 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSSequenceTooLong { .. }
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
-        | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
+        | E::BCSSignerNotDeserializable
+        | E::BCSInvalidEnumTag { .. } => return V1Equivalent::V1StatusUnknown,
+
+        // The embedder maps argument checks to its own statuses before they
+        // reach here.
+        E::MalformedStringArgument
+        | E::ObjectArgumentDoesNotExist
+        | E::ObjectArgumentLacksResource
+        | E::TooManyObjectArguments => return V1Equivalent::V1StatusUnknown,
+        E::ArgumentStorageRead(inner) => return describe(inner),
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.
         E::Unsupported(_) => return V1Equivalent::NoV1Failure,
@@ -335,9 +344,9 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         // it, V1 reports `MISSING_DEPENDENCY` at the call instead; that takes a
         // framework release declaring an unregistered native, so this mapping
         // does not distinguish it.
-        L::NativeFunctionNotLoadable { .. } | L::LoweringSkipped { .. } => {
-            return V1Equivalent::NoV1Failure
-        },
+        L::NativeFunctionNotLoadable { .. }
+        | L::LoweringSkipped { .. }
+        | L::ResourceTypeNotPublishable { .. } => return V1Equivalent::NoV1Failure,
         L::GlobalContext(_) | L::InvariantViolation(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
         },
@@ -734,6 +743,9 @@ mod tests {
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
+            LoaderError::ResourceTypeNotPublishable {
+                ty: "0x1::m::S<T>".to_string(),
+            },
         ];
         for err in &cases {
             // Exhaustive, so a new variant must be added to `cases`.
@@ -745,7 +757,8 @@ mod tests {
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
-                | LoaderError::InvariantViolation(_) => {},
+                | LoaderError::InvariantViolation(_)
+                | LoaderError::ResourceTypeNotPublishable { .. } => {},
             }
             let status = match describe_loader_error(err) {
                 V1Equivalent::Described(info) => info.status,

@@ -1072,6 +1072,41 @@ pub fn try_discover_types_for_lowering_in_module(
     Ok(descriptors)
 }
 
+/// Publishes the layout and struct descriptor of the closed resource type
+/// `ty`, as lowering does for the resource types a function's storage
+/// operations reach, so the type can be read from storage.
+pub fn try_publish_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+) -> VMResult<()> {
+    let mut visited = UnorderedSet::new();
+    let mut descriptors = LoweringDescriptors::default();
+    discover_resource_type(
+        ctx,
+        interner,
+        ty,
+        EMPTY_TYPE_LIST,
+        &mut visited,
+        &mut descriptors,
+    )
+}
+
+/// Publishes the layout and struct descriptor of the resource type `ty` under
+/// `ty_args`, as a global-storage operation on it needs.
+fn discover_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+    ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
+) -> VMResult<()> {
+    discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
+    let ty = interner.subst_type(ty, ty_args)?;
+    publish_struct_descriptor_for(ctx, ty, &mut descriptors.vec)
+}
+
 /// Per-function variant of [`try_discover_types_for_lowering_in_module`]. Returns
 /// the descriptor maps discovered for this function's type/closure set.
 pub fn try_discover_types_for_lowering_in_function(
@@ -1162,9 +1197,7 @@ fn try_discover_types_for_lowering_in_function_impl(
                 arg_types,
                 view_type_list(callee_ty_args),
             ) {
-                discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-                let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-                publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+                discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
             }
 
             // Here we only need layout, so there is no need to publish the type descriptor.
@@ -1210,9 +1243,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // resource's layout, then publish a struct descriptor keyed on the
         // concrete resource type.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
-            discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-            let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+            discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
         }
 
         // The walks above don't reach a constant's own type. A vector

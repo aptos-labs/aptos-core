@@ -32,8 +32,10 @@ use crate::{
     value_conv::rust::write_value,
 };
 use mono_move_core::{
-    captured_values_size,
-    interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
+    captured_values_size, intern_type_tag,
+    interner::{
+        is_script_module_id, module_id_of, view_module_id, InternedIdentifier, InternedModuleId,
+    },
     native::{
         NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus,
         ObjectHandle, RootPool,
@@ -41,8 +43,8 @@ use mono_move_core::{
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
     types::{
-        is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
-        Type,
+        is_signer_or_signer_immut_ref, view_name, view_type, view_type_list, InternedType,
+        InternedTypeList, Type,
     },
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
     FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
@@ -56,9 +58,10 @@ use mono_move_core::{
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     account_address::AccountAddress,
+    ident_str,
     identifier::Identifier,
     int256::{I256, U256},
-    language_storage::ModuleId,
+    language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::AbortLocation,
 };
 use move_value_view::MoveValueView;
@@ -83,7 +86,9 @@ macro_rules! resolve_resource_group {
             ));
         };
         let arena_ref = $ctx.loader.guard().arena_ref_for_module_id(*module_id);
-        Ok($ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name))
+        Ok::<Option<InternedType>, VMInternalError>(
+            $ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name),
+        )
     }};
 }
 
@@ -294,6 +299,48 @@ impl<'a> CallBuilder<'a, '_> {
         unsafe { value_conv::bcs::deserialize_into(guard, &mut self.interp.heap, ty, bytes, dst) }
     }
 
+    /// Places a BCS-encoded argument from an untrusted source, refusing the
+    /// framework values a transaction may not construct.
+    ///
+    /// On error, the parameter slot is left partially written and the call
+    /// must be abandoned.
+    pub fn arg_bcs_untrusted(&mut self, bytes: &[u8]) -> VMResult<()> {
+        let (dst, ty) = self.next_slot()?;
+        let InterpreterContext {
+            loader,
+            read_set,
+            gas_meter,
+            resource_provider,
+            heap,
+            read_write_set,
+            ..
+        } = &mut *self.interp;
+        let mut untrusted = UntrustedInput {
+            storage: StorageReader {
+                loader,
+                read_set,
+                gas_meter,
+                resource_provider: *resource_provider,
+                read_write_set,
+            },
+            object_core: None,
+            objects: 0,
+        };
+        // SAFETY: `dst` and `ty` come from the function's own signature, so
+        // the slot is writable for the type's in-memory size.
+        unsafe {
+            value_conv::bcs::deserialize_with(
+                loader.guard(),
+                heap,
+                ty,
+                bytes,
+                dst,
+                Some(&mut untrusted),
+            )
+        }
+        .map_err(|e| VMInternalError::new(e.into_runtime_error()))
+    }
+
     /// Runs the call once all parameters have been filled.
     pub fn run(self) -> VMResult<RuntimeStatus> {
         if self.next_param != self.func.param_slots.len() {
@@ -303,6 +350,131 @@ impl<'a> CallBuilder<'a, '_> {
         }
         self.interp.prepare_call(self.func);
         self.interp.run()
+    }
+}
+
+/// Global-storage reads available while an untrusted argument is being placed.
+pub(crate) struct StorageReader<'a, 'guard> {
+    pub(crate) loader: &'a Loader<'guard, 'guard>,
+    pub(crate) read_set: &'a mut ModuleReadSet<'guard>,
+    pub(crate) gas_meter: &'a mut GasMeter,
+    pub(crate) resource_provider: &'guard dyn ResourceProvider,
+    pub(crate) read_write_set: &'a mut ResourceReadWriteSet,
+}
+
+impl StorageReader<'_, '_> {
+    /// Whether a resource of type `ty` exists at `address`, recording the
+    /// read. Publishes the type's layout and loads its module if lowered code
+    /// has not done so yet.
+    fn resource_exists(&mut self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
+        self.loader
+            .publish_resource_type(self.read_set, self.gas_meter, ty)?;
+        let group = resolve_resource_group!(self, ty)?;
+        Ok(self.read_write_set.exists(
+            self.resource_provider,
+            &InMemoryStorageKey::resource(address, ty),
+            group,
+        )?)
+    }
+}
+
+/// The most `Object<T>` values one untrusted argument may hold.
+const MAX_OBJECTS_PER_ARGUMENT: usize = 32;
+
+/// An argument decoded from untrusted bytes: the framework values a
+/// transaction may not construct are refused as the decoder produces them.
+//
+// TODO(cleanup): the framework types checked here belong to the embedder, not
+// the runtime.
+pub(crate) struct UntrustedInput<'a, 'guard> {
+    pub(crate) storage: StorageReader<'a, 'guard>,
+    /// `0x1::object::ObjectCore`, interned on the first `Object` value.
+    pub(crate) object_core: Option<InternedType>,
+    /// `Object` values seen so far.
+    pub(crate) objects: usize,
+}
+
+impl UntrustedInput<'_, '_> {
+    /// Refuses the values AptosVM's argument constructors refuse: a `String`
+    /// that is not valid UTF-8, and an `Object<T>` whose address holds no
+    /// `ObjectCore` or no `T`. Every other value passes.
+    pub(crate) fn check(&mut self, ty: InternedType, bytes: &[u8]) -> Result<(), RuntimeError> {
+        let Type::Nominal {
+            module_id,
+            name,
+            ty_args,
+        } = view_type(ty)
+        else {
+            return Ok(());
+        };
+        let module_id = view_module_id(*module_id);
+        if *module_id.address() != AccountAddress::ONE {
+            return Ok(());
+        }
+        match (view_name(module_id.name()), view_name(*name)) {
+            ("string", "String") => {
+                // A `String` holds a `vector<u8>`: a length prefix, then the text.
+                let mut cursor = 0;
+                value_conv::bcs::read_uleb128_len(bytes, &mut cursor)?;
+                if std::str::from_utf8(&bytes[cursor..]).is_err() {
+                    return Err(RuntimeError::MalformedStringArgument);
+                }
+                Ok(())
+            },
+            ("object", "Object") => {
+                self.objects += 1;
+                if self.objects > MAX_OBJECTS_PER_ARGUMENT {
+                    return Err(RuntimeError::TooManyObjectArguments);
+                }
+                let address = AccountAddress::from_bytes(bytes).map_err(|_| {
+                    RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(
+                        "an `Object` value is one address".to_string(),
+                    ))
+                })?;
+                let &[resource] = view_type_list(*ty_args) else {
+                    return Err(RuntimeError::InvariantViolation(
+                        RuntimeInvariantViolation::Unreachable(
+                            "`Object` takes one type argument".to_string(),
+                        ),
+                    ));
+                };
+                let object_core = match self.object_core {
+                    Some(ty) => ty,
+                    None => *self.object_core.insert(self.object_core_type()?),
+                };
+                if !self
+                    .storage
+                    .resource_exists(address, object_core)
+                    .map_err(RuntimeError::ArgumentStorageRead)?
+                {
+                    return Err(RuntimeError::ObjectArgumentDoesNotExist);
+                }
+                if !self
+                    .storage
+                    .resource_exists(address, resource)
+                    .map_err(RuntimeError::ArgumentStorageRead)?
+                {
+                    return Err(RuntimeError::ObjectArgumentLacksResource);
+                }
+                Ok(())
+            },
+            _ => Ok(()),
+        }
+    }
+
+    /// The interned `0x1::object::ObjectCore`.
+    fn object_core_type(&self) -> Result<InternedType, RuntimeError> {
+        let tag = TypeTag::Struct(Box::new(StructTag {
+            address: AccountAddress::ONE,
+            module: ident_str!("object").to_owned(),
+            name: ident_str!("ObjectCore").to_owned(),
+            type_args: vec![],
+        }));
+        intern_type_tag(&tag, self.storage.loader.guard()).map_err(|err| {
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(
+                err.to_string(),
+            ))
+        })
     }
 }
 
@@ -502,6 +674,17 @@ impl<'guard> InterpreterContext<'guard> {
     /// The module `func` was loaded from.
     pub fn module_of(&self, func: &Function) -> VMResult<&'guard PreparedModule> {
         self.prepared_module(func.module_id)
+    }
+
+    /// The module `module_id`, loaded and charged if this transaction has not
+    /// loaded it yet.
+    pub fn load_module(&mut self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        if self.read_set.get(arena_ref).is_none() {
+            self.loader
+                .load_module(&mut self.read_set, &mut self.gas_meter, arena_ref)?;
+        }
+        self.prepared_module(module_id)
     }
 
     /// A module some loaded function came from. Loading the function loaded

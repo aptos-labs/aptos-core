@@ -23,6 +23,7 @@
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationResult, Heap},
+    interpreter::UntrustedInput,
     memory::{read_enum_tag, read_ptr, read_vec_len, write_ptr},
     types::VEC_DATA_OFFSET,
 };
@@ -234,6 +235,24 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     bytes: &[u8],
     dst: *mut u8,
 ) -> AllocationResult<()> {
+    // SAFETY: forwarded to the caller.
+    unsafe { deserialize_with(layouts, heap, ty, bytes, dst, None) }
+}
+
+/// Like [`deserialize`], for bytes that are `untrusted` when given: the
+/// framework values a transaction may not construct are refused.
+///
+/// # Safety
+///
+/// Same as [`deserialize`].
+pub(crate) unsafe fn deserialize_with<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    heap: &mut Heap,
+    ty: InternedType,
+    bytes: &[u8],
+    dst: *mut u8,
+    untrusted: Option<&mut UntrustedInput<'_, '_>>,
+) -> AllocationResult<()> {
     let layout = layouts.layout_by_ty(ty).ok_or({
         RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
     })?;
@@ -244,7 +263,7 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
 
     let mut cursor = 0usize;
     // SAFETY: caller must enforce the safety precondition.
-    unsafe { deserialize_impl(layouts, heap, layout, bytes, &mut cursor, dst)? };
+    unsafe { deserialize_impl(layouts, heap, layout, bytes, &mut cursor, dst, untrusted)? };
     if cursor != bytes.len() {
         return Err(RuntimeError::BCSRemainingInput {
             remaining: bytes.len().saturating_sub(cursor),
@@ -274,6 +293,13 @@ pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
         .map_err(|e| VMInternalError::new(e.into_runtime_error()))
 }
 
+/// Whether a value of `layout` may be decoded by one copy of its BCS bytes.
+/// An untrusted struct is walked instead so its typed parts are checked.
+fn blittable(layout: &ValueLayout, untrusted: bool) -> bool {
+    layout.all_byte_patterns_valid()
+        && !(untrusted && matches!(layout.kind, LayoutKind::Struct { .. }))
+}
+
 /// # Safety
 ///
 /// `dst` must be writable for `layout.size` bytes.
@@ -284,6 +310,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     bytes: &[u8],
     cursor: &mut usize,
     dst: *mut u8,
+    mut untrusted: Option<&mut UntrustedInput<'_, '_>>,
 ) -> AllocationResult<()> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
     // to a non-recursive form to bound stack depth on deeply nested values.
@@ -294,7 +321,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
     // TODO(correctness): breaks on big-endian hosts. This writes the
     // little-endian BCS bytes verbatim, but the in-memory representation is
     // native-endian, so the two only match on little-endian hosts.
-    if layout.all_byte_patterns_valid() {
+    if blittable(layout, untrusted.is_some()) {
         let n = layout.size as usize;
         let src = read_slice(bytes, cursor, n)?;
         // SAFETY: caller ensures `n` bytes can be written to `dst` and it is
@@ -303,6 +330,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
         return Ok(());
     }
 
+    let start = *cursor;
     match &layout.kind {
         LayoutKind::Bool => {
             // BCS encodes a `bool` as a single canonical byte: `0` or `1`. Any
@@ -339,8 +367,12 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                         bytes,
                         cursor,
                         dst.add(field.offset as usize),
+                        untrusted.as_deref_mut(),
                     )?
                 };
+            }
+            if let (Some(untrusted), Some(ty)) = (untrusted, layout.ty) {
+                untrusted.check(ty, &bytes[start..*cursor])?;
             }
             Ok(())
         },
@@ -370,7 +402,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // The allocation checked this product against overflow.
             let data_size = len as usize * elem_size;
 
-            if elem_layout.all_byte_patterns_valid() {
+            if blittable(elem_layout, untrusted.is_some()) {
                 // If every element byte pattern is valid, element bytes equal
                 // their BCS bytes. A `bool` element is excluded so each byte is
                 // validated by the per-element walk below.
@@ -399,7 +431,15 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                     // element layout, as guaranteed by the precondition of the
                     // function.
                     unsafe {
-                        deserialize_impl(layouts, heap, elem_layout, bytes, cursor, elem_ptr)?
+                        deserialize_impl(
+                            layouts,
+                            heap,
+                            elem_layout,
+                            bytes,
+                            cursor,
+                            elem_ptr,
+                            untrusted.as_deref_mut(),
+                        )?
                     };
                 }
             }
@@ -417,12 +457,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
             if tag >= variants.len() as u64 {
-                return Err(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag,
-                        variant_count: variants.len(),
-                    },
-                )
+                return Err(RuntimeError::BCSInvalidEnumTag {
+                    tag,
+                    variant_count: variants.len(),
+                }
                 .into());
             }
 
@@ -447,8 +485,12 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                     bytes,
                     cursor,
                     obj_ptr.add(ENUM_DATA_OFFSET),
+                    untrusted.as_deref_mut(),
                 )?
             };
+            if let (Some(untrusted), Some(ty)) = (untrusted, layout.ty) {
+                untrusted.check(ty, &bytes[start..*cursor])?;
+            }
 
             // SAFETY: `dst` has space to write the 8-byte enum pointer as
             // guaranteed by the caller.
@@ -500,7 +542,7 @@ fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
 /// if:
 /// - data is not a valid ULEB128,
 /// - end of input is unexpectedly reached.
-fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
+pub(crate) fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
     let mut result = 0u64;
     let mut shift = 0u32;
     loop {
@@ -574,16 +616,28 @@ impl AlignedBuf {
 mod tests {
     use super::*;
     use crate::{
+        global_storage::ResourceReadWriteSet,
         heap::AllocationError,
+        interpreter::StorageReader,
         value_cmp::{compare_impl, equals_impl},
     };
     use mono_move_core::{
-        align_up_u32,
-        types::U64_TY,
+        align_up_u32, intern_type_tag,
+        native::NoNatives,
+        types::{U128_TY, U16_TY, U64_TY},
         value_layout::{
-            BOOL_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID,
+            ADDRESS_LAYOUT_ID, BOOL_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID,
+            U8_LAYOUT_ID,
         },
-        DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
+        DescriptorId, FieldValueLayout, GasMeter, LayoutFlags, LayoutId, NoModuleProvider,
+        NoResourceProvider, ValueLayoutTable,
+    };
+    use mono_move_global_context::{ExecutionGuard, GlobalContext};
+    use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+    use move_core_types::{
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
     };
     use serde::Serialize;
     use std::mem::{offset_of, size_of};
@@ -615,6 +669,7 @@ mod tests {
                 &bytes,
                 &mut cursor,
                 slot.as_mut_ptr(),
+                None,
             )
         };
         assert!(matches!(
@@ -644,6 +699,7 @@ mod tests {
                 &bytes,
                 &mut cursor,
                 &mut slot as *mut u64 as *mut u8,
+                None,
             )
         };
         assert!(matches!(
@@ -680,6 +736,7 @@ mod tests {
                 &bytes,
                 &mut cursor,
                 &mut slot as *mut u64 as *mut u8,
+                None,
             )
             .unwrap()
         };
@@ -705,6 +762,7 @@ mod tests {
                 &bytes,
                 &mut cursor,
                 &mut slot as *mut u64 as *mut u8,
+                None,
             )
         };
         assert!(matches!(
@@ -812,6 +870,231 @@ mod tests {
         ));
     }
 
+    /// Runs `f` with an [`UntrustedInput`] over an empty module set and no
+    /// storage: `String` checks run in full, an `Object` check fails as soon
+    /// as it tries to load `0x1::object`.
+    fn with_untrusted_input<R>(
+        f: impl FnOnce(&ExecutionGuard<'_>, &mut UntrustedInput<'_, '_>) -> R,
+    ) -> R {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let loader = Loader::new_with_policy(
+            &guard,
+            &NoModuleProvider,
+            LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+            &NoNatives,
+        );
+        let mut read_set = ModuleReadSet::new();
+        let mut gas_meter = GasMeter::new(u64::MAX);
+        let mut read_write_set = ResourceReadWriteSet::new();
+        let mut untrusted = UntrustedInput {
+            storage: StorageReader {
+                loader: &loader,
+                read_set: &mut read_set,
+                gas_meter: &mut gas_meter,
+                resource_provider: &NoResourceProvider,
+                read_write_set: &mut read_write_set,
+            },
+            object_core: None,
+            objects: 0,
+        };
+        f(&guard, &mut untrusted)
+    }
+
+    /// The tag of `0x1::<module>::<name><type_args>`.
+    fn framework_tag(module: &str, name: &str, type_args: Vec<TypeTag>) -> TypeTag {
+        TypeTag::Struct(Box::new(StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new(module).unwrap(),
+            name: Identifier::new(name).unwrap(),
+            type_args,
+        }))
+    }
+
+    /// Publishes the layout of `0x1::string::String`: a struct holding a
+    /// `vector<u8>`.
+    fn push_string_layout(guard: &ExecutionGuard<'_>, table: &mut ValueLayoutTable) -> LayoutId {
+        let bytes_id = table.push(U64_TY, vector_layout(U8_LAYOUT_ID));
+        let layout = build_struct_layout(table, 8, vec![(0, bytes_id)]);
+        let string_ty = intern_type_tag(&framework_tag("string", "String", vec![]), guard).unwrap();
+        table.push(string_ty, layout)
+    }
+
+    /// Decodes `bytes` as a value of `layout` into a scratch slot.
+    ///
+    /// # Safety
+    ///
+    /// `layout` must fit an 8-byte slot or be a reference-free struct whose
+    /// fields are heap pointers.
+    unsafe fn decode(
+        table: &ValueLayoutTable,
+        layout: &ValueLayout,
+        bytes: &[u8],
+        untrusted: Option<&mut UntrustedInput<'_, '_>>,
+    ) -> AllocationResult<()> {
+        let mut heap = Heap::new(4096);
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        // SAFETY: forwarded to the caller.
+        unsafe {
+            deserialize_impl(
+                table,
+                &mut heap,
+                layout,
+                bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+                untrusted,
+            )
+        }
+    }
+
+    const MALFORMED_UTF8: [u8; 2] = [0xFF, 0xFE];
+
+    #[test]
+    fn untrusted_string_must_be_utf8() {
+        with_untrusted_input(|guard, untrusted| {
+            let mut table = ValueLayoutTable::new();
+            let id = push_string_layout(guard, &mut table);
+            let layout = table.layout(id).unwrap();
+            let valid = bcs::to_bytes("hi").unwrap();
+            let malformed = bcs::to_bytes(MALFORMED_UTF8.as_slice()).unwrap();
+            unsafe {
+                decode(&table, layout, &valid, None).unwrap();
+                decode(&table, layout, &malformed, None).unwrap();
+                decode(&table, layout, &valid, Some(&mut *untrusted)).unwrap();
+                assert!(matches!(
+                    decode(&table, layout, &malformed, Some(&mut *untrusted)),
+                    Err(AllocationError::RuntimeError(
+                        RuntimeError::MalformedStringArgument
+                    ))
+                ));
+            }
+        });
+    }
+
+    #[test]
+    fn untrusted_string_inside_some_must_be_utf8() {
+        with_untrusted_input(|guard, untrusted| {
+            let mut table = ValueLayoutTable::new();
+            let string_id = push_string_layout(guard, &mut table);
+            let option_id =
+                build_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, string_id)])]);
+            let layout = table.layout(option_id).unwrap();
+            let none = [0x00u8];
+            let some_malformed = [
+                vec![0x01u8],
+                bcs::to_bytes(MALFORMED_UTF8.as_slice()).unwrap(),
+            ]
+            .concat();
+            unsafe {
+                decode(&table, layout, &none, Some(&mut *untrusted)).unwrap();
+                decode(&table, layout, &some_malformed, None).unwrap();
+                assert!(matches!(
+                    decode(&table, layout, &some_malformed, Some(&mut *untrusted)),
+                    Err(AllocationError::RuntimeError(
+                        RuntimeError::MalformedStringArgument
+                    ))
+                ));
+            }
+        });
+    }
+
+    #[test]
+    fn untrusted_string_inside_vector_of_wrappers_must_be_utf8() {
+        with_untrusted_input(|guard, untrusted| {
+            let mut table = ValueLayoutTable::new();
+            let string_id = push_string_layout(guard, &mut table);
+            let wrapper = build_struct_layout(&table, 8, vec![(0, string_id)]);
+            let wrapper_id = table.push(U128_TY, wrapper);
+            let vector_id = table.push(U16_TY, vector_layout(wrapper_id));
+            let layout = table.layout(vector_id).unwrap();
+            let bytes = [
+                vec![0x02u8],
+                bcs::to_bytes("hi").unwrap(),
+                bcs::to_bytes(MALFORMED_UTF8.as_slice()).unwrap(),
+            ]
+            .concat();
+            unsafe {
+                decode(&table, layout, &bytes, None).unwrap();
+                assert!(matches!(
+                    decode(&table, layout, &bytes, Some(&mut *untrusted)),
+                    Err(AllocationError::RuntimeError(
+                        RuntimeError::MalformedStringArgument
+                    ))
+                ));
+            }
+        });
+    }
+
+    /// An `Object` inside a blittable wrapper inside a vector is still
+    /// checked: with no module to load `ObjectCore` from, the storage read
+    /// fails, while trusted decoding copies the bytes through.
+    #[test]
+    fn untrusted_object_in_blittable_vector_element_is_checked() {
+        with_untrusted_input(|guard, untrusted| {
+            let mut table = ValueLayoutTable::new();
+            let object_ty = intern_type_tag(
+                &framework_tag("object", "Object", vec![framework_tag(
+                    "object",
+                    "ObjectCore",
+                    vec![],
+                )]),
+                guard,
+            )
+            .unwrap();
+            let object = build_struct_layout(&table, 32, vec![(0, ADDRESS_LAYOUT_ID)]);
+            let object_id = table.push(object_ty, object);
+            let wrapper = build_struct_layout(&table, 32, vec![(0, object_id)]);
+            assert!(wrapper.all_byte_patterns_valid());
+            let wrapper_id = table.push(U128_TY, wrapper);
+            let vector_id = table.push(U16_TY, vector_layout(wrapper_id));
+            let layout = table.layout(vector_id).unwrap();
+            let bytes = [vec![0x02u8], vec![3u8; 32], vec![4u8; 32]].concat();
+            unsafe {
+                decode(&table, layout, &bytes, None).unwrap();
+                assert!(matches!(
+                    decode(&table, layout, &bytes, Some(&mut *untrusted)),
+                    Err(AllocationError::RuntimeError(
+                        RuntimeError::ArgumentStorageRead(_)
+                    ))
+                ));
+            }
+            assert_eq!(untrusted.objects, 1);
+        });
+    }
+
+    #[test]
+    fn deserialize_rejects_out_of_range_enum_tag_as_decode_error() {
+        let mut table = ValueLayoutTable::new();
+        let eid = build_enum_layout(&mut table, vec![(0, vec![]), (8, vec![(0, U64_LAYOUT_ID)])]);
+        let layout = table.layout(eid).unwrap();
+        let mut heap = Heap::new(4096);
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &[0x02u8],
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+                None,
+            )
+        };
+        match result {
+            Err(AllocationError::RuntimeError(err)) => {
+                assert!(matches!(err, RuntimeError::BCSInvalidEnumTag {
+                    tag: 2,
+                    variant_count: 2
+                }));
+                assert!(err.is_bcs_decode_error());
+            },
+            other => panic!("expected a decode error, got {other:?}"),
+        }
+    }
+
     #[test]
     fn deserialize_bool_canonical() {
         let table = ValueLayoutTable::new();
@@ -825,8 +1108,16 @@ mod tests {
             let mut slot = 0xFFu8;
             let mut cursor = 0;
             unsafe {
-                deserialize_impl(&table, &mut heap, layout, &[byte], &mut cursor, &mut slot)
-                    .unwrap()
+                deserialize_impl(
+                    &table,
+                    &mut heap,
+                    layout,
+                    &[byte],
+                    &mut cursor,
+                    &mut slot,
+                    None,
+                )
+                .unwrap()
             };
             assert_eq!(slot, byte);
             assert_eq!(cursor, 1);
@@ -840,8 +1131,17 @@ mod tests {
         let mut heap = Heap::new(64);
         let mut slot = 0u8;
         let mut cursor = 0;
-        let result =
-            unsafe { deserialize_impl(&table, &mut heap, layout, &[2u8], &mut cursor, &mut slot) };
+        let result = unsafe {
+            deserialize_impl(
+                &table,
+                &mut heap,
+                layout,
+                &[2u8],
+                &mut cursor,
+                &mut slot,
+                None,
+            )
+        };
         assert!(matches!(
             result,
             Err(AllocationError::RuntimeError(
@@ -868,6 +1168,7 @@ mod tests {
                 &bytes,
                 &mut cursor,
                 &mut slot as *mut u64 as *mut u8,
+                None,
             )
         };
         assert!(matches!(
@@ -903,6 +1204,7 @@ mod tests {
                 &bytes,
                 &mut cursor,
                 slot.as_mut_ptr(),
+                None,
             )
         };
         assert!(matches!(
@@ -993,6 +1295,7 @@ mod tests {
                     &x_bcs,
                     &mut cursor,
                     dst.as_mut_ptr(),
+                    None,
                 )
                 .unwrap()
             };
@@ -1201,6 +1504,7 @@ mod tests {
                     &bytes,
                     &mut cursor,
                     dst.as_mut_ptr(),
+                    None,
                 )
                 .unwrap()
             };
@@ -1376,7 +1680,7 @@ mod tests {
         for (size, fields) in variants {
             max_data = max_data.max(size);
             let layout = build_struct_layout(table, size, fields);
-            variant_ids.push(table.push(U64_TY, layout));
+            variant_ids.push(table.push_anonymous(layout));
         }
         let max_size_across_variants = align_up_u32(8 + max_data, 8);
         let layout = ValueLayout::frozen_enum(

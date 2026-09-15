@@ -58,17 +58,21 @@ pub(super) fn place_user_txn_args<'a>(
             .map_err(MoveExecutionFailure::RuntimeError)?;
     }
     for arg in args {
-        // Only a decode failure faults the argument's bytes; anything else
-        // (a non-decodable parameter type, an exhausted heap) is the VM's.
-        call.arg_bcs(arg).map_err(|err| {
-            if err
-                .downcast_ref::<RuntimeError>()
-                .is_some_and(RuntimeError::is_bcs_decode_error)
-            {
-                MoveExecutionFailure::InvalidArguments(InvalidArguments::UndecodableArgument)
-            } else {
-                MoveExecutionFailure::RuntimeError(err)
-            }
+        // A refused value or a decode failure faults the argument; anything
+        // else (a non-decodable parameter type, an exhausted heap) is the VM's.
+        call.arg_bcs_untrusted(arg).map_err(|err| {
+            let Some(runtime_error) = err.downcast_ref::<RuntimeError>() else {
+                return MoveExecutionFailure::RuntimeError(err);
+            };
+            let reason = match runtime_error {
+                RuntimeError::MalformedStringArgument => InvalidArguments::MalformedString,
+                RuntimeError::ObjectArgumentDoesNotExist => InvalidArguments::ObjectDoesNotExist,
+                RuntimeError::ObjectArgumentLacksResource => InvalidArguments::ObjectLacksResource,
+                RuntimeError::TooManyObjectArguments => InvalidArguments::TooManyObjects,
+                decode if decode.is_bcs_decode_error() => InvalidArguments::UndecodableArgument,
+                _ => return MoveExecutionFailure::RuntimeError(err),
+            };
+            MoveExecutionFailure::InvalidArguments(reason)
         })?;
     }
     Ok(())
