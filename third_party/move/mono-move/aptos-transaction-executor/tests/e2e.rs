@@ -29,7 +29,10 @@ use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, TxnOutcome,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use move_core_types::{transaction_argument::TransactionArgument, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, transaction_argument::TransactionArgument,
+    vm_status::StatusCode,
+};
 use std::collections::BTreeMap;
 
 /// Event types whose payload embeds gas amounts.
@@ -927,20 +930,17 @@ entry public fun takes_store(o: object::Object<fungible_asset::FungibleStore>)
 "#;
 
 /// The APT fungible-asset metadata object, created at genesis.
-fn apt_metadata_object() -> move_core_types::account_address::AccountAddress {
-    move_core_types::account_address::AccountAddress::from_hex_literal("0xa").unwrap()
-}
+const APT_METADATA_OBJECT: AccountAddress = AccountAddress::TEN;
 
 /// Asserts that v1 keeps `txn` with a Move abort raised in the framework
-/// module `v1_module` with `v1_code`, and that v2 keeps it with the
-/// miscellaneous error `v2_code`: v2 checks the value itself instead of
+/// module `v1_module` with `v1_code`, and that v2 keeps it with
+/// `FAILED_TO_DESERIALIZE_ARGUMENT`: v2 checks the value itself instead of
 /// running the framework's constructor.
 fn assert_constructor_abort_on_v1_and_code_on_v2(
     fx: &FakeExecutor,
     txn: SignedTransaction,
     v1_module: &str,
     v1_code: u64,
-    v2_code: StatusCode,
 ) {
     use move_core_types::vm_status::AbortLocation;
 
@@ -961,22 +961,29 @@ fn assert_constructor_abort_on_v1_and_code_on_v2(
     let v2_output = execute_v2(fx.get_state_view(), &txn);
     assert_eq!(
         v2_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(v2_code)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+        )))
     );
 
     // Write sets are not compared: the statuses differ by design.
 }
 
-/// Asserts that both VMs run `txn` successfully with the same output.
-fn assert_success_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedTransaction) {
-    let v1_output = fx.execute_transaction(txn.clone());
+/// Runs `txn` on v1, asserting that it succeeds.
+fn run_on_v1(fx: &FakeExecutor, txn: &SignedTransaction) -> TransactionOutput {
+    let output = fx.execute_transaction(txn.clone());
     assert_eq!(
-        v1_output.status(),
+        output.status(),
         &TransactionStatus::Keep(ExecutionStatus::Success),
         "v1 did not run the transaction: {:?}",
-        v1_output.status()
+        output.status()
     );
+    output
+}
 
+/// Asserts that both VMs run `txn` successfully with the same output.
+fn assert_success_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedTransaction) {
+    let v1_output = run_on_v1(fx, &txn);
     let v2_output = execute_v2(fx.get_state_view(), &txn);
     assert_eq!(v2_output.status(), v1_output.status());
 
@@ -1002,13 +1009,7 @@ fn malformed_string_rejected() {
     let txn = call_txn(&alice, address, "constructed", "takes_string", vec![
         bcs::to_bytes(&vec![0xFFu8, 0xFE]).unwrap(),
     ]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "string",
-        1,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
 }
 
 /// A malformed `String` nested in a `Some` is refused.
@@ -1020,13 +1021,7 @@ fn malformed_string_in_option_rejected() {
     let txn = call_txn(&alice, address, "constructed", "takes_option_string", vec![
         vec![0x01, 0x01, 0xFF],
     ]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "string",
-        1,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
 }
 
 /// An `Option` argument holding two values is refused.
@@ -1038,13 +1033,7 @@ fn over_long_option_rejected() {
     let txn = call_txn(&alice, address, "constructed", "takes_option_string", vec![
         bcs::to_bytes(&vec!["a", "b"]).unwrap(),
     ]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "option",
-        0x40002,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "option", 0x40002);
 }
 
 /// An `Object<T>` argument naming an existing object of type `T` runs like on
@@ -1054,7 +1043,7 @@ fn existing_object_accepted_like_v1() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
     let txn = call_txn(&alice, address, "constructed", "takes_object", vec![
-        bcs::to_bytes(&apt_metadata_object()).unwrap(),
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
     ]);
     assert_success_like_v1(&fx, &alice, txn);
 }
@@ -1067,13 +1056,7 @@ fn object_at_plain_address_rejected() {
     let txn = call_txn(&alice, address, "constructed", "takes_object", vec![
         bcs::to_bytes(alice.address()).unwrap(),
     ]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "object",
-        0x60002,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "object", 0x60002);
 }
 
 /// An `Object<T>` argument naming an object that holds no `T` is refused.
@@ -1082,15 +1065,9 @@ fn object_lacking_resource_rejected() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
     let txn = call_txn(&alice, address, "constructed", "takes_store", vec![
-        bcs::to_bytes(&apt_metadata_object()).unwrap(),
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
     ]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "object",
-        0x60007,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "object", 0x60007);
 }
 
 /// An argument holding as many objects as one argument may check runs like on
@@ -1099,7 +1076,7 @@ fn object_lacking_resource_rejected() {
 fn object_check_bound_matches_v1() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
-    let objects = |n: usize| bcs::to_bytes(&vec![apt_metadata_object(); n]).unwrap();
+    let objects = |n: usize| bcs::to_bytes(&vec![APT_METADATA_OBJECT; n]).unwrap();
 
     let txn = call_txn(&alice, address, "constructed", "takes_objects", vec![
         objects(32),
@@ -1234,13 +1211,7 @@ fn foo_bytes(x: &[u8], n: u64) -> Vec<u8> {
 /// Asserts that v1 runs `txn` while v2 keeps it with the miscellaneous error
 /// `code`.
 fn assert_v1_runs_and_v2_rejects(fx: &FakeExecutor, txn: SignedTransaction, code: StatusCode) {
-    let v1_output = fx.execute_transaction(txn.clone());
-    assert_eq!(
-        v1_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::Success),
-        "v1 did not run the transaction: {:?}",
-        v1_output.status()
-    );
+    run_on_v1(fx, &txn);
 
     let v2_output = execute_v2(fx.get_state_view(), &txn);
     assert_eq!(
@@ -1269,13 +1240,7 @@ fn malformed_string_in_public_struct_rejected() {
         &[0xFF, 0xFE],
         7,
     )]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "string",
-        1,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
 }
 
 /// A malformed `String` in the second of two public structs in a vector is
@@ -1290,13 +1255,7 @@ fn malformed_string_in_vector_of_public_structs_rejected() {
         foo_bytes(&[0xFF, 0xFE], 8),
     ]
     .concat()]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "string",
-        1,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
 }
 
 /// An `Option` of a public struct runs like on v1, whether `Some` or `None`.
@@ -1339,13 +1298,7 @@ fn malformed_string_in_public_enum_rejected() {
     let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![vec![
         0x01, 0x02, 0xFF, 0xFE,
     ]]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "string",
-        1,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
 }
 
 /// An enum tag naming no variant is refused like on v1.
@@ -1426,17 +1379,11 @@ fn object_in_public_struct_rejected() {
     let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
     let txn = call_txn(&alice, address, "pubs", "takes_boxed_objects", vec![[
         vec![0x02],
-        bcs::to_bytes(&apt_metadata_object()).unwrap(),
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
         bcs::to_bytes(alice.address()).unwrap(),
     ]
     .concat()]);
-    assert_constructor_abort_on_v1_and_code_on_v2(
-        &fx,
-        txn,
-        "object",
-        0x60002,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-    );
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "object", 0x60002);
 }
 
 /// Transactions violating the pre-execution gas bounds expressible by the

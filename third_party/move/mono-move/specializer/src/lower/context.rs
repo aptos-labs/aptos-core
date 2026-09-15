@@ -1105,19 +1105,32 @@ pub fn publish_resource_type(
 ) -> VMResult<bool> {
     let mut visited = UnorderedSet::new();
     let mut descriptors = LoweringDescriptors::default();
-    let published = discover_type_metadata(
+    let layout = discover_resource_type(
         ctx,
         interner,
         ty,
         EMPTY_TYPE_LIST,
         &mut visited,
         &mut descriptors,
-    )?
-    .is_some();
-    if published {
-        publish_struct_descriptor_for(ctx, ty, &mut descriptors.vec)?;
-    }
-    Ok(published)
+    )?;
+    Ok(layout.is_some())
+}
+
+/// Discovers the layout of the resource type `ty` under `ty_args` and
+/// publishes its struct descriptor, so a global-storage read of it can be
+/// materialized as a GC-traceable heap object.
+fn discover_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+    ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
+) -> VMResult<Option<LayoutId>> {
+    let layout = discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
+    let ty = interner.subst_type(ty, ty_args)?;
+    publish_struct_descriptor_for(ctx, ty, &mut descriptors.vec)?;
+    Ok(layout)
 }
 
 fn try_discover_types_for_lowering_in_function_impl(
@@ -1187,9 +1200,7 @@ fn try_discover_types_for_lowering_in_function_impl(
                 arg_types,
                 view_type_list(callee_ty_args),
             ) {
-                discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-                let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-                publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+                discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
             }
 
             // Here we only need layout, so there is no need to publish the type descriptor.
@@ -1235,9 +1246,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // resource's layout, then publish a struct descriptor keyed on the
         // concrete resource type.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
-            discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-            let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+            discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
         }
 
         // The walks above don't reach a constant's own type. A vector

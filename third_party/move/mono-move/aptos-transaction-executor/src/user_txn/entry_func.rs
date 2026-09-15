@@ -4,8 +4,8 @@
 //! Running an entry-function payload.
 
 use super::{
-    arg_check::{check_arg_values, check_param_types},
-    args::{check_arg_counts, leading_signer_params, place_user_txn_args},
+    arg_check::check_args,
+    args::{leading_signer_params, place_user_txn_args},
 };
 use crate::{
     calls::resolve_function_by_name,
@@ -75,10 +75,14 @@ pub(crate) fn call_entry_function<'a>(
         .map_err(MoveExecutionFailure::RuntimeError)?;
     let signer_params =
         check_callable_by_user_txn(func, module).map_err(MoveExecutionFailure::InvalidArguments)?;
-    check_param_types(guard, interp, &func.param_tys[signer_params..])?;
-    check_arg_counts(&func.param_tys, signer_params, secondary_signers, args)
-        .map_err(MoveExecutionFailure::InvalidArguments)?;
-    check_arg_values(guard, interp, &func.param_tys[signer_params..], args)?;
+    check_args(
+        guard,
+        interp,
+        &func.param_tys,
+        signer_params,
+        secondary_signers,
+        args,
+    )?;
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;

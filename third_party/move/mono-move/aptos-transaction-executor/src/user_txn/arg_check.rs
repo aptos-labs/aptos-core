@@ -4,7 +4,9 @@
 //! Checking a payload's parameter types and BCS arguments against what a
 //! transaction may construct, before any argument is placed.
 
+use super::args::check_arg_counts;
 use crate::errors::{invariant_violation, InvalidArguments, MoveExecutionFailure};
+use aptos_types::account_config::ObjectCoreResource;
 use mono_move_core::{
     intern_type_tag,
     interner::{view_module_id, InternedIdentifier, InternedModuleId},
@@ -19,60 +21,52 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{TypeTag, DOLLAR_SIGN_DELIMITER, PACK},
+    move_resource::MoveStructType,
 };
 
 /// The most object existence checks one argument may make.
 const MAX_OBJECT_CHECKS_PER_ARG: usize = 32;
 
-/// Checks that every parameter type can be filled by a transaction argument.
-/// - Primitives, and vectors of allowed types.
-/// - `String`, `Object<T>`, `FixedPoint32`, `FixedPoint64`, and `Option<E>`
-///   of an allowed `E`.
-/// - Public structs and enums whose fields are allowed.
-pub(super) fn check_param_types<'a>(
+/// Checks that a transaction may fill `param_tys` with its signers and `args`.
+/// - Every non-signer parameter type is one an argument can fill: primitives,
+///   vectors and `Option`s of such, `String`, `Object<T>`, `FixedPoint32`,
+///   `FixedPoint64`, and public structs and enums whose fields are.
+/// - The signer and argument counts match the parameters.
+/// - Each argument holds a value the framework's constructors would accept: a
+///   `String` is valid UTF-8, an `Option` holds at most one value, an
+///   `Object<T>` names an address holding an `ObjectCore` and a `T`, and an
+///   enum's tag names one of its variants.
+pub(super) fn check_args<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
     param_tys: &[InternedType],
+    signer_params: usize,
+    secondary_signers: &[AccountAddress],
+    args: &[Vec<u8>],
 ) -> Result<(), MoveExecutionFailure> {
-    let mut checker = ArgChecker::new(guard, interp)?;
-    for &ty in param_tys {
+    let mut checker = ArgChecker {
+        guard,
+        interp,
+        object_core: None,
+    };
+    let arg_tys = &param_tys[signer_params..];
+    for &ty in arg_tys {
         if !checker.is_allowed(ty)? {
             return Err(MoveExecutionFailure::InvalidArguments(
                 InvalidArguments::DisallowedParameterType,
             ));
         }
     }
-    Ok(())
-}
-
-/// Checks that each argument holds a value the framework's argument
-/// constructors would accept, and nothing more.
-/// - A `String` is valid UTF-8.
-/// - An `Option` holds at most one value.
-/// - An `Object<T>` names an address holding an `ObjectCore` and a `T`.
-/// - An enum's tag names one of its variants.
-///
-/// `param_tys` are the non-signer parameter types, one per argument, already
-/// checked by `check_param_types`.
-pub(super) fn check_arg_values<'a>(
-    guard: &ExecutionGuard<'a>,
-    interp: &mut InterpreterContext<'a>,
-    param_tys: &[InternedType],
-    args: &[Vec<u8>],
-) -> Result<(), MoveExecutionFailure> {
-    let mut checker = ArgChecker::new(guard, interp)?;
-    for (&ty, arg) in param_tys.iter().zip(args) {
+    check_arg_counts(param_tys, signer_params, secondary_signers, args)
+        .map_err(MoveExecutionFailure::InvalidArguments)?;
+    for (&ty, arg) in arg_tys.iter().zip(args) {
         let mut walk = Walk {
             bytes: arg,
             cursor: 0,
             object_checks: 0,
         };
         checker.walk(&mut walk, ty)?;
-        if walk.cursor != arg.len() {
-            return Err(undecodable());
-        }
     }
     Ok(())
 }
@@ -102,42 +96,16 @@ fn framework_type(module_id: InternedModuleId, name: InternedIdentifier) -> Opti
     }
 }
 
-/// The instantiated field types of a struct, or of each variant of an enum in
-/// tag order.
-enum Fields {
-    Struct(Vec<InternedType>),
-    Enum(Vec<Vec<InternedType>>),
-}
-
 /// Checks types and values against the transaction's own interpreter, which
 /// loads the modules they name.
 struct ArgChecker<'w, 'g> {
     guard: &'w ExecutionGuard<'g>,
     interp: &'w mut InterpreterContext<'g>,
-    object_core: InternedType,
+    /// The `ObjectCore` type, interned on first use.
+    object_core: Option<InternedType>,
 }
 
-impl<'w, 'g> ArgChecker<'w, 'g> {
-    fn new(
-        guard: &'w ExecutionGuard<'g>,
-        interp: &'w mut InterpreterContext<'g>,
-    ) -> Result<Self, MoveExecutionFailure> {
-        let tag = TypeTag::Struct(Box::new(StructTag {
-            address: AccountAddress::ONE,
-            module: ident_str!("object").to_owned(),
-            name: ident_str!("ObjectCore").to_owned(),
-            type_args: vec![],
-        }));
-        let object_core = intern_type_tag(&tag, guard).map_err(|err| {
-            MoveExecutionFailure::RuntimeError(invariant_violation(err.to_string()))
-        })?;
-        Ok(Self {
-            guard,
-            interp,
-            object_core,
-        })
-    }
-
+impl ArgChecker<'_, '_> {
     // -----------------------------------------------------------------------
     // Types
     // -----------------------------------------------------------------------
@@ -211,14 +179,17 @@ impl<'w, 'g> ArgChecker<'w, 'g> {
         let has_pack_fns = match &module.struct_def_at(def_idx).field_information {
             StructFieldInformation::Declared(_) => has_public_pack_fn(
                 module,
-                &format!("pack${struct_name}"),
+                &format!("{PACK}{DOLLAR_SIGN_DELIMITER}{struct_name}"),
                 FunctionAttribute::Pack,
             ),
             StructFieldInformation::DeclaredVariants(variants) => {
                 variants.iter().enumerate().all(|(tag, variant)| {
+                    let variant_name = module.identifier_at(variant.name);
                     has_public_pack_fn(
                         module,
-                        &format!("pack${struct_name}${}", module.identifier_at(variant.name)),
+                        &format!(
+                            "{PACK}{DOLLAR_SIGN_DELIMITER}{struct_name}{DOLLAR_SIGN_DELIMITER}{variant_name}"
+                        ),
                         FunctionAttribute::PackVariant(tag as VariantIndex),
                     )
                 })
@@ -228,48 +199,27 @@ impl<'w, 'g> ArgChecker<'w, 'g> {
         if !has_pack_fns {
             return Ok(false);
         }
-        let fields = match self.fields_of(module, name, ty_args)? {
-            Fields::Struct(fields) => fields,
-            Fields::Enum(variants) => variants.into_iter().flatten().collect(),
+        let fields: Vec<InternedType> = match declared_fields(module, name)? {
+            FieldTypes::Struct(fields) => fields.clone(),
+            FieldTypes::Enum(variants) => variants.iter().flatten().copied().collect(),
         };
         for ty in fields {
-            if !self.is_allowed(ty)? {
+            if !self.is_allowed(self.subst(ty, ty_args)?)? {
                 return Ok(false);
             }
         }
         Ok(true)
     }
 
-    /// The field types of `name`, defined in `module`, instantiated with
-    /// `ty_args`.
-    fn fields_of(
+    /// `ty` with the type parameters replaced by `ty_args`.
+    fn subst(
         &self,
-        module: &PreparedModule,
-        name: InternedIdentifier,
+        ty: InternedType,
         ty_args: InternedTypeList,
-    ) -> Result<Fields, MoveExecutionFailure> {
-        let subst = |ty: InternedType| {
-            self.guard.subst_type(ty, ty_args).map_err(|err| {
-                MoveExecutionFailure::RuntimeError(invariant_violation(err.to_string()))
-            })
-        };
-        match module.interned_field_types(name) {
-            Some(FieldTypes::Struct(fields)) => Ok(Fields::Struct(
-                fields
-                    .iter()
-                    .map(|&ty| subst(ty))
-                    .collect::<Result<_, _>>()?,
-            )),
-            Some(FieldTypes::Enum(variants)) => Ok(Fields::Enum(
-                variants
-                    .iter()
-                    .map(|fields| fields.iter().map(|&ty| subst(ty)).collect())
-                    .collect::<Result<_, _>>()?,
-            )),
-            None => Err(MoveExecutionFailure::RuntimeError(invariant_violation(
-                "nominal type without a definition in its module",
-            ))),
-        }
+    ) -> Result<InternedType, MoveExecutionFailure> {
+        self.guard
+            .subst_type(ty, ty_args)
+            .map_err(|err| MoveExecutionFailure::RuntimeError(invariant_violation(err.to_string())))
     }
 
     // -----------------------------------------------------------------------
@@ -278,13 +228,10 @@ impl<'w, 'g> ArgChecker<'w, 'g> {
 
     /// Walks one value of type `ty`, checking what it holds.
     fn walk(&mut self, w: &mut Walk<'_>, ty: InternedType) -> Result<(), MoveExecutionFailure> {
+        if let Some(n) = primitive_size(ty) {
+            return w.skip(n);
+        }
         match view_type(ty) {
-            Type::Bool | Type::U8 | Type::I8 => w.skip(1),
-            Type::U16 | Type::I16 => w.skip(2),
-            Type::U32 | Type::I32 => w.skip(4),
-            Type::U64 | Type::I64 => w.skip(8),
-            Type::U128 | Type::I128 => w.skip(16),
-            Type::U256 | Type::I256 | Type::Address => w.skip(32),
             Type::Vector { elem } => {
                 let len = w.read_len()?;
                 if let Some(size) = primitive_size(*elem) {
@@ -329,24 +276,35 @@ impl<'w, 'g> ArgChecker<'w, 'g> {
                         .interp
                         .load_module(*module_id)
                         .map_err(MoveExecutionFailure::RuntimeError)?;
-                    let fields = match self.fields_of(module, *name, *ty_args)? {
-                        Fields::Struct(fields) => fields,
-                        Fields::Enum(mut variants) => {
-                            let tag = w.read_len()?;
-                            if tag >= variants.len() {
-                                return Err(undecodable());
-                            }
-                            variants.swap_remove(tag)
+                    let fields = match declared_fields(module, *name)? {
+                        FieldTypes::Struct(fields) => fields,
+                        FieldTypes::Enum(variants) => {
+                            variants.get(w.read_len()?).ok_or_else(undecodable)?
                         },
                     };
-                    for ty in fields {
+                    for &ty in fields {
+                        let ty = self.subst(ty, *ty_args)?;
                         self.walk(w, ty)?;
                     }
                     Ok(())
                 },
             },
-            // The type check refuses these parameter types.
-            Type::Signer
+            // Primitives were skipped above; the type check refuses the rest.
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer
             | Type::ImmutRef { .. }
             | Type::MutRef { .. }
             | Type::Function { .. }
@@ -370,10 +328,11 @@ impl<'w, 'g> ArgChecker<'w, 'g> {
             ));
         }
         w.object_checks += 1;
+        let object_core = self.object_core()?;
         // TODO(metering): charge for the two reads.
         if !self
             .interp
-            .resource_exists(address, self.object_core)
+            .resource_exists(address, object_core)
             .map_err(MoveExecutionFailure::RuntimeError)?
         {
             return Err(MoveExecutionFailure::InvalidArguments(
@@ -391,6 +350,30 @@ impl<'w, 'g> ArgChecker<'w, 'g> {
         }
         Ok(())
     }
+
+    fn object_core(&mut self) -> Result<InternedType, MoveExecutionFailure> {
+        if let Some(ty) = self.object_core {
+            return Ok(ty);
+        }
+        let tag = TypeTag::Struct(Box::new(ObjectCoreResource::struct_tag()));
+        let ty = intern_type_tag(&tag, self.guard).map_err(|err| {
+            MoveExecutionFailure::RuntimeError(invariant_violation(err.to_string()))
+        })?;
+        self.object_core = Some(ty);
+        Ok(ty)
+    }
+}
+
+/// The declared field types of `name`, defined in `module`.
+fn declared_fields(
+    module: &PreparedModule,
+    name: InternedIdentifier,
+) -> Result<&FieldTypes, MoveExecutionFailure> {
+    module.interned_field_types(name).ok_or_else(|| {
+        MoveExecutionFailure::RuntimeError(invariant_violation(
+            "nominal type without a definition in its module",
+        ))
+    })
 }
 
 /// Whether `module` defines a public function `name` carrying `attribute`.

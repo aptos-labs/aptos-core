@@ -260,6 +260,32 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
     }
 
+    /// Publishes the layout and GC descriptor of the resource type `ty`, so a
+    /// read of it can be materialized outside lowered code, charging for the
+    /// modules its definition pulls in.
+    pub fn publish_resource_type(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        ty: InternedType,
+    ) -> VMResult<()> {
+        if self.guard.layout_id_for(ty).is_some() && self.guard.struct_descriptor(ty).is_some() {
+            return Ok(());
+        }
+        let mut ctx = LoweringContext::new(self, read_set);
+        let published = publish_resource_type(&mut ctx, self.guard, ty)?;
+        let discovered = Arc::<[LoadedModuleSlot]>::from(ctx.discovered);
+        self.record_loaded_and_charge_slots(read_set, gas_meter, &discovered, |_, _| {
+            invariant_violation!(UnexpectedReadSetMiss);
+        })?;
+        if !published {
+            return Err(VMInternalError::new(
+                LoaderError::ResourceLayoutNotDerivable,
+            ));
+        }
+        Ok(())
+    }
+
     /// Loads a script from its bytes and returns its `main` instantiated with
     /// `ty_args`. A script is loaded as a module holding that one function,
     /// under a module ID all scripts share, and cached by the hash of its
@@ -378,29 +404,6 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// Runs the lowering pipeline for a single function with the given
     /// substitution table. Returns a fresh `FunctionSlot` containing the
     /// lowered code and its mandatory-dependency set.
-    /// Publishes the layout and GC descriptor of the resource type `ty`, so a
-    /// read of it can be materialized outside lowered code, charging for the
-    /// modules its definition pulls in.
-    pub fn publish_resource_type(
-        &self,
-        read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut GasMeter,
-        ty: InternedType,
-    ) -> VMResult<()> {
-        let mut ctx = LoweringContext::new(self, read_set);
-        let published = publish_resource_type(&mut ctx, self.guard, ty)?;
-        let discovered = Arc::<[LoadedModuleSlot]>::from(ctx.discovered);
-        self.record_loaded_and_charge_slots(read_set, gas_meter, &discovered, |_, _| {
-            invariant_violation!(UnexpectedReadSetMiss);
-        })?;
-        if !published {
-            return Err(VMInternalError::new(LoaderError::LoweringSkipped {
-                reason: "the resource type's layout is not derivable",
-            }));
-        }
-        Ok(())
-    }
-
     fn lower_function_with_ty_args(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
