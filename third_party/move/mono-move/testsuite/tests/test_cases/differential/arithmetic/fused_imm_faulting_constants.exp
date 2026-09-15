@@ -1,0 +1,38 @@
+=== micro-ops ===
+// module 0x1::fused_imm_faulting_constants
+
+fun div_by_zero() {
+  frame_data_size: 16
+  entry_gas: 59
+  code:
+    0: IntDiv [8] <- [0] / u64 #0 @2
+    1: Move8 [0] <- [8] @3
+    2: Return @3
+}
+
+fun mod_by_zero() {
+  frame_data_size: 16
+  entry_gas: 59
+  code:
+    0: IntMod [8] <- [0] % u64 #0 @2
+    1: Move8 [0] <- [8] @3
+    2: Return @3
+}
+
+fun shl_by_64() {
+  frame_data_size: 16
+  entry_gas: 59
+  code:
+    0: IntShl.u64 [8] <- [0] << #64 @2
+    1: Move8 [0] <- [8] @3
+    2: Return @3
+}
+
+fun shr_by_64() {
+  frame_data_size: 16
+  entry_gas: 59
+  code:
+    0: IntShr.u64 [8] <- [0] >> #64 @2
+    1: Move8 [0] <- [8] @3
+    2: Return @3
+}

@@ -73,6 +73,9 @@ pub enum DivergenceCategory {
     Unsupported,
     /// MonoMove behaves differently from V1.
     Semantic,
+    /// Execution behavior matches V1, but diagnostic offsets, messages, or
+    /// stack traces differ.
+    Rendering,
 }
 
 /// A recorded divergence of MonoMove from a source's canonical baseline.
@@ -97,6 +100,14 @@ impl MonoMoveDivergence {
         Self {
             source,
             category: DivergenceCategory::Semantic,
+            reason,
+        }
+    }
+
+    pub const fn rendering(source: &'static str, reason: &'static str) -> Self {
+        Self {
+            source,
+            category: DivergenceCategory::Rendering,
             reason,
         }
     }
