@@ -175,16 +175,6 @@ module aptos_framework::code {
         // To avoid prover compiler error on spec
         // the package need to be an immutable variable
         let module_names = get_module_names(&pack);
-
-        // Record, per module in this package, the object's transitive root owner at (re)publish, so
-        // lazy self-init can detect a later transfer of the object or an ancestor since that module
-        // was published (see `init::internal_maybe_initialize`). Objects only; feature-gated.
-        if (features::is_lazy_module_initialization_enabled() && object::is_object(addr)) {
-            let owner = object::address_to_object<object::ObjectCore>(addr).root_owner();
-            module_names.for_each_ref(|name| {
-                init::record_deploy_owner(addr, *name.bytes(), owner);
-            });
-        };
         let package_immutable = &borrow_global<PackageRegistry>(addr).packages;
         let len = package_immutable.length();
         let index = len;
@@ -207,10 +197,6 @@ module aptos_framework::code {
         // Update registry
         let policy = pack.upgrade_policy;
         if (index < len) {
-            pack.modules.for_each_ref(|m| {
-                let m: &ModuleMetadata = m;
-                init::reset_initialized(addr, *m.name.bytes());
-            });
             *packages.borrow_mut(index) = pack
         } else {
             packages.push_back(pack)
@@ -268,6 +254,27 @@ module aptos_framework::code {
     public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
         publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
+    }
+
+    /// Publishes a package to the object `code_object` signs for, authorized by `owner`, who must
+    /// currently own that object. The ownership is recorded for the package's modules so that they
+    /// can lazily self-initialize (see `init`); modules published to an object via
+    /// `publish_package` alone cannot.
+    public fun publish_package_to_object(
+        owner: &signer,
+        code_object: &signer,
+        metadata_serialized: vector<u8>,
+        code: vector<vector<u8>>
+    ) acquires PackageRegistry {
+        let pack = util::from_bytes<PackageMetadata>(metadata_serialized);
+        let module_names = get_module_names(&pack);
+        publish_package(code_object, pack, code);
+        if (features::is_lazy_module_initialization_enabled()) {
+            let addr = signer::address_of(code_object);
+            module_names.for_each_ref(|name| {
+                init::record_deploy_owner(owner, addr, *name.bytes());
+            });
+        }
     }
 
     // Helpers
