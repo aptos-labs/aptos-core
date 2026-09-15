@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Configuration for transaction lifecycle tracing.
 ///
 /// When `enabled` is true and the filter matches, the node traces transactions
-/// through the pipeline (mempool → QS → consensus → execution → commit)
+/// through the pipeline (API → mempool → QS → consensus → execution → commit)
 /// and logs a `TxnTrace` line for each.
 ///
 /// Two-level sampling controls overhead:
