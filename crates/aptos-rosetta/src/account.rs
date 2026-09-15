@@ -313,6 +313,8 @@ async fn get_staking_info(
                 Ok(Some(balance_result)) => {
                     if let Some(balance) = balance_result.balance {
                         has_staking = true;
+                        // Prefer availability over failing the whole balance call if a value is
+                        // malformed; treat unparsable amounts as zero.
                         total_balance += u64::from_str(&balance.value).unwrap_or_default();
                     }
                     // TODO: This seems like it only works if there's only one staking contract (hopefully it stays that way)
@@ -403,6 +405,13 @@ async fn get_base_balances(
                     }),
                 ..
             } => {
+                let fa_metadata_address =
+                    AccountAddress::from_str(fa_address).map_err(|err| {
+                        ApiError::InvalidInput(Some(format!(
+                            "Invalid fungible asset address in currency {}: {}",
+                            currency.symbol, err
+                        )))
+                    })?;
                 let response = view::<Vec<u64>>(
                     rest_client,
                     version,
@@ -416,8 +425,8 @@ async fn get_base_balances(
                         type_args: vec![],
                     }))],
                     vec![
-                        bcs::to_bytes(&owner_address).unwrap(),
-                        bcs::to_bytes(&AccountAddress::from_str(fa_address).unwrap()).unwrap(),
+                        bcs::to_bytes(&owner_address)?,
+                        bcs::to_bytes(&fa_metadata_address)?,
                     ],
                 )
                 .await?;
