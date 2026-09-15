@@ -42,7 +42,14 @@ export interface MoveStructTagFilter {
 
 export interface EventFilter {
   structType?: MoveStructTagFilter | undefined;
-  dataSubstringFilter?: string | undefined;
+  dataSubstringFilter?:
+    | string
+    | undefined;
+  /**
+   * Filter events by client_order_id field. This is useful for querying
+   * trading events (like OrderEvent) by the client-specified order identifier.
+   */
+  clientOrderId?: string | undefined;
 }
 
 export interface APIFilter {
@@ -814,7 +821,7 @@ export const MoveStructTagFilter = {
 };
 
 function createBaseEventFilter(): EventFilter {
-  return { structType: undefined, dataSubstringFilter: undefined };
+  return { structType: undefined, dataSubstringFilter: undefined, clientOrderId: undefined };
 }
 
 export const EventFilter = {
@@ -824,6 +831,9 @@ export const EventFilter = {
     }
     if (message.dataSubstringFilter !== undefined) {
       writer.uint32(18).string(message.dataSubstringFilter);
+    }
+    if (message.clientOrderId !== undefined) {
+      writer.uint32(26).string(message.clientOrderId);
     }
     return writer;
   },
@@ -848,6 +858,13 @@ export const EventFilter = {
           }
 
           message.dataSubstringFilter = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.clientOrderId = reader.string();
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -896,6 +913,7 @@ export const EventFilter = {
       dataSubstringFilter: isSet(object.dataSubstringFilter)
         ? globalThis.String(object.dataSubstringFilter)
         : undefined,
+      clientOrderId: isSet(object.clientOrderId) ? globalThis.String(object.clientOrderId) : undefined,
     };
   },
 
@@ -906,6 +924,9 @@ export const EventFilter = {
     }
     if (message.dataSubstringFilter !== undefined) {
       obj.dataSubstringFilter = message.dataSubstringFilter;
+    }
+    if (message.clientOrderId !== undefined) {
+      obj.clientOrderId = message.clientOrderId;
     }
     return obj;
   },
@@ -919,6 +940,7 @@ export const EventFilter = {
       ? MoveStructTagFilter.fromPartial(object.structType)
       : undefined;
     message.dataSubstringFilter = object.dataSubstringFilter ?? undefined;
+    message.clientOrderId = object.clientOrderId ?? undefined;
     return message;
   },
 };
