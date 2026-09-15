@@ -25,10 +25,11 @@ above this crate.
 Still open before the transaction executor can be wired to the block
 coordinator:
 
-- Entry-function validation: `entry` visibility, no return values, admissible
-  argument types, constructed arguments. Without the visibility check a signed
-  payload naming any loadable function runs it. See the `TODO(security,
-  completeness)` in `user_txn/execute.rs`.
+- Argument validation is missing two things AptosVM does through its argument
+  constructors: value checks on the whitelisted framework types (`String`
+  UTF-8 validity, `Option` length, `Object<T>` existence), and public struct
+  and enum arguments. See the `TODO(security, completeness)` in
+  `user_txn/entry_func.rs`.
 - Multi-agent transactions are untested.
 
 ## Conventions
