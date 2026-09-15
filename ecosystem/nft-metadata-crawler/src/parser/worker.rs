@@ -304,6 +304,16 @@ impl Worker {
         // If raw_animation_uri_option is None, skip
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             self.log_info("Parsing raw_animation_uri");
+
+            // Check raw_animation_uri against the URI blacklist
+            if self.is_blacklisted_uri(&raw_animation_uri) {
+                self.log_info("Found match in URI blacklist, marking as do_not_parse");
+                self.model.set_do_not_parse(true);
+                self.upsert();
+                SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
+                return Ok(());
+            }
+
             let animation_uri = URIParser::parse(
                 &self.parser_config.ipfs_prefix,
                 &raw_animation_uri,
