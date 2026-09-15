@@ -3,7 +3,9 @@
 
 //! Interpreter-internal error types.
 
-use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError};
+use mono_move_core::{
+    ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError, VMInternalError,
+};
 use move_core_types::{
     account_address::AccountAddress,
     int256::{I256, U256},
@@ -117,9 +119,25 @@ pub enum RuntimeError {
     #[error("BCS deserialize: enum tag {tag} out of range for {variant_count} variants")]
     BCSInvalidEnumTag { tag: u64, variant_count: usize },
 
-    /// A decode hook refused a value; the hook holds the reason.
-    #[error("BCS deserialize: value refused by the decode hook")]
-    BCSRefusedByHook,
+    /// A `String` argument is not valid UTF-8.
+    #[error("argument check: a `String` is not valid UTF-8")]
+    MalformedStringArgument,
+
+    /// An `Object` argument names an address holding no object.
+    #[error("argument check: no object at the `Object` argument's address")]
+    ObjectArgumentDoesNotExist,
+
+    /// An `Object<T>` argument names an object holding no `T`.
+    #[error("argument check: the `Object` argument's address holds no resource of its type")]
+    ObjectArgumentLacksResource,
+
+    /// An argument holds more `Object` values than are checked.
+    #[error("argument check: too many `Object` values in one argument")]
+    TooManyObjectArguments,
+
+    /// A storage read while checking an `Object` argument failed.
+    #[error("argument check: {0}")]
+    ArgumentStorageRead(VMInternalError),
 
     #[error("unsupported: {0}")]
     Unsupported(&'static str),
@@ -145,7 +163,11 @@ impl RuntimeError {
             | BCSSignerNotDeserializable
             | BCSInvalidEnumTag { .. } => true,
 
-            BCSRefusedByHook
+            MalformedStringArgument
+            | ObjectArgumentDoesNotExist
+            | ObjectArgumentLacksResource
+            | TooManyObjectArguments
+            | ArgumentStorageRead(_)
             | ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }
             | DivisionByZero { .. }
@@ -208,7 +230,11 @@ impl IntoExecutionError for RuntimeError {
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable
             | BCSInvalidEnumTag { .. }
-            | BCSRefusedByHook => ExecutionErrorKind::InvalidOperation,
+            | MalformedStringArgument
+            | ObjectArgumentDoesNotExist
+            | ObjectArgumentLacksResource
+            | TooManyObjectArguments => ExecutionErrorKind::InvalidOperation,
+            ArgumentStorageRead(err) => err.kind(),
 
             Unsupported(_) => ExecutionErrorKind::InvariantViolation,
 

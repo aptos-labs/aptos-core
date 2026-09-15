@@ -233,13 +233,6 @@ pub(crate) fn call_entry_function<'a>(
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    place_user_txn_args(
-        guard,
-        &mut call,
-        signer_params,
-        sender,
-        secondary_signers,
-        args,
-    )?;
+    place_user_txn_args(&mut call, signer_params, sender, secondary_signers, args)?;
     call.run().map_err(MoveExecutionFailure::RuntimeError)
 }

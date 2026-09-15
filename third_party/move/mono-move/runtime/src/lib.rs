@@ -17,9 +17,7 @@ mod verifier;
 pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, RuntimeStatus, VecOp};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
 pub use heap::{FrozenHeap, Heap, SharedArena};
-pub use interpreter::{
-    CallBuilder, InterpreterContext, InterpreterOptions, SessionEffects, StorageReader,
-};
+pub use interpreter::{CallBuilder, InterpreterContext, InterpreterOptions, SessionEffects};
 pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,
     write_u64, MemoryRegion,
@@ -30,5 +28,5 @@ pub use native_context::{
     ProductionNativeRegistry,
 };
 pub use types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use value_conv::bcs::{deserialize_into, read_uleb128_len, serialize};
+pub use value_conv::bcs::{deserialize_into, serialize};
 pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};

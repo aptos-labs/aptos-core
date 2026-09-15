@@ -48,7 +48,6 @@ pub(crate) fn run_script<'a>(
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;
     place_user_txn_args(
-        guard,
         &mut call,
         signer_params,
         sender,
