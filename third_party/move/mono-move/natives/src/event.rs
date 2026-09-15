@@ -208,7 +208,7 @@ fn collect_events<'a, C: NativeContext>(
     };
     // SAFETY: each payload is the event value's in-frame image, held in a Rust
     // `Vec` outside the heap, and the store keeps every pointer it holds live.
-    unsafe { ctx.vector_write_elements(&vector, elem_size, &data) }?;
+    unsafe { ctx.vector_write_elements_raw_test_only(&vector, elem_size, &data) }?;
     Ok(vector)
 }
 

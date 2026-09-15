@@ -140,7 +140,7 @@ pub trait NativeContext {
     ///
     /// The length is set to `count`, so the result is a well-formed value whose
     /// elements are all-zero bit patterns. Fill them with
-    /// [`Self::vector_write_elements`] before handing it back to Move.
+    /// [`Self::vector_write_elements_raw_test_only`] before handing it back to Move.
     fn new_vector<'a>(
         &'a self,
         descriptor: DescriptorId,
@@ -154,12 +154,15 @@ pub trait NativeContext {
     /// with wherever `data` came from. Null slots (an empty vector, say) stay
     /// null.
     ///
+    /// Reserved for test-only natives: `data` bypasses the type system, so a
+    /// production native should build its result through the typed APIs.
+    ///
     /// # Safety
     ///
     /// `data` must be a valid representation of the vector's full length in
     /// elements of its element type, must not overlap the VM heap, and every
     /// heap pointer it holds must point at a live object.
-    unsafe fn vector_write_elements(
+    unsafe fn vector_write_elements_raw_test_only(
         &self,
         vector: &Vector<'_, Opaque>,
         elem_size: u32,

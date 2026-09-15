@@ -506,7 +506,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
     }
 
-    unsafe fn vector_write_elements(
+    unsafe fn vector_write_elements_raw_test_only(
         &self,
         vector: &Vector<'_, Opaque>,
         elem_size: u32,
@@ -514,12 +514,14 @@ impl NativeContext for ProductionNativeContext<'_> {
     ) -> VMResult<()> {
         if self.returns_started.get() {
             return Err(native_invariant_violation(
-                "vector_write_elements called after a return value was written".into(),
+                "vector_write_elements_raw_test_only called after a return value was written"
+                    .into(),
             ));
         }
         if (vector.len() as usize).checked_mul(elem_size as usize) != Some(data.len()) {
             return Err(native_invariant_violation(
-                "vector_write_elements: data length must equal len * elem_size".into(),
+                "vector_write_elements_raw_test_only: data length must equal len * elem_size"
+                    .into(),
             ));
         }
         let ptr = vector.ptr();
@@ -530,7 +532,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: `ptr` is a live object, so its header names its descriptor.
         let descriptor = DescriptorId(unsafe { read_descriptor(ptr) });
         let desc = self.desc_provider.descriptor(descriptor).ok_or_else(|| {
-            native_invariant_violation("vector_write_elements: unknown descriptor".into())
+            native_invariant_violation(
+                "vector_write_elements_raw_test_only: unknown descriptor".into(),
+            )
         })?;
         let offsets = match desc.inner() {
             // A pointer-free element type publishes as the trivial descriptor:
@@ -542,7 +546,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             } => {
                 if *stride != elem_size {
                     return Err(native_invariant_violation(
-                        "vector_write_elements: descriptor element size does not match".into(),
+                        "vector_write_elements_raw_test_only: descriptor element size does not match".into(),
                     ));
                 }
                 elem_pointer_offsets.as_slice()
@@ -552,7 +556,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             | ObjectDescriptorInner::Closure
             | ObjectDescriptorInner::CapturedData { .. } => {
                 return Err(native_invariant_violation(
-                    "vector_write_elements: not a vector descriptor".into(),
+                    "vector_write_elements_raw_test_only: not a vector descriptor".into(),
                 ))
             },
         };
@@ -562,7 +566,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             .saturating_sub(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET);
         if data.len() > capacity {
             return Err(native_invariant_violation(
-                "vector_write_elements: data does not fit the vector".into(),
+                "vector_write_elements_raw_test_only: data does not fit the vector".into(),
             ));
         }
 
@@ -573,7 +577,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // below may trigger.
         if is_heap_ptr(heap, data.as_ptr()) {
             return Err(native_invariant_violation(
-                "vector_write_elements: data must not alias the VM heap".into(),
+                "vector_write_elements_raw_test_only: data must not alias the VM heap".into(),
             ));
         }
         // SAFETY: bounded by `capacity` above, and `data` does not alias the

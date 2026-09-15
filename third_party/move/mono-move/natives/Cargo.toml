@@ -32,5 +32,7 @@ siphasher = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [features]
-# Enables the test-only crypto natives (key generation, signing, PoP creation).
+# Enables the test-only natives (crypto key generation, signing, PoP creation,
+# event queries). See the TODO(security) in src/lib.rs: this gate should become
+# an explicit runtime flag.
 testing = ["aptos-crypto/fuzzing", "rand_core"]

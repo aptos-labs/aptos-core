@@ -6,6 +6,11 @@
 //!
 //! [`NativeContext`]: mono_move_core::native::NativeContext
 
+// TODO(security): stop gating the test-only natives on the `testing` cargo
+// feature. Cargo features are additive over the whole build tree, so any crate
+// in it can switch them on for everyone. Select them with an explicit runtime
+// flag instead.
+
 // Re-exported so the native list macros can name these via `$crate::...`
 // without callers having to add `mono-move-core` to their imports.
 use mono_move_core::native::NativeContextFamily;
