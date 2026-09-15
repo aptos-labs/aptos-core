@@ -1310,6 +1310,8 @@ fn try_build_inline_value_layout(
     let mut layout_fields = Vec::with_capacity(field_layouts.len());
     let mut fixed_bcs_total: u64 = 0;
     let mut data_dependent = false;
+    let mut packed_size: u64 = 0;
+    let mut fields_no_pointers_no_padding = true;
     let mut all_bytes_valid = true;
     for (field, &fid) in field_layouts.iter().zip(field_ids) {
         // A field can be sized yet still lack a published layout (e.g. a
@@ -1328,6 +1330,8 @@ fn try_build_inline_value_layout(
             Some(bcs_sz) => fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64),
             None => data_dependent = true,
         }
+        packed_size = packed_size.saturating_add(child.size as u64);
+        fields_no_pointers_no_padding &= child.has_no_pointers_no_padding();
         all_bytes_valid &= child.all_byte_patterns_valid();
     }
 
@@ -1336,13 +1340,13 @@ fn try_build_inline_value_layout(
     } else {
         Some(fixed_bcs_total as u32)
     };
-    // No pointers and no padding exactly when the packed BCS size equals the
-    // in-memory size: a pointer field makes the BCS size data-dependent
-    // (`None`), and alignment padding makes it strictly smaller than `total`.
+    // No pointers and no padding exactly when every field is itself pointer-
+    // and padding-free and the fields fill `total` with no alignment gaps. Not
+    // derived from `fixed_bcs_size`: `signer` is pointer-free yet `None`.
     let mut flags = LayoutFlags::empty();
-    if fixed_bcs_size == Some(total) {
+    if fields_no_pointers_no_padding && packed_size == total as u64 {
         flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
-        // Blittable on deserialize only when no field reaches a `bool`, which
+        // Raw-copy deserialization only when no field reaches a `bool`, which
         // needs per-byte validation that a single `memcpy` would skip.
         if all_bytes_valid {
             flags |= LayoutFlags::ALL_BYTE_PATTERNS_VALID;
