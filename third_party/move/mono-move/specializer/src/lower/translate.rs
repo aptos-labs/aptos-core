@@ -889,7 +889,7 @@ impl<'a> LoweringState<'a> {
                         BinaryOp::Shl | BinaryOp::Shr => {
                             let ty = IntTy::from_type(lhs_ty)
                                 .filter(|t| !t.is_signed())
-                                .ok_or(LoweringError::ShiftRequiresUnsignedNonU64)?;
+                                .ok_or(LoweringError::ShiftRequiresUnsigned)?;
                             let shift_op = IntShiftOp {
                                 ty,
                                 dst,
@@ -980,6 +980,11 @@ impl<'a> LoweringState<'a> {
                             src: lhs,
                             imm: imm_to_u64(imm)?,
                         }),
+                        // Zero divisors and shifts >= 64 must produce VM errors only if executed.
+                        // Use checked integer operations, since the corresponding unchecked
+                        // u64 immediate operations require valid operands.
+                        BinaryOp::Div | BinaryOp::Mod if imm_to_u64(imm)? == 0 => None,
+                        BinaryOp::Shl | BinaryOp::Shr if shift_imm_u8(imm)? >= 64 => None,
                         BinaryOp::Div => Some(MicroOp::DivU64Imm {
                             dst,
                             src: lhs,
@@ -1055,7 +1060,7 @@ impl<'a> LoweringState<'a> {
                         BinaryOp::Shl | BinaryOp::Shr => {
                             let ty = IntTy::from_type(lhs_ty)
                                 .filter(|t| !t.is_signed())
-                                .ok_or(LoweringError::ShiftRequiresUnsignedNonU64)?;
+                                .ok_or(LoweringError::ShiftRequiresUnsigned)?;
                             let shift_op = IntShiftOp {
                                 ty,
                                 dst,

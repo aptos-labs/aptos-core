@@ -5,7 +5,8 @@
 //!
 //! Task parsing, compilation, and publishing checks use V1's infrastructure.
 //! Publish tasks also apply MonoVM loading checks before updating storage.
-//! Run tasks execute on MonoVM and render outcomes in V1's baseline format.
+//! Function and script run tasks execute on MonoVM and render
+//! outcomes in V1's baseline format.
 
 use crate::transactional_session::{
     ArgumentError, PublishError, RunError, RunOutcome, TransactionalSession,
@@ -32,9 +33,9 @@ use move_transactional_test_runner::{
     tasks::{taskify, EmptyCommand, InitCommand, SyntaxChoice, TaskCommand, TaskInput},
     vm_test_harness::{
         compiled_state_with_stdlib, deserialize_value, function_execution_error,
-        precompiled_v2_stdlib, publish_error, serialize_module, stage_precompiled_stdlib,
-        type_layout, view_resource, AdapterExecuteArgs, AdapterPublishArgs,
-        PrecompiledFilesModules, TestRunConfig,
+        precompiled_v2_stdlib, publish_error, script_execution_error, serialize_module,
+        serialize_script, stage_precompiled_stdlib, type_layout, view_resource, AdapterExecuteArgs,
+        AdapterPublishArgs, PrecompiledFilesModules, TestRunConfig,
     },
 };
 use move_vm_runtime::move_vm::SerializedReturnValues;
@@ -47,9 +48,7 @@ type MonoVMTaskCommand =
 
 /// Returns whether the source contains only supported tasks: initialization,
 /// bytecode printing, module publishing, resource viewing, and unmetered runs
-/// that name a module function. Script runs are unsupported, and so are runs
-/// with a `--gas-budget`: the adapter runs unmetered, so a run that V1 ends
-/// with `OUT_OF_GAS` would not terminate.
+/// of a module function or script.
 pub fn supports_source(path: &Path) -> Result<bool> {
     Ok(taskify::<MonoVMTaskCommand>(path)?
         .iter()
@@ -58,7 +57,7 @@ pub fn supports_source(path: &Path) -> Result<bool> {
             | TaskCommand::PrintBytecode(..)
             | TaskCommand::Publish(..)
             | TaskCommand::View(..) => true,
-            TaskCommand::Run(command, _) => command.name.is_some() && command.gas_budget.is_none(),
+            TaskCommand::Run(command, _) => command.gas_budget.is_none(),
             TaskCommand::Subcommand(..) => false,
         }))
 }
@@ -141,23 +140,34 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
         Ok((None, module))
     }
 
+    /// Runs the script unmetered and returns diagnostic text only on failure.
     fn execute_script(
         &mut self,
-        _script: CompiledScript,
-        _type_args: Vec<TypeTag>,
-        _signers: Vec<ParsedAddress>,
-        _args: Vec<MoveValue>,
-        _gas_budget: Option<u64>,
-        _extra_args: Self::ExtraRunArgs,
+        script: CompiledScript,
+        type_args: Vec<TypeTag>,
+        signers: Vec<ParsedAddress>,
+        args: Vec<MoveValue>,
+        gas_budget: Option<u64>,
+        extra_args: Self::ExtraRunArgs,
     ) -> Option<String> {
-        panic!(
-            "the MonoVM adapter does not support script tasks yet; filter sources with \
-             `supports_source`"
-        )
+        if let Some(error) = gas_budget_error(gas_budget) {
+            return Some(error);
+        }
+        let script_bytes = match serialize_script(self.session.storage(), &script) {
+            Ok(script_bytes) => script_bytes,
+            Err(err) => return Some(format!("Error: {err}")),
+        };
+        let signers = self.compiled_state.resolve_signers(signers);
+        let args = serialize_values(&args);
+        let result = self
+            .session
+            .run_script(&script_bytes, &type_args, &signers, &args);
+        self.run_result(result, script_execution_error, extra_args.verbose)
+            .err()
+            .map(|error| format!("Error: {error}"))
     }
 
-    /// Runs the function unmetered; `supports_source` keeps `--gas-budget`
-    /// runs out.
+    /// Runs the function unmetered.
     fn call_function(
         &mut self,
         module: &ModuleId,
@@ -165,38 +175,23 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
         type_args: Vec<TypeTag>,
         signers: Vec<ParsedAddress>,
         args: Vec<MoveValue>,
-        _gas_budget: Option<u64>,
+        gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Option<String> {
-        let signers = signers
-            .into_iter()
-            .map(|addr| self.compiled_state().resolve_address(&addr))
-            .collect::<Vec<_>>();
+        if let Some(error) = gas_budget_error(gas_budget) {
+            return Some(error);
+        }
+        let signers = self.compiled_state.resolve_signers(signers);
         let args = serialize_values(&args);
-        let debugging = self.run_config.vm_config.enable_debugging;
-        let failed = |vm_error: VMError| function_execution_error(&vm_error, extra_args.verbose);
-
-        let error = match self
+        let result = self
             .session
-            .run(module, function, &type_args, &signers, &args)
-        {
-            Ok(RunOutcome::Success { return_values }) => {
-                match self.serialized_return_values(return_values) {
-                    Ok(values) => return self.display_return_values(values),
-                    Err(err) => format!("{err:#}"),
-                }
+            .run(module, function, &type_args, &signers, &args);
+        let error = match self.run_result(result, function_execution_error, extra_args.verbose) {
+            Ok(return_values) => match self.serialized_return_values(return_values) {
+                Ok(values) => return self.display_return_values(values),
+                Err(err) => format!("{err:#}"),
             },
-            Ok(RunOutcome::Aborted {
-                code,
-                message,
-                location,
-                offset,
-            }) => failed(abort_error(code, message, location, offset, debugging)).to_string(),
-            Err(RunError::Arguments(err)) => failed(argument_error(err)).to_string(),
-            Err(RunError::Vm(err)) => failed(run_vm_error(&err, debugging)).to_string(),
-            Err(
-                err @ (RunError::VmUnsupported(_) | RunError::Unsupported(_) | RunError::Commit(_)),
-            ) => err.to_string(),
+            Err(error) => error,
         };
         Some(format!("Error: {error}"))
     }
@@ -221,6 +216,32 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
 }
 
 impl MonoVMTestAdapter<'_> {
+    /// Returns successful results or formats failures, using `execution_error`
+    /// for the task kind's VM diagnostics.
+    fn run_result(
+        &self,
+        result: Result<RunOutcome, RunError>,
+        execution_error: fn(&VMError, bool) -> anyhow::Error,
+        verbose: bool,
+    ) -> Result<Vec<(TypeTag, Vec<u8>)>, String> {
+        let debugging = self.run_config.vm_config.enable_debugging;
+        let vm_error = match result {
+            Ok(RunOutcome::Success { return_values }) => return Ok(return_values),
+            Ok(RunOutcome::Aborted {
+                code,
+                message,
+                location,
+                offset,
+            }) => abort_error(code, message, location, offset, debugging),
+            Err(RunError::Arguments(err)) => argument_error(err),
+            Err(RunError::Vm(err)) => run_vm_error(&err, debugging),
+            Err(
+                err @ (RunError::VmUnsupported(_) | RunError::Unsupported(_) | RunError::Commit(_)),
+            ) => return Err(err.to_string()),
+        };
+        Err(execution_error(&vm_error, verbose).to_string())
+    }
+
     /// Pairs each BCS return value with the layout V1's renderer needs.
     fn serialized_return_values(
         &self,
@@ -235,6 +256,16 @@ impl MonoVMTestAdapter<'_> {
             return_values,
         })
     }
+}
+
+/// Rejects gas budgets when callers bypass `supports_source`. Unmetered
+/// execution may not terminate where V1 stops with `OUT_OF_GAS`.
+fn gas_budget_error(gas_budget: Option<u64>) -> Option<String> {
+    gas_budget.map(|budget| {
+        format!(
+            "Error: the MonoVM adapter runs unmetered and cannot apply a gas budget of {budget}"
+        )
+    })
 }
 
 /// V1's `VMError` for an abort. V1 attributes a native abort to the native's

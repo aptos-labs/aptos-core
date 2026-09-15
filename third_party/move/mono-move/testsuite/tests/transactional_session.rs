@@ -3,14 +3,18 @@
 
 //! Tests [`TransactionalSession`]: publishing replaces stored bytes on a
 //! compatible upgrade and preserves them when V1 rejects an incompatible
-//! upgrade; running commits resource writes only when the call succeeds.
+//! upgrade; running a function or a script commits resource writes only when
+//! the call succeeds.
 
 use bytes::Bytes;
+use mono_move_output::v1_error::describe_or_fallback;
 use mono_move_testsuite::{
-    compile_move_source, function_def_index, ArgumentError, PublishError, RunError, RunOutcome,
-    TransactionalSession,
+    compile_move_script, compile_move_source, function_def_index, ArgumentError, PublishError,
+    RunError, RunOutcome, TransactionalSession,
 };
-use move_binary_format::{compatibility::Compatibility, CompiledModule};
+use move_binary_format::{
+    compatibility::Compatibility, file_format::FunctionDefinitionIndex, CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -45,6 +49,11 @@ const COUNTER: &str = r#"module 0x42::m {
     public fun bump_then_abort(addr: address) acquires Counter { bump(addr); abort 7 }
 }"#;
 
+const INIT_SCRIPT: &str = "script { fun main(account: &signer) { 0x42::m::init(account) } }";
+const BUMP_SCRIPT: &str = "script { fun main(addr: address) { 0x42::m::bump(addr) } }";
+const BUMP_THEN_ABORT_SCRIPT: &str =
+    "script { fun main(addr: address) { 0x42::m::bump(addr); abort 9 } }";
+
 fn session() -> TransactionalSession {
     TransactionalSession::new(&TestRunConfig::default().vm_config)
 }
@@ -60,6 +69,14 @@ fn serialized(module: &CompiledModule) -> Bytes {
     let mut bytes = vec![];
     module.serialize(&mut bytes).expect("the module serializes");
     bytes.into()
+}
+
+/// Compiles and serializes `source` against the counter module.
+fn script(source: &str) -> Vec<u8> {
+    let script = compile_move_script(&format!("{COUNTER}\n{source}")).expect("the script compiles");
+    let mut bytes = vec![];
+    script.serialize(&mut bytes).expect("the script serializes");
+    bytes
 }
 
 /// A session with `source` published, and the module it compiled to.
@@ -234,6 +251,84 @@ fn a_signer_on_an_address_parameter_is_undecodable() {
         RunError::Arguments(error) => assert_eq!(error, ArgumentError::Undecodable),
         other => panic!("expected an argument error, got {other}"),
     }
+}
+
+/// Script signers precede BCS arguments, and successful runs commit writes.
+#[test]
+fn a_successful_script_commits_its_writes_for_later_runs() {
+    let (mut session, _) = session_with(COUNTER);
+    session
+        .run_script(&script(INIT_SCRIPT), &[], &[ADDRESS], &[])
+        .expect("the init script runs");
+    assert_eq!(read_counter(&mut session), 1);
+
+    session
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .expect("the bump script runs");
+    assert_eq!(read_counter(&mut session), 2);
+}
+
+/// An abort in script code has `AbortLocation::Script` and function definition
+/// index zero, and discards the run's resource writes.
+#[test]
+fn a_script_abort_is_located_at_the_script_and_discards_its_writes() {
+    let (mut session, _) = session_with(COUNTER);
+    run(&mut session, ident_str!("init"), &[ADDRESS], &[]).expect("`init` runs");
+
+    let outcome = session
+        .run_script(&script(BUMP_THEN_ABORT_SCRIPT), &[], &[], &[address_arg()])
+        .expect("an abort is an outcome, not an error");
+    match outcome {
+        RunOutcome::Aborted {
+            code,
+            location,
+            offset,
+            ..
+        } => {
+            assert_eq!(code, 9);
+            assert_eq!(location, AbortLocation::Script);
+            let (function, _) = offset.expect("a Move-level abort names its instruction");
+            assert_eq!(function, FunctionDefinitionIndex(0));
+        },
+        RunOutcome::Success { .. } => panic!("the script aborts"),
+    }
+    assert_eq!(read_counter(&mut session), 1);
+}
+
+/// Returns the V1 status for `RunError::Vm`; panics on other error variants.
+fn vm_status(error: RunError) -> StatusCode {
+    match error {
+        RunError::Vm(error) => describe_or_fallback(&error).status,
+        other => panic!("expected a VM error, got {other}"),
+    }
+}
+
+#[test]
+fn an_undeserializable_script_is_a_vm_error() {
+    let mut session = session();
+    let error = session
+        .run_script(&[0xFF, 0x00], &[], &[], &[])
+        .expect_err("garbage is not a script");
+    assert_eq!(vm_status(error), StatusCode::CODE_DESERIALIZATION_ERROR);
+}
+
+#[test]
+fn a_script_whose_module_is_unpublished_fails_to_link() {
+    let mut session = session();
+    let error = session
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .expect_err("nothing is published");
+    assert_eq!(vm_status(error), StatusCode::LINKER_ERROR);
+}
+
+/// The script names `m::bump`, which the published `m` lacks.
+#[test]
+fn a_script_naming_a_missing_function_fails_verification() {
+    let (mut session, _) = session_with(ORIGINAL);
+    let error = session
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .expect_err("`bump` is not in the published module");
+    assert_eq!(vm_status(error), StatusCode::LOOKUP_FAILED);
 }
 
 /// The count check precedes the call, so a miscounted `bump` leaves the
