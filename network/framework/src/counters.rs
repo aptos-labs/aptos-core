@@ -388,6 +388,18 @@ pub static PENDING_NETWORK_NOTIFICATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Messages shed when a peer already occupies its deserialization slot and its
+/// single pending slot. This prevents one peer from monopolizing decode workers
+/// or moving an unbounded raw-message backlog into the application stream.
+pub static NETWORK_DESERIALIZATION_BACKPRESSURE_DROPS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_deserialization_backpressure_drops",
+        "Number of inbound messages dropped by per-peer deserialization backpressure",
+        &["protocol_id"]
+    )
+    .unwrap()
+});
+
 /// Counter of pending requests in Network Provider
 pub static PENDING_NETWORK_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
