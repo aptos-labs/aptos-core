@@ -102,6 +102,10 @@ module aptos_trading::order_book_types {
         }
     }
 
+    spec time_in_force_from_index {
+        aborts_if index > 2;
+    }
+
     #[test_only]
     public fun time_in_force_to_index(self: &TimeInForce): u8 {
         match(self) { GTC => 0, POST_ONLY => 1, IOC => 2 }
