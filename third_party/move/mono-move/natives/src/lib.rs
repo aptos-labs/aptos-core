@@ -12,11 +12,11 @@ use mono_move_core::native::NativeContextFamily;
 pub use mono_move_core::native::{Dispatch, NativeFunction, NativeName};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
-mod address_derivation;
 pub mod aggregator_v2;
 pub mod aptos_hash;
 pub mod bcs;
 pub mod bls12381;
+pub mod bulletproofs;
 pub mod cmp;
 pub mod consensus_config;
 pub mod ed25519;
@@ -49,6 +49,9 @@ pub use bcs::make_all_bcs_natives;
 pub use bls12381::make_all_bls12381_natives;
 #[cfg(feature = "testing")]
 pub use bls12381::make_all_bls12381_test_natives;
+pub use bulletproofs::make_all_bulletproofs_natives;
+#[cfg(feature = "testing")]
+pub use bulletproofs::make_all_bulletproofs_test_natives;
 pub use cmp::make_all_cmp_natives;
 pub use consensus_config::make_all_consensus_config_natives;
 pub use ed25519::make_all_ed25519_natives;
@@ -74,7 +77,9 @@ pub use state_storage::{make_all_state_storage_natives, StorageUsageAtEpochBound
 pub use string::make_all_string_natives;
 pub use table::make_all_table_natives;
 #[cfg(feature = "testing")]
-pub use test_natives::{make_all_test_natives, native_u64_add, native_u64_identity};
+pub use test_natives::{
+    make_all_test_natives, native_split_bytes, native_u64_add, native_u64_identity,
+};
 pub use transaction_context::{make_all_transaction_context_natives, TransactionContextExtension};
 pub use type_info::make_all_type_info_natives;
 #[cfg(feature = "testing")]
@@ -111,6 +116,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_bls12381_natives::<F>());
     natives.extend(make_all_ristretto255_scalar_natives::<F>());
     natives.extend(make_all_ristretto255_point_natives::<F>());
+    natives.extend(make_all_bulletproofs_natives::<F>());
     natives.extend(make_all_vector_natives::<F>());
     natives
 }
