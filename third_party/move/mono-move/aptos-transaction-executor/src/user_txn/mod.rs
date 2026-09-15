@@ -3,6 +3,7 @@
 
 //! Execution of user transactions.
 
+mod arg_check;
 mod args;
 mod entry_func;
 mod execute;

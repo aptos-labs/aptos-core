@@ -25,9 +25,27 @@ pub(super) fn leading_signer_params(param_tys: &[InternedType]) -> Result<usize,
     Ok(signer_params)
 }
 
+/// Checks that the arguments and signers fill the parameters exactly: a
+/// function with signer parameters requires exactly that many signers, while
+/// one without ignores them.
+pub(super) fn check_arg_counts(
+    param_tys: &[InternedType],
+    signer_params: usize,
+    secondary_signers: &[AccountAddress],
+    args: &[Vec<u8>],
+) -> Result<(), InvalidArguments> {
+    if args.len() != param_tys.len() - signer_params {
+        return Err(InvalidArguments::ArgumentCountMismatch);
+    }
+    if signer_params > 0 && 1 + secondary_signers.len() != signer_params {
+        return Err(InvalidArguments::SignerCountMismatch);
+    }
+    Ok(())
+}
+
 /// Fills the call in parameter order: the `signer_params` leading signer
 /// parameters from the sender and secondary signers, everything else from the
-/// transaction's BCS arguments.
+/// transaction's BCS arguments. The counts must already have been checked.
 pub(super) fn place_user_txn_args<'a>(
     call: &mut CallBuilder<'a, '_>,
     signer_params: usize,
@@ -35,19 +53,6 @@ pub(super) fn place_user_txn_args<'a>(
     secondary_signers: &'a [AccountAddress],
     args: &[Vec<u8>],
 ) -> Result<(), MoveExecutionFailure> {
-    // Like AptosVM, check both counts before decoding any argument: a function
-    // with signer parameters requires exactly that many signers, while one
-    // without ignores them.
-    if args.len() != call.param_tys().len() - signer_params {
-        return Err(MoveExecutionFailure::InvalidArguments(
-            InvalidArguments::ArgumentCountMismatch,
-        ));
-    }
-    if signer_params > 0 && 1 + secondary_signers.len() != signer_params {
-        return Err(MoveExecutionFailure::InvalidArguments(
-            InvalidArguments::SignerCountMismatch,
-        ));
-    }
     // The sender fills the first signer parameter, secondary signers the
     // rest. Placing a signer can only fail on a bug.
     for signer in std::iter::once(sender)

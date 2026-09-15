@@ -133,6 +133,14 @@ pub enum InvalidArguments {
     ArgumentCountMismatch,
     /// The signer count does not match the function's signer parameters.
     SignerCountMismatch,
+    /// A `String` argument is not valid UTF-8.
+    MalformedString,
+    /// An `Object<T>` argument names an address holding no object.
+    ObjectDoesNotExist,
+    /// An `Object<T>` argument names an object holding no `T`.
+    ObjectLacksResource,
+    /// An argument holds more objects than one argument may check.
+    TooManyObjectChecks,
     /// An argument's bytes do not decode to its parameter's type.
     UndecodableArgument,
 }

@@ -504,6 +504,17 @@ impl<'guard> InterpreterContext<'guard> {
         self.prepared_module(func.module_id)
     }
 
+    /// The module `module_id` names, loaded into this transaction's read set
+    /// if it is not there yet.
+    pub fn load_module(&mut self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
+        let id = self.loader.guard().arena_ref_for_module_id(module_id);
+        if self.read_set.get(id).is_none() {
+            self.loader
+                .load_module(&mut self.read_set, &mut self.gas_meter, id)?;
+        }
+        self.prepared_module(module_id)
+    }
+
     /// A module some loaded function came from. Loading the function loaded
     /// its module into the read set, so a miss is an invariant violation.
     fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
@@ -530,6 +541,20 @@ impl<'guard> InterpreterContext<'guard> {
     /// resource's defining module, which must be available.
     fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
         resolve_resource_group!(self, ty)
+    }
+
+    /// Whether a resource of type `ty` exists at `address`, recording the read.
+    /// Loads the type's defining module and publishes its layout if this
+    /// transaction has not yet.
+    pub fn resource_exists(&mut self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
+        self.loader
+            .publish_resource_type(&mut self.read_set, &mut self.gas_meter, ty)?;
+        let group = self.resource_group_of(ty)?;
+        Ok(self.read_write_set.exists(
+            self.resource_provider,
+            &InMemoryStorageKey::resource(address, ty),
+            group,
+        )?)
     }
 
     /// Returns the transaction's read-set.

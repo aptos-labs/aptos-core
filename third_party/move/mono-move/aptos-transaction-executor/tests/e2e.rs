@@ -29,7 +29,10 @@ use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, TxnOutcome,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use move_core_types::{transaction_argument::TransactionArgument, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, transaction_argument::TransactionArgument,
+    vm_status::StatusCode,
+};
 use std::collections::BTreeMap;
 
 /// Event types whose payload embeds gas amounts.
@@ -773,8 +776,16 @@ entry public fun takes_option_of_private(o: option::Option<Private>)
 fn publish_uncallable_module(
     fx: &mut FakeExecutor,
 ) -> move_core_types::account_address::AccountAddress {
-    let (module, blob) =
-        aptos_language_e2e_tests::compile::compile_module(UNCALLABLE_ENTRY_FUNCTIONS);
+    publish_module(fx, UNCALLABLE_ENTRY_FUNCTIONS)
+}
+
+/// Assembles the MASM module `code` and publishes it straight into `fx`'s
+/// state, returning the module's address.
+fn publish_module(
+    fx: &mut FakeExecutor,
+    code: &str,
+) -> move_core_types::account_address::AccountAddress {
+    let (module, blob) = aptos_language_e2e_tests::compile::compile_module(code);
     fx.add_module(&module.self_id(), blob.into_inner());
     *module.self_id().address()
 }
@@ -888,6 +899,491 @@ fn native_function_rejected_like_v1() {
         txn,
         StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED,
     );
+}
+
+/// Entry functions taking the framework types whose values the argument
+/// constructors check.
+const CONSTRUCTED_ARGUMENT_FUNCTIONS: &str = r#"
+module 0xcafe::constructed
+use 0x1::string
+use 0x1::option
+use 0x1::object
+use 0x1::fungible_asset
+
+entry public fun takes_string(s: string::String)
+    ret
+
+entry public fun takes_option_string(o: option::Option<string::String>)
+    ret
+
+entry public fun takes_strings(v: vector<string::String>)
+    ret
+
+entry public fun takes_object(o: object::Object<object::ObjectCore>)
+    ret
+
+entry public fun takes_objects(v: vector<object::Object<object::ObjectCore>>)
+    ret
+
+entry public fun takes_store(o: object::Object<fungible_asset::FungibleStore>)
+    ret
+"#;
+
+/// The APT fungible-asset metadata object, created at genesis.
+const APT_METADATA_OBJECT: AccountAddress = AccountAddress::TEN;
+
+/// Asserts that v1 keeps `txn` with a Move abort raised in the framework
+/// module `v1_module` with `v1_code`, and that v2 keeps it with
+/// `FAILED_TO_DESERIALIZE_ARGUMENT`: v2 checks the value itself instead of
+/// running the framework's constructor.
+fn assert_constructor_abort_on_v1_and_code_on_v2(
+    fx: &FakeExecutor,
+    txn: SignedTransaction,
+    v1_module: &str,
+    v1_code: u64,
+) {
+    use move_core_types::vm_status::AbortLocation;
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert!(
+        matches!(
+            v1_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: AbortLocation::Module(module),
+                code,
+                ..
+            }) if module.name().as_str() == v1_module && *code == v1_code
+        ),
+        "v1 did not abort in {v1_module} with {v1_code}: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+        )))
+    );
+
+    // Write sets are not compared: the statuses differ by design.
+}
+
+/// Runs `txn` on v1, asserting that it succeeds.
+fn run_on_v1(fx: &FakeExecutor, txn: &SignedTransaction) -> TransactionOutput {
+    let output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 did not run the transaction: {:?}",
+        output.status()
+    );
+    output
+}
+
+/// Asserts that both VMs run `txn` successfully with the same output.
+fn assert_success_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedTransaction) {
+    let v1_output = run_on_v1(fx, &txn);
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *sender.address());
+}
+
+/// Valid `String` arguments run like on v1.
+#[test]
+fn valid_strings_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_strings", vec![
+        bcs::to_bytes(&vec!["hi", "yo"]).unwrap(),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A `String` argument that is not valid UTF-8 is refused.
+#[test]
+fn malformed_string_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_string", vec![
+        bcs::to_bytes(&vec![0xFFu8, 0xFE]).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
+}
+
+/// A malformed `String` nested in a `Some` is refused.
+#[test]
+fn malformed_string_in_option_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    // `Some("\xff")`: the tag, then a one-byte string.
+    let txn = call_txn(&alice, address, "constructed", "takes_option_string", vec![
+        vec![0x01, 0x01, 0xFF],
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
+}
+
+/// An `Option` argument holding two values is refused.
+#[test]
+fn over_long_option_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    // Two strings where `None` or `Some` should be.
+    let txn = call_txn(&alice, address, "constructed", "takes_option_string", vec![
+        bcs::to_bytes(&vec!["a", "b"]).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "option", 0x40002);
+}
+
+/// An `Object<T>` argument naming an existing object of type `T` runs like on
+/// v1.
+#[test]
+fn existing_object_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_object", vec![
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// An `Object<T>` argument naming an address holding no object is refused.
+#[test]
+fn object_at_plain_address_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_object", vec![
+        bcs::to_bytes(alice.address()).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "object", 0x60002);
+}
+
+/// An `Object<T>` argument naming an object that holds no `T` is refused.
+#[test]
+fn object_lacking_resource_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "constructed", "takes_store", vec![
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
+    ]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "object", 0x60007);
+}
+
+/// An argument holding as many objects as one argument may check runs like on
+/// v1, and one more is refused like on v1.
+#[test]
+fn object_check_bound_matches_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, CONSTRUCTED_ARGUMENT_FUNCTIONS);
+    let objects = |n: usize| bcs::to_bytes(&vec![APT_METADATA_OBJECT; n]).unwrap();
+
+    let txn = call_txn(&alice, address, "constructed", "takes_objects", vec![
+        objects(32),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+
+    let txn = call_txn(&alice, address, "constructed", "takes_objects", vec![
+        objects(33),
+    ]);
+    assert_kept_with_code_like_v1(&fx, &alice, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// Public structs and enums, and entry functions taking them. A struct is
+/// public when its module has a `pack$` function for it; `Partial` has one
+/// for only one variant, `Private` has none, and `Keyed` may not have one.
+const PUBLIC_STRUCT_FUNCTIONS: &str = r#"
+module 0xcafe::pubs
+use 0x1::string
+use 0x1::option
+use 0x1::object
+
+struct Bar has copy+drop
+  n: u64
+
+struct Foo has copy+drop
+  x: string::String
+  y: Bar
+
+enum Shape has copy+drop
+  Circle
+    r: u64
+  Label
+    s: string::String
+
+enum Partial has copy+drop
+  A
+    v: u64
+  B
+    w: u64
+
+struct Private has copy+drop
+  v: u64
+
+struct Keyed has key+copy+drop
+  v: u64
+
+struct NoCopy has drop
+  v: u64
+
+struct Box<T> has copy+drop
+  t: T
+
+#[pack] public fun pack$Bar(l0: u64): Bar
+    move_loc l0
+    pack Bar
+    ret
+
+#[pack] public fun pack$Foo(l0: string::String, l1: Bar): Foo
+    move_loc l0
+    move_loc l1
+    pack Foo
+    ret
+
+#[pack_variant(0)] public fun pack$Shape$Circle(l0: u64): Shape
+    move_loc l0
+    pack_variant Shape, Circle
+    ret
+
+#[pack_variant(1)] public fun pack$Shape$Label(l0: string::String): Shape
+    move_loc l0
+    pack_variant Shape, Label
+    ret
+
+#[pack_variant(0)] public fun pack$Partial$A(l0: u64): Partial
+    move_loc l0
+    pack_variant Partial, A
+    ret
+
+#[pack] public fun pack$NoCopy(l0: u64): NoCopy
+    move_loc l0
+    pack NoCopy
+    ret
+
+#[pack] public fun pack$Box<T>(l0: T): Box<T>
+    move_loc l0
+    pack Box<T>
+    ret
+
+entry public fun takes_foo(f: Foo)
+    ret
+
+entry public fun takes_foos(v: vector<Foo>)
+    ret
+
+entry public fun takes_opt_foo(o: option::Option<Foo>)
+    ret
+
+entry public fun takes_shape(s: Shape)
+    ret
+
+entry public fun takes_partial(p: Partial)
+    ret
+
+entry public fun takes_private(p: Private)
+    ret
+
+entry public fun takes_keyed(k: Keyed)
+    ret
+
+entry public fun takes_nocopy(n: NoCopy)
+    ret
+
+entry public fun takes_box_string(b: Box<string::String>)
+    ret
+
+entry public fun takes_box_private(b: Box<Private>)
+    ret
+
+entry public fun takes_boxed_objects(v: vector<Box<object::Object<object::ObjectCore>>>)
+    ret
+"#;
+
+/// The BCS of `Foo { x, y: Bar { n } }`.
+fn foo_bytes(x: &[u8], n: u64) -> Vec<u8> {
+    [
+        bcs::to_bytes(&x.to_vec()).unwrap(),
+        bcs::to_bytes(&n).unwrap(),
+    ]
+    .concat()
+}
+
+/// Asserts that v1 runs `txn` while v2 keeps it with the miscellaneous error
+/// `code`.
+fn assert_v1_runs_and_v2_rejects(fx: &FakeExecutor, txn: SignedTransaction, code: StatusCode) {
+    run_on_v1(fx, &txn);
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
+    );
+}
+
+/// A public struct argument runs like on v1.
+#[test]
+fn public_struct_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_foo", vec![foo_bytes(
+        b"hi", 7,
+    )]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A malformed `String` field of a public struct is refused.
+#[test]
+fn malformed_string_in_public_struct_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_foo", vec![foo_bytes(
+        &[0xFF, 0xFE],
+        7,
+    )]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
+}
+
+/// A malformed `String` in the second of two public structs in a vector is
+/// refused.
+#[test]
+fn malformed_string_in_vector_of_public_structs_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_foos", vec![[
+        vec![0x02],
+        foo_bytes(b"hi", 7),
+        foo_bytes(&[0xFF, 0xFE], 8),
+    ]
+    .concat()]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
+}
+
+/// An `Option` of a public struct runs like on v1, whether `Some` or `None`.
+#[test]
+fn option_of_public_struct_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+
+    let txn = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![[
+        vec![0x01],
+        foo_bytes(b"hi", 7),
+    ]
+    .concat()]);
+    assert_success_like_v1(&fx, &alice, txn);
+
+    let txn = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![vec![0x00]]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A public enum argument runs like on v1, for each variant.
+#[test]
+fn public_enum_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+
+    let circle = [vec![0x00], bcs::to_bytes(&1u64).unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![circle]);
+    assert_success_like_v1(&fx, &alice, txn);
+
+    let label = [vec![0x01], bcs::to_bytes("hi").unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![label]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// A malformed `String` field of a public enum variant is refused.
+#[test]
+fn malformed_string_in_public_enum_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![vec![
+        0x01, 0x02, 0xFF, 0xFE,
+    ]]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "string", 1);
+}
+
+/// An enum tag naming no variant is refused like on v1.
+#[test]
+fn public_enum_bad_tag_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![[
+        vec![0x02],
+        bcs::to_bytes(&1u64).unwrap(),
+    ]
+    .concat()]);
+    assert_kept_with_code_like_v1(&fx, &alice, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
+}
+
+/// An enum missing a variant's pack function is refused whatever the value,
+/// where v1 refuses only a value of the variant that lacks it.
+#[test]
+fn partially_packable_enum_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+
+    let a = [vec![0x00], bcs::to_bytes(&5u64).unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_partial", vec![a]);
+    assert_v1_runs_and_v2_rejects(&fx, txn, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+
+    let b = [vec![0x01], bcs::to_bytes(&5u64).unwrap()].concat();
+    let txn = call_txn(&alice, address, "pubs", "takes_partial", vec![b]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// Structs a transaction may not construct are refused like on v1: one
+/// without a pack function, one with `key`, one without `copy`, and a public
+/// struct wrapping the first.
+#[test]
+fn unconstructible_structs_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    for function in [
+        "takes_private",
+        "takes_keyed",
+        "takes_nocopy",
+        "takes_box_private",
+    ] {
+        let txn = call_txn(&alice, address, "pubs", function, vec![bcs::to_bytes(
+            &5u64,
+        )
+        .unwrap()]);
+        assert_kept_with_code_like_v1(
+            &fx,
+            &alice,
+            txn,
+            StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+        );
+    }
+}
+
+/// A generic public struct instantiated with an allowed type runs like on v1.
+#[test]
+fn generic_public_struct_accepted_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_box_string", vec![
+        bcs::to_bytes("hi").unwrap(),
+    ]);
+    assert_success_like_v1(&fx, &alice, txn);
+}
+
+/// An `Object<T>` nested in a public struct inside a vector is checked.
+#[test]
+fn object_in_public_struct_rejected() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_module(&mut fx, PUBLIC_STRUCT_FUNCTIONS);
+    let txn = call_txn(&alice, address, "pubs", "takes_boxed_objects", vec![[
+        vec![0x02],
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
+        bcs::to_bytes(alice.address()).unwrap(),
+    ]
+    .concat()]);
+    assert_constructor_abort_on_v1_and_code_on_v2(&fx, txn, "object", 0x60002);
 }
 
 /// Transactions violating the pre-execution gas bounds expressible by the

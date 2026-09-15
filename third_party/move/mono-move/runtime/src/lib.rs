@@ -28,5 +28,5 @@ pub use native_context::{
     ProductionNativeRegistry,
 };
 pub use types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use value_conv::bcs::{deserialize_into, serialize};
+pub use value_conv::bcs::{deserialize_into, read_slice, read_uleb128_len, serialize};
 pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};

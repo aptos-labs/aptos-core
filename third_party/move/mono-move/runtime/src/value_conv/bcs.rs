@@ -417,12 +417,10 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
             if tag >= variants.len() as u64 {
-                return Err(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag,
-                        variant_count: variants.len(),
-                    },
-                )
+                return Err(RuntimeError::BCSInvalidEnumTag {
+                    tag,
+                    variant_count: variants.len(),
+                }
                 .into());
             }
 
@@ -468,7 +466,11 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
 
 /// Borrows the next `n` bytes, advancing the cursor. Returns an error if
 /// there is not enough bytes to read or the size of the slice overflows.
-fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> Result<&'b [u8], RuntimeError> {
+pub fn read_slice<'b>(
+    bytes: &'b [u8],
+    cursor: &mut usize,
+    n: usize,
+) -> Result<&'b [u8], RuntimeError> {
     let end = cursor.checked_add(n).ok_or(RuntimeError::BCSEof)?;
     if end > bytes.len() {
         return Err(RuntimeError::BCSEof);
@@ -500,7 +502,7 @@ fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
 /// if:
 /// - data is not a valid ULEB128,
 /// - end of input is unexpectedly reached.
-fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
+pub fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
     let mut result = 0u64;
     let mut shift = 0u32;
     loop {
