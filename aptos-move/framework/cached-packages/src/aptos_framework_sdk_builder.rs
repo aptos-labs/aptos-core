@@ -417,6 +417,21 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    /// Reclaim the record of an expired allowance. Anyone may call this: an expired allowance can never
+    /// be redeemed again, so dropping what is tracked about it changes nothing. Revoked records are kept
+    /// instead of reclaimed, because the payload they block carries an expiration this module never saw.
+    AuthorizedAllowanceRemoveExpired {
+        sender: AccountAddress,
+        nonce: u64,
+    },
+
+    /// Invalidate the allowance issued under `nonce`, whether or not it has been redeemed. This holds
+    /// even if the payload has not been submitted yet, so a sender who loses track of a signature can
+    /// still take it out of circulation before it expires.
+    AuthorizedAllowanceRevoke {
+        nonce: u64,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -1535,6 +1550,10 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
+            AuthorizedAllowanceRemoveExpired { sender, nonce } => {
+                authorized_allowance_remove_expired(sender, nonce)
+            },
+            AuthorizedAllowanceRevoke { nonce } => authorized_allowance_revoke(nonce),
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -3077,6 +3096,48 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
         ],
+    ))
+}
+
+/// Reclaim the record of an expired allowance. Anyone may call this: an expired allowance can never
+/// be redeemed again, so dropping what is tracked about it changes nothing. Revoked records are kept
+/// instead of reclaimed, because the payload they block carries an expiration this module never saw.
+pub fn authorized_allowance_remove_expired(
+    sender: AccountAddress,
+    nonce: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("authorized_allowance").to_owned(),
+        ),
+        ident_str!("remove_expired").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&sender).unwrap(),
+            bcs::to_bytes(&nonce).unwrap(),
+        ],
+    ))
+}
+
+/// Invalidate the allowance issued under `nonce`, whether or not it has been redeemed. This holds
+/// even if the payload has not been submitted yet, so a sender who loses track of a signature can
+/// still take it out of circulation before it expires.
+pub fn authorized_allowance_revoke(nonce: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("authorized_allowance").to_owned(),
+        ),
+        ident_str!("revoke").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&nonce).unwrap()],
     ))
 }
 
@@ -6290,6 +6351,29 @@ mod decoder {
         }
     }
 
+    pub fn authorized_allowance_remove_expired(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AuthorizedAllowanceRemoveExpired {
+                sender: bcs::from_bytes(script.args().get(0)?).ok()?,
+                nonce: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn authorized_allowance_revoke(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AuthorizedAllowanceRevoke {
+                nonce: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -8016,6 +8100,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
+        );
+        map.insert(
+            "authorized_allowance_remove_expired".to_string(),
+            Box::new(decoder::authorized_allowance_remove_expired),
+        );
+        map.insert(
+            "authorized_allowance_revoke".to_string(),
+            Box::new(decoder::authorized_allowance_revoke),
         );
         map.insert(
             "code_publish_package_txn".to_string(),
