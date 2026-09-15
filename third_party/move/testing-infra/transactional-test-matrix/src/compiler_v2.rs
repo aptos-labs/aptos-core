@@ -4,9 +4,11 @@
 //! The Compiler V2 transactional-test corpus: Move sources compiled by
 //! Compiler V2 and run on the VM, plus Lean sources under `tests/leaner/`.
 
-use crate::{Applicability, Corpus, MatrixConfig, VmBackend};
+use crate::{Applicability, Corpus, MatrixConfig, Resolution, VmBackend};
+use move_command_line_common::testing::EXP_EXT;
 use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
+use move_transactional_test_runner::{tasks::SyntaxChoice, vm_test_harness::TestRunConfig};
 
 /// Settings specific to this corpus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +29,33 @@ fn effective_payload(payload: &CompilerV2Payload, backend: VmBackend) -> Compile
     }
 }
 
+impl Resolution<'_, CompilerV2Payload> {
+    /// Builds run settings for this source/config pair and VM backend.
+    /// Cross-compiled output depends on compiler settings, so its baseline
+    /// suffix always includes the config name.
+    pub fn test_run_config(&self) -> TestRunConfig {
+        let experiments = self
+            .config
+            .experiments
+            .iter()
+            .map(|(name, value)| (name.to_string(), *value))
+            .collect();
+        let run_config =
+            TestRunConfig::new(self.config.language_version, experiments).with_runtime_ref_checks();
+        if self.effective_payload.cross_compile {
+            run_config.cross_compile_into(
+                SyntaxChoice::Source,
+                true,
+                self.canonical_exp_suffix
+                    .clone()
+                    .or_else(|| Some(format!("{}.{}", self.config.name, EXP_EXT))),
+            )
+        } else {
+            run_config
+        }
+    }
+}
+
 /// Excluded by every config that takes all tests: these directories are served
 /// by the specialized configs below, which need non-default settings.
 const COMMON_EXCLUSIONS: &[&str] = &[
@@ -44,6 +73,9 @@ const COMMON_EXCLUSIONS: &[&str] = &[
 /// Lean sources need the `lake` toolchain, which MonoMove CI does not install.
 /// They compile to ordinary Move bytecode, so we can change this in the future.
 const LEAN_ONLY: Applicability = Applicability::Deferred("requires the lake toolchain");
+
+/// Only the `baseline` config is enabled for MonoMove.
+const LATER_TIER: Applicability = Applicability::Deferred("a later MonoMove rollout tier");
 
 const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
     // Matches all default experiments.
@@ -71,7 +103,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "no-optimize",
@@ -82,7 +114,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     // Lean-authored programs have their own front end and use one default
     // Compiler V2 configuration outside the generic optimization matrix.
@@ -129,7 +161,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "operator-eval-lang-2",
@@ -140,7 +172,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: true,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "no-recursive-check",
@@ -151,7 +183,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "no-access-check",
@@ -162,7 +194,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "no-recursive-type-check",
@@ -173,7 +205,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "public-struct",
@@ -184,7 +216,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "public-const",
@@ -195,7 +227,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "testing-constant-true",
@@ -206,7 +238,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     MatrixConfig {
         name: "testing-constant-false",
@@ -217,7 +249,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
     // Under language version 2.4, a `for` loop evaluates its upper bound inside
     // the iterator's scope.
@@ -230,7 +262,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: Applicability::Applicable,
+        mono_move: LATER_TIER,
     },
 ];
 
