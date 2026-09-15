@@ -9,8 +9,9 @@
 //! signal that the release executed. Add a real framework-code check in the
 //! future -- this may not be trivial and might require significant work.
 
-use crate::{bundle, network::NetworkSelection};
+use crate::network::NetworkSelection;
 use anyhow::{bail, Context, Result};
+use aptos_governance_bundle as bundle;
 use aptos_release_builder::components::fetch_config;
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_types::on_chain_config::GasScheduleV2;
@@ -23,7 +24,7 @@ pub async fn run(
 ) -> Result<()> {
     // Gate on the bundle's own integrity first, so we compare the chain against
     // trusted expected values.
-    crate::commands::verify::run(bundle_path, false)?;
+    crate::commands::verify_bundle::run(bundle_path, false)?;
 
     let mut client = Client::builder(AptosBaseUrl::Custom(network.to_url()?));
     if let Some(key) = node_api_key.as_ref() {
