@@ -83,7 +83,9 @@ macro_rules! resolve_resource_group {
             ));
         };
         let arena_ref = $ctx.loader.guard().arena_ref_for_module_id(*module_id);
-        Ok($ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name))
+        Ok::<Option<InternedType>, VMInternalError>(
+            $ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name),
+        )
     }};
 }
 
@@ -296,15 +298,15 @@ impl<'a> CallBuilder<'a, '_> {
 
     /// Places a BCS-encoded argument, running `check` on every typed nominal
     /// value decoded from it with the value's type and bytes. A failing check
-    /// fails the placement with the check's error.
+    /// ends the placement and is returned as the inner error.
     ///
     /// On error, the parameter slot is left partially written and the call
     /// must be abandoned.
-    pub fn arg_bcs_with(
+    pub fn arg_bcs_with<E>(
         &mut self,
         bytes: &[u8],
-        check: impl FnMut(&mut StorageReader<'_, '_>, InternedType, &[u8]) -> VMResult<()>,
-    ) -> VMResult<()> {
+        check: impl FnMut(&mut StorageReader<'_, '_>, InternedType, &[u8]) -> Result<(), E>,
+    ) -> VMResult<Result<(), E>> {
         let (dst, ty) = self.next_slot()?;
         let InterpreterContext {
             loader,
@@ -328,19 +330,14 @@ impl<'a> CallBuilder<'a, '_> {
         };
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
-        let result = unsafe {
-            value_conv::bcs::deserialize_into_with_hook(
-                loader.guard(),
-                heap,
-                ty,
-                bytes,
-                dst,
-                &mut hook,
-            )
+        let decoded = unsafe {
+            value_conv::bcs::deserialize_with_hook(loader.guard(), heap, ty, bytes, dst, &mut hook)
         };
         match hook.failure {
-            Some(failure) => Err(failure),
-            None => result,
+            Some(failure) => Ok(Err(failure)),
+            None => decoded
+                .map(Ok)
+                .map_err(|e| VMInternalError::new(e.into_runtime_error())),
         }
     }
 
@@ -371,21 +368,9 @@ impl StorageReader<'_, '_> {
     /// read. Publishes the type's layout and loads its module if lowered code
     /// has not done so yet.
     pub fn resource_exists(&mut self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
-        let Type::Nominal {
-            module_id, name, ..
-        } = view_type(ty)
-        else {
-            invariant_violation!(Unreachable(
-                "resource type must be a nominal type".to_string()
-            ));
-        };
-        let guard = self.loader.guard();
-        if guard.layout_id_for(ty).is_none() || guard.struct_descriptor(ty).is_none() {
-            self.loader
-                .publish_resource_type(self.read_set, self.gas_meter, ty)?;
-        }
-        let arena_ref = guard.arena_ref_for_module_id(*module_id);
-        let group = self.read_set.get_loaded(arena_ref)?.resource_group_of(name);
+        self.loader
+            .publish_resource_type(self.read_set, self.gas_meter, ty)?;
+        let group = resolve_resource_group!(self, ty)?;
         Ok(self.read_write_set.exists(
             self.resource_provider,
             &InMemoryStorageKey::resource(address, ty),
@@ -396,15 +381,15 @@ impl StorageReader<'_, '_> {
 
 /// Runs an argument check as a decode hook, keeping the check's error for the
 /// caller since the decoder can only carry a `RuntimeError`.
-struct CheckHook<'a, 'guard, F> {
+struct CheckHook<'a, 'guard, F, E> {
     storage: StorageReader<'a, 'guard>,
     check: F,
-    failure: Option<VMInternalError>,
+    failure: Option<E>,
 }
 
-impl<F> value_conv::bcs::DecodeHook for CheckHook<'_, '_, F>
+impl<F, E> value_conv::bcs::DecodeHook for CheckHook<'_, '_, F, E>
 where
-    F: FnMut(&mut StorageReader<'_, '_>, InternedType, &[u8]) -> VMResult<()>,
+    F: FnMut(&mut StorageReader<'_, '_>, InternedType, &[u8]) -> Result<(), E>,
 {
     const OBSERVES: bool = true;
 

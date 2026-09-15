@@ -34,6 +34,10 @@ pub enum LoaderError {
     #[error("Failed to lower function: {reason}")]
     LoweringSkipped { reason: &'static str },
 
+    /// A resource type whose layout or GC descriptor cannot be derived.
+    #[error("Resource type {ty} has no publishable layout")]
+    ResourceTypeNotPublishable { ty: String },
+
     #[error("Script does not deserialize: {message}")]
     ScriptDeserializationFailed { message: String },
 
@@ -59,7 +63,9 @@ impl IntoExecutionError for LoaderError {
             },
 
             // TODO(cleanup): delegate once GlobalContext has its own error type.
-            GlobalContext(_) | LoweringSkipped { .. } => ExecutionErrorKind::Placeholder,
+            GlobalContext(_) | LoweringSkipped { .. } | ResourceTypeNotPublishable { .. } => {
+                ExecutionErrorKind::Placeholder
+            },
 
             // TODO(cleanup): needs deserialization and verification categories.
             ScriptDeserializationFailed { .. } | ScriptVerificationFailed { .. } => {

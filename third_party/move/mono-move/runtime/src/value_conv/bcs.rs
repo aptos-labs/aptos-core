@@ -309,42 +309,8 @@ pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
     dst: *mut u8,
 ) -> VMResult<()> {
     // SAFETY: forwarded to the caller.
-    unsafe { deserialize_into_with_hook(layouts, heap, ty, bytes, dst, &mut NoHook) }
-}
-
-/// Like [`deserialize_into`], reporting each typed nominal value to `hook` as
-/// it is decoded.
-///
-/// # Safety
-///
-/// Same as [`deserialize_into`].
-pub(crate) unsafe fn deserialize_into_with_hook<T: LayoutProvider + ?Sized, H: DecodeHook>(
-    layouts: &T,
-    heap: &mut Heap,
-    ty: InternedType,
-    bytes: &[u8],
-    dst: *mut u8,
-    hook: &mut H,
-) -> VMResult<()> {
-    // SAFETY: forwarded to the caller.
-    unsafe { deserialize_with_hook(layouts, heap, ty, bytes, dst, hook) }
+    unsafe { deserialize(layouts, heap, ty, bytes, dst) }
         .map_err(|e| VMInternalError::new(e.into_runtime_error()))
-}
-
-/// # Safety
-///
-/// `dst` must be writable for `layout.size` bytes.
-#[cfg(test)]
-unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
-    layouts: &T,
-    heap: &mut Heap,
-    layout: &ValueLayout,
-    bytes: &[u8],
-    cursor: &mut usize,
-    dst: *mut u8,
-) -> AllocationResult<()> {
-    // SAFETY: forwarded to the caller.
-    unsafe { deserialize_impl_with_hook(layouts, heap, layout, bytes, cursor, dst, &mut NoHook) }
 }
 
 /// Whether a value of `layout` may be decoded by one copy of its BCS bytes.
@@ -355,17 +321,16 @@ fn blittable<H: DecodeHook>(layout: &ValueLayout) -> bool {
         && !(H::OBSERVES && matches!(layout.kind, LayoutKind::Struct { .. }))
 }
 
-/// Reports a decoded nominal value to `hook` if its layout has a type.
+/// Reports a nominal value decoded from `bytes` to `hook` if its layout has a
+/// type.
 fn observe<H: DecodeHook>(
     hook: &mut H,
     layout: &ValueLayout,
     bytes: &[u8],
-    start: usize,
-    end: usize,
 ) -> Result<(), RuntimeError> {
     if H::OBSERVES {
         if let Some(ty) = layout.ty {
-            hook.on_nominal(ty, &bytes[start..end])?;
+            hook.on_nominal(ty, bytes)?;
         }
     }
     Ok(())
@@ -442,7 +407,7 @@ unsafe fn deserialize_impl_with_hook<T: LayoutProvider + ?Sized, H: DecodeHook>(
                     )?
                 };
             }
-            observe(hook, layout, bytes, start, *cursor)?;
+            observe(hook, layout, &bytes[start..*cursor])?;
             Ok(())
         },
         LayoutKind::Vector {
@@ -557,7 +522,7 @@ unsafe fn deserialize_impl_with_hook<T: LayoutProvider + ?Sized, H: DecodeHook>(
                     hook,
                 )?
             };
-            observe(hook, layout, bytes, start, *cursor)?;
+            observe(hook, layout, &bytes[start..*cursor])?;
 
             // SAFETY: `dst` has space to write the 8-byte enum pointer as
             // guaranteed by the caller.
@@ -700,6 +665,23 @@ mod tests {
 
     fn ptr<T>(x: &T) -> *const u8 {
         x as *const T as *const u8
+    }
+
+    /// # Safety
+    ///
+    /// `dst` must be writable for `layout.size` bytes.
+    unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
+        layouts: &T,
+        heap: &mut Heap,
+        layout: &ValueLayout,
+        bytes: &[u8],
+        cursor: &mut usize,
+        dst: *mut u8,
+    ) -> AllocationResult<()> {
+        // SAFETY: forwarded to the caller.
+        unsafe {
+            deserialize_impl_with_hook(layouts, heap, layout, bytes, cursor, dst, &mut NoHook)
+        }
     }
 
     fn vector_layout(elem_id: LayoutId) -> ValueLayout {

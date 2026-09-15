@@ -836,8 +836,8 @@ fn assert_rejected_by_both(fx: &FakeExecutor, txn: SignedTransaction, code: Stat
     );
 }
 
-/// Asserts that both VMs run `txn` successfully with the same effects.
-fn assert_succeeds_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedTransaction) {
+/// Runs `txn` on v1, asserting it succeeds.
+fn assert_v1_succeeds(fx: &FakeExecutor, txn: &SignedTransaction) -> TransactionOutput {
     let v1_output = fx.execute_transaction(txn.clone());
     assert_eq!(
         v1_output.status(),
@@ -845,7 +845,12 @@ fn assert_succeeds_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedT
         "v1 refused the transaction: {:?}",
         v1_output.status()
     );
+    v1_output
+}
 
+/// Asserts that both VMs run `txn` successfully with the same effects.
+fn assert_succeeds_like_v1(fx: &FakeExecutor, sender: &AccountData, txn: SignedTransaction) {
+    let v1_output = assert_v1_succeeds(fx, &txn);
     let v2_output = execute_v2(fx.get_state_view(), &txn);
     assert_eq!(v2_output.status(), v1_output.status());
 
@@ -1171,14 +1176,7 @@ entry public fun takes_boxed_objects(v: vector<Box<object::Object<object::Object
 /// Asserts that v1 runs `txn` successfully while v2 keeps it with the
 /// miscellaneous error `code`: the cases where v2 is deliberately stricter.
 fn assert_v1_runs_but_v2_rejects(fx: &FakeExecutor, txn: SignedTransaction, code: StatusCode) {
-    let v1_output = fx.execute_transaction(txn.clone());
-    assert_eq!(
-        v1_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::Success),
-        "v1 refused the transaction: {:?}",
-        v1_output.status()
-    );
-
+    assert_v1_succeeds(fx, &txn);
     let v2_output = execute_v2(fx.get_state_view(), &txn);
     assert_eq!(
         v2_output.status(),
@@ -1186,21 +1184,18 @@ fn assert_v1_runs_but_v2_rejects(fx: &FakeExecutor, txn: SignedTransaction, code
     );
 }
 
-fn concat(parts: &[Vec<u8>]) -> Vec<u8> {
-    parts.concat()
-}
-
 /// `Foo { x: "hi", y: Bar { n: 7 } }`.
 fn valid_foo() -> Vec<u8> {
-    concat(&[bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&7u64).unwrap()])
+    [bcs::to_bytes("hi").unwrap(), bcs::to_bytes(&7u64).unwrap()].concat()
 }
 
 /// `Foo` with `x` that is not valid UTF-8.
 fn malformed_foo() -> Vec<u8> {
-    concat(&[
+    [
         bcs::to_bytes(&[0xFFu8, 0xFE].as_slice()).unwrap(),
         bcs::to_bytes(&7u64).unwrap(),
-    ])
+    ]
+    .concat()
 }
 
 /// A public struct argument runs like on v1.
@@ -1227,11 +1222,12 @@ fn malformed_string_in_public_struct_rejected() {
 fn malformed_string_in_public_struct_in_vector_rejected() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "pubs", "takes_foos", vec![concat(&[
+    let txn = call_txn(&alice, address, "pubs", "takes_foos", vec![[
         vec![0x02],
         valid_foo(),
         malformed_foo(),
-    ])]);
+    ]
+    .concat()]);
     assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
 }
 
@@ -1240,10 +1236,11 @@ fn malformed_string_in_public_struct_in_vector_rejected() {
 fn option_of_public_struct_accepted_like_v1() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let some = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![concat(&[
+    let some = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![[
         vec![0x01],
         valid_foo(),
-    ])]);
+    ]
+    .concat()]);
     assert_succeeds_like_v1(&fx, &alice, some);
     let none = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![vec![0x00]]);
     assert_succeeds_like_v1(&fx, &alice, none);
@@ -1254,15 +1251,17 @@ fn option_of_public_struct_accepted_like_v1() {
 fn public_enum_argument_accepted_like_v1() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let circle = call_txn(&alice, address, "pubs", "takes_shape", vec![concat(&[
+    let circle = call_txn(&alice, address, "pubs", "takes_shape", vec![[
         vec![0x00],
         bcs::to_bytes(&1u64).unwrap(),
-    ])]);
+    ]
+    .concat()]);
     assert_succeeds_like_v1(&fx, &alice, circle);
-    let label = call_txn(&alice, address, "pubs", "takes_shape", vec![concat(&[
+    let label = call_txn(&alice, address, "pubs", "takes_shape", vec![[
         vec![0x01],
         bcs::to_bytes("hi").unwrap(),
-    ])]);
+    ]
+    .concat()]);
     assert_succeeds_like_v1(&fx, &alice, label);
 }
 
@@ -1271,10 +1270,11 @@ fn public_enum_argument_accepted_like_v1() {
 fn malformed_string_in_public_enum_rejected() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![concat(&[
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![[
         vec![0x01],
         bcs::to_bytes(&[0xFFu8, 0xFE].as_slice()).unwrap(),
-    ])]);
+    ]
+    .concat()]);
     assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
 }
 
@@ -1284,10 +1284,11 @@ fn malformed_string_in_public_enum_rejected() {
 fn public_enum_out_of_range_tag_rejected_like_v1() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![concat(&[
+    let txn = call_txn(&alice, address, "pubs", "takes_shape", vec![[
         vec![0x02],
         bcs::to_bytes(&1u64).unwrap(),
-    ])]);
+    ]
+    .concat()]);
     assert_kept_with_code_like_v1(&fx, &alice, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
 }
 
@@ -1297,15 +1298,17 @@ fn public_enum_out_of_range_tag_rejected_like_v1() {
 fn enum_missing_variant_pack_function_refused() {
     let (mut fx, alice, _bob) = setup();
     let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let packable = call_txn(&alice, address, "pubs", "takes_partial", vec![concat(&[
+    let packable = call_txn(&alice, address, "pubs", "takes_partial", vec![[
         vec![0x00],
         bcs::to_bytes(&5u64).unwrap(),
-    ])]);
+    ]
+    .concat()]);
     assert_v1_runs_but_v2_rejects(&fx, packable, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
-    let unpackable = call_txn(&alice, address, "pubs", "takes_partial", vec![concat(&[
+    let unpackable = call_txn(&alice, address, "pubs", "takes_partial", vec![[
         vec![0x01],
         bcs::to_bytes(&5u64).unwrap(),
-    ])]);
+    ]
+    .concat()]);
     assert_kept_with_code_like_v1(
         &fx,
         &alice,
@@ -1356,13 +1359,12 @@ fn generic_public_struct_argument_accepted_like_v1() {
 fn object_in_public_struct_in_vector_rejected() {
     let (mut fx, alice, bob) = setup();
     let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "pubs", "takes_boxed_objects", vec![
-        concat(&[
-            vec![0x02],
-            bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
-            bcs::to_bytes(bob.address()).unwrap(),
-        ]),
-    ]);
+    let txn = call_txn(&alice, address, "pubs", "takes_boxed_objects", vec![[
+        vec![0x02],
+        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
+        bcs::to_bytes(bob.address()).unwrap(),
+    ]
+    .concat()]);
     assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
 }
 
