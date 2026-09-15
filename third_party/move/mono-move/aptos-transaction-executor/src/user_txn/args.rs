@@ -12,38 +12,36 @@ use move_core_types::account_address::AccountAddress;
 /// Counts the leading signer parameters, rejecting a signer that follows a
 /// non-signer parameter.
 pub(super) fn leading_signer_params(param_tys: &[InternedType]) -> Result<usize, InvalidArguments> {
-    let signer_params = param_tys
+    let num_signer_params = param_tys
         .iter()
         .take_while(|&&ty| is_signer_or_signer_immut_ref(ty))
         .count();
-    if param_tys[signer_params..]
+    if param_tys[num_signer_params..]
         .iter()
         .any(|&ty| is_signer_or_signer_immut_ref(ty))
     {
         return Err(InvalidArguments::SignerAfterArgument);
     }
-    Ok(signer_params)
+    Ok(num_signer_params)
 }
 
-/// Fills the call in parameter order: the `signer_params` leading signer
+/// Fills the call in parameter order: the `num_signer_params` leading signer
 /// parameters from the sender and secondary signers, everything else from the
 /// transaction's BCS arguments.
 pub(super) fn place_user_txn_args<'a>(
     call: &mut CallBuilder<'a, '_>,
-    signer_params: usize,
+    num_signer_params: usize,
     sender: &'a AccountAddress,
     secondary_signers: &'a [AccountAddress],
     args: &[Vec<u8>],
 ) -> Result<(), MoveExecutionFailure> {
-    // Like AptosVM, check both counts before decoding any argument: a function
-    // with signer parameters requires exactly that many signers, while one
-    // without ignores them.
-    if args.len() != call.param_tys().len() - signer_params {
+    // A function can take either all signers or none of them.
+    if args.len() != call.param_tys().len() - num_signer_params {
         return Err(MoveExecutionFailure::InvalidArguments(
             InvalidArguments::ArgumentCountMismatch,
         ));
     }
-    if signer_params > 0 && 1 + secondary_signers.len() != signer_params {
+    if num_signer_params > 0 && 1 + secondary_signers.len() != num_signer_params {
         return Err(MoveExecutionFailure::InvalidArguments(
             InvalidArguments::SignerCountMismatch,
         ));
@@ -52,7 +50,7 @@ pub(super) fn place_user_txn_args<'a>(
     // rest. Placing a signer can only fail on a bug.
     for signer in std::iter::once(sender)
         .chain(secondary_signers)
-        .take(signer_params)
+        .take(num_signer_params)
     {
         call.signer(signer)
             .map_err(MoveExecutionFailure::RuntimeError)?;

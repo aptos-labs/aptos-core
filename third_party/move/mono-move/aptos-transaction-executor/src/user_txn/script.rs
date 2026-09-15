@@ -42,14 +42,14 @@ pub(crate) fn run_script<'a>(
         .map_err(MoveExecutionFailure::RejectedScript)?;
     // TODO(correctness): like an entry function, a script must not return
     // values or take a parameter type a transaction argument cannot fill.
-    let signer_params =
+    let num_signer_params =
         leading_signer_params(&func.param_tys).map_err(MoveExecutionFailure::InvalidArguments)?;
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;
     place_user_txn_args(
         &mut call,
-        signer_params,
+        num_signer_params,
         sender,
         secondary_signers,
         &convert_txn_args(args),

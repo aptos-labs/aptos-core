@@ -4,25 +4,42 @@
 //! Running an entry-function payload.
 
 use super::args::{leading_signer_params, place_user_txn_args};
-use crate::{
-    calls::resolve_function_by_name,
-    errors::{InvalidArguments, MoveExecutionFailure},
-};
+use crate::errors::{InvalidArguments, MoveExecutionFailure};
 use mono_move_core::{
     interner::{view_module_id, InternedIdentifier, InternedModuleId},
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    Function, PreparedModule,
+    Interner, PreparedModule,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_loader::LoaderError;
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
-/// Checks that `func` is allowed to be called by a user transaction, returning
-/// the number of leading signer parameters.
+/// Checks that the function `def_idx` of `module` is one a user transaction
+/// may call.
+/// - It must not be a native.
 /// - It must be an entry function.
 /// - It must not return values.
+fn check_callable_definition(
+    module: &PreparedModule,
+    def_idx: FunctionDefinitionIndex,
+) -> Result<(), InvalidArguments> {
+    let def = module.function_def_at(def_idx);
+    if def.is_native() {
+        return Err(InvalidArguments::NativeEntryFunction);
+    }
+    if !def.is_entry {
+        return Err(InvalidArguments::NotEntryFunction);
+    }
+    let handle = module.function_handle_at(def.function);
+    if !module.interned_types_at(handle.return_).is_empty() {
+        return Err(InvalidArguments::ReturnsValues);
+    }
+    Ok(())
+}
+
+/// Checks that a user transaction can fill every parameter, returning the
+/// number of leading signer parameters.
 /// - All signers must be in leading positions.
 /// - All other parameters must be of the allowed types.
 //
@@ -32,29 +49,21 @@ use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 //   - Object: an `ObjectCore` resource must exist at the address, and
 //     a resource of type `T` must also exist under the same address.
 // - Public structs and enums are not yet supported.
-fn check_callable_by_user_txn(
-    func: &Function,
-    module: &PreparedModule,
-) -> Result<usize, InvalidArguments> {
-    let def = module.function_def_at(func.def_idx);
-    if !def.is_entry {
-        return Err(InvalidArguments::NotEntryFunction);
-    }
-    let handle = module.function_handle_at(def.function);
-    if !module.interned_types_at(handle.return_).is_empty() {
-        return Err(InvalidArguments::ReturnsValues);
-    }
-    let signer_params = leading_signer_params(&func.param_tys)?;
-    if func.param_tys[signer_params..]
+fn check_callable_signature(param_tys: &[InternedType]) -> Result<usize, InvalidArguments> {
+    let num_signer_params = leading_signer_params(param_tys)?;
+    if param_tys[num_signer_params..]
         .iter()
         .any(|&ty| !is_allowed_arg_type(ty))
     {
         return Err(InvalidArguments::DisallowedParameterType);
     }
-    Ok(signer_params)
+    Ok(num_signer_params)
 }
 
 /// Whether a type can be allowed as a transaction argument.
+//
+// TODO(security): audit the depth of type arguments this recursion can reach
+// so the check stays bounded.
 fn is_allowed_arg_type(ty: InternedType) -> bool {
     match view_type(ty) {
         Type::Bool
@@ -121,34 +130,32 @@ pub(crate) fn call_entry_function<'a>(
     secondary_signers: &[AccountAddress],
     args: &[Vec<u8>],
 ) -> Result<RuntimeStatus, MoveExecutionFailure> {
-    let func =
-        match resolve_function_by_name(guard, interp, address, module_name, function_name, ty_args)
-        {
-            Ok(func) => func,
-            // A native never lowers, so it surfaces as a load failure; AptosVM
-            // loads it and then refuses to run it.
-            Err(err)
-                if matches!(
-                    err.downcast_ref::<LoaderError>(),
-                    Some(LoaderError::NativeFunctionNotLoadable { .. })
-                ) =>
-            {
-                return Err(MoveExecutionFailure::InvalidArguments(
-                    InvalidArguments::NativeEntryFunction,
-                ));
-            },
-            Err(err) => return Err(MoveExecutionFailure::RuntimeError(err)),
-        };
+    let module_id = guard.module_id_of(address, module_name);
+    let function_name = guard.identifier_of(function_name);
+    let module = interp
+        .load_module(module_id)
+        .map_err(MoveExecutionFailure::RuntimeError)?;
+    // A function the module does not define is reported by the loader below.
+    if let Some(def_idx) = module.function_def_idx(function_name) {
+        check_callable_definition(&module.ir().module, def_idx)
+            .map_err(MoveExecutionFailure::InvalidArguments)?;
+    }
     // TODO(completeness): AptosVM marks the session unbiasable when a friend
     // or private entry function carries the `#[randomness]` annotation.
-    let module = interp
-        .module_of(func)
+    let func = interp
+        .load_function(module_id, function_name, ty_args)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    let signer_params =
-        check_callable_by_user_txn(func, module).map_err(MoveExecutionFailure::InvalidArguments)?;
+    let num_signer_params = check_callable_signature(&func.param_tys)
+        .map_err(MoveExecutionFailure::InvalidArguments)?;
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    place_user_txn_args(&mut call, signer_params, sender, secondary_signers, args)?;
+    place_user_txn_args(
+        &mut call,
+        num_signer_params,
+        sender,
+        secondary_signers,
+        args,
+    )?;
     call.run().map_err(MoveExecutionFailure::RuntimeError)
 }

@@ -53,6 +53,7 @@ use mono_move_core::{
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
+use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     account_address::AccountAddress,
@@ -499,9 +500,16 @@ impl<'guard> InterpreterContext<'guard> {
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
-    /// The module `func` was loaded from.
-    pub fn module_of(&self, func: &Function) -> VMResult<&'guard PreparedModule> {
-        self.prepared_module(func.module_id)
+    /// The module `module_id`, loaded and charged if this transaction has not
+    /// loaded it yet.
+    pub fn load_module(&mut self, module_id: InternedModuleId) -> VMResult<&'guard LoadedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        match self.read_set.get(arena_ref) {
+            None => self
+                .loader
+                .load_module(&mut self.read_set, &mut self.gas_meter, arena_ref),
+            Some(_) => self.read_set.get_loaded(arena_ref),
+        }
     }
 
     /// A module some loaded function came from. Loading the function loaded
