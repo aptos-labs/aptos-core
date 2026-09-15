@@ -327,6 +327,10 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "function values in resources",
     ),
     MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/closure_equality.move",
+        "function types as resource type arguments, function value equality",
+    ),
+    MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/closure_equality_operand_order.move",
         "function value equality",
     ),
@@ -381,6 +385,30 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/fv_as_keys.move",
         "function types as resource type arguments",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i128.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i16.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i256.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i32.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i64.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i8.move",
+        "no stack trace in exec_state",
     ),
 ];
 
