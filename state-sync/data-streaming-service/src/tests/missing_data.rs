@@ -4,8 +4,9 @@
 use crate::{
     data_notification::{
         DataClientRequest, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
+        HotStateValuesWithProofRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        NumberOfStatesRequest, StateValuesWithProofRequest,
         SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
@@ -28,6 +29,7 @@ use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::{
     proof::{SparseMerkleRangeProof, TransactionInfoListWithProof},
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -220,6 +222,57 @@ fn create_missing_data_request_state_values() {
     let missing_data_request =
         create_missing_data_request(&data_client_request, &response_payload).unwrap();
     assert!(missing_data_request.is_none());
+}
+
+#[test]
+fn create_missing_data_request_hot_state_values() {
+    // Create the data client request
+    let version = 10;
+    let start_index = 100;
+    let end_index = 200;
+    let data_client_request =
+        DataClientRequest::HotStateValuesWithProof(HotStateValuesWithProofRequest {
+            version,
+            start_index,
+            end_index,
+        });
+
+    // Create the partial response payload (i.e., the server hit its byte limit)
+    let last_response_index = end_index - 1;
+    let response_payload = ResponsePayload::HotStateValuesWithProof(create_hot_state_value_chunk(
+        start_index,
+        last_response_index,
+        last_response_index - start_index + 1,
+    ));
+
+    // Create the missing data request and verify that it requests only the suffix
+    let missing_data_request =
+        create_missing_data_request(&data_client_request, &response_payload).unwrap();
+    let expected_missing_data_request =
+        DataClientRequest::HotStateValuesWithProof(HotStateValuesWithProofRequest {
+            version,
+            start_index: last_response_index + 1,
+            end_index,
+        });
+    assert_eq!(missing_data_request.unwrap(), expected_missing_data_request);
+
+    // Create a complete response payload
+    let response_payload = ResponsePayload::HotStateValuesWithProof(create_hot_state_value_chunk(
+        start_index,
+        end_index,
+        end_index - start_index + 1,
+    ));
+
+    // Create the missing data request and verify that it's empty
+    let missing_data_request =
+        create_missing_data_request(&data_client_request, &response_payload).unwrap();
+    assert!(missing_data_request.is_none());
+
+    // An empty response makes no progress, so it must be rejected instead of
+    // scheduling a suffix request that repeats the same range forever.
+    let response_payload =
+        ResponsePayload::HotStateValuesWithProof(create_hot_state_value_chunk(start_index, 0, 0));
+    create_missing_data_request(&data_client_request, &response_payload).unwrap_err();
 }
 
 #[test]
@@ -871,6 +924,34 @@ fn create_state_value_chunk(
 
     // Create the chunk of state values
     StateValueChunkWithProof {
+        first_index,
+        last_index,
+        first_key: HashValue::zero(),
+        last_key: HashValue::zero(),
+        raw_values,
+        proof: SparseMerkleRangeProof::new(vec![]),
+        root_hash: HashValue::zero(),
+    }
+}
+
+/// Returns a hot state value chunk with proof for testing purposes
+fn create_hot_state_value_chunk(
+    first_index: u64,
+    last_index: u64,
+    num_values: u64,
+) -> HotStateValueChunkWithProof {
+    // Create the raw values
+    let raw_values = (0..num_values)
+        .map(|_| {
+            (
+                StateKey::raw(&[]),
+                HotStateValue::new(Some(StateValue::new_legacy(vec![].into())), 0),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    // Create the chunk of hot state values
+    HotStateValueChunkWithProof {
         first_index,
         last_index,
         first_key: HashValue::zero(),
