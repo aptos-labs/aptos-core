@@ -65,7 +65,8 @@ pub struct Corpus<P: 'static> {
     pub test_run_config: fn(&Resolution<'_, P>) -> TestRunConfig,
     /// Sources whose MonoMove output is known to differ from the canonical
     /// baseline. Their trials run against MonoMove-owned override baselines
-    /// (see [`mono_move_override_path`]) instead of the canonical ones.
+    /// (see [`mono_move_override_path`]) instead of the canonical ones, except
+    /// under the configs in an entry's `except` list.
     pub mono_move_divergences: &'static [MonoMoveDivergence],
 }
 
@@ -88,30 +89,38 @@ pub struct MonoMoveDivergence {
     pub source: &'static str,
     pub category: DivergenceCategory,
     pub reason: &'static str,
+    /// Configs under which MonoMove matches the canonical baseline after all,
+    /// so the source runs against it there.
+    pub except: &'static [&'static str],
 }
 
 impl MonoMoveDivergence {
     pub const fn unsupported(source: &'static str, reason: &'static str) -> Self {
-        Self {
-            source,
-            category: DivergenceCategory::Unsupported,
-            reason,
-        }
+        Self::new(source, DivergenceCategory::Unsupported, reason)
     }
 
     pub const fn semantic(source: &'static str, reason: &'static str) -> Self {
-        Self {
-            source,
-            category: DivergenceCategory::Semantic,
-            reason,
-        }
+        Self::new(source, DivergenceCategory::Semantic, reason)
     }
 
     pub const fn rendering(source: &'static str, reason: &'static str) -> Self {
+        Self::new(source, DivergenceCategory::Rendering, reason)
+    }
+
+    const fn new(source: &'static str, category: DivergenceCategory, reason: &'static str) -> Self {
         Self {
             source,
-            category: DivergenceCategory::Rendering,
+            category,
             reason,
+            except: &[],
+        }
+    }
+
+    pub const fn except(self, configs: &'static [&'static str]) -> Self {
+        assert!(self.except.is_empty(), "except is set once");
+        Self {
+            except: configs,
+            ..self
         }
     }
 }
@@ -160,11 +169,17 @@ impl<P> Corpus<P> {
             .any(|entry| identity.contains(entry))
     }
 
-    /// The recorded MonoMove divergence for `source`, if any.
-    pub fn mono_move_divergence(&self, source: &str) -> Option<&'static MonoMoveDivergence> {
+    /// The recorded MonoMove divergence for `source` under `config`, if any;
+    /// none under a config the entry excepts.
+    pub fn mono_move_divergence(
+        &self,
+        source: &str,
+        config: &MatrixConfig<P>,
+    ) -> Option<&'static MonoMoveDivergence> {
         self.mono_move_divergences
             .iter()
             .find(|divergence| divergence.source == source)
+            .filter(|divergence| !divergence.except.contains(&config.name))
     }
 
     /// Resolves one (source, config, VM backend) cell, or [`None`] when the

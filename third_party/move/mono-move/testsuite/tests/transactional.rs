@@ -9,10 +9,11 @@
 //! tasks remain listed as ignored trials.
 //!
 //! Sources listed in `Corpus::mono_move_divergences` use MonoMove override
-//! baselines under [`OVERRIDE_ROOT`]. Add an entry, then run with `UB=1` to
-//! create or update its baselines. Startup rejects overrides without a
-//! manifest entry or an active trial, and overrides identical to the canonical
-//! baseline because they no longer represent a divergence.
+//! baselines under [`OVERRIDE_ROOT`], one per config the divergence holds
+//! under. Add an entry, then run with `UB=1` to create or update its
+//! baselines. Startup rejects overrides that no active trial reads, and
+//! overrides identical to the canonical baseline because they no longer
+//! represent a divergence.
 
 use libtest_mimic::{Arguments, Trial};
 use mono_move_testsuite::{run_transactional_test, supports_source};
@@ -90,7 +91,7 @@ fn register<P>(
             if !ignored {
                 runnable += 1;
             }
-            let baseline = match corpus.mono_move_divergence(identity) {
+            let baseline = match corpus.mono_move_divergence(identity, config) {
                 Some(divergence) if !ignored => {
                     let override_path =
                         mono_move_override_path(override_root, corpus, config, identity);
@@ -156,7 +157,7 @@ fn check_overrides(override_root: &Path, expected: &[Override]) {
         .collect::<Vec<_>>();
     assert!(
         orphans.is_empty(),
-        "override baselines without a manifest entry and an active trial: {orphans:#?}"
+        "override baselines that no active trial reads: {orphans:#?}"
     );
     let closed = expected
         .iter()
@@ -169,8 +170,9 @@ fn check_overrides(override_root: &Path, expected: &[Override]) {
         .collect::<Vec<_>>();
     assert!(
         closed.is_empty(),
-        "these overrides equal the canonical baseline, so the divergence has closed; remove the \
-         manifest entry and the override: {closed:#?}"
+        "these overrides equal the canonical baseline, so the divergence has closed under their \
+         config: `except` that config in the manifest entry and delete the override, or remove \
+         the entry and all its overrides if it closed under every config: {closed:#?}"
     );
 }
 

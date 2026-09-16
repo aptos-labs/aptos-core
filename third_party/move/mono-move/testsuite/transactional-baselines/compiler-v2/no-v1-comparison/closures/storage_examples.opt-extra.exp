@@ -1,0 +1,12 @@
+processed 3 tasks
+task 0 lines 1-19:  publish [module 0xc0ffee::m {]
+task 1 lines 21-21:  run 0xc0ffee::m::init --signers 0xc0ffee
+Error: unsupported by MonoVM: function values are not yet supported
+task 2 lines 23-23:  run 0xc0ffee::m::fetch_and_run --signers 0xc0ffee
+Error: Function execution failed with VMError: {
+    major_status: MISSING_DATA,
+    sub_status: None,
+    location: 0xc0ffee::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 2)],
+}

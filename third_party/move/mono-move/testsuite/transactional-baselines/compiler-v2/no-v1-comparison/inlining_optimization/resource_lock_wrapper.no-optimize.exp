@@ -1,0 +1,8 @@
+processed 6 tasks
+task 0 lines 5-16:  publish [module 0x42::b {]
+task 1 lines 18-22:  publish [module 0x42::c {]
+task 2 lines 24-30:  publish [module 0x42::a {]
+task 3 lines 32-32:  run 0x42::b::init --signers 0x42
+task 4 lines 34-34:  run 0x42::a::go
+task 5 lines 36-36:  run 0x42::a::check
+return values: 1
