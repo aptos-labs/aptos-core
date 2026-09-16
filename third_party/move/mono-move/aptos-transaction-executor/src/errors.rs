@@ -36,6 +36,8 @@ impl MaterializationError {
 /// rejection reason is observable.
 #[derive(Debug)]
 pub enum DiscardReason {
+    /// The transaction's signature did not verify.
+    InvalidSignature,
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
     /// A payload or feature that no VM supports anymore.

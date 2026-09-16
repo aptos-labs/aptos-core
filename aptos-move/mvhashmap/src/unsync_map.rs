@@ -75,8 +75,10 @@ where
 {
     /// Size of arena used by MonoMove to deserialize BCS values from storage
     /// into MonoMove memory representation.
-    // TODO(completeness): make this configurable, rewrite arena so it can grow
-    // dynamically.
+    // TODO(completeness, security): make this configurable, rewrite arena so it
+    // can grow dynamically. The arena is shared by the whole block, transactions
+    // can drive it to exhaustion through their reads, and a rollback does not
+    // reclaim what the transaction allocated.
     const RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
 
     #[allow(clippy::new_without_default)]

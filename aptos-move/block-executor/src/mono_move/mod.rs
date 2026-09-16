@@ -35,7 +35,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosTransactionExecutor, TxnOutcome,
+    production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
 };
 use mono_move_core::{
     storage::resource_provider::{InMemoryStorageKey, ReadPin},
@@ -423,11 +423,18 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             ));
         };
 
-        // TODO(security): All transactions are valid, V1 VM unwraps. Consider
-        //   doing the same here or return a meaningful error.
+        // A failed signature verification discards this transaction only, so a
+        // block carrying one still executes the rest.
         let SignatureVerifiedTransaction::Valid(inner_txn) = txn else {
-            return Err(code_invariant_error(
-                "All transactions must be valid for execution",
+            return Ok((
+                ExecutionStatus::Executed {
+                    output: MonoTxnOutput::Executed {
+                        outcome: TxnOutcome::Discarded(DiscardReason::InvalidSignature),
+                        skips_rest: false,
+                    },
+                    skips_rest: false,
+                },
+                MonoReads,
             ));
         };
 
@@ -504,6 +511,9 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
 
         // TODO(correctenss): currently system txn failure fails here and not at txn
         //   execution time. Refactor materialization so that this does not happen!
+        // TODO(metering): the change set is not run through
+        //   `ChangeSetConfigs::check_change_set`, so the per-transaction write,
+        //   event and table-item caps are not enforced.
         let (output, groups) = outcome
             .materialize(
                 &guard,

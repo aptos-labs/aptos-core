@@ -114,6 +114,9 @@ fn drain_write_set(
         match group {
             None => {
                 let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
+                // TODO(correctness): ops carry no `StateValueMetadata` (slot
+                // deposits, refunds, creation time); the legacy VM's
+                // `WriteOpConverter` fills these.
                 let op = match class {
                     WriteClass::Creation(ptr) => {
                         WriteOp::legacy_creation(written_bytes(ptr, key.value_ty())?)
