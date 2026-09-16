@@ -17,8 +17,12 @@
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
+    secret_sharing::EvalProof,
     state_store::StateView,
     transaction::{
+        encrypted_payload::{
+            DecryptedPlaintext, DecryptionFailureReason, EncryptedInner, EncryptedPayload,
+        },
         AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction, Transaction,
         TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
@@ -941,6 +945,14 @@ fn gas_checks_discard_like_v1() {
             transfer(u64::MAX, 1_000_000),
             StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
         ),
+        (
+            encrypted_txn(
+                &alice,
+                encrypted_min_gas_unit_price() - 1,
+                failed_decryption,
+            ),
+            StatusCode::ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+        ),
     ];
     // The fixture's current minimum price is zero, for which no valid `u64`
     // gas price can be below the bound. Keep the check active when the
@@ -965,6 +977,161 @@ fn gas_checks_discard_like_v1() {
             "v2 discard differs from v1 for {expected:?}"
         );
     }
+}
+
+/// An encrypted transaction. It is signed while still encrypted, the way a
+/// client submits it, then moved to the state `after_decryption` returns.
+fn encrypted_txn(
+    sender: &AccountData,
+    gas_unit_price: u64,
+    after_decryption: impl FnOnce(EncryptedInner) -> EncryptedPayload,
+) -> SignedTransaction {
+    use aptos_crypto::HashValue;
+    use aptos_types::{
+        secret_sharing::Ciphertext,
+        transaction::{TransactionExtraConfig, TransactionPayload},
+    };
+
+    let original = EncryptedInner {
+        ciphertext: Ciphertext::random(),
+        extra_config: TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+        },
+        payload_hash: HashValue::random(),
+        encryption_epoch: 1,
+        claimed_entry_fun: None,
+    };
+    let mut txn = sender
+        .account()
+        .transaction()
+        .payload(TransactionPayload::EncryptedPayload(
+            EncryptedPayload::Encrypted(original.clone()),
+        ))
+        .sequence_number(10)
+        .gas_unit_price(gas_unit_price)
+        .max_gas_amount(1_000_000)
+        .sign();
+    *txn.payload_mut() = TransactionPayload::EncryptedPayload(after_decryption(original));
+    txn
+}
+
+/// A payload whose decryption failed.
+fn failed_decryption(original: EncryptedInner) -> EncryptedPayload {
+    EncryptedPayload::FailedDecryption {
+        original,
+        eval_proof: Some(EvalProof::random()),
+        reason: DecryptionFailureReason::CryptoFailure,
+    }
+}
+
+/// The minimum gas unit price an encrypted transaction must pay.
+fn encrypted_min_gas_unit_price() -> u64 {
+    TransactionGasParameters::initial()
+        .encrypted_txn_min_price_per_gas_unit
+        .into()
+}
+
+/// A transaction that could not be decrypted still commits, and its sequence
+/// number is bumped so it cannot be replayed.
+//
+// Only the status is compared: nothing runs, so no fee is charged yet.
+#[test]
+fn undecrypted_payload_kept_like_v1() {
+    use aptos_types::{account_config::AccountResource, state_store::state_key::StateKey};
+
+    let (fx, alice, _bob) = setup();
+    let txn = encrypted_txn(&alice, encrypted_min_gas_unit_price(), failed_decryption);
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+        ))),
+        "v1 did not keep the undecrypted transaction"
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    // The sequence number lives in the sender's account resource.
+    let account_key =
+        StateKey::resource_typed::<AccountResource>(alice.address()).expect("the key builds");
+    for (vm, output) in [("v1", &v1_output), ("v2", &v2_output)] {
+        assert!(
+            output
+                .write_set()
+                .write_op_iter()
+                .any(|(key, _)| key == &account_key),
+            "{vm} did not bump the sequence number"
+        );
+    }
+}
+
+/// A decrypted payload runs as the plain transaction it carries.
+#[test]
+fn decrypted_payload_matches_v1() {
+    use aptos_types::transaction::{TransactionExecutable, TransactionPayload};
+
+    let (fx, alice, bob) = setup();
+    let TransactionPayload::EntryFunction(transfer) =
+        aptos_cached_packages::aptos_stdlib::aptos_account_transfer(*bob.address(), 1_000)
+    else {
+        unreachable!("the SDK builds a transfer as an entry function")
+    };
+    let txn = encrypted_txn(&alice, encrypted_min_gas_unit_price(), |original| {
+        EncryptedPayload::Decrypted {
+            original,
+            eval_proof: EvalProof::random(),
+            decrypted: DecryptedPlaintext::new(
+                TransactionExecutable::EntryFunction(transfer),
+                [0u8; 16],
+            ),
+        }
+    });
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 rejected the decrypted transfer: {:?}",
+        v1_output.status()
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+    compare_outputs(&v1_output, &v2_output, *alice.address());
+}
+
+/// Only a multisig transaction may leave out the executable.
+#[test]
+fn empty_payload_discarded_like_v1() {
+    use aptos_types::transaction::{
+        TransactionExecutable, TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
+    };
+
+    let (fx, alice, _bob) = setup();
+    let txn = alice
+        .account()
+        .transaction()
+        .payload(TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable: TransactionExecutable::Empty,
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+        }))
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign();
+
+    let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+    assert_eq!(
+        v1_status,
+        TransactionStatus::Discard(StatusCode::EMPTY_PAYLOAD_PROVIDED)
+    );
+    assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
 }
 
 /// A block-metadata transaction produces byte-identical outputs on both VMs:

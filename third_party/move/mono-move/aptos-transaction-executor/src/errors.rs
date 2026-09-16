@@ -40,6 +40,8 @@ pub enum DiscardReason {
     Unsupported(&'static str),
     /// A payload or feature that no VM supports anymore.
     Deprecated(&'static str),
+    /// A non-multisig transaction carries no executable.
+    EmptyPayload,
     /// A pre-execution check failed.
     PreExecutionCheck(PreExecutionCheckFailure),
     /// A type argument failed to resolve.
@@ -85,6 +87,8 @@ pub enum PreExecutionCheckFailure {
     GasBudgetBelowIntrinsicCost { max_gas: u64, min: u64 },
     #[error("gas unit price {price} is below the minimum {min}")]
     GasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("gas unit price {price} is below the encrypted-transaction minimum {min}")]
+    EncryptedGasPriceBelowMinimum { price: u64, min: u64 },
     #[error("gas unit price {price} is above the maximum {max}")]
     GasPriceAboveMaximum { price: u64, max: u64 },
 }
@@ -161,6 +165,8 @@ pub enum MoveExecutionFailure {
     InvalidArguments(InvalidArguments),
     /// The transaction's script was refused before running.
     RejectedScript(ScriptRejection),
+    /// The payload is still encrypted: decryption failed before execution.
+    UndecryptedPayload,
     /// Execution failed with a VM error.
     RuntimeError(VMInternalError),
 }
