@@ -105,11 +105,9 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
         },
         Experiment {
-            name: Experiment::ACROSS_PACKAGE_INLINING.to_string(),
-            description: "Turns on or off inlining across package boundaries".to_string(),
-            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
-        },
-        Experiment {
+            // TODO: Remove this experiment, `extended-framework-optimizations`, and the
+            // framework release options that enable them. Inlining within dependency modules
+            // cannot affect primary target bytecode when cross-module inlining is disabled.
             name: Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS.to_string(),
             description: "Turns on or off restricting inlining optimization to primary target modules".to_string(),
             default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
@@ -320,7 +318,6 @@ impl Experiment {
     pub const ABILITY_CHECK: &'static str = "ability-check";
     pub const ACCESS_CHECK: &'static str = "access-use-function-check";
     pub const ACQUIRES_CHECK: &'static str = "acquires-check";
-    pub const ACROSS_PACKAGE_INLINING: &'static str = "across-package-inlining";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
