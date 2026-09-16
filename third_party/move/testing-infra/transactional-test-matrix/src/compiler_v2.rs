@@ -48,7 +48,7 @@ fn test_run_config(resolution: &Resolution<'_, CompilerV2Payload>) -> TestRunCon
 }
 
 /// Excluded by every config that takes all tests: these directories are served
-/// by the specialized configs below, which need non-default settings.
+/// by the specialized configs below (non-default settings, or no cross-compilation).
 const COMMON_EXCLUSIONS: &[&str] = &[
     "/leaner/",
     "/operator_eval/",
@@ -65,7 +65,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
 /// They compile to ordinary Move bytecode, so we can change this in the future.
 const LEAN_ONLY: Applicability = Applicability::Deferred("requires the lake toolchain");
 
-/// Only the `baseline` config is enabled for MonoMove.
+/// The same sources as `baseline`, under other optimization settings.
 const LATER_TIER: Applicability = Applicability::Deferred("a later MonoMove rollout tier");
 
 const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
@@ -159,44 +159,44 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         experiments: &[(Experiment::OPTIMIZE, true)],
         language_version: LanguageVersion::latest(),
         include: &["/operator_eval/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: true,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "no-recursive-check",
         experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-check/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "no-access-check",
         experiments: &[(Experiment::ACCESS_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-access-check/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "no-recursive-type-check",
         experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-type-check/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "public-struct",
@@ -207,7 +207,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "public-const",
@@ -218,29 +218,29 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "testing-constant-true",
         experiments: &[(Experiment::COMPILE_FOR_TESTING, true)],
         language_version: LanguageVersion::latest(),
         include: &["/testing-constant/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "testing-constant-false",
         experiments: &[(Experiment::COMPILE_FOR_TESTING, false)],
         language_version: LanguageVersion::latest(),
         include: &["/testing-constant/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     // Under language version 2.4, a `for` loop evaluates its upper bound inside
     // the iterator's scope.
@@ -253,7 +253,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
 ];
 
@@ -278,7 +278,6 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/enum/enum_field_select_different_offsets.move",
     "no-v1-comparison/assert_one.move",
     "no-v1-comparison/closures/reentrancy",
-    "no-v1-comparison/structs_visibility/migrated_tests/public_enum_field_select.move",
     "control_flow/for_loop_non_terminating.move",
     "control_flow/for_loop_nested_break.move",
     "evaluation_order/lazy_assert.move",
@@ -376,6 +375,10 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/fv_as_keys.move",
         "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/structs_visibility/public_struct_assign_swap.move",
+        "multiple return values",
     ),
     MonoMoveDivergence::rendering(
         "tests/signed-int/arithmetic_i128.move",
