@@ -6,15 +6,6 @@
 
 use super::*;
 
-/// Root of the workspace, derived from this crate's location.
-fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(4)
-        .expect("crate sits four levels below the workspace root")
-        .to_path_buf()
-}
-
 /// The named config of `corpus`; tests refer to configs by name.
 fn config<'c, P>(corpus: &'c Corpus<P>, name: &str) -> &'c MatrixConfig<P> {
     corpus
@@ -51,9 +42,8 @@ fn cross_compilation_is_suppressed_for_mono_move_but_kept_for_v1() {
 
 #[test]
 fn the_v1_vm_runs_every_config_regardless_of_mono_move_applicability() {
-    // A config MonoMove cannot run is still applicable for the V1 VM, whose
-    // behavior the baselines record. Redundant once a MonoMove harness exists: a
-    // leak of the MonoMove verdict into V1 would then shrink V1's trial list.
+    // MonoMove applicability must not exclude V1 trials: the canonical baselines
+    // record V1's behavior under every config.
     let resolution = MOVE_VM
         .resolve(
             config(&MOVE_VM, "tracing"),
