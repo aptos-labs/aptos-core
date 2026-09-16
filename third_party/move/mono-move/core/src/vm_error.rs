@@ -18,10 +18,10 @@ use std::{any::Any, fmt};
 
 pub type VMResult<T> = Result<T, VMInternalError>;
 
-/// Where the interpreter attributed a VM error.
+/// Where a VM error was attributed.
 ///
-/// Subsystem errors remain location-independent. The interpreter attaches a
-/// location when it knows the executing frame.
+/// The interpreter attaches the executing frame's location when known. The
+/// loader uses [`ErrorLocation::Script`] for script deserialization failures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorLocation {
     /// A Move instruction: its module, defining function, and offset in that

@@ -39,7 +39,7 @@ use mono_move_loader::LoaderError;
 use mono_move_natives::EventStore;
 use mono_move_output::{
     to_contract_events_from_store,
-    v1_error::{self, V1Equivalent},
+    v1_error::{self, V1Equivalent, V1ErrorInfo},
 };
 use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex, CompiledModule};
 use move_core_types::{
@@ -167,8 +167,12 @@ pub(crate) fn render_error_location(location: &Location) -> String {
 /// A failure that cannot be stated, including one that was never located, is
 /// not comparable with V1's.
 fn describe_v2_error_as_v1(err: &VMInternalError) -> ParityOutcome {
-    let V1Equivalent::Described(v1_info) = v1_error::describe(err) else {
-        return ParityOutcome::Unmappable;
+    let v1_info = match v1_error::describe(err) {
+        V1Equivalent::Described(v1_info) => v1_info,
+        V1Equivalent::Verbatim(error) => V1ErrorInfo::verbatim(error),
+        V1Equivalent::NoV1Failure | V1Equivalent::V1StatusUnknown => {
+            return ParityOutcome::Unmappable
+        },
     };
     if !v1_info.message.is_comparable() || !v1_info.sub_status.is_comparable() {
         return ParityOutcome::Unmappable;

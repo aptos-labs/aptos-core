@@ -7,13 +7,16 @@
 //! the call succeeds.
 
 use bytes::Bytes;
+use mono_move_core::{ErrorLocation, VMInternalError};
+use mono_move_loader::LoaderError;
 use mono_move_output::v1_error::describe_or_fallback;
 use mono_move_testsuite::{
     compile_move_script, compile_move_source, function_def_index, ArgumentError, PublishError,
     RunError, RunOutcome, TransactionalSession,
 };
 use move_binary_format::{
-    compatibility::Compatibility, file_format::FunctionDefinitionIndex, CompiledModule,
+    compatibility::Compatibility, errors::Location, file_format::FunctionDefinitionIndex,
+    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -295,21 +298,54 @@ fn a_script_abort_is_located_at_the_script_and_discards_its_writes() {
     assert_eq!(read_counter(&mut session), 1);
 }
 
-/// Returns the V1 status for `RunError::Vm`; panics on other error variants.
-fn vm_status(error: RunError) -> StatusCode {
+/// Unwraps `RunError::Vm`; panics on other error variants.
+fn vm_error(error: RunError) -> VMInternalError {
     match error {
-        RunError::Vm(error) => describe_or_fallback(&error).status,
+        RunError::Vm(error) => error,
         other => panic!("expected a VM error, got {other}"),
     }
 }
 
+/// Returns the V1 status for `RunError::Vm`; panics on other error variants.
+fn vm_status(error: RunError) -> StatusCode {
+    describe_or_fallback(&vm_error(error)).status
+}
+
 #[test]
-fn an_undeserializable_script_is_a_vm_error() {
+fn an_undeserializable_script_fails_at_the_script() {
     let mut session = session();
-    let error = session
-        .run_script(&[0xFF, 0x00], &[], &[], &[])
-        .expect_err("garbage is not a script");
-    assert_eq!(vm_status(error), StatusCode::CODE_DESERIALIZATION_ERROR);
+    let error = vm_error(
+        session
+            .run_script(&[0xFF, 0x00], &[], &[], &[])
+            .expect_err("garbage is not a script"),
+    );
+    assert_eq!(
+        describe_or_fallback(&error).status,
+        StatusCode::CODE_DESERIALIZATION_ERROR
+    );
+    assert_eq!(error.location(), Some(&ErrorLocation::Script));
+}
+
+#[test]
+fn scripts_are_verified_under_the_session_vm_config() {
+    let mut vm_config = TestRunConfig::default().vm_config;
+    vm_config.verifier_config.max_function_parameters = Some(0);
+    let mut session = TransactionalSession::new(&vm_config);
+    let error = vm_error(
+        session
+            .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+            .expect_err("one parameter exceeds the limit"),
+    );
+    assert_eq!(
+        describe_or_fallback(&error).status,
+        StatusCode::TOO_MANY_PARAMETERS
+    );
+    let Some(LoaderError::ScriptVerificationFailed { error: report }) =
+        error.downcast_ref::<LoaderError>()
+    else {
+        panic!("expected the verifier's report, got {error}");
+    };
+    assert_eq!(report.location(), &Location::Script);
 }
 
 #[test]

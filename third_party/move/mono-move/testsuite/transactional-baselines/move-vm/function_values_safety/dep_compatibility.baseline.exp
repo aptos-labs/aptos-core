@@ -1,0 +1,15 @@
+processed 5 tasks
+task 0 lines 2-24:  publish --verbose [module 0x66::lib]
+task 1 lines 25-47:  publish --verbose [module 0x66::app]
+task 2 lines 49-51:  run --verbose 0x66::app::run [/// `lib` is republished with change of parameter type (compat turned off)]
+task 3 lines 52-75:  publish --skip-check-struct-and-pub-function-linking [module 0x66::lib]
+task 4 lines 77-77:  run --verbose 0x66::app::run
+Error: Function execution failed with VMError: {
+    message: invariant violation: CallClosure: provided_args[0].size 4 != callee param_slots[0].size 8,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: None,
+    location: 0x66::lib,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

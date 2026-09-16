@@ -6,26 +6,9 @@
 //! Runs the Move VM transactional tests defined by the shared test matrix.
 
 use libtest_mimic::{Arguments, Trial};
-use move_transactional_test_matrix::{MatrixConfig, MoveVmPayload, Resolution, VmBackend, MOVE_VM};
-use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
-use std::{collections::BTreeSet, path::Path};
-
-/// Builds the settings a (source, config) trial runs with.
-fn test_run_config(resolution: &Resolution<'static, MoveVmPayload>) -> TestRunConfig {
-    TestRunConfig {
-        language_version: resolution.config.language_version,
-        experiments: resolution
-            .config
-            .experiments
-            .iter()
-            .map(|(name, value)| (name.to_string(), *value))
-            .collect::<Vec<_>>(),
-        vm_config: resolution.effective_payload.vm_config.clone(),
-        echo: true,
-        cross_compilation_targets: BTreeSet::new(),
-        tracing: resolution.effective_payload.tracing,
-    }
-}
+use move_transactional_test_matrix::{MatrixConfig, MoveVmPayload, VmBackend, MOVE_VM};
+use move_transactional_test_runner::vm_test_harness;
+use std::path::Path;
 
 fn run(
     identity: &str,
@@ -35,7 +18,7 @@ fn run(
         .resolve(config, identity, VmBackend::V1)
         .expect("the trial was registered, so the config selects its source");
     vm_test_harness::run_test_with_config_and_exp_suffix(
-        test_run_config(&resolution),
+        (MOVE_VM.test_run_config)(&resolution),
         Path::new(identity),
         &resolution.canonical_exp_suffix,
     )
