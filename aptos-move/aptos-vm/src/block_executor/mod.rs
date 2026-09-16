@@ -9,6 +9,7 @@ use aptos_block_executor::{
     check_resource_group_serialization,
     code_cache_global_manager::AptosModuleCacheManager,
     executor::BlockExecutor,
+    mono_move::MonoTransactionExecutor,
     single_transaction_executor::LegacyTransactionExecutor,
     task::{
         ExecutorTask, LegacyTxnOutput as BlockExecutorLegacyTxnOutput,
@@ -418,27 +419,52 @@ impl<
             init_speculative_logs(num_txns);
         }
 
-        BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
-
         let mut module_cache_manager_guard = module_cache_manager
             .try_lock(&state_view, transaction_slice_metadata)
             .map_err(|status| BlockError::new(status.to_string()))?;
 
-        let executor = BlockExecutor::<
-            SignatureVerifiedTransaction,
-            LegacyTransactionExecutor<E>,
-            S,
-            L,
-            TP,
-            AuxiliaryInfo,
-        >::new(config, transaction_commit_listener);
+        // TODO(correctness): Remove when parallel execution is supported.
+        let mut config = config;
+        let is_mono_move = module_cache_manager_guard
+            .environment()
+            .features()
+            .is_mono_move_enabled();
+        if is_mono_move {
+            config.local.concurrency_level = 1;
+        }
+        BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
-        let ret = executor.execute_block(
-            signature_verified_block,
-            state_view,
-            &transaction_slice_metadata,
-            &mut module_cache_manager_guard,
-        );
+        let ret = if is_mono_move {
+            BlockExecutor::<
+                SignatureVerifiedTransaction,
+                MonoTransactionExecutor,
+                S,
+                L,
+                TP,
+                AuxiliaryInfo,
+            >::new(config, transaction_commit_listener)
+            .execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        } else {
+            BlockExecutor::<
+                SignatureVerifiedTransaction,
+                LegacyTransactionExecutor<E>,
+                S,
+                L,
+                TP,
+                AuxiliaryInfo,
+            >::new(config, transaction_commit_listener)
+            .execute_block(
+                signature_verified_block,
+                state_view,
+                &transaction_slice_metadata,
+                &mut module_cache_manager_guard,
+            )
+        };
         match ret {
             Ok(block_output) => {
                 let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();

@@ -120,6 +120,7 @@ fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
 /// with.
 pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
     match reason {
+        DiscardReason::InvalidSignature => VMStatus::error(StatusCode::INVALID_SIGNATURE, None),
         DiscardReason::Unsupported(msg) => unsupported_status(msg),
         DiscardReason::Deprecated(what) => VMStatus::error(
             StatusCode::FEATURE_UNDER_GATING,

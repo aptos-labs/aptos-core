@@ -106,14 +106,15 @@ fn execute_v2_in<S: StateView>(
         &env,
         usage,
     );
-    run(&executor)
+    let (output, _groups) = run(&executor)
         .materialize(
             guard,
             &data_provider,
             env.features(),
             TransactionAuxiliaryData::default(),
         )
-        .expect("the transaction output materializes")
+        .expect("the transaction output materializes");
+    output
 }
 
 /// Runs `txns` in order through one global context, applying each output to
