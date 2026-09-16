@@ -436,9 +436,26 @@ impl<'guard> InterpreterContext<'guard> {
         natives: &'guard ProductionNativeRegistry,
         options: InterpreterOptions,
     ) -> Self {
-        let stack = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
+        // The region carries the previous transaction's bytes. Every frame
+        // slot the interpreter reads is written first, either by the caller
+        // (parameters) or by the callee's `zero_frame` prologue (pointer slots
+        // past the parameter region), so no stale byte is ever observed.
+        let stack = loader
+            .guard()
+            .take_scratch_region()
+            .unwrap_or_else(|| MemoryRegion::new_uninit(DEFAULT_STACK_SIZE));
+        // The stack size bounds call depth and so decides when execution fails
+        // with `CALL_STACK_OVERFLOW`, which is consensus-visible. A parked
+        // region of the wrong size would silently move that bound.
+        debug_assert_eq!(stack.len(), DEFAULT_STACK_SIZE);
         let base = stack.as_ptr();
 
+        // Sentinel metadata terminating the GC's stack walk. The region is not
+        // zeroed, so a stale non-null `saved_func_ptr` here would send the walk
+        // past the root frame.
+        //
+        // SAFETY: `base` is the start of a `DEFAULT_STACK_SIZE`-byte region,
+        // which is larger than the metadata block.
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
             write_u64(base, META_SAVED_FP_OFFSET, 0);
@@ -606,6 +623,8 @@ impl<'guard> InterpreterContext<'guard> {
     /// types are not: the effects do not borrow the guard, so the caller must
     /// keep the global arena alive until the effects are dropped.
     pub fn finish(self) -> SessionEffects {
+        self.loader.guard().return_scratch_region(self.stack);
+
         SessionEffects {
             read_write_set: self.read_write_set,
             extensions: self.extensions,
