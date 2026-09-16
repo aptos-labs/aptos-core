@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 1-4:  publish [module 0x1::M]
+task 1 lines 8-11:  run --type-args 0x1::M::Ex [script]

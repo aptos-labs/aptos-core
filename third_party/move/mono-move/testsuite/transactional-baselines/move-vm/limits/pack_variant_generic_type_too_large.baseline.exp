@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 1-20:  publish [module 0x22::test]
+task 1 lines 22-22:  run --verbose 0x22::test::entry_below_limit --type-args u8
+task 2 lines 24-24:  run --verbose 0x22::test::entry_above_limit --type-args vector<u8>
