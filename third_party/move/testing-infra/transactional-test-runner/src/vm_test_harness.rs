@@ -36,7 +36,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::{MoveTypeLayout, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::StatusType,
 };
 use move_model::metadata::LanguageVersion;
@@ -219,23 +219,13 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     ) -> Option<String> {
         let code_storage = self.storage.clone().into_unsync_code_storage();
 
-        let signers: Vec<_> = signers
-            .into_iter()
-            .map(|addr| self.compiled_state().resolve_address(&addr))
-            .collect();
+        let signers = self.compiled_state().resolve_signers(signers);
+        let script_bytes = match serialize_script(&self.storage, &script) {
+            Ok(script_bytes) => script_bytes,
+            Err(err) => return Some(format!("Error: {}", err)),
+        };
 
-        let mut script_bytes = vec![];
-        if let Err(err) = script.serialize_for_version(
-            Some(self.storage.max_binary_format_version()),
-            &mut script_bytes,
-        ) {
-            return Some(format!("Error: {}", err));
-        }
-
-        let args = txn_args
-            .iter()
-            .map(|arg| arg.simple_serialize().unwrap())
-            .collect::<Vec<_>>();
+        let args = serialize_values(&txn_args);
         // TODO rethink testing signer args
         let args = signers
             .iter()
@@ -259,11 +249,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         match result {
             Ok(_) => trace_str,
             Err(err) => {
-                let err = anyhow!(
-                    "Script execution failed with VMError: {}",
-                    err.format_test_output(move_test_debug() || verbose)
-                );
-                let err_str = Some(format!("Error: {}", err));
+                let err_str = Some(format!("Error: {}", script_execution_error(&err, verbose)));
                 merge_output(trace_str, err_str)
             },
         }
@@ -281,15 +267,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     ) -> Option<String> {
         let code_storage = self.storage.clone().into_unsync_code_storage();
 
-        let signers: Vec<_> = signers
-            .into_iter()
-            .map(|addr| self.compiled_state().resolve_address(&addr))
-            .collect();
+        let signers = self.compiled_state().resolve_signers(signers);
 
-        let args = txn_args
-            .iter()
-            .map(|arg| arg.simple_serialize().unwrap())
-            .collect::<Vec<_>>();
+        let args = serialize_values(&txn_args);
         // TODO rethink testing signer args
         let args = signers
             .iter()
@@ -355,6 +335,14 @@ pub fn publish_error(module_id: &ModuleId, err: &VMError, verbose: bool) -> anyh
 pub fn function_execution_error(err: &VMError, verbose: bool) -> anyhow::Error {
     anyhow!(
         "Function execution failed with VMError: {}",
+        err.format_test_output(move_test_debug() || verbose)
+    )
+}
+
+/// Formats a script execution failure for transactional test baselines.
+pub fn script_execution_error(err: &VMError, verbose: bool) -> anyhow::Error {
+    anyhow!(
+        "Script execution failed with VMError: {}",
         err.format_test_output(move_test_debug() || verbose)
     )
 }
@@ -436,6 +424,13 @@ pub fn serialize_module(storage: &InMemoryStorage, module: &CompiledModule) -> R
     let mut module_bytes = vec![];
     module.serialize_for_version(Some(storage.max_binary_format_version()), &mut module_bytes)?;
     Ok(module_bytes.into())
+}
+
+/// Serializes `script` at the storage's binary format version.
+pub fn serialize_script(storage: &InMemoryStorage, script: &CompiledScript) -> Result<Vec<u8>> {
+    let mut script_bytes = vec![];
+    script.serialize_for_version(Some(storage.max_binary_format_version()), &mut script_bytes)?;
+    Ok(script_bytes)
 }
 
 impl SimpleVMTestAdapter<'_> {
