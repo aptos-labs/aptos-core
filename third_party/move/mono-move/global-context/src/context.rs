@@ -448,6 +448,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
     }
 
     /// Parks a region on this guard's arena for its next user.
+    ///
+    /// INVARIANT: every user of a guard's scratch region agrees on its size.
+    /// The region is parked and handed out as is, with no size check.
     pub fn return_scratch_region(&self, region: MemoryRegion) {
         self.global_arena.return_scratch_region(region)
     }

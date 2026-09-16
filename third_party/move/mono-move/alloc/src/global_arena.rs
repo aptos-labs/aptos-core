@@ -268,6 +268,9 @@ impl<'pool> GlobalArenaShard<'pool> {
     /// Parks a region on this arena for its next user. Keeps one region; a
     /// surplus region (the caller allocated its own because none was parked)
     /// is dropped here.
+    ///
+    /// INVARIANT: every user of an arena's scratch region agrees on its size.
+    /// The region is parked and handed out as is, with no size check.
     pub fn return_scratch_region(&self, region: MemoryRegion) {
         if cfg!(miri) {
             return;
