@@ -11,7 +11,7 @@ VM per repeat. Without that, the two runs would draw different transactions from
 the generators' entropy, and the difference in workload would show up as a
 difference in speed.
 
-The two replays differ only in a feature flip applied after workload
+The two replays differ only in a feature flag override applied after workload
 initialization: MonoMove gets `--enable-feature-after-init ENABLE_MONO_MOVE`,
 V1 gets `--disable-feature-after-init`. Both run the same governance script and
 the same epoch change, so the only difference is the flag's value.
@@ -295,7 +295,7 @@ def extract_run_stats(output):
 
 
 def mono_move_was_enabled(output):
-    """Whether the run's post-init flip turned MonoMove on.
+    """Whether the run's post-init override turned MonoMove on.
 
     An unapplied flag would give a V1-versus-V1 comparison reporting a flat
     1.00x, which looks exactly like "MonoMove is no faster".
@@ -311,7 +311,7 @@ def mono_move_was_enabled(output):
         return True
     if MONO_MOVE_FLAG in disabled:
         return False
-    raise ValueError(f"run did not flip {MONO_MOVE_FLAG} either way")
+    raise ValueError(f"run did not override {MONO_MOVE_FLAG} either way")
 
 
 METRICS = [
@@ -385,7 +385,7 @@ def common_flags(workload, db_dir, checkpoint_dir):
 def record(workload, db_dir, checkpoint_dir, blocks_path):
     """Generate the blocks once and leave the initialized DB in checkpoint_dir.
 
-    The recording is not executed and no feature flip is applied, so
+    The recording is not executed and no feature flag override is applied, so
     checkpoint_dir is exactly the state every replay starts from.
     """
     execute_command(
@@ -403,10 +403,10 @@ def replay(workload, recorded_db_dir, checkpoint_dir, blocks_path, mono):
     Both settings run the same governance script and epoch change; disabling an
     already-disabled flag writes no state.
     """
-    flip = "--enable-feature-after-init" if mono else "--disable-feature-after-init"
+    override = "--enable-feature-after-init" if mono else "--disable-feature-after-init"
     output = execute_command(
         f"{common_flags(workload, recorded_db_dir, checkpoint_dir)} "
-        f"--replay-blocks {blocks_path} {flip} {MONO_MOVE_FLAG}"
+        f"--replay-blocks {blocks_path} {override} {MONO_MOVE_FLAG}"
     )
     return extract_run_stats(output)
 

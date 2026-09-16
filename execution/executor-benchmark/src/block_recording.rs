@@ -19,12 +19,13 @@
 //!
 //! 1. A recording run reads the warmup DB from `source_dir`, initializes the
 //!    workload into `checkpoint_dir`, writes the generated blocks to a file, and
-//!    stops. Nothing is executed and no feature flag is flipped, so
+//!    stops. Nothing is executed and no feature flag is overridden, so
 //!    `checkpoint_dir` holds exactly the state the blocks were generated
 //!    against.
 //! 2. Each replay run passes that `checkpoint_dir` as its own `source_dir`. The
-//!    workload is already initialized there, so the replay only flips its
-//!    feature flags and executes the recorded blocks against its own fresh copy.
+//!    workload is already initialized there, so the replay only applies its
+//!    feature flag overrides and executes the recorded blocks against its own
+//!    fresh copy.
 //!
 //! Replays are therefore independent of each other: each one starts from the
 //! same recorded base and throws its copy away.
@@ -33,8 +34,8 @@
 //!
 //! The user transactions of each block. Block metadata is dropped and re-minted
 //! per block at replay: the recorded one carries the epoch and timestamp of the
-//! recording, and the replay's own feature flip moves both. Anything else in a
-//! block is rejected at record time rather than dropped.
+//! recording, and the replay's own feature flag overrides move both. Anything
+//! else in a block is rejected at record time rather than dropped.
 
 use anyhow::{bail, Result};
 use aptos_logger::info;
@@ -122,7 +123,7 @@ impl RecordedBlocks {
                  recorded (version {}, base_usecs {}, epoch {}), \
                  found (version {}, base_usecs {}, epoch {}). \
                  A replay has to start from the DB the recording left behind, \
-                 and check this before applying its own feature flip.",
+                 and check this before applying its own feature flag overrides.",
                 h.version,
                 h.base_usecs,
                 h.epoch,

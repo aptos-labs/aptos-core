@@ -124,8 +124,8 @@ pub enum BlockSource {
     #[default]
     Generate,
     /// Generate blocks, write them to `blocks_path`, and exit without executing
-    /// them or flipping any feature flags. Leaves the initialized, pre-flip DB
-    /// the blocks were generated against in `checkpoint_dir`.
+    /// them or applying any feature flag overrides. Leaves the initialized,
+    /// un-overridden DB the blocks were generated against in `checkpoint_dir`.
     Record { blocks_path: PathBuf },
     /// Execute the blocks in `blocks_path`. Workload initialization is skipped:
     /// `source_dir` is the `checkpoint_dir` a recording left behind, so the
@@ -326,7 +326,7 @@ enum InitializedBenchmarkWorkload {
 /// `overrides` to the on-chain `Features` and reconfiguring so the change takes
 /// effect for the next block. Runs under the V1 VM. The block executor
 /// rereads `Features` from committed state each block, so the measured run picks
-/// up the new flags. Panics if the flip transaction is not committed as a
+/// up the new flags. Panics if the override transaction is not committed as a
 /// success.
 fn apply_features_after_init(
     db: &DbReaderWriter,
@@ -538,16 +538,16 @@ where
         BlockSource::Replay { .. } => unreachable!(),
     };
 
-    // Flip requested feature flags after init/publish but before the measured
-    // run, so the flip is not counted in the measured transactions.
+    // Apply the feature flag overrides after init/publish but before the
+    // measured run, so they are not counted in the measured transactions.
     //
-    // A recording is the one run that does not flip. Its DB is the shared base
-    // every replay starts from, so it has to stay neutral between the VMs being
-    // compared; each replay flips on top of it.
+    // A recording is the one run that applies no overrides. Its DB is the shared
+    // base every replay starts from, so it has to stay neutral between the VMs
+    // being compared; each replay overrides on top of it.
     if recording.is_none() && !features_after_init.is_empty() {
         apply_features_after_init(&db, &root_account, &ts, &features_after_init);
-        // The flip ends the epoch, so refresh the cached epoch; otherwise the
-        // measured run's block metadata would carry the stale pre-flip epoch.
+        // The override ends the epoch, so refresh the cached epoch; otherwise
+        // the measured run's block metadata would carry the stale old epoch.
         ts = Arc::new(BenchmarkTimestamp::from_db(&db));
     }
 
@@ -729,8 +729,8 @@ where
 /// Executes blocks recorded by an earlier [`BlockSource::Record`] run.
 ///
 /// The recording's `checkpoint_dir` is this run's `source_dir`, so the workload
-/// is already initialized and only the feature flip is left to apply. That flip
-/// is what makes two replays of the same file differ.
+/// is already initialized and only the feature flag overrides are left to
+/// apply. Those overrides are what makes two replays of the same file differ.
 #[allow(clippy::too_many_arguments)]
 fn replay_benchmark<V>(
     blocks_path: &Path,
@@ -752,7 +752,7 @@ where
 
     let recorded = RecordedBlocks::read(blocks_path).expect("failed to read recorded blocks");
 
-    // Checked before the flip, since the recording never applied one.
+    // Checked before the overrides, since the recording never applied any.
     recorded
         .check_replayable_at(
             db.reader.expect_synced_version(),
@@ -1797,7 +1797,7 @@ mod tests {
         aptos_logger::Logger::new().init();
 
         // `enable` starts disabled in the benchmark genesis, `disable` starts
-        // enabled, so a successful flip is observable on both.
+        // enabled, so a successful override is observable on both.
         let enable = FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION;
         let disable = FeatureFlag::ENABLE_ENUM_TYPES;
 
@@ -1832,11 +1832,12 @@ mod tests {
         assert!(after.is_enabled(enable));
         assert!(!after.is_enabled(disable));
 
-        // The flip ends the epoch; callers must refresh `BenchmarkTimestamp`.
+        // The override ends the epoch; callers must refresh
+        // `BenchmarkTimestamp`.
         assert_eq!(
             BenchmarkTimestamp::from_db(&db).epoch(),
             epoch_before + 1,
-            "feature flip did not advance the epoch"
+            "feature flag override did not advance the epoch"
         );
     }
 }

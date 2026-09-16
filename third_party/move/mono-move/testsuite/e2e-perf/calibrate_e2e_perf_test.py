@@ -180,11 +180,13 @@ def rows_from_jsonl(paths):
     for path in paths:
         with open(path) as f:
             for line in f:
-                line = line.strip()
-                if not line.startswith("{"):
+                # Downloaded job logs prefix every line with a timestamp, and
+                # `gh run view --log` adds job and step columns in front of it.
+                start = line.find("{")
+                if start < 0:
                     continue
                 try:
-                    record = json.loads(line)
+                    record = json.loads(line[start:])
                 except json.JSONDecodeError:
                     continue
                 if record.get("grep") != GREP_KEY:

@@ -19,8 +19,8 @@ workloads whose cost depends on earlier transactions — orderbook, liquidity po
 — that difference shows up as a difference in speed. Replaying one recording on
 both VMs removes it.
 
-The two replays differ only in a feature flip applied after the workload is
-initialized: MonoMove gets `--enable-feature-after-init ENABLE_MONO_MOVE`,
+The two replays differ only in a feature flag override applied after the
+workload is initialized: MonoMove gets `--enable-feature-after-init ENABLE_MONO_MOVE`,
 V1 gets `--disable-feature-after-init ENABLE_MONO_MOVE`. Both run the same
 governance script and the same epoch change, so the only difference between them
 is the flag's value.
@@ -39,8 +39,8 @@ how they relate:
 - `--data-dir` is the database the run starts from. The run only reads it, so
   the same one can feed any number of later runs.
 - `--checkpoint-dir` receives a fresh copy of that database at startup.
-  Everything the run writes — workload initialization, the feature flip, the
-  executed blocks — lands in the copy.
+  Everything the run writes — workload initialization, the feature flag
+  override, the executed blocks — lands in the copy.
 
 A recording and its replays chain the two. The recording's `--checkpoint-dir`
 becomes each replay's `--data-dir`:
@@ -60,28 +60,28 @@ recorded DB
 
 1. The recording run reads the warmup DB, initializes the workload into its
    checkpoint, writes the generated blocks to a file, and stops. Nothing is
-   executed and no feature flag is flipped, so the checkpoint holds exactly the
-   state the blocks were generated against. The flip belongs to the replay,
-   which is what keeps this state neutral between the two VMs.
+   executed and no feature flag is overridden, so the checkpoint holds exactly
+   the state the blocks were generated against. The override belongs to the
+   replay, which is what keeps this state neutral between the two VMs.
 
-2. Each replay run reads the recorded DB, flips `ENABLE_MONO_MOVE` on or off,
-   and executes the recorded blocks against its own copy. The copy is thrown
-   away afterwards, so every replay starts from the same base and cannot see
-   what an earlier one did.
+2. Each replay run reads the recorded DB, overrides `ENABLE_MONO_MOVE` on or
+   off, and executes the recorded blocks against its own copy. The copy is
+   thrown away afterwards, so every replay starts from the same base and cannot
+   see what an earlier one did.
 
-Before flipping, a replay checks that the DB it was handed is at the version,
+Before overriding, a replay checks that the DB it was handed is at the version,
 timestamp, and epoch the recording wrote into the file's header. A mismatch
 means the replay was pointed at the wrong directory: sequence numbers would not
 line up, and the recorded transactions may already have expired. It fails there
 rather than reporting a number.
 
 Only user transactions are recorded. Block metadata carries an epoch and a
-timestamp that the flip makes stale, so a replay mints a fresh metadata
+timestamp that the override makes stale, so a replay mints a fresh metadata
 transaction per block from its own DB.
 
 ## What it does not measure
 
-- **Gas.** MonoMove runs unmetered, so its gas metrics are zero.
+- **Gas.** MonoMove runs unmetered today, so its gas metrics are zero.
 - **Parallel execution.** MonoMove is sequential only today.
 - **Publish, script, and multisig workloads.** MonoMove discards those payloads.
 

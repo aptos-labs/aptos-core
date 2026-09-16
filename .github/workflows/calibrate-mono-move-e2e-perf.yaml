@@ -21,7 +21,7 @@ jobs:
   calibrate:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -29,7 +29,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests==2.32.3
 
       - name: Run mono-move e2e performance calibration
         env:

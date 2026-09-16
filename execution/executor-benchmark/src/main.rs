@@ -455,7 +455,7 @@ enum Command {
         /// Generate the blocks, write them here, and exit without executing.
         /// Leaves --checkpoint-dir holding the initialized DB the blocks were
         /// generated against; pass that as --data-dir when replaying. No feature
-        /// flip is applied, since each replay applies its own.
+        /// flag override is applied, since each replay applies its own.
         #[clap(long, value_parser, conflicts_with = "replay_blocks")]
         dump_blocks: Option<PathBuf>,
 

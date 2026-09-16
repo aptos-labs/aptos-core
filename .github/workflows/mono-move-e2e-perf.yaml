@@ -73,7 +73,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Install python dependencies
-        run: TABULATE_INSTALL=lib-only pip install tabulate
+        run: TABULATE_INSTALL=lib-only pip install tabulate==0.9.0
 
       - name: Run mono-move e2e performance comparison
         id: perf
