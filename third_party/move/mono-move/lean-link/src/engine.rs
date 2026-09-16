@@ -23,8 +23,7 @@ use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes
 use mono_move_aptos_transaction_executor::production_natives;
 use mono_move_core::{
     types::{view_type_list, EMPTY_TYPE_LIST},
-    ExecutionErrorKind, GasMeter, Interner, IntoExecutionError, NoResourceProvider,
-    VMInternalError, VMResult,
+    ExecutionErrorKind, GasMeter, Interner, NoResourceProvider, VMResult,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleProvider};
@@ -32,12 +31,12 @@ use mono_move_runtime::{
     error::RuntimeError, InterpreterContext, InterpreterOptions, ProductionNativeRegistry,
     RuntimeStatus,
 };
-use move_binary_format::CompiledModule;
+use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
+use move_bytecode_verifier::VerifierConfig;
 use move_compiler_v2::Options;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_model::metadata::LanguageVersion;
 use std::{collections::HashMap, path::Path};
-use thiserror::Error;
 
 /// The adapter's build identity, stamped by `build.rs`.
 pub fn identity(abi: u32) -> Identity {
@@ -55,16 +54,6 @@ pub fn identity(abi: u32) -> Identity {
 /// addressable.
 pub struct InMemoryModuleProvider {
     module_bytes: HashMap<(AccountAddress, Identifier), Bytes>,
-}
-
-#[derive(Debug, Error)]
-#[error("deserialization failed: {0}")]
-struct DeserializationError(move_binary_format::errors::PartialVMError);
-
-impl IntoExecutionError for DeserializationError {
-    fn kind(&self) -> ExecutionErrorKind {
-        ExecutionErrorKind::Placeholder
-    }
 }
 
 impl InMemoryModuleProvider {
@@ -95,15 +84,18 @@ impl ModuleProvider for InMemoryModuleProvider {
         Ok(self.module_bytes.get(&(*address, identifier)).cloned())
     }
 
-    fn deserialize_module(&self, bytes: &[u8]) -> VMResult<CompiledModule> {
-        CompiledModule::deserialize(bytes)
-            .map_err(|e| VMInternalError::new(DeserializationError(e)))
-    }
-
     fn verify_module(&self, _module: &CompiledModule) -> VMResult<()> {
         // Modules come from the in-process compiler, which produces valid
         // bytecode; the loader still runs its own lowering checks.
         Ok(())
+    }
+
+    fn deserializer_config(&self) -> &DeserializerConfig {
+        &DeserializerConfig::DEFAULT
+    }
+
+    fn verifier_config(&self) -> &VerifierConfig {
+        &VerifierConfig::DEFAULT
     }
 
     fn get_same_package_modules(

@@ -5,10 +5,9 @@
 //!
 //! V1 is the MoveVM in `move-vm-runtime` that MonoMove (V2) replaces.
 //!
-//! [`describe`] maps a type-erased [`VMInternalError`] to the [`V1ErrorInfo`]
-//! V1 would have produced for the same fault: its status code, sub-status, and
-//! message. Consumers needing V1-shaped errors share this one mapping instead
-//! of keeping their own.
+//! [`describe`] maps a type-erased [`VMInternalError`] to V1's status code,
+//! sub-status, and message, or preserves a complete error from a shared
+//! component. Consumers needing V1-shaped errors share this mapping.
 //!
 //! Not every message can be reproduced. Most match V1's byte for byte, some
 //! faults carry no message at all, and a few keep MonoMove's own text because
@@ -33,7 +32,10 @@ use mono_move_core::{
 };
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError};
-use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex};
+use move_binary_format::{
+    errors::{Location, VMError},
+    file_format::FunctionDefinitionIndex,
+};
 use move_core_types::vm_status::StatusCode;
 use move_vm_types::values::{INDEX_OUT_OF_BOUNDS, POP_EMPTY_VEC, VEC_UNPACK_PARITY_MISMATCH};
 
@@ -147,11 +149,25 @@ impl V1ErrorInfo {
             message: V1Message::MonoText(err.to_string()),
         }
     }
+
+    /// Extracts a V1 error's status, sub-status, and message. The sub-status and
+    /// message remain comparable, including when absent.
+    pub fn verbatim(error: VMError) -> Self {
+        let (status, sub_status, message, ..) = error.all_data();
+        Self {
+            status,
+            sub_status: sub_status.map_or(V1SubStatus::Absent, V1SubStatus::Known),
+            message: message.map_or(V1Message::Absent, V1Message::Verbatim),
+        }
+    }
 }
 
 /// The result of mapping a MonoMove error to V1.
 pub enum V1Equivalent {
     Described(V1ErrorInfo),
+    /// An unchanged error from the bytecode verifier shared with V1, including
+    /// its location, indices, and offsets.
+    Verbatim(VMError),
     /// V1 does not fail here: it either runs the input successfully or does not
     /// check for this at all.
     NoV1Failure,
@@ -208,8 +224,16 @@ pub fn describe(err: &VMInternalError) -> V1Equivalent {
 /// [`describe`] with a fallback when no V1 equivalent is available.
 /// Callers comparing with V1 must treat the fallback as a divergence.
 pub fn describe_or_fallback(err: &VMInternalError) -> V1ErrorInfo {
-    let status = match describe(err) {
+    fallback_info(err, describe(err))
+}
+
+/// Returns details from `equivalent`, using a fallback if no V1 equivalent
+/// exists. `equivalent` must be the result of [`describe`] for `err`.
+/// Callers comparing with V1 must treat the fallback as a divergence.
+pub fn fallback_info(err: &VMInternalError, equivalent: V1Equivalent) -> V1ErrorInfo {
+    let status = match equivalent {
         V1Equivalent::Described(info) => return info,
+        V1Equivalent::Verbatim(error) => return V1ErrorInfo::verbatim(error),
         // Execution-range codes throughout, so the executor keeps the
         // transaction and the fee it already charged.
         V1Equivalent::NoV1Failure => StatusCode::UNKNOWN_RUNTIME_STATUS,
@@ -354,8 +378,7 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::ScriptDeserializationFailed { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::CODE_DESERIALIZATION_ERROR, err)
         },
-        // The verifier's own status, as V1 reports it.
-        L::ScriptVerificationFailed { status } => V1ErrorInfo::with_mono_message(*status, err),
+        L::ScriptVerificationFailed { error } => return V1Equivalent::Verbatim(error.clone()),
         // MonoMove-only loading or lowering gaps have no corresponding V1
         // failure and therefore map to `NoV1Failure`.
         //
@@ -448,6 +471,7 @@ fn primitive_name(ty: IntTy) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use move_binary_format::errors::PartialVMError;
     use move_core_types::{account_address::AccountAddress, int256::I256};
 
     /// The mapping for an error V1 has a counterpart for.
@@ -759,7 +783,7 @@ mod tests {
                 message: "truncated".to_string(),
             },
             LoaderError::ScriptVerificationFailed {
-                status: StatusCode::MISSING_DEPENDENCY,
+                error: PartialVMError::new(StatusCode::MISSING_DEPENDENCY).finish(Location::Script),
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
@@ -778,6 +802,7 @@ mod tests {
             }
             let status = match describe_loader_error(err) {
                 V1Equivalent::Described(info) => info.status,
+                V1Equivalent::Verbatim(error) => error.major_status(),
                 // V1 does not fail here, so there is no V1 status to persist
                 // differently from.
                 V1Equivalent::NoV1Failure | V1Equivalent::V1StatusUnknown => continue,
