@@ -45,7 +45,10 @@ pub mod state_store;
 use crate::{
     chunk_to_commit::ChunkToCommit,
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary, state::State, state_summary::StateSummary,
+        positions::{PositionOverlay, ShardedPositionLayers},
+        sharded_jmt_state::PositionStateWithSummary,
+        state::State,
+        state_summary::StateSummary,
         state_with_summary::LedgerWithSummary,
     },
 };
@@ -398,6 +401,10 @@ pub trait DbReader: Send + Sync {
             &self,
         ) -> Result<LedgerWithSummary<PositionStateWithSummary>>;
 
+        /// Pre-committed position overlay. Errors when the feature is on
+        /// but native-position storage is absent.
+        fn get_pre_committed_positions(&self) -> Result<PositionOverlay>;
+
         /// Native-position analog of `get_state_proof_by_version_ext`: a
         /// cold-key proof from the persisted position JMT at `version`.
         fn get_position_state_proof_by_version_ext(
@@ -673,6 +680,23 @@ pub trait DbWriter: Send + Sync {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         chunk_opt: Option<ChunkToCommit>,
     ) -> Result<()> {
+        unimplemented!()
+    }
+
+    /// Fold `target` into the in-memory position base if given, and return
+    /// the base's layers: the floor every overlay built this stage extends
+    /// from. `None` when native position is off.
+    ///
+    /// Callers must ensure the base doesn't move while a block executes,
+    /// or that block's reads straddle two versions: the block executor
+    /// advances under its execution lock, state sync on a linear chain.
+    ///
+    /// Unimplemented rather than a silent no-op, so a delegating wrapper
+    /// that forgets to forward it fails loudly instead of never folding.
+    fn advance_position_base(
+        &self,
+        _target: Option<&PositionOverlay>,
+    ) -> Result<Option<ShardedPositionLayers>> {
         unimplemented!()
     }
 }

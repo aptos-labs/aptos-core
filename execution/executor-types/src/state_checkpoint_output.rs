@@ -65,9 +65,8 @@ impl StateCheckpointOutput {
     }
 
     pub fn reconfig_suffix(&self) -> Self {
-        // An empty reconfig-suffix block produces no position writes, so the
-        // position state is unchanged — propagate it for the next block's
-        // freeze base.
+        // No position writes in a reconfig suffix, so the summary carries
+        // over as the next block's freeze base.
         Self::new_empty(
             self.state_summary.clone(),
             self.position_state_summary.clone(),

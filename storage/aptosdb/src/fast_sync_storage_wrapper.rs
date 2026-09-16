@@ -8,7 +8,9 @@ use aptos_crypto::HashValue;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit,
+    state_store::positions::{PositionOverlay, ShardedPositionLayers},
+    DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -195,6 +197,13 @@ impl DbWriter for FastSyncStorageWrapper {
         let mut status = self.fast_sync_status.write();
         *status = FastSyncStatus::FINISHED;
         Ok(())
+    }
+
+    fn advance_position_base(
+        &self,
+        target: Option<&PositionOverlay>,
+    ) -> Result<Option<ShardedPositionLayers>> {
+        self.get_aptos_db_write_ref().advance_position_base(target)
     }
 
     fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {

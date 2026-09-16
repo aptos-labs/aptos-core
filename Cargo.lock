@@ -4467,10 +4467,12 @@ dependencies = [
 name = "aptos-storage-interface"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "anyhow",
  "aptos-config",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",

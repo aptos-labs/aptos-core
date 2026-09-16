@@ -27,6 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
+        positions::PositionParent,
         state::State,
         state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
         state_view::cached_state_view::CachedStateView,
@@ -380,8 +381,15 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             )?;
         }
 
+        // Record what is now durable. The fold itself happens when the
+        // next chunk is enqueued, so the base cannot move while a chunk
+        // is being executed or applied.
+        let committed_positions = chunk.output.result_positions().cloned();
+
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
-        self.commit_queue.lock().dequeue_committed()?;
+        self.commit_queue
+            .lock()
+            .dequeue_committed(committed_positions)?;
 
         Ok(chunk)
     }
@@ -399,6 +407,17 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     ) -> Result<()> {
         let parent_state = self.commit_queue.lock().latest_state().clone();
 
+        // Advance here, not at commit, so the base can't move while a
+        // chunk is executed or applied. The chain is linear and the
+        // target is the last committed chunk, so everything in flight
+        // descends from it.
+        let committed = self.commit_queue.lock().committed_positions();
+        let position_floor = self
+            .db
+            .writer
+            .advance_position_base(committed.as_ref())
+            .map_err(anyhow::Error::from)?;
+
         let first_version = parent_state.next_version();
         ensure!(
             chunk.first_version() == parent_state.next_version(),
@@ -410,7 +429,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let num_txns = chunk.len();
 
         let state_view = self.state_view(parent_state.latest())?;
-        let execution_output = chunk.into_output::<V>(&parent_state, state_view)?;
+        let latest_positions = self.commit_queue.lock().latest_positions();
+        let parent_positions = latest_positions
+            .as_ref()
+            .zip(position_floor.as_ref())
+            .map(|(overlay, floor)| PositionParent { overlay, floor });
+        let execution_output =
+            chunk.into_output::<V>(&parent_state, parent_positions, state_view)?;
         let output = PartialStateComputeResult::new(execution_output);
 
         // Enqueue for next stage.
@@ -747,6 +772,8 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             txns.into(),
             auxiliary_info,
             &parent_state,
+            // Verification only; nothing here is committed.
+            None,
             state_view,
             onchain_config,
             TransactionSliceMetadata::chunk(begin_version, end_version),

@@ -27,6 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
+        positions::{PositionParent, ShardedPositionLayers},
         state_summary::{ProvablePositionStateSummary, ProvableStateSummary},
         state_view::cached_state_view::CachedStateView,
     },
@@ -221,6 +222,7 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
+        let position_floor = self.prepare_position_base(block_id, parent_output)?;
 
         // Record ExecutionStart for traced transactions.
         // block_txns is populated at proposal time (round_manager::process_proposal).
@@ -264,6 +266,10 @@ where
                     transactions,
                     auxiliary_info,
                     parent_output.result_state(),
+                    parent_output
+                        .result_positions()
+                        .zip(position_floor.as_ref())
+                        .map(|(overlay, floor)| PositionParent { overlay, floor }),
                     state_view,
                     onchain_config,
                     TransactionSliceMetadata::block(parent_block_id, block_id),
@@ -295,6 +301,44 @@ where
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
         Ok(())
+    }
+
+    /// Advances the position base, and refuses a block that can no
+    /// longer read against it.
+    ///
+    /// Called under `execution_lock`, so the base can't move while a
+    /// block executes — which is what lets one check here cover every
+    /// read the VM goes on to make.
+    fn prepare_position_base(
+        &self,
+        block_id: HashValue,
+        parent_output: &PartialStateComputeResult,
+    ) -> ExecutorResult<Option<ShardedPositionLayers>> {
+        let Some(parent_positions) = parent_output.result_positions() else {
+            return Ok(None);
+        };
+        // Advance only to a version this block descends from. A block
+        // that doesn't is on a dead branch; leaving the base where it is
+        // keeps that block readable until it's pruned.
+        let certified = self.block_tree.root_block();
+        let target = certified
+            .output
+            .result_positions()
+            .filter(|certified_positions| parent_positions.is_descendant_of(certified_positions));
+        let floor = self
+            .db
+            .writer
+            .advance_position_base(target)
+            .map_err(anyhow::Error::from)?
+            .ok_or_else(|| ExecutorError::InternalError {
+                error: "parent carries positions but native-position storage is absent".into(),
+            })?;
+        if !parent_positions.descends_from(&floor) {
+            // The base already sits past this block's branch point, so
+            // its reads would resolve against the certified branch.
+            return Err(ExecutorError::StaleBranch(block_id));
+        }
+        Ok(Some(floor))
     }
 
     fn ledger_update(
