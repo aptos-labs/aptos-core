@@ -12998,6 +12998,7 @@ dependencies = [
  "move-model",
  "move-value-view",
  "serde",
+ "shared-dsa",
  "thiserror 1.0.69",
 ]
 
