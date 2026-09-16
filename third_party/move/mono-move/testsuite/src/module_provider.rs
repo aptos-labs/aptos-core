@@ -11,20 +11,11 @@
 use bytes::Bytes;
 use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult};
 use mono_move_loader::ModuleProvider;
-use move_binary_format::CompiledModule;
+use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::collections::HashMap;
 use thiserror::Error;
-
-#[derive(Debug, Error)]
-#[error("deserialization failed: {0}")]
-pub struct DeserializationError(move_binary_format::errors::PartialVMError);
-
-impl IntoExecutionError for DeserializationError {
-    fn kind(&self) -> ExecutionErrorKind {
-        ExecutionErrorKind::Placeholder
-    }
-}
 
 #[derive(Debug, Error)]
 pub enum ModuleProviderError {
@@ -44,17 +35,31 @@ impl IntoExecutionError for ModuleProviderError {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct InMemoryModuleProvider {
     module_bytes: HashMap<(AccountAddress, Identifier), Bytes>,
     packages: HashMap<(AccountAddress, Identifier), Vec<Identifier>>,
+    deserializer_config: DeserializerConfig,
+    verifier_config: VerifierConfig,
 }
 
 impl InMemoryModuleProvider {
+    /// An empty provider using the default deserializer and verifier configs.
     pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates an empty provider with the given configs. Deserialization
+    /// settings apply to modules and scripts; verification settings apply only
+    /// to scripts.
+    pub fn with_configs(
+        deserializer_config: DeserializerConfig,
+        verifier_config: VerifierConfig,
+    ) -> Self {
         Self {
-            module_bytes: HashMap::new(),
-            packages: HashMap::new(),
+            deserializer_config,
+            verifier_config,
+            ..Self::default()
         }
     }
 
@@ -101,12 +106,6 @@ impl InMemoryModuleProvider {
     }
 }
 
-impl Default for InMemoryModuleProvider {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ModuleProvider for InMemoryModuleProvider {
     fn get_module_bytes(&self, address: &AccountAddress, name: &str) -> VMResult<Option<Bytes>> {
         let Ok(ident) = Identifier::new(name) else {
@@ -115,14 +114,17 @@ impl ModuleProvider for InMemoryModuleProvider {
         Ok(self.module_bytes.get(&(*address, ident)).cloned())
     }
 
-    fn deserialize_module(&self, bytes: &[u8]) -> VMResult<CompiledModule> {
-        CompiledModule::deserialize(bytes)
-            .map_err(|e| VMInternalError::new(DeserializationError(e)))
-    }
-
     fn verify_module(&self, _module: &CompiledModule) -> VMResult<()> {
         // The loader verifies bytecode during translation, so no separate check is needed here.
         Ok(())
+    }
+
+    fn deserializer_config(&self) -> &DeserializerConfig {
+        &self.deserializer_config
+    }
+
+    fn verifier_config(&self) -> &VerifierConfig {
+        &self.verifier_config
     }
 
     fn get_same_package_modules(

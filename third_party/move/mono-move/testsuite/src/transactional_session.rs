@@ -162,7 +162,10 @@ impl TransactionalSession {
             storage: InMemoryStorage::new_with_runtime_environment(create_runtime_environment(
                 vm_config.clone(),
             )),
-            module_provider: InMemoryModuleProvider::new(),
+            module_provider: InMemoryModuleProvider::with_configs(
+                vm_config.deserializer_config.clone(),
+                vm_config.verifier_config.clone(),
+            ),
         }
     }
 
@@ -398,11 +401,7 @@ fn call(
     }
     let encoded_signers = signers
         .iter()
-        .map(|signer| {
-            MoveValue::Signer(*signer)
-                .simple_serialize()
-                .expect("a signer serializes")
-        })
+        .map(|signer| encode_signer(*signer))
         .collect::<Vec<_>>();
     let blobs = encoded_signers.iter().chain(args).map(Vec::as_slice);
     let placements = func
@@ -437,6 +436,13 @@ fn call(
         }
     }
     call.run().map_err(RunError::from)
+}
+
+/// Encodes a signer as V1's single-variant enum containing its address.
+fn encode_signer(address: AccountAddress) -> Vec<u8> {
+    MoveValue::Signer(address)
+        .simple_serialize()
+        .expect("a signer serializes")
 }
 
 /// The address of a signer in V1's wire encoding, or `None` for any other
@@ -489,10 +495,18 @@ fn return_values(
             let tag = type_tag_of(*ty).ok_or_else(|| {
                 RunError::Unsupported("return a value whose type has no type tag".to_string())
             })?;
-            // TODO(correctness): a returned `signer` serializes as a bare address,
-            // while V1 renders its one-variant enum encoding; only an empty
-            // `vector<signer>` is returned anywhere in the corpus today.
             let bytes = interp.serialize_root_result(*ty)?;
+            // Only a top-level signer is converted from a bare address to V1's
+            // variant encoding. Nested signers retain the bare encoding; the
+            // adapter rejects decoding failures but cannot detect incorrect
+            // values if the bytes also decode under V1's layout.
+            let bytes = if tag == TypeTag::Signer {
+                let address = AccountAddress::from_bytes(&bytes)
+                    .expect("MonoVM serializes a signer as its address");
+                encode_signer(address)
+            } else {
+                bytes
+            };
             Ok(vec![(tag, bytes)])
         },
         returns => Err(RunError::Unsupported(format!(

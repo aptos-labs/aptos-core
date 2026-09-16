@@ -4,7 +4,8 @@
 //! Loader subsystem error types.
 
 use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
-use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
+use move_binary_format::errors::VMError;
+use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -37,10 +38,10 @@ pub enum LoaderError {
     #[error("Script does not deserialize: {message}")]
     ScriptDeserializationFailed { message: String },
 
-    /// The script failed bytecode verification or linking against its
-    /// dependencies; `status` is the verifier's status code.
-    #[error("Script failed verification: {status:?}")]
-    ScriptVerificationFailed { status: StatusCode },
+    /// The script failed bytecode verification or dependency linking.
+    /// Preserves the original verifier error.
+    #[error("Script failed verification: {:?}", .error.major_status())]
+    ScriptVerificationFailed { error: VMError },
 
     /// TODO(cleanup): replace once the global context has its own error type.
     #[error(transparent)]
