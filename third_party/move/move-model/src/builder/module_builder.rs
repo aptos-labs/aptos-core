@@ -1716,6 +1716,7 @@ impl ModuleBuilder<'_, '_> {
             // Run finalization again, this time with reporting errors.
             et.finalize_types(true);
             et.check_mutable_borrow_field(&translated);
+            et.check_match_guards(&params, &translated);
             et.check_lambda_types(&translated);
             assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
             if let Some(specifiers) = access_specifiers {
