@@ -5,22 +5,31 @@
 //! of function calls (which comes at the cost of increasing code size).
 //!
 //! See the documentation for the `optimize` function for more details on what inlining is.
+//!
+//! Only callees in the caller's own module are inlined. Inlining across modules
+//! would have to preserve every property the language and the VM scope to a
+//! module: e.g., struct privacy, function visibility, which module emits an
+//! event, which module an abort is attributed to, the frames counted by the
+//! VM's reentrancy checks, independence from upgrades of other packages. Each
+//! needs its own exception, some cannot be decided from the callee's body at
+//! all but only from who calls it at runtime. We have determined that after all
+//! these exceptions, the remaining benefit is not worth the complexity added.
+//!
+//! Within a module none of these properties can change, so a static call to a
+//! callee without `#[module_lock]` is always safe to inline.
 
 use crate::{
     env_pipeline::rewrite_target::{RewriteState, RewriteTarget, RewriteTargets, RewritingScope},
     file_format_generator::MAX_LOCAL_COUNT,
 };
 use codespan_reporting::diagnostic::Severity;
-use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
     model::{
-        FunId, FunctionEnv, FunctionSize, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter,
-        QualifiedId,
+        FunId, FunctionEnv, FunctionSize, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
     },
     ty::Type,
-    well_known,
 };
 use once_cell::sync::Lazy;
 use petgraph::{algo::kosaraju_scc, prelude::DiGraphMap};
@@ -65,27 +74,21 @@ pub static UNROLL_DEPTH: Lazy<usize> = Lazy::new(|| {
 /// let (x, y, z, ...) = (a, b, c, ...); body
 /// ```
 ///
-/// The `across_package` value controls if inlining is performed across package boundaries.
-/// With across-package inlining, calls to functions in other packages may be inlined,
-/// which means that if the other package is upgraded, one would get the behavior
-/// at the inline-time rather than the latest upgrade.
-/// With `allow_non_primary_targets`, inlining optimization is performed to functions
-/// that do not belong to the primary target.
-pub fn optimize(env: &mut GlobalEnv, across_package: bool, allow_non_primary_targets: bool) {
+/// If `allow_non_primary_targets` is true, also optimize non-primary target modules.
+pub fn optimize(env: &mut GlobalEnv, allow_non_primary_targets: bool) {
     let mut targets = RewriteTargets::create(env, RewritingScope::CompilationTarget);
     let skip_functions = find_cycles_in_call_graph(env, &targets);
     targets.filter(|target, _| {
         if let RewriteTarget::MoveFun(function_id) = target {
             let function = env.get_function(*function_id);
             // We will consider inlining the callees in a function only if it satisfies all of:
-            // - is not a part of a cycle in the call graph
+            // - is not part of a cycle of same-module calls
             // - is in a primary target module (if `allow_non_primary_targets` is false)
             // - is not in a script module
             // - is not a test only function
             // - is not a verify only function
             // - is not a native function
             // - is not an inline function
-            // - does not have the `#[module_lock]` attribute
             !skip_functions.contains(function_id)
                 && (allow_non_primary_targets || function.module_env.is_primary_target())
                 && !function.module_env.is_script_module()
@@ -93,7 +96,6 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool, allow_non_primary_tar
                 && !function.is_verify_only()
                 && !function.is_native()
                 && !function.is_inline()
-                && !has_module_lock_attribute(&function)
         } else {
             // only move functions are considered for inlining optimization
             false
@@ -105,14 +107,10 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool, allow_non_primary_tar
         if todo.is_empty() {
             break;
         }
-        todo = inline_call_sites(env, &mut targets, todo, across_package);
+        todo = inline_call_sites(env, &mut targets, todo);
     }
     // Update the changed function definitions due to inlining.
     targets.write_to_env(env);
-    // Inlining can cause direct calls to `package` functions that were previously
-    // indirect. Thus, it may require additional caller modules to become friends
-    // of the callee modules.
-    env.update_friend_decls_in_targets();
 }
 
 /// Inline call sites in the given `todo` list of functions.
@@ -124,7 +122,6 @@ fn inline_call_sites(
     env: &GlobalEnv,
     targets: &mut RewriteTargets,
     todo: Vec<RewriteTarget>,
-    across_package: bool,
 ) -> Vec<RewriteTarget> {
     let mut changed_targets = Vec::new();
     for target in todo {
@@ -133,7 +130,6 @@ fn inline_call_sites(
         };
         let function_env = env.get_function(function_id);
         if let Some(def) = get_latest_function_definition(targets, &target, &function_env) {
-            let caller_module = &function_env.module_env;
             let current_caller_size = env
                 .function_size_estimate
                 .borrow()
@@ -144,12 +140,13 @@ fn inline_call_sites(
             };
             let (call_sites, new_size) = compute_call_sites_to_inline_and_new_function_size(
                 env,
-                caller_module,
+                function_env.module_env.get_id(),
                 def,
                 caller_size,
-                across_package,
-                &function_env,
             );
+            if call_sites.is_empty() {
+                continue;
+            }
             let mut rewriter = CallerRewriter { env, call_sites };
             // Rewrite the caller's body with inlined call sites.
             let rewritten_def = rewriter.rewrite_exp(def.clone());
@@ -184,8 +181,8 @@ fn get_latest_function_definition<'a>(
     }
 }
 
-/// Construct a call graph starting from the `targets`, and find all functions
-/// that are part of cycles (including self-recursion).
+/// Find functions in cycles of same-module calls, including self-recursion.
+/// Cross-module calls are never inlined, so cycles through them cannot be unrolled.
 fn find_cycles_in_call_graph(
     env: &GlobalEnv,
     targets: &RewriteTargets,
@@ -206,7 +203,7 @@ fn find_cycles_in_call_graph(
             if callee == &caller {
                 // self-recursion is added to the solution directly
                 cycle_nodes.insert(caller);
-            } else {
+            } else if callee.module_id == caller.module_id {
                 // non-self-recursion edges
                 graph.add_edge(caller, *callee, ());
             }
@@ -227,13 +224,10 @@ fn find_cycles_in_call_graph(
 /// after inlining those call sites.
 fn compute_call_sites_to_inline_and_new_function_size(
     env: &GlobalEnv,
-    caller_module: &ModuleEnv,
+    caller_mid: ModuleId,
     def: &Exp,
     caller_function_size: FunctionSize,
-    across_package: bool,
-    caller_func_env: &FunctionEnv,
 ) -> (BTreeSet<NodeId>, FunctionSize) {
-    let caller_mid = caller_module.get_id();
     let callees = def.called_funs_with_callsites_and_loop_depth();
     // Find all the callees that are eligible for inlining.
     let inline_eligible_functions = callees
@@ -241,40 +235,16 @@ fn compute_call_sites_to_inline_and_new_function_size(
         .filter_map(|(callee, sites_and_loop_depth)| {
             let callee_env = env.get_function(callee);
             let callee_size = get_function_size_estimate(env, &callee);
-            if callee_env.is_inline()
-                || callee_env.is_native()
-                || callee_size.code_size > *MAX_CALLEE_CODE_SIZE
-                || has_explicit_return(&callee_env)
-                || has_abort(&callee_env, caller_func_env)
-                || has_privileged_operations(caller_mid, &callee_env)
-                || has_invisible_calls(caller_module, &callee_env, across_package)
-                || has_module_lock_attribute(&callee_env)
-                || has_cross_module_event_emit(caller_mid, &callee_env)
-            {
-                // won't inline if:
-                // - callee is inline (should have been inlined already)
-                // - callee is native (no body to inline)
-                // - callee is too large (heuristic limit)
-                // - callee has an explicit return (cannot inline safely without additional
-                //   transformations)
-                // - callee has privileged operations on structs/enums that the caller cannot
-                //   perform directly
-                // - callee has calls to functions that are not visible from the caller module
-                // - callee has the `#[module_lock]` attribute
-                // - callee emits an event whose struct is defined in a module other than the
-                //   caller's (0x1::event::emit<T> must be called from T's defining module)
-                // - callee has runtime access control checks
-                // - callee has an abort expression
+            if !is_inlinable_callee(caller_mid, &callee_env, callee_size) {
                 None
             } else {
-                let function_size = get_function_size_estimate(env, &callee);
                 let callee_frequency = sites_and_loop_depth.len();
                 assert!(callee_frequency > 0);
                 // Note that the number of locals introduced by inlining a callee can be amortized
                 // by the number of times the callee is called, because these variables have
                 // non-overlapping lifetimes and will likely be coalesced.
                 // We also currently either inline all the callsites of a callee or none (for simplicity).
-                let locals_per_site = function_size.num_locals;
+                let locals_per_site = callee_size.num_locals;
                 let amortized_locals_per_site = locals_per_site.div_ceil(callee_frequency);
                 let max_loop_depth = sites_and_loop_depth
                     .iter()
@@ -387,211 +357,30 @@ fn get_function_size_estimate(env: &GlobalEnv, function: &QualifiedId<FunId>) ->
         .unwrap_or_default()
 }
 
-/// Does `callee` have any privileged operations on structs/enums that cannot be performed
-/// directly in a caller with module id `caller_mid`?
-fn has_privileged_operations(caller_mid: ModuleId, callee: &FunctionEnv) -> bool {
-    let env = callee.env();
-    // keep track if we have found any privileged operations
-    let mut found = false;
-    // used to track if we are within a spec block, privileged operations within
-    // spec blocks are allowed
-    let mut spec_blocks_seen = 0;
-    if let Some(body) = callee.get_def() {
-        body.visit_pre_post(&mut |post, exp: &ExpData| {
-            if !post {
-                if matches!(exp, ExpData::SpecBlock(..)) {
-                    spec_blocks_seen += 1;
-                }
-                if spec_blocks_seen > 0 {
-                    // within a spec block, we can have privileged operations
-                    return true;
-                }
-                // not inside a spec block, see if there are any privileged operations
-                match exp {
-                    ExpData::Call(id, op, _) => match op {
-                        Operation::Exists(_)
-                        | Operation::BorrowGlobal(_)
-                        | Operation::MoveFrom
-                        | Operation::MoveTo => {
-                            let inst = env.get_node_instantiation(*id);
-                            if let Some((struct_env, _)) = inst[0].get_struct(env) {
-                                let struct_mid = struct_env.module_env.get_id();
-                                if struct_mid != caller_mid {
-                                    found = true;
-                                }
-                            }
-                        },
-                        Operation::Select(mid, ..)
-                        | Operation::SelectVariants(mid, ..)
-                        | Operation::TestVariants(mid, ..)
-                        | Operation::Pack(mid, ..) => {
-                            if *mid != caller_mid {
-                                found = true;
-                            }
-                        },
-                        _ => {},
-                    },
-                    // various ways to unpack
-                    ExpData::Assign(_, pat, _)
-                    | ExpData::Block(_, pat, ..)
-                    | ExpData::Lambda(_, pat, ..) => pat.visit_pre_post(&mut |post, pat| {
-                        if !post {
-                            if let Pattern::Struct(_, sid, ..) = pat {
-                                let struct_mid = sid.module_id;
-                                if struct_mid != caller_mid {
-                                    found = true;
-                                }
-                            }
-                        }
-                    }),
-                    ExpData::Match(_, discriminator, _) => {
-                        let did = discriminator.node_id();
-                        if let Type::Struct(mid, ..) = env.get_node_type(did).drop_reference() {
-                            if mid != caller_mid {
-                                found = true;
-                            }
-                        }
-                    },
-                    _ => {},
-                }
-            } else {
-                // post visit
-                if matches!(exp, ExpData::SpecBlock(..)) {
-                    spec_blocks_seen -= 1;
-                }
-            }
-            // skip scanning for privileged operations if we already found one
-            !found
-        });
-    }
-    found
-}
-
-/// Does `callee` have any calls to functions that are not visible from `caller_module`?
-fn has_invisible_calls(
-    caller_module: &ModuleEnv,
+/// Returns whether `callee` is eligible for inlining into module `caller_mid`.
+fn is_inlinable_callee(
+    caller_mid: ModuleId,
     callee: &FunctionEnv,
-    across_package: bool,
+    callee_size: FunctionSize,
 ) -> bool {
-    let env = callee.env();
-    let caller_mid = caller_module.get_id();
-    if let Some(body) = callee.get_def() {
-        for called_fun_id in body.used_funs() {
-            let called_function = env.get_function(called_fun_id);
-            let called_mid = called_function.module_env.get_id();
-            if called_mid == caller_mid {
-                // same module, so visible
-                continue;
-            }
-            // TODO(#13745): hack for checking if two modules are in the same package
-            let same_package = caller_module.self_address()
-                == called_function.module_env.self_address()
-                && caller_module.is_primary_target()
-                && called_function.module_env.is_primary_target();
-
-            match called_function.visibility() {
-                Visibility::Public => {
-                    if !same_package && !across_package {
-                        // public function in a different package cannot be inlined due to change
-                        // in semantics on package upgrade, but we allow it when across-package
-                        // inlining is enabled
-                        return true;
-                    }
-                },
-                Visibility::Private => {
-                    return true;
-                },
-                Visibility::Friend => {
-                    // Note: `is_friend` implies `same_package`
-                    let is_friend = called_function.module_env.has_friend(&caller_mid);
-                    if is_friend || (called_function.has_package_visibility() && same_package) {
-                        // 1. a call to a friend function whose module has the caller module as a friend
-                        //    is visible and belongs to the same package
-                        // 2. a call to a package function belonging to the same package is also visible
-                        continue;
-                    }
-                    return true;
-                },
-            }
-        }
-    }
-    false
+    // Only same-module callees are inlined; see the module documentation.
+    callee.module_env.get_id() == caller_mid
+        // The module lock is acquired by the callee's own frame.
+        && !callee.has_module_lock()
+        // Explicit inline functions are expanded earlier; native functions have no body.
+        && !callee.is_inline()
+        && !callee.is_native()
+        // Bound code growth.
+        && callee_size.code_size <= *MAX_CALLEE_CODE_SIZE
+        // Inlined returns would exit the caller without additional rewriting.
+        && !has_explicit_return(callee)
 }
 
 /// Does `function` have an explicit return statement in its body?
 fn has_explicit_return(function: &FunctionEnv) -> bool {
-    let Some(exp) = function.get_def() else {
-        return false;
-    };
-    let mut found = false;
-    exp.visit_pre_order(&mut |e: &ExpData| {
-        if let ExpData::Return(..) = e {
-            found = true;
-        }
-        // Keep going if not yet found
-        !found
-    });
-    found
-}
-
-/// Does `function` have an abort expression in its body?
-fn has_abort(function: &FunctionEnv, caller: &FunctionEnv) -> bool {
-    let Some(exp) = function.get_def() else {
-        return false;
-    };
-    if function.module_env.get_id() == caller.module_env.get_id() {
-        return false;
-    }
-    let mut found = false;
-    exp.visit_pre_order(&mut |e: &ExpData| {
-        if let ExpData::Call(_, Operation::Abort(_), _) = e {
-            found = true;
-        }
-        // Keep going if not yet found
-        !found
-    });
-    found
-}
-
-/// Does `function` have the `#[module_lock]` attribute?
-fn has_module_lock_attribute(function: &FunctionEnv) -> bool {
-    let env = function.env();
-    function.has_attribute(|attr| {
-        env.symbol_pool().string(attr.name()).as_str() == well_known::MODULE_LOCK_ATTRIBUTE
-    })
-}
-
-/// Returns true when inlining `callee` would move an `event::emit<T>` call
-/// out of `T`'s module.
-///
-/// `event::emit<T>` is only valid when it runs in `T`'s defining module, and
-/// the extended checker enforces this per call-site. Inlining copies the
-/// callee's bytecode into the caller, so any emit inside the callee lands in
-/// the caller's module. That only works when `T` is a struct defined in the
-/// caller's own module.
-fn has_cross_module_event_emit(caller_mid: ModuleId, callee: &FunctionEnv) -> bool {
-    let env = callee.env();
-    let Some(body) = callee.get_def() else {
-        return false;
-    };
-    let stdlib_address = env.get_stdlib_address();
-    body.any(&mut |exp: &ExpData| {
-        let ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) = exp else {
-            return false;
-        };
-        let call = env.get_function(mid.qualified(*fid));
-        if call.module_env.get_name().addr() != &stdlib_address
-            || call.get_full_name_str() != well_known::EVENT_EMIT
-        {
-            return false;
-        }
-
-        // We can only inline if struct is in the same module as caller.
-        !matches!(
-            env.get_node_instantiation(*node_id).first(),
-            Some(Type::Struct(struct_mid, _, _)) if *struct_mid == caller_mid
-        )
-    })
+    function
+        .get_def()
+        .is_some_and(|exp| exp.any(&mut |e| matches!(e, ExpData::Return(..))))
 }
 
 /// Rewriter for a caller function to inline the call sites in it.
