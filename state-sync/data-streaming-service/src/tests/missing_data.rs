@@ -6,7 +6,7 @@ use crate::{
         DataClientRequest, DataPayload, EpochEndingLedgerInfosRequest,
         HotStateValuesWithProofRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        NumberOfStatesRequest, StateValuesWithProofRequest,
+        NumberOfHotStatesRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
         SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
@@ -16,7 +16,7 @@ use crate::{
     stream_engine::{bound_by_range, DataStreamEngine, StreamEngine},
     streaming_client::{
         ContinuouslyStreamTransactionOutputsRequest, GetAllEpochEndingLedgerInfosRequest,
-        GetAllStatesRequest, GetAllTransactionsRequest, StreamRequest,
+        GetAllHotStatesRequest, GetAllStatesRequest, GetAllTransactionsRequest, StreamRequest,
     },
     tests::{utils, utils::create_ledger_info},
 };
@@ -681,6 +681,198 @@ fn transform_state_values_stream_notifications() {
     // Verify the tracked stream indices
     assert_eq!(stream_engine.cursor.next_stream_index, last_index + 1);
     assert_eq!(stream_engine.cursor.next_request_index, number_of_states);
+}
+
+#[test]
+fn transform_hot_state_values_stream_notifications() {
+    // Create a hot state values stream request
+    let version = 100;
+    let start_index = 1000;
+    let stream_request = StreamRequest::GetAllHotStates(GetAllHotStatesRequest {
+        version,
+        start_index,
+    });
+
+    // Create a global data summary with a single state range
+    let mut global_data_summary = GlobalDataSummary::empty();
+    global_data_summary.advertised_data.states =
+        vec![CompleteDataRange::new(version, version).unwrap()];
+    global_data_summary.optimal_chunk_sizes.state_chunk_size = 20_000;
+
+    // Create a new hot state values stream engine
+    let mut stream_engine = match StreamEngine::new(
+        DataStreamingServiceConfig::default(),
+        &stream_request,
+        &global_data_summary.advertised_data,
+    )
+    .unwrap()
+    {
+        StreamEngine::HotStateStreamEngine(stream_engine) => stream_engine,
+        unexpected_engine => {
+            panic!(
+                "Expected hot state values stream engine but got {:?}",
+                unexpected_engine
+            );
+        },
+    };
+
+    // The engine must first request the number of hot states
+    let notification_id_generator = create_notification_id_generator();
+    let count_requests = stream_engine
+        .create_data_client_requests(
+            1,
+            1,
+            0,
+            &global_data_summary,
+            notification_id_generator.clone(),
+        )
+        .unwrap();
+    assert_eq!(count_requests, vec![DataClientRequest::NumberOfHotStates(
+        NumberOfHotStatesRequest { version }
+    )]);
+
+    // Feed the count back and verify no notification is surfaced to the consumer
+    let number_of_hot_states = 10_000;
+    let data_notification = stream_engine
+        .transform_client_response_into_notification(
+            &count_requests[0].clone(),
+            ResponsePayload::NumberOfStates(number_of_hot_states),
+            notification_id_generator.clone(),
+        )
+        .unwrap();
+    assert!(data_notification.is_none());
+    assert!(!stream_engine.is_stream_complete());
+
+    // Verify the tracked stream indices
+    assert_eq!(stream_engine.cursor.next_stream_index, start_index);
+    assert_eq!(stream_engine.cursor.next_request_index, start_index);
+
+    // Create a single chunk request
+    let data_client_request = stream_engine
+        .create_data_client_requests(
+            1,
+            1,
+            0,
+            &global_data_summary,
+            notification_id_generator.clone(),
+        )
+        .unwrap();
+    assert_eq!(data_client_request.len(), 1);
+    assert_eq!(
+        stream_engine.cursor.next_request_index,
+        number_of_hot_states
+    );
+
+    // A state value response for a hot request is the wrong type
+    stream_engine
+        .transform_client_response_into_notification(
+            &data_client_request[0].clone(),
+            ResponsePayload::StateValuesWithProof(create_state_value_chunk(
+                start_index,
+                start_index,
+                1,
+            )),
+            notification_id_generator.clone(),
+        )
+        .unwrap_err();
+
+    // An empty hot state chunk is rejected
+    stream_engine
+        .transform_client_response_into_notification(
+            &data_client_request[0].clone(),
+            ResponsePayload::HotStateValuesWithProof(create_hot_state_value_chunk(
+                start_index,
+                start_index - 1,
+                0,
+            )),
+            notification_id_generator.clone(),
+        )
+        .unwrap_err();
+
+    // A partial (byte-limited) response advances the stream but not to the end
+    let last_index = number_of_hot_states - 500;
+    let hot_state_value_chunk =
+        create_hot_state_value_chunk(start_index, last_index, last_index - start_index + 1);
+    let data_notification = stream_engine
+        .transform_client_response_into_notification(
+            &data_client_request[0].clone(),
+            ResponsePayload::HotStateValuesWithProof(hot_state_value_chunk.clone()),
+            notification_id_generator.clone(),
+        )
+        .unwrap();
+    assert_eq!(
+        data_notification.unwrap().data_payload,
+        DataPayload::HotStateValuesWithProof(hot_state_value_chunk)
+    );
+    assert_eq!(stream_engine.cursor.next_stream_index, last_index + 1);
+    assert!(!stream_engine.is_stream_complete());
+
+    // The final chunk completes the stream
+    let final_last_index = number_of_hot_states - 1;
+    let data_client_request =
+        DataClientRequest::HotStateValuesWithProof(HotStateValuesWithProofRequest {
+            version,
+            start_index: last_index + 1,
+            end_index: final_last_index,
+        });
+    let _ = stream_engine
+        .transform_client_response_into_notification(
+            &data_client_request,
+            ResponsePayload::HotStateValuesWithProof(create_hot_state_value_chunk(
+                last_index + 1,
+                final_last_index,
+                final_last_index - last_index,
+            )),
+            notification_id_generator,
+        )
+        .unwrap();
+    assert!(stream_engine.is_stream_complete());
+}
+
+#[test]
+fn transform_empty_hot_state_snapshot_stream_notifications() {
+    // Create a hot state values stream request
+    let version = 100;
+    let stream_request = StreamRequest::GetAllHotStates(GetAllHotStatesRequest {
+        version,
+        start_index: 0,
+    });
+
+    // Create a global data summary with a single state range
+    let mut global_data_summary = GlobalDataSummary::empty();
+    global_data_summary.advertised_data.states =
+        vec![CompleteDataRange::new(version, version).unwrap()];
+
+    // Create a new hot state values stream engine
+    let mut stream_engine = match StreamEngine::new(
+        DataStreamingServiceConfig::default(),
+        &stream_request,
+        &global_data_summary.advertised_data,
+    )
+    .unwrap()
+    {
+        StreamEngine::HotStateStreamEngine(stream_engine) => stream_engine,
+        unexpected_engine => {
+            panic!(
+                "Expected hot state values stream engine but got {:?}",
+                unexpected_engine
+            );
+        },
+    };
+
+    // A hot state count of zero ends the stream without any chunk notification.
+    // The bootstrapper decides whether emptiness is legitimate.
+    let notification_id_generator = create_notification_id_generator();
+    let count_request = DataClientRequest::NumberOfHotStates(NumberOfHotStatesRequest { version });
+    let data_notification = stream_engine
+        .transform_client_response_into_notification(
+            &count_request,
+            ResponsePayload::NumberOfStates(0),
+            notification_id_generator,
+        )
+        .unwrap();
+    assert!(data_notification.is_none());
+    assert!(stream_engine.is_stream_complete());
 }
 
 #[test]
