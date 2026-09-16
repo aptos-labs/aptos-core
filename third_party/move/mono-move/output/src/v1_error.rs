@@ -294,7 +294,13 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSSequenceTooLong { .. }
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
-        | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
+        | E::BCSSignerNotDeserializable
+        | E::BCSInvalidEnumTag { .. } => return V1Equivalent::V1StatusUnknown,
+
+        E::MalformedStringArgument
+        | E::ObjectArgumentDoesNotExist
+        | E::ObjectArgumentLacksResource => return V1Equivalent::V1StatusUnknown,
+        E::ArgumentStorageRead(inner) => return describe(inner),
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.
         E::Unsupported(_) => return V1Equivalent::NoV1Failure,

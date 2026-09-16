@@ -711,9 +711,10 @@ impl<'ctx> ExecutionGuard<'ctx> {
         self.ctx.layouts.by_ty.get(&ty).map(|r| *r)
     }
 
-    /// Publishes the layout for the given type and returns its assigned
-    /// [`LayoutId`].
-    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+    /// Publishes the layout for the type it was built for and returns its
+    /// assigned [`LayoutId`].
+    pub fn publish_layout(&self, layout: ValueLayout) -> LayoutId {
+        let ty = layout.ty.expect("a published layout carries its type");
         if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
             return *id;
         }

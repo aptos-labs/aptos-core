@@ -3,10 +3,10 @@
 
 //! Running a script payload.
 
-use super::args::{leading_signer_params, place_user_txn_args};
-use crate::errors::{MoveExecutionFailure, ScriptRejection};
+use super::args::{check_callable_signature, check_no_return_values, place_user_txn_args};
+use crate::errors::{invariant_violation, MoveExecutionFailure, ScriptRejection};
 use aptos_types::{chain_id::ChainId, vm::module_metadata::get_compilation_metadata};
-use mono_move_core::types::InternedTypeList;
+use mono_move_core::{interner::SCRIPT_MAIN, types::InternedTypeList, Interner};
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -38,12 +38,16 @@ pub(crate) fn run_script<'a>(
         .read_set()
         .get_loaded(guard.arena_ref_for_module_id(func.module_id))
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    check_script_allowed(&module.ir().module, chain_id)
-        .map_err(MoveExecutionFailure::RejectedScript)?;
-    // TODO(correctness): like an entry function, a script must not return
-    // values or take a parameter type a transaction argument cannot fill.
-    let num_signer_params =
-        leading_signer_params(&func.param_tys).map_err(MoveExecutionFailure::InvalidArguments)?;
+    let prepared = &module.ir().module;
+    check_script_allowed(prepared, chain_id).map_err(MoveExecutionFailure::RejectedScript)?;
+    // A script's `main` is checked like an entry function: same return-value
+    // and parameter-type rules, same order, before any argument is decoded.
+    let def_idx = module
+        .function_def_idx(guard.identifier_of(SCRIPT_MAIN))
+        .ok_or_else(|| invariant_violation("a loaded script defines `main`"))
+        .map_err(MoveExecutionFailure::RuntimeError)?;
+    check_no_return_values(prepared, def_idx).map_err(MoveExecutionFailure::InvalidArguments)?;
+    let num_signer_params = check_callable_signature(guard, interp, &func.param_tys)?;
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;

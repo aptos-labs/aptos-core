@@ -12957,6 +12957,7 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-value-view",
+ "shared-dsa",
  "thiserror 1.0.69",
  "triomphe",
 ]
