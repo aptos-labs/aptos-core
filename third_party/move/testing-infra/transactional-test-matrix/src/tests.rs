@@ -127,6 +127,23 @@ fn every_divergence_names_a_source_and_records_a_reason() {
     assert_every_divergence_names_a_source(&MOVE_VM);
 }
 
+fn assert_every_separate_baseline_fragment_matches_a_source<P>(corpus: &Corpus<P>) {
+    let sources = corpus.sources(&workspace_root().join(corpus.root));
+    for fragment in corpus.separate_baseline {
+        assert!(
+            sources.iter().any(|identity| identity.contains(fragment)),
+            "{}: separate-baseline fragment `{fragment}` matches no source",
+            corpus.name
+        );
+    }
+}
+
+#[test]
+fn every_separate_baseline_fragment_matches_a_source() {
+    assert_every_separate_baseline_fragment_matches_a_source(&COMPILER_V2);
+    assert_every_separate_baseline_fragment_matches_a_source(&MOVE_VM);
+}
+
 fn assert_every_source_is_covered<P>(corpus: &Corpus<P>) {
     for identity in corpus.sources(&workspace_root().join(corpus.root)) {
         assert!(
