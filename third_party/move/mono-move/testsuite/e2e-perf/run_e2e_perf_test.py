@@ -160,6 +160,9 @@ class WorkloadResult:
     # Per metric, the wider of the two VMs' (max - min) / median.
     spread: dict = field(default_factory=dict)
     verdict: str = "ok"
+    # Per metric, the speedup this workload is calibrated at. A metric with no
+    # row in the TSV is absent.
+    calibrated: dict = field(default_factory=dict)
     warnings: list = field(default_factory=list)
 
 
@@ -478,11 +481,17 @@ def run_workload(workload, db_dir, tmpdir, calibration):
                     f"code; the comparison may be skewed"
                 )
 
-    result.verdict = (
-        "self-compare"
-        if SELF_COMPARE
-        else verdict_for(workload, result.speedup, result.spread, calibration)
-    )
+    if SELF_COMPARE:
+        result.verdict = "self-compare"
+    else:
+        result.calibrated = {
+            metric: calibration[(workload.name, metric)]["median_speedup"]
+            for metric in CALIBRATED_METRICS
+            if (workload.name, metric) in calibration
+        }
+        result.verdict = verdict_for(
+            workload, result.speedup, result.spread, calibration
+        )
     return result
 
 
@@ -519,6 +528,18 @@ def ratio(value):
     return f"{value:.2f}x"
 
 
+def calibrated(result, metric):
+    """The calibrated ratio for a metric, and how far this run moved from it. The
+    ratio alone says where the band sits, not whether the run barely moved or
+    doubled.
+    """
+    baseline = result.calibrated.get(metric)
+    if not baseline:
+        return "-"
+    change = result.speedup[metric] / baseline - 1.0
+    return f"{ratio(baseline)} ({change * 100:+.1f}%)"
+
+
 def headline_table(results, failures):
     rows = []
     for r in results:
@@ -528,14 +549,17 @@ def headline_table(results, failures):
                 f"{statistics.median([x.tps for x in r.v1_runs]):.0f}",
                 f"{statistics.median([x.tps for x in r.mono_runs]):.0f}",
                 ratio(r.speedup["total"]),
+                calibrated(r, "total"),
                 ratio(r.speedup["execution"]),
+                calibrated(r, "execution"),
                 ratio(r.speedup["inner_block_executor"]),
+                calibrated(r, "inner_block_executor"),
                 f"{max(r.spread[m] for m in VERDICT_METRICS) * 100:.1f}%",
                 r.verdict,
             ]
         )
     for name, _ in failures:
-        rows.append([name, "-", "-", "-", "-", "-", "-", "failed"])
+        rows.append([name] + ["-"] * 9 + ["failed"])
     return tabulate(
         rows,
         headers=[
@@ -543,8 +567,11 @@ def headline_table(results, failures):
             "V1 txn/s",
             "MonoMove txn/s",
             "total speedup",
+            "calibrated",
             "execution speedup",
+            "calibrated",
             "Block-STM speedup",
+            "calibrated",
             "run-to-run range",
             "verdict",
         ],
@@ -563,6 +590,7 @@ def output_size_table(results):
                 f"{v1_bpt:.0f}",
                 f"{mono_bpt:.0f}",
                 ratio(r.speedup["output_bytes_per_txn"]),
+                calibrated(r, "output_bytes_per_txn"),
             ]
         )
     return tabulate(
@@ -572,6 +600,7 @@ def output_size_table(results):
             "V1 bytes/txn",
             "MonoMove bytes/txn",
             "bytes/txn ratio",
+            "calibrated",
         ],
         tablefmt="github",
     )
@@ -646,6 +675,10 @@ def glossary(selected, results):
         "- `total speedup` — the whole pipeline: signature verification, "
         "execution, ledger update, commit.",
         "- `execution speedup` — the executor's execute stage alone.",
+        "- `calibrated` — the ratio in the column to its left as recorded in "
+        "`e2e_perf_speedup.tsv`: the median over the runs that row was last "
+        "seeded from, and in parentheses how far this run moved from it. "
+        "`-` when the workload has no row for that metric yet.",
         "- `Block-STM speedup` — `BlockExecutor::execute_block`, run "
         "sequentially here. The innermost of the three timers and the closest "
         "proxy for VM-only time: it leaves out the block setup and output "
@@ -661,6 +694,13 @@ def glossary(selected, results):
         "The stages nest: `total` ⊃ `execution` ⊃ `Block-STM`.",
         "",
         "#### Verdicts",
+        "",
+        "Only `execution` decides a verdict, by where its speedup fell relative "
+        "to the band around the `calibrated` value beside it. The percentages in "
+        "that column measure drift from the last calibration, not from the base "
+        "branch: while the bands are stale every run carries the same offset, "
+        "and a local run carries whatever this machine differs from the "
+        "benchmark runner by.",
         "",
         "- `ok` — the execution speedup landed inside the workload's calibrated "
         "band.",

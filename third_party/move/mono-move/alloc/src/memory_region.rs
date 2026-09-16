@@ -57,13 +57,12 @@ impl MemoryRegion {
         region
     }
 
-    /// Prepares a region for reuse by a new owner. The previous owner's bytes
-    /// carry over, so the new owner still owes [`Self::new_uninit`]'s
+    /// Hands a region to a new owner. Whatever bytes are already there carry
+    /// over, so the new owner still owes [`Self::new_uninit`]'s
     /// write-before-read contract.
     ///
-    /// Debug builds re-poison. Without this, a reused region holds plausible
-    /// stale data rather than 0xAA, and a read-before-write bug would go
-    /// unnoticed.
+    /// Debug builds poison. Without this, the region holds plausible data
+    /// rather than 0xAA, and a read-before-write bug would go unnoticed.
     pub fn recycle(&mut self) {
         #[cfg(all(debug_assertions, not(miri)))]
         // SAFETY: `ptr` is a valid allocation of `layout.size()` bytes, and
