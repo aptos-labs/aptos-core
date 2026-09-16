@@ -168,6 +168,7 @@ impl StateComputeResult {
             state_reads: &self.execution_output.state_reads,
             hot_state_updates: &self.execution_output.hot_state_updates,
             position_state_summary: self.state_checkpoint_output.position_state_summary.as_ref(),
+            positions: self.state_checkpoint_output.positions.as_ref(),
             is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
     }

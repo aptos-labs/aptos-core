@@ -24,6 +24,7 @@ anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-experimental-layered-map = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-scratchpad = { workspace = true }

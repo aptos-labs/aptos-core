@@ -40,6 +40,12 @@ pub enum ExecutorError {
 
     #[error("request timeout")]
     CouldNotGetData,
+
+    // Appended, not inserted: this enum derives `Serialize`/`Deserialize`
+    // and BCS encodes variants positionally, so adding one anywhere but
+    // the end shifts the discriminants of everything after it.
+    #[error("Block {0:x} sits on a branch the certified chain has left behind")]
+    StaleBranch(HashValue),
 }
 
 impl From<anyhow::Error> for ExecutorError {

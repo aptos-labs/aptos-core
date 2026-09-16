@@ -44,7 +44,7 @@ pub struct AptosDB {
 // DbReader implementations and private functions used by them.
 mod aptosdb_reader;
 // DbWriter implementations and private functions used by them.
-mod aptosdb_writer;
+pub(crate) mod aptosdb_writer;
 // Other private methods.
 mod aptosdb_internal;
 // Native-position subsystem: `PositionBundle` + `impl AptosDB` for

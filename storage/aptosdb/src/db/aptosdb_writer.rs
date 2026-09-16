@@ -14,6 +14,7 @@ use crate::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
+    native_state_store::PositionWrites,
     position_buffered_state::{
         PositionLedgerStateWithSummary, PositionProofReader, PositionSlot, PositionStateWithSummary,
     },
@@ -30,8 +31,8 @@ use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
-    StateKind, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, db_ensure as ensure, state_store::positions::PositionOverlay,
+    AptosDbError, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_types::transaction::TransactionAuxiliaryData;
@@ -79,6 +80,26 @@ impl DbWriter for AptosDB {
                 sync_commit || chunk.is_reconfig,
             )?;
 
+            Ok(())
+        })
+    }
+
+    fn advance_position_base(&self, positions: &PositionOverlay) -> Result<()> {
+        gauged_api("advance_position_base", || {
+            let Some(bundle) = self.position.as_ref() else {
+                return Ok(());
+            };
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["advance_position_base"]);
+            // A declined fold isn't an error: this runs on every block
+            // execution, and the base can legitimately sit ahead of the
+            // target when state sync has folded further.
+            if bundle.position_base.fold(positions) {
+                // The published tip's view base now sits below the
+                // base's; re-seat it or the layers underneath stay
+                // reachable from the bundle and never drop.
+                let mut tip = bundle.positions.lock();
+                *tip = tip.rebased_on_current_base();
+            }
             Ok(())
         })
     }
@@ -166,6 +187,18 @@ impl DbWriter for AptosDB {
     ) -> Result<()> {
         let (output_with_proof, persisted_aux_info) = output_with_proof.into_parts();
         gauged_api("finalize_state_snapshot", || {
+            // The resident index is built at open time, and a fast-sync
+            // restore writes position rows durably afterwards without
+            // rebuilding it — every restored position would read as
+            // absent. Refuse: rebuilding needs the bundle made swappable
+            // and the position JMT pipeline reset.
+            ensure!(
+                self.position.is_none(),
+                "Fast-sync restore is not supported with native-position storage attached: the \
+                 resident position index is built at open time and would not reflect the \
+                 restored position data.",
+            );
+
             // Ensure the output with proof only contains a single transaction output and info
             let num_transaction_outputs = output_with_proof.get_num_outputs();
             let num_transaction_infos = output_with_proof.proof.transaction_infos.len();
@@ -389,6 +422,11 @@ impl AptosDB {
         // Persist the position KV values + stale index.
         let mut sharded_kv_batches = new_sharded_kv_batches();
         let mut in_chunk_prior = InChunkPriorVersions::new();
+        // Decoded writes for the whole chunk, in arrival order. Applied
+        // to the published overlay once at chunk end, after the durable
+        // `position_db.commit(...)` succeeds.
+        let mut chunk_position_writes = PositionWrites::new();
+
         for (i, output) in chunk.transaction_outputs.iter().enumerate() {
             let version = chunk_first + i as Version;
             let position_writes: Vec<_> = output
@@ -397,7 +435,7 @@ impl AptosDB {
                 .map(|(k, op)| (k.clone(), op.as_write_op().clone()))
                 .collect();
             if !position_writes.is_empty() {
-                committer
+                let writes = committer
                     .apply(
                         version,
                         position_writes,
@@ -405,12 +443,29 @@ impl AptosDB {
                         &mut in_chunk_prior,
                     )
                     .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?;
+                chunk_position_writes.extend(writes);
             }
         }
         bundle
             .kv_db
             .commit(chunk_last_inclusive, None, sharded_kv_batches)
             .map_err(|e| AptosDbError::Other(format!("position_db commit failed: {e}")))?;
+
+        // Advance the tip the scanner reads through. `None` means either
+        // the feature is off or the chunk was built without the executor,
+        // as `aptosdb_testonly` does — extend from this chunk's writes
+        // rather than adopting an overlay.
+        match chunk.positions {
+            Some(executed) => {
+                *bundle.positions.lock() = executed.latest().clone();
+            },
+            None => {
+                if !chunk_position_writes.is_empty() {
+                    let mut positions = bundle.positions.lock();
+                    *positions = positions.extend(chunk_last_inclusive, chunk_position_writes);
+                }
+            },
+        }
 
         // Advance the position pipeline (merklize + persist + advance the base).
         // Flag on: the summary comes from execution on the chunk; off: compute

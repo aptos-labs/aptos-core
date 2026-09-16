@@ -20,7 +20,11 @@ use crate::{
 use aptos_config::config::{LedgerPrunerConfig, RocksdbConfig, StorageDirPaths};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_temppath::TempPath;
-use aptos_types::{state_store::state_key::StateKey, transaction::Version, write_set::WriteOp};
+use aptos_types::{
+    state_store::{native_position::NativePosition, state_key::StateKey},
+    transaction::Version,
+    write_set::WriteOp,
+};
 use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeSet, sync::Arc};
 
@@ -45,8 +49,25 @@ fn position_key(user_byte: u8) -> StateKey {
     StateKey::position(addr(1), addr(user_byte), addr(1))
 }
 
-fn upsert(bytes: &[u8]) -> WriteOp {
-    WriteOp::legacy_modification(bytes.to_vec().into())
+/// BCS-encoded `NativePosition` carrying `tag` in the `size` field.
+fn position_bytes(tag: u64) -> Vec<u8> {
+    NativePosition::PerpV1 {
+        size: tag,
+        is_long: true,
+        entry_px_times_size_sum: 0,
+        avg_acquire_entry_px: 0,
+        user_leverage: 1,
+        is_isolated: false,
+        funding_index_at_last_update: 0,
+        unrealized_funding_amount_before_last_update: 0,
+        timestamp: 0,
+    }
+    .serialize()
+    .expect("NativePosition serialize")
+}
+
+fn upsert(tag: u64) -> WriteOp {
+    WriteOp::legacy_modification(position_bytes(tag).into())
 }
 
 fn commit_at(db: &Arc<PositionDb>, version: Version, writes: Vec<(StateKey, WriteOp)>) {
@@ -90,9 +111,9 @@ fn position_pruner_removes_superseded_values_keeps_live() {
     let key = position_key(1);
     let hash = key.hash();
 
-    commit_at(&db, 0, vec![(key.clone(), upsert(b"v0"))]);
-    commit_at(&db, 5, vec![(key.clone(), upsert(b"v5"))]);
-    commit_at(&db, 10, vec![(key.clone(), upsert(b"v10"))]);
+    commit_at(&db, 0, vec![(key.clone(), upsert(100))]);
+    commit_at(&db, 5, vec![(key.clone(), upsert(105))]);
+    commit_at(&db, 10, vec![(key.clone(), upsert(110))]);
 
     let pruner = StateKvPruner::<PositionValue>::new(Arc::clone(&db)).unwrap();
     pruner.set_target_version(7);
@@ -115,7 +136,7 @@ fn position_pruner_first_write_removes_index_but_not_value() {
     let key = position_key(1);
     let hash = key.hash();
 
-    commit_at(&db, 3, vec![(key.clone(), upsert(b"v3"))]);
+    commit_at(&db, 3, vec![(key.clone(), upsert(103))]);
 
     let pruner = StateKvPruner::<PositionValue>::new(Arc::clone(&db)).unwrap();
     pruner.set_target_version(100);
@@ -143,12 +164,12 @@ fn position_pruner_fans_out_across_shards() {
     commit_at(
         &db,
         0,
-        keys.iter().cloned().map(|k| (k, upsert(b"a"))).collect(),
+        keys.iter().cloned().map(|k| (k, upsert(1001))).collect(),
     );
     commit_at(
         &db,
         1,
-        keys.iter().cloned().map(|k| (k, upsert(b"b"))).collect(),
+        keys.iter().cloned().map(|k| (k, upsert(1002))).collect(),
     );
 
     let pruner = StateKvPruner::<PositionValue>::new(Arc::clone(&db)).unwrap();
@@ -168,8 +189,8 @@ fn position_manager_drives_pruning() {
     let (_tmp, db) = open_position_db();
     let key = position_key(1);
     let hash = key.hash();
-    commit_at(&db, 0, vec![(key.clone(), upsert(b"v0"))]);
-    commit_at(&db, 5, vec![(key.clone(), upsert(b"v5"))]);
+    commit_at(&db, 0, vec![(key.clone(), upsert(100))]);
+    commit_at(&db, 5, vec![(key.clone(), upsert(105))]);
 
     let manager = PositionValuePrunerManager::new(Arc::clone(&db), LedgerPrunerConfig {
         enable: true,

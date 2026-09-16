@@ -16,7 +16,8 @@ use aptos_jellyfish_merkle::JellyfishMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
-        state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
+        positions::PositionOverlay, state::State, state_summary::StateSummary,
+        state_view::hot_state_view::HotStateView, state_with_summary::LedgerWithSummary,
     },
     AptosDbError, BlockHeight, DbReader, LedgerSummary, Result, StateKind, MAX_REQUEST_LIMIT,
 };
@@ -93,6 +94,28 @@ impl DbReader for AptosDB {
                 .as_ref()
                 .and_then(|bundle| bundle.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone())
+                .ok_or_else(|| {
+                    AptosDbError::Other(
+                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
+                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
+                            .to_string(),
+                    )
+                })
+        })
+    }
+
+    fn get_pre_committed_positions(&self) -> Result<LedgerWithSummary<PositionOverlay>> {
+        gauged_api("get_pre_committed_positions", || {
+            // Bundle holds the current `PositionOverlay` top, advanced by
+            // `commit_native_position`. Wrap into a LedgerWithSummary
+            // where latest == last_checkpoint == current top, so the
+            // executor can chain blocks off it after restart.
+            self.position
+                .as_ref()
+                .map(|bundle| {
+                    let top = bundle.positions.lock().clone();
+                    LedgerWithSummary::from_latest_and_last_checkpoint(top.clone(), top)
+                })
                 .ok_or_else(|| {
                     AptosDbError::Other(
                         "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
@@ -706,11 +729,19 @@ impl DbReader for AptosDB {
                 .as_ref()
                 .and_then(|bundle| bundle.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone());
+            // Alongside `position_state_summary` — bundle's positions
+            // wrapped as a single-tip `LedgerWithSummary` so the
+            // executor's first block after restart chains from it.
+            let positions = self.position.as_ref().map(|bundle| {
+                let top = bundle.positions.lock().clone();
+                LedgerWithSummary::from_latest_and_last_checkpoint(top.clone(), top)
+            });
             Ok(LedgerSummary {
                 state,
                 state_summary,
                 transaction_accumulator,
                 position_state_summary,
+                positions,
             })
         })
     }
