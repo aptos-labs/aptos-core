@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Checks a transaction must pass before execution touches any state.
+//! Checks a transaction must pass before it runs. All but the account-creation
+//! check need no state.
 //!
 //! TODO(completeness): currently this uses the legacy VM types (e.g. `AptosGasParameters`),
 //! but eventually should switch to a new on-chain config format.
@@ -17,10 +18,16 @@ use aptos_gas_schedule::{
     },
     AptosGasParameters, TransactionGasParameters, VMGasParameters,
 };
+use aptos_types::on_chain_config::Features;
+use aptos_vm_types::storage::space_pricing::DiskSpacePricing;
+
+/// The execution gas units budgeted for creating the sender's account.
+const ACCOUNT_CREATION_EXECUTION_GAS: u64 = 10;
 
 pub(crate) struct PreExecutionChecker<'a> {
     gas_params: &'a AptosGasParameters,
     gas_feature_version: u64,
+    features: &'a Features,
     txn_data: &'a TxnMetadata,
 }
 
@@ -28,23 +35,23 @@ impl<'a> PreExecutionChecker<'a> {
     pub fn new(
         gas_params: &'a AptosGasParameters,
         gas_feature_version: u64,
+        features: &'a Features,
         txn_data: &'a TxnMetadata,
     ) -> Self {
         Self {
             gas_params,
             gas_feature_version,
+            features,
             txn_data,
         }
     }
 
+    /// Runs the checks that need no state.
     pub fn run_checks(&self) -> Result<(), PreExecutionCheckFailure> {
         self.check_transaction_size()?;
         self.check_gas_price_bounds()?;
         self.check_gas_budget_upper_bound()?;
-        self.check_gas_budget_covers_base_cost()?;
-        // TODO(completeness, metering): the account-creation affordability
-        // check, once lazy account creation is supported.
-        Ok(())
+        self.check_gas_budget_covers_base_cost()
     }
 
     fn txn_gas_params(&self) -> &TransactionGasParameters {
@@ -155,6 +162,33 @@ impl<'a> PreExecutionChecker<'a> {
                 max_gas: self.max_gas().into(),
                 min: base_cost.into(),
             });
+        }
+        Ok(())
+    }
+
+    /// When the sender's account is about to be created, the budget must also
+    /// cover its storage slot on top of a minimal execution. Not enforced at a
+    /// zero gas price.
+    pub fn check_gas_budget_covers_account_creation(&self) -> Result<(), PreExecutionCheckFailure> {
+        let gas_unit_price = u64::from(self.gas_price());
+        if gas_unit_price == 0 {
+            return Ok(());
+        }
+        let slot_fee = u64::from(
+            DiskSpacePricing::new(self.gas_feature_version, self.features)
+                .hack_estimated_fee_for_account_creation(self.txn_gas_params()),
+        );
+        let min_octas = gas_unit_price
+            .saturating_mul(ACCOUNT_CREATION_EXECUTION_GAS)
+            .saturating_add(slot_fee);
+        let budget_octas = gas_unit_price.saturating_mul(u64::from(self.max_gas()));
+        if budget_octas < min_octas {
+            return Err(
+                PreExecutionCheckFailure::GasBudgetBelowAccountCreationCost {
+                    budget_octas,
+                    min_octas,
+                },
+            );
         }
         Ok(())
     }
