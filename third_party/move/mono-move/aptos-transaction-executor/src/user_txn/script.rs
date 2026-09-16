@@ -3,7 +3,7 @@
 
 //! Running a script payload.
 
-use super::args::place_user_txn_args;
+use super::args::{leading_signer_params, place_user_txn_args};
 use crate::errors::{MoveExecutionFailure, ScriptRejection};
 use aptos_types::{chain_id::ChainId, vm::module_metadata::get_compilation_metadata};
 use mono_move_core::types::InternedTypeList;
@@ -40,11 +40,16 @@ pub(crate) fn run_script<'a>(
         .map_err(MoveExecutionFailure::RuntimeError)?;
     check_script_allowed(&module.ir().module, chain_id)
         .map_err(MoveExecutionFailure::RejectedScript)?;
+    // TODO(correctness): like an entry function, a script must not return
+    // values or take a parameter type a transaction argument cannot fill.
+    let num_signer_params =
+        leading_signer_params(&func.param_tys).map_err(MoveExecutionFailure::InvalidArguments)?;
     let mut call = interp
         .build_call(func)
         .map_err(MoveExecutionFailure::RuntimeError)?;
     place_user_txn_args(
         &mut call,
+        num_signer_params,
         sender,
         secondary_signers,
         &convert_txn_args(args),

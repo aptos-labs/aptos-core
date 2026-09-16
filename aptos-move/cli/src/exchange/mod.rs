@@ -783,7 +783,9 @@ fn constant_value(cons: &Constant) -> Result<exchange::Value> {
         Constant::U32(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::U64(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::U128(x) => Ok(exchange::Value::Num(x.to_string())),
-        Constant::U256(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::U256(x) => Ok(exchange::Value::Num(
+            move_core_types::int256::U256::from(*x).to_string(),
+        )),
         Constant::Address(Address::Numerical(a)) => {
             Ok(exchange::Value::Address(a.to_hex_literal()))
         },

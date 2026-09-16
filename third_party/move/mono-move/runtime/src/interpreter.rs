@@ -11,9 +11,9 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_or_gc, deserialize_or_gc,
+        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        AllocationError, FrozenHeap, Heap, TopFrame,
+        FrozenHeap, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
@@ -35,8 +35,7 @@ use mono_move_core::{
     captured_values_size,
     interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
     native::{
-        NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus,
-        ObjectHandle, RootPool,
+        NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus, RootPool,
     },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
@@ -46,13 +45,14 @@ use mono_move_core::{
     },
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
     FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand, VMInternalError,
-    VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    IntShiftOp, IntTy, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
+    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
+    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
+use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     account_address::AccountAddress,
@@ -499,17 +499,33 @@ impl<'guard> InterpreterContext<'guard> {
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
+    /// The module `module_id`, loaded and charged if this transaction has not
+    /// loaded it yet.
+    pub fn load_module(&mut self, module_id: InternedModuleId) -> VMResult<&'guard LoadedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        match self.read_set.get(arena_ref) {
+            None => self
+                .loader
+                .load_module(&mut self.read_set, &mut self.gas_meter, arena_ref),
+            Some(_) => self.read_set.get_loaded(arena_ref),
+        }
+    }
+
+    /// A module some loaded function came from. Loading the function loaded
+    /// its module into the read set, so a miss is an invariant violation.
+    fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        Ok(&self.read_set.get_loaded(arena_ref)?.ir().module)
+    }
+
     /// Resolve a constant from `module_id`'s constant pool, returning its
-    /// interned type and BCS bytes. The calling function was loaded from
-    /// `module_id`, so the module is always present and loaded in the read
-    /// set; a missing or not-yet-loaded entry is an invariant violation.
+    /// interned type and BCS bytes.
     fn load_constant(
         &self,
         module_id: InternedModuleId,
         idx: ConstantPoolIndex,
     ) -> VMResult<(InternedType, &'guard [u8])> {
-        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
-        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        let module = self.prepared_module(module_id)?;
         Ok((
             module.interned_constant_type_at(idx),
             module.constant_data_at(idx),
@@ -2685,14 +2701,6 @@ impl InterpreterContext<'_> {
     /// Deep-copy each of `sources` into the local heap, returning the new root
     /// pointers in the same order.
     ///
-    /// All sources are rooted for the whole batch, so a GC triggered partway
-    /// through preserves and relocates the not-yet-copied ones. Because
-    /// `try_deep_copy` never GCs mid-copy, a *successful* pass builds every
-    /// result without an intervening GC, so the already-built results need no
-    /// root of their own — only the sources are rooted. Mirrors
-    /// [`Self::deep_copy`]'s single GC-then-retry-once policy, batched over all
-    /// sources.
-    ///
     /// # Safety
     ///
     /// Every `source` must point to the data region of a live object whose
@@ -2702,47 +2710,22 @@ impl InterpreterContext<'_> {
         regs: VMRegisters,
         sources: &[NonNull<u8>],
     ) -> VMResult<Vec<NonNull<u8>>> {
-        // SAFETY: each source is a live object (caller contract); the handle
-        // keeps it live and relocated across any GC during the batch.
-        let guards: Vec<ObjectHandle> = sources
-            .iter()
-            .map(|&src| unsafe { self.root_pool.root_object(src.as_ptr()) })
-            .collect();
-        // First attempt. On out-of-memory, the partial copies are unrooted
-        // garbage; drop them, GC (which relocates the rooted sources), and
-        // retry the whole batch once.
-        let mut out = Vec::with_capacity(guards.len());
-        let mut needs_gc = false;
-        for guard in &guards {
-            // SAFETY: each root holds a live object; GC keeps `guard.ptr()`
-            // valid and relocated.
-            match unsafe {
-                self.heap
-                    .try_deep_copy(self.loader.guard(), NonNull::new_unchecked(guard.ptr()))
-            } {
-                Ok(ptr) => out.push(ptr),
-                Err(AllocationError::RuntimeError(err)) => return Err(VMInternalError::new(err)),
-                Err(AllocationError::OutOfHeapMemory { .. }) => {
-                    needs_gc = true;
-                    break;
+        // SAFETY: by this function's contract every source is a live object.
+        unsafe {
+            deep_copy_batch_or_gc(
+                &mut self.heap,
+                self.loader.guard(),
+                &mut self.read_write_set,
+                &self.root_pool,
+                &self.extensions,
+                regs.fp,
+                TopFrame::Function {
+                    func: regs.func,
+                    pc: regs.pc,
                 },
-            }
+                sources,
+            )
         }
-        if !needs_gc {
-            return Ok(out);
-        }
-        gc_collect!(self, regs.fp, regs.pc, regs.func)?;
-        out.clear();
-        for guard in &guards {
-            // SAFETY: as above, after relocation.
-            let ptr = unsafe {
-                self.heap
-                    .try_deep_copy(self.loader.guard(), NonNull::new_unchecked(guard.ptr()))
-            }
-            .map_err(AllocationError::into_runtime_error)?;
-            out.push(ptr);
-        }
-        Ok(out)
     }
 
     /// Implementation of `MicroOp::PackClosure`.
