@@ -3,7 +3,9 @@
 
 //! Interpreter-internal error types.
 
-use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError};
+use mono_move_core::{
+    ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError, VMInternalError,
+};
 use move_core_types::{
     account_address::AccountAddress,
     int256::{I256, U256},
@@ -114,6 +116,25 @@ pub enum RuntimeError {
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
 
+    #[error("BCS deserialize: enum tag {tag} out of range for {variant_count} variants")]
+    BCSInvalidEnumTag { tag: u64, variant_count: usize },
+
+    /// A `String` argument is not valid UTF-8.
+    #[error("argument check: a `String` is not valid UTF-8")]
+    MalformedStringArgument,
+
+    /// An `Object` argument names an address holding no object.
+    #[error("argument check: no object at the `Object` argument's address")]
+    ObjectArgumentDoesNotExist,
+
+    /// An `Object<T>` argument names an object holding no `T`.
+    #[error("argument check: the `Object` argument's address holds no resource of its type")]
+    ObjectArgumentLacksResource,
+
+    /// A storage read while checking an `Object` argument failed.
+    #[error("argument check: {0}")]
+    ArgumentStorageRead(VMInternalError),
+
     #[error("unsupported: {0}")]
     Unsupported(&'static str),
 }
@@ -135,9 +156,14 @@ impl RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
-            | BCSSignerNotDeserializable => true,
+            | BCSSignerNotDeserializable
+            | BCSInvalidEnumTag { .. } => true,
 
-            ArithmeticOverflow { .. }
+            MalformedStringArgument
+            | ObjectArgumentDoesNotExist
+            | ObjectArgumentLacksResource
+            | ArgumentStorageRead(_)
+            | ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }
             | DivisionByZero { .. }
             | ShiftAmountOutOfRange { .. }
@@ -197,7 +223,12 @@ impl IntoExecutionError for RuntimeError {
             | BCSSequenceTooLong { .. }
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
-            | BCSSignerNotDeserializable => ExecutionErrorKind::InvalidOperation,
+            | BCSSignerNotDeserializable
+            | BCSInvalidEnumTag { .. }
+            | MalformedStringArgument
+            | ObjectArgumentDoesNotExist
+            | ObjectArgumentLacksResource => ExecutionErrorKind::InvalidOperation,
+            ArgumentStorageRead(err) => err.kind(),
 
             Unsupported(_) => ExecutionErrorKind::InvariantViolation,
 

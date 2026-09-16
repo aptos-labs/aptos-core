@@ -27,7 +27,9 @@ use mono_move_core::{
         script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
     },
     native::NativeResolver,
-    types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    types::{
+        type_to_string, view_name, view_type, InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST,
+    },
     DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
     LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
 };
@@ -43,7 +45,7 @@ use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
         try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
-        try_lower_function, LoweringOutcome, SpecializerContext,
+        try_lower_function, try_publish_resource_type, LoweringOutcome, SpecializerContext,
     },
     ModuleIR,
 };
@@ -257,6 +259,48 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let (function, function_ms) =
             self.lower_function_with_ty_args(read_set, gas_meter, module, func_name, ty_args)?;
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
+    }
+
+    pub fn publish_resource_type(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        ty: InternedType,
+    ) -> VMResult<()> {
+        // The layout is published once for the whole context, but the read set
+        // is this transaction's own, and reading the resource needs the
+        // defining module in it. Record that before any early return.
+        let Type::Nominal { module_id, .. } = view_type(ty) else {
+            return Err(VMInternalError::new(
+                LoaderError::ResourceTypeNotPublishable {
+                    ty: type_to_string(ty),
+                },
+            ));
+        };
+        let arena_ref = self.guard.arena_ref_for_module_id(*module_id);
+        if read_set.get(arena_ref).is_none() {
+            self.load_module(read_set, gas_meter, arena_ref)?;
+        }
+
+        let published =
+            || self.guard.layout_id_for(ty).is_some() && self.guard.struct_descriptor(ty).is_some();
+        if published() {
+            return Ok(());
+        }
+        let mut loading_ctx = LoweringContext::new(self, read_set);
+        try_publish_resource_type(&mut loading_ctx, self.guard, ty)?;
+        let discovered = Arc::<[LoadedModuleSlot]>::from(loading_ctx.discovered);
+        self.record_loaded_and_charge_slots(read_set, gas_meter, &discovered, |_, _| {
+            invariant_violation!(UnexpectedReadSetMiss);
+        })?;
+        if !published() {
+            return Err(VMInternalError::new(
+                LoaderError::ResourceTypeNotPublishable {
+                    ty: type_to_string(ty),
+                },
+            ));
+        }
+        Ok(())
     }
 
     /// Loads a script from its bytes and returns its `main` instantiated with

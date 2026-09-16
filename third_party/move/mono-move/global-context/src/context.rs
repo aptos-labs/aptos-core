@@ -713,10 +713,11 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
     /// Publishes the layout for the given type and returns its assigned
     /// [`LayoutId`].
-    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+    pub fn publish_layout(&self, ty: InternedType, mut layout: ValueLayout) -> LayoutId {
         if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
             return *id;
         }
+        layout.ty = Some(ty);
 
         // TODO(perf): consider if we should append to the table without holding the shard lock.
         *self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {

@@ -264,6 +264,7 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
         // implement, or a feature the specializer/verifier can't lower.
         LoaderError::NativeFunctionNotLoadable { .. }
         | LoaderError::LoweringSkipped { .. }
+        | LoaderError::ResourceTypeNotPublishable { .. }
         | LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. } => TestResult::Unsupported(err.to_string()),
         // Genuine problems: storage/context infrastructure errors, or a VM bug.

@@ -29,10 +29,10 @@ use crate::{
         VEC_PUSHBACK_INIT_CAPACITY,
     },
     value_cmp, value_conv,
-    value_conv::rust::write_value,
+    value_conv::{bcs::DeserializeHooks, rust::write_value},
 };
 use mono_move_core::{
-    captured_values_size,
+    captured_values_size, intern_type_tag,
     interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
     native::{
         NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus, RootPool,
@@ -56,9 +56,10 @@ use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     account_address::AccountAddress,
+    ident_str,
     identifier::Identifier,
     int256::{I256, U256},
-    language_storage::ModuleId,
+    language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::AbortLocation,
 };
 use move_value_view::MoveValueView;
@@ -83,7 +84,9 @@ macro_rules! resolve_resource_group {
             ));
         };
         let arena_ref = $ctx.loader.guard().arena_ref_for_module_id(*module_id);
-        Ok($ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name))
+        Ok::<Option<InternedType>, VMInternalError>(
+            $ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name),
+        )
     }};
 }
 
@@ -292,6 +295,94 @@ impl<'a> CallBuilder<'a, '_> {
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
         unsafe { value_conv::bcs::deserialize_into(guard, &mut self.interp.heap, ty, bytes, dst) }
+    }
+
+    /// Places a BCS-encoded argument from an untrusted source, refusing the
+    /// framework values that fail validation (e.g. String that is not valid utf-8).
+    ///
+    /// On error, the parameter slot may be left partially written and the call
+    /// must be abandoned.
+    pub fn arg_bcs_untrusted(&mut self, bytes: &[u8]) -> VMResult<()> {
+        // Taken before the hooks below borrow the interpreter's fields.
+        let (dst, ty) = self.next_slot()?;
+
+        // Materialize the `0x1::object::ObjectCore` type, which is needed for checking
+        // whether there is a valid object under a deserialized address.
+        //
+        // TODO(perf): interned once per untrusted argument, whether or not it
+        // holds an `Object`; cache it for the transaction.
+        let guard = self.interp.loader.guard();
+        let object_core_tag = TypeTag::Struct(Box::new(StructTag {
+            address: AccountAddress::ONE,
+            module: ident_str!("object").to_owned(),
+            name: ident_str!("ObjectCore").to_owned(),
+            type_args: vec![],
+        }));
+        let object_core = intern_type_tag(&object_core_tag, guard).map_err(|err| {
+            VMInternalError::new(RuntimeError::InvariantViolation(
+                RuntimeInvariantViolation::Unreachable(err.to_string()),
+            ))
+        })?;
+
+        // Set up the hooks required for validating certain value types, deserialized from
+        // untrusted bytes.
+        let mut hooks = Hooks {
+            loader: &self.interp.loader,
+            read_set: &mut self.interp.read_set,
+            gas_meter: &mut self.interp.gas_meter,
+            resource_provider: self.interp.resource_provider,
+            read_write_set: &mut self.interp.read_write_set,
+            object_core,
+        };
+
+        struct Hooks<'a, 'guard> {
+            loader: &'a Loader<'guard, 'guard>,
+            read_set: &'a mut ModuleReadSet<'guard>,
+            gas_meter: &'a mut GasMeter,
+            resource_provider: &'guard dyn ResourceProvider,
+            read_write_set: &'a mut ResourceReadWriteSet,
+            object_core: InternedType,
+        }
+
+        impl DeserializeHooks for Hooks<'_, '_> {
+            /// Publishes the type's layout and loads its module if lowered
+            /// code has not done so yet.
+            fn resource_exists(
+                &mut self,
+                address: AccountAddress,
+                ty: InternedType,
+            ) -> VMResult<bool> {
+                self.loader
+                    .publish_resource_type(self.read_set, self.gas_meter, ty)?;
+                let group = resolve_resource_group!(self, ty)?;
+                Ok(self.read_write_set.exists(
+                    self.resource_provider,
+                    &InMemoryStorageKey::resource(address, ty),
+                    group,
+                )?)
+            }
+
+            fn object_core_type(&self) -> InternedType {
+                self.object_core
+            }
+        }
+
+        // Deserialize in untrusted mode, performing validation for certain
+        // framework types.
+        //
+        // SAFETY: `dst` and `ty` come from the function's own signature, so
+        // the slot is writable for the type's in-memory size.
+        unsafe {
+            value_conv::bcs::deserialize_untrusted(
+                guard,
+                &mut self.interp.heap,
+                ty,
+                bytes,
+                dst,
+                &mut hooks,
+            )
+        }
+        .map_err(|e| VMInternalError::new(e.into_runtime_error()))
     }
 
     /// Runs the call once all parameters have been filled.
