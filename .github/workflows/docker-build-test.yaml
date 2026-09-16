@@ -1,11 +1,12 @@
 ## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
 
 ## Note that when you create a PR the jobs in this file are triggered off the
-## `pull_request_target` event instead of `pull_request` event. This is because
-## the `pull_request` event makes secrets only available to PRs from branches,
-## not from forks, and some of these jobs require secrets. So with `pull_request_target`
-## we're making secrets available to fork-based PRs too. Using `pull_request_target"
-## has a side effect, which is that the workflow execution will be driven by the
+## `pull_request_target` event instead of `pull_request` event. Some jobs execute
+## code from the PR while authenticated to cloud services, so they must only run
+## for PR branches hosted in this repository. Fork PRs must be copied to a branch
+## in this repository before this workflow can run against them.
+##
+## Using `pull_request_target` has a side effect, which is that the workflow execution will be driven by the
 ## state of the <workflow>.yaml on the `main` (=target) branch, even if you edited
 ## the <workflow>.yaml in your PR. So when you for example add a new job here, you
 ## won't see that job appear in the PR itself. It will only become effective once
@@ -13,11 +14,9 @@
 ## to test it's functionality prior to a merge to main, you have to to _temporarily_
 ## change the trigger event from `pull_request_target` to `pull_request`.
 
-## Additionally, because `pull_request_target` gets secrets injected for forked PRs
-## we use `https://github.com/sushichop/action-repository-permission` to ensure these
-## jobs are only executed when a repo member with "write" permission has triggered
-## the workflow (directly through a push or indirectly by applying a label or enabling
-## auto_merge).
+## Additionally, we reject fork PRs before checking the triggering user's repository
+## permission. Both checks must pass before a job can execute PR code or access
+## credentials.
 
 name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
@@ -90,7 +89,23 @@ jobs:
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
     runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      AWS_ECR_ACCOUNT_NUM: ""
     steps:
+      - name: Reject fork PRs before privileged execution
+        if: github.event_name == 'pull_request_target'
+        env:
+          BASE_REPOSITORY: ${{ github.repository }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [[ -z "$PR_HEAD_REPOSITORY" || "$PR_HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]]; then
+            echo "::error::Privileged Docker and Forge CI cannot run against a fork PR. Copy the commit to a branch in $BASE_REPOSITORY and open a new PR."
+            exit 1
+          fi
       - name: Check repository permission for user which triggered workflow
         uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
         with:
@@ -129,6 +144,10 @@ jobs:
   test-target-determinator:
     needs: [permission-check]
     runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: read
+    env:
+      AWS_ECR_ACCOUNT_NUM: ""
     outputs:
       run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
     steps:
