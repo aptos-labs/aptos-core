@@ -50,6 +50,11 @@ type MonoVMTaskCommand =
 /// bytecode printing, module publishing, resource viewing, and unmetered runs
 /// of a module function or script.
 pub fn supports_source(path: &Path) -> Result<bool> {
+    // Only a budgeted run is unsupported; parse the tasks only when its flag
+    // can occur at all.
+    if !std::fs::read_to_string(path)?.contains("--gas-budget") {
+        return Ok(true);
+    }
     Ok(taskify::<MonoVMTaskCommand>(path)?
         .iter()
         .all(|task| match &task.command {

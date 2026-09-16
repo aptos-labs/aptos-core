@@ -65,8 +65,10 @@ const COMMON_EXCLUSIONS: &[&str] = &[
 /// They compile to ordinary Move bytecode, so we can change this in the future.
 const LEAN_ONLY: Applicability = Applicability::Deferred("requires the lake toolchain");
 
-/// The same sources as `baseline`, under other optimization settings.
-const LATER_TIER: Applicability = Applicability::Deferred("a later MonoMove rollout tier");
+/// The config compiles the same bytecode as `baseline` on MonoMove, so its
+/// trials would only repeat `baseline`'s.
+const SAME_AS_BASELINE: Applicability =
+    Applicability::NotApplicable("compiles the same bytecode as `baseline` on MonoMove");
 
 const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
     // Matches all default experiments.
@@ -94,7 +96,9 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        // `OPTIMIZE` is on by default, `OPTIMIZE_WAITING_FOR_COMPARE_TESTS` gates
+        // no compiler pass, and MonoMove never cross-compiles.
+        mono_move: SAME_AS_BASELINE,
     },
     MatrixConfig {
         name: "no-optimize",
@@ -105,7 +109,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     // Lean-authored programs have their own front end and use one default
     // Compiler V2 configuration outside the generic optimization matrix.
@@ -152,7 +156,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "operator-eval-lang-2",
@@ -297,7 +301,7 @@ const SEPARATE_BASELINE: &[&str] = &[
 ];
 
 /// Sources whose MonoMove output differs from the canonical baseline; each
-/// runs against its override baseline.
+/// runs against an override baseline, except under the configs it excepts.
 const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     MonoMoveDivergence::unsupported(
         "tests/misc/struct_assign_swap.move",
@@ -380,30 +384,38 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/no-v1-comparison/structs_visibility/public_struct_assign_swap.move",
         "multiple return values",
     ),
+    // The six `signed-int` scripts: under `opt-extra`, inlining removes the
+    // called frame, so V1 prints no stack trace either.
     MonoMoveDivergence::rendering(
         "tests/signed-int/arithmetic_i128.move",
         "no stack trace in exec_state",
-    ),
+    )
+    .except(&["opt-extra"]),
     MonoMoveDivergence::rendering(
         "tests/signed-int/arithmetic_i16.move",
         "no stack trace in exec_state",
-    ),
+    )
+    .except(&["opt-extra"]),
     MonoMoveDivergence::rendering(
         "tests/signed-int/arithmetic_i256.move",
         "no stack trace in exec_state",
-    ),
+    )
+    .except(&["opt-extra"]),
     MonoMoveDivergence::rendering(
         "tests/signed-int/arithmetic_i32.move",
         "no stack trace in exec_state",
-    ),
+    )
+    .except(&["opt-extra"]),
     MonoMoveDivergence::rendering(
         "tests/signed-int/arithmetic_i64.move",
         "no stack trace in exec_state",
-    ),
+    )
+    .except(&["opt-extra"]),
     MonoMoveDivergence::rendering(
         "tests/signed-int/arithmetic_i8.move",
         "no stack trace in exec_state",
-    ),
+    )
+    .except(&["opt-extra"]),
 ];
 
 pub static COMPILER_V2: Corpus<CompilerV2Payload> = Corpus {
