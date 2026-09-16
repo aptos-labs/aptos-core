@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
+    positions::PositionOverlay,
     sharded_jmt_state::PositionStateWithSummary,
     state::LedgerState,
     state_summary::LedgerStateSummary,
@@ -30,6 +31,15 @@ pub struct ChunkToCommit<'a> {
     /// be persisted/merklized at commit without recomputation. `None` when
     /// native position is disabled.
     pub position_state_summary: Option<&'a LedgerWithSummary<PositionStateWithSummary>>,
+    /// Position writes since the base, computed in the execution phase
+    /// — earlier than `position_state_summary`, which is a checkpoint-stage
+    /// product. Commit publishes this as the bundle's tip so the
+    /// validator-side scanner sees the latest committed view. `None` when
+    /// native position is disabled.
+    ///
+    /// The chunk's latest only. The executor tracks a last-checkpoint
+    /// overlay alongside it, but nothing outside the executor reads one.
+    pub positions: Option<&'a PositionOverlay>,
     pub is_reconfig: bool,
 }
 

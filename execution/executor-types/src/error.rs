@@ -40,6 +40,9 @@ pub enum ExecutorError {
 
     #[error("request timeout")]
     CouldNotGetData,
+
+    #[error("Block {0:x} sits on a branch the certified chain has left behind")]
+    StaleBranch(HashValue),
 }
 
 impl From<anyhow::Error> for ExecutorError {

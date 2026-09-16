@@ -78,17 +78,6 @@ pub(crate) fn get_position_commit_progress(position_db: &PositionDb) -> Result<O
     )
 }
 
-pub(crate) fn get_position_merkle_commit_progress(
-    position_merkle_db: &PositionMerkleDb,
-) -> Result<Option<Version>> {
-    // `StateMerkleCommitProgress` is the generic JMT commit-progress
-    // key written by `ShardedJmtMerkleDb::put_progress`.
-    get_progress(
-        position_merkle_db.metadata_db(),
-        &DbMetadataKey::StateMerkleCommitProgress,
-    )
-}
-
 /// Walk position merkle snapshots back to `target_version`, peeling
 /// one snapshot at a time. Each iteration deletes the top-level
 /// nodes and stale indices at-or-after the current snapshot, commits

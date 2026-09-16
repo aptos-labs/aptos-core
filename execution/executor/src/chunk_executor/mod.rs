@@ -380,8 +380,15 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             )?;
         }
 
+        // Record what is now durable. The fold itself happens when the
+        // next chunk is enqueued, so the base cannot move while a chunk
+        // is being executed or applied.
+        let committed_positions = chunk.output.result_positions().cloned();
+
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
-        self.commit_queue.lock().dequeue_committed()?;
+        self.commit_queue
+            .lock()
+            .dequeue_committed(committed_positions)?;
 
         Ok(chunk)
     }
@@ -399,6 +406,17 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     ) -> Result<()> {
         let parent_state = self.commit_queue.lock().latest_state().clone();
 
+        // Advance here, not at commit, so the base can't move while a
+        // chunk is executed or applied. The chain is linear and the
+        // target is the last committed chunk, so everything in flight
+        // descends from it.
+        if let Some(committed) = self.commit_queue.lock().committed_positions() {
+            self.db
+                .writer
+                .advance_position_base(&committed)
+                .map_err(anyhow::Error::from)?;
+        }
+
         let first_version = parent_state.next_version();
         ensure!(
             chunk.first_version() == parent_state.next_version(),
@@ -410,7 +428,9 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let num_txns = chunk.len();
 
         let state_view = self.state_view(parent_state.latest())?;
-        let execution_output = chunk.into_output::<V>(&parent_state, state_view)?;
+        let parent_positions = self.commit_queue.lock().latest_positions();
+        let execution_output =
+            chunk.into_output::<V>(&parent_state, parent_positions.as_ref(), state_view)?;
         let output = PartialStateComputeResult::new(execution_output);
 
         // Enqueue for next stage.
@@ -747,6 +767,8 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             txns.into(),
             auxiliary_info,
             &parent_state,
+            // Verification only; nothing here is committed.
+            None,
             state_view,
             onchain_config,
             TransactionSliceMetadata::chunk(begin_version, end_version),

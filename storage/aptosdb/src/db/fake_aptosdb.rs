@@ -435,6 +435,16 @@ impl FakeAptosDB {
 }
 
 impl DbWriter for FakeAptosDB {
+    fn advance_position_base(
+        &self,
+        positions: &aptos_storage_interface::state_store::positions::PositionOverlay,
+    ) -> Result<()> {
+        // Delegate like the other wrapped writes: the inner `AptosDB` owns
+        // the position bundle, so inheriting the trait default would leave
+        // its overlay growing with nothing ever folding it.
+        self.inner.advance_position_base(positions)
+    }
+
     fn get_state_snapshot_receiver(
         &self,
         version: Version,

@@ -141,6 +141,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         // will need it.
         vec![AuxiliaryInfo::new_empty()],
         &ledger_summary.state,
+        ledger_summary.positions.as_ref(),
         base_state_view,
         onchain_config,
         TransactionSliceMetadata::unknown(),
