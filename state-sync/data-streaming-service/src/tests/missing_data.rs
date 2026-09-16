@@ -545,11 +545,11 @@ fn transform_state_values_stream_notifications() {
 
     // Update the number of states for the stream
     let number_of_states = 10_000;
-    stream_engine.number_of_states = Some(number_of_states);
+    stream_engine.cursor.number_of_items = Some(number_of_states);
 
     // Verify the tracked stream indices
-    assert_eq!(stream_engine.next_stream_index, start_index);
-    assert_eq!(stream_engine.next_request_index, start_index);
+    assert_eq!(stream_engine.cursor.next_stream_index, start_index);
+    assert_eq!(stream_engine.cursor.next_request_index, start_index);
 
     // Create a single data client request
     let notification_id_generator = create_notification_id_generator();
@@ -599,8 +599,8 @@ fn transform_state_values_stream_notifications() {
     );
 
     // Verify the tracked stream indices
-    assert_eq!(stream_engine.next_stream_index, start_index + 1);
-    assert_eq!(stream_engine.next_request_index, number_of_states);
+    assert_eq!(stream_engine.cursor.next_stream_index, start_index + 1);
+    assert_eq!(stream_engine.cursor.next_request_index, number_of_states);
 
     // Create a partial client response
     let last_index = number_of_states - 500;
@@ -626,8 +626,8 @@ fn transform_state_values_stream_notifications() {
         .unwrap();
 
     // Verify the tracked stream indices
-    assert_eq!(stream_engine.next_stream_index, last_index + 1);
-    assert_eq!(stream_engine.next_request_index, number_of_states);
+    assert_eq!(stream_engine.cursor.next_stream_index, last_index + 1);
+    assert_eq!(stream_engine.cursor.next_request_index, number_of_states);
 }
 
 #[test]
