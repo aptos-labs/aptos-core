@@ -335,9 +335,9 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         // it, V1 reports `MISSING_DEPENDENCY` at the call instead; that takes a
         // framework release declaring an unregistered native, so this mapping
         // does not distinguish it.
-        L::NativeFunctionNotLoadable { .. } | L::LoweringSkipped { .. } => {
-            return V1Equivalent::NoV1Failure
-        },
+        L::NativeFunctionNotLoadable { .. }
+        | L::LoweringSkipped { .. }
+        | L::ResourceLayoutNotDerivable => return V1Equivalent::NoV1Failure,
         L::GlobalContext(_) | L::InvariantViolation(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
         },
@@ -726,6 +726,7 @@ mod tests {
                 name: "f".to_string(),
             },
             LoaderError::LoweringSkipped { reason: "nominal" },
+            LoaderError::ResourceLayoutNotDerivable,
             LoaderError::ScriptDeserializationFailed {
                 message: "truncated".to_string(),
             },
@@ -742,6 +743,7 @@ mod tests {
                 | LoaderError::FunctionNotFound { .. }
                 | LoaderError::NativeFunctionNotLoadable { .. }
                 | LoaderError::LoweringSkipped { .. }
+                | LoaderError::ResourceLayoutNotDerivable
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
