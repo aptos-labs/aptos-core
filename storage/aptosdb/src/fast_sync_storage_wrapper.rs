@@ -1,14 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::AptosDB;
+use crate::{native_state_reader::install_global_reader, AptosDB};
 use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, state_store::positions::PositionOverlay, DbReader, DbWriter,
+    Result, StateKind, StateSnapshotReceiver,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -87,9 +88,18 @@ impl FastSyncStorageWrapper {
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
 
+            let db_for_fast_sync = Arc::new(db_main);
+            // Both opens installed the process-global native-position
+            // reader, and the secondary is a throwaway genesis DB. Put the
+            // main one back, since that is where the restore lands and
+            // where reads are served from afterwards.
+            if let Some(reader) = db_for_fast_sync.native_state_reader() {
+                install_global_reader(Arc::new(reader));
+            }
+
             Ok(Either::Right(FastSyncStorageWrapper {
                 temporary_db_with_genesis: Arc::new(secondary_db),
-                db_for_fast_sync: Arc::new(db_main),
+                db_for_fast_sync,
                 fast_sync_status: Arc::new(RwLock::new(FastSyncStatus::UNKNOWN)),
             }))
         } else {
@@ -195,6 +205,11 @@ impl DbWriter for FastSyncStorageWrapper {
         let mut status = self.fast_sync_status.write();
         *status = FastSyncStatus::FINISHED;
         Ok(())
+    }
+
+    fn advance_position_base(&self, positions: &PositionOverlay) -> Result<()> {
+        self.get_aptos_db_write_ref()
+            .advance_position_base(positions)
     }
 
     fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {

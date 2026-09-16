@@ -13,7 +13,7 @@ use crate::{
     types::partial_state_compute_result::PartialStateComputeResult,
     workflow::{
         do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
-        do_state_checkpoint::DoStateCheckpoint,
+        do_positions::DoPositions, do_state_checkpoint::DoStateCheckpoint,
     },
 };
 use anyhow::Result;
@@ -221,6 +221,7 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
+        self.prepare_position_base(block_id, parent_output)?;
 
         // Record ExecutionStart for traced transactions.
         // block_txns is populated at proposal time (round_manager::process_proposal).
@@ -290,10 +291,54 @@ where
             }
         }
 
+        // Extend the position overlay here, in the execution phase, so
+        // it exists before this block's child runs its VM. Possible only
+        // because the overlay is keyed as the write set is, making this a
+        // pure function of the parent overlay and this block's writes.
+        let positions =
+            DoPositions::run(&execution_output, parent_output.ensure_result_positions()?)?;
+
         let output = PartialStateComputeResult::new(execution_output);
+        output.set_positions(positions);
         let _ = self
             .block_tree
             .add_block(parent_block_id, block_id, output)?;
+        Ok(())
+    }
+
+    /// Advances the position base, and refuses a block that can no
+    /// longer read against it.
+    ///
+    /// Called under `execution_lock`, so the base can't move while a
+    /// block executes — which is what lets one check here cover every
+    /// read the VM goes on to make.
+    fn prepare_position_base(
+        &self,
+        block_id: HashValue,
+        parent_output: &PartialStateComputeResult,
+    ) -> ExecutorResult<()> {
+        let Some(parent_positions) = parent_output.ensure_result_positions()? else {
+            return Ok(());
+        };
+        // Advance only to a version this block descends from. A block
+        // that doesn't is on a dead branch; leaving the base where it is
+        // keeps that block readable until it's pruned.
+        let certified = self.block_tree.root_block();
+        if let Some(certified_positions) = certified.output.ensure_result_positions()?
+            && parent_positions
+                .latest()
+                .is_descendant_of(certified_positions.latest())
+        {
+            self.db
+                .writer
+                .advance_position_base(certified_positions.latest())
+                .map_err(anyhow::Error::from)?;
+        }
+        if !parent_positions.latest().descends_from_base() {
+            // The base already sits past this block's branch point, so
+            // its reads would resolve against the certified branch.
+            return Err(ExecutorError::StaleBranch(block_id));
+        }
         Ok(())
     }
 
@@ -369,6 +414,7 @@ where
                         )?)
                         .maybe_parent_position_state_summary(parent_position_summary)
                         .maybe_persisted_position_state_summary(position_persisted.as_ref())
+                        .maybe_positions(output.ensure_result_positions()?.cloned())
                         .build()?,
                 );
                 output.set_ledger_update_output(DoLedgerUpdate::run(

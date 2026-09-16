@@ -9,6 +9,7 @@ use aptos_executor_types::{
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
+    positions::PositionOverlay,
     sharded_jmt_state::{PositionSlot, PositionStateWithSummary},
     state_summary::{LedgerStateSummary, ProvablePositionStateSummary, ProvableStateSummary},
     state_with_summary::LedgerWithSummary,
@@ -30,6 +31,7 @@ impl DoStateCheckpoint {
         parent_position_state_summary: Option<&'a LedgerWithSummary<PositionStateWithSummary>>,
         persisted_position_state_summary: Option<&'a ProvablePositionStateSummary<'db>>,
         known_position_state_checkpoints: Option<Vec<Option<HashValue>>>,
+        positions: Option<LedgerWithSummary<PositionOverlay>>,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
 
@@ -74,12 +76,16 @@ impl DoStateCheckpoint {
                 (None, None)
             };
 
+        // `positions` is computed in the execution phase by `DoPositions`
+        // so a block's overlay exists before its child's VM reads it;
+        // this only threads it into the output for the commit path.
         Ok(StateCheckpointOutput::builder()
             .state_summary(state_summary)
             .state_checkpoint_hashes(state_checkpoint_hashes)
             .maybe_hot_state_checkpoint_hashes(hot_state_checkpoint_hashes)
             .maybe_position_state_summary(position_state_summary)
             .maybe_position_state_checkpoint_hashes(position_state_checkpoint_hashes)
+            .maybe_positions(positions)
             .build())
     }
 

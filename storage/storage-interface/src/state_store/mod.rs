@@ -3,6 +3,7 @@
 
 mod hot_state;
 pub mod leaf_entry;
+pub mod positions;
 pub mod sharded_jmt_state;
 pub mod state;
 pub mod state_delta;
