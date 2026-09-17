@@ -87,8 +87,9 @@ jobs:
           path: unit-results.json
           retention-days: 14
 
+      # No `if`, so this needs the run step to have succeeded. That step already
+      # absorbs a test failure, so a red one means partial results.
       - name: Check parity
-        if: "!cancelled()"
         run: |
           set +e
           python3 "$PARITY" --check unit-results.json 2>&1 | tee parity.txt
@@ -226,10 +227,9 @@ jobs:
           retention-days: 14
 
   smoke-parity:
+    # No `if`, so this needs every partition to have succeeded. A partition
+    # already absorbs a test failure, so a red one means partial results.
     needs: smoke-tests
-    # Check even when a partition went red; the two lists decide whether its
-    # failures are known.
-    if: "!cancelled() && needs.smoke-tests.result != 'skipped'"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
