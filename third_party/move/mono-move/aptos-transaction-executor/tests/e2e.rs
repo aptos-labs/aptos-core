@@ -15,7 +15,10 @@
 // store is masked, so a wrong debit there is not caught.
 
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
-use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
+use aptos_language_e2e_tests::{
+    account::{Account, AccountData},
+    executor::FakeExecutor,
+};
 use aptos_types::{
     secret_sharing::EvalProof,
     state_store::StateView,
@@ -1132,6 +1135,145 @@ fn empty_payload_discarded_like_v1() {
         TransactionStatus::Discard(StatusCode::EMPTY_PAYLOAD_PROVIDED)
     );
     assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
+}
+
+/// An address with a balance but no account yet.
+fn fund_fresh_account(fx: &mut FakeExecutor, funder: &AccountData, amount: u64) -> Account {
+    let fresh = fx.create_raw_account();
+    let fund = funder
+        .account()
+        .transaction()
+        .payload(
+            aptos_cached_packages::aptos_stdlib::aptos_account_fungible_transfer_only(
+                *fresh.address(),
+                amount,
+            ),
+        )
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign();
+    fx.execute_and_apply(fund);
+    assert!(
+        !has_account_resource(fx.get_state_view(), fresh.address()),
+        "funding must not create the account"
+    );
+    fresh
+}
+
+/// Whether an account resource is stored at `address`.
+fn has_account_resource<S: StateView>(
+    state: &S,
+    address: &move_core_types::account_address::AccountAddress,
+) -> bool {
+    use aptos_types::{account_config::AccountResource, state_store::state_key::StateKey};
+
+    let key = StateKey::resource_typed::<AccountResource>(address).expect("the account key builds");
+    state
+        .get_state_value_bytes(&key)
+        .expect("the state is readable")
+        .is_some()
+}
+
+/// A transfer that is `sender`'s first transaction.
+fn first_transfer(
+    sender: &Account,
+    to: &AccountData,
+    amount: u64,
+    max_gas: u64,
+) -> SignedTransaction {
+    sender
+        .transaction()
+        .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
+            *to.address(),
+            amount,
+        ))
+        .sequence_number(0)
+        .gas_unit_price(100)
+        .max_gas_amount(max_gas)
+        .sign()
+}
+
+/// `status` with any abort info stripped.
+//
+// TODO(correctness): compare the abort info too, once the executor resolves it.
+fn without_abort_info(status: &TransactionStatus) -> TransactionStatus {
+    match status {
+        TransactionStatus::Keep(ExecutionStatus::MoveAbort { location, code, .. }) => {
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: location.clone(),
+                code: *code,
+                info: None,
+            })
+        },
+        other => other.clone(),
+    }
+}
+
+/// Asserts both VMs agree on `txn`, returning the status they agreed on.
+fn assert_output_matches_v1(
+    fx: &FakeExecutor,
+    txn: &SignedTransaction,
+    fee_payer: move_core_types::account_address::AccountAddress,
+) -> TransactionStatus {
+    let v1_output = fx.execute_transaction(txn.clone());
+    let v2_output = execute_v2(fx.get_state_view(), txn);
+    assert_eq!(
+        without_abort_info(v2_output.status()),
+        without_abort_info(v1_output.status()),
+        "v2 status differs from v1"
+    );
+    compare_outputs(&v1_output, &v2_output, fee_payer);
+    v1_output.status().clone()
+}
+
+/// A first transaction from an address with no account creates one.
+#[test]
+fn first_transaction_creates_account_like_v1() {
+    let (mut fx, alice, bob) = setup();
+    let carol = fund_fresh_account(&mut fx, &alice, 100_000_000);
+    let txn = first_transfer(&carol, &bob, 1_000, 1_000_000);
+    let status = assert_output_matches_v1(&fx, &txn, *carol.address());
+    assert_eq!(status, TransactionStatus::Keep(ExecutionStatus::Success));
+}
+
+/// The new account survives a payload that aborts.
+#[test]
+fn account_created_when_payload_aborts_like_v1() {
+    let (mut fx, alice, bob) = setup();
+    let carol = fund_fresh_account(&mut fx, &alice, 100_000_000);
+    let txn = first_transfer(&carol, &bob, 1_000_000_000, 1_000_000);
+    let status = assert_output_matches_v1(&fx, &txn, *carol.address());
+    assert!(
+        matches!(
+            status,
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
+        ),
+        "the payload did not abort: {status:?}"
+    );
+}
+
+/// A budget too small to pay for the new account is rejected.
+#[test]
+fn unaffordable_account_creation_discarded_like_v1() {
+    let (mut fx, alice, bob) = setup();
+    let carol = fund_fresh_account(&mut fx, &alice, 100_000_000);
+    let txn = first_transfer(&carol, &bob, 1_000, 100);
+    let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+    assert_eq!(
+        v1_status,
+        TransactionStatus::Discard(StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS)
+    );
+    assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
+}
+
+/// An account that already exists is not created again.
+#[test]
+fn existing_account_first_transaction_matches_v1() {
+    let (fx, alice, bob) = setup();
+    let txn = first_transfer(bob.account(), &alice, 1_000, 1_000_000);
+    let status = assert_output_matches_v1(&fx, &txn, *bob.address());
+    assert_eq!(status, TransactionStatus::Keep(ExecutionStatus::Success));
 }
 
 /// A block-metadata transaction produces byte-identical outputs on both VMs:

@@ -12944,6 +12944,7 @@ dependencies = [
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm-environment",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "mono-move-aptos-state-view-providers",

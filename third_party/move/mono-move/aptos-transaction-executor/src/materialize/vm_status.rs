@@ -137,6 +137,11 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
             stage: ExecutionStage::Prologue,
             failure,
         } => prologue_failure_to_status(failure),
+        // Discarded with the failure's own status, as V1 does.
+        DiscardReason::Failure {
+            stage: stage @ ExecutionStage::AccountCreation,
+            failure,
+        } => failure_status(&stage, &failure),
         DiscardReason::Failure { stage, failure } => {
             stage_failure_status(&stage, &format!("{failure:?}"))
         },
@@ -150,7 +155,7 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
     let code = match &failure {
         F::TransactionTooLarge { .. } => StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
         F::GasBudgetAboveBound { .. } => StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
-        F::GasBudgetBelowIntrinsicCost { .. } => {
+        F::GasBudgetBelowIntrinsicCost { .. } | F::GasBudgetBelowAccountCreationCost { .. } => {
             StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
         },
         F::GasPriceBelowMinimum { .. } => StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
@@ -164,80 +169,69 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
 
 /// Converts an executed transaction's conclusion into its `VMStatus`.
 pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
-    let (stage, failure) = match status {
-        ExecutionStatus::Success => return VMStatus::Executed,
-        ExecutionStatus::Failure { stage, failure } => (stage, failure),
-    };
+    match status {
+        ExecutionStatus::Success => VMStatus::Executed,
+        ExecutionStatus::Failure { stage, failure } => failure_status(stage, failure),
+    }
+}
+
+/// Converts a failure in `stage` into its `VMStatus`. Only the payload and the
+/// account creation fail as the transaction's own; a failure anywhere else
+/// means the framework misbehaved, which V1 reports as an unexpected error.
+fn failure_status(stage: &ExecutionStage, failure: &MoveExecutionFailure) -> VMStatus {
+    let own_failure = matches!(
+        stage,
+        ExecutionStage::Payload | ExecutionStage::AccountCreation
+    );
     match failure {
         // The fee payer failing to cover the fee is the one epilogue abort that
-        // survives as the transaction's own; any other means the framework
-        // misbehaved, which V1 reports as an unexpected error.
+        // survives as the transaction's own.
         MoveExecutionFailure::Abort {
             code,
             message,
             location,
-        } if matches!(stage, ExecutionStage::Payload) || is_cant_pay_fee_abort(*code) => {
-            VMStatus::MoveAbort {
-                location: location.clone(),
-                code: *code,
-                message: message.clone(),
-            }
+        } if own_failure || is_cant_pay_fee_abort(*code) => VMStatus::MoveAbort {
+            location: location.clone(),
+            code: *code,
+            message: message.clone(),
         },
-        // Like the sibling arms: only the payload stage legitimately faults
-        // the transaction's arguments.
-        MoveExecutionFailure::InvalidArguments(reason)
-            if matches!(stage, ExecutionStage::Payload) =>
-        {
-            VMStatus::error(
-                match reason {
-                    InvalidArguments::NativeEntryFunction => {
-                        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
-                    },
-                    InvalidArguments::NotEntryFunction => {
-                        StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION
-                    },
-                    InvalidArguments::ReturnsValues
-                    | InvalidArguments::SignerAfterArgument
-                    | InvalidArguments::DisallowedParameterType => {
-                        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
-                    },
-                    InvalidArguments::ArgumentCountMismatch => {
-                        StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH
-                    },
-                    InvalidArguments::SignerCountMismatch => {
-                        StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
-                    },
-                    InvalidArguments::UndecodableArgument => {
-                        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
-                    },
+        MoveExecutionFailure::InvalidArguments(reason) if own_failure => VMStatus::error(
+            match reason {
+                InvalidArguments::NativeEntryFunction => {
+                    StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
                 },
-                None,
-            )
-        },
-        MoveExecutionFailure::RejectedScript(rejection)
-            if matches!(stage, ExecutionStage::Payload) =>
-        {
-            match rejection {
-                ScriptRejection::UnstableOnMainnet => VMStatus::error(
-                    StatusCode::UNSTABLE_BYTECODE_REJECTED,
-                    Some("script marked unstable cannot be run on mainnet".to_string()),
-                ),
-                ScriptRejection::EmitsEvents => {
-                    VMStatus::error(StatusCode::INVALID_OPERATION_IN_SCRIPT, None)
+                InvalidArguments::NotEntryFunction => {
+                    StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION
                 },
-            }
+                InvalidArguments::ReturnsValues
+                | InvalidArguments::SignerAfterArgument
+                | InvalidArguments::DisallowedParameterType => {
+                    StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
+                },
+                InvalidArguments::ArgumentCountMismatch => StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+                InvalidArguments::SignerCountMismatch => {
+                    StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
+                },
+                InvalidArguments::UndecodableArgument => StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            },
+            None,
+        ),
+        MoveExecutionFailure::RejectedScript(rejection) if own_failure => match rejection {
+            ScriptRejection::UnstableOnMainnet => VMStatus::error(
+                StatusCode::UNSTABLE_BYTECODE_REJECTED,
+                Some("script marked unstable cannot be run on mainnet".to_string()),
+            ),
+            ScriptRejection::EmitsEvents => {
+                VMStatus::error(StatusCode::INVALID_OPERATION_IN_SCRIPT, None)
+            },
         },
         // V1 reports a payload it could not decrypt as an argument it could
         // not deserialize.
-        MoveExecutionFailure::UndecryptedPayload if matches!(stage, ExecutionStage::Payload) => {
-            VMStatus::error(
-                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                Some("the encrypted payload was not decrypted".to_string()),
-            )
-        },
-        MoveExecutionFailure::RuntimeError(err) if matches!(stage, ExecutionStage::Payload) => {
-            internal_error_to_status(err)
-        },
+        MoveExecutionFailure::UndecryptedPayload if own_failure => VMStatus::error(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            Some("the encrypted payload was not decrypted".to_string()),
+        ),
+        MoveExecutionFailure::RuntimeError(err) if own_failure => internal_error_to_status(err),
         failure => stage_failure_status(stage, &format!("{failure:?}")),
     }
 }
@@ -340,6 +334,7 @@ fn unexpected_validation_error(msg: &str, detail: String) -> VMStatus {
 fn stage_failure_status(stage: &ExecutionStage, detail: &str) -> VMStatus {
     let what = match stage {
         ExecutionStage::Prologue => "prologue",
+        ExecutionStage::AccountCreation => "account creation",
         ExecutionStage::Payload => "payload",
         ExecutionStage::Epilogue => "epilogue",
         ExecutionStage::EpilogueAfterRollback => "epilogue after a rolled-back payload",

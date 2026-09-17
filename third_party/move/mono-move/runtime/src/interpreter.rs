@@ -511,6 +511,19 @@ impl<'guard> InterpreterContext<'guard> {
         }
     }
 
+    /// Whether a resource of type `ty` is stored at `address`, as `exists<T>`
+    /// reports it. Loads and charges for the modules defining `ty`.
+    pub fn resource_exists(&mut self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
+        self.loader
+            .publish_resource_type(&mut self.read_set, &mut self.gas_meter, ty)?;
+        let group = self.resource_group_of(ty)?;
+        Ok(self.read_write_set.exists(
+            self.resource_provider,
+            &InMemoryStorageKey::resource(address, ty),
+            group,
+        )?)
+    }
+
     /// A module some loaded function came from. Loading the function loaded
     /// its module into the read set, so a miss is an invariant violation.
     fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {

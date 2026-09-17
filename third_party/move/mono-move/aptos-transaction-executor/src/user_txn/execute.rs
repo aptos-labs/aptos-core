@@ -5,6 +5,7 @@
 //! session hosting the prologue, the payload, and the epilogue.
 
 use super::{
+    account::{create_account, needs_account_creation},
     entry_func::call_entry_function,
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
@@ -63,7 +64,13 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let gas_params = self.env.gas_params().as_ref().map_err(|e| {
             DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
         })?;
-        PreExecutionChecker::new(gas_params, self.env.gas_feature_version(), &txn_data)
+        let checker = PreExecutionChecker::new(
+            gas_params,
+            self.env.gas_feature_version(),
+            self.env.features(),
+            &txn_data,
+        );
+        checker
             .run_checks()
             .map_err(DiscardReason::PreExecutionCheck)?;
 
@@ -117,6 +124,23 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         let signers = ValidationSigners::new(&txn_data);
 
+        // ======================= Lazy account creation ========================
+        // The sender's first transaction may come from an address holding no
+        // `Account` resource yet. The account is created between the prologue
+        // and the payload, so that it survives the payload's rollback.
+        let create_sender_account =
+            needs_account_creation(&mut interp, guard, &txn_data).map_err(|e| {
+                DiscardReason::Failure {
+                    stage: ExecutionStage::AccountCreation,
+                    failure: MoveExecutionFailure::RuntimeError(e),
+                }
+            })?;
+        if create_sender_account {
+            checker
+                .check_gas_budget_covers_account_creation()
+                .map_err(DiscardReason::PreExecutionCheck)?;
+        }
+
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
         run_prologue(&mut interp, guard, &signers, &txn_data).map_err(|failure| {
@@ -125,17 +149,25 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 failure,
             }
         })?;
-        // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
+        if create_sender_account {
+            self.run_metered(&mut interp, |interp| {
+                create_account(interp, guard, &txn_data.sender)
+            })
+            .map_err(|failure| DiscardReason::Failure {
+                stage: ExecutionStage::AccountCreation,
+                failure,
+            })?;
+        }
+        // A failed payload rolls back to here, so the prologue's effects (e.g.
+        // nonce insertion) and the created account survive.
         checkpoint(&mut interp)?;
 
         // ========================== User payload ============================
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
-        let payload_result = if self.unmetered {
-            interp.unmetered(|interp| self.execute_payload(interp, &txn_data, &executable, ty_args))
-        } else {
-            self.execute_payload(&mut interp, &txn_data, &executable, ty_args)
-        };
+        let payload_result = self.run_metered(&mut interp, |interp| {
+            self.execute_payload(interp, &txn_data, &executable, ty_args)
+        });
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
 
@@ -246,6 +278,20 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         };
 
         call_result(status)
+    }
+
+    /// Runs `f` metered against the transaction's budget, or unmetered if the
+    /// executor was built `without_metering`.
+    fn run_metered<R>(
+        &self,
+        interp: &mut InterpreterContext<'guard>,
+        f: impl FnOnce(&mut InterpreterContext<'guard>) -> R,
+    ) -> R {
+        if self.unmetered {
+            interp.unmetered(f)
+        } else {
+            f(interp)
+        }
     }
 }
 
