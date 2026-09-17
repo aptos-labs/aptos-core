@@ -49,16 +49,20 @@ use std::sync::Arc;
 /// transaction.
 const PUBLISHER_BALANCE: u64 = 1000_0000_0000;
 
-/// Gas ceiling on every account-signed transaction. The prologue requires the
-/// sender to cover `max_gas_amount * gas_unit_price` up front, so the default
-/// ceiling would put the floor on [`ACCOUNT_CREATION_BALANCE`] at 20 APT.
-/// Funding thousands of accounts at that rate drains the accounts the harness
-/// draws from, which start with 100 APT each.
+/// Gas ceiling on every account-signed transaction. The prologue makes the
+/// sender cover `max_gas_amount * gas_unit_price` up front, so the SDK default
+/// of 20,000,000 units would lock 20 APT of every account's balance against a
+/// transaction that spends a fraction of it. Two million still leaves several
+/// times the headroom the widest fan-out in the suite needs.
 const MAX_GAS_UNITS: u64 = 2_000_000;
 
-/// Balance each benchmark account is created with: the prologue's 2 APT floor
-/// plus room for the gas a long run actually burns.
-const ACCOUNT_CREATION_BALANCE: u64 = 5_0000_0000;
+/// Balance each benchmark account is created with, bounded from both sides.
+/// The floor: the prologue reserves [`MAX_GAS_UNITS`] at 100 octas a unit,
+/// 2 APT that is never spent, and a 50-block run burns around 5 more on
+/// storage, since a new state slot costs 400,000 octas and `airdrop_fanout`
+/// creates 75 of them per distribution. The ceiling: the harness funds these
+/// five to a sender out of 100 APT, so past 20 the fifth transfer is short.
+const ACCOUNT_CREATION_BALANCE: u64 = 10_0000_0000;
 
 #[derive(Debug, Copy, Clone)]
 pub enum BenchWorkflowKind {
