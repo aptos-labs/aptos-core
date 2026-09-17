@@ -46,7 +46,7 @@ jobs:
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npmjs.
   node-api-compatibility-tests:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=8,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
@@ -55,6 +55,13 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ env.GIT_SHA }}
+
+      - name: Sample host memory
+        if: ${{ !inputs.SKIP_JOB }}
+        continue-on-error: true
+        run: |
+          nohup bash -c 'while true; do awk '\''/MemTotal:/ {total=$2} /MemAvailable:/ {print total-$2}'\'' /proc/meminfo; sleep 1; done' \
+            > "$RUNNER_TEMP/api-memory-kib.txt" 2>/dev/null < /dev/null &
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         if: ${{ !inputs.SKIP_JOB }}
@@ -112,3 +119,17 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
 
       # TODO: Need to use the other SDKs here to verify correctness
+
+      - name: Record runner resources and image digests
+        if: always() && !inputs.SKIP_JOB
+        continue-on-error: true
+        run: |
+          nproc
+          free -b
+          awk 'BEGIN {peak=0} {if ($1>peak) peak=$1} END {printf "Sampled host used peak bytes (1s): %.0f\n", peak*1024}' "$RUNNER_TEMP/api-memory-kib.txt"
+          for counter in /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory/memory.max_usage_in_bytes; do
+            if [[ -r "$counter" ]]; then
+              echo "Cgroup peak bytes ($counter): $(<"$counter")"
+            fi
+          done
+          docker images --digests || true

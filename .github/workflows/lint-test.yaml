@@ -11,6 +11,16 @@ on:
       - aptos-node-v*
       - aptos-release-v*
   workflow_dispatch:
+    inputs:
+      ci-benchmark:
+        type: boolean
+        default: false
+        description: Run only the CI A/B benchmark on this ref
+      benchmark-suite:
+        type: choice
+        options: [small, medium, large]
+        default: small
+        description: Fixed package selection for all samples
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -28,8 +38,17 @@ permissions:
 
 
 jobs:
+  # This existing dispatch entry point can invoke a new reusable workflow before
+  # it is on main: select the candidate branch when dispatching Lint+Test.
+  ci-benchmark:
+    if: github.event_name == 'workflow_dispatch' && inputs.ci-benchmark
+    uses: ./.github/workflows/ci-benchmark.yaml
+    with:
+      suite: ${{ inputs.benchmark-suite }}
+
   # This job determines which files were changed
   file_change_determinator:
+    if: ${{ !inputs.ci-benchmark }}
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
@@ -99,6 +118,7 @@ jobs:
   # Run the docs tests. This is a PR required job.
   rust-doc-tests:
     if: | # Only run when an appropriate event occurs
+      !inputs.ci-benchmark &&
       (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
@@ -131,9 +151,9 @@ jobs:
   # Required check compatibility shim. Maintains the "rust-smoke-tests" check name
   # that branch protection rules expect, while the actual work happens in smoke-tests.yaml.
   rust-smoke-tests:
-    needs: rust-smoke-tests-workflow
+    needs: [rust-smoke-tests-workflow, file_change_determinator]
     if: | # Always evaluate so failures are reported, but only when smoke tests are expected
-      always() && (
+      always() && !inputs.ci-benchmark && (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
@@ -145,12 +165,14 @@ jobs:
       - name: Check smoke test results
         run: |
           result="${{ needs.rust-smoke-tests-workflow.result }}"
-          if [ "$result" = "success" ] || [ "$result" = "skipped" ]; then
+          if [[ "$result" == success || ( "$result" == skipped && "$ALLOW_SKIP" == true ) ]]; then
             echo "Smoke tests passed (result: $result)"
           else
             echo "Smoke tests failed: $result"
             exit 1
           fi
+        env:
+          ALLOW_SKIP: ${{ needs.file_change_determinator.result == 'success' && needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
 
   # Check the freshess of the merge base. This is a PR required job.
   rust-check-merge-base:
@@ -159,7 +181,7 @@ jobs:
         !contains(github.event.pull_request.base.ref, '-release-')
       )
     needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: 2cpu-gh-ubuntu24-x64 # only builds aptos-cargo-cli and runs a git check
     steps:
       - uses: actions/checkout@v4
         with:
@@ -170,28 +192,32 @@ jobs:
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-  # Run only the targeted rust unit tests. This is a PR required job.
+  # Run only the targeted rust unit tests (build once, then run inline or fan out to shards).
+  rust-targeted-unit-tests-workflow:
+    if: | # Only on PRs. push, workflow_dispatch and release branches run the full rust-unit-tests instead.
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.base.ref, '-release-')
+    uses: ./.github/workflows/targeted-unit-tests.yaml
+
+  # Required check compatibility shim. Maintains the "rust-targeted-unit-tests" check name
+  # that branch protection rules expect, while the actual work happens in targeted-unit-tests.yaml.
+  # This is a PR required job.
   rust-targeted-unit-tests:
-    if: | # Don't run on release branches. Instead, all unit tests will be triggered.
-      (
-        !contains(github.event.pull_request.base.ref, '-release-')
-      )
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: rust-targeted-unit-tests-workflow
+    if: ${{ always() && !inputs.ci-benchmark }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0 # Fetch all git history for accurate target determination
-
-      - name: Run dev_setup.sh
+      - name: Check targeted unit test results
         run: |
-          scripts/dev_setup.sh -b -p -r -y -P -t
-
-      - name: Run targeted rust unit tests
-        uses: ./.github/actions/rust-targeted-unit-tests
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          result="${{ needs.rust-targeted-unit-tests-workflow.result }}"
+          if [[ "$result" == success || ( "$result" == skipped && "$ALLOW_SKIP" == true ) ]]; then
+            echo "Targeted unit tests passed (result: $result)"
+          else
+            echo "Targeted unit tests failed: $result"
+            exit 1
+          fi
+        env:
+          ALLOW_SKIP: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.base.ref, '-release-') }}
 
   # Run aptos-batch-encryption (i.e., with TypeScript/Node.js). This is a PR required job.
   rust-batch-encryption-tests:
@@ -229,6 +255,7 @@ jobs:
   # Run all rust unit tests. This is not a PR required job.
   rust-unit-tests:
     if: | # Only run when an appropriate event occurs
+      !inputs.ci-benchmark &&
       (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
@@ -238,15 +265,16 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
-      # Install Move Prover tools
-      - name: Run dev_setup.sh
-        run: |
-          scripts/dev_setup.sh -b -y
+      - uses: ./.github/actions/prover-tools-setup
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: rust-unit-tests
 
   # Run the cached packages build. This is advisory (non-blocking) because
   # concurrent PR merges can cause spurious staleness failures.

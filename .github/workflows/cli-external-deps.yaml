@@ -11,13 +11,13 @@ permissions:
 
 
 jobs:
+  # `cargo tree` resolves the dependency graph for the Apple target without needing
+  # that target installed, so this does not need a macOS runner.
   check-dynamic-deps:
-    runs-on: macos-latest
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v4
-        if: ${{ !inputs.SKIP_JOB }}
-        with:
-          ref: ${{ inputs.GIT_SHA }}
+      - uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # pin@v1
 
       # This will exit with failure if any of the banned dynamic deps are found.
       - run: ./crates/aptos/scripts/check_dynamic_deps.sh

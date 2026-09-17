@@ -10,6 +10,12 @@ runs:
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
 
+    - name: Test CI helpers
+      shell: bash
+      run: |
+        node --test .github/scripts/*.test.cjs
+        python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
     # Install shellcheck and run it on the dev_setup.sh script
     - name: Run shell lints
       run: |
