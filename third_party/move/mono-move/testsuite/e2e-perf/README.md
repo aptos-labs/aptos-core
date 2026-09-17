@@ -173,7 +173,7 @@ runner type before trusting any band, and record the result here:
 | runner | date | config | largest deviation from 1.00x | largest run-to-run range |
 | --- | --- | --- | --- | --- |
 | Apple M-series laptop | 2026-09-03 | 5 blocks, 3 repeats, 20k accounts | 0.7% | 3.6% |
-| `benchmark-c3d-60` | | | _(not yet measured)_ | |
+| `benchmark-c3d-60` | 2026-09-17 | 30 blocks, 3 repeats, 2M accounts | 1.2% | 2.6% |
 
 Both numbers cover `total`, `execution`, and `inner_block_executor`. The verdict
 itself rests on the last two only. Every other stage is disk bound or takes
