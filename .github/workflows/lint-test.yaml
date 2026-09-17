@@ -1,27 +1,52 @@
-name: Workspace validation retry
+name: CI measurement verification
 on:
   workflow_dispatch:
 permissions:
   contents: read
-env:
-  HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
-  HAS_DATADOG_SECRETS: ${{ secrets.DD_API_KEY != '' }}
-  CARGO_INCREMENTAL: "0"
-  CARGO_TERM_COLOR: always
+  actions: read
 jobs:
-  rust-unit-tests:
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+  verify:
+    runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 3be0111fe8a6d36c22aaad8972d44512b582e515
-      - uses: ./.github/actions/prover-tools-setup
-      - name: Run rust unit tests
-        uses: ./.github/actions/rust-unit-tests
+          ref: ceafa814722d3cd2292b6d186c2ff25880aeebb1
+      - name: Test current validation helpers
+        run: |
+          node --test .github/scripts/*.test.cjs
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+      - name: Download small measurements
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
-      - uses: ./.github/actions/ci-metrics-report
-        if: always()
+          run-id: 35172638902
+          pattern: ci-metrics-*
+          path: small/metrics
+          github-token: ${{ github.token }}
+      - name: Download medium measurements
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: rust-unit-tests
+          run-id: 35172874065
+          pattern: ci-metrics-*
+          path: medium/metrics
+          github-token: ${{ github.token }}
+      - name: Download large measurements
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: 35173246819
+          pattern: ci-metrics-*
+          path: large/metrics
+          github-token: ${{ github.token }}
+      - name: Replay the exact corrected verifier over every recorded sample
+        run: |
+          python3 - <<'VERIFY'
+          import os
+          import subprocess
+          import textwrap
+          from pathlib import Path
+          source = Path('.github/workflows/ci-benchmark.yaml').read_text()
+          script = textwrap.dedent(source.rsplit('        run: |\n', 1)[1])
+          environment = {**os.environ, 'PYTHONPATH': str(Path('.github/scripts').resolve())}
+          for suite in ('small', 'medium', 'large'):
+              print(f'Verifying {suite}', flush=True)
+              subprocess.run(['bash', '-e', '-c', script], cwd=suite, env=environment, check=True)
+          VERIFY
