@@ -243,7 +243,7 @@ fn bv_helper() -> Vec<BvInfo> {
     bv_info.push(bv_16);
     let bv_32 = BvInfo {
         base: 32,
-        max: "2147483647".to_string(),
+        max: "4294967295".to_string(),
     };
     bv_info.push(bv_32);
     let bv_64 = BvInfo {
