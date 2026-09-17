@@ -599,14 +599,7 @@ pub fn env_optimization_pipeline<'a, 'b>(options: &'a Options) -> EnvProcessorPi
     // those simplifications can take advantage of the inlining.
     let do_inlining_optimization = options.experiment_on(Experiment::INLINING_OPTIMIZATION);
     if do_inlining_optimization {
-        // This allows performing an inlining optimization to a function that does not belong to the primary target package
-        let allow_non_primary_targets =
-            options.experiment_on(Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS);
-        env_pipeline.add("inlining optimization", {
-            move |env: &mut GlobalEnv| {
-                inlining_optimization::optimize(env, allow_non_primary_targets)
-            }
-        });
+        env_pipeline.add("inlining optimization", inlining_optimization::optimize);
     }
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
         env_pipeline.add("simplifier with code elimination", {

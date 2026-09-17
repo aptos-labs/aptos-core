@@ -15,8 +15,8 @@
 //! all but only from who calls it at runtime. We have determined that after all
 //! these exceptions, the remaining benefit is not worth the complexity added.
 //!
-//! Within a module none of these properties can change, so a static call to a
-//! callee without `#[module_lock]` is always safe to inline.
+//! Same-module inlining crosses none of these boundaries; the remaining
+//! eligibility rules are in `is_inlinable_callee`.
 
 use crate::{
     env_pipeline::rewrite_target::{RewriteState, RewriteTarget, RewriteTargets, RewritingScope},
@@ -60,7 +60,7 @@ pub static UNROLL_DEPTH: Lazy<usize> = Lazy::new(|| {
         .unwrap_or(10)
 });
 
-/// Optimize functions in target modules by applying inlining transformations.
+/// Optimize functions in primary target modules by applying inlining transformations.
 /// With inlining, a call site of the form:
 /// ```move
 /// foo(a, b, c, ...)
@@ -73,27 +73,16 @@ pub static UNROLL_DEPTH: Lazy<usize> = Lazy::new(|| {
 /// ```move
 /// let (x, y, z, ...) = (a, b, c, ...); body
 /// ```
-///
-/// If `allow_non_primary_targets` is true, also optimize non-primary target modules.
-pub fn optimize(env: &mut GlobalEnv, allow_non_primary_targets: bool) {
+pub fn optimize(env: &mut GlobalEnv) {
     let mut targets = RewriteTargets::create(env, RewritingScope::CompilationTarget);
     let skip_functions = find_cycles_in_call_graph(env, &targets);
     targets.filter(|target, _| {
         if let RewriteTarget::MoveFun(function_id) = target {
             let function = env.get_function(*function_id);
-            // We will consider inlining the callees in a function only if it satisfies all of:
-            // - is not part of a cycle of same-module calls
-            // - is in a primary target module (if `allow_non_primary_targets` is false)
-            // - is not in a script module
-            // - is not a test only function
-            // - is not a verify only function
-            // - is not a native function
-            // - is not an inline function
             !skip_functions.contains(function_id)
-                && (allow_non_primary_targets || function.module_env.is_primary_target())
+                && function.module_env.is_primary_target()
                 && !function.module_env.is_script_module()
-                && !function.is_test_only()
-                && !function.is_verify_only()
+                && !function.is_test_or_verify_only()
                 && !function.is_native()
                 && !function.is_inline()
         } else {
@@ -150,14 +139,11 @@ fn inline_call_sites(
             let mut rewriter = CallerRewriter { env, call_sites };
             // Rewrite the caller's body with inlined call sites.
             let rewritten_def = rewriter.rewrite_exp(def.clone());
-            // If nothing has changed, no need to update.
-            if !ExpData::ptr_eq(&rewritten_def, def) {
-                *targets.state_mut(&target) = RewriteState::Def(rewritten_def);
-                env.function_size_estimate
-                    .borrow_mut()
-                    .insert(function_id, new_size);
-                changed_targets.push(target);
-            }
+            *targets.state_mut(&target) = RewriteState::Def(rewritten_def);
+            env.function_size_estimate
+                .borrow_mut()
+                .insert(function_id, new_size);
+            changed_targets.push(target);
         }
     }
     changed_targets
@@ -181,8 +167,11 @@ fn get_latest_function_definition<'a>(
     }
 }
 
-/// Find functions in cycles of same-module calls, including self-recursion.
-/// Cross-module calls are never inlined, so cycles through them cannot be unrolled.
+/// Find functions in same-module cycles of function uses (calls and closure
+/// references), including self-recursion. Cross-module uses are ignored since
+/// they are never inlined. Conservative: uses are not filtered by
+/// `is_inlinable_callee`, so a caller may be skipped for a cycle that unrolling
+/// could never follow.
 fn find_cycles_in_call_graph(
     env: &GlobalEnv,
     targets: &RewriteTargets,
@@ -232,10 +221,12 @@ fn compute_call_sites_to_inline_and_new_function_size(
     // Find all the callees that are eligible for inlining.
     let inline_eligible_functions = callees
         .into_iter()
+        // Only same-module callees are inlined; see the module documentation.
+        .filter(|(callee, _)| callee.module_id == caller_mid)
         .filter_map(|(callee, sites_and_loop_depth)| {
             let callee_env = env.get_function(callee);
             let callee_size = get_function_size_estimate(env, &callee);
-            if !is_inlinable_callee(caller_mid, &callee_env, callee_size) {
+            if !is_inlinable_callee(&callee_env, callee_size) {
                 None
             } else {
                 let callee_frequency = sites_and_loop_depth.len();
@@ -357,30 +348,19 @@ fn get_function_size_estimate(env: &GlobalEnv, function: &QualifiedId<FunId>) ->
         .unwrap_or_default()
 }
 
-/// Returns whether `callee` is eligible for inlining into module `caller_mid`.
-fn is_inlinable_callee(
-    caller_mid: ModuleId,
-    callee: &FunctionEnv,
-    callee_size: FunctionSize,
-) -> bool {
-    // Only same-module callees are inlined; see the module documentation.
-    callee.module_env.get_id() == caller_mid
-        // The module lock is acquired by the callee's own frame.
-        && !callee.has_module_lock()
-        // Explicit inline functions are expanded earlier; native functions have no body.
+/// Returns whether the same-module `callee` is eligible for inlining.
+fn is_inlinable_callee(callee: &FunctionEnv, callee_size: FunctionSize) -> bool {
+    // The module lock is acquired by the callee's own frame.
+    !callee.has_module_lock()
+        // Explicit inline functions are expanded earlier.
         && !callee.is_inline()
-        && !callee.is_native()
         // Bound code growth.
         && callee_size.code_size <= *MAX_CALLEE_CODE_SIZE
-        // Inlined returns would exit the caller without additional rewriting.
-        && !has_explicit_return(callee)
-}
-
-/// Does `function` have an explicit return statement in its body?
-fn has_explicit_return(function: &FunctionEnv) -> bool {
-    function
-        .get_def()
-        .is_some_and(|exp| exp.any(&mut |e| matches!(e, ExpData::Return(..))))
+        // The callee must have a body with no explicit `return`: once inlined,
+        // a `return` would exit the caller instead of the callee.
+        && callee
+            .get_def()
+            .is_some_and(|body| !body.any(&mut |exp| matches!(exp, ExpData::Return(..))))
 }
 
 /// Rewriter for a caller function to inline the call sites in it.
