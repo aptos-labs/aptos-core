@@ -130,6 +130,78 @@ WORKLOADS = [
         description="Places orders on a single market whose buy and sell prices "
         "never overlap, so every order rests in the book.",
     ),
+    # The benches-e2e suite. Each of these publishes one application-shaped
+    # package and runs a weighted mix of its entry points, so a number here
+    # moves for the same reasons a real protocol's would.
+    Workload(
+        "clob-avl",
+        block_size=500,
+        description="Central limit order book over a bit-packed AVL queue in "
+        "table items. Mixes resting placements, matching, cancels, and "
+        "traversal, so the read set is a pointer chase of data-dependent depth.",
+    ),
+    Workload(
+        "lending-market",
+        block_size=500,
+        description="Lending protocol adjusted from Aave v3. Supply, withdraw, "
+        "borrow, repay, collateral toggles, and flash loans over eight "
+        "reserves, with u256 index accrual once per reserve per block.",
+    ),
+    Workload(
+        "clmm-swap",
+        block_size=500,
+        description="Concentrated liquidity swap in the Uniswap V3 shape. How "
+        "densely the pool initializes ticks drives how many a swap crosses, so "
+        "the read set widens from a few slots to dozens with no code change.",
+    ),
+    Workload(
+        "stableswap",
+        block_size=500,
+        description="Curve-style stableswap. The get_D and get_y Newton loops "
+        "run a data-dependent number of iterations, so per-transaction compute "
+        "cannot be constant-folded.",
+    ),
+    Workload(
+        "bridge-relay",
+        block_size=500,
+        description="LayerZero-shaped cross-chain message relay. Near-zero "
+        "compute per message, so the number measures the storage IO floor: "
+        "nonce compare, payload write, attestation.",
+    ),
+    Workload(
+        "airdrop-fanout",
+        block_size=500,
+        description="Batch token distribution to 100 recipients per "
+        "transaction. Mixes first-touch creation writes with repeat "
+        "modification writes across sharded tables and primary stores.",
+    ),
+    Workload(
+        "oracle-batch",
+        block_size=500,
+        description="Switchboard-shaped oracle update. Verifies real ed25519 "
+        "and secp256k1 signatures over batched price reports, with matched "
+        "write-only and verify-only controls that isolate the native's share.",
+    ),
+    Workload(
+        "cdp-liquidation",
+        block_size=500,
+        description="Liquity-style CDP with a doubly-linked sorted vault list "
+        "over resources. Each hop's address comes only from the previous "
+        "resource, so the walk is a chain of sequentially dependent reads.",
+    ),
+    Workload(
+        "dex-aggregator",
+        block_size=500,
+        description="Panora-shaped router over four pool backends. Routes carry "
+        "up to 32 type parameters, driving monomorphization and generic "
+        "dispatch far past anything else in the suite.",
+    ),
+    Workload(
+        "nft-mint-market",
+        block_size=500,
+        description="Token v2 mint and marketplace. Buys, listings, offers, and "
+        "fee splits over resource-group members at derived object addresses.",
+    ),
 ]
 
 
@@ -379,6 +451,11 @@ def common_flags(workload, db_dir, checkpoint_dir):
         f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
         f"--execution-threads 1 --generate-then-execute "
+        # Several generator threads assign sequence numbers in whatever order
+        # they run, but the block keeps the order the slots were laid out in. A
+        # workload that draws the same account twice in a block then lands its
+        # transactions reversed, and the second one is discarded.
+        f"--num-generator-workers 1 "
         f"--block-size {workload.block_size} "
         f"run-executor "
         f"--data-dir {db_dir} --checkpoint-dir {checkpoint_dir}"

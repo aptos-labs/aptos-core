@@ -4954,6 +4954,8 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-crypto-derive",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -13147,6 +13149,7 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework",
  "aptos-framework-natives",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
