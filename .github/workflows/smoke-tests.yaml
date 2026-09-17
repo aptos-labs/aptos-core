@@ -1,146 +1,123 @@
-name: "Smoke Tests"
-
-permissions:
-  contents: read
-
+name: Smoke artifact transfer comparison
 on:
   workflow_dispatch:
-  workflow_call:
     inputs:
-      only_docs_changed:
-        description: "Whether only docs changed (skip smoke tests if true)"
+      source-run:
         required: true
         type: string
-
-env:
-  CARGO_INCREMENTAL: "0"
-  CARGO_TERM_COLOR: always
-
+      node-artifact:
+        required: true
+        type: string
+      tests-artifact:
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
 jobs:
-  # Build aptos-node separately due to feature unification issues.
-  build-smoke-aptos-node:
-    if: inputs.only_docs_changed != 'true'
+  producer:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     outputs:
-      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
+      node-0: ${{ steps.node0.outputs.artifact-id }}
+      tests-0: ${{ steps.tests0.outputs.artifact-id }}
+      node-1: ${{ steps.node1.outputs.artifact-id }}
+      tests-1: ${{ steps.tests1.outputs.artifact-id }}
+      checksums: ${{ steps.hashes.outputs.checksums }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build aptos-node
-        run: python3 .github/scripts/ci_metrics.py run smoke-node-build -- cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
-        shell: bash
-      - name: Upload aptos-node binary
-        id: artifact
+        with:
+          ref: 3be0111fe8a6d36c22aaad8972d44512b582e515
+      - name: Download exact candidate node binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: ${{ inputs.source-run }}
+          artifact-ids: ${{ inputs.node-artifact }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: target/release
+      - name: Download exact candidate test binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: ${{ inputs.source-run }}
+          artifact-ids: ${{ inputs.tests-artifact }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+      - name: Record identical file content and byte counts
+        id: hashes
+        run: |
+          sha256sum target/release/aptos-node target/release/aptos target/release/aptos-debugger smoke-test-archive.tar.zst > checksums.txt
+          cat checksums.txt
+          wc -c target/release/aptos-node target/release/aptos target/release/aptos-debugger smoke-test-archive.tar.zst
+          echo "checksums=$(base64 -w0 checksums.txt)" >> "$GITHUB_OUTPUT"
+      - name: Upload node compression 0
+        id: node0
         uses: actions/upload-artifact@v4
         with:
+          name: transfer-node-0-${{ github.run_attempt }}
           path: target/release/aptos-node
-          name: smoke-aptos-node-${{ github.run_attempt }}
-          compression-level: 1 # Compress the raw binary's large debug sections.
+          compression-level: 0
           retention-days: 1
           if-no-files-found: error
-
-      - uses: ./.github/actions/ci-metrics-report
-        if: always()
-        with:
-          name: smoke-node-build
-
-  # Build test archive + helper binaries in parallel with aptos-node.
-  build-smoke-tests:
-    if: inputs.only_docs_changed != 'true'
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    outputs:
-      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build smoke test archive and helper binaries
-        run: |
-          # Build helper binaries needed by smoke tests
-          python3 .github/scripts/ci_metrics.py run smoke-helpers-build -- cargo build --locked --release --package aptos --package aptos-debugger
-          # Create nextest archive with compiled test binaries.
-          # LOCAL_SWARM_NODE_RELEASE must be set at compile time (option_env!) so the
-          # test binary uses the release aptos-node binary instead of building a debug one.
-          LOCAL_SWARM_NODE_RELEASE=1 python3 .github/scripts/ci_metrics.py run smoke-archive-build -- cargo nextest archive --locked --release --package smoke-test --archive-file smoke-test-archive.tar.zst
-        shell: bash
-      - name: Upload smoke test archive and helper binaries
-        id: artifact
+      - name: Upload tests compression 0
+        id: tests0
         uses: actions/upload-artifact@v4
         with:
+          name: transfer-tests-0-${{ github.run_attempt }}
           path: |
             target/release/aptos
             target/release/aptos-debugger
             smoke-test-archive.tar.zst
-          name: smoke-test-archive-${{ github.run_attempt }}
-          compression-level: 1 # The helper binaries are not pre-compressed.
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Upload node compression 1
+        id: node1
+        uses: actions/upload-artifact@v4
+        with:
+          name: transfer-node-1-${{ github.run_attempt }}
+          path: target/release/aptos-node
+          compression-level: 1
+          retention-days: 1
+          if-no-files-found: error
+      - name: Upload tests compression 1
+        id: tests1
+        uses: actions/upload-artifact@v4
+        with:
+          name: transfer-tests-1-${{ github.run_attempt }}
+          path: |
+            target/release/aptos
+            target/release/aptos-debugger
+            smoke-test-archive.tar.zst
+          compression-level: 1
           retention-days: 1
           if-no-files-found: error
 
-      - uses: ./.github/actions/ci-metrics-report
-        if: always()
-        with:
-          name: smoke-tests-build
-
-  # Run smoke tests in parallel partitions. This is a PR required job.
-  rust-smoke-tests:
-    needs: [build-smoke-aptos-node, build-smoke-tests]
-    if: inputs.only_docs_changed != 'true'
+  consumer:
+    needs: producer
     runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
-        partition: [1, 2, 3, 4, 5, 6, 7, 8]
+        sample: [1, 2, 3]
+        compression: [0, 1]
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Run postgres database
-        uses: ./.github/actions/postgres-start
-
-      # Exact artifact IDs also work when only failed shard jobs are rerun.
-      - name: Require the producer artifact IDs
-        env:
-          NODE_ARTIFACT_ID: ${{ needs.build-smoke-aptos-node.outputs.artifact-id }}
-          TEST_ARTIFACT_ID: ${{ needs.build-smoke-tests.outputs.artifact-id }}
-        run: |
-          [[ "$NODE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || { echo "Missing or invalid node artifact ID"; exit 1; }
-          [[ "$TEST_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]] || { echo "Missing or invalid test artifact ID"; exit 1; }
-
-      - name: Download aptos-node binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
+      - name: Download node
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
+          artifact-ids: ${{ matrix.compression == 0 && needs.producer.outputs.node-0 || needs.producer.outputs.node-1 }}
+          merge-multiple: true
           path: target/release
-          artifact-ids: ${{ needs.build-smoke-aptos-node.outputs.artifact-id }}
-          merge-multiple: true
-
-      - name: Download smoke test archive and helper binaries
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # pin@v4
+      - name: Download tests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          artifact-ids: ${{ needs.build-smoke-tests.outputs.artifact-id }}
+          artifact-ids: ${{ matrix.compression == 0 && needs.producer.outputs.tests-0 || needs.producer.outputs.tests-1 }}
           merge-multiple: true
-
-      - name: Run smoke tests partition ${{ matrix.partition }}/8
+      - name: Verify identical bytes
+        env:
+          CHECKSUMS: ${{ needs.producer.outputs.checksums }}
         run: |
-          chmod +x target/release/aptos-node target/release/aptos target/release/aptos-debugger
-          SMOKE_TEST_PREBUILD_BINARIES=1 \
-          SMOKE_TEST_BIN_DIR=${{ github.workspace }}/target/release \
-          LOCAL_SWARM_NODE_RELEASE=1 \
-          python3 .github/scripts/ci_metrics.py run smoke-shard -- cargo nextest run \
-            --archive-file smoke-test-archive.tar.zst \
-            --workspace-remap . \
-            --profile smoke-test \
-            --partition count:${{ matrix.partition }}/8
-        shell: bash
-
-      - uses: ./.github/actions/ci-metrics-report
-        if: always()
-        with:
-          name: smoke-shard-${{ matrix.partition }}
-
-      # Upload logs on failure for debugging.
-      - name: Upload smoke test logs for failed and flaky tests
-        if: ${{ failure() || success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: failed-smoke-test-logs-${{ github.run_attempt }}-${{ matrix.partition }}
-          include-hidden-files: true
-          path: |
-            /tmp/.tmp*
-            !/tmp/.tmp*/**/db/
-          retention-days: 14
+          printf '%s' "$CHECKSUMS" | base64 -d | sha256sum -c
+          nproc
+          free -b
+          lscpu
