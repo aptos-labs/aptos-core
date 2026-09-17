@@ -31,6 +31,10 @@ so a workload that publishes modules could not be set up under it.
 The report defines its own columns, verdicts, and workloads in a collapsed block
 below the tables. This file covers the method and the calibration.
 
+Ten of the workloads come from `../benches-e2e/`, a set of Move packages shaped
+after protocols that run on mainnet. Its README covers what each one stresses
+and what a new package there has to satisfy.
+
 ## Record and replay
 
 `run-executor` takes two directories, and the record/replay flow is built out of

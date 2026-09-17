@@ -6,7 +6,9 @@ use crate::publishing::prebuild_packages::PrebuiltPackagesBundle;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     move_types::{
-        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
     },
     types::transaction::{EntryFunction, TransactionPayload},
 };
@@ -111,7 +113,16 @@ pub fn get_payload(
     func: Identifier,
     args: Vec<Vec<u8>>,
 ) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, func, vec![], args))
+    get_payload_ty(module_id, func, vec![], args)
+}
+
+pub fn get_payload_ty(
+    module_id: ModuleId,
+    func: Identifier,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(module_id, func, ty_args, args))
 }
 
 pub trait CloneEntryPointTrait {

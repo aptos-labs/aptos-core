@@ -1,0 +1,10 @@
+[package]
+name = "nft_mint_market"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../../../aptos-move/framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../../../../aptos-move/framework/aptos-token-objects" }
+
+[addresses]
+bench = "0xB0"
