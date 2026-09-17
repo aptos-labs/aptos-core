@@ -1,52 +1,19 @@
-name: CI measurement verification
+name: CI artifact failure contract
 on:
   workflow_dispatch:
 permissions:
   contents: read
-  actions: read
 jobs:
-  verify:
+  missing-artifact:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ceafa814722d3cd2292b6d186c2ff25880aeebb1
-      - name: Test current validation helpers
-        run: |
-          node --test .github/scripts/*.test.cjs
-          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
-      - name: Download small measurements
+      - name: Exercise a missing artifact
+        id: missing-artifact
+        continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          run-id: 35172638902
-          pattern: ci-metrics-*
-          path: small/metrics
-          github-token: ${{ github.token }}
-      - name: Download medium measurements
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          run-id: 35172874065
-          pattern: ci-metrics-*
-          path: medium/metrics
-          github-token: ${{ github.token }}
-      - name: Download large measurements
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          run-id: 35173246819
-          pattern: ci-metrics-*
-          path: large/metrics
-          github-token: ${{ github.token }}
-      - name: Replay the exact corrected verifier over every recorded sample
-        run: |
-          python3 - <<'VERIFY'
-          import os
-          import subprocess
-          import textwrap
-          from pathlib import Path
-          source = Path('.github/workflows/ci-benchmark.yaml').read_text()
-          script = textwrap.dedent(source.rsplit('        run: |\n', 1)[1])
-          environment = {**os.environ, 'PYTHONPATH': str(Path('.github/scripts').resolve())}
-          for suite in ('small', 'medium', 'large'):
-              print(f'Verifying {suite}', flush=True)
-              subprocess.run(['bash', '-e', '-c', script], cwd=suite, env=environment, check=True)
-          VERIFY
+          artifact-ids: "0"
+      - name: Require missing-artifact failure
+        env:
+          OUTCOME: ${{ steps.missing-artifact.outcome }}
+        run: test "$OUTCOME" = failure
