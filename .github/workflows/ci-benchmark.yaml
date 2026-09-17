@@ -72,7 +72,7 @@ jobs:
           read -ra packages <<< "$CI_BENCHMARK_PACKAGES"
           args=()
           for package in "${packages[@]}"; do args+=(-p "$package"); done
-          cargo nextest list --locked --cargo-profile ci "${args[@]}" -T json > ci-metrics/inventory.json
+          cargo nextest list --profile ci --locked --cargo-profile ci "${args[@]}" -T json > ci-metrics/inventory.json
       - uses: ./.github/actions/ci-metrics-report
         if: always()
         with:
