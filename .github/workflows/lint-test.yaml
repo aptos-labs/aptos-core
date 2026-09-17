@@ -1,89 +1,27 @@
-name: CI validation measurements
+name: Workspace validation retry
 on:
   workflow_dispatch:
 permissions:
   contents: read
-  id-token: write
+env:
+  HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
+  HAS_DATADOG_SECRETS: ${{ secrets.DD_API_KEY != '' }}
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
 jobs:
-  image-pins:
-    runs-on: 2cpu-gh-ubuntu24-x64
-    outputs:
-      digests: ${{ steps.resolve.outputs.digests }}
+  rust-unit-tests:
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: 3be0111fe8a6d36c22aaad8972d44512b582e515
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@3be0111fe8a6d36c22aaad8972d44512b582e515
+      - uses: ./.github/actions/prover-tools-setup
+      - name: Run rust unit tests
+        uses: ./.github/actions/rust-unit-tests
         with:
-          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - id: resolve
-        name: Resolve immutable image digests once for all samples
-        env:
-          IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
-        run: |
-          set -euo pipefail
-          digests='{}'
-          for tag in 893d1ffea49dcfa933f0421b19fc6e31a9c808ab devnet testnet mainnet; do
-            digest=$(docker buildx imagetools inspect "$IMAGE_REPO/tools:$tag" --format '{{json .Manifest}}' | jq -er '.digest')
-            [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
-            digests=$(jq -c --arg tag "$tag" --arg digest "$digest" '. + {($tag): $digest}' <<< "$digests")
-          done
-          echo "$digests"
-          echo "digests=$digests" >> "$GITHUB_OUTPUT"
-
-  cli-baseline:
-    needs: image-pins
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        sample: [1, 2, 3]
-    uses: ./.github/workflows/validation-cli-baseline.yaml
-    secrets: inherit
-    with:
-      GIT_SHA: 3be0111fe8a6d36c22aaad8972d44512b582e515
-      image-digests: ${{ needs.image-pins.outputs.digests }}
-
-  cli-candidate:
-    needs: image-pins
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        sample: [1, 2, 3]
-    uses: ./.github/workflows/validation-cli-candidate.yaml
-    secrets: inherit
-    with:
-      GIT_SHA: 3be0111fe8a6d36c22aaad8972d44512b582e515
-      image-digests: ${{ needs.image-pins.outputs.digests }}
-
-  api-baseline:
-    needs: image-pins
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        sample: [1, 2, 3]
-    uses: ./.github/workflows/validation-api-baseline.yaml
-    secrets: inherit
-    with:
-      GIT_SHA: 3be0111fe8a6d36c22aaad8972d44512b582e515
-      image-digests: ${{ needs.image-pins.outputs.digests }}
-
-  api-candidate:
-    needs: image-pins
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        sample: [1, 2, 3]
-    uses: ./.github/workflows/validation-api-candidate.yaml
-    secrets: inherit
-    with:
-      GIT_SHA: 3be0111fe8a6d36c22aaad8972d44512b582e515
-      image-digests: ${{ needs.image-pins.outputs.digests }}
+          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
+      - uses: ./.github/actions/ci-metrics-report
+        if: always()
+        with:
+          name: rust-unit-tests
