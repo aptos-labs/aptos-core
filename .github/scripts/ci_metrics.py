@@ -13,13 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def inventory(listing):
+def inventory(listing, *, include_filtered=False):
     """Keep test identities and ignore status, not machine-specific paths."""
     return sorted(
         (binary, name, case["ignored"])
         for binary, suite in listing["rust-suites"].items()
         for name, case in suite["testcases"].items()
-        if case["filter-match"]["status"] == "matches"
+        if include_filtered or case["filter-match"]["status"] == "matches"
     )
 
 

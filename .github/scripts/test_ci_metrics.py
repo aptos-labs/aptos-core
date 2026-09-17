@@ -199,6 +199,17 @@ class MetricsTests(unittest.TestCase):
             inventory(listing), [("one", "same", False), ("two", "same", True)]
         )
 
+    def test_full_inventory_preserves_filtered_ignored_tests(self):
+        case = {
+            "ignored": True,
+            "filter-match": {"status": "mismatch", "reason": "ignored"},
+        }
+        listing = {"rust-suites": {"binary": {"testcases": {"ignored": case}}}}
+        self.assertEqual(inventory(listing), [])
+        self.assertEqual(
+            inventory(listing, include_filtered=True), [("binary", "ignored", True)]
+        )
+
     def test_measurement_preserves_failures(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

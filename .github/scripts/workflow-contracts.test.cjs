@@ -130,14 +130,19 @@ test('benchmark verifier accepts inline and sharded runs and rejects incomplete 
   try {
     const script = stepRun('.github/workflows/ci-benchmark.yaml', 'Require identical inventories and complete disjoint partitions');
     const env = { PYTHONPATH: path.join(root, '.github/scripts'), PYTHONDONTWRITEBYTECODE: '1' };
-    function record(name, tests) {
+    function record(name, tests, includeIgnored = true) {
       const directory = path.join(temporary, 'metrics', `ci-metrics-${name}-1`);
       fs.mkdirSync(directory, { recursive: true });
       const listing = {
-        'test-count': tests.length,
-        'rust-suites': { binary: { testcases: Object.fromEntries(tests.map(name => [name, {
-          ignored: false, 'filter-match': { status: 'matches' },
-        }])) } },
+        'test-count': tests.length + Number(includeIgnored),
+        'rust-suites': { binary: { testcases: {
+          ...Object.fromEntries(tests.map(name => [name, {
+            ignored: false, 'filter-match': { status: 'matches' },
+          }])),
+          ...(includeIgnored ? { 'ignored-test': {
+            ignored: true, 'filter-match': { status: 'mismatch', reason: 'ignored' },
+          } } : {}),
+        } } },
       };
       fs.writeFileSync(path.join(directory, 'inventory.json'), JSON.stringify(listing));
     }
@@ -155,6 +160,11 @@ test('benchmark verifier accepts inline and sharded runs and rejects incomplete 
       const result = shell(script, env, temporary);
       assert.equal(result.status, 0, result.stderr);
       assert.equal(result.stdout.split('exact inventory and partition match').length - 1, 3);
+      record('candidate-2-build', tests, false);
+      const missingIgnored = shell(script, env, temporary);
+      assert.notEqual(missingIgnored.status, 0, 'A missing ignored test must fail the full inventory comparison');
+      assert.match(missingIgnored.stderr, /Partition mismatch/);
+      record('candidate-2-build', tests);
     }
     record('candidate-3-shard-8', []);
     const incomplete = shell(script, env, temporary);

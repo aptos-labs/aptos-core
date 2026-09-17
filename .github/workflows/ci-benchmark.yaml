@@ -115,10 +115,12 @@ jobs:
           for sample in (1, 2, 3):
               baseline = latest(f'baseline-{sample}')
               candidate = latest(f'candidate-{sample}-build')
+              complete = inventory(baseline, include_filtered=True)
+              check_partitions(complete, [inventory(candidate, include_filtered=True)])
               expected = inventory(baseline)
               check_partitions(expected, [inventory(candidate)])
               if execution_mode(candidate['test-count'], 3000) == 'shard':
                   shards = [latest(f'candidate-{sample}-shard-{partition}') for partition in range(1, 9)]
                   check_partitions(expected, [inventory(shard) for shard in shards])
-              print(f'Sample {sample}: {len(expected)} tests, exact inventory and partition match')
+              print(f'Sample {sample}: {len(complete)} total, {len(expected)} runnable tests; exact inventory and partition match')
           PY
