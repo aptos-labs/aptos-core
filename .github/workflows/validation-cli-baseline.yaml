@@ -1,0 +1,136 @@
+name: "Run Aptos CLI E2E tests"
+on:
+  # This is called from within the docker-build-test.yaml workflow since we depend
+  # on the build of the image of the CLI we're testing having been built before this
+  # workflow runs. You can see in the invocation of the test suite that we pass in
+  # the image repo we just built and pushed the tools image to and the git SHA1 of
+  # the commit / PR that triggered this workflow.
+  workflow_call:
+    inputs:
+      image-digests:
+        required: true
+        type: string
+      GIT_SHA:
+        required: true
+        type: string
+        description: Use this to override the git SHA1, branch name (e.g. devnet) or tag
+      SKIP_JOB:
+        required: false
+        default: false
+        type: boolean
+        description: Set to true to skip this job. Useful for PRs that don't require this workflow.
+
+# TODO: should we migrate this to a composite action, so that we can skip it
+# at the call site, and don't need to wrap each step in an if statement?
+permissions:
+  contents: read
+
+env:
+  CI_VALIDATION_IMAGE_DIGESTS: ${{ inputs.image-digests }}
+
+jobs:
+  # Run the Aptos CLI examples. We run the CLI on this commit / PR against a
+  # local testnet using the devnet, testnet, and mainnet branches. This way
+  # we ensure that the Aptos CLI works with all 3 prod networks, at least
+  # based on the tests in the test suite.
+  run-cli-tests:
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ !inputs.SKIP_JOB }}
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@6de07db2c04bdd975e13f2e33003458c15dc32f6
+        if: ${{ !inputs.SKIP_JOB }}
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Sample host memory
+        continue-on-error: true
+        run: |
+          nohup bash -c 'while true; do awk '\''/MemTotal:/ {total=$2} /MemAvailable:/ {print total-$2}'\'' /proc/meminfo; sleep 1; done' \
+            > "$RUNNER_TEMP/cli-memory-kib.txt" 2>/dev/null < /dev/null &
+
+      - name: Pin identical CLI and localnet image digests
+        run: |
+          git apply <<'PATCH'
+          diff --git a/crates/aptos/e2e/common.py b/crates/aptos/e2e/common.py
+          --- a/crates/aptos/e2e/common.py
+          +++ b/crates/aptos/e2e/common.py
+          @@ -45,7 +45,9 @@ def build_image_name(image_repo_with_project: str, tag: str):
+               image_repo_with_project = image_repo_with_project.rstrip("/")
+               if image_repo_with_project != "":
+                   image_repo_with_project = f"{image_repo_with_project}/"
+          -    return f"{image_repo_with_project}tools:{tag}"
+          +    import json
+          +    import os
+          +    return f"{image_repo_with_project}tools@{json.loads(os.environ['CI_VALIDATION_IMAGE_DIGESTS'])[str(tag)]}"
+           
+           
+           # Exception to use when a test fails, for the CLI did something unexpected, an
+          PATCH
+
+      - uses: ./.github/actions/python-setup
+        if: ${{ !inputs.SKIP_JOB }}
+        with:
+          pyproject_directory: crates/aptos/e2e
+          poetry_version: 2.1.2
+
+      # Run CLI tests against local testnet built from devnet branch.
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
+        if: ${{ !inputs.SKIP_JOB }}
+        name: devnet-tests
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network devnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag aba7ebe8287390be4768c5845d7022b5ccdec512 --working-directory ${{ runner.temp }}/aptos-e2e-tests-devnet
+
+      # Run CLI tests against local testnet built from testnet branch.
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
+        if: ${{ !inputs.SKIP_JOB }}
+        name: testnet-tests
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network testnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag aba7ebe8287390be4768c5845d7022b5ccdec512 --working-directory ${{ runner.temp }}/aptos-e2e-tests-testnet
+
+      # Run CLI tests against local testnet built from mainnet branch.
+      - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
+        if: ${{ !inputs.SKIP_JOB }}
+        name: mainnet-tests
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./crates/aptos/e2e && poetry run python main.py -d --base-network mainnet --image-repo-with-project ${{ vars.GCP_DOCKER_ARTIFACT_REPO }} --test-cli-tag aba7ebe8287390be4768c5845d7022b5ccdec512 --working-directory ${{ runner.temp }}/aptos-e2e-tests-mainnet
+
+      - name: Print local testnet logs on failure
+        if: ${{ !inputs.SKIP_JOB && failure() }}
+        working-directory: docker/compose/validator-testnet
+        run: docker logs aptos-tools-devnet && docker logs aptos-tools-testnet && docker logs aptos-tools-mainnet
+
+      # Print out whether the job was skipped.
+      - run: echo "Skipping CLI E2E tests!"
+        if: ${{ inputs.SKIP_JOB }}
+
+      - name: Record runner resources and image digests
+        if: always()
+        continue-on-error: true
+        run: |
+          nproc
+          free -b
+          awk 'BEGIN {peak=0} {if ($1>peak) peak=$1} END {printf "Sampled host used peak bytes (1s): %.0f\n", peak*1024}' "$RUNNER_TEMP/cli-memory-kib.txt"
+          for counter in /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory/memory.max_usage_in_bytes; do
+            if [[ -r "$counter" ]]; then
+              echo "Cgroup peak bytes ($counter): $(<"$counter")"
+            fi
+          done
+          docker images --digests || true
