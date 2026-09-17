@@ -1,0 +1,41 @@
+name: CI measurements
+description: Preserve phase timings and runner configuration
+inputs:
+  name:
+    description: Unique measurement name within this workflow run
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Collect measurements
+      if: always()
+      continue-on-error: true
+      shell: bash
+      run: |
+        mkdir -p ci-metrics
+        {
+          echo "CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-unset}"
+          echo "CARGO_TERM_COLOR: ${CARGO_TERM_COLOR:-unset}"
+          echo "Instance type: ${RUNS_ON_INSTANCE_TYPE:-unknown}"
+          echo "Runner OS/architecture: ${RUNNER_OS:-unknown}/${RUNNER_ARCH:-unknown}"
+          git rev-parse HEAD
+          rustc -Vv
+          cargo nextest --version
+          nproc
+          free -b
+          for counter in /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory/memory.max_usage_in_bytes; do
+            if [[ -r "$counter" ]]; then
+              echo "Cgroup peak bytes ($counter): $(<"$counter")"
+            fi
+          done
+          df -B1 .
+        } > ci-metrics/runner.txt
+    - name: Upload measurements
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-metrics-${{ inputs.name }}-${{ github.run_attempt }}
+        path: ci-metrics/
+        retention-days: 7
+        if-no-files-found: error

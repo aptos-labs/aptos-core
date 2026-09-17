@@ -86,6 +86,7 @@ pub enum AptosCargoCommand {
     TargetedExecutionPerformanceTests(CommonArgs),
     TargetedFrameworkUpgradeTests(CommonArgs),
     TargetedUnitTests(CommonArgs),
+    TargetedUnitTestsArchive(CommonArgs),
     Test(CommonArgs),
 }
 
@@ -115,6 +116,7 @@ impl AptosCargoCommand {
             AptosCargoCommand::TargetedExecutionPerformanceTests(args) => args,
             AptosCargoCommand::TargetedFrameworkUpgradeTests(args) => args,
             AptosCargoCommand::TargetedUnitTests(args) => args,
+            AptosCargoCommand::TargetedUnitTestsArchive(args) => args,
             AptosCargoCommand::Test(args) => args,
         }
     }
@@ -146,6 +148,40 @@ impl AptosCargoCommand {
 
         // Return the parsed args and packages
         Ok((direct_args, push_through_args, packages))
+    }
+
+    /// Runs `cargo nextest <nextest_args>` (e.g., `run` or `archive`) over the affected
+    /// packages, excluding those that other jobs cover. Skips if none were affected.
+    fn run_targeted_unit_tests(
+        &self,
+        package_args: &SelectedPackageArgs,
+        nextest_args: &[&str],
+    ) -> anyhow::Result<()> {
+        let (mut direct_args, push_through_args, affected_package_paths) =
+            self.get_args_and_affected_packages(package_args)?;
+
+        let packages_to_test = targeted_unit_test_packages(affected_package_paths);
+        if packages_to_test.is_empty() {
+            println!("Skipping targeted unit tests because no test packages were affected!");
+            return Ok(());
+        }
+
+        // Add each package to the arguments
+        for package in packages_to_test {
+            direct_args.push("-p".into());
+            direct_args.push(package);
+        }
+
+        // Create and run the command
+        println!(
+            "Running `cargo nextest {}` for the targeted unit tests...",
+            nextest_args.join(" ")
+        );
+        let mut command = Cargo::command("nextest");
+        command.args(nextest_args);
+        command.args(direct_args).pass_through(push_through_args);
+        command.run(false);
+        Ok(())
     }
 
     fn parse_args(&self) -> (Vec<String>, Vec<String>) {
@@ -278,41 +314,12 @@ impl AptosCargoCommand {
                 Ok(())
             },
             AptosCargoCommand::TargetedUnitTests(_) => {
-                // Run the targeted unit tests (if necessary).
-                // Start by calculating the affected packages.
-                let (direct_args, push_through_args, affected_package_paths) =
-                    self.get_args_and_affected_packages(package_args)?;
-
-                // Filter out the ignored packages
-                let mut packages_to_test = vec![];
-                for package_path in affected_package_paths {
-                    // Extract the package name from the full path
-                    let package_name = get_package_name_from_path(&package_path);
-
-                    // Only add the package if it is not in the ignore list
-                    if TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE.contains(&package_name.as_str()) {
-                        debug!(
-                            "Ignoring package when running targeted-unit-tests: {:?}",
-                            package_name
-                        );
-                    } else {
-                        packages_to_test.push(package_path); // Add the package to the list
-                    }
-                }
-
-                // Create and run the command if we found packages to test
-                if !packages_to_test.is_empty() {
-                    println!("Running the targeted unit tests...");
-                    return run_targeted_unit_tests(
-                        packages_to_test,
-                        direct_args,
-                        push_through_args,
-                    );
-                }
-
-                // Otherwise, skip the targeted unit tests
-                println!("Skipping targeted unit tests because no test packages were affected!");
-                Ok(())
+                // Run the targeted unit tests (if necessary). Don't fail if no tests are run!
+                self.run_targeted_unit_tests(package_args, &["run", "--no-tests=warn"])
+            },
+            AptosCargoCommand::TargetedUnitTestsArchive(_) => {
+                // The archive contains the same test selection as the inline command.
+                self.run_targeted_unit_tests(package_args, &["archive"])
             },
             _ => {
                 // Otherwise, we need to parse and run the command.
@@ -460,29 +467,6 @@ fn run_targeted_compiler_v2_tests(
     Ok(())
 }
 
-/// Runs the targeted unit tests
-fn run_targeted_unit_tests(
-    packages_to_test: Vec<String>,
-    mut direct_args: Vec<String>,
-    push_through_args: Vec<String>,
-) -> anyhow::Result<()> {
-    // Add each package to the arguments
-    for package in packages_to_test {
-        direct_args.push("-p".into());
-        direct_args.push(package);
-    }
-
-    // Create the command to run the unit tests
-    let mut command = Cargo::command("nextest");
-    command.args(["run"]);
-    command.args(["--no-tests=warn"]); // Don't fail if no tests are run!
-    command.args(direct_args).pass_through(push_through_args);
-
-    // Run the unit tests
-    command.run(false);
-    Ok(())
-}
-
 /// Outputs the specified affected packages
 fn output_affected_packages(packages: Vec<String>) -> anyhow::Result<()> {
     // Output the affected packages (if they exist)
@@ -534,9 +518,65 @@ impl AptosCargoCli {
     }
 }
 
+/// Excludes packages covered by separate CI jobs without changing package identities.
+fn targeted_unit_test_packages(packages: Vec<String>) -> Vec<String> {
+    packages
+        .into_iter()
+        .filter(|path| {
+            let name = get_package_name_from_path(path);
+            let ignored = TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE.contains(&name.as_str());
+            if ignored {
+                debug!(
+                    "Ignoring package when running targeted-unit-tests: {:?}",
+                    name
+                );
+            }
+            !ignored
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn targeted_unit_test_selection_preserves_package_ids() {
+        let selected = "file:///workspace/devtools/aptos-cargo-cli#aptos-cargo-cli".to_string();
+        let mut packages = vec![selected.clone()];
+        packages.extend(
+            TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE
+                .iter()
+                .map(|name| format!("file:///workspace/{name}#{name}")),
+        );
+        assert_eq!(targeted_unit_test_packages(packages), vec![selected]);
+    }
+
+    #[test]
+    fn targeted_unit_test_selection_can_be_empty() {
+        assert!(targeted_unit_test_packages(vec![]).is_empty());
+        let ignored = TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE
+            .iter()
+            .map(|name| format!("file:///workspace/{name}#{name}"))
+            .collect();
+        assert!(targeted_unit_test_packages(ignored).is_empty());
+    }
+
+    #[test]
+    fn targeted_unit_test_commands_preserve_forwarded_arguments() {
+        let args = CommonArgs {
+            args: vec!["--locked".into(), "--".into(), "--nocapture".into()],
+        };
+        for command in [
+            AptosCargoCommand::TargetedUnitTests(args.clone()),
+            AptosCargoCommand::TargetedUnitTestsArchive(args.clone()),
+        ] {
+            assert_eq!(
+                command.parse_args(),
+                (vec!["--locked".into()], vec!["--nocapture".into()])
+            );
+        }
+    }
 
     #[test]
     fn test_detect_relevant_changes() {
