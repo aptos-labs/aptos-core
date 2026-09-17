@@ -264,6 +264,9 @@ impl AptosModuleCacheManager {
 
         // MonoMove uses its own code cache, so the legacy framework prefetch does not apply.
         // TODO(completeness): prefetch framework for MonoMove into cache.
+        // TODO(correctness): the MonoMove `GlobalContext` survives across blocks and is never
+        //   invalidated, so a module upgrade leaves the stale translation cached. Reset or
+        //   version-check it here before the feature can be enabled.
         let mono_move_enabled = guard.environment().features().is_mono_move_enabled();
 
         // To avoid cold starts, fetch the framework code. This ensures the state with 0 modules

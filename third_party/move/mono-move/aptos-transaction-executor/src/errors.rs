@@ -36,8 +36,12 @@ impl MaterializationError {
 /// rejection reason is observable.
 #[derive(Debug)]
 pub enum DiscardReason {
+    /// The transaction's signature did not verify.
+    InvalidSignature,
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
+    /// A payload or feature that no VM supports anymore.
+    Deprecated(&'static str),
     /// A pre-execution check failed.
     PreExecutionCheck(PreExecutionCheckFailure),
     /// A type argument failed to resolve.
@@ -112,17 +116,36 @@ pub enum ExecutionStatus {
     },
 }
 
-/// Why a transaction's arguments were rejected.
+/// Why a transaction's call was rejected: the function is not one a
+/// transaction may call, or the arguments do not fit it. In the order they are
+/// checked.
 #[derive(Debug)]
 pub enum InvalidArguments {
+    /// The function is a native, which a transaction may not call directly.
+    NativeEntryFunction,
+    /// The function is not an `entry` function.
+    NotEntryFunction,
+    /// The function returns values.
+    ReturnsValues,
     /// A signer parameter follows a non-signer one.
     SignerAfterArgument,
+    /// A parameter has a type a transaction argument cannot fill.
+    DisallowedParameterType,
     /// The argument count does not match the function's parameters.
     ArgumentCountMismatch,
     /// The signer count does not match the function's signer parameters.
     SignerCountMismatch,
     /// An argument's bytes do not decode to its parameter's type.
     UndecodableArgument,
+}
+
+/// Why a script was refused before running.
+#[derive(Debug)]
+pub enum ScriptRejection {
+    /// Its compiler marked it unstable, which mainnet does not run.
+    UnstableOnMainnet,
+    /// It emits events, which scripts may not.
+    EmitsEvents,
 }
 
 /// How Move execution failed, whether it was the prologue, the payload, the
@@ -138,6 +161,8 @@ pub enum MoveExecutionFailure {
     },
     /// The transaction's arguments were rejected.
     InvalidArguments(InvalidArguments),
+    /// The transaction's script was refused before running.
+    RejectedScript(ScriptRejection),
     /// Execution failed with a VM error.
     RuntimeError(VMInternalError),
 }

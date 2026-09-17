@@ -11,8 +11,11 @@ use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
+    ident_str,
     identifier::{IdentStr, Identifier},
-    language_storage::{self, StructTag, TypeTag},
+    language_storage::{
+        self, pseudo_script_module_id, FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag,
+    },
 };
 use thiserror::Error;
 
@@ -194,8 +197,9 @@ pub trait Interner {
     ) -> Result<InternedTypeList, TypeSubstitutionError>;
 }
 
-/// The [`TypeTag`] for an interned type, or [`None`] for types that have no tag
-/// representation (references, functions, and unsubstituted type parameters).
+/// Converts an interned type to a [`TypeTag`]. References are supported only as
+/// function arguments or results. Returns [`None`] for unsupported types,
+/// unsubstituted type parameters, or invalid module or type identifiers.
 ///
 /// TODO(perf): cache the tag per interned type (e.g. in the global context)
 /// instead of re-walking the type graph on every call.
@@ -221,11 +225,54 @@ pub fn type_tag_of(ty: InternedType) -> Option<TypeTag> {
         Type::Signer => TypeTag::Signer,
         Type::Vector { elem } => TypeTag::Vector(Box::new(type_tag_of(*elem)?)),
         Type::Nominal { .. } => TypeTag::Struct(Box::new(struct_tag_of(ty)?)),
-        Type::ImmutRef { .. }
-        | Type::MutRef { .. }
-        | Type::Function { .. }
-        | Type::TypeParam { .. } => return None,
+        Type::Function {
+            args,
+            results,
+            abilities,
+        } => TypeTag::Function(Box::new(FunctionTag {
+            args: function_param_tags_of(*args)?,
+            results: function_param_tags_of(*results)?,
+            abilities: *abilities,
+        })),
+        Type::ImmutRef { .. } | Type::MutRef { .. } | Type::TypeParam { .. } => return None,
     })
+}
+
+/// Converts function arguments or results to tags, preserving reference kinds.
+/// Returns [`None`] if a value type or referent has no tag.
+fn function_param_tags_of(types: InternedTypeList) -> Option<Vec<FunctionParamOrReturnTag>> {
+    view_type_list(types)
+        .iter()
+        .map(|ty| {
+            Some(match view_type(*ty) {
+                Type::ImmutRef { inner } => {
+                    FunctionParamOrReturnTag::Reference(type_tag_of(*inner)?)
+                },
+                Type::MutRef { inner } => {
+                    FunctionParamOrReturnTag::MutableReference(type_tag_of(*inner)?)
+                },
+                Type::Bool
+                | Type::U8
+                | Type::U16
+                | Type::U32
+                | Type::U64
+                | Type::U128
+                | Type::U256
+                | Type::I8
+                | Type::I16
+                | Type::I32
+                | Type::I64
+                | Type::I128
+                | Type::I256
+                | Type::Address
+                | Type::Signer
+                | Type::Vector { .. }
+                | Type::Nominal { .. }
+                | Type::Function { .. }
+                | Type::TypeParam { .. } => FunctionParamOrReturnTag::Value(type_tag_of(*ty)?),
+            })
+        })
+        .collect()
 }
 
 /// The owned [`language_storage::ModuleId`] for an interned module ID.
@@ -240,6 +287,22 @@ pub fn module_id_of(module_id: InternedModuleId) -> language_storage::ModuleId {
         "interned module name is not a valid identifier"
     );
     language_storage::ModuleId::new(*module_id.address(), Identifier::new_unchecked(name))
+}
+
+/// The name of a script's one function, and of the module a script is loaded
+/// as.
+pub const SCRIPT_MAIN: &IdentStr = ident_str!("main");
+
+/// The module ID every loaded script takes.
+pub fn script_module_id(interner: &impl Interner) -> InternedModuleId {
+    interner.module_id_of(&pseudo_script_module_id().address, SCRIPT_MAIN)
+}
+
+/// Whether `module_id` is the one loaded scripts take.
+pub fn is_script_module_id(module_id: InternedModuleId) -> bool {
+    let module_id = view_module_id(module_id);
+    module_id.address() == &pseudo_script_module_id().address
+        && view_name(module_id.name()) == SCRIPT_MAIN.as_str()
 }
 
 /// The [`StructTag`] for an interned nominal (struct/enum) type, or [`None`] if

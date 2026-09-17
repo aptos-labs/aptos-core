@@ -4,20 +4,41 @@
 //! MonoMove event store → Aptos [`ContractEvent`]s.
 
 use crate::error::OutputError;
-use aptos_types::{contract_event::ContractEvent, event::EventKey};
+use aptos_types::{
+    account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
+    contract_event::ContractEvent,
+    event::EventKey,
+};
 use mono_move_core::{type_tag_of, value_layout::LayoutProvider, VMInternalError, VMResult};
 use mono_move_natives::{EventKind, EventStore};
 use mono_move_runtime::{serialize, SessionEffects};
 
-/// Materializes the emitted events into [`ContractEvent`]s, in emission order.
-/// The effects retain every backing allocation reachable from the event values
-/// and the originating layout provider needed to BCS-serialize them.
-pub fn to_contract_events(effects: &SessionEffects<'_>) -> VMResult<Vec<ContractEvent>> {
+/// Whether the effects emitted a reconfiguration (new-epoch) event. Only each
+/// event's type is inspected, not its payload, so no value is serialized.
+// TODO(perf): record on event emit or when processing gas cost for storage for all events.
+pub fn has_new_epoch_event(effects: &SessionEffects) -> VMResult<bool> {
     let store = effects.extension::<EventStore>()?;
-    let layouts = effects.layout_provider();
+    Ok(store.entries().iter().any(|entry| {
+        type_tag_of(entry.msg_ty).is_some_and(|tag| {
+            tag == *NEW_EPOCH_EVENT_MOVE_TYPE_TAG || tag == *NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG
+        })
+    }))
+}
 
-    // SAFETY: the effects retain their frozen local heap, originating resource
-    // provider, and matching layout provider; no GC can run after execution.
+/// Materializes the emitted events into [`ContractEvent`]s, in emission order.
+/// The effects retain every backing allocation reachable from the event values;
+/// `layouts` must describe those values' interned types.
+//
+// TODO(security): prove at compile time that the execution guard backing
+// `layouts` is held.
+pub fn to_contract_events<L: LayoutProvider + ?Sized>(
+    effects: &SessionEffects,
+    layouts: &L,
+) -> VMResult<Vec<ContractEvent>> {
+    let store = effects.extension::<EventStore>()?;
+
+    // SAFETY: the effects retain their frozen local heap and `layouts` describes
+    // the event values' types; no GC can run after execution.
     unsafe { to_contract_events_from_store(&store, layouts) }
 }
 

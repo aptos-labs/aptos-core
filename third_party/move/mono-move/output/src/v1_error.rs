@@ -169,6 +169,12 @@ pub fn v1_location(
             offset,
         }) => (Location::Module(module.clone()), Some((*function, *offset))),
         Some(ErrorLocation::Module(module)) => (Location::Module(module.clone()), None),
+        // A script holds one function, which V1 reports as definition 0.
+        Some(ErrorLocation::ScriptInstruction { offset }) => (
+            Location::Script,
+            Some((FunctionDefinitionIndex(0), *offset)),
+        ),
+        Some(ErrorLocation::Script) => (Location::Script, None),
         None => (Location::Undefined, None),
     }
 }
@@ -316,6 +322,11 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::FunctionNotFound { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::FUNCTION_RESOLUTION_FAILURE, err)
         },
+        L::ScriptDeserializationFailed { .. } => {
+            V1ErrorInfo::with_mono_message(StatusCode::CODE_DESERIALIZATION_ERROR, err)
+        },
+        // The verifier's own status, as V1 reports it.
+        L::ScriptVerificationFailed { status } => V1ErrorInfo::with_mono_message(*status, err),
         // MonoMove-only loading or lowering gaps have no corresponding V1
         // failure and therefore map to `NoV1Failure`.
         //
@@ -424,6 +435,20 @@ mod tests {
             .text()
             .expect("this error carries a V1 message")
             .to_string()
+    }
+
+    /// A script's locations map to V1's script location, with the script's
+    /// one function as definition 0.
+    #[test]
+    fn script_locations_map_to_v1_script() {
+        assert_eq!(
+            v1_location(Some(&ErrorLocation::ScriptInstruction { offset: 7 })),
+            (Location::Script, Some((FunctionDefinitionIndex(0), 7)))
+        );
+        assert_eq!(
+            v1_location(Some(&ErrorLocation::Script)),
+            (Location::Script, None)
+        );
     }
 
     #[test]
@@ -701,6 +726,12 @@ mod tests {
                 name: "f".to_string(),
             },
             LoaderError::LoweringSkipped { reason: "nominal" },
+            LoaderError::ScriptDeserializationFailed {
+                message: "truncated".to_string(),
+            },
+            LoaderError::ScriptVerificationFailed {
+                status: StatusCode::MISSING_DEPENDENCY,
+            },
             LoaderError::GlobalContext(std::fmt::Error.into()),
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
         ];
@@ -711,6 +742,8 @@ mod tests {
                 | LoaderError::FunctionNotFound { .. }
                 | LoaderError::NativeFunctionNotLoadable { .. }
                 | LoaderError::LoweringSkipped { .. }
+                | LoaderError::ScriptDeserializationFailed { .. }
+                | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
                 | LoaderError::InvariantViolation(_) => {},
             }

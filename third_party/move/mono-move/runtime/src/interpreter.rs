@@ -11,9 +11,9 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_or_gc, deserialize_or_gc,
+        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        AllocationError, Heap, TopFrame,
+        FrozenHeap, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
@@ -33,10 +33,9 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    interner::{module_id_of, InternedIdentifier, InternedModuleId},
+    interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
     native::{
-        NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus,
-        ObjectHandle, RootPool,
+        NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus, RootPool,
     },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
@@ -46,14 +45,14 @@ use mono_move_core::{
     },
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
     FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
+    IntShiftOp, IntTy, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
     VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
     CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
-use mono_move_global_context::ExecutionGuard;
+use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     account_address::AccountAddress,
@@ -173,51 +172,39 @@ unsafe fn saved_caller_ptr(fp: *mut u8) -> *const Function {
 /// global-storage read-write set, and the native extensions (event store and
 /// friends).
 ///
-/// Read-write-set and extension entries point into the frozen heap, so the
-/// parts are only valid together. Read-write-set keys and some extension
-/// entries, notably emitted events, contain interned types backed by the global
-/// arena. Retaining the originating execution guard prevents arena-resetting
-/// maintenance while the effects exist and supplies the matching layout table
-/// during materialization. Retaining the exact resource provider used during
-/// execution keeps its external read allocations alive and lets materializers
-/// reject another provider whose pointer-keyed caches or state snapshot do not
-/// match these effects.
-pub struct SessionEffects<'guard> {
+/// Read-write-set writes and extension entries point into the owned frozen heap,
+/// so the parts are only valid together; the heap outlives them because it is
+/// the last field. Reads of values from other arenas carry their own pins
+/// (see [`StorageRead::ExternalHeap`](mono_move_core::StorageRead)). Read-write-set
+/// keys and some extension entries, notably emitted events, hold interned types
+/// backed by the global arena, so the block's `GlobalContext` must outlive these
+/// effects; nothing here borrows it, so that is a caller invariant.
+//
+// TODO(security): prove at compile time that the block's `GlobalContext` guard
+// is held.
+pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
-    /// The guard whose layout table describes the effects' interned types.
-    guard: &'guard ExecutionGuard<'guard>,
-    /// The exact provider that supplied external reads during execution.
-    resource_provider: &'guard dyn ResourceProvider,
     /// Owns the allocations referenced by the read-write set and extensions.
-    /// Not read directly: those hold raw pointers into it, so it only needs to
-    /// outlive them. Declared last because fields drop in declaration order.
-    _heap: Heap,
+    /// Those hold raw pointers into it, so the heap only needs to outlive them.
+    /// Declared last because fields drop in declaration order.
+    heap: std::sync::Arc<FrozenHeap>,
 }
 
-impl<'guard> SessionEffects<'guard> {
+impl SessionEffects {
     /// The transaction's global-storage read-write set.
     pub fn read_write_set(&self) -> &ResourceReadWriteSet {
         &self.read_write_set
     }
 
+    /// Returns the frozen heap allocation backing the written values.
+    pub fn frozen_heap(&self) -> std::sync::Arc<FrozenHeap> {
+        self.heap.clone()
+    }
+
     /// Immutable access to one of the transaction's native extensions.
     pub fn extension<T: NativeExtension>(&self) -> VMResult<Ref<'_, T>> {
         self.extensions.get::<T>()
-    }
-
-    /// The originating layout provider for the effects' interned types.
-    #[inline]
-    pub fn layout_provider(&self) -> &impl LayoutProvider {
-        self.guard
-    }
-
-    /// Whether `provider` is the exact provider instance used during execution.
-    ///
-    /// Identity matters because storage keys and provider caches can contain
-    /// pointer-identified interned types.
-    pub fn originates_from_provider(&self, provider: &dyn ResourceProvider) -> bool {
-        std::ptr::addr_eq(self.resource_provider, provider)
     }
 }
 
@@ -324,8 +311,10 @@ impl<'a> CallBuilder<'a, '_> {
 }
 
 /// Materializes the [`AbortLocation`] naming the module that raised an abort.
-// TODO(completeness): return `AbortLocation::Script` for script aborts.
 fn abort_location(module_id: InternedModuleId) -> AbortLocation {
+    if is_script_module_id(module_id) {
+        return AbortLocation::Script;
+    }
     AbortLocation::Module(module_id_of(module_id))
 }
 
@@ -349,14 +338,22 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
     // SAFETY: `regs.func` points at the function that was executing, which the
     // execution guard keeps alive.
     let func = unsafe { regs.func.as_ref() };
-    let module = module_id_of(func.module_id);
-    let location = match func.code.origins().get(regs.pc) {
-        Some(&offset) => ErrorLocation::Instruction {
-            module,
-            function: func.def_idx,
-            offset,
-        },
-        None => ErrorLocation::Module(module),
+    let offset = func.code.origins().get(regs.pc).copied();
+    let location = if is_script_module_id(func.module_id) {
+        match offset {
+            Some(offset) => ErrorLocation::ScriptInstruction { offset },
+            None => ErrorLocation::Script,
+        }
+    } else {
+        let module = module_id_of(func.module_id);
+        match offset {
+            Some(offset) => ErrorLocation::Instruction {
+                module,
+                function: func.def_idx,
+                offset,
+            },
+            None => ErrorLocation::Module(module),
+        }
     };
     err.at(location)
 }
@@ -492,17 +489,47 @@ impl<'guard> InterpreterContext<'guard> {
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
+    /// Loads a script from its bytes and returns its `main` instantiated with
+    /// `ty_args`.
+    pub fn load_script(
+        &mut self,
+        code: &[u8],
+        ty_args: InternedTypeList,
+    ) -> VMResult<&'guard Function> {
+        let ptr =
+            self.loader
+                .load_script(&mut self.read_set, &mut self.gas_meter, code, ty_args)?;
+        // SAFETY: the function lives in an arena the guard keeps alive.
+        Ok(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// The module `module_id`, loaded and charged if this transaction has not
+    /// loaded it yet.
+    pub fn load_module(&mut self, module_id: InternedModuleId) -> VMResult<&'guard LoadedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        match self.read_set.get(arena_ref) {
+            None => self
+                .loader
+                .load_module(&mut self.read_set, &mut self.gas_meter, arena_ref),
+            Some(_) => self.read_set.get_loaded(arena_ref),
+        }
+    }
+
+    /// A module some loaded function came from. Loading the function loaded
+    /// its module into the read set, so a miss is an invariant violation.
+    fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        Ok(&self.read_set.get_loaded(arena_ref)?.ir().module)
+    }
+
     /// Resolve a constant from `module_id`'s constant pool, returning its
-    /// interned type and BCS bytes. The calling function was loaded from
-    /// `module_id`, so the module is always present and loaded in the read
-    /// set; a missing or not-yet-loaded entry is an invariant violation.
+    /// interned type and BCS bytes.
     fn load_constant(
         &self,
         module_id: InternedModuleId,
         idx: ConstantPoolIndex,
     ) -> VMResult<(InternedType, &'guard [u8])> {
-        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
-        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        let module = self.prepared_module(module_id)?;
         Ok((
             module.interned_constant_type_at(idx),
             module.constant_data_at(idx),
@@ -574,19 +601,16 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. No execution can follow, so the heap is frozen and every
-    /// heap pointer inside the read-write set and extensions stays valid for
-    /// as long as the returned effects live. Retaining the originating guard
-    /// also prevents the global arena that owns their interned types from being
-    /// reset and supplies the matching layout table during materialization.
-    pub fn finish(self) -> SessionEffects<'guard> {
-        let guard = self.loader.guard();
+    /// publication. The session heap is frozen into the effects, so every heap
+    /// pointer they hold stays valid for as long as they live. Their interned
+    /// types are not: the effects do not borrow the guard, so the caller must
+    /// keep the global arena alive until the effects are dropped.
+    pub fn finish(self) -> SessionEffects {
         SessionEffects {
             read_write_set: self.read_write_set,
             extensions: self.extensions,
-            guard,
-            resource_provider: self.resource_provider,
-            _heap: self.heap,
+            #[allow(clippy::arc_with_non_send_sync)]
+            heap: std::sync::Arc::new(FrozenHeap::new(self.heap)),
         }
     }
 
@@ -2682,14 +2706,6 @@ impl InterpreterContext<'_> {
     /// Deep-copy each of `sources` into the local heap, returning the new root
     /// pointers in the same order.
     ///
-    /// All sources are rooted for the whole batch, so a GC triggered partway
-    /// through preserves and relocates the not-yet-copied ones. Because
-    /// `try_deep_copy` never GCs mid-copy, a *successful* pass builds every
-    /// result without an intervening GC, so the already-built results need no
-    /// root of their own — only the sources are rooted. Mirrors
-    /// [`Self::deep_copy`]'s single GC-then-retry-once policy, batched over all
-    /// sources.
-    ///
     /// # Safety
     ///
     /// Every `source` must point to the data region of a live object whose
@@ -2699,47 +2715,22 @@ impl InterpreterContext<'_> {
         regs: VMRegisters,
         sources: &[NonNull<u8>],
     ) -> VMResult<Vec<NonNull<u8>>> {
-        // SAFETY: each source is a live object (caller contract); the handle
-        // keeps it live and relocated across any GC during the batch.
-        let guards: Vec<ObjectHandle> = sources
-            .iter()
-            .map(|&src| unsafe { self.root_pool.root_object(src.as_ptr()) })
-            .collect();
-        // First attempt. On out-of-memory, the partial copies are unrooted
-        // garbage; drop them, GC (which relocates the rooted sources), and
-        // retry the whole batch once.
-        let mut out = Vec::with_capacity(guards.len());
-        let mut needs_gc = false;
-        for guard in &guards {
-            // SAFETY: each root holds a live object; GC keeps `guard.ptr()`
-            // valid and relocated.
-            match unsafe {
-                self.heap
-                    .try_deep_copy(self.loader.guard(), NonNull::new_unchecked(guard.ptr()))
-            } {
-                Ok(ptr) => out.push(ptr),
-                Err(AllocationError::RuntimeError(err)) => return Err(VMInternalError::new(err)),
-                Err(AllocationError::OutOfHeapMemory { .. }) => {
-                    needs_gc = true;
-                    break;
+        // SAFETY: by this function's contract every source is a live object.
+        unsafe {
+            deep_copy_batch_or_gc(
+                &mut self.heap,
+                self.loader.guard(),
+                &mut self.read_write_set,
+                &self.root_pool,
+                &self.extensions,
+                regs.fp,
+                TopFrame::Function {
+                    func: regs.func,
+                    pc: regs.pc,
                 },
-            }
+                sources,
+            )
         }
-        if !needs_gc {
-            return Ok(out);
-        }
-        gc_collect!(self, regs.fp, regs.pc, regs.func)?;
-        out.clear();
-        for guard in &guards {
-            // SAFETY: as above, after relocation.
-            let ptr = unsafe {
-                self.heap
-                    .try_deep_copy(self.loader.guard(), NonNull::new_unchecked(guard.ptr()))
-            }
-            .map_err(AllocationError::into_runtime_error)?;
-            out.push(ptr);
-        }
-        Ok(out)
     }
 
     /// Implementation of `MicroOp::PackClosure`.

@@ -38,9 +38,9 @@ impl MempoolStatus {
 
 impl fmt::Display for MempoolStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.code)?;
+        write!(f, "{}", self.code)?;
         if !self.message.is_empty() {
-            write!(f, " - {}", &self.message)?;
+            write!(f, " - {}", self.message)?;
         }
         Ok(())
     }

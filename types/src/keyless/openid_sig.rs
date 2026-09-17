@@ -94,7 +94,7 @@ impl OpenIdSig {
                         .is_allowed_override_aud(&claims.oidc_claims.aud)
                         .is_ok(),
                     "{} is not an allow-listed override aud",
-                    &claims.oidc_claims.aud
+                    claims.oidc_claims.aud
                 );
                 idc_aud_val
             },

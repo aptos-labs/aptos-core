@@ -28,8 +28,8 @@ use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewRes
 use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, TxnOutcome,
 };
-use mono_move_global_context::GlobalContext;
-use move_core_types::vm_status::StatusCode;
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use move_core_types::{transaction_argument::TransactionArgument, vm_status::StatusCode};
 use std::collections::BTreeMap;
 
 /// Event types whose payload embeds gas amounts.
@@ -74,36 +74,76 @@ fn first_txn_aux_info() -> AuxiliaryInfo {
     )
 }
 
-/// Builds the executor against `state`, runs one transaction through it, and
-/// materializes the outcome.
+/// Builds the executor against `state` in a fresh global context, runs one
+/// transaction through it, and materializes the outcome.
 fn execute_v2_with<S: StateView>(
     state: &S,
-    run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome<'guard>,
+    run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome,
 ) -> TransactionOutput {
     let global_ctx = GlobalContext::with_num_execution_workers(1);
     let guard = global_ctx
         .try_execution_context(0)
         .expect("execution context is available");
+    execute_v2_in(&guard, state, run)
+}
+
+/// Like `execute_v2_with`, in an existing execution context.
+fn execute_v2_in<S: StateView>(
+    guard: &ExecutionGuard<'_>,
+    state: &S,
+    run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome,
+) -> TransactionOutput {
     let natives = production_natives();
     let module_provider = StateViewModuleProvider::new(state);
-    let data_provider = StateViewResourceProvider::new(&guard, state);
+    let data_provider = StateViewResourceProvider::new(guard, state);
     let env = AptosEnvironment::new(state);
     let usage = state.get_usage().expect("usage is readable");
     let executor = AptosTransactionExecutor::new(
-        &guard,
+        guard,
         natives,
         &module_provider,
         &data_provider,
         &env,
         usage,
     );
-    run(&executor)
+    let (output, _groups) = run(&executor)
         .materialize(
+            guard,
             &data_provider,
             env.features(),
             TransactionAuxiliaryData::default(),
         )
-        .expect("the transaction output materializes")
+        .expect("the transaction output materializes");
+    output
+}
+
+/// Runs `txns` in order through one global context, applying each output to
+/// the state before the next.
+fn execute_v2_sequence<S: StateView + Sync>(
+    base: &S,
+    txns: &[SignedTransaction],
+) -> Vec<TransactionOutput> {
+    use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
+
+    let state = DeltaStateStore::new_with_base(base);
+    let global_ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = global_ctx
+        .try_execution_context(0)
+        .expect("execution context is available");
+    let mut outputs = Vec::with_capacity(txns.len());
+    for txn in txns {
+        let output = execute_v2_in(&guard, &state, |executor| {
+            executor.execute_transaction(
+                &Transaction::UserTransaction(txn.clone()),
+                &AuxiliaryInfo::new(PersistedAuxiliaryInfo::None, None),
+            )
+        });
+        state
+            .apply_write_set(output.write_set())
+            .expect("write set applies");
+        outputs.push(output);
+    }
+    outputs
 }
 
 /// Fresh genesis with a funded sender (sequence number 10) and recipient.
@@ -409,6 +449,446 @@ fn extra_signers_rejected_like_v1() {
 
     // Write sets are not compared: the gas divergence leaves v1 with fee
     // writes v2 lacks.
+}
+
+/// A script transaction from `sender`, with the script given as assembly.
+fn script_txn(
+    sender: &AccountData,
+    code: &str,
+    args: Vec<TransactionArgument>,
+    sequence_number: u64,
+) -> SignedTransaction {
+    let code = aptos_language_e2e_tests::compile::compile_script(code, vec![])
+        .code()
+        .to_vec();
+    script_bytes_txn(sender, code, args, sequence_number)
+}
+
+/// A script transaction from `sender`, with the script given as bytecode.
+fn script_bytes_txn(
+    sender: &AccountData,
+    code: Vec<u8>,
+    args: Vec<TransactionArgument>,
+    sequence_number: u64,
+) -> SignedTransaction {
+    use aptos_types::transaction::{Script, TransactionPayload};
+
+    sender
+        .account()
+        .transaction()
+        .payload(TransactionPayload::Script(Script::new(code, vec![], args)))
+        .sequence_number(sequence_number)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign()
+}
+
+/// A script transferring APT through the framework.
+const TRANSFER_SCRIPT: &str = r#"
+script
+use 0x1::aptos_account as account
+
+public fun main(sender: &signer, to: address, amount: u64)
+    move_loc sender
+    move_loc to
+    move_loc amount
+    call account::transfer
+    ret
+"#;
+
+/// Runs the transfer script with `amount` as its amount argument on both VMs
+/// and asserts they agree.
+fn assert_transfer_script_matches_v1(amount: TransactionArgument) {
+    let (fx, alice, bob) = setup();
+    let txn = script_txn(
+        &alice,
+        TRANSFER_SCRIPT,
+        vec![TransactionArgument::Address(*bob.address()), amount],
+        10,
+    );
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 rejected the script: {:?}",
+        v1_output.status()
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *alice.address());
+}
+
+/// A script payload runs like on v1, with the same effects.
+#[test]
+fn script_transfer_matches_v1() {
+    assert_transfer_script_matches_v1(TransactionArgument::U64(1_000));
+}
+
+/// A pre-serialized script argument is accepted like on v1.
+#[test]
+fn script_serialized_argument_matches_v1() {
+    assert_transfer_script_matches_v1(TransactionArgument::Serialized(
+        bcs::to_bytes(&1_000u64).unwrap(),
+    ));
+}
+
+/// A script's abort is located at the script, like on v1.
+#[test]
+fn script_abort_matches_v1() {
+    use move_core_types::vm_status::AbortLocation;
+
+    let (fx, alice, _bob) = setup();
+    let txn = script_txn(
+        &alice,
+        r#"
+script
+
+public fun main()
+    ld_u64 42
+    abort
+"#,
+        vec![],
+        10,
+    );
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert!(
+        matches!(
+            v1_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: AbortLocation::Script,
+                code: 42,
+                ..
+            })
+        ),
+        "v1 did not abort at the script: {:?}",
+        v1_output.status()
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *alice.address());
+}
+
+/// A script's runtime error is located at the script, like on v1.
+#[test]
+fn script_runtime_error_matches_v1() {
+    use move_core_types::vm_status::AbortLocation;
+
+    let (fx, alice, _bob) = setup();
+    let txn = script_txn(
+        &alice,
+        r#"
+script
+
+public fun main(divisor: u64)
+    ld_u64 1
+    move_loc divisor
+    div
+    pop
+    ret
+"#,
+        vec![TransactionArgument::U64(0)],
+        10,
+    );
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert!(
+        matches!(
+            v1_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
+                location: AbortLocation::Script,
+                ..
+            })
+        ),
+        "v1 did not fail at the script: {:?}",
+        v1_output.status()
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *alice.address());
+}
+
+/// A script that emits an event is refused with the same status as on v1.
+#[test]
+fn event_emitting_script_refused_like_v1() {
+    let (fx, alice, _bob) = setup();
+    let txn = script_txn(
+        &alice,
+        r#"
+script
+use 0x1::event
+
+public fun main()
+    ld_u64 1
+    call event::emit<u64>
+    ret
+"#,
+        vec![],
+        10,
+    );
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::INVALID_OPERATION_IN_SCRIPT
+        ))),
+        "v1 did not refuse the script: {:?}",
+        v1_output.status()
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *alice.address());
+}
+
+/// A script that does not deserialize is kept with the same status as on v1.
+#[test]
+fn undeserializable_script_kept_like_v1() {
+    let (fx, alice, _bob) = setup();
+    let txn = script_bytes_txn(&alice, vec![0xDE, 0xAD, 0xBE, 0xEF], vec![], 10);
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::CODE_DESERIALIZATION_ERROR
+        ))),
+        "v1 did not reject the script: {:?}",
+        v1_output.status()
+    );
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    // Write sets are not compared: the payload fails before anything is
+    // loaded, and v2 charges no intrinsic gas, so it writes no fee.
+}
+
+/// The same script run twice through one global context, hitting the script
+/// cache the second time, behaves like on v1 both times.
+#[test]
+fn script_cache_hit_matches_v1() {
+    let (mut fx, alice, bob) = setup();
+    let args = || {
+        vec![
+            TransactionArgument::Address(*bob.address()),
+            TransactionArgument::U64(1_000),
+        ]
+    };
+    let txns = [
+        script_txn(&alice, TRANSFER_SCRIPT, args(), 10),
+        script_txn(&alice, TRANSFER_SCRIPT, args(), 11),
+    ];
+
+    let v2_outputs = execute_v2_sequence(fx.get_state_view(), &txns);
+    for (txn, v2_output) in txns.iter().zip(&v2_outputs) {
+        let v1_output = fx.execute_and_apply(txn.clone());
+        assert_eq!(
+            v1_output.status(),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
+            "v1 rejected the script: {:?}",
+            v1_output.status()
+        );
+        assert_eq!(v2_output.status(), v1_output.status());
+        compare_outputs(&v1_output, v2_output, *alice.address());
+    }
+}
+
+/// A transaction from `sender` calling `<address>::<module>::<function>` with
+/// no type arguments and the given BCS-encoded arguments.
+fn call_txn(
+    sender: &AccountData,
+    address: move_core_types::account_address::AccountAddress,
+    module: &str,
+    function: &str,
+    args: Vec<Vec<u8>>,
+) -> SignedTransaction {
+    use aptos_types::transaction::{EntryFunction, TransactionPayload};
+    use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+
+    sender
+        .account()
+        .transaction()
+        .payload(TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(address, Identifier::new(module).unwrap()),
+            Identifier::new(function).unwrap(),
+            vec![],
+            args,
+        )))
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign()
+}
+
+/// Asserts that v1 keeps `txn` with the miscellaneous error `code`, and that
+/// v2 agrees on the status and, modulo gas, on the output.
+fn assert_kept_with_code_like_v1(
+    fx: &FakeExecutor,
+    sender: &AccountData,
+    txn: SignedTransaction,
+    code: StatusCode,
+) {
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code))),
+        "v1 did not keep the transaction with {code:?}"
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *sender.address());
+}
+
+/// Entry functions with signatures a transaction may not call. Assembled from
+/// MASM, since the framework has none and the Move compiler would refuse some.
+const UNCALLABLE_ENTRY_FUNCTIONS: &str = r#"
+module 0xcafe::uncallable
+use 0x1::option
+
+struct Private has drop
+  x: u64
+
+entry public fun returns_value(): u64
+    ld_u64 0
+    ret
+
+entry public fun takes_ref(x: &u64)
+    ret
+
+entry public fun signer_after_arg(x: u64, s: &signer)
+    ret
+
+entry public fun takes_option_of_private(o: option::Option<Private>)
+    ret
+"#;
+
+/// Publishes `UNCALLABLE_ENTRY_FUNCTIONS` straight into `fx`'s state,
+/// returning the module's address.
+fn publish_uncallable_module(
+    fx: &mut FakeExecutor,
+) -> move_core_types::account_address::AccountAddress {
+    let (module, blob) =
+        aptos_language_e2e_tests::compile::compile_module(UNCALLABLE_ENTRY_FUNCTIONS);
+    fx.add_module(&module.self_id(), blob.into_inner());
+    *module.self_id().address()
+}
+
+/// A public function that is not `entry` is refused like on v1.
+#[test]
+fn non_entry_function_rejected_like_v1() {
+    use move_core_types::account_address::AccountAddress;
+
+    let (fx, alice, bob) = setup();
+    let txn = call_txn(
+        &alice,
+        AccountAddress::ONE,
+        "aptos_governance",
+        "assert_proposal_expiration",
+        vec![
+            bcs::to_bytes(bob.address()).unwrap(),
+            bcs::to_bytes(&0u64).unwrap(),
+        ],
+    );
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+    );
+}
+
+/// An entry function that returns values is refused like on v1.
+#[test]
+fn returning_function_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    let txn = call_txn(&alice, address, "uncallable", "returns_value", vec![]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// An entry function with a reference parameter is refused like on v1.
+#[test]
+fn reference_parameter_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    let txn = call_txn(&alice, address, "uncallable", "takes_ref", vec![
+        bcs::to_bytes(&0u64).unwrap(),
+    ]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// An entry function whose signer parameter follows another parameter is
+/// refused like on v1.
+#[test]
+fn signer_after_argument_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    let txn = call_txn(&alice, address, "uncallable", "signer_after_arg", vec![
+        bcs::to_bytes(&0u64).unwrap(),
+    ]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// An entry function taking an `Option` of a private struct is refused like on
+/// v1.
+#[test]
+fn option_of_private_struct_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    // `Some(Private { x: 0 })`: v1 admits the type but fails to construct the
+    // value, so it would accept a `None`.
+    let txn = call_txn(
+        &alice,
+        address,
+        "uncallable",
+        "takes_option_of_private",
+        vec![bcs::to_bytes(&vec![0u64]).unwrap()],
+    );
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// A native function is refused like on v1.
+#[test]
+fn native_function_rejected_like_v1() {
+    use move_core_types::account_address::AccountAddress;
+
+    let (fx, alice, _bob) = setup();
+    let txn = call_txn(&alice, AccountAddress::ONE, "hash", "sha2_256", vec![
+        bcs::to_bytes(&vec![1u8, 2, 3]).unwrap(),
+    ]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED,
+    );
 }
 
 /// Transactions violating the pre-execution gas bounds expressible by the

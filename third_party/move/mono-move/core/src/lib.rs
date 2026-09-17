@@ -47,7 +47,8 @@ pub use interner::{
 pub use move_binary_format::file_format::{ConstantPoolIndex, FunctionDefinitionIndex};
 pub use object_descriptor::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
-    CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
+    CLOSURE_DESCRIPTOR_ID, POINTER_VEC_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 pub use prepared_module::{
     intern_sig_token, intern_struct_tag, intern_type_tag, FieldTypes,
@@ -55,7 +56,7 @@ pub use prepared_module::{
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{
-    nominal_tag, ModuleProvider, NoModuleProvider, NoResourceProvider, ResourceProvider,
+    nominal_tag, ModuleProvider, NoModuleProvider, NoResourceProvider, ReadPin, ResourceProvider,
     ResourceProviderError, StorageRead,
 };
 pub use types::{convert_mut_to_immut_ref, is_assignable, strip_ref};

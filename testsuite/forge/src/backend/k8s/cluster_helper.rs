@@ -62,7 +62,7 @@ pub fn dump_string_to_file(
     tmp_dir: &TempDir,
 ) -> Result<String> {
     let file_path = tmp_dir.path().join(file_name.clone());
-    info!("Wrote content to: {:?}", &file_path);
+    info!("Wrote content to: {:?}", file_path);
     let mut file = File::create(file_path).expect("Could not create file in temp dir");
     file.write_all(&content.into_bytes())
         .expect("Could not write to file");
@@ -92,13 +92,13 @@ async fn tail_job_logs(
         .map_err(|e| LogJobError::FinalError(format!("Failed to get job status: {}", e)))?;
 
     let status = genesis_job.status.expect("Job status not found");
-    info!("Job {} status: {:?}", &job_name, status);
+    info!("Job {} status: {:?}", job_name, status);
     match status.active {
         Some(active) => {
             if active < 1 {
                 return Err(LogJobError::RetryableError(format!(
                     "Job {} has no active pods. Maybe it has not started yet",
-                    &job_name
+                    job_name
                 )));
             }
             // try tailing the logs of the genesis job
@@ -110,7 +110,7 @@ async fn tail_job_logs(
                     "logs",
                     "--tail=10", // in case of connection reset we only want the last few lines to avoid spam
                     "-f",
-                    format!("job/{}", &job_name).as_str(),
+                    format!("job/{}", job_name).as_str(),
                 ])
                 .stdout(Stdio::piped())
                 .spawn()
@@ -129,7 +129,7 @@ async fn tail_job_logs(
             while let Some(line) = reader.next_line().await.transpose() {
                 match line {
                     Ok(line) => {
-                        info!("[{}]: {}", &job_name, line); // Add a prefix to each line
+                        info!("[{}]: {}", job_name, line); // Add a prefix to each line
                     },
                     Err(e) => {
                         return Err(LogJobError::RetryableError(format!(
@@ -143,22 +143,22 @@ async fn tail_job_logs(
                 LogJobError::RetryableError(format!("Error waiting for command: {}", e))
             })?;
         },
-        None => info!("Job {} has no active pods running", &job_name),
+        None => info!("Job {} has no active pods running", job_name),
     }
     match status.succeeded {
         Some(_) => {
-            info!("Job {} succeeded!", &job_name);
+            info!("Job {} succeeded!", job_name);
             return Ok(());
         },
-        None => info!("Job {} has no succeeded pods", &job_name),
+        None => info!("Job {} has no succeeded pods", job_name),
     }
     if status.failed.is_some() {
-        info!("Job {} failed!", &job_name);
-        return Err(LogJobError::FinalError(format!("Job {} failed", &job_name)));
+        info!("Job {} failed!", job_name);
+        return Err(LogJobError::FinalError(format!("Job {} failed", job_name)));
     }
     Err(LogJobError::RetryableError(format!(
         "Job {} has no succeeded or failed pods. Maybe it has not started yet.",
-        &job_name
+        job_name
     )))
 }
 
@@ -348,21 +348,21 @@ async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
             // delete the management configmap
             let configmap: Api<ConfigMap> = Api::namespaced(client.clone(), &kube_namespace);
             let management_configmap_name =
-                format!("{}-{}", MANAGEMENT_CONFIGMAP_PREFIX, &kube_namespace);
+                format!("{}-{}", MANAGEMENT_CONFIGMAP_PREFIX, kube_namespace);
             match configmap
                 .delete(&management_configmap_name, &DeleteParams::default())
                 .await
             {
                 Ok(_) => info!(
                     "Deleted default management configmap: {}",
-                    &management_configmap_name
+                    management_configmap_name
                 ),
                 // if configmap not found, assume it's already been deleted and make clean-up idempotent
                 Err(KubeError::Api(api_err)) => {
                     if api_err.code == 404 {
                         info!(
                             "Could not find configmap {}, continuing",
-                            &management_configmap_name
+                            management_configmap_name
                         );
                     } else {
                         bail!(api_err);
@@ -900,12 +900,12 @@ pub async fn create_namespace(
             if api_err.message.contains("object is being deleted") {
                 return Err(ApiError::RetryableError(format!(
                     "Namespace {} is being deleted (Terminating), will retry",
-                    &kube_namespace_name
+                    kube_namespace_name
                 )));
             }
             info!(
                 "Namespace {} already exists, continuing with it",
-                &kube_namespace_name
+                kube_namespace_name
             );
         } else if api_err.code == 401 {
             return Err(ApiError::FinalError(
@@ -916,7 +916,7 @@ pub async fn create_namespace(
         } else {
             return Err(ApiError::RetryableError(format!(
                 "Failed to use existing namespace {}: {:?}",
-                &kube_namespace_name, api_err
+                kube_namespace_name, api_err
             )));
         }
     }
@@ -949,7 +949,7 @@ pub async fn create_management_configmap(
         Some(kube_namespace.clone()),
     ));
 
-    let management_configmap_name = format!("{}-{}", MANAGEMENT_CONFIGMAP_PREFIX, &kube_namespace);
+    let management_configmap_name = format!("{}-{}", MANAGEMENT_CONFIGMAP_PREFIX, kube_namespace);
     let mut data: BTreeMap<String, String> = BTreeMap::new();
     let start = SystemTime::now();
     let cleanup_time = (start
@@ -975,12 +975,12 @@ pub async fn create_management_configmap(
         if api_err.code == 409 {
             info!(
                 "Configmap {} already exists, continuing with it",
-                &management_configmap_name
+                management_configmap_name
             );
         } else {
             bail!(
                 "Failed to use existing management configmap {}: {:?}",
-                &kube_namespace,
+                kube_namespace,
                 api_err
             );
         }
@@ -1022,7 +1022,7 @@ pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
                 return false;
             }
             if let Some(data) = &configmap.data {
-                info!("Got configmap {} with data: {:?}", &configmap_name, data);
+                info!("Got configmap {} with data: {:?}", configmap_name, data);
                 return check_namespace_for_cleanup(
                     data,
                     configmap_namespace,

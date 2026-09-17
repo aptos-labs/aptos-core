@@ -56,7 +56,7 @@ use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
     FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeSubstitutionError, ValueLayout, TRIVIAL_DESCRIPTOR_ID,
+    TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
@@ -76,8 +76,11 @@ pub use loaded_module::{
 };
 mod module_cache;
 use module_cache::ModuleCache;
+mod script_cache;
 use mono_move_core::interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use script_cache::ScriptCache;
+pub use script_cache::ScriptHash;
 
 mod types;
 pub use types::{
@@ -128,6 +131,8 @@ struct Context {
         ahash::RandomState,
     >,
     module_cache: ModuleCache,
+    /// Scripts loaded as modules, keyed by the hash of their bytes.
+    script_cache: ScriptCache,
     /// Published object descriptors.
     descriptors: Descriptors,
     /// Published type layouts (the type-driven walk shape, separate from the
@@ -209,11 +214,12 @@ impl Descriptors {
     }
 }
 
-/// Initial descriptor table: the two reserved entries.
+/// Returns the initial descriptor table with the reserved entries.
 fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
     let table = boxcar::Vec::new();
     table.push(ObjectDescriptor::trivial());
     table.push(ObjectDescriptor::closure());
+    table.push(ObjectDescriptor::pointer_vec());
     table
 }
 
@@ -342,6 +348,7 @@ impl GlobalContext {
                 type_lists: DashMap::default(),
                 function_refs: DashMap::default(),
                 module_cache: ModuleCache::new(),
+                script_cache: ScriptCache::new(),
                 descriptors: Descriptors::default(),
                 layouts: Layouts::default(),
             },
@@ -446,6 +453,21 @@ impl<'ctx> ExecutionGuard<'ctx> {
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
+    /// Inserts a script loaded as a module into the cache, keyed by the hash
+    /// of the script's bytes.
+    pub fn insert_script(&self, hash: ScriptHash, module: Box<LoadedModule>) -> &LoadedModule {
+        let ptr = self.ctx.script_cache.insert(hash, module);
+        // SAFETY: as for `insert_module`.
+        unsafe { ptr.as_ref_unchecked() }
+    }
+
+    /// Looks up a cached script by the hash of its bytes.
+    pub fn get_script<'guard>(&'guard self, hash: &ScriptHash) -> Option<&'guard LoadedModule> {
+        let ptr = self.ctx.script_cache.get(hash)?;
+        // SAFETY: as for `get_module`.
+        Some(unsafe { ptr.as_ref_unchecked() })
+    }
+
     /// Looks up a cached loaded module by its interned ID and returns a
     /// reference tied to the guard's lifetime, if found.
     pub fn get_module<'guard>(
@@ -542,6 +564,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
     ) -> DescriptorId {
         if elem_ptr_offsets.is_empty() {
             return TRIVIAL_DESCRIPTOR_ID;
+        }
+        if elem_size == 8 && elem_ptr_offsets == [FrameOffset(0)] {
+            return POINTER_VEC_DESCRIPTOR_ID;
         }
         // Fast path: existing entry returns without touching the shard
         // write-lock.
@@ -981,6 +1006,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             type_lists,
             function_refs,
             module_cache,
+            script_cache,
             descriptors,
             layouts,
         } = self.ctx;
@@ -998,6 +1024,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         // alive, and it is safe to free the allocation behind the box.
         unsafe {
             module_cache.clear();
+            script_cache.clear();
         }
     }
 }

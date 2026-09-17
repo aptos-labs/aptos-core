@@ -543,7 +543,7 @@ impl ModuleBuilder<'_, '_> {
         if self.parent.const_table.contains_key(&qsym) {
             self.parent.env.error(
                 &self.parent.to_loc(&name.loc()),
-                &format!("duplicate declaration of const `{}`", &name.value()),
+                &format!("duplicate declaration of const `{}`", name.value()),
             )
         }
         let (move_visibility, has_package_visibility) = match def.visibility {
@@ -592,7 +592,7 @@ impl ModuleBuilder<'_, '_> {
         {
             self.parent.env.error(
                 &self.parent.to_loc(&name.loc()),
-                &format!("duplicate declaration of `{}`", &name.value()),
+                &format!("duplicate declaration of `{}`", name.value()),
             )
         }
         let struct_id = StructId::new(qsym.symbol);
@@ -641,7 +641,7 @@ impl ModuleBuilder<'_, '_> {
         if self.parent.fun_table.contains_key(&qsym) {
             self.parent.env.error(
                 &self.parent.to_loc(&name.loc()),
-                &format!("duplicate declaration of `{}`", &name.value()),
+                &format!("duplicate declaration of `{}`", name.value()),
             )
         }
         let fun_id = FunId::new(qsym.symbol);
@@ -3645,10 +3645,10 @@ impl ModuleBuilder<'_, '_> {
             if let Some(old_loc) = ty_params_defined.get(&symbol) {
                 builder
                     .parent
-                    .error(&loc, &format!("duplicate declaration of `{}`", &name.value));
+                    .error(&loc, &format!("duplicate declaration of `{}`", name.value));
                 builder.parent.note(
                     old_loc,
-                    &format!("previous declaration of `{}`", &name.value),
+                    &format!("previous declaration of `{}`", name.value),
                 );
                 None
             } else {

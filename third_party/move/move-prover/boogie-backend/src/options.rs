@@ -341,10 +341,10 @@ impl BoogieOptions {
         if self.use_cvc5 {
             add(&[
                 "-proverOpt:SOLVER=cvc5",
-                &format!("-proverOpt:PROVER_PATH={}", &self.cvc5_exe),
+                &format!("-proverOpt:PROVER_PATH={}", self.cvc5_exe),
             ]);
         } else {
-            add(&[&format!("-proverOpt:PROVER_PATH={}", &self.z3_exe)]);
+            add(&[&format!("-proverOpt:PROVER_PATH={}", self.z3_exe)]);
         }
         if self.use_smt_array_theory {
             if matches!(self.vector_theory, VectorTheory::SmtArray) {

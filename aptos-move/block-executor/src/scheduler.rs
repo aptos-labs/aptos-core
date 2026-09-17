@@ -446,7 +446,7 @@ impl Scheduler {
         } else {
             return Err(code_invariant_error(format!(
                 "Status {:?} at block epilogue txn {} not ExecutionHalted",
-                &*status, block_epilogue_idx
+                *status, block_epilogue_idx
             )));
         }
 
@@ -985,7 +985,7 @@ impl Scheduler {
             ExecutionStatus::ExecutionHalted(_) => Ok(false),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in suspend",
-                &*status,
+                *status,
             ))),
         }
     }
@@ -1005,7 +1005,7 @@ impl Scheduler {
             ExecutionStatus::ExecutionHalted(_) => Ok(()),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in resume",
-                &*status,
+                *status,
             ))),
         }
     }
@@ -1031,7 +1031,7 @@ impl Scheduler {
             },
             _ => Err(code_invariant_error(format!(
                 "Expected Executing incarnation {incarnation}, got {:?}",
-                &*status,
+                *status,
             ))),
         }
     }
@@ -1056,7 +1056,7 @@ impl Scheduler {
             },
             _ => Err(code_invariant_error(format!(
                 "Expected Aborting incarnation {incarnation}, got {:?}",
-                &*status,
+                *status,
             ))),
         }
     }

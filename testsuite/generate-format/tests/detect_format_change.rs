@@ -50,7 +50,7 @@ fn analyze_serde_formats() {
                     key,
                     corpus,
                     e.get(),
-                    &value,
+                    value,
                 ),
             }
         }

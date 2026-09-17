@@ -856,7 +856,9 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, 
             });
         }
         if let Some(epi_txn) = epilogue {
-            let to_make_hot = op_accu.get_keys_to_make_hot();
+            let to_make_hot = op_accu
+                .get_keys_to_make_hot(|k| Ok(k.clone()))
+                .expect("Identity conversion to storage key cannot fail");
 
             state_by_version.append_version(
                 epi_txn.writes.iter().map(|(k, v)| (k, v.as_ref())),

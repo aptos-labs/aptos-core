@@ -211,14 +211,14 @@ async fn create_pepper_input(
             None => {
                 return Err(PepperServiceError::UnexpectedError(format!(
                     "The issuer {} and aud {} correspond to an account recovery manager, but no aud override was provided!",
-                    &iss, &claims_aud
+                    iss, claims_aud
                 )));
             },
         }
     } else if let Some(aud_override) = aud_override {
         return Err(PepperServiceError::UnexpectedError(format!(
             "The issuer {} and aud {} do not correspond to an account recovery manager, but an aud override was provided: {}!",
-            &iss, &claims_aud, &aud_override
+            iss, claims_aud, aud_override
         )));
     } else {
         claims_aud // Use the aud directly from the claims

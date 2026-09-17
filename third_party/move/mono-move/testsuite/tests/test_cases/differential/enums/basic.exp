@@ -5,7 +5,7 @@ fun circle_value() {
   frame_data_size: 64
   entry_gas: 43
   code:
-    0: EnumNew [8] desc=2 tag #0 @1
+    0: EnumNew [8] desc=3 tag #0 @1
     1: HeapMoveTo8 [8]+8 <- [0] @1
     2: SlotBorrow [16] <- &[8] @3
     3: EnumTestTag [32] <- (*[16]).tag == #0 @6
@@ -32,7 +32,7 @@ fun is_circle() {
   frame_data_size: 56
   entry_gas: 43
   code:
-    0: EnumNew [8] desc=2 tag #0 @1
+    0: EnumNew [8] desc=3 tag #0 @1
     1: HeapMoveTo8 [8]+8 <- [0] @1
     2: SlotBorrow [16] <- &[8] @3
     3: EnumTestTag [32] <- (*[16]).tag == #0 @4
@@ -51,7 +51,7 @@ fun is_rect() {
   frame_data_size: 64
   entry_gas: 69
   code:
-    0: EnumNew [16] desc=2 tag #1 @2
+    0: EnumNew [16] desc=3 tag #1 @2
     1: HeapMoveTo8 [16]+8 <- [0] @2
     2: HeapMoveTo8 [16]+16 <- [8] @2
     3: SlotBorrow [24] <- &[16] @4
@@ -71,7 +71,7 @@ fun rect_sum() {
   frame_data_size: 72
   entry_gas: 69
   code:
-    0: EnumNew [16] desc=2 tag #1 @2
+    0: EnumNew [16] desc=3 tag #1 @2
     1: HeapMoveTo8 [16]+8 <- [0] @2
     2: HeapMoveTo8 [16]+16 <- [8] @2
     3: SlotBorrow [24] <- &[16] @4

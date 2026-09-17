@@ -91,7 +91,7 @@ impl std::fmt::Display for HumanReadable<&StateKey> {
 
 impl std::fmt::Display for HumanReadable<StateKey> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &HumanReadable(&self.0))
+        write!(f, "{}", HumanReadable(&self.0))
     }
 }
 

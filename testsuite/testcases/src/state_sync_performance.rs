@@ -94,7 +94,7 @@ impl NetworkTest for StateSyncFullnodeFastSyncPerformance {
             let fullnode_name = swarm.full_nodes().next().unwrap().name();
             format!(
                 "{}{{instance=\"{}\"}}",
-                NUM_STATE_VALUE_COUNTER_NAME, &fullnode_name
+                NUM_STATE_VALUE_COUNTER_NAME, fullnode_name
             )
         };
 

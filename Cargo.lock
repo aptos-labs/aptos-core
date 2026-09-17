@@ -744,7 +744,11 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
  "mono-move-global-context",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -3436,6 +3440,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -12929,7 +12934,6 @@ dependencies = [
  "move-bytecode-verifier",
  "move-core-types",
  "thiserror 1.0.69",
- "triomphe",
 ]
 
 [[package]]
@@ -12955,9 +12959,9 @@ dependencies = [
  "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
+ "move-model",
  "move-value-view",
  "thiserror 1.0.69",
- "triomphe",
 ]
 
 [[package]]
@@ -12992,6 +12996,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.5",
+ "sha3 0.9.1",
  "shared-dsa",
  "specializer",
 ]
@@ -13027,6 +13032,8 @@ dependencies = [
  "mono-move-core",
  "mono-move-global-context",
  "mono-move-testsuite",
+ "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "shared-dsa",
  "specializer",
@@ -13041,10 +13048,14 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "blake2-rfc",
+ "bulletproofs",
+ "byteorder",
  "curve25519-dalek-ng",
  "libsecp256k1",
+ "merlin",
  "mono-move-core",
  "move-core-types",
+ "once_cell",
  "rand_core 0.5.1",
  "ripemd",
  "sha2 0.9.9",
@@ -13121,7 +13132,7 @@ dependencies = [
  "move-core-types",
  "move-value-view",
  "move-value-view-derive",
- "num-bigint 0.3.3",
+ "num 0.4.1",
  "paste",
  "proptest",
  "rand 0.7.3",
@@ -13135,7 +13146,6 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-crypto",
  "aptos-framework-natives",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
@@ -13166,7 +13176,6 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
- "rand_core 0.5.1",
  "smallvec",
  "specializer",
  "tempfile",

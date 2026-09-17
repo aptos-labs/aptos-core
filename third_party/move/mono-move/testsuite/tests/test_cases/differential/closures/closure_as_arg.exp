@@ -39,12 +39,12 @@ fun add_u64(r0, r1): u64 {
 
 fun apply(r0, r1): u64 {
   slots: params(2), locals(0), temps(1)
-    r0: |u64|u64
+    r0: |u64|(u64)
     r1: u64
     r2: u64
   code:
   L0:
-    0: [r2] := call_closure [|u64|u64], [r1, r0] @2
+    0: [r2] := call_closure [|u64|(u64)], [r1, r0] @2
     1: ret [r2] @3
 }
 
