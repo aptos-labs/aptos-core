@@ -32,7 +32,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let txn_data = SystemTxnMetadata::for_block_metadata(block_metadata);
         let mut interp = self.system_session(&txn_data);
         match run_block_prologue(&mut interp, self.guard, block_metadata) {
-            Ok(()) => system_txn_outcome(interp),
+            Ok(()) => system_txn_outcome(interp, BLOCK_PROLOGUE.as_str()),
             Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
                 call: "block_prologue",
                 failure,
@@ -54,7 +54,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let txn_data = SystemTxnMetadata::for_block_metadata_ext(block_metadata_ext);
         let mut interp = self.system_session(&txn_data);
         match run_block_prologue_ext(&mut interp, self.guard, block_metadata_ext) {
-            Ok(()) => system_txn_outcome(interp),
+            Ok(()) => system_txn_outcome(interp, BLOCK_PROLOGUE_EXT.as_str()),
             Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
                 call: "block_prologue_ext",
                 failure,
