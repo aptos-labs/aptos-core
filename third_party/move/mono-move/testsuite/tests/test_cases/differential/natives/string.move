@@ -36,6 +36,14 @@ module 0x1::main {
         string::utf8(vector[0xc3u8])
     }
 
+    // --- length ---
+
+    // Byte length of a multi-byte string: "héllo" is 6 bytes.
+    public fun len_multibyte(): u64 {
+        let s = string::utf8(vector[0x68u8, 0xc3u8, 0xa9u8, 0x6cu8, 0x6cu8, 0x6fu8]);
+        string::length(&s)
+    }
+
     // --- internal_index_of (via index_of) ---
 
     public fun index_found(): u64 {
@@ -107,6 +115,9 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::truncated
 // CHECK: aborted: code 1 in 0x1::string
+
+// RUN: execute 0x1::main::len_multibyte
+// CHECK: results: 6
 
 // RUN: execute 0x1::main::index_found
 // CHECK: results: 6
