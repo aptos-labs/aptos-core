@@ -1,129 +1,162 @@
-# CI validation results
+# Rebased CI validation
 
-Measured on 2026-09-17 UTC. Measurements are complete; merge gates remain below.
+Measured on 2026-09-17 UTC. **Validation is not green:** normal workspace CI and
+one large baseline sample, including its bounded rerun, failed on a prover output
+mismatch. Measurement runs are finished; no further retries were launched.
 
-## Revision and method
+## Revisions and method
 
-Timed candidate: `3be0111fe8a6d36c22aaad8972d44512b582e515`, on
-`vk/ci-improve-1-validation-20260916`. The original remote branch was preserved;
-no PR was opened.
+Rebased onto main `aba7ebe8287390be4768c5845d7022b5ccdec512` without conflicts;
+the three existing commits retained identical patches. Shipping branch:
+`vk/ci-improve-1-validation-20260916`. No PR was opened.
 
-Follow-up `ceafa814722d3cd2292b6d186c2ff25880aeebb1` fixes a validation gap:
-ignored tests are filtered in nextest listings, so build-inventory comparison
-must include filtered entries. Shard coverage still compares runnable tests only.
-Regression tests reproduced the omission before the fix. Timed commands are
-unchanged; the [corrected verifier passed on Linux](https://github.com/aptos-labs/aptos-core/actions/runs/35175437620)
-over all nine recorded samples, along with all 12 Node and 13 Python helper tests.
+Candidate `6de07db2c04bdd975e13f2e33003458c15dc32f6` also aligns all three
+nextest inventory commands with `--profile ci`: newer main excludes Lean tests
+through that profile. A regression test failed before the fix and passed after it.
+Execution commands, assertions, retry settings and upstream exclusions are unchanged.
 
-Targeted benchmarks use `50599562104473fcb4dd4a535d1d643a69590638`, an empty
-child commit with the identical Git tree
-`4ef92740ac59f882810ce7be5b91e384dc350122`. This isolates their cancellation
-group from normal CI without changing any benchmarked file. Each suite compares
-three baseline/candidate samples with matching source, packages, profiles and
-retry settings; inventories include ignore status.
+Targeted benchmarks use `2b8522e0f93c05d468b2372cb3f9599cebb03104`, with the
+identical Git tree `b13ed12a01b41902e24b90b43c5a40bd82b64225`. The separate SHA
+prevents concurrent normal CI from cancelling benchmarks. Each suite schedules
+three baseline/candidate samples using the same source, packages and profiles.
 
-[CLI/API comparison](https://github.com/aptos-labs/aptos-core/actions/runs/35170870724)
-uses candidate test sources on both sides, baseline workflow logic from
-`893d1ffea49dcfa933f0421b19fc6e31a9c808ab`, and immutable image digests resolved
-once for all samples. The tools image is from that unchanged product-code
-revision. The [temporary harness](https://github.com/aptos-labs/aptos-core/commit/ea77e689a8a6e99fa26cda254fbc266bbc8b4bce)
-changes image selection, workflow sizing/orchestration and diagnostics, not test
-assertions. It is on a separate measurements branch, outside shipping history.
+[CLI/API comparisons](https://github.com/aptos-labs/aptos-core/actions/runs/35233992968)
+use candidate test sources on both sides, main's baseline orchestration and its
+prebuilt tools image, pinned to
+`sha256:e64d0e85cd83b1f6383631a9216ffb9b3a909baf6b632dc6c4ba6c80ad295226`.
+The branch does not change product Rust sources relative to that main revision.
+Devnet/testnet/mainnet image digests were resolved once for all samples.
+The [temporary comparison harness](https://github.com/aptos-labs/aptos-core/commit/7c742e7b5225f7364607752861be136de99cdfef)
+is outside shipping history; its adaptations select images and collect diagnostics,
+without changing assertions.
 
-## Measured changes
+## Measurements
 
-Three samples per variant. Times are workload-job durations, including
-setup/cleanup/reporting but excluding queueing. CLI time is the slowest network
-job; its compute sums all three networks. For sharded targeted tests, time is
-build plus slowest shard; compute sums build and all shards. Small reporting/gate
-jobs are excluded. Allocated vCPU-minutes are a proxy, **not billed dollars**.
+Three samples per variant, except large: only successful matched samples one and
+three are compared below. Medians and full ranges include job
+setup/cleanup/reporting, excluding queueing. CLI time is the slowest network job;
+compute sums all three networks. Sharded targeted time is build plus slowest
+shard; compute sums build and all shards. Small reporting/result-gate jobs are
+excluded. Allocated vCPU-minutes are a proxy, **not billed dollars**.
 
 | Workload | Baseline seconds: median (range) | Candidate seconds: median (range) | Median allocated vCPU-minutes: baseline → candidate | Result |
 | --- | --- | --- | --- | --- |
-| [Targeted small](https://github.com/aptos-labs/aptos-core/actions/runs/35172638902) | 131 (128–134) | 132 (128–134) | 139.7 → 140.8 | Neutral; nine identities matched |
-| [Targeted medium](https://github.com/aptos-labs/aptos-core/actions/runs/35172874065) | 262 (253–273) | 240 (224–249) | 279.5 → 256.0 | 8.4% less time/compute; 2,341 identities matched |
-| [Targeted large](https://github.com/aptos-labs/aptos-core/actions/runs/35173246819) | 1,877 (1,851–1,961) | 979 (949–1,003) | 2,002.1 → 1,902.4 | 47.8% less time; 5.0% less compute |
-| CLI E2E | 498 (493–514) | 254 (241–263) | 531.2 → 98.1 | 49.0% less time; 81.5% less compute |
-| API compatibility | 131 (73–141) | 72 (69–83) | 139.7 → 9.6 | 45.0% less time; 93.1% less compute |
+| [Targeted small](https://github.com/aptos-labs/aptos-core/actions/runs/35234005745) | 133 (132–133) | 129 (128–129) | 141.9 → 137.6 | 3.0% less time/compute; modest difference |
+| [Targeted medium](https://github.com/aptos-labs/aptos-core/actions/runs/35234419023) | 248 (225–274) | 247 (246–252) | 264.5 → 263.5 | Essentially flat |
+| [Targeted large](https://github.com/aptos-labs/aptos-core/actions/runs/35235061862) | 1,927.5 (1,902–1,953) | 890.5 (853–928) | 2,056.0 → 1,819.7 | 53.8% faster; 11.5% less compute; **two successful pairs only** |
+| CLI E2E | 526 (508–550) | 255 (236–410) | 561.1 → 99.1 | 51.5% faster; 82.3% less compute |
+| API compatibility | 81 (77–91) | 95 (81–101) | 86.4 → 12.7 | 17.3% slower; 85.3% less compute |
 
-Removing benchmark-only inventory collection changes the small comparison to
-129s → 132s (+2.3%, still overlapping ranges) and medium to 260s → 240s
-(7.7% faster). Including its result gate and scheduling gaps, CLI's candidate
-median is 259s (246–269), still 48.0% faster than the baseline.
-For large, removing inventory overhead yields 1,874s → 972s and 1,998.9 →
-1,877.9 vCPU-minutes (48.1% less time, 6.1% less compute). Including inter-job
-scheduling gaps, candidate elapsed time is 1,016s (978–1,032), a 45.9% reduction.
-All three large samples matched 3,609 total tests, including 29 ignored tests,
-with exact, disjoint coverage of 3,580 runnable tests across each eight-way split.
+Removing benchmark-only inventory collection gives **131s → 129s** for small
+(1.5% faster) and **246s → 247s** for medium (0.4% slower). These small differences
+are not evidence of a substantial speedup. Unlike the previous revision's run,
+the medium gain and API latency improvement did not repeat.
+For the two large pairs, removing inventory overhead gives **1,925.5s → 885s**
+(54.0% faster) and **2,053.9 → 1,796.0 vCPU-minutes** (12.6% lower).
+Including build-to-shard scheduling gaps gives 922s (884–960), 52.2% faster.
+Including network scheduling and the result gate, CLI's median is 261s
+(243–416), still 50.4% faster. Across all three samples, including the retry,
+CLI's total allocated compute is 81.7% lower.
 
-CLI ran 41 tests per network: all 18 network suites across both variants passed
-on the first attempt. Both API spec comparisons passed in all six jobs, without
-retries. Medium samples had no retries. One large candidate prover test,
-`folds_of_idx.move`, hit resource/timeouts twice before passing on attempt three;
-baseline `folds_of_multi.move` passed on its second attempt. Both sides' retry
-time is included in the measurements. Targeted builders used
-c7i-flex.16xlarge and shards c7i-flex.8xlarge. CLI/API assignments varied among
-c7i, c7i-flex and c7a; these are practical CI comparisons, not universally
-architecture-controlled CPU benchmarks. Observed latency gains are not guarantees.
+API's first spec-generation step, including image pull, took a median 37s → 44s;
+checkout took 3s → 7s. All six YAML/JSON comparison jobs passed on their first
+attempt. API latency remains variable; its repeatable benefit is lower allocation.
 
-Candidate phase medians (small / medium / large): prover setup **8.1 / 7.8 /
-8.2s**, build/archive **69.2 / 137.1 / 492.4s**, and inline/slowest-shard test
-phase **0.2 / 40.5 / 375.9s**. Large-shard archive download was a 21s median
-(17–61s); each archive was 767 MB. Peak sampled shard memory was 8.4 GB.
-These phase summaries are not additive medians and exclude other job overhead.
+Small inventories matched nine tests in every sample. Medium matched 2,354 total
+identities and 2,346 runnable tests, with eight CI-profile exclusions and no ignored
+tests. No small/medium retries occurred. Large candidate inventories contain
+3,651 identities: 29 ignored, eight CI-profile exclusions and 3,614 runnable
+tests. Local checks of downloaded inventories verified exact baseline/candidate
+identity and ignore-status equality for samples one and three, and exact,
+disjoint runnable partition coverage for all three candidate samples. Sample
+two has no baseline inventory because its test step failed; the remote
+three-sample verifier therefore remains failed. All 24 candidate shards passed.
+Across all three candidate samples, the median was 896s and 1,829.9 vCPU-minutes;
+sample two is excluded from the paired comparison above, not counted as a third
+successful pair.
+Candidate sample three's prover test `choice.move` had output-baseline differences
+on its first three attempts and passed on its fourth; retry time is included.
+Baseline samples one and three each passed on a second attempt for `choice.move`
+and `closures/inline/folds_of_idx.move`, respectively.
+Baseline sample two's [initial attempt](https://github.com/aptos-labs/aptos-core/actions/runs/35235061862/attempts/1)
+exhausted all four attempts on `choice.move`; its prover
+`closures/amm_example.move` also needed a second attempt. The failed job consumed
+**1,961s / 2,091.7 allocated vCPU-minutes**. The single
+[rerun](https://github.com/aptos-labs/aptos-core/actions/runs/35235061862/attempts/2)
+failed on the same test after four attempts: 3,613 passed, one failed, 37 skipped.
+It consumed **2,120s / 2,261.3 allocated vCPU-minutes**. The mismatch adds a
+redacted return value and a duplicate `simple_incorrect` trace frame, not a test
+timeout. Both failed jobs are excluded from successful-pair medians but retained
+as **4,353.1 additional allocated vCPU-minutes** of validation cost. The two
+failed inventory verifiers add 28s / 0.9 vCPU-minutes. Reused successful jobs were
+counted once. These success-conditioned, two-pair results have limited confidence;
+they do not establish reliability or a clean three-sample benchmark.
 
-### Smoke artifacts
+All 18 CLI network suites passed, with 41 tests per network. One candidate
+sample's testnet suite needed a second attempt:
+`test_node_update_consensus_key` and `test_node_update_validator_network_address`
+encountered `ERECONFIGURATION_IN_PROGRESS`. The retry passed, and all retry time
+is included. Unchanged assertions do not establish that runner sizing has no
+effect on flake frequency.
 
-The [transfer comparison](https://github.com/aptos-labs/aptos-core/actions/runs/35171739994)
-reused exact binaries from normal CI. All four file checksums matched in all six
-consumers.
+Candidate phase medians across all three samples (small / medium / large): prover
+setup **8.3 / 8.0 / 8.2s**, build/archive **65.7 / 146.3 / 463.8s**, and inline/slowest-shard tests
+**0.2 / 42.4 / 309.1s**. Large archives were 781 MB; shard downloads took a median
+18s (15–48s), with peak sampled shard memory of 8.0 GB.
+Phase medians are not additive. Targeted builders used c7i-flex.16xlarge;
+candidate shards used c7i-flex.8xlarge.
+CLI/API runner families can vary, so these are practical CI comparisons rather
+than architecture-controlled CPU benchmarks.
 
-- Artifact bytes: **12.57 GB → 3.47 GB (72.4% smaller)**.
-- Download/extraction, three consumers per format: median **332s → 158s (52.4%
-  faster)**; ranges 310–353s and 104–278s.
-- Upload tradeoff, one controlled producer comparison: node **14s → 28s**;
-  helper/archive **40s → 94s**.
+### Smoke artifact transfer
 
-This compares artifact compression, not the full smoke workflow against the old
-cache backend. Faster downloads do not imply the same percentage reduction in
-overall smoke-check time.
+The [transfer comparison](https://github.com/aptos-labs/aptos-core/actions/runs/35235523714)
+reuses the exact freshly built rebased smoke binaries. All four file checksums
+matched in all six consumers.
 
-## Correctness, interruptions and remaining gates
+- Artifact bytes: **13.26 GB → 3.65 GB (72.5% smaller)**.
+- Download/extraction, three samples per format: median **309s → 98s (68.3%
+  faster)**; ranges 289–336s and 88–119s.
+- Upload tradeoff, one controlled producer comparison: node **16s → 38s**;
+  helpers/archive **42s → 119s**.
 
-- Local: 40 tests passed, plus Cargo check, Clippy, formatting and workflow linting.
-  [Linux CLI dependency check](https://github.com/aptos-labs/aptos-core/actions/runs/35170614809)
+This compares artifact compression, not the full smoke workflow against its
+former cache backend. Transfer percentages are not whole-smoke-check speedups.
+
+## Correctness and remaining checks
+
+- Local: **41 tests passed** (13 Node, 13 Python metrics, six CLI assertion,
+  nine Rust), plus Cargo check, Clippy, formatting and workflow linting.
+- The small benchmark passed Linux helper tests, exact inventories, and the live
+  missing-artifact failure contract. Freshness now passes: merge base age zero
+  days against a seven-day limit.
+- [CLI dependency check](https://github.com/aptos-labs/aptos-core/actions/runs/35233362096)
   passed.
-- [Normal CI](https://github.com/aptos-labs/aptos-core/actions/runs/35170613312):
-  general/Rust lints, license checks, batch-encryption tests, cached-package
-  consistency and doctests passed (63 doctests, 36 ignored).
-- All eight smoke partitions passed: 143 executed tests and 48 ignored.
-  `test_changing_working_consensus` failed a no-progress assertion and
-  `optimistic_verification` failed a chain-resumption assertion; each passed on
-  its second attempt. Their sources and retry policies are unchanged. The slowest
-  measured shard took 624.7s; peak sampled host memory was 26.3 GB. No OOM was reported.
-- The workspace step was interrupted after about 24 minutes, then stuck
-  finalizing. Normal cancellation and force-cancellation released the run;
-  GitHub provides no log for that job, so the initial cause remains unconfirmed.
-  Its reported allocation is 2,413.9 vCPU-minutes, including stalled finalization,
-  not verified billed consumption.
-- The [isolated workspace retry](https://github.com/aptos-labs/aptos-core/actions/runs/35173112084)
-  passed using the exact candidate source and unchanged action: VM-feature checks,
-  doctests, and **12,611 unit tests passed, 162 skipped**. `test_mint_nft` overflowed
-  while corrupting a signature byte, then passed on its second attempt; that test
-  is unchanged. The job took **55m 28s / 3,549.9 allocated vCPU-minutes**. This is a
-  correctness run, not a matched workspace-performance comparison.
-- **Rebase before merging:** the merge base is 14 days old; the policy permits
-  seven. This failed normal CI and the small benchmark's freshness helper.
-  Benchmark execution and inventory verification passed; the freshness check
-  was not weakened. Small-run Linux helper/missing-artifact steps after that check
-  were skipped, then covered by the successful Linux helper replay and a separate
-  [live missing-artifact check](https://github.com/aptos-labs/aptos-core/actions/runs/35175637233).
-- A real PR is still needed to validate affected-package selection in PR context,
-  labels/skip conditions, required-check integration and PR-specific permissions.
-  Manual runs do not establish those properties or prove every workload regression-free.
+- [Normal CI](https://github.com/aptos-labs/aptos-core/actions/runs/35233358677)
+  checks out rebased `30aed347bd06c2d4bb2fc1861ff1dcc18394acca`; its test actions
+  are unchanged by the later inventory-only fix. General/Rust lints, licenses,
+  batch-encryption, cached-package consistency, VM-feature checks and doctests
+  passed (63 doctests passed, 36 ignored).
+- **Workspace failure:** 12,822 passed, one failed, 171 skipped. `choice.move`
+  exhausted all four attempts with output-baseline differences. The unchanged
+  `ping_success_resets_fail_counter` timed out once and `folds_of_idx.move` hit
+  prover resource/time limits once; each passed on its second attempt.
+  The job took **60m 41s / 3,883.7 allocated vCPU-minutes** and was not rerun.
+  Prover sources, unit-test action and nextest configuration are unchanged from
+  main; the same `choice.move` discrepancy also occurred in the old-path benchmark.
+  This does not establish a clean regression-free result; triage the flake before
+  claiming full validation. No assertion, baseline or timeout was weakened.
+- All eight smoke partitions passed: **143 executed tests, 48 ignored**.
+  `test_swarm_with_bad_non_qs_node` twice timed out waiting for a ledger version,
+  then passed on its third attempt. The slowest measured test phase was 714.5s;
+  peak sampled host memory was 27.2 GB.
 
-There is no whole-PR speedup or dollar-savings claim, and no isolated measurement
-of warm native caches, merge-base checking or the dependency-check runner change.
+A real PR is still needed to exercise affected-package selection in PR context,
+labels/skip conditions, required-check integration and PR-specific permissions.
+No whole-PR speedup, universal regression-free result, or billed-dollar savings
+is claimed. Warm native caches and the dependency-check runner change have no
+isolated performance measurement.
+
 See [ci-performance.md](ci-performance.md) for current behavior and reproduction
-commands. Run benchmark suites sequentially: dispatches sharing a SHA also share
-a cancellation group. Preserve metrics before their seven-day retention expires.
+commands. Run benchmark suites sequentially; dispatches sharing a SHA share a
+cancellation group. Metrics expire after seven days and build artifacts after one.
