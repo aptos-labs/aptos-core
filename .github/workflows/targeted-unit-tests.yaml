@@ -72,7 +72,7 @@ jobs:
             exit 0
           fi
           python3 .github/scripts/ci_metrics.py run list-archive -- \
-            cargo nextest list --archive-file "$TEST_ARCHIVE" --workspace-remap . -T json > ci-metrics/inventory.json
+            cargo nextest list --profile ci --archive-file "$TEST_ARCHIVE" --workspace-remap . -T json > ci-metrics/inventory.json
           python3 .github/scripts/ci_metrics.py plan ci-metrics/inventory.json --threshold "$INLINE_TEST_COUNT_MAX"
           stat --printf='Archive bytes: %s\n' "$TEST_ARCHIVE"
 
@@ -146,7 +146,7 @@ jobs:
       - name: Record the benchmark partition inventory
         if: inputs.benchmark-packages != ''
         run: |
-          cargo nextest list --archive-file "$TEST_ARCHIVE" --workspace-remap . -T json \
+          cargo nextest list --profile ci --archive-file "$TEST_ARCHIVE" --workspace-remap . -T json \
             --partition count:${{ matrix.partition }}/${{ strategy.job-total }} > ci-metrics/inventory.json
 
       - uses: ./.github/actions/ci-metrics-report

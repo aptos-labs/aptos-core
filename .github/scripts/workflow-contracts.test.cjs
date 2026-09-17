@@ -125,6 +125,16 @@ test('artifact consumers reject empty, invalid and multiple producer IDs', () =>
   }
 });
 
+test('test inventories use the same nextest profile as CI execution', () => {
+  for (const [file, name] of [
+    ['.github/workflows/ci-benchmark.yaml', 'Record inventory after the timed baseline'],
+    ['.github/workflows/targeted-unit-tests.yaml', 'Choose between an inline run and shards'],
+    ['.github/workflows/targeted-unit-tests.yaml', 'Record the benchmark partition inventory'],
+  ]) {
+    assert.match(stepRun(file, name), /cargo nextest list --profile ci\b/);
+  }
+});
+
 test('benchmark verifier accepts inline and sharded runs and rejects incomplete coverage', () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-inventory-coverage-'));
   try {
