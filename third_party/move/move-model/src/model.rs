@@ -5562,8 +5562,16 @@ impl<'env> FunctionEnv<'env> {
 
     /// Checks whether this function has the `#[module_lock]` attribute.
     pub fn has_module_lock(&self) -> bool {
-        self.has_attribute(|a| {
-            self.symbol_pool().string(a.name()).as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+        self.has_attribute(|attr| {
+            self.symbol_pool().string(attr.name()).as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+        })
+    }
+
+    /// Checks whether this function has an explicit `#[persistent]` attribute.
+    /// Public functions are implicitly persistent but are not reported here.
+    pub fn has_persistent(&self) -> bool {
+        self.has_attribute(|attr| {
+            self.symbol_pool().string(attr.name()).as_str() == well_known::PERSISTENT_ATTRIBUTE
         })
     }
 
