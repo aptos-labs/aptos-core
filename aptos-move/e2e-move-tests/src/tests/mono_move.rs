@@ -478,6 +478,6 @@ fn mono_move_env_reaches_genesis() {
         features.is_mono_move_enabled(),
         aptos_types::on_chain_config::mono_move_env_enabled(),
         "genesis features disagree with {}",
-        aptos_types::on_chain_config::MONO_MOVE_ENV
+        aptos_types::on_chain_config::MONO_MOVE_ENV_VAR
     );
 }

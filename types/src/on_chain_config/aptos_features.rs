@@ -240,14 +240,14 @@ pub enum FeatureFlag {
 ///
 /// Set for tests only to run testsuites as if MonoMove is enabled. Must never be
 /// set outside tests.
-pub const MONO_MOVE_ENV: &str = "MONO_MOVE_ENV";
+pub const MONO_MOVE_ENV_VAR: &str = "MONO_MOVE_ENABLED";
 
-/// Returns true if MonoMove environment is enabled. Should be only used for
-/// testing.
+/// Returns true if [`MONO_MOVE_ENV_VAR`] is set to `1` or `true`. Anything else,
+/// including an unset variable, is off. Should be only used for testing.
 pub fn mono_move_env_enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
-    *ENABLED.get_or_init(|| match std::env::var(MONO_MOVE_ENV) {
-        Ok(value) => !value.is_empty() && value != "0",
+    *ENABLED.get_or_init(|| match std::env::var(MONO_MOVE_ENV_VAR) {
+        Ok(value) => matches!(value.to_lowercase().as_str(), "1" | "true"),
         Err(_) => false,
     })
 }

@@ -1,6 +1,6 @@
 name: "mono-move-tests-parity"
 
-# Runs the normal Aptos test suites with MONO_MOVE_ENV=1 and diffs the outcome
+# Runs the normal Aptos test suites with MONO_MOVE_ENABLED=1 and diffs the outcome
 # against failing.toml and skipped.toml. Advisory, never required: it is
 # label-gated, and a skipped required check leaves a PR unmergeable.
 #
@@ -46,7 +46,7 @@ jobs:
       - name: Run postgres database
         run: docker run --detach -p 5432:5432 cimg/postgres:14.2
 
-      # Same invocation as .github/actions/rust-unit-tests, plus MONO_MOVE_ENV
+      # Same invocation as .github/actions/rust-unit-tests, plus MONO_MOVE_ENABLED
       # and the skip filter.
       - name: Run unit tests with MonoMove defaulted on
         run: |
@@ -69,7 +69,7 @@ jobs:
             --message-format libtest-json \
             -E "$FILTER" > unit-results.json || { code=$?; [ "$code" -eq 100 ] || exit "$code"; }
         env:
-          MONO_MOVE_ENV: "1"
+          MONO_MOVE_ENABLED: "1"
           NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
           RUST_MIN_STACK: "1073741824"
@@ -200,7 +200,7 @@ jobs:
             --message-format libtest-json \
             -E "$FILTER" > smoke-results-${{ matrix.partition }}.json || { code=$?; [ "$code" -eq 100 ] || exit "$code"; }
         env:
-          MONO_MOVE_ENV: "1"
+          MONO_MOVE_ENABLED: "1"
           NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
           RUST_MIN_STACK: "1073741824"
 

@@ -4,7 +4,7 @@
 
 """Diffs a MonoMove test run against failing.toml and skipped.toml.
 
-The parity CI job runs the normal suites with MONO_MOVE_ENV=1, which adds
+The parity CI job runs the normal suites with MONO_MOVE_ENABLED=1, which adds
 ENABLE_MONO_MOVE to the default feature set. Every test absent from both files is
 expected to pass. This script turns that expectation into a gate.
 
@@ -39,7 +39,7 @@ FAILING_HEADER = """\
 # produce it locally:
 #
 #   FILTER=$({invocation} --skip-filter)
-#   MONO_MOVE_ENV=1 RUST_MIN_STACK=1073741824 NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \\
+#   MONO_MOVE_ENABLED=1 RUST_MIN_STACK=1073741824 NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \\
 #     cargo nextest run --profile ci --workspace --no-fail-fast \\
 #     --message-format libtest-json -E "$FILTER" > results.json
 #
@@ -198,9 +198,10 @@ def skip_filter(entries):
 def resolved(entries, outcomes):
     """Splits the failing entries the run says should go into passed and gone.
 
-    A name the run never mentions counts as gone only if its binary ran. Each CI
-    job checks its own results, so the other job's binaries are legitimately
-    absent and must not look like deletions.
+    An `ignored` test did not run, so it is gone the same way a deleted one is. A
+    name the run never mentions counts as gone only if its binary ran. Each CI job
+    checks its own results, so the other job's binaries are legitimately absent
+    and must not look like deletions.
     """
     binaries = {split_name(name)[0] for name in outcomes}
     passed, gone = [], []
@@ -210,7 +211,7 @@ def resolved(entries, outcomes):
         outcome = outcomes.get(name)
         if outcome == "ok":
             passed.append(name)
-        elif outcome is None and split_name(name)[0] in binaries:
+        elif outcome == "ignored" or (outcome is None and split_name(name)[0] in binaries):
             gone.append(name)
     return passed, gone
 
@@ -224,12 +225,12 @@ def check(entries, outcomes):
         if outcome in broken and name not in entries
     )
     now_passing, no_longer_exist = resolved(entries, outcomes)
-    # A skipped test is filtered out of the run, so seeing one means the filter
-    # and skipped.toml disagree.
+    # A skipped test is filtered out of the run, so seeing one execute means the
+    # filter and skipped.toml disagree.
     ran_anyway = sorted(
         name
         for name, entry in entries.items()
-        if entry.status == "skipped" and name in outcomes
+        if entry.status == "skipped" and outcomes.get(name) not in (None, "ignored")
     )
 
     if new_failures:
@@ -249,7 +250,7 @@ def check(entries, outcomes):
         print(f"{len(no_longer_exist)} test(s) in {FAILING.name} did not run, drop them:")
         for name in no_longer_exist:
             print(f"  {name}")
-        print("Their binary ran without them, so they were renamed or deleted.")
+        print("Their binary ran, so they were renamed, deleted or marked `#[ignore]`.")
         print()
 
     if ran_anyway:

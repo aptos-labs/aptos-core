@@ -5,7 +5,7 @@
 # produce it locally:
 #
 #   FILTER=$(python3 third_party/move/mono-move/aptos-tests-parity/check_parity.py --skip-filter)
-#   MONO_MOVE_ENV=1 RUST_MIN_STACK=1073741824 NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
+#   MONO_MOVE_ENABLED=1 RUST_MIN_STACK=1073741824 NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
 #     cargo nextest run --profile ci --workspace --no-fail-fast \
 #     --message-format libtest-json -E "$FILTER" > results.json
 #

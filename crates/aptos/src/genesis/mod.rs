@@ -35,7 +35,7 @@ use aptos_logger::info;
 use aptos_types::{
     account_address::{AccountAddress, AccountAddressWithChecks},
     on_chain_config::{
-        mono_move_env_enabled, OnChainConsensusConfig, OnChainExecutionConfig, MONO_MOVE_ENV,
+        mono_move_env_enabled, OnChainConsensusConfig, OnChainExecutionConfig, MONO_MOVE_ENV_VAR,
     },
 };
 use aptos_vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
@@ -111,7 +111,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
         // TODO(completeness): Remove when MonoMove is production-ready.
         if mono_move_env_enabled() {
             return Err(CliError::UnexpectedError(format!(
-                "{MONO_MOVE_ENV} is set; refusing to generate genesis"
+                "{MONO_MOVE_ENV_VAR} is set; refusing to generate genesis"
             )));
         }
 
