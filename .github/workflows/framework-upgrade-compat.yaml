@@ -1,0 +1,115 @@
+# Framework upgrade compatibility test.
+#
+# Asserts that a node running the previous release's binary can execute the
+# framework on this branch. On mainnet, validators take a new binary first and
+# the framework upgrade follows, so a fullnode still on the old binary has to
+# execute that upgrade or it stops there.
+#
+# One localnet, no consensus, no Forge cluster. See
+# scripts/test_framework_upgrade_compat.sh for the mechanics.
+name: Framework Upgrade Compatibility
+
+# Nothing here authenticates to a cloud or a registry: both binaries are built
+# from source and the localnet is reached over loopback. Read access is enough.
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      OLD_BRANCH:
+        required: false
+        type: string
+        description: >-
+          Release branch supplying the old binary. Defaults to the newest
+          aptos-release-vX.Y branch.
+
+  # schedule: # NOTE: the schedule is dictated by PIES
+
+jobs:
+  framework-upgrade-compat:
+    # Two debug cargo builds plus a localnet. disk=large is required: a debug
+    # aptos binary alone is ~775MB, and this builds two trees.
+    runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+
+      # Resolve the previous release branch: the highest-numbered
+      # aptos-release-vX.Y, which is what determine_target_branch("main") picks.
+      #
+      # Done with git rather than the Forge action that resolves the same thing.
+      # That action also resolves a docker image tag, which needs crane and
+      # registry credentials -- and this job has no other use for a registry: it
+      # builds both binaries from source and talks only to localhost. Keeping it
+      # out means no cloud credentials are in scope here at all.
+      - name: Resolve and validate the old branch
+        id: old
+        env:
+          RAW: ${{ inputs.OLD_BRANCH }}
+        run: |
+          set -euo pipefail
+          BRANCH="${RAW}"
+          if [[ -z "${BRANCH}" ]]; then
+            BRANCH="$(git ls-remote --heads origin 'refs/heads/aptos-release-v*' \
+              | sed 's|.*refs/heads/||' \
+              | grep -E '^aptos-release-v[0-9]+\.[0-9]+$' \
+              | sort -t v -k2 -V \
+              | tail -1)"
+          fi
+          [[ -n "${BRANCH}" ]] || { echo "::error::could not resolve a release branch"; exit 1; }
+          # Read via env, never expression-substituted into this script, and
+          # constrain the charset: this value becomes a git ref below.
+          if ! [[ "${BRANCH}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
+            echo "::error::Refusing branch name with unexpected characters"
+            exit 1
+          fi
+          echo "BRANCH=${BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "Old binary will be built from ${BRANCH}"
+
+      # The CLI embeds aptos-node, so the CLI *is* the VM under test. It has to be
+      # built from the release branch: CLI releases are versioned independently of
+      # node releases (CLI 9.x vs node 1.4x), so a downloaded CLI has no defined
+      # relationship to a given release branch.
+      - name: Check out the old release branch
+        env:
+          BRANCH: ${{ steps.old.outputs.BRANCH }}
+        run: git worktree add --detach ../aptos-old "origin/${BRANCH}"
+
+      - name: Build the old CLI
+        run: cargo build -p aptos --bin aptos
+        working-directory: ../aptos-old
+
+      - name: Build aptos-release-tool from this branch
+        run: cargo build -p aptos-release-tool
+
+      # TMPDIR is pinned so the work directory lands somewhere the upload step can
+      # find: the script uses ${TMPDIR:-/tmp}, and a runner may set TMPDIR anywhere.
+      - name: Run the compatibility test
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          ./scripts/test_framework_upgrade_compat.sh \
+            --old-cli ../aptos-old/target/debug/aptos \
+            --release-tool ./target/debug/aptos-release-tool
+
+      # The script keeps every localnet, bundle and transaction log in its work
+      # directory; without these a failure is just an exit code.
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: framework-upgrade-compat-logs
+          # Exclude the localnet's key material. It only authorises a throwaway
+          # chain and is reproducible from the fixed seed anyway, but there is no
+          # reason to ship private keys in an artifact.
+          path: |
+            ${{ runner.temp }}/fwup-compat.*/
+            !${{ runner.temp }}/fwup-compat.*/**/mint.key
+            !${{ runner.temp }}/fwup-compat.*/**/*identity.yaml
+          retention-days: 7
+          if-no-files-found: warn
