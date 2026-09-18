@@ -16,9 +16,11 @@ use crate::{
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
+    providers::read_config,
 };
 use aptos_types::{
     fee_statement::FeeStatement,
+    on_chain_config::ApprovedExecutionHashes,
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{
         AuxiliaryInfo, EntryFunction, Script, SignedTransaction, TransactionExecutableRef,
@@ -63,9 +65,22 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let gas_params = self.env.gas_params().as_ref().map_err(|e| {
             DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
         })?;
-        PreExecutionChecker::new(gas_params, self.env.gas_feature_version(), &txn_data)
-            .run_checks()
-            .map_err(DiscardReason::PreExecutionCheck)?;
+        // Only a script can be one governance has approved.
+        let approved_gov_scripts = if txn_data.script_hash.is_empty() {
+            None
+        } else {
+            read_config::<ApprovedExecutionHashes>(guard, self.data_provider)
+                .ok()
+                .flatten()
+        };
+        PreExecutionChecker::new(
+            gas_params,
+            self.env.gas_feature_version(),
+            approved_gov_scripts.as_ref(),
+            &txn_data,
+        )
+        .run_checks()
+        .map_err(DiscardReason::PreExecutionCheck)?;
 
         // TODO(completeness): multisig payloads. Refused for now, since the
         // inner executable must run as the multisig account, not the sender.

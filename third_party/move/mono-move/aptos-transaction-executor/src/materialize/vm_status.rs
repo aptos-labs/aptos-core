@@ -8,34 +8,35 @@ use crate::errors::{
     MoveExecutionFailure, PreExecutionCheckFailure, ScriptRejection,
 };
 use aptos_types::{
-    error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
+    error::{
+        split_canonical, INVALID_ARGUMENT, INVALID_STATE, NOT_FOUND, OUT_OF_RANGE,
+        PERMISSION_DENIED,
+    },
     transaction::validation::{
-        EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID,
-        ECANT_PAY_GAS_DEPOSIT, EGAS_PAYER_ACCOUNT_MISSING,
-        EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT, ENONCE_ALREADY_USED,
+        transaction_limits_module_id, transaction_validation_module_id, EACCOUNT_DOES_NOT_EXIST,
+        EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID, ECANT_PAY_GAS_DEPOSIT,
+        EDELEGATION_POOL_NOT_FOUND, EGAS_PAYER_ACCOUNT_MISSING,
+        EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT, EINSUFFICIENT_STAKE, EINVALID_MULTIPLIER,
+        EMULTIPLIER_NOT_AVAILABLE, ENONCE_ALREADY_USED, ENOT_DELEGATED_VOTER,
+        ENOT_STAKE_POOL_OWNER, EPOOL_NOT_IN_VALIDATOR_SET,
         ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH, ESEQUENCE_NUMBER_TOO_BIG,
-        ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD,
+        ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD, ESTAKE_POOL_NOT_FOUND,
         ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE, ETRANSACTION_EXPIRED,
     },
 };
 use mono_move_core::{ExecutionErrorKind, VMInternalError};
 use mono_move_output::v1_error::{self, V1Equivalent};
 use move_binary_format::errors::PartialVMError;
-use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    language_storage::ModuleId,
-    vm_status::{AbortLocation, StatusCode, StatusType, VMStatus},
-};
+use move_core_types::vm_status::{AbortLocation, StatusCode, StatusType, VMStatus};
 use std::sync::LazyLock;
 
 /// Where the transaction prologue and epilogue live.
-static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
-    AbortLocation::Module(ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("transaction_validation").to_owned(),
-    ))
-});
+static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> =
+    LazyLock::new(|| AbortLocation::Module(transaction_validation_module_id()));
+
+/// Where a request for raised limits is checked against its staking.
+static ABORT_LOC_LIMITS_MODULE: LazyLock<AbortLocation> =
+    LazyLock::new(|| AbortLocation::Module(transaction_limits_module_id()));
 
 /// Converts a type-erased VM error into `VMStatus`.
 ///
@@ -158,6 +159,13 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
         F::EncryptedGasPriceBelowMinimum { .. } => {
             StatusCode::ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
         },
+        F::HighLimitGasPriceBelowMinimum { .. } => {
+            StatusCode::HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
+        },
+        F::InvalidLimitsMultiplier { .. } => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+        F::LimitsRequestOnGovernanceScript => {
+            StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT
+        },
         F::GasPriceAboveMaximum { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
     };
     VMStatus::error(code, Some(failure.to_string()))
@@ -263,9 +271,9 @@ fn unsupported_status(msg: &str) -> VMStatus {
 /// Mirrors V1's `convert_prologue_error`: recognized validation aborts map to
 /// their discard codes.
 //
-// TODO(completeness): V1 also recognizes aborts from `transaction_limits` and
-// the multisig account module. Neither is reachable here yet, so they land in
-// the unexpected-abort branch below.
+// TODO(completeness): V1 also recognizes aborts from the multisig account
+// module. They are not reachable here yet, so they land in the
+// unexpected-abort branch below.
 fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
     let (code, message, location) = match failure {
         MoveExecutionFailure::Abort {
@@ -283,6 +291,9 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
             return unexpected_validation_error("prologue", format!("{failure:?}"))
         },
     };
+    if location == *ABORT_LOC_LIMITS_MODULE {
+        return limits_abort_to_status(code, message, location);
+    }
     if location != *ABORT_LOC_VALIDATION_MODULE {
         return unexpected_prologue_abort(code, message, location);
     }
@@ -308,6 +319,24 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
             StatusCode::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE
         },
         (INVALID_ARGUMENT, ENONCE_ALREADY_USED) => StatusCode::NONCE_ALREADY_USED,
+        _ => return unexpected_prologue_abort(code, message, location),
+    };
+    VMStatus::error(new_major_status, None)
+}
+
+/// Converts a rejected request for raised limits into its discard code.
+fn limits_abort_to_status(code: u64, message: Option<String>, location: AbortLocation) -> VMStatus {
+    let new_major_status = match split_canonical(code) {
+        (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
+        (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
+        (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
+        (PERMISSION_DENIED, EPOOL_NOT_IN_VALIDATOR_SET) => {
+            StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET
+        },
+        (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
+        (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
+        (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+        (INVALID_ARGUMENT, EMULTIPLIER_NOT_AVAILABLE) => StatusCode::MULTIPLIER_NOT_AVAILABLE,
         _ => return unexpected_prologue_abort(code, message, location),
     };
     VMStatus::error(new_major_status, None)
@@ -356,7 +385,10 @@ mod tests {
     use mono_move_loader::LoaderError;
     use mono_move_runtime::{error::RuntimeInvariantViolation, ArithOp, RuntimeError};
     use move_binary_format::file_format::FunctionDefinitionIndex;
-    use move_core_types::vm_status::KeptVMStatus;
+    use move_core_types::{
+        account_address::AccountAddress, ident_str, language_storage::ModuleId,
+        vm_status::KeptVMStatus,
+    };
 
     fn test_module() -> ModuleId {
         ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned())

@@ -78,8 +78,7 @@ pub(crate) fn run_prologue<'a>(
         txn_expiration_time: txn_data.expiration_timestamp_secs,
         chain_id: txn_data.chain_id,
         is_simulation: false,
-        // TODO(completeness): transaction limits requests (staking multipliers).
-        txn_limits_request: None,
+        txn_limits_request: txn_data.txn_limits_request.clone(),
     };
     let status =
         call_validation_function_unmetered(guard, interp, VERSIONED_PROLOGUE, signers, &args)
