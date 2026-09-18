@@ -97,9 +97,20 @@ MVP_TEST_FLAGS="-T=20" cargo test -p move-prover
 ## Inconsistency Check
 
 If the flag `--check-inconsistency` is given, the prover not only verifies a target, but also checks if there is any
-inconsistent assumption in the verification. If the environment variable `MVP_TEST_INCONSISTENCY=1` is set, `cargo test`
-will perform the inconsistency check while running the tests in `sources` (i.e., the prover will run those tests with the flag `--check-inconsistency`).
+inconsistent assumption in the verification.
+
+To enable it for a single test, put the flag directive at the head of the test source:
+
+```move
+// flag: --check-inconsistency
+```
+
+To enable it for a whole run, pass it through `MVP_TEST_FLAGS`:
 
 ```shell script
-MVP_TEST_INCONSISTENCY=1 cargo test -p move-prover
+MVP_TEST_FLAGS=--check-inconsistency cargo test -p move-prover
 ```
+
+A run with the check enabled takes noticeably longer than one without, since each target gets a
+second verification condition. That difference is a useful confirmation that the flag actually took
+effect.
