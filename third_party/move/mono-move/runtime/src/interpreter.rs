@@ -11,7 +11,7 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
+        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc, evacuate_session_roots,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         FrozenHeap, Heap, TopFrame,
     },
@@ -31,6 +31,7 @@ use crate::{
     value_cmp, value_conv,
     value_conv::rust::write_value,
 };
+use mono_move_alloc::RegionKind;
 use mono_move_core::{
     captured_values_size,
     interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
@@ -463,9 +464,11 @@ impl<'guard> InterpreterContext<'guard> {
         // call writes it. It is written explicitly below.
         let stack = loader
             .guard()
-            .take_scratch_region()
+            .take_region(RegionKind::Stack)
             .unwrap_or_else(new_stack_region);
         debug_assert_eq!(stack.len(), DEFAULT_STACK_SIZE);
+
+        let heap = Heap::new_session(loader.guard(), options.heap_size);
 
         // Built before the metadata writes below: it asserts the region is
         // large enough to hold them.
@@ -494,7 +497,7 @@ impl<'guard> InterpreterContext<'guard> {
             resource_provider,
             registers,
             stack,
-            heap: Heap::new(options.heap_size),
+            heap,
             root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
@@ -641,19 +644,50 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. The session heap is frozen into the effects, so every heap
-    /// pointer they hold stays valid for as long as they live. Their interned
-    /// types are not: the effects do not borrow the guard, so the caller must
-    /// keep the global arena alive until the effects are dropped.
-    pub fn finish(self) -> SessionEffects {
-        self.loader.guard().return_scratch_region(self.stack);
+    /// publication. The effects are copied out of the session heap into a
+    /// buffer sized to what the session allocated, which is then frozen into
+    /// them, so every heap pointer they hold stays valid for as long as they
+    /// live. Their interned types are not: the effects do not borrow the guard,
+    /// so the caller must keep the global arena alive until the effects are
+    /// dropped.
+    ///
+    /// Fails only on a VM bug. The copy leaves the session heap half-forwarded,
+    /// so nothing is recoverable afterwards and the block has to be aborted.
+    pub fn finish(self) -> VMResult<SessionEffects> {
+        let Self {
+            loader,
+            read_set: _,
+            gas_meter: _,
+            natives: _,
+            extensions,
+            resource_provider: _,
+            registers: _,
+            stack,
+            heap,
+            root_pool,
+            mut read_write_set,
+            rng: _,
+        } = self;
 
-        SessionEffects {
-            read_write_set: self.read_write_set,
-            extensions: self.extensions,
-            #[allow(clippy::arc_with_non_send_sync)]
-            heap: std::sync::Arc::new(FrozenHeap::new(self.heap)),
+        // The call stack is gone and every handle is scoped to one allocation,
+        // so the read-write set and the extensions are the complete root set.
+        // A root left behind means evacuation would miss it and overwrite the
+        // original with a forwarding marker.
+        if root_pool.has_live_roots() {
+            invariant_violation!(LiveRootAtSessionEnd);
         }
+
+        let evacuated =
+            evacuate_session_roots(&heap, loader.guard(), &mut read_write_set, &extensions)?;
+        heap.release(loader.guard());
+        loader.guard().return_region(RegionKind::Stack, stack);
+
+        Ok(SessionEffects {
+            read_write_set,
+            extensions,
+            #[allow(clippy::arc_with_non_send_sync)]
+            heap: std::sync::Arc::new(FrozenHeap::new(evacuated)),
+        })
     }
 
     /// Runs `f` with gas metering suspended: the meter is swapped for an

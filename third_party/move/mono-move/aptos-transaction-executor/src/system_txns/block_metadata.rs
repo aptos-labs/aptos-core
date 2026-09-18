@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::{call_block_function, system_txn_outcome, SystemTxnMetadata};
+use super::common::{
+    call_block_function, discard_system_session, system_txn_outcome, SystemTxnMetadata,
+};
 use crate::{
     errors::{invariant_violation, MoveExecutionFailure, SystemTxnFailure},
     executor::AptosTransactionExecutor,
@@ -33,10 +35,13 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let mut interp = self.system_session(&txn_data);
         match run_block_prologue(&mut interp, self.guard, block_metadata) {
             Ok(()) => system_txn_outcome(interp),
-            Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
-                call: "block_prologue",
-                failure,
-            }),
+            Err(failure) => {
+                discard_system_session(interp);
+                TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
+                    call: "block_prologue",
+                    failure,
+                })
+            },
         }
     }
 
@@ -55,10 +60,13 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let mut interp = self.system_session(&txn_data);
         match run_block_prologue_ext(&mut interp, self.guard, block_metadata_ext) {
             Ok(()) => system_txn_outcome(interp),
-            Err(failure) => TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
-                call: "block_prologue_ext",
-                failure,
-            }),
+            Err(failure) => {
+                discard_system_session(interp);
+                TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
+                    call: "block_prologue_ext",
+                    failure,
+                })
+            },
         }
     }
 }

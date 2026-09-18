@@ -224,11 +224,15 @@ impl MonoTxnOutput {
         match self {
             MonoTxnOutput::Executed { outcome, .. } => match outcome {
                 TxnOutcome::Executed { effects, .. } => Some(effects),
-                TxnOutcome::Discarded(_) => None,
+                // TODO(correctness): a discard writes nothing, but its reads are
+                //   what parallel validation needs; publish the read set here
+                //   once Block-STM validates MonoMove transactions.
+                TxnOutcome::Discarded { .. } => None,
                 TxnOutcome::ExecutedNoEffects(_) => None,
                 // TODO(correctness): Revisit this arm: unexpected system txn errors
                 //   should be handled at execution time!
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
+                TxnOutcome::Panic(_) => None,
             },
             MonoTxnOutput::SkippedToRetry => None,
         }
@@ -328,9 +332,10 @@ impl TxnOutput for MonoTxnOutput {
         match self {
             MonoTxnOutput::Executed { outcome, .. } => match outcome {
                 TxnOutcome::Executed { fee_statement, .. } => *fee_statement,
-                TxnOutcome::Discarded(_) => FeeStatement::zero(),
+                TxnOutcome::Discarded { .. } => FeeStatement::zero(),
                 TxnOutcome::ExecutedNoEffects(_) => FeeStatement::zero(),
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => FeeStatement::zero(),
+                TxnOutcome::Panic(_) => FeeStatement::zero(),
             },
             MonoTxnOutput::SkippedToRetry => FeeStatement::zero(),
         }
@@ -429,7 +434,10 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             return Ok((
                 ExecutionStatus::Executed {
                     output: MonoTxnOutput::Executed {
-                        outcome: TxnOutcome::Discarded(DiscardReason::InvalidSignature),
+                        outcome: TxnOutcome::Discarded {
+                            reason: DiscardReason::InvalidSignature,
+                            effects: None,
+                        },
                         skips_rest: false,
                     },
                     skips_rest: false,
@@ -461,6 +469,12 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         )
         .without_metering()
         .execute_transaction(inner_txn, auxiliary_info);
+
+        if let TxnOutcome::Panic(err) = &outcome {
+            return Err(code_invariant_error(format!(
+                "MonoMove: could not close the session: {err:?}"
+            )));
+        }
 
         // A reconfiguration (new epoch) event cuts the block early. Record this
         // in output so remaining transactions can be skipped.

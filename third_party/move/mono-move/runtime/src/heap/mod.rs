@@ -25,6 +25,7 @@ use crate::{
         VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
+use mono_move_alloc::RegionKind;
 use mono_move_core::{
     align_max, checked_align_max,
     native::{NativeABI, NativeExtensions},
@@ -32,8 +33,9 @@ use mono_move_core::{
     DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
     ReadPin, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
+use mono_move_global_context::ExecutionGuard;
 use std::{cell::RefCell, ptr::NonNull};
 
 // ---------------------------------------------------------------------------
@@ -231,19 +233,78 @@ pub struct Heap {
     pub(crate) gc_count: usize,
 }
 
+/// A buffer to back a [`Heap`].
+///
+/// Zeroed in production so no part of a heap is ever uninitialized memory.
+/// Miri gets an uninitialized one instead, so it still catches a read of a byte
+/// no object wrote. A debug build poisons it, so nothing can come to depend on
+/// the zeros either.
+fn new_heap_region(size: usize) -> MemoryRegion {
+    if cfg!(miri) {
+        return MemoryRegion::new_uninit(size);
+    }
+    let mut region = MemoryRegion::new_zeroed(size);
+    region.recycle();
+    region
+}
+
 impl Heap {
-    /// Creates a heap backed by an uninitialized buffer of the given size.
-    ///
-    /// The buffer is not zeroed. This is sound only while this contract holds:
-    /// every heap object is fully written before any byte of it is read, and
-    /// nothing reads the unbumped tail `[bump_ptr, buffer.end)`.
+    /// Creates a heap backed by a fresh buffer of the given size.
     pub fn new(size: usize) -> Self {
-        let buffer = MemoryRegion::new_uninit(size);
+        Self::from_region(new_heap_region(size))
+    }
+
+    /// Creates a heap over `buffer`, with nothing allocated yet.
+    fn from_region(buffer: MemoryRegion) -> Self {
         Self {
             bump_ptr: buffer.as_ptr(),
             buffer,
             gc_count: 0,
         }
+    }
+
+    /// Creates a session heap, reusing this worker's parked buffer when there
+    /// is one. Return it with [`Self::release`] when the session ends.
+    ///
+    /// Only the default size is pooled. A session that asks for another size
+    /// gets a fresh buffer and parks nothing, which keeps every buffer in the
+    /// slot the same size.
+    //
+    // TODO(cleanup): drop the size check once the heap size comes from a
+    // VM-wide config. Every session should then take the one configured size
+    // and this can pool unconditionally.
+    pub(crate) fn new_session(guard: &ExecutionGuard<'_>, size: usize) -> Self {
+        if size != DEFAULT_HEAP_SIZE {
+            return Self::new(size);
+        }
+        match guard.take_region(RegionKind::Heap) {
+            Some(buffer) => Self::from_region(buffer),
+            None => Self::new(size),
+        }
+    }
+
+    /// Parks this heap's buffer on the worker for the next session.
+    ///
+    /// The buffer is handed out as is, holding the dead session's bytes.
+    /// `heap_alloc` zeroes every object over its full aligned size before
+    /// returning it, so no allocation can observe them.
+    //
+    // TODO(cleanup): drop the size check once the heap size comes from a
+    // VM-wide config, the same way `new_session` can.
+    pub(crate) fn release(self, guard: &ExecutionGuard<'_>) {
+        if self.buffer.len() == DEFAULT_HEAP_SIZE {
+            guard.return_region(RegionKind::Heap, self.buffer);
+        }
+    }
+
+    /// Bytes allocated so far. An upper bound on how much is still live.
+    pub(crate) fn used(&self) -> usize {
+        self.bump_ptr as usize - self.buffer.as_ptr() as usize
+    }
+
+    /// Size of the backing buffer, in bytes.
+    pub fn capacity(&self) -> usize {
+        self.buffer.len()
     }
 
     /// Rewinds the bump pointer to the start of the buffer, discarding all allocations. The buffer
@@ -271,15 +332,20 @@ impl Heap {
 }
 
 /// A session heap that has been frozen: no further execution can mutate it, so
-/// its allocations never move. It exposes no APIs; wrapping keeps the raw [`Heap`]
-/// methods unreachable so the only thing a holder can do is keep the heap alive,
-/// which is exactly what pinning a read against another transaction's heap needs.
-pub struct FrozenHeap(#[allow(dead_code)] Heap);
+/// its allocations never move. Wrapping keeps the raw [`Heap`] methods
+/// unreachable, so a holder can do nothing but keep the heap alive, which is
+/// exactly what pinning a read against another transaction's heap needs.
+pub struct FrozenHeap(Heap);
 
 impl FrozenHeap {
     /// Freezes a session heap.
     pub fn new(heap: Heap) -> Self {
         Self(heap)
+    }
+
+    /// Bytes this heap holds down for as long as it is pinned.
+    pub fn capacity(&self) -> usize {
+        self.0.capacity()
     }
 }
 
@@ -298,7 +364,7 @@ pub struct SharedArena {
 }
 
 impl SharedArena {
-    /// Creates a shared arena backed by an uninitialized buffer of `size` bytes.
+    /// Creates a shared arena backed by a fresh buffer of `size` bytes.
     pub fn new(size: usize) -> Self {
         Self {
             heap: RefCell::new(Heap::new(size)),
@@ -975,9 +1041,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 ) -> VMResult<()> {
     heap.gc_count += 1;
 
-    // Uninitialized is safe: the copy below fills to-space contiguously up to
-    // `free_ptr`, and the Phase-2 scan only reads `[to_space.start, free_ptr)`.
-    let to_space = MemoryRegion::new_uninit(heap.buffer.len());
+    let to_space = new_heap_region(heap.buffer.len());
     // `free_ptr` is a raw bump cursor — it points at the start of the
     // next *header* reservation, advancing by each object's total size.
     // Treating it as a raw cursor (rather than as an "object pointer"
@@ -1066,14 +1130,36 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
-    // `scan_ptr` is a raw cursor — header start of the next object to
-    // scan. Object pointers (data starts) are `scan_ptr + H`.
+    gc_scan_to_space(provider, &mut scanner, &to_space)?;
+
+    // Phase 3: swap — drop old heap, adopt new one. The bump cursor
+    // semantics match `free_ptr` directly (both are raw header-start
+    // cursors).
+    let RootScanner { free_ptr, .. } = scanner;
+    heap.buffer = to_space;
+    heap.bump_ptr = free_ptr;
+    Ok(())
+}
+
+/// Cheney-style breadth-first scan of the objects already copied into
+/// `to_space`, following their pointers until nothing new is copied.
+///
+/// Mutates only the scanner, so the caller decides what becomes of from-space
+/// afterwards: [`gc_collect`] adopts `to_space` in place of it, while
+/// [`evacuate_session_roots`] leaves it behind.
+fn gc_scan_to_space<P: DescriptorProvider + ?Sized>(
+    provider: &P,
+    scanner: &mut RootScanner<'_>,
+    to_space: &MemoryRegion,
+) -> VMResult<()> {
+    // `scan_ptr` is a raw cursor — header start of the next object to scan.
+    // Object pointers (data starts) are `scan_ptr + H`.
     let mut scan_ptr = to_space.as_ptr();
     while (scan_ptr as usize) < scanner.cursor() {
         // SAFETY: scan_ptr advances through to-space by each object's
         // aligned size. Object headers were copied verbatim by
         // gc_copy_object, so descriptor_id and size are valid as long
-        // as the object-header-integrity invariant holds (see above).
+        // as the object-header-integrity invariant holds (see `gc_collect`).
         unsafe {
             let obj_ptr = scan_ptr.add(OBJECT_HEADER_SIZE);
             let descriptor_id = read_descriptor(obj_ptr);
@@ -1086,19 +1172,61 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
             if descriptor_id == FORWARDED_MARKER {
                 invariant_violation!(GcForwardingMarkerInToSpace);
             }
-            gc_scan_object(provider, &mut scanner, obj_ptr, DescriptorId(descriptor_id))?;
+            gc_scan_object(provider, scanner, obj_ptr, DescriptorId(descriptor_id))?;
 
             scan_ptr = scan_ptr.add(obj_size);
         }
     }
-
-    // Phase 3: swap — drop old heap, adopt new one. The bump cursor
-    // semantics match `free_ptr` directly (both are raw header-start
-    // cursors).
-    let RootScanner { free_ptr, .. } = scanner;
-    heap.buffer = to_space;
-    heap.bump_ptr = free_ptr;
     Ok(())
+}
+
+/// Copies everything a finished session still exposes — its written resources
+/// and its native extensions — into a buffer sized to what the session
+/// allocated, and returns a heap over that buffer.
+///
+/// `heap` is left behind untouched by the caller's standards but unusable: the
+/// evacuated objects are overwritten with forwarding markers. Only the returned
+/// heap may be read afterwards.
+///
+/// The call stack is gone by this point and the root pool is empty, so `rws`
+/// and `extensions` are the complete root set. Missing a root would leave a
+/// pointer into the dead buffer, so the caller must be sure of that.
+pub(crate) fn evacuate_session_roots<P: DescriptorProvider + ?Sized>(
+    heap: &Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extensions: &NativeExtensions,
+) -> VMResult<Heap> {
+    // A session that allocated nothing still needs a buffer a bump pointer can
+    // legally address.
+    let to_space = new_heap_region(heap.used().max(MAX_ALIGN));
+    let mut scanner = RootScanner {
+        heap,
+        free_ptr: to_space.as_ptr(),
+    };
+
+    rws.scan(&mut scanner);
+
+    // SAFETY: execution has finished, so no native holds an extension borrow
+    // and the closure cannot re-enter the extensions.
+    unsafe {
+        extensions
+            .relocate_all_roots(&mut |base| scanner.relocate(base))
+            .map_err(|_| {
+                VMInternalError::new(RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::ExtensionBorrowedDuringGC,
+                ))
+            })?;
+    }
+
+    gc_scan_to_space(provider, &mut scanner, &to_space)?;
+
+    let RootScanner { free_ptr, .. } = scanner;
+    Ok(Heap {
+        bump_ptr: free_ptr,
+        buffer: to_space,
+        gc_count: 0,
+    })
 }
 
 /// Returns true if `ptr` is a valid object pointer (data-region start)
@@ -1322,4 +1450,118 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
         },
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::global_storage::WriteClass;
+    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_core::{
+        storage::resource_provider::{InMemoryStorageKey, NoResourceProvider},
+        types::Type,
+        ObjectDescriptor, ObjectDescriptorTable,
+    };
+    use mono_move_global_context::GlobalContext;
+    use move_core_types::account_address::AccountAddress;
+
+    // An `InternedType` is just an arena pointer, so a `'static` node gives a
+    // stable one without standing up an interner.
+    static TY: Type = Type::U64;
+
+    fn test_guard(ctx: &GlobalContext) -> ExecutionGuard<'_> {
+        ctx.try_execution_context(0)
+            .expect("worker 0 arena is free in a fresh context")
+    }
+
+    fn test_key() -> InMemoryStorageKey {
+        InMemoryStorageKey::Resource {
+            address: AccountAddress::ONE,
+            ty: GlobalArenaPtr::from_static(&TY),
+        }
+    }
+
+    #[test]
+    fn default_sized_session_heap_comes_back_from_the_pool() {
+        // Miri parks nothing, so the pointers never match there.
+        if cfg!(miri) {
+            return;
+        }
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = test_guard(&ctx);
+
+        let first = Heap::new_session(&guard, DEFAULT_HEAP_SIZE);
+        let base = first.buffer.as_ptr();
+        first.release(&guard);
+
+        let second = Heap::new_session(&guard, DEFAULT_HEAP_SIZE);
+        assert_eq!(second.buffer.as_ptr(), base);
+    }
+
+    #[test]
+    fn custom_sized_session_heap_is_not_pooled() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = test_guard(&ctx);
+
+        let heap = Heap::new_session(&guard, DEFAULT_HEAP_SIZE / 2);
+        assert_eq!(heap.capacity(), DEFAULT_HEAP_SIZE / 2);
+        heap.release(&guard);
+        assert!(guard.take_region(RegionKind::Heap).is_none());
+    }
+
+    #[test]
+    fn evacuation_shrinks_to_what_the_session_allocated() {
+        const GARBAGE_COUNT: usize = 64;
+        const GARBAGE_PAYLOAD: usize = 4096;
+        const LIVE_PAYLOAD: usize = 16;
+        const SENTINEL: u64 = 0x0102_0304_0506_0708;
+
+        let mut descriptors = ObjectDescriptorTable::new();
+        let garbage_id = descriptors.push(
+            ObjectDescriptor::new_struct(GARBAGE_PAYLOAD as u32, vec![]).expect("valid descriptor"),
+        );
+        let live_id = descriptors.push(
+            ObjectDescriptor::new_struct(LIVE_PAYLOAD as u32, vec![]).expect("valid descriptor"),
+        );
+
+        let mut heap = Heap::new(DEFAULT_HEAP_SIZE);
+        for _ in 0..GARBAGE_COUNT {
+            heap.alloc_object(OBJECT_HEADER_SIZE + GARBAGE_PAYLOAD, garbage_id)
+                .expect("heap has room for the garbage");
+        }
+        let live = heap
+            .alloc_object(OBJECT_HEADER_SIZE + LIVE_PAYLOAD, live_id)
+            .expect("heap has room for the live object");
+        // SAFETY: the object was just allocated with a 16-byte payload.
+        unsafe { write_u64(live.as_ptr(), 0usize, SENTINEL) };
+
+        let key = test_key();
+        let mut rws = ResourceReadWriteSet::new();
+        rws.move_to(&NoResourceProvider, &key, None, live)
+            .expect("the resource does not exist yet");
+
+        let evacuated =
+            evacuate_session_roots(&heap, &descriptors, &mut rws, &NativeExtensions::new())
+                .expect("evacuation succeeds");
+
+        // The copy is sized to what the session allocated, garbage included,
+        // but only the live object is copied into it.
+        assert_eq!(evacuated.capacity(), heap.used());
+        assert!(evacuated.capacity() < heap.capacity());
+        assert_eq!(
+            evacuated.used(),
+            align_max(OBJECT_HEADER_SIZE + LIVE_PAYLOAD)
+        );
+
+        let (_, class, _) = rws
+            .writes_unordered()
+            .next()
+            .expect("the resource is a write");
+        let WriteClass::Creation(moved) = class else {
+            panic!("a `move_to` of a fresh resource is a creation");
+        };
+        assert_ne!(moved, live);
+        // SAFETY: the write now points at the copy in the evacuated heap.
+        assert_eq!(unsafe { read_u64(moved.as_ptr(), 0usize) }, SENTINEL);
+    }
 }
