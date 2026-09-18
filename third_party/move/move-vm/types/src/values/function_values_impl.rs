@@ -199,6 +199,7 @@ impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
             match seq.next_element_seed(DeserializationSeed {
                 ctx: self.0.ctx,
                 layout: &layout,
+                depth: self.0.depth + 1,
             })? {
                 Some(v) => {
                     captured_layouts.push(layout);
