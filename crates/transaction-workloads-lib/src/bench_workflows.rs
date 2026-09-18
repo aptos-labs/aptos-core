@@ -1,17 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Workflows for the DeFi benchmark packages under
+//! Workflows for the benchmark packages under
 //! `third_party/move/mono-move/testsuite/benches-e2e`.
 //!
-//! Each of these packages needs more setup than an [`crate::EntryPoints`]
-//! variant can express: admin-signed protocol configuration, then one
-//! onboarding transaction per account, then a steady-state mix. That maps onto
-//! a three-stage [`WorkflowKind`] — account creation, onboarding, then the mix
-//! looping on the same pool.
-//!
-//! The mix samples an entry function per transaction from a seeded RNG, so a
-//! single registration produces a varied but reproducible transaction stream.
+//! These packages need more setup than an [`crate::EntryPoints`] variant can
+//! express, so each runs as a three-stage [`WorkflowKind`]: account creation,
+//! one onboarding transaction per account, then a mix sampling entry points
+//! from a seeded RNG.
 
 use crate::prebuilt_packages::PreBuiltPackagesImpl;
 use aptos_sdk::{
@@ -35,7 +31,7 @@ use aptos_transaction_generator_lib::{
         CustomModulesDelegationGeneratorCreator, PlainUserModuleTransactionGenerator,
         TransactionGeneratorWorker, UserModuleTransactionGenerator,
     },
-    entry_point_trait::{get_payload, get_payload_ty},
+    entry_point_trait::{get_payload, get_payload_with_ty_args},
     publishing::publish_util::Package,
     workflow_delegator::{StageTracking, WorkflowKind, WorkflowTxnGeneratorCreator},
     ReliableTransactionSubmitter, RootAccountHandle,
@@ -56,12 +52,10 @@ const PUBLISHER_BALANCE: u64 = 1000_0000_0000;
 /// times the headroom the widest fan-out in the suite needs.
 const MAX_GAS_UNITS: u64 = 2_000_000;
 
-/// Balance each benchmark account is created with, bounded from both sides.
-/// The floor: the prologue reserves [`MAX_GAS_UNITS`] at 100 octas a unit,
-/// 2 APT that is never spent, and a 50-block run burns around 5 more on
-/// storage, since a new state slot costs 400,000 octas and `airdrop_fanout`
-/// creates 75 of them per distribution. The ceiling: the harness funds these
-/// five to a sender out of 100 APT, so past 20 the fifth transfer is short.
+/// Balance each benchmark account is created with. The floor is the 2 APT the
+/// prologue reserves plus the ~5 a 50-block `airdrop_fanout` run burns on new
+/// state slots. The ceiling is 20: the harness funds five of these per sender
+/// out of a 100 APT signer.
 const ACCOUNT_CREATION_BALANCE: u64 = 10_0000_0000;
 
 #[derive(Debug, Copy, Clone)]
@@ -79,6 +73,8 @@ pub enum BenchWorkflowKind {
     /// Order book over a bit-packed AVL queue. The publisher registers one
     /// market and seeds it, each account opens a funded market account, and
     /// the mix samples resting placements / matching / cancels / traversal.
+    /// One market, because splitting the same order flow across several would
+    /// shorten every tree and with it the walk this workload measures.
     ClobAvl {
         num_accounts: usize,
         seed_orders_per_side: usize,
@@ -152,11 +148,9 @@ pub enum BenchWorkflowKind {
         num_txns: usize,
     },
     /// Collateralized debt positions in a sorted doubly linked list, in the
-    /// shape Liquity and Thala use. The publisher seeds the list and the
-    /// stability pool, each account opens one vault, and the mix samples walks
-    /// / adjustments / liquidation sweeps / auction steps. Every hop along the
-    /// list reads the next vault's address out of the current vault, so a walk
-    /// is a chain of sequentially dependent resource reads.
+    /// shape Liquity and Thala use. The mix samples walks / adjustments /
+    /// liquidation sweeps / auction steps. A hop reads the next vault's address
+    /// out of the current one, so a walk is a chain of dependent reads.
     CdpLiquidation {
         num_accounts: usize,
         list_length: usize,
@@ -768,13 +762,9 @@ mod lending_market {
     }
 
     /// Stage 2: the steady-state mix, with relative frequencies. Supply
-    /// outweighs withdraw and repay outweighs nothing, so positions grow
-    /// slowly rather than draining.
-    ///
-    /// Every entry but the collateral toggle goes through a `bench_*` wrapper
-    /// that clamps its amount to what the account and the reserve can actually
-    /// take, so no transaction in the mix aborts however long it runs or
-    /// however large `STEP` is set.
+    /// outweighs withdraw, so positions grow slowly rather than draining. Every
+    /// entry but the collateral toggle clamps its amount Move-side, so no
+    /// transaction aborts however long the run or however large `STEP`.
     const MIX: [(MixKind, u32); 6] = [
         (MixKind::Supply, 25),
         (MixKind::Withdraw, 20),
@@ -809,12 +799,10 @@ mod lending_market {
                     u256_arg(STEP),
                     bcs::to_bytes(&VARIABLE).unwrap(),
                 ]),
-                // Always the account's last collateral, never a random one: the
-                // two directions then cancel out instead of leaving a different
-                // slot off on every pass. The flag alternates with the sequence
-                // number, so both of them run. Clearing it is what puts
-                // `validate_hf_and_ltv` on the measured path; the collaterals
-                // left standing keep the health factor above six.
+                // Always the account's last collateral, never a random one, so
+                // the two directions cancel instead of leaving a different slot
+                // off on every pass. Clearing it is what puts
+                // `validate_hf_and_ltv` on the measured path.
                 MixKind::SetCollateral => (ident_str!("set_user_use_reserve_as_collateral"), vec![
                     bcs::to_bytes(collaterals.last().unwrap()).unwrap(),
                     bcs::to_bytes(&(account.sequence_number() % 2 == 0)).unwrap(),
@@ -862,12 +850,11 @@ mod clob_avl {
     const BASE_PRICE: u64 = 1_000_000;
     const SPREAD: u64 = 100;
 
-    /// Ticks a side spans, starting `SPREAD` away from the mid. Prices are
-    /// drawn uniformly over the band however many orders a call places, so a
-    /// band eight times the resting depth leaves most orders on a price level
-    /// of their own: 512 orders over 4097 ticks come out at 478 distinct
-    /// levels, a tree nine deep. A band the size of the order count would pile
-    /// them onto a handful of levels and leave no pointer chase to measure.
+    /// Ticks a side spans, starting `SPREAD` away from the mid. Eight times the
+    /// resting depth, so most orders land on a price level of their own: 512
+    /// orders over 4097 ticks give 478 levels, a tree nine deep. A band the size
+    /// of the order count would pile them onto a few levels and leave no
+    /// pointer chase to measure.
     const PRICE_BAND: u64 = 4096;
 
     /// `seed_book` draws every price from that one band, however many orders
@@ -1058,16 +1045,11 @@ mod clob_avl {
             let side = rng.gen_bool(0.5);
 
             let (func, args) = match MIX[dist.sample(rng)].0 {
-                // Tops up both sides, each gated on its own depth and centred
-                // on the mid the book was seeded around rather than on a side,
-                // so a replenished order rests instead of crossing. A side
-                // under its target gains 0.20 * 4 * 4.5 = 3.6 lots a
-                // transaction against the 0.30 * 0.5 * 16.5 = 2.5 lots market
-                // orders take off it, and the gate closes at the target, so
-                // depth settles at `seed_orders_per_side` for a run of any
-                // length. The surplus is what stops the book draining and the
-                // gate is what stops it growing until the AVL queue runs out
-                // of nodes.
+                // Tops up both sides, gated on depth and centred on the seeded
+                // mid so a replenished order rests instead of crossing. It adds
+                // 3.6 lots a transaction against the 2.5 market orders take
+                // off, and the gate closes at `seed_orders_per_side`, so depth
+                // settles there for a run of any length.
                 MixKind::Replenish => (ident_str!("bench_replenish"), vec![
                     bcs::to_bytes(&MARKET_ID).unwrap(),
                     bcs::to_bytes(&REPLENISH_PER_SIDE).unwrap(),
@@ -1442,13 +1424,9 @@ mod stableswap {
     }
 
     /// The pools the publisher builds, in the order it builds them. Ids are
-    /// handed out from one, so an entry's position fixes its id.
-    ///
-    /// Two run at the configured amplification and two at a hundredth of it,
-    /// and their target compositions span two orders of magnitude. Distance
-    /// from balance and `A` are the two things that set a Newton trip count, so
-    /// spanning both is what spreads the counts across the mix instead of
-    /// pinning them at one value.
+    /// handed out from one, so an entry's position fixes its id. Newton trip
+    /// count follows `A` and distance from balance, so the four pools span two
+    /// orders of magnitude on both, rather than all costing the same.
     static POOLS: [PoolSpec; 4] = [
         PoolSpec {
             coins: &[0, 1],
@@ -1479,11 +1457,10 @@ mod stableswap {
     const MIN_SOFT_AMP: u64 = 2;
 
     /// Whole tokens of the lead coin the publisher seeds a pool with; every
-    /// other coin gets the pool's skew share of that. Deliberately small: a
-    /// swap has to be a percent-scale move on a reserve for the package's 5%
-    /// per-swap cap to bind and for the solve to start somewhere new each time.
-    /// At a million the mix's swaps are rounding error and every solve costs
-    /// the same three rounds.
+    /// other coin gets the pool's skew share of that. Deliberately small, so a
+    /// swap is a percent-scale move on a reserve and every solve starts
+    /// somewhere new. At a million the swaps are rounding error and every solve
+    /// costs the same three rounds.
     const SEED_UNITS: u64 = 20_000;
 
     /// Whole tokens an onboarding transaction faucets the account in every
@@ -1493,14 +1470,11 @@ mod stableswap {
     const ONBOARD_FUND_UNITS: u64 = 100_000;
     const ONBOARD_DEPOSIT_UNITS: u64 = 20;
 
-    /// Whole tokens an imbalanced deposit leads with.
-    ///
-    /// This and `ONBOARD_DEPOSIT_UNITS` are small enough that the skew share of
-    /// the two narrowest pools truncates to zero whole tokens, making those
-    /// deposits single-sided. That is the intent, not an accident of rounding:
-    /// it is what keeps pools 3 and 4 lopsided against their own liquidity
-    /// traffic. Raising either constant past 10000 / `deposit_skew_bp` pulls
-    /// them back toward balance and flattens the trip counts.
+    /// Whole tokens an imbalanced deposit leads with. Small enough that the
+    /// skew share of the two narrowest pools truncates to zero, which is what
+    /// keeps those deposits single-sided and the pools lopsided. Raising this
+    /// or `ONBOARD_DEPOSIT_UNITS` past 10000 / `deposit_skew_bp` flattens the
+    /// trip counts.
     const ADD_UNITS: u64 = 10;
 
     /// Share of its LP a single-coin withdrawal burns, in basis points. Large
@@ -1774,13 +1748,9 @@ mod stableswap {
 
     /// Stage 2: the steady-state mix, with relative frequencies. Swaps
     /// dominate, as they do on a real stable pool, and the two liquidity flows
-    /// are the ones that solve the invariant twice.
-    ///
-    /// `Ramp` does not move the amplification: the harness freezes the block
-    /// timestamp, so `ramp_to` sets `t0 = now` and the interpolation returns
-    /// the value already in place. It keeps a small share because it is the
-    /// only branch that writes the amplification entry every swap on that pool
-    /// reads, which is a write to a hot slot rather than a Newton solve.
+    /// solve the invariant twice. `Ramp` cannot move the amplification under a
+    /// frozen block timestamp; it stays in as the one branch that writes the
+    /// entry every swap on that pool reads.
     const MIX: [(MixKind, u32); 6] = [
         (MixKind::Swap2, 40),
         (MixKind::Swap3, 25),
@@ -1903,15 +1873,10 @@ mod bridge_relay {
     /// schedule's `txn.max_transaction_size_in_bytes`.
     const MAX_TXN_BYTES: usize = 65536;
 
-    /// What a signed mix transaction carries besides the message bodies: the
-    /// 32-byte sender, the sequence number and the three u64 gas and expiry
-    /// fields and the chain id at 33, the Ed25519 authenticator at 99, the
-    /// entry-function header at 67 (payload tag, 32-byte module address,
-    /// `relay_endpoint` at 15, the longest entry name at 17, an empty type
-    /// argument list, and the argument count), the channel argument at 9, and
-    /// 4 for the two BCS length prefixes ahead of the message vector. That is
-    /// 244; the remaining 5 cover the versioned payload format, which wraps
-    /// the same entry function in five more enum tags.
+    /// What a signed mix transaction carries besides the message bodies:
+    /// sender, sequence number, gas and expiry fields, authenticator, the
+    /// entry-function header, the channel argument, and the BCS length
+    /// prefixes. Subtracted from the transaction size limit to size a batch.
     const TXN_ENVELOPE_BYTES: usize = 249;
 
     /// Prepaid executor balance per channel, and the top-up each account adds
@@ -2249,10 +2214,8 @@ mod bridge_relay {
 
         /// Batches a channel's queue has to hold for a delivery to find a full
         /// one waiting. The queue is a random walk reflected at empty, so its
-        /// mean depth has to sit several batches clear of that boundary;
-        /// below this the Deliver branch, nearly a third of the mix, starts
-        /// writing fewer payloads than it was handed and the run stops
-        /// measuring writes.
+        /// mean depth has to sit several batches clear of that boundary or
+        /// Deliver starts writing fewer payloads than it was handed.
         const QUEUE_DEPTH_IN_BATCHES: f64 = 4.0;
 
         fn weight_of(kind: MixKind) -> f64 {
@@ -2262,13 +2225,11 @@ mod bridge_relay {
                 .1 as f64
         }
 
-        /// The Send and Deliver weights, the Skip weight, and `SKIP_PER_TXN`
-        /// together fix how deep a channel's queue sits, and nothing else in
-        /// the package checks them against each other. At the shipped weights
-        /// 100 transactions put 30/100 * 8 * 100 = 240 messages on a channel
-        /// and take 30/100 * 8 * 100 + 4/100 * 1 * 100 = 244 off, a drift of
-        /// -0.04 a transaction against a spread of about 38, which settles the
-        /// queue at 480 messages, or 60 batches.
+        /// The Send, Deliver and Skip weights and `SKIP_PER_TXN` together fix
+        /// how deep a channel's queue sits, and nothing else in the package
+        /// checks them against each other. At the shipped weights the drift is
+        /// -0.04 messages a transaction against a spread of about 38, settling
+        /// the queue at 60 batches.
         #[test]
         fn the_mix_drains_the_queue_slowly_enough_to_keep_deliveries_full() {
             let total = MIX.iter().map(|(_, weight)| *weight).sum::<u32>() as f64;
@@ -2416,12 +2377,10 @@ mod airdrop_fanout {
                 .collect::<Vec<AccountAddress>>()
         }
 
-        /// The batch a distribute branch sends: `batch` with its last
-        /// recipient replaced by the caller. Every benchmark account is a
-        /// campaign participant as well as a distributor, and this is the only
-        /// thing in the mix that credits an address a benchmark account can
-        /// sign for, so without it no claim past the onboarding one would find
-        /// a balance.
+        /// The batch a distribute branch sends: `batch` with its last recipient
+        /// replaced by the caller. The only thing in the mix that credits an
+        /// address a benchmark account can sign for, so without it no claim
+        /// past the onboarding one would find a balance.
         fn with_own_slot(
             &self,
             account: &LocalAccount,
@@ -2561,11 +2520,9 @@ mod airdrop_fanout {
     }
 
     /// Stage 2: the steady-state mix, with relative frequencies. Distribution
-    /// dominates because a campaign is mostly batch payouts, and the split
-    /// between the update and fresh branches is what separates modification
-    /// writes from creation writes. Claims sit far below the 56 weight of the
-    /// two distribute branches that credit the caller, so 56/64 of them find a
-    /// credited slot and pay out.
+    /// dominates because a campaign is mostly batch payouts, and the update /
+    /// fresh split separates modification writes from creation writes. Claims
+    /// sit well below the distribute weight, so most find a credited slot.
     const MIX: [(MixKind, u32); 6] = [
         (MixKind::DistributeUpdate, 34),
         (MixKind::DistributeFresh, 22),
@@ -3145,14 +3102,10 @@ mod cdp_liquidation {
                 (PRICE_MIN..=PRICE_MAX).contains(&START_PRICE),
                 "the feed clamps a start price outside its own band"
             );
-            // Both ends of the liquidation loop have to meet inside the price
-            // band. The healthiest seeded vault must fall below the minimum
-            // ratio somewhere in the band, or the top of the list is safe
-            // forever and the sweep runs out of work; since the band is fixed,
-            // that is a ceiling on how far the seeded ratios run and so on the
-            // list length. The riskiest one must climb above the minimum
-            // somewhere in the band, or every sweep liquidates and the branch
-            // never measures an empty one.
+            // Both ends of the seeded ratio range have to cross the minimum
+            // somewhere inside the price band, or the sweep either never runs
+            // out of work or never finds any. The band is fixed, so this caps
+            // the list length.
             let top_icr_bps = SEED_ICR_MIN_BPS + (list_length as u64 - 1) * SEED_ICR_STEP_BPS;
             assert!(
                 PRICE_MIN * top_icr_bps / REFERENCE_PRICE < mcr_bps,
@@ -3884,7 +3837,7 @@ mod dex_aggregator {
             Some(sign_capped(
                 account,
                 txn_factory,
-                get_payload_ty(router(package), func.to_owned(), ty_args, args),
+                get_payload_with_ty_args(router(package), func.to_owned(), ty_args, args),
             ))
         })
     }
