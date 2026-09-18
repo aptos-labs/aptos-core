@@ -30,9 +30,12 @@ import json
 import os
 import re
 import shutil
+import signal
 import statistics
 import sys
 import tempfile
+import threading
+import time
 from dataclasses import dataclass, field
 from subprocess import Popen, PIPE, STDOUT
 
@@ -249,6 +252,13 @@ RUN_SOURCE = os.environ.get("RUN_SOURCE", default="local")
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 REPORT_PATH = os.environ.get("REPORT_PATH")
 HIDE_OUTPUT = bool(os.environ.get("HIDE_OUTPUT"))
+# How long a subprocess may print nothing before it is killed as hung. Silence,
+# not total runtime, is what separates a hang from a slow workload: the
+# benchmark logs every block and cargo logs every crate, so any of these
+# commands going quiet for half an hour has stopped making progress. Without
+# this a single stuck workload takes the job's whole six-hour budget and the
+# job ends with no report at all.
+SILENCE_TIMEOUT_SECS = int(os.environ.get("SILENCE_TIMEOUT_SECS", default=30 * 60))
 
 if BUILD not in ("release", "performance"):
     print(f"BUILD must be 'release' or 'performance', got {BUILD!r}")
@@ -269,8 +279,8 @@ NUM_ACCOUNTS = max(NUM_INIT_ACCOUNTS, (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE)
 
 
 class CommandFailed(Exception):
-    def __init__(self, returncode, output):
-        super().__init__(f"exit code {returncode}: {panic_reason(output)}")
+    def __init__(self, returncode, output, reason=None):
+        super().__init__(reason or f"exit code {returncode}: {panic_reason(output)}")
         self.returncode = returncode
         self.output = output
 
@@ -294,6 +304,9 @@ def panic_reason(output):
 def execute_command(command):
     print(f"Executing command:\n\t{command}\nand waiting for it to finish...")
     lines = []
+    last_output_at = time.monotonic()
+    hung = threading.Event()
+
     # The benchmark logs to stderr, so it is merged into stdout: draining one
     # pipe at a time would deadlock once the other filled up.
     with Popen(
@@ -304,13 +317,36 @@ def execute_command(command):
         stderr=STDOUT,
         bufsize=1,
         universal_newlines=True,
+        # Puts the shell and the benchmark it spawns in one process group.
+        # Killing the shell alone orphans the benchmark, which then holds the
+        # runner after the job that started it is gone.
+        start_new_session=True,
     ) as p:
+
+        def watchdog():
+            while p.poll() is None:
+                if time.monotonic() - last_output_at > SILENCE_TIMEOUT_SECS:
+                    hung.set()
+                    os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                    return
+                time.sleep(min(30, SILENCE_TIMEOUT_SECS / 4))
+
+        threading.Thread(target=watchdog, daemon=True).start()
         for line in p.stdout:
+            last_output_at = time.monotonic()
             if not HIDE_OUTPUT:
                 print(line, end="")
             lines.append(line)
 
     output = "".join(lines)
+    if hung.is_set():
+        if HIDE_OUTPUT:
+            print(output)
+        raise CommandFailed(
+            p.returncode,
+            output,
+            f"printed nothing for {SILENCE_TIMEOUT_SECS}s, killed as hung",
+        )
     if p.returncode != 0:
         if HIDE_OUTPUT:
             print(output)
