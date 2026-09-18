@@ -9,6 +9,7 @@ proposals:
       source_code_url: "https://github.com/aptos-labs/aptos-core/pull/20132"
     execution_mode: MultiStep
     update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/gas_refund_fa_mint.move
       - FeatureFlag:
           enabled:
             - gas_refund_fa_mint
