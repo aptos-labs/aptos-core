@@ -1135,6 +1135,143 @@ fn empty_payload_discarded_like_v1() {
     assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
 }
 
+/// A transfer that asks for raised limits with the given multiplier, in
+/// percent, for both execution and IO.
+fn raised_limits_txn(
+    sender: &AccountData,
+    to: &AccountData,
+    gas_unit_price: u64,
+    multiplier_percent: u64,
+) -> SignedTransaction {
+    use aptos_types::transaction::{
+        RequestedMultipliers, TransactionExecutable, TransactionExtraConfig, TransactionPayload,
+        TransactionPayloadInner, UserTxnLimitsRequest,
+    };
+
+    let TransactionPayload::EntryFunction(transfer) =
+        aptos_cached_packages::aptos_stdlib::aptos_account_transfer(*to.address(), 1_000)
+    else {
+        unreachable!("the SDK builds a transfer as an entry function")
+    };
+    sender
+        .account()
+        .transaction()
+        .payload(TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable: TransactionExecutable::EntryFunction(transfer),
+            extra_config: TransactionExtraConfig::V2 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+                txn_limits_request: Some(UserTxnLimitsRequest::StakePoolOwner {
+                    multipliers: RequestedMultipliers::V1 {
+                        execution_multiplier_percent: multiplier_percent,
+                        io_multiplier_percent: multiplier_percent,
+                    },
+                }),
+            },
+        }))
+        .sequence_number(10)
+        .gas_unit_price(gas_unit_price)
+        .max_gas_amount(100_000)
+        .sign()
+}
+
+/// A request for raised limits must name a multiplier that actually raises
+/// them, pay the higher price floor, and be backed by staking. Each is
+/// rejected with the same status as V1.
+#[test]
+fn raised_limits_requests_discard_like_v1() {
+    let (fx, alice, bob) = setup();
+    let floor: u64 = TransactionGasParameters::initial()
+        .high_limit_txn_min_price_per_gas_unit
+        .into();
+
+    let cases = [
+        // A multiplier of exactly 1x raises nothing.
+        ("multiplier", raised_limits_txn(&alice, &bob, floor, 100)),
+        // Raised limits are priced above the ordinary floor.
+        ("price", raised_limits_txn(&alice, &bob, floor - 1, 200)),
+        // Alice owns no stake pool to back the request.
+        ("staking", raised_limits_txn(&alice, &bob, floor, 200)),
+    ];
+    for (case, txn) in cases {
+        let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+        assert!(
+            v1_status.is_discarded(),
+            "v1 kept the {case} case: {v1_status:?}"
+        );
+        assert_eq!(
+            execute_v2(fx.get_state_view(), &txn).status(),
+            &v1_status,
+            "v2 differs from v1 for the {case} case"
+        );
+    }
+}
+
+/// A script governance has approved already runs with raised limits, so it
+/// may not also ask for them. Reaching that rule means the executor matched
+/// the script against the approved hashes on chain.
+#[test]
+fn approved_governance_script_may_not_request_limits() {
+    use aptos_crypto::HashValue;
+    use aptos_types::{
+        on_chain_config::ApprovedExecutionHashes,
+        state_store::state_key::StateKey,
+        transaction::{
+            RequestedMultipliers, Script, TransactionExecutable, TransactionExtraConfig,
+            TransactionPayload, TransactionPayloadInner, UserTxnLimitsRequest,
+        },
+        write_set::{WriteOp, WriteSet},
+    };
+
+    let (mut fx, alice, _bob) = setup();
+    let code = aptos_language_e2e_tests::compile::compile_script(TRANSFER_SCRIPT, vec![])
+        .code()
+        .to_vec();
+
+    // Governance approves this script's hash.
+    let approved = ApprovedExecutionHashes {
+        entries: vec![(0, HashValue::sha3_256_of(&code).to_vec())],
+    };
+    let key =
+        StateKey::on_chain_config::<ApprovedExecutionHashes>().expect("the config key builds");
+    let value = bcs::to_bytes(&approved).expect("the config serializes");
+    fx.apply_write_set(
+        &WriteSet::new(vec![(key, WriteOp::legacy_creation(value.into()))])
+            .expect("the write set builds"),
+    );
+
+    let txn = alice
+        .account()
+        .transaction()
+        .payload(TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable: TransactionExecutable::Script(Script::new(code, vec![], vec![])),
+            extra_config: TransactionExtraConfig::V2 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+                txn_limits_request: Some(UserTxnLimitsRequest::StakePoolOwner {
+                    multipliers: RequestedMultipliers::V1 {
+                        execution_multiplier_percent: 200,
+                        io_multiplier_percent: 200,
+                    },
+                }),
+            },
+        }))
+        .sequence_number(10)
+        .gas_unit_price(1_000)
+        .max_gas_amount(100_000)
+        .sign();
+
+    let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+    assert_eq!(
+        v1_status,
+        TransactionStatus::Discard(
+            StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT
+        ),
+        "v1 did not refuse the request"
+    );
+    assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
+}
+
 /// A block-metadata transaction produces byte-identical outputs on both VMs:
 /// the block prologue runs unmetered on both, so nothing is gas-masked.
 #[test]

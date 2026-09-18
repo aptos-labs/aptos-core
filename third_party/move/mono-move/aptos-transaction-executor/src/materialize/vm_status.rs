@@ -8,7 +8,10 @@ use crate::errors::{
     MoveExecutionFailure, PreExecutionCheckFailure, ScriptRejection,
 };
 use aptos_types::{
-    error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
+    error::{
+        split_canonical, INVALID_ARGUMENT, INVALID_STATE, NOT_FOUND, OUT_OF_RANGE,
+        PERMISSION_DENIED,
+    },
     transaction::validation::{
         EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID,
         ECANT_PAY_GAS_DEPOSIT, EGAS_PAYER_ACCOUNT_MISSING,
@@ -36,6 +39,25 @@ static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
         ident_str!("transaction_validation").to_owned(),
     ))
 });
+
+/// Where a request for raised limits is checked against its staking.
+static ABORT_LOC_LIMITS_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
+    AbortLocation::Module(ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_limits").to_owned(),
+    ))
+});
+
+// The reasons `0x1::transaction_limits` aborts with. Must match the Move
+// constants in that module.
+const ESTAKE_POOL_NOT_FOUND: u64 = 1;
+const ENOT_STAKE_POOL_OWNER: u64 = 2;
+const ENOT_DELEGATED_VOTER: u64 = 3;
+const EDELEGATION_POOL_NOT_FOUND: u64 = 4;
+const EINSUFFICIENT_STAKE: u64 = 5;
+const EINVALID_MULTIPLIER: u64 = 7;
+const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
+const EPOOL_NOT_IN_VALIDATOR_SET: u64 = 9;
 
 /// Converts a type-erased VM error into `VMStatus`.
 ///
@@ -157,6 +179,13 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
         F::GasPriceBelowMinimum { .. } => StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
         F::EncryptedGasPriceBelowMinimum { .. } => {
             StatusCode::ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
+        },
+        F::HighLimitGasPriceBelowMinimum { .. } => {
+            StatusCode::HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
+        },
+        F::InvalidLimitsMultiplier { .. } => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+        F::LimitsRequestOnGovernanceScript => {
+            StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT
         },
         F::GasPriceAboveMaximum { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
     };
@@ -283,6 +312,9 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
             return unexpected_validation_error("prologue", format!("{failure:?}"))
         },
     };
+    if location == *ABORT_LOC_LIMITS_MODULE {
+        return limits_abort_to_status(code, message, location);
+    }
     if location != *ABORT_LOC_VALIDATION_MODULE {
         return unexpected_prologue_abort(code, message, location);
     }
@@ -308,6 +340,24 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
             StatusCode::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE
         },
         (INVALID_ARGUMENT, ENONCE_ALREADY_USED) => StatusCode::NONCE_ALREADY_USED,
+        _ => return unexpected_prologue_abort(code, message, location),
+    };
+    VMStatus::error(new_major_status, None)
+}
+
+/// Converts a rejected request for raised limits into its discard code.
+fn limits_abort_to_status(code: u64, message: Option<String>, location: AbortLocation) -> VMStatus {
+    let new_major_status = match split_canonical(code) {
+        (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
+        (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
+        (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
+        (PERMISSION_DENIED, EPOOL_NOT_IN_VALIDATOR_SET) => {
+            StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET
+        },
+        (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
+        (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
+        (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+        (INVALID_ARGUMENT, EMULTIPLIER_NOT_AVAILABLE) => StatusCode::MULTIPLIER_NOT_AVAILABLE,
         _ => return unexpected_prologue_abort(code, message, location),
     };
     VMStatus::error(new_major_status, None)
