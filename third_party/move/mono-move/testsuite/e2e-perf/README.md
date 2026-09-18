@@ -134,6 +134,13 @@ RUN_SOURCE=local python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_p
 | `RUNNER_NAME` | `none` | Tags the JSON lines; in CI it also picks the runner |
 | `REPORT_PATH` | unset | Write the markdown report here |
 | `HIDE_OUTPUT` | unset | Suppress the benchmark's own log lines |
+| `SILENCE_TIMEOUT_SECS` | `1800` | Kill a subprocess that has printed nothing for this long |
+
+`SILENCE_TIMEOUT_SECS` is what keeps one stuck workload from taking the job's
+whole timeout. Every command here prints as it goes — the benchmark logs each
+block, cargo logs each crate — so going quiet for half an hour means it has
+stopped. A workload killed this way is reported as failed and the run continues
+with the next one, the same as any other workload failure.
 
 ## Running in CI
 
