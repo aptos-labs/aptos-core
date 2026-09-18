@@ -10,7 +10,7 @@ use mono_move_runtime::{
     error::{RuntimeError, RuntimeInvariantViolation},
     RuntimeStatus,
 };
-use move_core_types::vm_status::AbortLocation;
+use move_core_types::vm_status::{AbortLocation, StatusCode};
 use thiserror::Error;
 
 /// Every reason a transaction's effects could not be rendered into a
@@ -38,6 +38,8 @@ impl MaterializationError {
 pub enum DiscardReason {
     /// The transaction's signature did not verify.
     InvalidSignature,
+    /// A keyless authenticator did not validate; the code says how.
+    KeylessValidation(StatusCode),
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
     /// A payload or feature that no VM supports anymore.
