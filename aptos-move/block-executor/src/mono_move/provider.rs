@@ -23,7 +23,7 @@ use mono_move_core::{
     LayoutProvider, ReadPin, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, SharedArena};
+use mono_move_runtime::{deserialize_into, serialize, Heap, SharedArena};
 use move_core_types::language_storage::StructTag;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{ptr::NonNull, sync::Arc};
@@ -223,6 +223,38 @@ impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMSequentialProv
     ) -> Result<Option<GroupMembers>, ResourceProviderError> {
         self.fetch_resource_group(group_key)
             .map_err(|e| invariant_violation(format!("{e:#}")))
+    }
+
+    // TODO(perf): a same-block write is serialized to BCS only for the caller
+    // to decode it again; hand out the value directly.
+    fn resource_bytes(
+        &self,
+        key: &InMemoryStorageKey,
+    ) -> Result<Option<Bytes>, ResourceProviderError> {
+        // A value written earlier in the block exists only in memory.
+        if let Some(value) = self.unsync_map.fetch_data(key) {
+            return match value {
+                MonoValue::Write { ptr, pin: _pin, .. } => {
+                    // SAFETY: `_pin` keeps the arena behind `ptr` alive for the
+                    // call, and lowering the code that wrote the value
+                    // published its layout.
+                    let bytes = unsafe { serialize(self.guard, ptr.as_ptr(), key.value_ty()) }
+                        .map_err(|e| {
+                            invariant_violation(format!("failed to serialize written value: {e}"))
+                        })?;
+                    Ok(Some(Bytes::from(bytes)))
+                },
+                MonoValue::Deletion => Ok(None),
+            };
+        }
+        let state_key = key
+            .as_state_key()
+            .map_err(|e| invariant_violation(format!("{e:#}")))?;
+        Ok(self
+            .base_view
+            .get_state_value(&state_key)
+            .map_err(|_| invariant_violation("Storage error"))?
+            .map(|value| value.bytes().clone()))
     }
 }
 

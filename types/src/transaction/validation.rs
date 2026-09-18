@@ -2,8 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! The arguments the transaction prologue and epilogue take, and the abort
-//! codes they raise. Both mirror `transaction_validation.move` and are shared
-//! by every VM.
+//! codes they raise. Both mirror `transaction_validation.move` (and, for the
+//! abort codes, `transaction_limits.move`) and are shared by every VM.
 //!
 //! The argument enums must keep the same BCS serialization: the framework
 //! deserializes them directly, so neither the variant order nor the field
@@ -14,7 +14,7 @@ use crate::{
     fee_statement::FeeStatement,
     transaction::{ReplayProtector, UserTxnLimitsRequest},
 };
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 use move_value_view_derive::MoveValueView;
 use serde::Serialize;
 
@@ -78,3 +78,38 @@ pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
 pub const ENONCE_ALREADY_USED: u64 = 1012;
 // Transaction expiration time is too far in the future.
 pub const ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
+
+/// The module the transaction prologue and epilogue live in.
+pub fn transaction_validation_module_id() -> ModuleId {
+    ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_validation").to_owned(),
+    )
+}
+
+/// The module that checks the staking behind a request for raised limits.
+pub fn transaction_limits_module_id() -> ModuleId {
+    ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_limits").to_owned(),
+    )
+}
+
+/// Abort codes `transaction_limits.move` raises from the prologue, which the
+/// VM translates into specific validation statuses.
+// No stake pool exists at the specified address.
+pub const ESTAKE_POOL_NOT_FOUND: u64 = 1;
+// Fee payer is not the owner of the specified stake pool.
+pub const ENOT_STAKE_POOL_OWNER: u64 = 2;
+// Fee payer is not the delegated voter of the specified stake pool.
+pub const ENOT_DELEGATED_VOTER: u64 = 3;
+// No delegation pool exists at the specified address.
+pub const EDELEGATION_POOL_NOT_FOUND: u64 = 4;
+// Committed stake is insufficient for the requested multiplier tier.
+pub const EINSUFFICIENT_STAKE: u64 = 5;
+// Multiplier is not in the allowed range.
+pub const EINVALID_MULTIPLIER: u64 = 7;
+// Requested multiplier is not available in any configured tier.
+pub const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
+// Stake pool is not in the current-epoch validator set.
+pub const EPOOL_NOT_IN_VALIDATOR_SET: u64 = 9;

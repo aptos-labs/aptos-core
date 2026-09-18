@@ -68,12 +68,7 @@ impl TransactionMetadata {
             && ApprovedExecutionHashes::fetch_config(resolver)
                 .ok()
                 .flatten()
-                .is_some_and(|approved| {
-                    approved
-                        .entries
-                        .iter()
-                        .any(|(_, hash)| hash == &script_hash)
-                });
+                .is_some_and(|approved| approved.contains_script_hash(&script_hash));
 
         let extra_config = txn.extra_config();
         let txn_limits_request = extra_config.txn_limits_request();
