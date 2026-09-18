@@ -1,0 +1,120 @@
+name: "Targeted Unit Tests"
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      only_docs_changed:
+        description: "Whether only docs/packer/dashboard files changed (skip unit tests if true)"
+        required: true
+        type: string
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Compile affected packages once into a nextest archive.
+  build-unit-test-archive:
+    if: inputs.only_docs_changed != 'true'
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    outputs:
+      skip_tests: ${{ steps.archive.outputs.skip_tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Run dev_setup.sh
+        run: scripts/dev_setup.sh -b -p -r -y -P -t
+
+      - name: Output the changed files
+        run: cargo x changed-files -vvv
+        shell: bash
+
+      - name: Output the affected packages
+        run: cargo x affected-packages -vvv
+        shell: bash
+
+      # Do not use `cargo x` here: the `x` alias is PR-controlled (.cargo/config.toml)
+      # and would inherit this step's GITHUB_OUTPUT. Invoke aptos-cargo-cli directly
+      # with GITHUB_OUTPUT unset; bash records skip_tests after cargo exits.
+      - name: Set skip_tests
+        id: archive
+        run: |
+          set -euo pipefail
+          output="$(env -u GITHUB_OUTPUT cargo run --locked --package aptos-cargo-cli --bin aptos-cargo-cli -- targeted-unit-tests -vvv --dry-run 2>&1)"
+          printf '%s\n' "$output"
+          if printf '%s\n' "$output" | grep -Fq 'Skipping targeted unit tests because no test packages were affected'; then
+            echo "skip_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_tests=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Archive targeted unit tests
+        if: steps.archive.outputs.skip_tests != 'true'
+        run: |
+          set -euo pipefail
+          env -u GITHUB_OUTPUT cargo run --locked --package aptos-cargo-cli --bin aptos-cargo-cli -- targeted-unit-tests -vvv \
+            --profile ci \
+            --cargo-profile ci \
+            --locked \
+            --archive-file unit-test-archive.tar.zst
+          test -f unit-test-archive.tar.zst
+        shell: bash
+
+      - name: Save unit test archive
+        if: steps.archive.outputs.skip_tests != 'true'
+        uses: runs-on/cache/save@a5f51d6f3fece787d03b7b4e981c82538a0654ed # pin@v4
+        with:
+          path: unit-test-archive.tar.zst
+          key: unit-test-archive-${{ github.run_id }}
+
+  # Run the archive in parallel partitions. Required-check name is the shim in lint-test.yaml.
+  rust-targeted-unit-test-shards:
+    needs: build-unit-test-archive
+    if: inputs.only_docs_changed != 'true' && needs.build-unit-test-archive.outputs.skip_tests != 'true'
+    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Run postgres database
+        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+        shell: bash
+
+      - name: Restore unit test archive
+        uses: runs-on/cache/restore@a5f51d6f3fece787d03b7b4e981c82538a0654ed # pin@v4
+        with:
+          path: unit-test-archive.tar.zst
+          key: unit-test-archive-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - name: Run targeted unit tests partition ${{ matrix.partition }}/8
+        run: |
+          cargo nextest run \
+            --archive-file unit-test-archive.tar.zst \
+            --workspace-remap . \
+            --profile ci \
+            --retries 3 \
+            --no-fail-fast \
+            --no-tests=warn \
+            --partition count:${{ matrix.partition }}/8
+        shell: bash
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUST_MIN_STACK: "4297152"
+          MVP_TEST_ON_CI: "true"
+          Z3_EXE: /home/runner/bin/z3
+          CVC5_EXE: /home/runner/bin/cvc5
+          DOTNET_ROOT: /home/runner/.dotnet
+          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
