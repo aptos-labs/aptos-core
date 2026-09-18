@@ -8,7 +8,12 @@ use mono_move_core::{
     storage::resource_provider::{InMemoryStorageKey, ResourceProvider, ResourceProviderError},
 };
 use mono_move_global_context::ExecutionGuard;
-use move_core_types::language_storage::{StructTag, TypeTag};
+use move_core_types::{
+    account_address::AccountAddress,
+    language_storage::{StructTag, TypeTag},
+    move_resource::MoveStructType,
+};
+use serde::de::DeserializeOwned;
 use std::collections::{BTreeMap, HashMap};
 
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
@@ -29,22 +34,50 @@ pub trait AptosDataProvider: ResourceProvider {
     ) -> Result<Option<Bytes>, ResourceProviderError>;
 }
 
+/// The key of the resource `tag` at `address`.
+//
+// TODO(perf): the type is interned on every call; intern it once.
+fn resource_key(
+    guard: &ExecutionGuard<'_>,
+    address: AccountAddress,
+    tag: StructTag,
+) -> Result<InMemoryStorageKey, ResourceProviderError> {
+    let ty = intern_type_tag(&TypeTag::Struct(Box::new(tag)), guard)
+        .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:#}")))?;
+    Ok(InMemoryStorageKey::resource(address, ty))
+}
+
 /// Reads the on-chain config `T` as execution would see it.
 //
 // TODO(perf): the value goes through BCS; decode the flat value directly.
-// TODO(perf): the config's type is interned on every call; intern it once.
 pub(crate) fn read_config<T: OnChainConfig>(
     guard: &ExecutionGuard<'_>,
     provider: &dyn AptosDataProvider,
 ) -> Result<Option<T>, ResourceProviderError> {
-    let ty = intern_type_tag(&TypeTag::Struct(Box::new(T::struct_tag())), guard)
-        .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:#}")))?;
-    let key = InMemoryStorageKey::resource(*T::address(), ty);
+    let key = resource_key(guard, *T::address(), T::struct_tag())?;
     provider
         .resource_bytes(&key)?
         .map(|bytes| {
             T::deserialize_into_config(&bytes)
                 .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:#}")))
+        })
+        .transpose()
+}
+
+/// Reads the resource `T` at `address` as execution would see it.
+//
+// TODO(perf): the value goes through BCS; decode the flat value directly.
+pub(crate) fn read_resource<T: MoveStructType + DeserializeOwned>(
+    guard: &ExecutionGuard<'_>,
+    provider: &dyn AptosDataProvider,
+    address: AccountAddress,
+) -> Result<Option<T>, ResourceProviderError> {
+    let key = resource_key(guard, address, T::struct_tag())?;
+    provider
+        .resource_bytes(&key)?
+        .map(|bytes| {
+            bcs::from_bytes(&bytes)
+                .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))
         })
         .transpose()
 }

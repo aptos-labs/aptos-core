@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_keyless_validation::KeylessValidationError;
 use aptos_types::{
     error::{split_canonical, OUT_OF_RANGE},
     transaction::validation::ECANT_PAY_GAS_DEPOSIT,
@@ -38,6 +39,8 @@ impl MaterializationError {
 pub enum DiscardReason {
     /// The transaction's signature did not verify.
     InvalidSignature,
+    /// A keyless authenticator did not validate.
+    KeylessValidationFailure(KeylessValidationError),
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
     /// A payload or feature that no VM supports anymore.
