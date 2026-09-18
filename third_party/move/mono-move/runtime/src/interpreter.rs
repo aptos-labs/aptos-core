@@ -155,6 +155,23 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
     unsafe { stack.as_ptr().add(FRAME_METADATA_SIZE) }
 }
 
+/// A fresh interpreter stack. Its contents are unspecified and must be written
+/// before they are read.
+///
+/// Release builds zero the region, so a slot read before it is written holds a
+/// defined value instead of an undefined one. A worker allocates one stack and
+/// reuses it, so the zeroing costs nothing per transaction. Debug builds poison
+/// and Miri gets genuinely uninitialized memory, so both still catch a read
+/// before write.
+fn new_stack_region() -> MemoryRegion {
+    if cfg!(miri) {
+        return MemoryRegion::new_uninit(DEFAULT_STACK_SIZE);
+    }
+    let mut region = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
+    region.recycle();
+    region
+}
+
 /// The function pointer saved in the metadata below the frame at `fp`: that
 /// frame's caller, or null for the root frame.
 ///
@@ -436,9 +453,32 @@ impl<'guard> InterpreterContext<'guard> {
         natives: &'guard ProductionNativeRegistry,
         options: InterpreterOptions,
     ) -> Self {
-        let stack = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
+        // INVARIANT: a call zeroes the non-parameter slots of every frame that
+        // holds heap pointers, so a reused region never exposes a stale byte as
+        // a pointer. Frames without pointer slots are not zeroed and keep the
+        // previous transaction's bytes; the specializer is what guarantees
+        // those slots are written before they are read.
+        //
+        // INVARIANT: the root frame's metadata sits below every frame, so no
+        // call writes it. It is written explicitly below.
+        let stack = loader
+            .guard()
+            .take_scratch_region()
+            .unwrap_or_else(new_stack_region);
+        debug_assert_eq!(stack.len(), DEFAULT_STACK_SIZE);
+
+        // Built before the metadata writes below: it asserts the region is
+        // large enough to hold them.
+        let registers = VMRegisters::idle(&stack);
         let base = stack.as_ptr();
 
+        // Root frame metadata. The GC walks the stack through saved metadata
+        // and stops at a null `saved_func_ptr`. A reused region holds the
+        // previous transaction's pointer here, which would send the walk past
+        // the root frame.
+        //
+        // SAFETY: `base` starts a region of at least `FRAME_METADATA_SIZE`
+        // bytes.
         unsafe {
             write_u64(base, META_SAVED_PC_OFFSET, 0);
             write_u64(base, META_SAVED_FP_OFFSET, 0);
@@ -452,7 +492,7 @@ impl<'guard> InterpreterContext<'guard> {
             natives,
             extensions: NativeExtensions::new(),
             resource_provider,
-            registers: VMRegisters::idle(&stack),
+            registers,
             stack,
             heap: Heap::new(options.heap_size),
             root_pool: RootPool::new(),
@@ -606,6 +646,8 @@ impl<'guard> InterpreterContext<'guard> {
     /// types are not: the effects do not borrow the guard, so the caller must
     /// keep the global arena alive until the effects are dropped.
     pub fn finish(self) -> SessionEffects {
+        self.loader.guard().return_scratch_region(self.stack);
+
         SessionEffects {
             read_write_set: self.read_write_set,
             extensions: self.extensions,
@@ -667,6 +709,11 @@ impl<'guard> InterpreterContext<'guard> {
         self.rng = StdRng::seed_from_u64(0);
     }
 
+    // INVARIANT: the readers below require a root call that ran to completion,
+    // and read the slot as the type that call returned. Before such a call the
+    // root slots hold the previous transaction's bytes on a reused stack, and a
+    // pointer slot points into a heap that is already gone.
+
     /// Read a u64 from the root frame's slot 0 (where the result lands).
     pub fn root_result_u64_for_test(&self) -> u64 {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
@@ -680,8 +727,8 @@ impl<'guard> InterpreterContext<'guard> {
     /// BCS-serializes the value a successfully completed root call returned.
     /// Call only after a successful run, with `ty` that call's return type;
     /// the result lives at the start of the root frame's shared
-    /// parameter/return region.
-    pub fn serialize_root_result(&self, ty: InternedType) -> VMResult<Vec<u8>> {
+    /// parameter/return region. For tests.
+    pub fn serialize_root_result_for_test(&self, ty: InternedType) -> VMResult<Vec<u8>> {
         // SAFETY: the caller guarantees a completed call whose return value
         // of type `ty` sits at the region start; the context's heap still
         // owns every reachable object, and the guard outlives the context.

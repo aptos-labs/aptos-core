@@ -3,7 +3,7 @@
 
 //! Integration tests for [`GlobalArenaPool`] and [`GlobalArenaPtr`].
 
-use mono_move_alloc::GlobalArenaPool;
+use mono_move_alloc::{GlobalArenaPool, MemoryRegion};
 
 #[test]
 fn test_alloc() {
@@ -42,6 +42,32 @@ fn test_num_arenas() {
 fn test_default() {
     let pool = GlobalArenaPool::default();
     assert!(pool.num_arenas() >= 1);
+}
+
+#[test]
+fn test_scratch_region_parking() {
+    let pool = GlobalArenaPool::default();
+    let arena = pool.lock_arena(0);
+
+    assert!(arena.take_scratch_region().is_none());
+
+    let region = MemoryRegion::new_uninit(1024);
+    let ptr = region.as_ptr();
+    arena.return_scratch_region(region);
+
+    // Miri opts out of reuse so it can still catch reads of uninitialized
+    // memory, and always hands out a fresh region.
+    if cfg!(miri) {
+        assert!(arena.take_scratch_region().is_none());
+        return;
+    }
+
+    let taken = arena.take_scratch_region().expect("a region was parked");
+    assert_eq!(taken.as_ptr(), ptr);
+    assert_eq!(taken.len(), 1024);
+
+    // Only one region is parked, and it is out.
+    assert!(arena.take_scratch_region().is_none());
 }
 
 #[test]

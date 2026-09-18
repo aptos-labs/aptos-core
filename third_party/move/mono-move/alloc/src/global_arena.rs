@@ -1,10 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::MemoryRegion;
 use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
 use parking_lot::{Mutex, MutexGuard};
 use std::{
+    cell::Cell,
     hash::{Hash, Hasher},
     ptr::NonNull,
 };
@@ -106,12 +108,28 @@ impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
     }
 }
 
+/// The memory one worker holds exclusively: its bump arena, plus a scratch
+/// region parked between executions.
+struct ArenaSlot {
+    bump: Bump,
+    scratch: Cell<Option<MemoryRegion>>,
+}
+
+impl ArenaSlot {
+    fn with_capacity(arena_capacity: usize) -> Self {
+        Self {
+            bump: Bump::with_capacity(arena_capacity),
+            scratch: Cell::new(None),
+        }
+    }
+}
+
 /// A pool of bump arenas that never deallocate individual items. Each arena
 /// from the pool can be acquired by the running thread to obtain an exclusive
 /// access.
 pub struct GlobalArenaPool {
     // Note: use cache-padded to avoid false sharing.
-    arenas: Box<[CachePadded<Mutex<Bump>>]>,
+    arenas: Box<[CachePadded<Mutex<ArenaSlot>>]>,
 }
 
 impl GlobalArenaPool {
@@ -131,7 +149,7 @@ impl GlobalArenaPool {
         let num_arenas = num_arenas.max(1);
 
         let arenas = (0..num_arenas)
-            .map(|_| CachePadded::new(Mutex::new(Bump::with_capacity(arena_capacity))))
+            .map(|_| CachePadded::new(Mutex::new(ArenaSlot::with_capacity(arena_capacity))))
             .collect();
         Self { arenas }
     }
@@ -174,7 +192,7 @@ impl GlobalArenaPool {
     /// Panics if the index is out of bounds.
     pub fn allocated_bytes(&self, idx: usize) -> usize {
         assert!(idx < self.num_arenas());
-        self.arenas[idx].lock().allocated_bytes()
+        self.arenas[idx].lock().bump.allocated_bytes()
     }
 
     /// Resets all arenas in the pool, making **all** allocations invalid.
@@ -185,7 +203,7 @@ impl GlobalArenaPool {
     /// data allocated in the arena that is about to be cleared.
     pub unsafe fn reset_all_arenas_unchecked(&mut self) {
         for arena in self.arenas.iter_mut() {
-            arena.get_mut().reset();
+            arena.get_mut().bump.reset();
         }
     }
 }
@@ -198,7 +216,7 @@ impl Default for GlobalArenaPool {
 
 /// A bump allocator borrowed from [`GlobalArenaPool`].
 pub struct GlobalArenaShard<'pool> {
-    guard: MutexGuard<'pool, Bump>,
+    guard: MutexGuard<'pool, ArenaSlot>,
 }
 
 impl<'pool> GlobalArenaShard<'pool> {
@@ -208,7 +226,7 @@ impl<'pool> GlobalArenaShard<'pool> {
     ///
     /// Panics if reserving space for the value fails.
     pub fn alloc<T>(&self, value: T) -> GlobalArenaPtr<T> {
-        GlobalArenaPtr(NonNull::from(self.guard.alloc(value)))
+        GlobalArenaPtr(NonNull::from(self.guard.bump.alloc(value)))
     }
 
     /// Allocates a string in the arena, returning a raw pointer to it.
@@ -217,7 +235,7 @@ impl<'pool> GlobalArenaShard<'pool> {
     ///
     /// Panics if reserving space for the string fails.
     pub fn alloc_str(&self, s: &str) -> GlobalArenaPtr<str> {
-        GlobalArenaPtr(NonNull::from(self.guard.alloc_str(s)))
+        GlobalArenaPtr(NonNull::from(self.guard.bump.alloc_str(s)))
     }
 
     /// Allocates a slice by copying from the source, returning a raw pointer.
@@ -226,6 +244,37 @@ impl<'pool> GlobalArenaShard<'pool> {
     ///
     /// Panics if reserving space for the slice fails.
     pub fn alloc_slice_copy<T: Copy>(&self, src: &[T]) -> GlobalArenaPtr<[T]> {
-        GlobalArenaPtr(NonNull::from(self.guard.alloc_slice_copy(src)))
+        GlobalArenaPtr(NonNull::from(self.guard.bump.alloc_slice_copy(src)))
+    }
+
+    /// Takes this arena's parked scratch region, or [`None`] if there is none
+    /// parked.
+    ///
+    /// The region is not zeroed: it holds whatever the previous owner left
+    /// behind, so the caller must write every byte before reading it.
+    pub fn take_scratch_region(&self) -> Option<MemoryRegion> {
+        // Reuse hides read-before-write bugs from Miri, since a recycled
+        // region is ordinary initialized memory rather than uninitialized.
+        // Hand out a fresh allocation instead so Miri still catches them.
+        if cfg!(miri) {
+            return None;
+        }
+
+        let mut region = self.guard.scratch.take()?;
+        region.recycle();
+        Some(region)
+    }
+
+    /// Parks a region on this arena for its next user. Keeps one region; a
+    /// surplus region (the caller allocated its own because none was parked)
+    /// is dropped here.
+    ///
+    /// INVARIANT: every user of an arena's scratch region agrees on its size.
+    /// The region is parked and handed out as is, with no size check.
+    pub fn return_scratch_region(&self, region: MemoryRegion) {
+        if cfg!(miri) {
+            return;
+        }
+        self.guard.scratch.set(Some(region));
     }
 }

@@ -47,17 +47,65 @@ KEY_COLUMNS = 2
 CALIBRATED_METRICS = ["total", "execution", "inner_block_executor", "output_bytes_per_txn"]
 
 
+# Expected range of `n` samples drawn from a normal distribution, in standard
+# deviations. An observed range divided by this estimates the deviation behind
+# it, which is what a band needs: the range a run set happens to cover grows
+# with the number of runs, the deviation it is drawn from does not. Past the
+# table the value keeps creeping up, so clamping there underestimates it,
+# overestimates the deviation, and widens the band. That is the safe direction.
+RANGE_OVER_DEVIATION = {
+    2: 1.128,
+    3: 1.693,
+    4: 2.059,
+    5: 2.326,
+    6: 2.534,
+    7: 2.704,
+    8: 2.847,
+    9: 2.970,
+    10: 3.078,
+    11: 3.173,
+    12: 3.258,
+    13: 3.336,
+    14: 3.407,
+    15: 3.472,
+    16: 3.532,
+    17: 3.588,
+    18: 3.640,
+    19: 3.689,
+    20: 3.735,
+    21: 3.778,
+    22: 3.819,
+    23: 3.858,
+    24: 3.895,
+    25: 3.931,
+}
+
+# How many estimated deviations a speedup may sit from the calibrated one before
+# it counts as changed.
+BAND_DEVIATIONS = 3.0
+
+# Floor under the band, as a fraction of the calibrated speedup. Without it a
+# workload whose runs happened to agree closely gets a band narrower than the
+# next run's noise, and a metric that is identical every run (any
+# `output_bytes_per_txn` row) gets no band at all. Has to sit above the
+# self-compare deviation measured on the runner.
+BAND_FLOOR = 0.03
+
+
 def speedup_band(median_speedup, num_samples, lowest_over_median, highest_over_median):
     """Band a new speedup must fall in to count as unchanged.
 
-    Widens the observed spread by a factor that shrinks as samples accumulate, so
-    a thinly sampled workload gets a forgiving band.
+    Estimates the run-to-run deviation from the observed range and allows
+    [`BAND_DEVIATIONS`] of it either side of the calibrated speedup. The band
+    converges on the real noise rather than tightening indefinitely, so more
+    samples make it accurate rather than narrow.
     """
-    widen = 1 + 10.0 / num_samples
-    slack = 1.0 / num_samples
-    low = median_speedup * (1 - (1 - lowest_over_median) * widen - slack)
-    high = median_speedup * (1 + (highest_over_median - 1) * widen + slack)
-    return low, high
+    samples = min(max(num_samples, 2), max(RANGE_OVER_DEVIATION))
+    deviation = (highest_over_median - lowest_over_median) / RANGE_OVER_DEVIATION[
+        samples
+    ]
+    margin = BAND_DEVIATIONS * deviation + BAND_FLOOR
+    return median_speedup * (1 - margin), median_speedup * (1 + margin)
 
 
 def load_calibration(path=TSV_PATH):

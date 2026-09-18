@@ -449,8 +449,7 @@ mod tests {
     // backing to get `MAX_ALIGN`.
     //
     // TODO(cleanup, testing): allocate through `MemoryRegion`, which is
-    // `MAX_ALIGN`-aligned by construction; it lives in `mono-move-runtime`,
-    // which this crate cannot depend on.
+    // `MAX_ALIGN`-aligned by construction.
     const _: () = assert!(
         core::mem::align_of::<u64>() >= MAX_ALIGN,
         "u64 no longer covers MAX_ALIGN"
