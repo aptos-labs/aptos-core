@@ -33,6 +33,7 @@ pub mod init;
 pub mod mem;
 pub mod multi_ed25519;
 pub mod object;
+pub mod randomness;
 pub mod ristretto255_point;
 pub mod ristretto255_scalar;
 pub mod secp256k1;
@@ -74,6 +75,7 @@ pub use multi_ed25519::make_all_multi_ed25519_natives;
 #[cfg(feature = "testing")]
 pub use multi_ed25519::make_all_multi_ed25519_test_natives;
 pub use object::{make_all_object_natives, ObjectContextExtension};
+pub use randomness::{make_all_randomness_natives, RandomnessContext};
 pub use ristretto255_point::{make_all_ristretto255_point_natives, RistrettoPointStore};
 pub use ristretto255_scalar::make_all_ristretto255_scalar_natives;
 #[cfg(feature = "testing")]
@@ -106,6 +108,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_aggregator_v2_natives::<F>());
     natives.extend(make_all_transaction_context_natives::<F>());
     natives.extend(make_all_object_natives::<F>());
+    natives.extend(make_all_randomness_natives::<F>());
     natives.extend(make_all_state_storage_natives::<F>());
     natives.extend(make_all_event_natives::<F>());
     natives.extend(make_all_hash_natives::<F>());
