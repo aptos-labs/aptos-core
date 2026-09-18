@@ -18,7 +18,8 @@ use aptos_types::{
     chain_id::ChainId,
     keyless::{Configuration, Groth16VerificationKey, KeylessOnchainConfig},
     on_chain_config::{
-        ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
+        ApprovedExecutionHashes, ConfigurationResource, Features, OnChainConfig, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     state_store::StateView,
 };
@@ -107,6 +108,12 @@ impl AptosEnvironment {
         self.0.keyless_configuration.as_ref()
     }
 
+    /// Returns the script hashes governance has approved for execution.
+    #[inline]
+    pub fn approved_execution_hashes(&self) -> Option<&ApprovedExecutionHashes> {
+        self.0.approved_execution_hashes.as_ref()
+    }
+
     /// Returns the [VMConfig] used by this environment.
     #[inline]
     pub fn vm_config(&self) -> &VMConfig {
@@ -189,6 +196,11 @@ struct Environment {
     keyless_pvk: OnceLock<Option<PreparedVerifyingKey<Bn254>>>,
     /// Some keyless configurations which are not frequently updated.
     keyless_configuration: Option<Configuration>,
+
+    /// The script hashes governance has approved for execution. Deliberately
+    /// left out of `hash`: it selects a transaction's size and limits
+    /// allowance, and changes nothing about how code loads or is charged.
+    approved_execution_hashes: Option<ApprovedExecutionHashes>,
 
     /// Gas feature version used in this environment.
     gas_feature_version: u64,
@@ -307,6 +319,11 @@ impl Environment {
                 config
             });
 
+        let approved_execution_hashes = ApprovedExecutionHashes::fetch_config_and_bytes(state_view)
+            .ok()
+            .flatten()
+            .map(|(config, _bytes)| config);
+
         let hash = sha3_256.finalize().into();
 
         #[allow(deprecated)]
@@ -317,6 +334,7 @@ impl Environment {
             keyless_vk,
             keyless_pvk,
             keyless_configuration,
+            approved_execution_hashes,
             gas_feature_version,
             gas_params,
             storage_gas_params,

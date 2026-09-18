@@ -59,7 +59,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ======================== Pre-execution checks ========================
         // Reject what this executor cannot execute, before touching any state.
-        let txn_data = TxnMetadata::new(txn, aux_info);
+        let txn_data = TxnMetadata::new(txn, aux_info, self.env.approved_execution_hashes());
         let gas_params = self.env.gas_params().as_ref().map_err(|e| {
             DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
         })?;

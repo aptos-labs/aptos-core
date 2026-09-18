@@ -18,6 +18,11 @@ use aptos_gas_schedule::{
     AptosGasParameters, TransactionGasParameters, VMGasParameters,
 };
 
+/// The range a requested limits multiplier must fall in, in percent, where 100
+/// is 1x. Must match the Move constants in `0x1::transaction_limits`.
+const MIN_MULTIPLIER_PERCENT: u64 = 100;
+const MAX_MULTIPLIER_PERCENT: u64 = 10_000;
+
 pub(crate) struct PreExecutionChecker<'a> {
     gas_params: &'a AptosGasParameters,
     gas_feature_version: u64,
@@ -38,6 +43,7 @@ impl<'a> PreExecutionChecker<'a> {
     }
 
     pub fn run_checks(&self) -> Result<(), PreExecutionCheckFailure> {
+        self.check_limits_multipliers()?;
         self.check_transaction_size()?;
         self.check_gas_price_bounds()?;
         self.check_gas_budget_upper_bound()?;
@@ -79,11 +85,40 @@ impl<'a> PreExecutionChecker<'a> {
         }
     }
 
-    /// Checks if the transaction size is within the allowed maximum.
-    // TODO(completeness): approved governance scripts get a larger size
-    // allowance (`max_transaction_size_in_bytes_gov`); revisit with scripts.
+    /// A requested multiplier must raise the limits without overflowing them,
+    /// so the gas meter never runs with a nonsensical bound. Whether the
+    /// request is backed by enough stake is the prologue's call. An approved
+    /// governance script already has raised limits and may not ask for more.
+    fn check_limits_multipliers(&self) -> Result<(), PreExecutionCheckFailure> {
+        let Some(request) = &self.txn_data.txn_limits_request else {
+            return Ok(());
+        };
+        if self.txn_data.is_approved_gov_script {
+            return Err(PreExecutionCheckFailure::LimitsRequestOnGovernanceScript);
+        }
+        let multipliers = request.multipliers();
+        let raises_within_cap =
+            |percent: u64| MIN_MULTIPLIER_PERCENT < percent && percent <= MAX_MULTIPLIER_PERCENT;
+        if !raises_within_cap(multipliers.execution_multiplier_percent())
+            || !raises_within_cap(multipliers.io_multiplier_percent())
+        {
+            return Err(PreExecutionCheckFailure::InvalidLimitsMultiplier {
+                min: MIN_MULTIPLIER_PERCENT,
+                max: MAX_MULTIPLIER_PERCENT,
+            });
+        }
+        Ok(())
+    }
+
+    /// Checks if the transaction size is within the allowed maximum. A script
+    /// governance approved gets a larger allowance.
     fn check_transaction_size(&self) -> Result<(), PreExecutionCheckFailure> {
-        let max = self.txn_gas_params().max_transaction_size_in_bytes;
+        let params = self.txn_gas_params();
+        let max = if self.txn_data.is_approved_gov_script {
+            params.max_transaction_size_in_bytes_gov
+        } else {
+            params.max_transaction_size_in_bytes
+        };
         if self.txn_size() > max {
             return Err(PreExecutionCheckFailure::TransactionTooLarge {
                 size: self.txn_size().into(),
@@ -112,8 +147,17 @@ impl<'a> PreExecutionChecker<'a> {
                 });
             }
         }
-        // TODO(completeness): the staking high-limit minimum price, once
-        // transaction-limits requests are supported.
+        // Raised limits are priced higher, so that the extra block capacity
+        // they claim is paid for.
+        if self.txn_data.txn_limits_request.is_some() {
+            let high_limit_min = self.txn_gas_params().high_limit_txn_min_price_per_gas_unit;
+            if self.gas_price() < high_limit_min {
+                return Err(PreExecutionCheckFailure::HighLimitGasPriceBelowMinimum {
+                    price: self.gas_price().into(),
+                    min: high_limit_min.into(),
+                });
+            }
+        }
         let max = self.txn_gas_params().max_price_per_gas_unit;
         if self.gas_price() > max {
             return Err(PreExecutionCheckFailure::GasPriceAboveMaximum {

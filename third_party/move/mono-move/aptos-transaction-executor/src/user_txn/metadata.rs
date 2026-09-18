@@ -1,10 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::transaction::{
-    authenticator::AnySignature,
-    user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+use aptos_types::{
+    on_chain_config::ApprovedExecutionHashes,
+    transaction::{
+        authenticator::AnySignature,
+        user_transaction_context::{TransactionIndexKind, UserTransactionContext},
+        AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction, UserTxnLimitsRequest,
+    },
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -18,6 +21,12 @@ pub(crate) struct TxnMetadata {
     pub secondary_auth_keys: Vec<Option<Vec<u8>>>,
     pub gas_unit_price: u64,
     pub max_gas_amount: u64,
+    /// A request for higher execution and IO limits. The prologue checks the
+    /// staking that backs it.
+    pub txn_limits_request: Option<UserTxnLimitsRequest>,
+    /// Whether this is a script governance has approved, which raises its
+    /// limits and its size allowance without any staking behind it.
+    pub is_approved_gov_script: bool,
     /// Size of the full signed transaction.
     pub transaction_size: u64,
     /// Whether any signer authenticates with a keyless signature (a gas
@@ -45,9 +54,22 @@ pub(crate) struct TxnMetadata {
 }
 
 impl TxnMetadata {
-    pub fn new(txn: &SignedTransaction, aux_info: &AuxiliaryInfo) -> Self {
+    pub fn new(
+        txn: &SignedTransaction,
+        aux_info: &AuxiliaryInfo,
+        approved_gov_scripts: Option<&ApprovedExecutionHashes>,
+    ) -> Self {
         let transaction_index_kind = aux_info.transaction_index_kind();
         let script_hash = txn.payload().script_hash();
+        // The hash is empty for everything but a script, so an entry function
+        // can never match one.
+        let is_approved_gov_script = !script_hash.is_empty()
+            && approved_gov_scripts.is_some_and(|approved| {
+                approved
+                    .entries
+                    .iter()
+                    .any(|(_, approved_hash)| approved_hash == &script_hash)
+            });
         let session_id = SessionId::txn(
             txn.sender(),
             txn.replay_protector(),
@@ -55,6 +77,7 @@ impl TxnMetadata {
             txn.expiration_timestamp_secs(),
         );
         let authenticator = txn.authenticator_ref();
+        let extra_config = txn.payload().extra_config();
         Self {
             sender: txn.sender(),
             fee_payer: authenticator.fee_payer_address(),
@@ -73,6 +96,8 @@ impl TxnMetadata {
                 .collect(),
             gas_unit_price: txn.gas_unit_price(),
             max_gas_amount: txn.max_gas_amount(),
+            txn_limits_request: extra_config.txn_limits_request().cloned(),
+            is_approved_gov_script,
             transaction_size: txn.txn_bytes_len() as u64,
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|auths| !auths.is_empty())
