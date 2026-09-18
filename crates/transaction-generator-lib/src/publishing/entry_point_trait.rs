@@ -113,10 +113,10 @@ pub fn get_payload(
     func: Identifier,
     args: Vec<Vec<u8>>,
 ) -> TransactionPayload {
-    get_payload_ty(module_id, func, vec![], args)
+    get_payload_with_ty_args(module_id, func, vec![], args)
 }
 
-pub fn get_payload_ty(
+pub fn get_payload_with_ty_args(
     module_id: ModuleId,
     func: Identifier,
     ty_args: Vec<TypeTag>,
