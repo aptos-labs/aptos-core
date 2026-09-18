@@ -279,10 +279,11 @@ NUM_ACCOUNTS = max(NUM_INIT_ACCOUNTS, (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE)
 
 
 class CommandFailed(Exception):
-    def __init__(self, returncode, output, reason=None):
+    def __init__(self, returncode, output, reason=None, hung=False):
         super().__init__(reason or f"exit code {returncode}: {panic_reason(output)}")
         self.returncode = returncode
         self.output = output
+        self.hung = hung
 
 
 def panic_reason(output):
@@ -346,6 +347,7 @@ def execute_command(command):
             p.returncode,
             output,
             f"printed nothing for {SILENCE_TIMEOUT_SECS}s, killed as hung",
+            hung=True,
         )
     if p.returncode != 0:
         if HIDE_OUTPUT:
@@ -909,6 +911,32 @@ def build_report(selected, results, failures):
     return "\n".join(parts) + "\n"
 
 
+def run_workload_with_retry(workload, db_dir, tmpdir, calibration):
+    """Run a workload, retrying once if the first attempt hangs.
+
+    Opening a workload's copy of the warmup DB sometimes stalls and never
+    recovers. With one copy per workload the suite hits that often enough to
+    lose a run to it. A hang says nothing about the workload, unlike a panic or
+    an assert, so it is the one failure worth a second attempt.
+    """
+    try:
+        return run_workload(workload, db_dir, tmpdir, calibration)
+    except CommandFailed as e:
+        if not e.hung:
+            raise
+        print(f"Workload {workload.name} hung, retrying once: {e}")
+
+    # The killed attempt leaves a partial copy and possibly a truncated blocks
+    # file, and a replay checks the recording's header against what it is
+    # handed. Start the second attempt from nothing.
+    blocks, *dirs = workload_dirs(workload, tmpdir)
+    for path in dirs:
+        shutil.rmtree(path, ignore_errors=True)
+    if os.path.exists(blocks):
+        os.remove(blocks)
+    return run_workload(workload, db_dir, tmpdir, calibration)
+
+
 def main():
     selected = WORKLOADS
     if ONLY_WORKLOADS:
@@ -931,7 +959,7 @@ def main():
 
         for test_index, workload in enumerate(selected):
             try:
-                result = run_workload(workload, db_dir, tmpdir, calibration)
+                result = run_workload_with_retry(workload, db_dir, tmpdir, calibration)
             except (CommandFailed, ValueError) as e:
                 # One unsupported workload must not take down the whole job, but
                 # it is a real finding, so it still fails at the end.
