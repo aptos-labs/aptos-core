@@ -34,6 +34,7 @@ ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-block-executor = { workspace = true }
+aptos-code-validation = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-framework-natives = { workspace = true }
