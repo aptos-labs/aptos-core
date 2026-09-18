@@ -31,7 +31,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     transaction_validation,
     verifier::{
-        event_validation, native_validation, resource_groups, transaction_arg_validation,
+        framework_call_validation, native_validation, resource_groups, transaction_arg_validation,
         view_function,
     },
     VMBlockExecutor, VMValidator,
@@ -992,7 +992,7 @@ impl AptosVM {
             // Check that unstable bytecode cannot be executed on mainnet and verify events.
             let script = func.owner_as_script()?;
             self.reject_unstable_bytecode_for_script(script)?;
-            event_validation::verify_no_event_emission_in_compiled_script(script)?;
+            framework_call_validation::verify_no_restricted_functions_in_compiled_script(script)?;
 
             // Record the script's declared module dependencies as reads. These are a function of
             // the script bytecode, so recording them here keeps the read set independent of the
@@ -1856,7 +1856,7 @@ impl AptosVM {
             gas_meter,
             modules,
         )?;
-        event_validation::validate_module_events(
+        framework_call_validation::validate_module_events(
             self.features(),
             module_storage,
             traversal_context,
