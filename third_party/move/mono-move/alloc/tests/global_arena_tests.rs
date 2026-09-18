@@ -71,6 +71,33 @@ fn test_stack_region_parking() {
 }
 
 #[test]
+fn test_heap_region_parking() {
+    let pool = GlobalArenaPool::default();
+    let arena = pool.lock_arena(0);
+
+    assert!(arena.take_heap_region().is_none());
+
+    let region = MemoryRegion::new_uninit(2048);
+    let ptr = region.as_ptr();
+    arena.return_heap_region(region);
+
+    if cfg!(miri) {
+        assert!(arena.take_heap_region().is_none());
+        return;
+    }
+
+    // The two slots are independent: a parked heap is not handed out as a
+    // stack.
+    assert!(arena.take_stack_region().is_none());
+
+    let taken = arena.take_heap_region().expect("a region was parked");
+    assert_eq!(taken.as_ptr(), ptr);
+    assert_eq!(taken.len(), 2048);
+
+    assert!(arena.take_heap_region().is_none());
+}
+
+#[test]
 fn test_lock_arena_try() {
     let pool = GlobalArenaPool::with_num_arenas(2);
     let arena = pool.try_lock_arena(0);

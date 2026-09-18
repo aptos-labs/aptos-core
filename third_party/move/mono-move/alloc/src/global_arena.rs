@@ -109,7 +109,7 @@ impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
 }
 
 /// The memory one worker holds exclusively: its bump arena, plus the
-/// interpreter stack parked between executions.
+/// interpreter stack and session heap parked between executions.
 ///
 /// Each kind of parked buffer gets its own field rather than sharing one pool
 /// of interchangeable regions. A region is handed out as is, with no size
@@ -121,6 +121,9 @@ struct ArenaSlot {
     /// The interpreter's call stack, left behind by the last execution on this
     /// worker. Empty until the first execution returns one.
     stack: Cell<Option<MemoryRegion>>,
+    /// The session heap, left behind by the last execution on this worker.
+    /// Empty until the first execution returns one.
+    heap: Cell<Option<MemoryRegion>>,
 }
 
 impl ArenaSlot {
@@ -128,6 +131,7 @@ impl ArenaSlot {
         Self {
             bump: Bump::with_capacity(arena_capacity),
             stack: Cell::new(None),
+            heap: Cell::new(None),
         }
     }
 }
@@ -284,5 +288,34 @@ impl<'pool> GlobalArenaShard<'pool> {
             return;
         }
         self.guard.stack.set(Some(region));
+    }
+
+    /// Takes this arena's parked session heap, or [`None`] if there is none
+    /// parked.
+    ///
+    /// The region is not zeroed: it holds whatever the previous owner left
+    /// behind, so the caller must write every byte before reading it.
+    pub fn take_heap_region(&self) -> Option<MemoryRegion> {
+        // See `take_stack_region` for why Miri never reuses.
+        if cfg!(miri) {
+            return None;
+        }
+
+        let mut region = self.guard.heap.take()?;
+        region.recycle();
+        Some(region)
+    }
+
+    /// Parks a session heap on this arena for its next user. Keeps one region;
+    /// a surplus region (the caller allocated its own because none was parked)
+    /// is dropped here.
+    ///
+    /// INVARIANT: every user of an arena's heap region agrees on its size. The
+    /// region is parked and handed out as is, with no size check.
+    pub fn return_heap_region(&self, region: MemoryRegion) {
+        if cfg!(miri) {
+            return;
+        }
+        self.guard.heap.set(Some(region));
     }
 }

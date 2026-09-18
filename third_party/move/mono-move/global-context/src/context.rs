@@ -455,6 +455,24 @@ impl<'ctx> ExecutionGuard<'ctx> {
         self.global_arena.return_stack_region(region)
     }
 
+    /// Takes the session heap parked on this guard's arena, or [`None`] if
+    /// there is none parked.
+    ///
+    /// The region is not zeroed: it holds whatever the previous owner left
+    /// behind, so the caller must write every byte before reading it. Return
+    /// it with [`Self::return_heap_region`] when done.
+    pub fn take_heap_region(&self) -> Option<MemoryRegion> {
+        self.global_arena.take_heap_region()
+    }
+
+    /// Parks a session heap on this guard's arena for its next user.
+    ///
+    /// INVARIANT: every user of a guard's heap region agrees on its size. The
+    /// region is parked and handed out as is, with no size check.
+    pub fn return_heap_region(&self, region: MemoryRegion) {
+        self.global_arena.return_heap_region(region)
+    }
+
     /// Inserts a loaded module into the cache, keyed by its interned ID.
     ///
     /// Returns an error only if the cache detects an invariant violation
