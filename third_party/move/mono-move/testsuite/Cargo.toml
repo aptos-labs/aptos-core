@@ -47,6 +47,8 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+aptos-framework = { workspace = true, features = ["testing"] }
+aptos-vm = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
 datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }

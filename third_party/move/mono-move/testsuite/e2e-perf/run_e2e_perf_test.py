@@ -30,9 +30,12 @@ import json
 import os
 import re
 import shutil
+import signal
 import statistics
 import sys
 import tempfile
+import threading
+import time
 from dataclasses import dataclass, field
 from subprocess import Popen, PIPE, STDOUT
 
@@ -130,6 +133,78 @@ WORKLOADS = [
         description="Places orders on a single market whose buy and sell prices "
         "never overlap, so every order rests in the book.",
     ),
+    # The benches-e2e suite. Each of these publishes one application-shaped
+    # package and runs a weighted mix of its entry points, so a number here
+    # moves for the same reasons a real protocol's would.
+    Workload(
+        "clob-avl",
+        block_size=500,
+        description="Central limit order book over a bit-packed AVL queue in "
+        "table items. Mixes resting placements, matching, cancels, and "
+        "traversal, so the read set is a pointer chase of data-dependent depth.",
+    ),
+    Workload(
+        "lending-market",
+        block_size=500,
+        description="Lending protocol adjusted from Aave v3. Supply, withdraw, "
+        "borrow, repay, collateral toggles, and flash loans over eight "
+        "reserves, with u256 index accrual once per reserve per block.",
+    ),
+    Workload(
+        "clmm-swap",
+        block_size=500,
+        description="Concentrated liquidity swap in the Uniswap V3 shape. How "
+        "densely the pool initializes ticks drives how many a swap crosses, so "
+        "the read set widens from a few slots to dozens with no code change.",
+    ),
+    Workload(
+        "stableswap",
+        block_size=500,
+        description="Curve-style stableswap. The get_D and get_y Newton loops "
+        "run a data-dependent number of iterations, so per-transaction compute "
+        "cannot be constant-folded.",
+    ),
+    Workload(
+        "bridge-relay",
+        block_size=500,
+        description="LayerZero-shaped cross-chain message relay. Near-zero "
+        "compute per message, so the number measures the storage IO floor: "
+        "nonce compare, payload write, attestation.",
+    ),
+    Workload(
+        "airdrop-fanout",
+        block_size=500,
+        description="Batch token distribution to 100 recipients per "
+        "transaction. Mixes first-touch creation writes with repeat "
+        "modification writes across sharded tables and primary stores.",
+    ),
+    Workload(
+        "oracle-batch",
+        block_size=500,
+        description="Switchboard-shaped oracle update. Verifies real ed25519 "
+        "and secp256k1 signatures over batched price reports, with matched "
+        "write-only and verify-only controls that isolate the native's share.",
+    ),
+    Workload(
+        "cdp-liquidation",
+        block_size=500,
+        description="Liquity-style CDP with a doubly-linked sorted vault list "
+        "over resources. Each hop's address comes only from the previous "
+        "resource, so the walk is a chain of sequentially dependent reads.",
+    ),
+    Workload(
+        "dex-aggregator",
+        block_size=500,
+        description="Panora-shaped router over four pool backends. Routes carry "
+        "up to 32 type parameters, driving monomorphization and generic "
+        "dispatch far past anything else in the suite.",
+    ),
+    Workload(
+        "nft-mint-market",
+        block_size=500,
+        description="Token v2 mint and marketplace. Buys, listings, offers, and "
+        "fee splits over resource-group members at derived object addresses.",
+    ),
 ]
 
 
@@ -177,6 +252,13 @@ RUN_SOURCE = os.environ.get("RUN_SOURCE", default="local")
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 REPORT_PATH = os.environ.get("REPORT_PATH")
 HIDE_OUTPUT = bool(os.environ.get("HIDE_OUTPUT"))
+# How long a subprocess may print nothing before it is killed as hung. Silence,
+# not total runtime, is what separates a hang from a slow workload: the
+# benchmark logs every block and cargo logs every crate, so any of these
+# commands going quiet for half an hour has stopped making progress. Without
+# this a single stuck workload takes the job's whole six-hour budget and the
+# job ends with no report at all.
+SILENCE_TIMEOUT_SECS = int(os.environ.get("SILENCE_TIMEOUT_SECS", default=30 * 60))
 
 if BUILD not in ("release", "performance"):
     print(f"BUILD must be 'release' or 'performance', got {BUILD!r}")
@@ -197,10 +279,11 @@ NUM_ACCOUNTS = max(NUM_INIT_ACCOUNTS, (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE)
 
 
 class CommandFailed(Exception):
-    def __init__(self, returncode, output):
-        super().__init__(f"exit code {returncode}: {panic_reason(output)}")
+    def __init__(self, returncode, output, reason=None, hung=False):
+        super().__init__(reason or f"exit code {returncode}: {panic_reason(output)}")
         self.returncode = returncode
         self.output = output
+        self.hung = hung
 
 
 def panic_reason(output):
@@ -222,6 +305,9 @@ def panic_reason(output):
 def execute_command(command):
     print(f"Executing command:\n\t{command}\nand waiting for it to finish...")
     lines = []
+    last_output_at = time.monotonic()
+    hung = threading.Event()
+
     # The benchmark logs to stderr, so it is merged into stdout: draining one
     # pipe at a time would deadlock once the other filled up.
     with Popen(
@@ -232,13 +318,37 @@ def execute_command(command):
         stderr=STDOUT,
         bufsize=1,
         universal_newlines=True,
+        # Puts the shell and the benchmark it spawns in one process group.
+        # Killing the shell alone orphans the benchmark, which then holds the
+        # runner after the job that started it is gone.
+        start_new_session=True,
     ) as p:
+
+        def watchdog():
+            while p.poll() is None:
+                if time.monotonic() - last_output_at > SILENCE_TIMEOUT_SECS:
+                    hung.set()
+                    os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                    return
+                time.sleep(min(30, SILENCE_TIMEOUT_SECS / 4))
+
+        threading.Thread(target=watchdog, daemon=True).start()
         for line in p.stdout:
+            last_output_at = time.monotonic()
             if not HIDE_OUTPUT:
                 print(line, end="")
             lines.append(line)
 
     output = "".join(lines)
+    if hung.is_set():
+        if HIDE_OUTPUT:
+            print(output)
+        raise CommandFailed(
+            p.returncode,
+            output,
+            f"printed nothing for {SILENCE_TIMEOUT_SECS}s, killed as hung",
+            hung=True,
+        )
     if p.returncode != 0:
         if HIDE_OUTPUT:
             print(output)
@@ -379,6 +489,11 @@ def common_flags(workload, db_dir, checkpoint_dir):
         f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
         f"--execution-threads 1 --generate-then-execute "
+        # Several generator threads assign sequence numbers in whatever order
+        # they run, but the block keeps the order the slots were laid out in. A
+        # workload that draws the same account twice in a block then lands its
+        # transactions reversed, and the second one is discarded.
+        f"--num-generator-workers 1 "
         f"--block-size {workload.block_size} "
         f"run-executor "
         f"--data-dir {db_dir} --checkpoint-dir {checkpoint_dir}"
@@ -796,6 +911,32 @@ def build_report(selected, results, failures):
     return "\n".join(parts) + "\n"
 
 
+def run_workload_with_retry(workload, db_dir, tmpdir, calibration):
+    """Run a workload, retrying once if the first attempt hangs.
+
+    Opening a workload's copy of the warmup DB sometimes stalls and never
+    recovers. With one copy per workload the suite hits that often enough to
+    lose a run to it. A hang says nothing about the workload, unlike a panic or
+    an assert, so it is the one failure worth a second attempt.
+    """
+    try:
+        return run_workload(workload, db_dir, tmpdir, calibration)
+    except CommandFailed as e:
+        if not e.hung:
+            raise
+        print(f"Workload {workload.name} hung, retrying once: {e}")
+
+    # The killed attempt leaves a partial copy and possibly a truncated blocks
+    # file, and a replay checks the recording's header against what it is
+    # handed. Start the second attempt from nothing.
+    blocks, *dirs = workload_dirs(workload, tmpdir)
+    for path in dirs:
+        shutil.rmtree(path, ignore_errors=True)
+    if os.path.exists(blocks):
+        os.remove(blocks)
+    return run_workload(workload, db_dir, tmpdir, calibration)
+
+
 def main():
     selected = WORKLOADS
     if ONLY_WORKLOADS:
@@ -818,7 +959,7 @@ def main():
 
         for test_index, workload in enumerate(selected):
             try:
-                result = run_workload(workload, db_dir, tmpdir, calibration)
+                result = run_workload_with_retry(workload, db_dir, tmpdir, calibration)
             except (CommandFailed, ValueError) as e:
                 # One unsupported workload must not take down the whole job, but
                 # it is a real finding, so it still fails at the end.

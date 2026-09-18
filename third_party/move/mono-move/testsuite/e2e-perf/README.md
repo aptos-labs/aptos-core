@@ -31,6 +31,10 @@ so a workload that publishes modules could not be set up under it.
 The report defines its own columns, verdicts, and workloads in a collapsed block
 below the tables. This file covers the method and the calibration.
 
+Ten of the workloads come from `../benches-e2e/`, a set of Move packages shaped
+after protocols that run on mainnet. Its README covers what each one stresses
+and what a new package there has to satisfy.
+
 ## Record and replay
 
 `run-executor` takes two directories, and the record/replay flow is built out of
@@ -130,6 +134,19 @@ RUN_SOURCE=local python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_p
 | `RUNNER_NAME` | `none` | Tags the JSON lines; in CI it also picks the runner |
 | `REPORT_PATH` | unset | Write the markdown report here |
 | `HIDE_OUTPUT` | unset | Suppress the benchmark's own log lines |
+| `SILENCE_TIMEOUT_SECS` | `1800` | Kill a subprocess that has printed nothing for this long |
+
+`SILENCE_TIMEOUT_SECS` is what keeps one stuck workload from taking the job's
+whole timeout. Every command here prints as it goes — the benchmark logs each
+block, cargo logs each crate — so going quiet for half an hour means it has
+stopped. The longest silence measured across five clean runs is six minutes,
+during a single long crate compile, so the default leaves five times that.
+
+A workload killed this way is retried once, because the stall seen so far is in
+opening the workload's copy of the warmup DB and says nothing about the
+workload itself. A second hang is reported as failed and the run continues with
+the next workload. Any other failure — a panic, an abort, a discard — is a real
+finding and is never retried.
 
 ## Running in CI
 
@@ -169,7 +186,7 @@ runner type before trusting any band, and record the result here:
 | runner | date | config | largest deviation from 1.00x | largest run-to-run range |
 | --- | --- | --- | --- | --- |
 | Apple M-series laptop | 2026-09-03 | 5 blocks, 3 repeats, 20k accounts | 0.7% | 3.6% |
-| `benchmark-c3d-60` | | | _(not yet measured)_ | |
+| `benchmark-c3d-60` | 2026-09-17 | 30 blocks, 3 repeats, 2M accounts | 1.2% | 2.6% |
 
 Both numbers cover `total`, `execution`, and `inner_block_executor`. The verdict
 itself rests on the last two only. Every other stage is disk bound or takes
