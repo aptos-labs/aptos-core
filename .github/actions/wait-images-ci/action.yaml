@@ -34,6 +34,13 @@ runs:
 
     # The source code must be checkout out by the workflow that invokes this action.
     - name: Run wait-images-ci
+      env:
+        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+        GIT_SHA: ${{ inputs.GIT_SHA }}
+        PROFILE_RELEASE: ${{ inputs.PROFILE_RELEASE }}
+        PROFILE_PERF: ${{ inputs.PROFILE_PERF }}
+        FEATURE_FAILPOINTS: ${{ inputs.FEATURE_FAILPOINTS }}
+        WAIT_FOR_IMAGE_SECONDS: ${{ inputs.WAIT_FOR_IMAGE_SECONDS }}
       run: |
-        GCP_DOCKER_ARTIFACT_REPO=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }} GIT_SHA=${{ inputs.GIT_SHA }} PROFILE_RELEASE=${{ inputs.PROFILE_RELEASE }} PROFILE_PERF=${{ inputs.PROFILE_PERF }} FEATURE_FAILPOINTS=${{ inputs.FEATURE_FAILPOINTS }} ./docker/wait-images-ci.mjs --wait-for-image-seconds=${{ inputs.WAIT_FOR_IMAGE_SECONDS }}
+        ./docker/wait-images-ci.mjs --wait-for-image-seconds="$WAIT_FOR_IMAGE_SECONDS"
       shell: bash

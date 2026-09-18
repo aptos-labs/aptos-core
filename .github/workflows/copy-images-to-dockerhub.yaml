@@ -67,4 +67,5 @@ jobs:
           GIT_SHA: ${{ inputs.GIT_SHA || github.sha }} # If GIT_SHA is not provided, use the sha of the triggering branch
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           IMAGE_TAG_PREFIX: ${{ inputs.image_tag_prefix }}
-        run: ./docker/release-images.mjs --wait-for-image-seconds=3600 ${{ inputs.dry_run && '--dry-run' || '' }}
+          DRY_RUN_FLAG: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: ./docker/release-images.mjs --wait-for-image-seconds=3600 $DRY_RUN_FLAG
