@@ -3,7 +3,7 @@
 
 //! Integration tests for [`GlobalArenaPool`] and [`GlobalArenaPtr`].
 
-use mono_move_alloc::{GlobalArenaPool, MemoryRegion};
+use mono_move_alloc::{GlobalArenaPool, MemoryRegion, RegionKind};
 
 #[test]
 fn test_alloc() {
@@ -45,56 +45,45 @@ fn test_default() {
 }
 
 #[test]
-fn test_stack_region_parking() {
-    let pool = GlobalArenaPool::default();
-    let arena = pool.lock_arena(0);
+fn test_region_parking() {
+    for (kind, size) in [(RegionKind::Stack, 1024), (RegionKind::Heap, 2048)] {
+        let pool = GlobalArenaPool::default();
+        let arena = pool.lock_arena(0);
 
-    assert!(arena.take_stack_region().is_none());
+        assert!(arena.take_region(kind).is_none());
 
-    let region = MemoryRegion::new_uninit(1024);
-    let ptr = region.as_ptr();
-    arena.return_stack_region(region);
+        let region = MemoryRegion::new_uninit(size);
+        let ptr = region.as_ptr();
+        arena.return_region(kind, region);
 
-    // Miri opts out of reuse so it can still catch reads of uninitialized
-    // memory, and always hands out a fresh region.
-    if cfg!(miri) {
-        assert!(arena.take_stack_region().is_none());
-        return;
+        // Miri opts out of reuse so it can still catch reads of uninitialized
+        // memory, and always hands out a fresh region.
+        if cfg!(miri) {
+            assert!(arena.take_region(kind).is_none());
+            continue;
+        }
+
+        let taken = arena.take_region(kind).expect("a region was parked");
+        assert_eq!(taken.as_ptr(), ptr);
+        assert_eq!(taken.len(), size);
+
+        // Only one region of a kind is parked, and it is out.
+        assert!(arena.take_region(kind).is_none());
     }
-
-    let taken = arena.take_stack_region().expect("a region was parked");
-    assert_eq!(taken.as_ptr(), ptr);
-    assert_eq!(taken.len(), 1024);
-
-    // Only one region is parked, and it is out.
-    assert!(arena.take_stack_region().is_none());
 }
 
 #[test]
-fn test_heap_region_parking() {
-    let pool = GlobalArenaPool::default();
-    let arena = pool.lock_arena(0);
-
-    assert!(arena.take_heap_region().is_none());
-
-    let region = MemoryRegion::new_uninit(2048);
-    let ptr = region.as_ptr();
-    arena.return_heap_region(region);
-
+fn test_region_kinds_are_independent() {
     if cfg!(miri) {
-        assert!(arena.take_heap_region().is_none());
         return;
     }
 
-    // The two slots are independent: a parked heap is not handed out as a
-    // stack.
-    assert!(arena.take_stack_region().is_none());
+    let pool = GlobalArenaPool::default();
+    let arena = pool.lock_arena(0);
 
-    let taken = arena.take_heap_region().expect("a region was parked");
-    assert_eq!(taken.as_ptr(), ptr);
-    assert_eq!(taken.len(), 2048);
-
-    assert!(arena.take_heap_region().is_none());
+    arena.return_region(RegionKind::Heap, MemoryRegion::new_uninit(2048));
+    assert!(arena.take_region(RegionKind::Stack).is_none());
+    assert!(arena.take_region(RegionKind::Heap).is_some());
 }
 
 #[test]

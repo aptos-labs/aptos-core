@@ -445,6 +445,9 @@ pub enum RuntimeInvariantViolation {
 
     #[error("a native extension was borrowed when the GC tried to scan its roots")]
     ExtensionBorrowedDuringGC,
+
+    #[error("a root pool handle was still outstanding when the session was closed")]
+    LiveRootAtSessionEnd,
 }
 
 /// Successful terminal outcomes from `Interpreter::run`.

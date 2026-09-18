@@ -31,6 +31,7 @@ use crate::{
     value_cmp, value_conv,
     value_conv::rust::write_value,
 };
+use mono_move_alloc::RegionKind;
 use mono_move_core::{
     captured_values_size,
     interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
@@ -463,7 +464,7 @@ impl<'guard> InterpreterContext<'guard> {
         // call writes it. It is written explicitly below.
         let stack = loader
             .guard()
-            .take_stack_region()
+            .take_region(RegionKind::Stack)
             .unwrap_or_else(new_stack_region);
         debug_assert_eq!(stack.len(), DEFAULT_STACK_SIZE);
 
@@ -655,22 +656,31 @@ impl<'guard> InterpreterContext<'guard> {
     pub fn finish(self) -> VMResult<SessionEffects> {
         let Self {
             loader,
+            read_set: _,
+            gas_meter: _,
+            natives: _,
             extensions,
+            resource_provider: _,
+            registers: _,
             stack,
             heap,
             root_pool,
             mut read_write_set,
-            ..
+            rng: _,
         } = self;
 
         // The call stack is gone and every handle is scoped to one allocation,
         // so the read-write set and the extensions are the complete root set.
-        debug_assert!(root_pool.has_no_live_roots());
+        // A root left behind means evacuation would miss it and overwrite the
+        // original with a forwarding marker.
+        if root_pool.has_live_roots() {
+            invariant_violation!(LiveRootAtSessionEnd);
+        }
 
         let evacuated =
             evacuate_session_roots(&heap, loader.guard(), &mut read_write_set, &extensions)?;
         heap.release(loader.guard());
-        loader.guard().return_stack_region(stack);
+        loader.guard().return_region(RegionKind::Stack, stack);
 
         Ok(SessionEffects {
             read_write_set,

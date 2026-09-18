@@ -108,6 +108,15 @@ impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
     }
 }
 
+/// Which of a worker's parked regions a call refers to.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RegionKind {
+    /// The interpreter stack.
+    Stack,
+    /// The session heap.
+    Heap,
+}
+
 /// The memory one worker holds exclusively: its bump arena, plus the
 /// interpreter stack and session heap parked between executions.
 struct ArenaSlot {
@@ -122,6 +131,13 @@ impl ArenaSlot {
             bump: Bump::with_capacity(arena_capacity),
             stack: Cell::new(None),
             heap: Cell::new(None),
+        }
+    }
+
+    fn region(&self, kind: RegionKind) -> &Cell<Option<MemoryRegion>> {
+        match kind {
+            RegionKind::Stack => &self.stack,
+            RegionKind::Heap => &self.heap,
         }
     }
 }
@@ -249,12 +265,12 @@ impl<'pool> GlobalArenaShard<'pool> {
         GlobalArenaPtr(NonNull::from(self.guard.bump.alloc_slice_copy(src)))
     }
 
-    /// Takes this arena's parked interpreter stack, or [`None`] if there is
-    /// none parked.
+    /// Takes this arena's parked region of the given kind, or [`None`] if
+    /// there is none parked.
     ///
     /// The region is not zeroed: it holds whatever the previous owner left
     /// behind, so the caller must write every byte before reading it.
-    pub fn take_stack_region(&self) -> Option<MemoryRegion> {
+    pub fn take_region(&self, kind: RegionKind) -> Option<MemoryRegion> {
         // Reuse hides read-before-write bugs from Miri, since a recycled
         // region is ordinary initialized memory rather than uninitialized.
         // Hand out a fresh allocation instead so Miri still catches them.
@@ -262,50 +278,22 @@ impl<'pool> GlobalArenaShard<'pool> {
             return None;
         }
 
-        let mut region = self.guard.stack.take()?;
+        let mut region = self.guard.region(kind).take()?;
         region.recycle();
         Some(region)
     }
 
-    /// Parks an interpreter stack on this arena for its next user. Keeps one
-    /// region; a surplus region (the caller allocated its own because none was
+    /// Parks a region on this arena for its next user. Keeps one region per
+    /// kind; a surplus region (the caller allocated its own because none was
     /// parked) is dropped here.
     ///
-    /// INVARIANT: every user of an arena's stack region agrees on its size.
-    /// The region is parked and handed out as is, with no size check.
-    pub fn return_stack_region(&self, region: MemoryRegion) {
+    /// INVARIANT: every user of an arena's region of a given kind agrees on
+    /// its size. The region is parked and handed out as is, with no size
+    /// check.
+    pub fn return_region(&self, kind: RegionKind, region: MemoryRegion) {
         if cfg!(miri) {
             return;
         }
-        self.guard.stack.set(Some(region));
-    }
-
-    /// Takes this arena's parked session heap, or [`None`] if there is none
-    /// parked.
-    ///
-    /// The region is not zeroed: it holds whatever the previous owner left
-    /// behind, so the caller must write every byte before reading it.
-    pub fn take_heap_region(&self) -> Option<MemoryRegion> {
-        // See `take_stack_region` for why Miri never reuses.
-        if cfg!(miri) {
-            return None;
-        }
-
-        let mut region = self.guard.heap.take()?;
-        region.recycle();
-        Some(region)
-    }
-
-    /// Parks a session heap on this arena for its next user. Keeps one region;
-    /// a surplus region (the caller allocated its own because none was parked)
-    /// is dropped here.
-    ///
-    /// INVARIANT: every user of an arena's heap region agrees on its size. The
-    /// region is parked and handed out as is, with no size check.
-    pub fn return_heap_region(&self, region: MemoryRegion) {
-        if cfg!(miri) {
-            return;
-        }
-        self.guard.heap.set(Some(region));
+        self.guard.region(kind).set(Some(region));
     }
 }

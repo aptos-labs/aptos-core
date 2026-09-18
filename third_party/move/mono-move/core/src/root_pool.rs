@@ -155,12 +155,12 @@ impl RootPool {
         unsafe { &*self.inner.get() }.entries.len()
     }
 
-    /// True if no handle is outstanding. A freed slot keeps its index but nulls
-    /// its base, so this checks the bases rather than the slot count.
-    pub fn has_no_live_roots(&self) -> bool {
+    /// True if a handle is still outstanding. A freed slot keeps its index but
+    /// nulls its base, so this checks the bases rather than the slot count.
+    pub fn has_live_roots(&self) -> bool {
         // SAFETY: short shared reborrow; single-threaded.
         let inner = unsafe { &*self.inner.get() };
-        inner.entries.iter().all(|entry| entry.base.is_null())
+        inner.entries.iter().any(|entry| !entry.base.is_null())
     }
 }
 
