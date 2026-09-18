@@ -27,10 +27,10 @@ runs:
   using: composite
   steps:
     # Deps setup
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version-file: .node-version
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
     # The source code must be checkout out by the workflow that invokes this action.
     - name: Run wait-images-ci
