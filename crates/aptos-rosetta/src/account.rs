@@ -11,6 +11,7 @@ use crate::{
         check_network, get_block_index_from_request, handle_request, native_coin, with_context,
     },
     error::{ApiError, ApiResult},
+    node_client::{self, NodeClient},
     types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, *},
     RosettaContext,
 };
@@ -18,7 +19,6 @@ use aptos_logger::{debug, trace, warn};
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode, ViewFunction},
     error::{AptosErrorResponse, RestError},
-    Client,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -30,7 +30,6 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     parser::parse_type_tag,
 };
-use serde::de::DeserializeOwned;
 use std::{collections::HashSet, str::FromStr};
 use warp::Filter;
 
@@ -72,7 +71,7 @@ async fn account_balance(
     // Version to grab is the last entry in the block (balance is at end of block)
     // NOTE: In Rosetta, we always do balances by block here rather than ledger version.
     let block_info = server_context
-        .block_cache()?
+        .block_retriever()?
         .get_block_info_by_height(block_height, server_context.chain_id)
         .await?;
     let balance_version = block_info.last_version;
@@ -116,7 +115,7 @@ async fn get_balances(
     // Handle the things that must always happen
 
     // Retrieve the sequence number
-    let sequence_number = get_sequence_number(&rest_client, owner_address, version).await?;
+    let sequence_number = get_sequence_number(rest_client.as_ref(), owner_address, version).await?;
 
     // Filter currencies to lookup
     let currencies_to_lookup = if let Some(currencies) = maybe_filter_currencies {
@@ -127,20 +126,31 @@ async fn get_balances(
 
     // Regular account, FA and Coin
     if account.is_base_account() {
-        balances =
-            get_base_balances(&rest_client, owner_address, version, currencies_to_lookup).await?;
+        balances = get_base_balances(
+            rest_client.as_ref(),
+            owner_address,
+            version,
+            currencies_to_lookup,
+        )
+        .await?;
     } else if let Some(currency) = account.secondary_store_currency() {
         if currencies_to_lookup.contains(currency) {
             balances =
-                get_secondary_store_balance(&rest_client, owner_address, version, currency).await?;
+                get_secondary_store_balance(rest_client.as_ref(), owner_address, version, currency)
+                    .await?;
         }
     } else if let Some(pool_address) = pool_address {
         // Lookup the delegation pool, if it's provided in the account information
         // Filter appropriately, must have native coin
         if currencies_to_lookup.contains(&native_coin()) {
-            (balances, lockup_expiration) =
-                get_delegation_info(&rest_client, &account, owner_address, pool_address, version)
-                    .await?;
+            (balances, lockup_expiration) = get_delegation_info(
+                rest_client.as_ref(),
+                &account,
+                owner_address,
+                pool_address,
+                version,
+            )
+            .await?;
         }
     } else {
         // Retrieve staking information (if it applies)
@@ -150,7 +160,7 @@ async fn get_balances(
         // Filter appropriately, must have native coin
         if currencies_to_lookup.contains(&native_coin()) {
             (balances, lockup_expiration, maybe_operators) =
-                get_staking_info(&rest_client, &account, owner_address, version).await?;
+                get_staking_info(rest_client.as_ref(), &account, owner_address, version).await?;
         }
     }
 
@@ -163,18 +173,18 @@ async fn get_balances(
 }
 
 async fn get_secondary_store_balance(
-    rest_client: &Client,
+    rest_client: &dyn NodeClient,
     store_address: AccountAddress,
     version: u64,
     currency: &Currency,
 ) -> ApiResult<Vec<Amount>> {
-    match rest_client
-        .get_account_resource_at_version_bcs(
-            store_address,
-            "0x1::fungible_asset::FungibleStore",
-            version,
-        )
-        .await
+    match node_client::get_account_resource_at_version_bcs::<FungibleStoreResource>(
+        rest_client,
+        store_address,
+        "0x1::fungible_asset::FungibleStore",
+        version,
+    )
+    .await
     {
         Ok(response) => {
             let store: FungibleStoreResource = response.into_inner();
@@ -245,14 +255,18 @@ fn currency_fa_metadata_address(currency: &Currency) -> ApiResult<Option<Account
 }
 
 async fn get_sequence_number(
-    rest_client: &Client,
+    rest_client: &dyn NodeClient,
     owner_address: AccountAddress,
     version: u64,
 ) -> ApiResult<u64> {
     // Retrieve sequence number
-    let sequence_number = match rest_client
-        .get_account_resource_at_version_bcs(owner_address, "0x1::account::Account", version)
-        .await
+    let sequence_number = match node_client::get_account_resource_at_version_bcs::<AccountResource>(
+        rest_client,
+        owner_address,
+        "0x1::account::Account",
+        version,
+    )
+    .await
     {
         Ok(response) => {
             let account: AccountResource = response.into_inner();
@@ -289,7 +303,7 @@ async fn get_sequence_number(
 }
 
 async fn get_staking_info(
-    rest_client: &Client,
+    rest_client: &dyn NodeClient,
     account: &AccountIdentifier,
     owner_address: AccountAddress,
     version: u64,
@@ -300,9 +314,13 @@ async fn get_staking_info(
     let mut total_balance = 0;
     let mut has_staking = false;
 
-    if let Ok(response) = rest_client
-        .get_account_resource_at_version_bcs(owner_address, "0x1::staking_contract::Store", version)
-        .await
+    if let Ok(response) = node_client::get_account_resource_at_version_bcs::<Store>(
+        rest_client,
+        owner_address,
+        "0x1::staking_contract::Store",
+        version,
+    )
+    .await
     {
         let store: Store = response.into_inner();
         maybe_operators = Some(vec![]);
@@ -352,7 +370,7 @@ async fn get_staking_info(
 }
 
 async fn get_delegation_info(
-    rest_client: &Client,
+    rest_client: &dyn NodeClient,
     account: &AccountIdentifier,
     owner_address: AccountAddress,
     pool_address: AccountAddress,
@@ -384,7 +402,7 @@ async fn get_delegation_info(
 }
 
 async fn get_base_balances(
-    rest_client: &Client,
+    rest_client: &dyn NodeClient,
     owner_address: AccountAddress,
     version: u64,
     currencies_to_lookup: HashSet<Currency>,
@@ -403,7 +421,7 @@ async fn get_base_balances(
                     }),
                 ..
             } => {
-                let response = view::<Vec<u64>>(
+                let response = view(
                     rest_client,
                     version,
                     AccountAddress::ONE,
@@ -437,7 +455,7 @@ async fn get_base_balances(
                 ..
             } => {
                 if let Ok(type_tag) = parse_type_tag(coin_type) {
-                    let response = view::<Vec<u64>>(
+                    let response = view(
                         rest_client,
                         version,
                         AccountAddress::ONE,
@@ -463,17 +481,19 @@ async fn get_base_balances(
     Ok(balances)
 }
 
-pub async fn view<T: DeserializeOwned>(
-    rest_client: &Client,
+/// Calls a BCS view function that returns a vector of `u64`s (the only shape
+/// Rosetta uses for BCS views: balances and stake amounts).
+pub async fn view(
+    rest_client: &dyn NodeClient,
     version: u64,
     address: AccountAddress,
     module: &'static IdentStr,
     function: &'static IdentStr,
     type_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-) -> ApiResult<T> {
+) -> ApiResult<Vec<u64>> {
     Ok(rest_client
-        .view_bcs::<T>(
+        .view_bcs_u64s(
             &ViewFunction {
                 module: ModuleId {
                     address,
