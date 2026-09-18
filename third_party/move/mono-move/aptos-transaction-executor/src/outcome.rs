@@ -13,17 +13,26 @@ use aptos_types::{
     on_chain_config::Features,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
 };
-use mono_move_core::{value_layout::LayoutProvider, VMResult};
+use mono_move_core::{value_layout::LayoutProvider, VMInternalError, VMResult};
 use mono_move_runtime::SessionEffects;
 
 /// The outcome of one transaction, not yet materialized into a write set.
 /// Intended to be consumed by the block coordinator for efficient handling.
 pub enum TxnOutcome {
-    /// Rejected without side effects.
-    Discarded(DiscardReason),
+    /// Rejected without side effects. The effects are carried only so the
+    /// session's reads are available; nothing here may be published.
+    Discarded {
+        reason: DiscardReason,
+        /// `None` when the transaction was rejected before a session existed.
+        effects: Option<SessionEffects>,
+    },
     /// A system transaction failed unexpectedly: there is no per-transaction
     /// output, and the whole block must be aborted.
     UnexpectedSystemTransactionFailure(SystemTxnFailure),
+    /// Closing the session failed, which happens only on a VM bug. Neither the
+    /// reads nor the writes survive it, so there is no per-transaction output
+    /// and the block must be aborted.
+    Panic(VMInternalError),
     /// Committed with no side effects and a zero fee. The reason distinguishes
     /// a transaction that had nothing to do from a block epilogue whose
     /// failure was absorbed; both render as an empty success.
@@ -39,7 +48,7 @@ pub enum TxnOutcome {
 
 impl TxnOutcome {
     pub fn is_discarded(&self) -> bool {
-        matches!(self, TxnOutcome::Discarded(_))
+        matches!(self, TxnOutcome::Discarded { .. })
     }
 
     /// Whether this transaction emitted a reconfiguration (new-epoch) event. The
@@ -47,8 +56,9 @@ impl TxnOutcome {
     pub fn has_new_epoch_event(&self) -> VMResult<bool> {
         match self {
             TxnOutcome::Executed { effects, .. } => mono_move_output::has_new_epoch_event(effects),
-            TxnOutcome::Discarded(_)
+            TxnOutcome::Discarded { .. }
             | TxnOutcome::UnexpectedSystemTransactionFailure(_)
+            | TxnOutcome::Panic(_)
             | TxnOutcome::ExecutedNoEffects(_) => Ok(false),
         }
     }
@@ -73,7 +83,7 @@ impl TxnOutcome {
         auxiliary_data: TransactionAuxiliaryData,
     ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
         match self {
-            TxnOutcome::Discarded(reason) => Ok((
+            TxnOutcome::Discarded { reason, .. } => Ok((
                 materialize::discarded_output(
                     materialize::discard_to_vm_status(reason).status_code(),
                     auxiliary_data,
@@ -88,6 +98,9 @@ impl TxnOutcome {
                     failure.call, failure.failure
                 )]))
             },
+            TxnOutcome::Panic(err) => Err(MaterializationError::new(vec![format!(
+                "session could not be closed: {err:?}"
+            )])),
             TxnOutcome::ExecutedNoEffects(_) => Ok((
                 materialize::empty_success_output(auxiliary_data),
                 MaterializedGroups::new(),

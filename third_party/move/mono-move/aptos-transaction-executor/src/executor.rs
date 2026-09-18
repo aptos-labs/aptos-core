@@ -85,16 +85,18 @@ impl<'a> AptosTransactionExecutor<'a> {
             Transaction::BlockEpilogue(block_epilogue) => {
                 self.execute_block_epilogue_transaction(block_epilogue)
             },
-            Transaction::GenesisTransaction(_) => {
-                TxnOutcome::Discarded(DiscardReason::Unsupported("genesis transactions"))
+            Transaction::GenesisTransaction(_) => TxnOutcome::Discarded {
+                reason: DiscardReason::Unsupported("genesis transactions"),
+                effects: None,
             },
             // A state checkpoint runs nothing on-chain; it only marks a point
             // for the executor to checkpoint the state tree at.
             Transaction::StateCheckpoint(_) => {
                 TxnOutcome::ExecutedNoEffects(NoEffectsReason::NothingToExecute)
             },
-            Transaction::ValidatorTransaction(_) => {
-                TxnOutcome::Discarded(DiscardReason::Unsupported("validator transactions"))
+            Transaction::ValidatorTransaction(_) => TxnOutcome::Discarded {
+                reason: DiscardReason::Unsupported("validator transactions"),
+                effects: None,
             },
         }
     }

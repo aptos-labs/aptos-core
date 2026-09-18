@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::{call_block_function, system_txn_outcome, SystemTxnMetadata};
+use super::common::{
+    call_block_function, discard_system_session, system_txn_outcome, SystemTxnMetadata,
+};
 use crate::{errors::NoEffectsReason, executor::AptosTransactionExecutor, outcome::TxnOutcome};
 use aptos_types::transaction::{BlockEpiloguePayload, FeeDistribution};
 use move_core_types::{ident_str, identifier::IdentStr};
@@ -45,6 +47,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         match result {
             Ok(()) => system_txn_outcome(interp),
             Err(failure) => {
+                discard_system_session(interp);
                 TxnOutcome::ExecutedNoEffects(NoEffectsReason::BlockEpilogueFailed(failure))
             },
         }
