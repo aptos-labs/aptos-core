@@ -1,0 +1,15 @@
+---
+remote_endpoint: ~
+name: "GAS_REFUND_FA_MINT"
+proposals:
+  - name: GAS_REFUND_FA_MINT
+    metadata:
+      title: "Enable GAS_REFUND_FA_MINT"
+      description: "Mint gas refunds directly as APT fungible assets via MintRef"
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/20132"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - gas_refund_fa_mint
+          disabled: [ ]
