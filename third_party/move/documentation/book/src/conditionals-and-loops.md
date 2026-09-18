@@ -106,6 +106,10 @@ fun status_message(code: u16): vector<u8> {
 
 Match expressions were first introduced in Move 2.0 for enum values: see [Matching Enum Values](./structs-and-enums.md#matching-enum-values) for the enum-specific patterns. Move 2.4 extends `match` to primitive values, range patterns, and references to primitive values, as described below. Additional struct- and enum-specific extensions (literal and range patterns nested inside variant patterns, struct/enum references, and mixed-tuple discriminators) are documented under [Match Expression Extensions](./structs-and-enums.md#match-expression-extensions).
 
+### Guards
+
+A guard runs after its arm's pattern has matched. While it runs, the value being matched and the variables bound by the pattern are read-only: the guard cannot assign to them, move them, mutably borrow them, or write through a mutable reference bound to them.
+
 ### Matching Primitive Values
 
 _Since language version 2.4_

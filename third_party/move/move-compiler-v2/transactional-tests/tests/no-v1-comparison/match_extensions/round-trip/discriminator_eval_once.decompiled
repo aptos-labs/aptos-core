@@ -1,0 +1,128 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/discriminator_eval_once.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum Color has drop {
+        Red,
+        Blue,
+    }
+    fun color(p0: &mut u64): Color {
+        if (next(p0) == 0) return Color::Red{};
+        Color::Blue{}
+    }
+    fun next(p0: &mut u64): u64 {
+        let _v0 = *p0;
+        *p0 = _v0 + 1;
+        _v0
+    }
+    public fun mixed_tuple(): u64 {
+        let _v0;
+        let _v1 = 0;
+        let _v2 = color(&mut _v1);
+        let _v3 = next(&mut _v1);
+        let _v4 = &_v2;
+        loop {
+            if (_v4 is Red) {
+                let _v5;
+                if (_v3 == 1) _v5 = _v1 > 100 else _v5 = false;
+                if (_v5) {
+                    let Color::Red{} = _v2;
+                    _v0 = 1;
+                    break
+                }
+            };
+            if (_v4 is Blue) {
+                if (_v3 == 0) {
+                    let Color::Blue{} = _v2;
+                    _v0 = 2;
+                    break
+                }};
+            if (!((_v4 is Red) && _v3 == 1)) {
+                _v0 = 4;
+                break
+            };
+            let Color::Red{} = _v2;
+            _v0 = 3;
+            break
+        };
+        assert!(_v1 == 2, 14566554180833181696);
+        _v0
+    }
+    fun pair(p0: &mut u64): (Color, u64) {
+        let _v0 = color(p0);
+        let _v1 = next(p0);
+        (_v0, _v1)
+    }
+    public fun prim_tuple(): u64 {
+        let _v0;
+        let _v1;
+        let _v2;
+        let _v3 = 0;
+        let _v4 = next(&mut _v3);
+        let _v5 = next(&mut _v3);
+        if (_v4 == 0) _v2 = _v5 == 1 else _v2 = false;
+        if (_v2) _v1 = _v3 > 100 else _v1 = false;
+        if (_v1) _v0 = 1 else {
+            let _v6;
+            if (_v4 == 1) _v6 = _v5 == 0 else _v6 = false;
+            if (_v6) _v0 = 2 else {
+                let _v7;
+                if (_v4 == 0) _v7 = _v5 == 1 else _v7 = false;
+                if (_v7) _v0 = 3 else _v0 = 4
+            }
+        };
+        assert!(_v3 == 2, 14566554180833181696);
+        _v0
+    }
+    public fun scalar(): u64 {
+        let _v0;
+        let _v1;
+        let _v2 = 0;
+        let _v3 = next(&mut _v2);
+        if (_v3 == 0) _v1 = _v2 > 100 else _v1 = false;
+        if (_v1) _v0 = 1 else {
+            let _v4;
+            if (_v3 == 0) _v4 = _v2 > 50 else _v4 = false;
+            if (_v4) _v0 = 2 else if (_v3 == 0) _v0 = 3 else _v0 = 4
+        };
+        assert!(_v2 == 1, 14566554180833181696);
+        _v0
+    }
+    public fun tuple_call(): u64 {
+        let _v0;
+        let _v1 = 0;
+        let (_v2,_v3) = pair(&mut _v1);
+        let _v4 = _v3;
+        let _v5 = _v2;
+        let _v6 = &_v5;
+        loop {
+            if (_v6 is Red) {
+                let _v7;
+                if (_v4 == 1) _v7 = _v1 > 100 else _v7 = false;
+                if (_v7) {
+                    let Color::Red{} = _v5;
+                    _v0 = 1;
+                    break
+                }
+            };
+            if (!((_v6 is Red) && _v4 == 1)) {
+                _v0 = 4;
+                break
+            };
+            let Color::Red{} = _v5;
+            _v0 = 3;
+            break
+        };
+        assert!(_v1 == 2, 14566554180833181696);
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::scalar
+
+//# run 0xc0ffee::m::prim_tuple
+
+//# run 0xc0ffee::m::mixed_tuple
+
+//# run 0xc0ffee::m::tuple_call
