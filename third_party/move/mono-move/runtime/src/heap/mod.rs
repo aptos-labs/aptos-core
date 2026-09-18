@@ -25,6 +25,7 @@ use crate::{
         VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
+use mono_move_alloc::RegionKind;
 use mono_move_core::{
     align_max, checked_align_max,
     native::{NativeABI, NativeExtensions},
@@ -268,11 +269,15 @@ impl Heap {
     /// Only the default size is pooled. A session that asks for another size
     /// gets a fresh buffer and parks nothing, which keeps every buffer in the
     /// slot the same size.
+    //
+    // TODO(cleanup): drop the size check once the heap size comes from a
+    // VM-wide config. Every session should then take the one configured size
+    // and this can pool unconditionally.
     pub(crate) fn new_session(guard: &ExecutionGuard<'_>, size: usize) -> Self {
         if size != DEFAULT_HEAP_SIZE {
             return Self::new(size);
         }
-        match guard.take_heap_region() {
+        match guard.take_region(RegionKind::Heap) {
             Some(buffer) => Self::from_region(buffer),
             None => Self::new(size),
         }
@@ -283,9 +288,12 @@ impl Heap {
     /// The buffer is handed out as is, holding the dead session's bytes.
     /// `heap_alloc` zeroes every object over its full aligned size before
     /// returning it, so no allocation can observe them.
+    //
+    // TODO(cleanup): drop the size check once the heap size comes from a
+    // VM-wide config, the same way `new_session` can.
     pub(crate) fn release(self, guard: &ExecutionGuard<'_>) {
         if self.buffer.len() == DEFAULT_HEAP_SIZE {
-            guard.return_heap_region(self.buffer);
+            guard.return_region(RegionKind::Heap, self.buffer);
         }
     }
 
@@ -1498,7 +1506,7 @@ mod tests {
         let heap = Heap::new_session(&guard, DEFAULT_HEAP_SIZE / 2);
         assert_eq!(heap.capacity(), DEFAULT_HEAP_SIZE / 2);
         heap.release(&guard);
-        assert!(guard.take_heap_region().is_none());
+        assert!(guard.take_region(RegionKind::Heap).is_none());
     }
 
     #[test]
