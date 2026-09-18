@@ -139,8 +139,14 @@ RUN_SOURCE=local python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_p
 `SILENCE_TIMEOUT_SECS` is what keeps one stuck workload from taking the job's
 whole timeout. Every command here prints as it goes — the benchmark logs each
 block, cargo logs each crate — so going quiet for half an hour means it has
-stopped. A workload killed this way is reported as failed and the run continues
-with the next one, the same as any other workload failure.
+stopped. The longest silence measured across five clean runs is six minutes,
+during a single long crate compile, so the default leaves five times that.
+
+A workload killed this way is retried once, because the stall seen so far is in
+opening the workload's copy of the warmup DB and says nothing about the
+workload itself. A second hang is reported as failed and the run continues with
+the next workload. Any other failure — a panic, an abort, a discard — is a real
+finding and is never retried.
 
 ## Running in CI
 
