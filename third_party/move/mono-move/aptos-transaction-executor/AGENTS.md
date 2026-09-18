@@ -10,11 +10,14 @@ above this crate.
 - Assume the latest feature set. All on-chain features and the latest gas
   feature version are enabled; supporting only that is sufficient. Do not port
   legacy validation paths, old gas versions, or feature-flag branches.
-- Entry functions and scripts are the only supported payloads. Anything else
-  is a `TODO(completeness)`.
-- Gas is deliberately incomplete: MonoMove's units are uncalibrated, IO gas and
-  storage fees are not charged. Do not treat a gas mismatch against the legacy VM
-  as a regression.
+- Entry functions and scripts are the only payloads that run. An encrypted
+  payload that reaches execution undecrypted fails and commits. Multisig
+  payloads are a `TODO(completeness)`.
+- Gas is deliberately incomplete: MonoMove's units are uncalibrated, and the
+  intrinsic cost, the authentication and decryption surcharges, IO gas, and
+  storage fees are none of them charged. The pre-execution checks still bound
+  the budget against those costs. Do not treat a gas mismatch against the
+  legacy VM as a regression.
 - Past the prologue, a transaction always commits and charges the fee.
 - Materialization is optional. Nothing on the execution path may call into
   `materialize/` -- it is up to the higher-level coordinator to decide when to
