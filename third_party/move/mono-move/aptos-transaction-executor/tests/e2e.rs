@@ -192,6 +192,33 @@ fn p2p_transfer_matches_v1() {
     compare_outputs(&v1_output, &v2_output, *alice.address());
 }
 
+/// An address may not sign the same transaction twice. Otherwise a function
+/// taking several signers could be handed one authority for all of them.
+#[test]
+fn duplicate_signers_discarded_like_v1() {
+    let (fx, alice, bob) = setup();
+    let txn = alice
+        .account()
+        .transaction()
+        .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
+            *bob.address(),
+            1_000,
+        ))
+        .secondary_signers(vec![alice.account().clone()])
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign_multi_agent();
+
+    let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+    assert_eq!(
+        v1_status,
+        TransactionStatus::Discard(StatusCode::SIGNERS_CONTAIN_DUPLICATES),
+        "v1 accepted a duplicate signer"
+    );
+    assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
+}
+
 /// Compares the two outputs' write sets and events, masking only what gas
 /// divergence explains.
 fn compare_outputs(

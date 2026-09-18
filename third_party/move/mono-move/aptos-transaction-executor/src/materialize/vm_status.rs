@@ -152,6 +152,8 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
         },
         F::GasPriceBelowMinimum { .. } => StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
         F::GasPriceAboveMaximum { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+        F::DuplicateSigners => StatusCode::SIGNERS_CONTAIN_DUPLICATES,
+        F::SignerProofCountMismatch { .. } => StatusCode::INVALID_NUMBER_OF_AUTHENTICATION_PROOFS,
     };
     VMStatus::error(code, Some(failure.to_string()))
 }

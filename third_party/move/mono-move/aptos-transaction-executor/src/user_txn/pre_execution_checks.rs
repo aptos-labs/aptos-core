@@ -13,6 +13,7 @@ use aptos_gas_schedule::{
     gas_params::txn::{KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST},
     AptosGasParameters, TransactionGasParameters,
 };
+use std::collections::BTreeSet;
 
 pub(crate) struct PreExecutionChecker<'a> {
     gas_params: &'a AptosGasParameters,
@@ -34,6 +35,7 @@ impl<'a> PreExecutionChecker<'a> {
     }
 
     pub fn run_checks(&self) -> Result<(), PreExecutionCheckFailure> {
+        self.check_signers()?;
         self.check_transaction_size()?;
         self.check_gas_price_bounds()?;
         self.check_gas_budget_upper_bound()?;
@@ -60,6 +62,28 @@ impl<'a> PreExecutionChecker<'a> {
 
     fn gas_price(&self) -> FeePerGasUnit {
         self.txn_data.gas_unit_price.into()
+    }
+
+    /// Checks the shape of the transaction's signers.
+    /// - No address may sign twice, so a function taking several signers
+    ///   cannot be handed the same authority for all of them.
+    /// - Every signer must carry exactly one authentication proof.
+    fn check_signers(&self) -> Result<(), PreExecutionCheckFailure> {
+        let mut seen = BTreeSet::from([self.txn_data.sender]);
+        if !self
+            .txn_data
+            .secondary_signers
+            .iter()
+            .all(|s| seen.insert(*s))
+        {
+            return Err(PreExecutionCheckFailure::DuplicateSigners);
+        }
+        let signers = 1 + self.txn_data.secondary_signers.len();
+        let proofs = 1 + self.txn_data.secondary_auth_keys.len();
+        if signers != proofs {
+            return Err(PreExecutionCheckFailure::SignerProofCountMismatch { signers, proofs });
+        }
+        Ok(())
     }
 
     /// Checks if the transaction size is within the allowed maximum.

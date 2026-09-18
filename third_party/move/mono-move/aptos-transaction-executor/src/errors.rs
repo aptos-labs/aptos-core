@@ -89,6 +89,10 @@ pub enum PreExecutionCheckFailure {
     GasPriceBelowMinimum { price: u64, min: u64 },
     #[error("gas unit price {price} is above the maximum {max}")]
     GasPriceAboveMaximum { price: u64, max: u64 },
+    #[error("an address signs the transaction more than once")]
+    DuplicateSigners,
+    #[error("{signers} signers carry {proofs} authentication proofs")]
+    SignerProofCountMismatch { signers: usize, proofs: usize },
 }
 
 /// Which Move call the transaction was in when it failed.
