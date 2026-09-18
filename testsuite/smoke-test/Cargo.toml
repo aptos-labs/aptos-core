@@ -29,6 +29,7 @@ aptos-forge = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-global-constants = { workspace = true }
+aptos-governance-bundle = { workspace = true }
 aptos-indexer-grpc-table-info = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-keygen = { workspace = true }

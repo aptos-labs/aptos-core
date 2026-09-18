@@ -1,33 +1,57 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! `verify-bundle`: validate that a bundle is internally self-consistent.
+//! What makes a bundle valid, behind a single [`verify`] entry point.
 
-use crate::{bundle, commands::combine_errors, config::BundleConfig, summary};
-use anyhow::Result;
-use aptos_crypto::HashValue;
+use crate::{
+    compiled_script_paths, verify_checksums, BundleManifest, BYTECODE_DIR, METADATA_JSON,
+    SCRIPTS_DIR, SUMMARY_DIR,
+};
+use anyhow::{bail, Result};
+use sha3::{Digest, Sha3_256};
 use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
 };
 
-pub fn run(bundle_path: &Path, require_signoff: bool) -> Result<()> {
+const UNTICKED_BOX: &str = "[ ]";
+
+/// Check that `bundle_path` holds a valid bundle, returning its manifest. The
+/// error lists every problem found.
+/// - Every file matches the manifest's checksums, and the digest matches.
+/// - `metadata.json` and at least one compiled script are present.
+/// - Every script source pairs with a compiled script and is stamped with its hash.
+/// - Every sign-off checkbox is ticked, if `require_signoff`.
+pub fn verify(bundle_path: &Path, require_signoff: bool) -> Result<BundleManifest> {
+    let manifest = BundleManifest::read(bundle_path)?;
+
+    let mut errors = integrity_errors(bundle_path, &manifest);
+    errors.extend(layout_errors(bundle_path));
+    errors.extend(source_errors(bundle_path));
+    if require_signoff {
+        errors.extend(signoff_errors(bundle_path));
+    }
+
+    if errors.is_empty() {
+        Ok(manifest)
+    } else {
+        bail!(
+            "bundle {} failed verification with {} error(s):\n  - {}",
+            bundle_path.display(),
+            errors.len(),
+            errors.join("\n  - ")
+        );
+    }
+}
+
+/// Check the bundle's files against its manifest: a checksum mismatch, a
+/// missing or extra file, or a digest mismatch.
+fn integrity_errors(bundle_path: &Path, manifest: &BundleManifest) -> Vec<String> {
     let mut errors: Vec<String> = vec![];
 
-    let manifest = bundle::BundleManifest::read(bundle_path)?;
-
-    let config_yaml = bundle_path.join(bundle::CONFIG_YAML);
-    let config = match BundleConfig::load(&config_yaml) {
-        Ok(c) => Some(c),
-        Err(e) => {
-            errors.push(format!("failed to load {}: {}", config_yaml.display(), e));
-            None
-        },
-    };
-
     // 1. Checksums: every file matches the manifest, with none missing or extra.
-    match bundle::verify_checksums(bundle_path, &manifest.checksums) {
+    match verify_checksums(bundle_path, &manifest.checksums) {
         Ok(checksum_errors) => {
             for p in checksum_errors {
                 errors.push(p.to_string());
@@ -45,67 +69,39 @@ pub fn run(bundle_path: &Path, require_signoff: bool) -> Result<()> {
         ));
     }
 
-    // 2. Consistency between bundle.toml and config.yaml, plus layout.
-    if let Some(config) = &config
-        && manifest.bundle.name != config.name
-    {
-        errors.push(format!(
-            "bundle.toml name ({}) does not match config.yaml name ({})",
-            manifest.bundle.name, config.name
-        ));
-    }
-    check_layout(bundle_path, &mut errors);
-
-    // 3. Optional sign-off enforcement.
-    if require_signoff {
-        check_signoff(bundle_path, &mut errors);
-    }
-
-    // Informational: report which summaries have been signed off.
-    report_signoff_info(bundle_path);
-
-    if errors.is_empty() {
-        println!("verify-bundle: OK ({})", bundle_path.display());
-        Ok(())
-    } else {
-        Err(combine_errors("verify-bundle", &errors))
-    }
+    errors
 }
 
-/// Check the single-proposal layout: a top-level `metadata.json`, plus the
-/// script sources and compiled bytecode (see [`check_scripts`]).
-fn check_layout(bundle_path: &Path, errors: &mut Vec<String>) {
-    if !bundle_path.join(bundle::METADATA_JSON).is_file() {
-        errors.push(format!("missing {}", bundle::METADATA_JSON));
+/// Check the single-proposal layout: a top-level `metadata.json`, plus at
+/// least one compiled script.
+fn layout_errors(bundle_path: &Path) -> Vec<String> {
+    let mut errors = vec![];
+    if !bundle_path.join(METADATA_JSON).is_file() {
+        errors.push(format!("missing {}", METADATA_JSON));
     }
-    check_scripts(bundle_path, errors);
+    if compiled_script_paths(bundle_path).is_empty() {
+        errors.push(format!("{}/ has no compiled .mv scripts", BYTECODE_DIR));
+    }
+    errors
 }
 
 /// Check that `scripts/` sources and `bytecode/` blobs pair 1:1 by file stem,
 /// and that each blob's hash matches the execution hash stamped on its source
 /// -- so what was audited (the stamped source) is what gets deployed (the
 /// blob), without needing a compiler.
-fn check_scripts(bundle_path: &Path, errors: &mut Vec<String>) {
-    let sources = files_by_stem(&bundle_path.join(bundle::SCRIPTS_DIR), "move");
-    let blobs = files_by_stem(&bundle_path.join(bundle::BYTECODE_DIR), "mv");
+fn source_errors(bundle_path: &Path) -> Vec<String> {
+    let mut errors = vec![];
+    let sources = files_by_stem(&bundle_path.join(SCRIPTS_DIR), "move");
+    let blobs = files_by_stem(&bundle_path.join(BYTECODE_DIR), "mv");
     if sources.is_empty() {
-        errors.push(format!("{}/ has no .move scripts", bundle::SCRIPTS_DIR));
-    }
-    if blobs.is_empty() {
-        errors.push(format!(
-            "{}/ has no compiled .mv scripts",
-            bundle::BYTECODE_DIR
-        ));
+        errors.push(format!("{}/ has no .move scripts", SCRIPTS_DIR));
     }
 
     for (stem, source_path) in &sources {
         let Some(blob_path) = blobs.get(stem) else {
             errors.push(format!(
                 "{}/{}.move has no compiled counterpart {}/{}.mv",
-                bundle::SCRIPTS_DIR,
-                stem,
-                bundle::BYTECODE_DIR,
-                stem
+                SCRIPTS_DIR, stem, BYTECODE_DIR, stem
             ));
             continue;
         };
@@ -127,18 +123,14 @@ fn check_scripts(bundle_path: &Path, errors: &mut Vec<String>) {
             None => errors.push(format!(
                 "{}/{}.move has no stamped execution hash (expected a leading \
                  '// Script hash: ...' comment, added by generate-bundle)",
-                bundle::SCRIPTS_DIR,
-                stem
+                SCRIPTS_DIR, stem
             )),
             Some(stamped) => {
-                let actual = HashValue::sha3_256_of(&blob).to_hex().to_lowercase();
+                let actual = hex::encode(Sha3_256::digest(&blob));
                 if actual != stamped {
                     errors.push(format!(
                         "{}/{}.mv hash {} does not match the hash stamped on its source {}",
-                        bundle::BYTECODE_DIR,
-                        stem,
-                        actual,
-                        stamped
+                        BYTECODE_DIR, stem, actual, stamped
                     ));
                 }
             },
@@ -148,13 +140,11 @@ fn check_scripts(bundle_path: &Path, errors: &mut Vec<String>) {
         if !sources.contains_key(stem) {
             errors.push(format!(
                 "{}/{}.mv has no source counterpart {}/{}.move",
-                bundle::BYTECODE_DIR,
-                stem,
-                bundle::SCRIPTS_DIR,
-                stem
+                BYTECODE_DIR, stem, SCRIPTS_DIR, stem
             ));
         }
     }
+    errors
 }
 
 /// The files with the given extension directly under `dir`, keyed by file
@@ -186,7 +176,7 @@ fn stamped_hash(source: &str) -> Option<String> {
 /// Every `*.md` file under `summary/` as `(path, contents)`, sorted by path;
 /// unreadable or absent files are skipped.
 fn summary_files(bundle_path: &Path) -> Vec<(PathBuf, String)> {
-    let summary_dir = bundle_path.join(bundle::SUMMARY_DIR);
+    let summary_dir = bundle_path.join(SUMMARY_DIR);
     let Ok(entries) = fs::read_dir(&summary_dir) else {
         return vec![];
     };
@@ -200,40 +190,31 @@ fn summary_files(bundle_path: &Path) -> Vec<(PathBuf, String)> {
     files
 }
 
-/// Print each summary file's sign-off state (informational; box ticks are
-/// checksum-neutral).
-fn report_signoff_info(bundle_path: &Path) {
-    for (path, contents) in summary_files(bundle_path) {
-        let (ticked, total) = summary::box_counts(&contents);
-        if total == 0 {
-            continue;
-        }
-        let status = if ticked == total {
-            "fully signed off"
-        } else if ticked > 0 {
-            "partially signed off"
-        } else {
-            "not signed off"
-        };
-        println!(
-            "info: {} ({}/{}) in {}",
-            status,
-            ticked,
-            total,
-            path.file_name().unwrap_or_default().to_string_lossy()
-        );
-    }
+/// The sign-off state of each summary file as `(path, ticked, total)`
+/// checkboxes, sorted by path.
+pub fn signoff_status(bundle_path: &Path) -> Vec<(PathBuf, usize, usize)> {
+    summary_files(bundle_path)
+        .into_iter()
+        .map(|(path, contents)| {
+            let ticked = contents.matches("[x]").count() + contents.matches("[X]").count();
+            let unticked = contents.matches(UNTICKED_BOX).count();
+            (path, ticked, ticked + unticked)
+        })
+        .collect()
 }
 
-fn check_signoff(bundle_path: &Path, errors: &mut Vec<String>) {
+/// One message per summary file that still has an unticked checkbox.
+fn signoff_errors(bundle_path: &Path) -> Vec<String> {
+    let mut errors = vec![];
     for (path, contents) in summary_files(bundle_path) {
-        if summary::has_unchecked_boxes(&contents) {
+        if contents.contains(UNTICKED_BOX) {
             errors.push(format!(
                 "sign-off required but {} has unchecked boxes",
                 path.file_name().unwrap_or_default().to_string_lossy()
             ));
         }
     }
+    errors
 }
 
 #[cfg(test)]
