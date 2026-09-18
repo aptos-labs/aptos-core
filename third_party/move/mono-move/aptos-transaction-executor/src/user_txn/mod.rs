@@ -6,6 +6,7 @@
 mod args;
 mod entry_func;
 mod execute;
+mod keyless;
 mod metadata;
 mod pre_execution_checks;
 mod script;

@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-keyless-validation = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }

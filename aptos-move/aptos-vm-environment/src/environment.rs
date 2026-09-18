@@ -16,9 +16,11 @@ use aptos_gas_schedule::{
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
+    jwks::PatchedJWKs,
     keyless::{Configuration, Groth16VerificationKey, KeylessOnchainConfig},
     on_chain_config::{
-        ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
+        ConfigurationResource, CurrentTimeMicroseconds, Features, OnChainConfig, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     state_store::StateView,
 };
@@ -107,6 +109,18 @@ impl AptosEnvironment {
         self.0.keyless_configuration.as_ref()
     }
 
+    /// Returns the encoded identity-provider keys agreed by JWK consensus.
+    #[inline]
+    pub fn patched_jwks_bytes(&self) -> Option<&[u8]> {
+        self.0.patched_jwks.as_deref()
+    }
+
+    /// Returns the on-chain time as of this environment's state.
+    #[inline]
+    pub fn current_time(&self) -> Option<&CurrentTimeMicroseconds> {
+        self.0.current_time.as_ref()
+    }
+
     /// Returns the [VMConfig] used by this environment.
     #[inline]
     pub fn vm_config(&self) -> &VMConfig {
@@ -189,6 +203,14 @@ struct Environment {
     keyless_pvk: OnceLock<Option<PreparedVerifyingKey<Bn254>>>,
     /// Some keyless configurations which are not frequently updated.
     keyless_configuration: Option<Configuration>,
+    /// The identity providers' keys, as JWK consensus agreed them, still
+    /// encoded because the decoded form does not clone. Deliberately left out
+    /// of `hash`: they change on their own schedule and affect no code
+    /// loading.
+    patched_jwks: Option<Vec<u8>>,
+    /// The on-chain time as of this environment's state. Also out of `hash`,
+    /// which every block would otherwise change.
+    current_time: Option<CurrentTimeMicroseconds>,
 
     /// Gas feature version used in this environment.
     gas_feature_version: u64,
@@ -307,6 +329,15 @@ impl Environment {
                 config
             });
 
+        let patched_jwks = PatchedJWKs::fetch_config_and_bytes(state_view)
+            .ok()
+            .flatten()
+            .map(|(_config, bytes)| bytes.to_vec());
+        let current_time = CurrentTimeMicroseconds::fetch_config_and_bytes(state_view)
+            .ok()
+            .flatten()
+            .map(|(config, _bytes)| config);
+
         let hash = sha3_256.finalize().into();
 
         #[allow(deprecated)]
@@ -317,6 +348,8 @@ impl Environment {
             keyless_vk,
             keyless_pvk,
             keyless_configuration,
+            patched_jwks,
+            current_time,
             gas_feature_version,
             gas_params,
             storage_gas_params,

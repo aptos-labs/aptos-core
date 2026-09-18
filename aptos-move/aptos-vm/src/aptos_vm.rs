@@ -1955,13 +1955,15 @@ impl AptosVM {
 
         // If there are keyless TXN authenticators, validate them all.
         if !keyless_authenticators.is_empty() && !self.is_simulation {
-            keyless_validation::validate_authenticators(
+            aptos_keyless_validation::validate_authenticators(
                 self.environment().keyless_pvk(),
                 self.environment().keyless_configuration(),
                 &keyless_authenticators,
                 self.features(),
-                session.resolver,
-                module_storage,
+                &keyless_validation::ResolverStateView {
+                    resolver: session.resolver,
+                    module_storage,
+                },
             )?;
         }
 
