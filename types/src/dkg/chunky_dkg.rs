@@ -362,7 +362,11 @@ impl ChunkyDKGSession {
 
         let eks: Vec<ChunkyEncryptPubKey> = target_validators
             .iter()
-            .map(|vi| (&vi.public_key).into())
+            .map(|vi| {
+                vi.public_key()
+                    .expect("on-chain validator consensus keys must be valid")
+                    .into()
+            })
             .collect();
 
         let profile = DKGRoundingProfile::new(
