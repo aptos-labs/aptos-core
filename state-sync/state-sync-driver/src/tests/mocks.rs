@@ -366,6 +366,12 @@ mock! {
             state_kind: StateKind,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
+        async fn get_all_hot_state_values(
+            &self,
+            version: Version,
+            start_index: Option<u64>,
+        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
         async fn get_all_epoch_ending_ledger_infos(
             &self,
             start_epoch: Epoch,
