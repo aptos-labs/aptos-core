@@ -15,7 +15,10 @@ use aptos_types::{
     contract_event::ContractEvent,
     error::{code_invariant_error, PanicError},
     state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
+        state_key::{
+            inner::{StateKeyInner, TradingNativeKey},
+            StateKey,
+        },
         state_value::StateValueMetadata,
     },
     transaction::ChangeSet as StorageChangeSet,
@@ -74,6 +77,10 @@ pub struct VMChangeSet {
     // Changes separated out from the writes, for better concurrency,
     // materialized back into resources when transaction output is computed.
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+
+    /// Native-position writes. These never enter the flat `WriteSet`;
+    /// they're materialized into its `native_positions` sibling bucket.
+    position_write_set: BTreeMap<StateKey, WriteOp>,
 }
 
 impl VMChangeSet {
@@ -82,6 +89,7 @@ impl VMChangeSet {
             resource_write_set: BTreeMap::new(),
             events: vec![],
             delayed_field_change_set: BTreeMap::new(),
+            position_write_set: BTreeMap::new(),
         }
     }
 
@@ -94,7 +102,35 @@ impl VMChangeSet {
             resource_write_set,
             events,
             delayed_field_change_set,
+            position_write_set: BTreeMap::new(),
         }
+    }
+
+    pub fn position_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+        &self.position_write_set
+    }
+
+    /// Replace the Position bucket; validates every key is a Position.
+    pub fn set_position_bucket(
+        &mut self,
+        position_writes: BTreeMap<StateKey, WriteOp>,
+    ) -> PartialVMResult<()> {
+        for key in position_writes.keys() {
+            if !matches!(
+                key.inner(),
+                StateKeyInner::TradingNative(TradingNativeKey::Position { .. })
+            ) {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "position_write_set bucket received a non-Position StateKey"
+                                .to_string(),
+                        ),
+                );
+            }
+        }
+        self.position_write_set = position_writes;
+        Ok(())
     }
 
     // TODO[agg_v2](cleanup) see if we can remove in favor of `new`.
@@ -197,6 +233,7 @@ impl VMChangeSet {
             resource_write_set,
             delayed_field_change_set,
             events,
+            position_write_set,
         } = self;
 
         if !delayed_field_change_set.is_empty() {
@@ -222,6 +259,8 @@ impl VMChangeSet {
                 .collect::<Result<Vec<_>, _>>()?,
         );
         write_set_mut.extend(module_write_set.into_write_ops());
+        // Not materialized into the flat WriteSet; see `VMOutput`.
+        let _ = position_write_set;
 
         let events = events.into_iter().map(|(e, _)| e).collect();
         let write_set = write_set_mut
@@ -615,6 +654,7 @@ impl VMChangeSet {
             resource_write_set: additional_resource_write_set,
             delayed_field_change_set: additional_delayed_field_change_set,
             events: additional_events,
+            position_write_set: additional_position_write_set,
         } = additional_change_set;
 
         Self::squash_additional_resource_writes(
@@ -626,6 +666,12 @@ impl VMChangeSet {
             &mut self.delayed_field_change_set,
             additional_delayed_field_change_set,
         )?;
+        // Last-wins. No create+delete collapse like the main WriteSet:
+        // the position store is an idempotent KV map, so overwrite is
+        // correct. Cross-TX squashing is handled by MVHashMap.
+        for (key, op) in additional_position_write_set {
+            self.position_write_set.insert(key, op);
+        }
         self.events.extend(additional_events);
         Ok(())
     }

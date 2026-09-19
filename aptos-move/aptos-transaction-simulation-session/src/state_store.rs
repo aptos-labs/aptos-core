@@ -5,7 +5,10 @@ use anyhow::{bail, Result};
 use aptos_types::{
     access_path::Path,
     state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
+        state_key::{
+            inner::{StateKeyInner, TradingNativeKey},
+            StateKey,
+        },
         table::TableHandle,
     },
 };
@@ -84,7 +87,13 @@ impl std::fmt::Display for HumanReadable<&StateKey> {
                 write!(f, "table_item::{}::{}", handle.0, hex::encode(key))
             },
             StateKeyInner::Raw(bytes) => write!(f, "raw::{}", hex::encode(bytes)),
-            StateKeyInner::TradingNative(key) => write!(f, "trading_native::{:?}", key),
+            StateKeyInner::TradingNative(key) => match key {
+                TradingNativeKey::Position {
+                    exchange,
+                    account,
+                    market,
+                } => write!(f, "position::{}::{}::{}", exchange, account, market),
+            },
         }
     }
 }
