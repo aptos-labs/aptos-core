@@ -1230,6 +1230,7 @@ impl IncludedArtifacts {
             named_addresses,
             override_std,
             skip_fetch_latest_git_deps,
+            modular_compilation: move_options.modular_compilation,
             bytecode_version,
             compiler_version,
             language_version,

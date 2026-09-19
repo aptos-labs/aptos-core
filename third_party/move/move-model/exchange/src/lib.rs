@@ -196,6 +196,94 @@ pub struct XirModule {
     /// holds only the module's identity.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub friends: Vec<XirModuleRef>,
+    /// Constants declared by this module.
+    ///
+    /// Every constant, not only the non-private ones. A `public const` is
+    /// ordinary interface surface, but a *private* constant is reachable too:
+    /// Move's specification language resolves another module's private
+    /// constants, and the framework relies on it — `hash.spec.move` names
+    /// `features::SHA_512_AND_RIPEMD_160_NATIVES`, which is declared without a
+    /// modifier. Filtering on visibility would therefore drop exactly the case
+    /// that breaks a dependent's spec code.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constants: Vec<XirConstant>,
+    /// Specification functions and schemas declared by this module, as Move
+    /// source.
+    ///
+    /// These are interface: a dependent's `spec` blocks name them across module
+    /// boundaries — `vector::spec_contains`, `features::spec_is_enabled`,
+    /// `ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf` — so an interface
+    /// without them makes any such dependent fail to compile.
+    ///
+    /// Source rather than structure, for the same reason as
+    /// [`XirFunction::source`]: a specification is written in the specification
+    /// language, which XIR's operation set deliberately does not cover. Text
+    /// sidesteps that entirely. Functions and schemas share one table because
+    /// they are emitted identically — as members of a `spec module { .. }`
+    /// block — and nothing downstream needs to tell them apart.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spec_declarations: Vec<XirSpecDeclaration>,
+    /// The module's `use` declarations.
+    ///
+    /// Needed only because [`XirSpecFunction::source`] is copied verbatim and
+    /// therefore still speaks in this module's aliases. Everything the exporter
+    /// *renders* carries full `0xA::m::T` paths and needs none of this.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub uses: Vec<XirUse>,
+}
+
+/// A `use` declaration. See [`XirModule::uses`].
+///
+/// Reconstructed from the model rather than copied as source text: a
+/// declaration's recorded location covers only its path, so `use
+/// std::option::Option;` reads back as `option::Option` — the address silently
+/// missing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirUse {
+    pub address: String,
+    pub module: String,
+    /// `use a::m as alias;`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    /// `use a::m::{one, two as three};`. `Self` appears here as an ordinary
+    /// member name, which is how the brace form binds the module qualifier.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<XirUseMember>,
+}
+
+/// One member of a `use a::m::{..}` declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirUseMember {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+}
+
+/// A constant declaration. See [`XirModule::constants`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirConstant {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub ty: Type,
+    pub value: Value,
+    /// Absent means private, matching [`XirStruct::visibility`]'s convention.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<XirVisibility>,
+}
+
+/// A specification function or schema. See [`XirModule::spec_declarations`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirSpecDeclaration {
+    /// Carried beside the source so a reader can index and diff declarations
+    /// without parsing Move.
+    pub name: String,
+    /// The complete declaration, normalized to the form a `spec module { .. }`
+    /// block takes: `fun f(..) { .. }` or `schema S { .. }`.
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -307,6 +395,26 @@ pub struct XirFunction {
     pub attributes: Vec<XirAttribute>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_map: Option<XirFunctionSourceMap>,
+    /// The function's complete Move source, when a declaration alone does not
+    /// describe it.
+    ///
+    /// Set only for `inline` functions. Those have no entry in the deployed
+    /// module — they are expanded at each call site — so a dependent cannot
+    /// link against a declaration; it needs the *body* in order to inline it.
+    /// For an inline function the body therefore **is** interface, and a change
+    /// to it must invalidate dependents.
+    ///
+    /// This is Move source text inside an otherwise structured format, which is
+    /// a deliberate compromise. The faithful alternative is a typed AST, and
+    /// the one that exists — `ast::XastModule` — rejects `Lambda` outright,
+    /// while 82 of the framework's 100 non-private inline functions are
+    /// higher-order. Rendering to source costs one string and reuses the
+    /// ordinary inliner; carrying an AST would need lambda support in that
+    /// format plus an importer that does not exist.
+    ///
+    /// A producer that has no inline functions — the Lean side — never sets it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// A half-open UTF-8 byte range in the source text supplied with XIR.

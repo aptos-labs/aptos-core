@@ -5,7 +5,7 @@ use crate::{
     ast::{
         AbortKind, AccessSpecifierKind, AddressSpecifier, Condition, ConditionKind, Exp, ExpData,
         FrameSpec, LambdaCaptureKind, MemoryRange, Operation, Pattern, PropertyBag, PropertyValue,
-        QuantKind, ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
+        QuantKind, ResourceSpecifier, Spec, SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -39,6 +39,15 @@ pub struct Sourcifier<'a> {
     sym_alias_map: RefCell<BTreeMap<Symbol, String>>,
     // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names) and more readable (e.g., local var names starting from `_v0`)
     amend: bool,
+    /// Whether to render names outside the enclosing module as `0xA::m::name`
+    /// rather than relying on that module's `use` declarations.
+    ///
+    /// Off by default, which is right when the output is re-read in the context
+    /// of the module it came from. Set it when the rendering is transplanted
+    /// somewhere else — a lone function emitted into a generated file has no
+    /// `use` declarations to shorten against, so both `option::Option` and
+    /// `helper::wrap(..)` there name an unbound module.
+    fully_qualify_external_names: bool,
     /// When set, state labels matching this label are suppressed during rendering.
     /// Used to avoid redundant nested labels like `S1 |~ global<T>(..S1 |~ ...)`.
     enclosing_state_label: Cell<Option<crate::ast::MemoryLabel>>,
@@ -326,7 +335,15 @@ impl<'a> Sourcifier<'a> {
             sym_alias_map: RefCell::new(BTreeMap::new()),
             enclosing_state_label: Cell::new(None),
             context_let_names: RefCell::new(BTreeSet::new()),
+            fully_qualify_external_names: false,
         }
+    }
+
+    /// Renders names outside the enclosing module with their full `0xA::m::name`
+    /// path. See [`Sourcifier::fully_qualify_external_names`].
+    pub fn with_fully_qualified_external_names(mut self) -> Self {
+        self.fully_qualify_external_names = true;
+        self
     }
 
     /// Sets the user-written `let`-binding names for the spec currently being
@@ -467,7 +484,8 @@ impl<'a> Sourcifier<'a> {
             Self::amend_fun_name(self.env(), self.sym(fun_env.get_name()), self.amend),
             self.type_params(fun_env.get_type_parameters_ref())
         );
-        let tctx = fun_env.get_type_display_ctx();
+        let mut tctx = fun_env.get_type_display_ctx();
+        tctx.fully_qualify_external_types = self.fully_qualify_external_names;
         let params = fun_env
             .get_parameters()
             .into_iter()
@@ -881,6 +899,56 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, ";");
     }
 
+    /// Prints a specification function as `spec fun name(..): T { body }`.
+    ///
+    /// Move accepts this form directly inside a `module` block — see
+    /// `option::spec_contains` — so the output drops into an ordinary module
+    /// without needing an enclosing `spec module { .. }`.
+    ///
+    /// A declaration without a body is emitted as `native fun`, which is how
+    /// the language spells an uninterpreted specification function.
+    pub fn print_spec_fun(&self, module_id: ModuleId, decl: &SpecFunDecl) {
+        let module_env = self.env().get_module(module_id);
+        let mut tctx = module_env.get_type_display_ctx();
+        tctx.type_param_names = Some(decl.type_params.iter().map(|param| param.0).collect());
+        tctx.fully_qualify_external_types = self.fully_qualify_external_names;
+
+        emit!(self.writer, "spec ");
+        if decl.uninterpreted || decl.is_native || decl.body.is_none() {
+            emit!(self.writer, "native ");
+        }
+        emit!(
+            self.writer,
+            "fun {}{}",
+            self.sym(decl.name),
+            self.type_params(&decl.type_params)
+        );
+        let params = decl
+            .params
+            .iter()
+            .map(|Parameter(sym, ty, _)| format!("{}: {}", self.sym(*sym), ty.display(&tctx)))
+            .join(", ");
+        emit!(
+            self.writer,
+            "({}): {}",
+            params,
+            decl.result_type.display(&tctx)
+        );
+
+        match &decl.body {
+            None => emitln!(self.writer, ";"),
+            Some(body) => {
+                emitln!(self.writer, " {");
+                self.writer.indent();
+                let exp_sourcifier = ExpSourcifier::for_spec(self, tctx, self.amend);
+                exp_sourcifier.print_exp(Prio::General, true, body);
+                emitln!(self.writer);
+                self.writer.unindent();
+                emitln!(self.writer, "}");
+            },
+        }
+    }
+
     /// Check for dummy field the compiler introduces for empty structs
     fn is_dummy_field(&self, fld: &FieldEnv) -> bool {
         fld.get_type().is_bool() && self.sym(fld.get_name()) == "dummy_field"
@@ -1017,6 +1085,10 @@ impl<'a> Sourcifier<'a> {
         if tctx.is_current_module(module_name) {
             // Current module, no qualification needed
             "".to_string()
+        } else if self.fully_qualify_external_names {
+            // Where this rendering lands there are no `use` declarations, so
+            // neither an alias nor a bare module name resolves.
+            format!("{}::", module_env.get_full_name_str())
         } else {
             format!(
                 "{}::",

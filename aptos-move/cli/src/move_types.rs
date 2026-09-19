@@ -102,6 +102,15 @@ pub struct MovePackageOptions {
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
 
+    /// Compile each package separately against its dependencies' XIR
+    /// interfaces, reusing packages whose inputs have not changed.
+    ///
+    /// Experimental. The result must be byte-identical to an ordinary build;
+    /// a package whose dependency publishes no interface is compiled the
+    /// ordinary way.
+    #[clap(long)]
+    pub modular_compilation: bool,
+
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -174,6 +183,7 @@ impl MovePackageOptions {
             named_addresses: Default::default(),
             override_std: None,
             skip_fetch_latest_git_deps: true,
+            modular_compilation: false,
             bytecode_version: None,
             compiler_version: Some(CompilerVersion::latest_stable()),
             language_version: Some(LanguageVersion::latest_stable()),

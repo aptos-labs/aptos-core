@@ -95,6 +95,36 @@ pub struct CanonicalModule {
     pub structs: Vec<CanonicalStruct>,
     /// Sorted by name.
     pub functions: Vec<CanonicalFunction>,
+    /// Sorted by name.
+    ///
+    /// A constant's *value* is included, not just its name and type: a
+    /// dependent's specifications read the value, so changing `3` to `4`
+    /// changes what they mean even though nothing about the declaration moves.
+    pub constants: Vec<CanonicalConstant>,
+    /// **Order preserved**: these are emitted ahead of the copied
+    /// specification text and decide what its aliases resolve to, so reordering
+    /// them can change what a dependent compiles.
+    pub uses: Vec<String>,
+    /// Sorted by name.
+    ///
+    /// Specification function bodies are included for the same reason inline
+    /// function bodies are (see [`CanonicalFunction::source`]): a dependent
+    /// compiles against the body, not merely the signature.
+    pub spec_declarations: Vec<CanonicalSpecDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CanonicalConstant {
+    pub name: String,
+    pub visibility: String,
+    pub ty: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CanonicalSpecDeclaration {
+    pub name: String,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -153,6 +183,19 @@ pub struct CanonicalFunction {
     pub acquires: Vec<String>,
     /// Sorted.
     pub attributes: Vec<String>,
+    /// **Order preserved**: parameter position. Included because a name is not
+    /// decoration in a Move signature — receiver syntax (`v.len()`) resolves
+    /// only against a function whose first parameter is named `self`, so a
+    /// rename removes call sites that used to compile.
+    pub local_names: Vec<Option<String>>,
+    /// The rendered body of an `inline` function, and nothing otherwise.
+    ///
+    /// This is the one place a *body* belongs in the hash. An inline function
+    /// is expanded into its callers rather than linked to, so its body is
+    /// literally part of what dependents compile — changing it changes their
+    /// bytecode, and they must rebuild. Every other function's body is excluded
+    /// for exactly the symmetric reason.
+    pub source: Option<String>,
 }
 
 /// Builds the canonical projection.
@@ -192,11 +235,75 @@ pub fn canonical_interface(module: &XirModule) -> Result<CanonicalModule> {
         .collect::<Result<Vec<_>>>()?;
     functions.sort_by(|a, b| a.name.cmp(&b.name));
 
+    let mut constants = module
+        .constants
+        .iter()
+        .map(|decl| {
+            Ok(CanonicalConstant {
+                name: decl.name.clone(),
+                visibility: match decl.visibility {
+                    None | Some(XirVisibility::Private) => "private",
+                    Some(XirVisibility::Public) => "public",
+                    Some(XirVisibility::Friend) => "friend",
+                }
+                .to_owned(),
+                ty: names.ty(&decl.ty)?,
+                value: format!("{:?}", decl.value),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    constants.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut spec_declarations = module
+        .spec_declarations
+        .iter()
+        .map(|decl| CanonicalSpecDeclaration {
+            name: decl.name.clone(),
+            source: decl.source.clone(),
+        })
+        .collect::<Vec<_>>();
+    spec_declarations.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // Order preserved: a `use` decides what the copied specification text
+    // below it resolves to, so this is not a set.
+    let uses = module
+        .uses
+        .iter()
+        .map(|decl| {
+            let members = decl
+                .members
+                .iter()
+                .map(|member| match &member.alias {
+                    Some(alias) => format!("{} as {}", member.name, alias),
+                    None => member.name.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "{}::{}{}{}",
+                decl.address,
+                decl.module,
+                decl.alias
+                    .as_ref()
+                    .map(|alias| format!(" as {alias}"))
+                    .unwrap_or_default(),
+                if members.is_empty() {
+                    String::new()
+                } else {
+                    format!("::{{{members}}}")
+                }
+            )
+        })
+        .collect::<Vec<_>>();
+
     Ok(CanonicalModule {
         module: format!("{}::{}", module.module.address, module.module.name),
         friends,
+        uses,
         structs,
         functions,
+        constants,
+        spec_declarations,
     })
 }
 
@@ -332,6 +439,8 @@ impl<'a> Names<'a> {
             returns: self.ty_list(&decl.returns)?,
             acquires,
             attributes: attributes(&decl.attributes),
+            local_names: decl.local_names.clone(),
+            source: decl.source.clone(),
         })
     }
 }
@@ -510,6 +619,23 @@ mod tests {
                 "module name",
                 Box::new(|v: &mut Value| v["module"]["name"] = json!("other")),
             ),
+            // A parameter name is not decoration. Receiver syntax (`v.len()`)
+            // resolves only against a function whose first parameter is named
+            // `self`, so renaming it removes call sites that used to compile.
+            // This was in the *unobservable* list until the exporter began
+            // carrying `local_names` for exactly that reason.
+            (
+                "local names",
+                Box::new(|v: &mut Value| v["functions"][0]["local_names"] = json!(["x", "y", "z"])),
+            ),
+            // The generated interface emits these ahead of the copied
+            // specification text, so they decide what its aliases resolve to.
+            (
+                "a use declaration",
+                Box::new(|v: &mut Value| {
+                    v["uses"] = json!([{"address": "0x1", "module": "vector"}])
+                }),
+            ),
             (
                 "module address",
                 Box::new(|v: &mut Value| v["module"]["address"] = json!("0x43")),
@@ -646,10 +772,6 @@ mod tests {
                         .unwrap()
                         .push(json!("u8"))
                 }),
-            ),
-            (
-                "local names",
-                Box::new(|v: &mut Value| v["functions"][0]["local_names"] = json!(["x", "y", "z"])),
             ),
             (
                 "a specification",

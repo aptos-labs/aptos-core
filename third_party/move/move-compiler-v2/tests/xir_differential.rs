@@ -17,9 +17,11 @@
 //! bytes is what rules that out.
 
 use move_compiler_v2::{
-    run_checker, run_move_compiler_to_stderr, xir_export, xir_interface_generator, Options,
+    run_checker, run_move_compiler_to_stderr, xir_export, xir_interface_generator, Experiment,
+    Options,
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model_exchange::{Value, XirVisibility};
 use std::{fs, path::Path};
 
 fn options(sources: Vec<String>) -> Options {
@@ -86,6 +88,33 @@ fn compile_with_xir_dependencies(
             }
             let interface = xir_export::export_interface(&module)
                 .unwrap_or_else(|e| panic!("exporting `{}`: {:#}", module.get_full_name_str(), e));
+
+            // No compiler-generated wrapper reaches the interface. `pack$S`,
+            // `borrow$S$N` and friends are synthesized during file-format
+            // generation to realize struct visibility; a dependent derives its
+            // own handles for them from the *struct declaration*, so carrying
+            // them would be both redundant and unparseable — `$` is not a Move
+            // identifier, and the interface is consumed as Move source.
+            //
+            // This assertion cannot fail *here*: dependencies are modelled with
+            // `run_checker`, which stops before file-format generation, so the
+            // wrappers do not exist in this model to begin with. It is kept as
+            // documentation of the invariant, and because a future change to
+            // model dependencies with a full compile would make it bite. The
+            // filter is actually enforced by `move-package`'s modular build
+            // tests, whose models *have* been through the whole compiler.
+            if let Some(generated) = interface
+                .functions
+                .iter()
+                .find(|function| function.name.contains('$'))
+            {
+                panic!(
+                    "`{}` exported the compiler-generated wrapper `{}`",
+                    module.get_full_name_str(),
+                    generated.name
+                );
+            }
+
             let path = dir.join(format!(
                 "dep{index}_{}.xir.json",
                 module.get_full_name_str().replace("::", "_")
@@ -135,6 +164,12 @@ module 0xcafe::dep {
     friend 0xcafe::helper;
 
     friend struct Token has drop { v: u64 }
+
+    /// Packed and read *directly* by the target, across the package boundary.
+    /// That is what drives the compiler to synthesize `pack$Slot` and
+    /// `borrow$Slot$N` handles from this declaration alone, since an interface
+    /// carries no such functions.
+    public struct Slot has copy, drop, store { a: u64, b: bool }
 
     struct Box<T: store> has store, drop { item: T, tag: u8 }
     struct Marker<phantom P> has copy, drop, store { id: u256 }
@@ -212,7 +247,14 @@ module 0xcafe::client {
         total = total + (dep::widen(2) as u64);
         let m: dep::Marker<bool> = dep::marker();
         let _ = m;
-        total
+        // Pack, read a field of, and unpack a foreign struct directly. Each is
+        // a compiler-generated wrapper (`pack$Slot`, `borrow$Slot$0`,
+        // `unpack$Slot`) that the interface does not carry and the dependent
+        // must derive from the struct declaration.
+        let slot = dep::Slot { a: 4, b: true };
+        total = total + slot.a;
+        let dep::Slot { a, b: _ } = slot;
+        total + a
     }
 }
 "#;
@@ -251,15 +293,18 @@ fn xir_dependencies_produce_identical_bytecode() {
     );
 }
 
-/// A non-private constant is reported, not silently dropped.
+/// Constants cross an interface, private ones included.
 ///
-/// Move 2.5 allows `public`/`package`/`friend` on constants and `M::PUB`
-/// resolves across modules, so such a constant is interface surface that
-/// `XirModule` has no table for. Exporting anyway would produce an interface
-/// missing part of its API, and the dependent would fail with an unbound-name
-/// error far from the cause.
+/// A `public` constant is plainly interface surface — Move 2.5 resolves
+/// `M::SHARED` across modules. A *private* one is too, which is less obvious:
+/// the specification language reads another module's private constants, and the
+/// framework depends on it, `hash.spec.move` naming
+/// `features::SHA_512_AND_RIPEMD_160_NATIVES` where that constant carries no
+/// modifier. Filtering on visibility would drop exactly the case that breaks a
+/// dependent's spec code, so the exporter carries both and keeps each one's
+/// visibility as written.
 #[test]
-fn non_private_constants_are_reported() {
+fn constants_cross_an_interface_with_their_visibility() {
     let dir = tempfile::Builder::new()
         .prefix("xir-constants")
         .tempdir()
@@ -271,6 +316,7 @@ fn non_private_constants_are_reported() {
 module 0xcafe::consts {
     const PRIVATE: u64 = 1;
     public const SHARED: u64 = 2;
+    const BYTES: vector<u8> = vector[1, 2];
     public fun get(): u64 { PRIVATE }
 }
 "#,
@@ -282,44 +328,143 @@ module 0xcafe::consts {
         .get_modules()
         .find(|module| module.is_primary_target())
         .expect("the module was modelled");
-    let error =
-        xir_export::export_interface(&module).expect_err("a non-private constant must be reported");
-    let error = format!("{error:#}");
-    assert!(error.contains("SHARED"), "{error}");
-    assert!(error.contains("monolithically"), "{error}");
+    let interface = xir_export::export_interface(&module).expect("constants are exportable");
+
+    let by_name = |name: &str| {
+        interface
+            .constants
+            .iter()
+            .find(|constant| constant.name == name)
+            .unwrap_or_else(|| panic!("`{name}` is missing from the interface"))
+    };
+    assert_eq!(
+        by_name("PRIVATE").visibility,
+        None,
+        "private is the default"
+    );
+    assert_eq!(
+        by_name("SHARED").visibility,
+        Some(XirVisibility::Public),
+        "a `public const` must stay public"
+    );
+    assert_eq!(by_name("PRIVATE").value, Value::Num("1".to_owned()));
+    assert_eq!(
+        by_name("BYTES").value,
+        Value::Vector(vec![Value::Num("1".to_owned()), Value::Num("2".to_owned())]),
+        "a byte string is carried element-wise"
+    );
+
+    // And the lowered interface declares them, so a dependent resolves them.
+    let generated = xir_interface_generator::xir_module_to_move_source(&interface).unwrap();
+    assert!(
+        generated.contains("public const SHARED: u64 = 2;"),
+        "generated interface:\n{generated}"
+    );
+    assert!(
+        generated.contains("const PRIVATE: u64 = 1;"),
+        "generated interface:\n{generated}"
+    );
 }
 
-/// A private constant does not block an export: it is not interface surface.
+/// Specification functions and schemas cross an interface, so a dependent's
+/// own `spec` blocks still compile.
+///
+/// This is not decoration. A dependent's specifications name these across
+/// module boundaries — `vector::spec_contains`, `features::spec_is_enabled`,
+/// `ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf` — and an interface
+/// without them fails the dependent at compile time. The framework hits it
+/// immediately: `aptos-stdlib`'s `capability.spec.move` calls
+/// `vector::spec_contains`, which lives in `move-stdlib`.
+///
+/// They cross as the *original source text* rather than as a rendering.
+/// `Sourcifier` targets the implementation language and loses fidelity on
+/// specification constructs — it expands `self.borrow()` into `borrow(&self)`,
+/// which specifications reject. Copying cannot have such gaps, at the cost of
+/// keeping the module's `use` aliases, which is why the interface re-emits
+/// those.
 #[test]
-fn private_constants_do_not_block_an_export() {
+fn spec_declarations_cross_an_interface() {
     let dir = tempfile::Builder::new()
-        .prefix("xir-private-constants")
+        .prefix("xir-spec-decls")
         .tempdir()
         .unwrap();
-    let source = dir.path().join("consts.move");
+    let helper = dir.path().join("helper.move");
     fs::write(
-        &source,
-        "module 0xcafe::privc { const P: u64 = 1; public fun get(): u64 { P } }",
+        &helper,
+        "module 0xcafe::limits { public fun cap(): u64 { 7 } }",
+    )
+    .unwrap();
+    let dependency = dir.path().join("dep.move");
+    fs::write(
+        &dependency,
+        r#"
+module 0xcafe::specdep {
+    use 0xcafe::limits;
+    const LIMIT: u64 = 7;
+    public fun pick(): u64 { limits::cap() }
+    spec fun spec_under_limit(x: u64): bool { x < LIMIT }
+    spec schema UnderLimit { x: u64; aborts_if !spec_under_limit(x); }
+}
+"#,
     )
     .unwrap();
 
-    let env = run_checker(options(vec![source.to_string_lossy().into_owned()])).unwrap();
+    let env = run_checker(Options {
+        dependencies: vec![helper.to_string_lossy().into_owned()],
+        ..options(vec![dependency.to_string_lossy().into_owned()])
+    })
+    .unwrap();
     let module = env
         .get_modules()
         .find(|module| module.is_primary_target())
-        .expect("the module was modelled");
-    xir_export::export_interface(&module).expect("a private constant is not interface surface");
+        .expect("the dependency was modelled");
+    let interface = xir_export::export_interface(&module).unwrap();
+
+    let mut names = interface
+        .spec_declarations
+        .iter()
+        .map(|decl| decl.name.as_str())
+        .collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(
+        names,
+        vec!["UnderLimit", "spec_under_limit"],
+        "a function and a schema both belong in an interface"
+    );
+
+    let generated = xir_interface_generator::xir_module_to_move_source(&interface).unwrap();
+    // Both are emitted at module level. A schema is *only* accepted there, and
+    // one table holds both, so both take the same form.
+    assert!(
+        generated.contains("spec fun spec_under_limit"),
+        "generated interface:\n{generated}"
+    );
+    assert!(
+        generated.contains("spec schema UnderLimit"),
+        "generated interface:\n{generated}"
+    );
+    // The copied text still says `vector`, so the aliases have to travel too.
+    assert!(
+        generated.contains("use 0xcafe::limits;"),
+        "the interface must re-emit the module's `use` declarations:\n{generated}"
+    );
 }
 
-/// A `public inline` function is not offered by an interface.
+/// A `public inline` function crosses an interface as *source*, and a caller
+/// can expand it.
 ///
-/// It has no entry in the deployed module, so declaring it — which the
-/// interface would do as `native` — produces a dependent whose calls fail at
-/// runtime with `FUNCTION_RESOLUTION_FAILURE`. Omitting it makes the same
-/// program fail at compile time instead, which is the honest outcome until the
-/// package system can fall back to a monolithic build.
+/// An inline function has no entry in the deployed module, so it cannot be
+/// declared `native` and linked to — the call would fail at runtime with
+/// `FUNCTION_RESOLUTION_FAILURE`. The interface therefore carries its rendered
+/// body (`XirFunction::source`) and the dependent inlines it exactly as it
+/// would from a source dependency.
+///
+/// This is the case that decides whether the feature engages on real code:
+/// every one of `move-stdlib`'s 36 non-private inline functions is
+/// higher-order, so a lambda-taking function like `twice` here is the common
+/// shape, not an exotic one.
 #[test]
-fn inline_functions_are_not_offered_by_an_interface() {
+fn inline_functions_cross_an_interface_as_source() {
     let dir = tempfile::Builder::new()
         .prefix("xir-inline")
         .tempdir()
@@ -350,11 +495,33 @@ module 0xcafe::inl {
         .collect::<Vec<_>>();
     assert_eq!(
         names,
-        vec!["plain"],
-        "an inline function must not appear in an interface"
+        vec!["plain", "twice"],
+        "an inline function must appear in an interface"
     );
 
-    // And a caller therefore fails at compile time, not at runtime.
+    // The inline one carries a body; the ordinary one does not — it is linked
+    // against, so a declaration suffices.
+    let by_name = |name: &str| {
+        interface
+            .functions
+            .iter()
+            .find(|function| function.name == name)
+            .unwrap()
+    };
+    assert!(
+        by_name("twice")
+            .source
+            .as_deref()
+            .unwrap_or_default()
+            .contains("f(f(x))"),
+        "the inline function's body did not cross the interface"
+    );
+    assert!(
+        by_name("plain").source.is_none(),
+        "a linkable function needs no body in the interface"
+    );
+
+    // And a caller can now expand it.
     let path = dir.path().join("inl.xir.json");
     fs::write(&path, serde_json::to_string(&interface).unwrap()).unwrap();
     let caller = dir.path().join("caller.move");
@@ -368,8 +535,200 @@ module 0xcafe::inl {
             xir_dependencies: vec![path.to_string_lossy().into_owned()],
             ..options(vec![caller.to_string_lossy().into_owned()])
         })
-        .is_err(),
-        "calling an inline function through an interface must be a compile error"
+        .is_ok(),
+        "a caller must be able to inline a function offered by an interface"
+    );
+}
+
+/// A rendered inline body must stand on its own in the file it lands in.
+///
+/// It is written into a generated interface that has no `use` declarations and
+/// no spec functions, so two things that are fine in the original module are
+/// fatal there: a type named by its short module alias, and a `spec` block
+/// calling into the module's spec file. Both were found by the framework sweeps
+/// rather than by reasoning, and both fail loudly — the body simply does not
+/// parse or resolve — so the risk is not silence but a broken build.
+#[test]
+fn a_rendered_inline_body_needs_no_context_from_its_module() {
+    let dir = tempfile::Builder::new()
+        .prefix("xir-inline-context")
+        .tempdir()
+        .unwrap();
+    let helper = dir.path().join("helper.move");
+    fs::write(
+        &helper,
+        "module 0xcafe::helper { public struct Wrapped has copy, drop { v: u64 } \
+         public fun wrap(v: u64): Wrapped { Wrapped { v } } }",
+    )
+    .unwrap();
+    let dependency = dir.path().join("dep.move");
+    fs::write(
+        &dependency,
+        r#"
+module 0xcafe::inl {
+    use 0xcafe::helper::{Self, Wrapped};
+    spec module { fun spec_ok(v: u64): bool { v > 0 } }
+    /// Names `Wrapped` through a `use`, and asserts via a spec function that
+    /// exists only in this module's spec.
+    public inline fun wrap_checked(v: u64): Wrapped {
+        spec { assert spec_ok(v); };
+        helper::wrap(v)
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    let env = run_checker(Options {
+        dependencies: vec![helper.to_string_lossy().into_owned()],
+        ..options(vec![dependency.to_string_lossy().into_owned()])
+    })
+    .unwrap();
+    let module = env
+        .get_modules()
+        .find(|module| module.is_primary_target())
+        .expect("the dependency was modelled");
+    let interface = xir_export::export_interface(&module).unwrap();
+    let source = interface
+        .functions
+        .iter()
+        .find(|function| function.name == "wrap_checked")
+        .and_then(|function| function.source.clone())
+        .expect("the inline function carries its body");
+
+    assert!(
+        source.contains("0xcafe::helper::Wrapped"),
+        "the type must carry its address, since the interface has no `use`; got:\n{source}"
+    );
+    assert!(
+        !source.contains("spec_ok"),
+        "a spec function cannot be named from an interface; got:\n{source}"
+    );
+
+    // The real check: a caller compiles against it.
+    let path = dir.path().join("inl.xir.json");
+    fs::write(&path, serde_json::to_string(&interface).unwrap()).unwrap();
+    let caller = dir.path().join("caller.move");
+    fs::write(
+        &caller,
+        "module 0xcafe::caller { public fun go(): u64 { \
+         0xcafe::helper::Wrapped { v: _ } = 0xcafe::inl::wrap_checked(1); 1 } }",
+    )
+    .unwrap();
+    let compiled = run_move_compiler_to_stderr(Options {
+        dependencies: vec![helper.to_string_lossy().into_owned()],
+        xir_dependencies: vec![path.to_string_lossy().into_owned()],
+        ..options(vec![caller.to_string_lossy().into_owned()])
+    });
+    assert!(
+        compiled.is_ok(),
+        "the rendered body did not compile in a foreign file: {:?}",
+        compiled.err()
+    );
+}
+
+/// Every call in a target's bytecode resolves back to a model function, even
+/// when the callee came from an interface.
+///
+/// Packing a dependency's public struct or enum across module boundaries emits
+/// a call to a compiler-generated wrapper — `pack$Shape$Line` and friends.
+/// Generating the *handle* needs only the struct declaration, which an
+/// interface carries, so bytecode comes out fine and every bytecode-level test
+/// passes. What breaks is the step after: mapping each handle back to a
+/// `FunctionEnv`. Those wrappers are declared in a callee's model only when it
+/// is loaded from bytecode or compiled from source, and a callee described by
+/// an interface is neither.
+///
+/// Nothing in this crate consumes that mapping, which is why the gap reached
+/// the Aptos e2e suite before anything caught it —
+/// `aptos_framework::extended_checks` rebuilds stackless bytecode from the
+/// compiled module and resolves every callee. The assertion here is that
+/// consumer's precondition, checked without depending on it.
+#[test]
+fn every_call_in_the_target_resolves_to_a_model_function() {
+    let dir = tempfile::Builder::new()
+        .prefix("xir-callee-resolution")
+        .tempdir()
+        .unwrap();
+    let dependency = dir.path().join("dep.move");
+    fs::write(
+        &dependency,
+        r#"
+module 0xcafe::shapes {
+    public enum Shape has copy, drop, store {
+        Point,
+        Line(u64),
+        Rect { w: u64, h: u64 },
+    }
+    public struct Slot has copy, drop, store { a: u64 }
+}
+"#,
+    )
+    .unwrap();
+
+    let env = run_checker(options(vec![dependency.to_string_lossy().into_owned()])).unwrap();
+    let module = env
+        .get_modules()
+        .find(|module| module.is_primary_target())
+        .expect("the dependency was modelled");
+    let interface = xir_export::export_interface(&module).unwrap();
+    let path = dir.path().join("shapes.xir.json");
+    fs::write(&path, serde_json::to_string(&interface).unwrap()).unwrap();
+
+    // Packs a variant, a positional variant, a named variant and a struct, so
+    // the target names several wrapper shapes rather than just one.
+    let target = dir.path().join("target.move");
+    fs::write(
+        &target,
+        r#"
+module 0xcafe::client {
+    use 0xcafe::shapes::{Shape, Slot};
+    public fun build(): (Shape, Shape, Shape, Slot) {
+        (Shape::Point, Shape::Line(1), Shape::Rect { w: 2, h: 3 }, Slot { a: 4 })
+    }
+    public fun width(s: &Shape): u64 {
+        match (s) { Shape::Rect { w, h: _ } => *w, _ => 0 }
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    let (compiled_env, _) = run_move_compiler_to_stderr(Options {
+        xir_dependencies: vec![path.to_string_lossy().into_owned()],
+        // The Aptos build turns this on because `extended_checks` needs the
+        // bytecode beside the model; without it there is nothing here to
+        // resolve handles against.
+        experiments: vec![format!("{}=on", Experiment::ATTACH_COMPILED_MODULE)],
+        ..options(vec![target.to_string_lossy().into_owned()])
+    })
+    .expect("compiling against the interface");
+
+    let mut resolved = 0;
+    for module in compiled_env.get_modules() {
+        let Some(compiled) = module.get_verified_module() else {
+            continue;
+        };
+        for index in 0..compiled.function_handles.len() {
+            let handle = move_binary_format::file_format::FunctionHandleIndex(index as u16);
+            // Panics rather than returning `None` when a callee is missing from
+            // the model, which is the failure this guards against.
+            let callee = module
+                .get_used_function(handle)
+                .expect("a compiled module is attached");
+            if callee.is_struct_api() {
+                assert!(
+                    callee.get_struct_api_struct().is_some(),
+                    "`{}` resolved but does not report the struct it serves",
+                    callee.get_full_name_str()
+                );
+                resolved += 1;
+            }
+        }
+    }
+    assert!(
+        resolved > 0,
+        "the target packed nothing across the interface, so this proved nothing"
     );
 }
 
