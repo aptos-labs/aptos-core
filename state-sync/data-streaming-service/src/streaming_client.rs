@@ -46,6 +46,18 @@ pub trait DataStreamingClient {
         state_kind: StateKind,
     ) -> Result<DataStreamListener, Error>;
 
+    /// Fetches the hot state values at the specified version. If `start_index`
+    /// is specified, the hot state values will be fetched starting at the
+    /// `start_index` (inclusive). Otherwise, the start index will be 0.
+    ///
+    /// Note: hot state leaves are `HotStateValue`s, so this is separate from
+    /// `get_all_state_values` rather than another `StateKind`.
+    async fn get_all_hot_state_values(
+        &self,
+        version: Version,
+        start_index: Option<u64>,
+    ) -> Result<DataStreamListener, Error>;
+
     /// Fetches all epoch ending ledger infos starting at `start_epoch`
     /// (inclusive) and ending at the last known epoch advertised in the network.
     async fn get_all_epoch_ending_ledger_infos(
@@ -173,6 +185,7 @@ pub struct StreamRequestMessage {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StreamRequest {
     GetAllEpochEndingLedgerInfos(GetAllEpochEndingLedgerInfosRequest),
+    GetAllHotStates(GetAllHotStatesRequest),
     GetAllStates(GetAllStatesRequest),
     GetAllTransactions(GetAllTransactionsRequest),
     GetAllTransactionOutputs(GetAllTransactionOutputsRequest),
@@ -188,6 +201,7 @@ impl StreamRequest {
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::GetAllEpochEndingLedgerInfos(_) => "get_all_epoch_ending_ledger_infos",
+            Self::GetAllHotStates(_) => "get_all_hot_states",
             Self::GetAllStates(_) => "get_all_states",
             Self::GetAllTransactions(_) => "get_all_transactions",
             Self::GetAllTransactionOutputs(_) => "get_all_transaction_outputs",
@@ -216,6 +230,13 @@ pub struct GetAllStatesRequest {
     pub version: Version,
     pub start_index: u64,
     pub state_kind: StateKind,
+}
+
+/// A client request for fetching all hot state values at a version.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GetAllHotStatesRequest {
+    pub version: Version,
+    pub start_index: u64,
 }
 
 /// A client request for fetching all transactions with proofs.
@@ -348,6 +369,19 @@ impl DataStreamingClient for StreamingServiceClient {
             version,
             start_index,
             state_kind,
+        });
+        self.send_request_and_await_response(client_request).await
+    }
+
+    async fn get_all_hot_state_values(
+        &self,
+        version: u64,
+        start_index: Option<u64>,
+    ) -> Result<DataStreamListener, Error> {
+        let start_index = start_index.unwrap_or(0);
+        let client_request = StreamRequest::GetAllHotStates(GetAllHotStatesRequest {
+            version,
+            start_index,
         });
         self.send_request_and_await_response(client_request).await
     }
