@@ -8,7 +8,7 @@
 //! constructors used by the binary module loader.
 
 use crate::{
-    ast::{Attribute, ModuleName, Spec},
+    ast::{Attribute, FriendDecl, ModuleName, Spec},
     model::{
         FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, Parameter,
         QualifiedId, StructData, StructId, StructVariant, TypeParameter,
@@ -26,6 +26,9 @@ pub struct XirModuleData {
     pub name: ModuleName,
     pub structs: Vec<XirStructData>,
     pub functions: Vec<XirFunctionData>,
+    /// Modules this one grants friend access to. A `Friend`-visible
+    /// declaration says only that it *is* friend-visible; this says to whom.
+    pub friends: Vec<FriendDecl>,
 }
 
 pub struct XirStructData {
@@ -36,6 +39,7 @@ pub struct XirStructData {
     pub fields: Vec<FieldData>,
     pub variants: Option<Vec<XirVariantData>>,
     pub visibility: Visibility,
+    pub attributes: Vec<Attribute>,
 }
 
 pub struct XirVariantData {
@@ -110,6 +114,7 @@ impl GlobalEnv {
                             variants,
                             false,
                             decl.visibility,
+                            decl.attributes,
                         ),
                     )
                     .is_none(),
@@ -144,12 +149,30 @@ impl GlobalEnv {
             );
         }
 
-        Ok(self.add(
+        // Resolve friend declarations against the modules already loaded.
+        //
+        // Source modules get this from `check_and_update_friend_info`, which
+        // runs at the end of the model builder — after every module has an id.
+        // An XIR module is added later than that, so it never passes through
+        // it, and `GlobalEnv::add` leaves `friend_modules` empty. Since
+        // file-format generation serializes friends from `friend_modules` and
+        // not from `friend_decls`, skipping this would silently drop every
+        // friend declaration from the bytecode of an XIR *target*.
+        let mut friend_decls = module.friends;
+        let mut friend_modules = BTreeSet::new();
+        for friend_decl in friend_decls.iter_mut() {
+            if let Some(friend) = self.find_module(&friend_decl.module_name) {
+                friend_decl.module_id = Some(friend.get_id());
+                friend_modules.insert(friend.get_id());
+            }
+        }
+
+        let module_id = self.add(
             module.loc,
             module.name,
             vec![],
             vec![],
-            vec![],
+            friend_decls,
             BTreeMap::new(),
             structs,
             functions,
@@ -158,6 +181,12 @@ impl GlobalEnv {
             vec![],
             Spec::default(),
             vec![],
-        ))
+        );
+        // Unlike the source path, an unresolved friend is not an error here.
+        // XIR modules are loaded one at a time and a friend is typically a
+        // *dependent*, which need not be present — and an absent friend only
+        // withholds an access grant, so being lenient cannot widen access.
+        self.get_module_data_mut(module_id).friend_modules = friend_modules;
+        Ok(module_id)
     }
 }
