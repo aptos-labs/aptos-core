@@ -7,8 +7,8 @@ use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    sharded_jmt_state::PositionStateWithSummary, state_summary::LedgerStateSummary,
-    state_with_summary::LedgerWithSummary,
+    positions::PositionOverlay, sharded_jmt_state::PositionStateWithSummary,
+    state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
 };
 use derive_more::Deref;
 use std::sync::Arc;
@@ -28,6 +28,7 @@ impl StateCheckpointOutput {
         hot_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
         position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
         position_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
+        positions: Option<LedgerWithSummary<PositionOverlay>>,
     ) -> Self {
         Self::new_impl(Inner {
             state_summary,
@@ -35,12 +36,14 @@ impl StateCheckpointOutput {
             hot_state_checkpoint_hashes,
             position_state_summary,
             position_state_checkpoint_hashes,
+            positions,
         })
     }
 
     pub fn new_empty(
         parent_state_summary: LedgerStateSummary,
         position_state_summary: Option<LedgerWithSummary<PositionStateWithSummary>>,
+        positions: Option<LedgerWithSummary<PositionOverlay>>,
     ) -> Self {
         Self::new_impl(Inner {
             state_summary: parent_state_summary,
@@ -48,12 +51,14 @@ impl StateCheckpointOutput {
             hot_state_checkpoint_hashes: None,
             position_state_summary,
             position_state_checkpoint_hashes: None,
+            positions,
         })
     }
 
     pub fn new_dummy() -> Self {
         Self::new_empty(
             LedgerStateSummary::new_empty(HotStateConfig::default()),
+            None,
             None,
         )
     }
@@ -65,12 +70,13 @@ impl StateCheckpointOutput {
     }
 
     pub fn reconfig_suffix(&self) -> Self {
-        // An empty reconfig-suffix block produces no position writes, so the
-        // position state is unchanged — propagate it for the next block's
-        // freeze base.
+        // An empty reconfig-suffix block produces no position writes, so
+        // both `position_state_summary` and `positions` are unchanged
+        // — propagate them for the next block's freeze base / read floor.
         Self::new_empty(
             self.state_summary.clone(),
             self.position_state_summary.clone(),
+            self.positions.clone(),
         )
     }
 }
@@ -89,4 +95,10 @@ pub struct Inner {
     /// Per-transaction position state root: `Some` at the checkpoint index,
     /// `None` elsewhere. `None` (the whole option) unless the feature is on.
     pub position_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
+    /// Position overlay after this chunk. Computed in the execution
+    /// phase — earlier than `position_state_summary`, which this stage
+    /// produces — and threaded through here for the commit path, which
+    /// publishes it onto `bundle.positions` for validator-side scanner
+    /// reads. `None` when native position is disabled.
+    pub positions: Option<LedgerWithSummary<PositionOverlay>>,
 }

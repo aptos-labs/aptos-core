@@ -2,9 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Physical storage schema for the native-position
-//! `stale_position_value_index` CF. Hash-keyed, mirroring
-//! `stale_state_value_index_by_key_hash` from the main-state tier —
-//! same `(stale_since_version, version, state_key_hash)` shape, so
+//! `stale_position_value_index` CF. Hash-keyed, same shape as
+//! `stale_state_value_index_by_key_hash` in the main-state tier —
+//! same `(stale_since_version, version, state_key_hash)` layout, so
 //! the position pruner reuses
 //! [`aptos_types::state_store::state_value::StaleStateValueByKeyHashIndex`]
 //! directly under the local alias [`StalePositionValueIndex`]. Only

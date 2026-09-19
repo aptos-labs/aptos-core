@@ -30,6 +30,7 @@ consensus-only-perf-test = []
 db-debugger = ["aptos-temppath", "clap", "crossbeam-channel", "owo-colors", "indicatif"]
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-accumulator = { workspace = true }
 aptos-config = { workspace = true }
