@@ -89,7 +89,7 @@ fn create_client_requests_state_values_stream() {
     };
 
     // Update the number of states for the stream
-    stream_engine.number_of_states = Some(1_000_000);
+    stream_engine.cursor.number_of_items = Some(1_000_000);
 
     // Verify that client requests are bound by the appropriate limits
     verify_data_client_requests(&mut global_data_summary, &mut stream_engine);
