@@ -113,13 +113,12 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: &[],
         cross_compile: false,
     },
-    // Test enabling inlining optimization, across package inlining, and extra optimizations.
+    // Test enabling inlining optimization and extra optimizations.
     TestConfig {
         name: "opt-extra",
         runner: |p| run(p, get_config_by_name("opt-extra")),
         experiments: &[
             (Experiment::INLINING_OPTIMIZATION, true),
-            (Experiment::ACROSS_PACKAGE_INLINING, true),
             (Experiment::OPTIMIZE, true),
             (Experiment::OPTIMIZE_EXTRA, true),
         ],

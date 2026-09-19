@@ -12,7 +12,7 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x99::test_struct,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(4), 3)],
+    offsets: [(FunctionDefinitionIndex(4), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 7 lines 104-106:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from [//expect to fail]
@@ -23,7 +23,7 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x99::test_struct,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(5), 3)],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 9 lines 109-111:  run --verbose --signers 0x1 -- 0x99::test_struct::test_move_from [// expected to fail as the functon value has been removed above]
@@ -34,7 +34,7 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x99::test_struct,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(6), 3)],
+    offsets: [(FunctionDefinitionIndex(6), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 11 lines 116-225:  publish [module 0x99::test_enum {]
@@ -60,7 +60,7 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x99::test_enum,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(5), 3)],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 19 lines 243-245:  run --verbose --signers 0x1 -- 0x99::test_enum::test_borrow_from [//expect to fail]
@@ -71,7 +71,7 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x99::test_enum,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(6), 3)],
+    offsets: [(FunctionDefinitionIndex(6), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 21 lines 248-250:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from [// expected to fail as the functon value has been removed above]
@@ -82,6 +82,6 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x99::test_enum,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(9), 3)],
+    offsets: [(FunctionDefinitionIndex(9), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
