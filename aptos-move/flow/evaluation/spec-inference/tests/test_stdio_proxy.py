@@ -148,6 +148,7 @@ class StdioProxyTest(unittest.TestCase):
                 try:
                     os.kill(child_pid, signal.SIGKILL)
                 except ProcessLookupError:
+                    # Normal: process-group teardown may already have reaped it.
                     pass
 
 if __name__ == "__main__":
