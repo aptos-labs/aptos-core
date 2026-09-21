@@ -8,6 +8,7 @@
 % Deck palette: one primary blue, used for title bars, boxes, and keywords.
 \definecolor{mBlue}{RGB}{28,73,137}
 \definecolor{mNavy}{RGB}{16,42,88}   % full-bleed frames: cover and standout
+\colorlet{codebg}{mBlue!9}           % frameless tinted background for listings
 \usepackage{listings}
 \usepackage[T1]{fontenc}
 \usepackage[sfdefault,lining]{FiraSans}
@@ -22,7 +23,7 @@
 \usepackage{tikz}
 \usepackage{qrcode}
 \usepackage{fontawesome5}
-\usetikzlibrary{arrows.meta,positioning,shapes.misc,calc,fit}
+\usetikzlibrary{arrows.meta,positioning,shapes.misc,calc,fit,decorations.pathreplacing}
 
 % Abbreviations
 \newcommand{\MVP}[0]{\textsf{MVP}\xspace}
@@ -107,27 +108,41 @@
 % Only | as short inline delimiter; ! would clash with prose on slides.
 \lstMakeShortInline[language=Move,style=MoveStyle]|
 
+% Frameless tinted box around display listings: a zero-width frame in the
+% background colour so that framesep still pads the text on all sides; the
+% x-margins keep the box inside the text width.
+\lstdefinestyle{CodeBox}{
+    backgroundcolor=\color{codebg},
+    frame=single, framerule=0pt, rulecolor=\color{codebg},
+    framesep=3pt, xleftmargin=3pt, xrightmargin=3pt,
+    aboveskip=\smallskipamount, belowskip=\smallskipamount,
+}
+
 % Text between $...$ in a listing is set in bold (for emphasis on slides).
 \lstnewenvironment{Move}{
-    \lstset{language=Move, style=MoveStyle,
+    \lstset{language=Move, style=MoveStyle, style=CodeBox,
         basicstyle=\footnotesize\codefont, keywordstyle=\color{mBlue},
         moredelim=**[is][\bfseries]{\$}{\$}}
 }{}
 
 \lstnewenvironment{MoveSmall}{
-    \lstset{language=Move, style=MoveStyle,
+    \lstset{language=Move, style=MoveStyle, style=CodeBox,
         basicstyle=\scriptsize\codefont, keywordstyle=\color{mBlue},
         moredelim=**[is][\bfseries]{\$}{\$}}
 }{}
 
 \lstnewenvironment{MoveDiag}{
-    \lstset{style=MoveStyle, basicstyle=\scriptsize\codefont}
+    \lstset{style=MoveStyle, style=CodeBox, basicstyle=\scriptsize\codefont}
 }{}
 
+% Right-flushed item number at the end of a listing line, e.g. to match an
+% invariant to an enumerated bullet: use as @\invnum{1}@ inside a listing.
+\newcommand{\invnum}[1]{\hfill{\normalfont\color{mBlue}(#1)}}
+
 % Highlight box for take-aways.
-\newcommand{\takeaway}[1]{%
+\newcommand{\takeaway}[2][0.9\textwidth]{%
   \par\smallskip
   \centerline{\begin{tikzpicture}
     \node[draw=mBlue, thick, rounded corners, inner sep=5pt,
-          text width=0.9\textwidth, fill=mBlue!8]{#1};
+          text width=#1, fill=mBlue!8]{#2};
   \end{tikzpicture}}\par}

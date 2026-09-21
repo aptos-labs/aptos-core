@@ -79,36 +79,24 @@
 
 % ---------------------------------------------------------------------------
 \begin{frame}{Why Formal Methods for Smart Contracts}
-  \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \begin{itemize}
-        \item Large assets, irreversible transactions.
-        \item Well-resourced adversaries: state actors took \$2B in 2025.
-        \item \emph{Billions per year} lost to bugs and attacks.
-      \end{itemize}
-      \medskip
-      \hspace*{1.2em}%
-      {\footnotesize
-      \begin{tabular}{@{}lccccc@{}}
-        \hline
-        Stolen & 2022 & 2023 & 2024 & 2025 & H1\,2026 \\
-        \hline
-        & \$3.7B & \$1.7B & \$2.2B & \$3.4B & \$1.0--1.3B \\
-        \hline
-      \end{tabular}}
-      \par\smallskip
-      \hspace*{1.2em}{\footnotesize\emph{Sources: Chainalysis, TRM Labs, CertiK}}
-    \end{column}
-    \begin{column}{0.46\textwidth}
-      \textbf{Contract-level bugs a prover targets}
-      \begin{itemize}
-        \item \textbf{Cetus} (Move, 2025): \$223M, flawed overflow check.
-        \item \textbf{Balancer} (2025): \$128M, rounding error.
-        \item \textbf{Euler} (2023): \$197M, missing health check.
-        \item \textbf{Nomad} (2022): \$190M, zero root trusted.
-      \end{itemize}
-    \end{column}
-  \end{columns}
+  \begin{itemize}
+    \item Large assets, irreversible transactions.
+    \item Well-resourced adversaries: state actors took \$2B in 2025.
+  \end{itemize}
+  \bigskip
+  \begin{center}
+    {\Large\textbf{\emph{Billions per year} lost to bugs and attacks}}
+    \par\medskip
+    \begin{tabular}{@{}lccccc@{}}
+      \hline
+      Stolen & 2022 & 2023 & 2024 & 2025 & H1\,2026 \\
+      \hline
+      & \$3.7B & \$1.7B & \$2.2B & \$3.4B & \$1.0--1.3B \\
+      \hline
+    \end{tabular}
+    \par\smallskip
+    {\footnotesize\emph{Sources: Chainalysis, TRM Labs, CertiK}}
+  \end{center}
   \takeaway{Blockchains are high assurance systems.}
 \end{frame}
 
@@ -195,15 +183,55 @@
 
 % ---------------------------------------------------------------------------
 \begin{frame}[fragile,c]{Move went higher-order in 2025}
+  New concepts:
+  \begin{itemize}
+    \item Function types $T_1 \times \cdots \times T_n \to T$: functions are first-class values.
+    \item Closures capture values from their context, e.g. |delta| in
+\begin{Move}
+let f = |x| x + delta;
+\end{Move}
+    \item A closure can be part of a struct and be persisted in global storage.
+    \item Persisted function values are Move's principled account of \textbf{dynamic dispatch}.
+  \end{itemize}
+  \medskip
+  Use cases: callbacks, extensible asset managers, dispatchable permissions, filter/map/reduce.
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile,c]{Example: an automated market maker (AMM)}
   \begin{columns}[c]
     \begin{column}{0.48\textwidth}
-      \begin{itemize}
-        \item Function types $T_1 \times \cdots \times T_n \to T$, closures with captured values.
-        \item A closure can be part of a struct and be persisted in global storage.
-        \item Persisted function values are Move's principled account of \textbf{dynamic dispatch}.
-      \end{itemize}
-      \medskip
-      Use cases: callbacks, extensible asset managers, dispatchable permissions, fold/map/filter.
+      \centering
+      \begin{tikzpicture}[x=1cm,y=1cm,font=\small,
+          reserve/.style={fill=mBlue!60},
+          added/.style={fill=mBlue!25},
+          fee/.style={fill=orange!70},
+          removed/.style={draw=mBlue,dashed,thin},
+          brace/.style={decorate,decoration={brace,amplitude=3pt}}]
+        % before the swap
+        \fill[reserve] (0,0) rectangle (0.7,2.2);
+        \fill[reserve] (1.1,0) rectangle (1.8,1.6);
+        \node[below] at (0.35,0) {$x$};
+        \node[below] at (1.45,0) {$y$};
+        % the swap
+        \draw[-{Stealth[length=2.5mm]},thick] (2.2,1.1) -- (3.4,1.1)
+          node[midway,above,font=\footnotesize\codefont] {swap(amt)};
+        % after the swap
+        \fill[reserve] (3.8,0) rectangle (4.5,2.2);
+        \fill[added]   (3.8,2.2) rectangle (4.5,2.8);
+        \fill[fee]     (3.8,2.8) rectangle (4.5,3.0);
+        \draw[brace] (4.55,3.0) -- (4.55,2.2) node[midway,right=3pt] {amt};
+        \node[left,font=\scriptsize,text=orange!70!black] at (3.75,2.9) {fee};
+        \fill[reserve] (5.4,0) rectangle (6.1,1.1);
+        \draw[removed] (5.4,1.1) rectangle (6.1,1.6);
+        \draw[brace] (6.15,1.6) -- (6.15,1.1) node[midway,right=3pt] {out};
+        \node[below] at (4.15,0) {$x'$};
+        \node[below] at (5.75,0) {$y'$};
+      \end{tikzpicture}
+      \par\medskip
+      \raggedright
+      The trader pays |amt| of $x$ and receives |out| of $y$, as priced by the curve; the fee stays in the pool.
+      Constant product: $x \cdot y \le x' \cdot y'$.
     \end{column}
     \begin{column}{0.5\textwidth}
 \begin{Move}
@@ -229,60 +257,7 @@ fun swap(pool: &mut Pool, amt: u64): u64 {
 \end{frame}
 
 % ---------------------------------------------------------------------------
-\begin{frame}[fragile]{Contributions}
-  \textbf{Challenge}: \MVP is modular: a call site looks up the callee's spec.
-  With dynamic dispatch there is no callee to look up. Solutions:
-  \medskip
-
-  \begin{enumerate}
-    \item \textbf{Behavioral predicates}: $\requiresof{f}{\bar x}$, $\abortsof{f}{\bar x}$, $\ensuresof{f}{\bar x,\bar y}$ allow to reason about a function value $f$, making function specs first-class constructs.
-    \item \textbf{State labels}: name intermediate states, e.g.
-      \[ \exists S \bullet \slabeled{..S}{\ensuresof{f}{\bar x}} \land \slabeled{S..}{\ensuresof{g}{\bar x}} \]
-    \item \textbf{Encoding}: discriminate over the function values that can reach a call site.
-  \end{enumerate}
-\end{frame}
-
-% ---------------------------------------------------------------------------
-\begin{frame}[fragile]{Running example: what may a pricing function do?}
-  \begin{columns}[c]
-    \begin{column}{0.55\textwidth}
-\begin{MoveSmall}
-spec Pool {
-  // Invariants of struct Pool
-  reads_of<self.pricing> *;
-
-  invariant forall S in *, ri: u64, ro: u64, a: u64:
-    S |~ !aborts_of<self.pricing>(ri, ro, a);
-
-  invariant forall S in *, ri: u64, ro: u64, a: u64:
-    S.. |~ result_of<self.pricing>(ri, ro, a) <= ro;
-
-  invariant forall S in *, ri: u64, ro: u64,
-                   a1: u64, a2: u64:
-    S.. |~ a1 <= a2 ==>
-      result_of<self.pricing>(ri, ro, a1)
-        <= result_of<self.pricing>(ri, ro, a2);
-  ..
-}
-\end{MoveSmall}
-    \end{column}
-    \begin{column}{0.45\textwidth}
-      A data invariant on |Pool| constrains \emph{any} closure stored in |pricing|:
-      \begin{enumerate}
-        \item never aborts,
-        \item output bounded by output reserve,
-        \item monotone in the input,
-        \item .. and more
-      \end{enumerate}
-      \medskip
-
-      Checked when a |Pool| is built, assumed wherever a |Pool| is used.
-    \end{column}
-  \end{columns}
-\end{frame}
-
-% ---------------------------------------------------------------------------
-\begin{frame}[fragile]{Behavioral predicates}
+\begin{frame}[fragile]{Behavioral Predicates: Make Function Specs First-Class}
   For a function value |f| with arguments $\bar x$ and results $\bar y$:
   \begin{center}
     \begin{tabular}{ll}
@@ -302,31 +277,63 @@ spec Pool {
 \end{frame}
 
 % ---------------------------------------------------------------------------
-\begin{frame}[fragile]{State labels}
-  \begin{itemize}
-    \item $\slabeled{S}{p}$: evaluate $p$ in state $S$.
-    \item $\slabeled{S..}{q}$: $S$ is the pre-state of a call; $\slabeled{S_1..S_2}{q}$ names both ends.
-    \item |forall S in *|, |exists S in *|: quantification over all states:
-  \end{itemize}
-  \begin{columns}[c]
-    \begin{column}{0.48\textwidth}
-\lstset{xleftmargin=3em}
+\begin{frame}[fragile,t]{State labels}
+  Specs can name the state in which a predicate is evaluated:
+  \begin{center}
+    \begin{tabular}{ll}
+      $\slabeled{S}{p}$ & evaluate $p$ in state $S$ \\
+      $\slabeled{S..}{q}$, $\slabeled{..S}{q}$ & $S$ is the pre-/post-state of a two-state predicate \\
+      |forall S in *|, |exists S in *| & quantification over all states \\
+    \end{tabular}
+  \end{center}
+  \medskip
 \begin{Move}
-fun followed_by(f: &mut A @\fto@ (),
-                g: &mut A @\fto@ (),
-                x: &mut A) {
+fun followed_by(f: &mut A @\fto@ (), g: &mut A @\fto@ (), x: &mut A) {
   f(x); g(x)
-}
-spec followed_by {
-  reads_of<f> *; reads_of<g> *;
-  ensures exists S in *:
-    (..S |~ ensures_of<f>(x)) &&
-    (S.. |~ ensures_of<g>(x))
+} spec {
+  ensures exists S in *: (..S |~ ensures_of<f>(x)) && (S.. |~ ensures_of<g>(x))
 }
 \end{Move}
+  \medskip
+  The post-state of |f| is the pre-state of |g|, with no values threaded through the spec.
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Invariants of the Automatic Market Maker}
+  \begin{columns}[c]
+    \begin{column}{0.4\textwidth}
+      A data invariant on |Pool| constrains \emph{any} closure stored in |pricing|:
+      \begin{enumerate}
+        \item never aborts,
+        \item output bounded by output reserve,
+        \item monotone in the input,
+        \item preserves the product of reserves.
+      \end{enumerate}
+      \medskip
+
+      Checked when a |Pool| is built, assumed wherever a |Pool| is used.
     \end{column}
-    \begin{column}{0.42\textwidth}
-      The post-state of |f| becomes the pre-state of |g|, without threading values through the spec.
+    \begin{column}{0.6\textwidth}
+\begin{MoveSmall}
+spec Pool { // Invariants of struct Pool
+  reads_of<self.pricing> *;
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S |~ !aborts_of<self.pricing>(ri, ro, a);@\invnum{1}@
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S.. |~ result_of<self.pricing>(ri, ro, a) <= ro;@\invnum{2}@
+
+  invariant forall S in *, ri: u64, ro: u64, a1: u64, a2: u64:
+    S.. |~ a1 <= a2 ==> result_of<self.pricing>(ri, ro, a1)
+      <= result_of<self.pricing>(ri, ro, a2);@\invnum{3}@
+
+  invariant forall S in *, ri: u64, ro: u64, a: u64:
+    S.. |~ (ri + a)
+             * (ro - result_of<self.pricing>(ri, ro, a))
+             >= ri * ro;@\invnum{4}@
+}
+\end{MoveSmall}
     \end{column}
   \end{columns}
 \end{frame}
@@ -342,7 +349,7 @@ spec swap {
 \end{Move}
   \medskip
   \begin{itemize}
-    \item Pricing cannot abort by (1), |reserve_y - out| cannot underflow by (2): only the overflow abort remains.
+    \item |pricing| cannot abort by (1), |reserve_y - out| cannot underflow by (2): only the overflow abort remains.
     \item Product preservation follows from (4).
   \end{itemize}
   \takeaway{Problem reduced to first-order: the application side is no harder than first-order code.}
@@ -352,10 +359,22 @@ spec swap {
 \begin{frame}[fragile]{Compliance side: building a pool}
   \begin{columns}[c]
     \begin{column}{0.5\textwidth}
+      Storing $f$ where $p$ is expected requires, for all inputs,
+      \[
+        \begin{array}{l}
+          \requiresof{p}{\bar x} \implies \requiresof{f}{\bar x} \\
+          \abortsof{f}{\bar x} \iff \abortsof{p}{\bar x} \\
+          \ensuresof{f}{\bar x,\bar y} \implies \ensuresof{p}{\bar x,\bar y}
+        \end{array}
+      \]
+      \takeaway[0.9\linewidth]{Maybe hard to verify.}
+    \end{column}
+    \begin{column}{0.5\textwidth}
 \begin{MoveSmall}
 // fee-free constant product: verifies
 fun product(ri: u64, ro: u64, a: u64): u64 { .. }
 
+// with fee: abort invariant does not hold
 struct Fee {bps: u64}
 fun with_fee(owner: address,
              ri: u64, ro: u64, a: u64): u64 {
@@ -370,22 +389,7 @@ spec with_fee {
 }
 Pool{..,
   pricing: |ri, ro, a| with_fee(owner, ri, ro, a)}
-// error: data invariant does not hold
 \end{MoveSmall}
-    \end{column}
-    \begin{column}{0.5\textwidth}
-      Storing $f$ where $p$ is expected requires, for all inputs,
-      \[
-        \begin{array}{l}
-          \requiresof{p}{\bar x} \implies \requiresof{f}{\bar x} \\
-          \abortsof{f}{\bar x} \iff \abortsof{p}{\bar x} \\
-          \ensuresof{f}{\bar x,\bar y} \implies \ensuresof{p}{\bar x,\bar y}
-        \end{array}
-      \]
-      \begin{itemize}
-        \item |with_fee| violates the no-abort invariant; a guarded variant with a default fee verifies.
-        \item The nonlinear fee variants need a one- or two-line proof hint.
-      \end{itemize}
     \end{column}
   \end{columns}
 \end{frame}
@@ -441,6 +445,20 @@ Pool{..,
 \begin{frame}[fragile]{Encoding: intermediate state labels}
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
+      \begin{ivl}
+        \FUN aborts_{C_{foo}}[\Mem', \Mem](a) \\
+        \t1 aborts_\tau(f,\Mem',a) \\
+        \t1 \lor (\exists \Mem^S @ ensures_\tau(f,\Mem',\Mem^S,a) \\
+        \t2 \land R[\Mem^S][a].0 > 0 \\
+        \t2 \land aborts_{\tau'}(g,\Mem^S,a))
+      \end{ivl}
+      An abort at |S| needs |S| established first: the ensures reaching |S| are conjoined with the abort condition; pre-state aborts are disjoined in front.
+      \medskip
+
+      Sound since a verified function satisfies
+      \[ \bigvee \sq A \lor \bigwedge \sq P. \]
+    \end{column}
+    \begin{column}{0.5\textwidth}
 \begin{MoveSmall}
 struct R(u64);
 spec foo(f: address @\fto@ (), g: address @\fto@ (),
@@ -455,27 +473,13 @@ spec foo(f: address @\fto@ (), g: address @\fto@ (),
       \medskip
       The state at |S| becomes an existentially quantified memory snapshot $\Mem^S$.
     \end{column}
-    \begin{column}{0.5\textwidth}
-      \begin{ivl}
-        \FUN aborts_{C_{foo}}[\Mem', \Mem](a) \\
-        \t1 aborts_\tau(f,\Mem',a) \\
-        \t1 \lor (\exists \Mem^S @ ensures_\tau(f,\Mem',\Mem^S,a) \\
-        \t2 \land R[\Mem^S][a].0 > 0 \\
-        \t2 \land aborts_{\tau'}(g,\Mem^S,a))
-      \end{ivl}
-      An abort at |S| needs |S| established first: the ensures reaching |S| are conjoined with the abort condition; pre-state aborts are disjoined in front.
-      \medskip
-
-      Sound since a verified function satisfies
-      \[ \bigvee \sq A \lor \bigwedge \sq P. \]
-    \end{column}
   \end{columns}
 \end{frame}
 
 
 % ---------------------------------------------------------------------------
 \begin{frame}[fragile]{Specification inference as a test oracle}
-  \MVP also has the reverse path: \WP-based \emph{specification inference} derives specs from code, using behavioral predicates for calls.
+  The Move Prover also has the reverse path: \WP-based \emph{specification inference} derives specs from code, using behavioral predicates for calls.
   Inferred specs are complete and are expected to verify.
   \medskip
 
@@ -512,7 +516,7 @@ spec foo(f: address @\fto@ (), g: address @\fto@ (),
     \item \textbf{Dafny}: behavioral predicates and labels, but function values cannot modify state, and labels are not quantified.
     \item \textbf{Verus}, \textbf{Prusti}: closure specs by state passing or separation logic; Move's alias-free references and resource-separated memory avoid both.
     \item \textbf{\fstar}: effectful higher-order code with \WP in the type system; heap separation is reasoned about in the logic, whereas Move separates memory at compile time.
-    \item \textbf{Solidity verifiers} (\certora and others): dispatch by enumerating callees; our datatype makes the case split explicit and falls back to behavioral predicates.
+    \item \textbf{Solidity verifiers} (\certora and others): dispatch by enumerating callees; our datatype makes the case split explicit and supports abstract function specs.
   \end{itemize}
 \end{frame}
 
@@ -521,20 +525,19 @@ spec foo(f: address @\fto@ (), g: address @\fto@ (),
   \begin{itemize}
     \item Behavioral predicates and state labels make function specs first-class.
     \item The encoding discriminates on the variant reaching a call site: concrete effect when known, behavioral predicates otherwise.
-    \item \MVP's routine, counterexample-driven verification now covers dynamic dispatch; inference validates the encoding.
+    \item The Move Prover's routine, counterexample-driven verification now covers dynamic dispatch.
   \end{itemize}
   \medskip
   \textbf{Future work}
   \begin{itemize}
-    \item Quantifying over \emph{sequences} of state labels for fold-style contracts.
-    \item Better automation for the nonlinear compliance proofs.
+    \item Proof tactics for higher-order combinators (filter/map/reduce).
     \item Encoding and verification of the schema in Lean.
   \end{itemize}
 \end{frame}
 
 % ---------------------------------------------------------------------------
 \begin{frame}[standout]
-  Thank you
+  Thank you! Questions?
   \vspace{0.5em}
 
   \small
@@ -550,6 +553,20 @@ spec foo(f: address @\fto@ (), g: address @\fto@ (),
 % ===========================================================================
 \appendix
 \talkframetitle
+
+\begin{frame}[fragile]{Backup: contributions}
+  \textbf{Challenge}: \MVP is modular: a call site looks up the callee's spec.
+  With dynamic dispatch there is no callee to look up. Solutions:
+  \medskip
+
+  \begin{enumerate}
+    \item \textbf{Behavioral predicates}: $\requiresof{f}{\bar x}$, $\abortsof{f}{\bar x}$, $\ensuresof{f}{\bar x,\bar y}$ allow to reason about a function value $f$, making function specs first-class constructs.
+    \item \textbf{State labels}: name intermediate states, e.g.
+      \[ \exists S \bullet \slabeled{..S}{\ensuresof{f}{\bar x}} \land \slabeled{S..}{\ensuresof{g}{\bar x}} \]
+    \item \textbf{Encoding}: discriminate over the function values that can reach a call site.
+  \end{enumerate}
+\end{frame}
+
 
 \begin{frame}[fragile]{Backup: higher-order loops, \texttt{find}}
   \begin{columns}[T]
