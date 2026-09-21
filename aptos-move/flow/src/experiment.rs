@@ -2128,6 +2128,19 @@ pub(crate) fn reject_untrusted_dependencies(
             })
         })
         .transpose()?;
+    if let Some(root) = &allowed_root {
+        for entry in walkdir::WalkDir::new(root).follow_links(false) {
+            let entry = entry.map_err(|error| {
+                format!("cannot inspect package root `{}`: {error}", root.display())
+            })?;
+            if entry.file_type().is_symlink() {
+                return Err(format!(
+                    "an evaluation package cannot contain symlink `{}`",
+                    entry.path().display()
+                ));
+            }
+        }
+    }
     let mut pending = vec![package.to_path_buf()];
     let mut seen = std::collections::BTreeSet::new();
     while let Some(dir) = pending.pop() {

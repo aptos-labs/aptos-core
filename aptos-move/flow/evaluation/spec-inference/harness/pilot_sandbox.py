@@ -33,7 +33,7 @@ from .codex_metrics import write_codex_metrics
 from .codex_otel import write_codex_request_metrics
 
 
-POLICY_VERSION = 7
+POLICY_VERSION = 8
 # Landlock confines the agent process itself to a subset of what the sandbox
 # mounts, so the outer namespace and the inner ruleset are two independent
 # layers rather than one repeated.
@@ -192,6 +192,12 @@ def preflight() -> dict[str, object]:
                 "    pass\n"
                 "else:\n"
                 "    raise SystemExit('a read-only file can be truncated')\n"
+                "try:\n"
+                "    os.symlink('/usr/bin/env', '/tmp/forbidden-symlink')\n"
+                "except OSError as error:\n"
+                "    assert error.errno in (errno.EACCES, errno.EPERM), error\n"
+                "else:\n"
+                "    raise SystemExit('symlink creation is available')\n"
                 "for family, kind, label in ((socket.AF_INET, socket.SOCK_STREAM, 'IPv4 TCP'), (socket.AF_INET, socket.SOCK_DGRAM, 'IPv4 UDP'), (socket.AF_INET6, socket.SOCK_DGRAM, 'IPv6 UDP')):\n"
                 "    try:\n"
                 "        socket.socket(family, kind)\n"
@@ -997,14 +1003,17 @@ def build_bwrap_environment(launch: Launch) -> dict[str, str]:
                 "MOVE_INFERENCE_MCP_CLIENT": str(AGENT_MCP),
             }
         )
-    for name in (
-        "ANTHROPIC_AUTH_TOKEN",
-        "ANTHROPIC_API_KEY",
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "ANTHROPIC_BASE_URL",
-        "SSL_CERT_FILE",
-        "SSL_CERT_DIR",
-    ):
+    provider_environment = (
+        (
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+        )
+        if launch.agent_runtime == "claude"
+        else ()
+    )
+    for name in (*provider_environment, "SSL_CERT_FILE", "SSL_CERT_DIR"):
         if value := os.environ.get(name):
             environment[name] = value
     return environment

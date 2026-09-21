@@ -36,7 +36,6 @@ static const __u64 WRITE_ACCESS = LANDLOCK_ACCESS_FS_WRITE_FILE |
                                   LANDLOCK_ACCESS_FS_MAKE_SOCK |
                                   LANDLOCK_ACCESS_FS_MAKE_FIFO |
                                   LANDLOCK_ACCESS_FS_MAKE_BLOCK |
-                                  LANDLOCK_ACCESS_FS_MAKE_SYM |
                                   LANDLOCK_ACCESS_FS_REFER;
 
 static void fail(const char *message, const char *path) {
@@ -148,7 +147,10 @@ int main(int argc, char **argv) {
     // outright. A writable path is granted truncation too, or the agent could
     // not rewrite its own workspace.
     __u64 write_access = WRITE_ACCESS | LANDLOCK_ACCESS_FS_TRUNCATE;
-    __u64 handled = READ_ACCESS | write_access;
+    // Symlink creation is governed but never granted, including in writable
+    // trees. Otherwise a workspace could redirect controller-side package
+    // discovery into a withheld baseline after the path itself was checked.
+    __u64 handled = READ_ACCESS | write_access | LANDLOCK_ACCESS_FS_MAKE_SYM;
     struct landlock_ruleset_attr ruleset = {
         .handled_access_fs = handled,
         .handled_access_net = deny_network

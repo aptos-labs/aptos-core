@@ -97,4 +97,23 @@ async fn evaluation_mcp_rejects_packages_and_dependencies_outside_its_root() {
     .await
     .expect_err("a local dependency outside the package root must be refused");
     assert!(error.to_string().contains("outside"));
+
+    #[cfg(unix)]
+    {
+        std::fs::write(
+            package.join("Move.toml"),
+            "[package]\nname = \"workspace\"\nversion = \"1.0.0\"\n",
+        )
+        .expect("restore workspace manifest");
+        std::os::unix::fs::symlink(outside.join("sources"), package.join("sources/linked"))
+            .expect("symlink baseline sources into workspace");
+        let error = common::call_tool_raw(
+            &client,
+            "move_package_status",
+            serde_json::json!({"package_path": package}),
+        )
+        .await
+        .expect_err("a symlink inside the package root must be refused");
+        assert!(error.to_string().contains("cannot contain symlink"));
+    }
 }

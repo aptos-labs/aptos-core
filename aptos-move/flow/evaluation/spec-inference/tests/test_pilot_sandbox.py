@@ -111,7 +111,7 @@ class PilotSandboxTest(unittest.TestCase):
         # The security property, asserted unconditionally: this is the only
         # test that runs the real `landlock-exec`, and nothing in CI runs it.
         result = preflight()
-        self.assertEqual(7, result["policy_version"])
+        self.assertEqual(8, result["policy_version"])
         self.assertTrue(result["isolation"], result["detail"])
         self.assertIn(
             "host-path-agent-proc-and-all-protocol-network-isolation=passed",
@@ -202,6 +202,30 @@ class PilotSandboxTest(unittest.TestCase):
             "test-subscription-token", environment["CLAUDE_CODE_OAUTH_TOKEN"]
         )
         self.assertNotIn("host-value", environment.values())
+
+    def test_codex_environment_excludes_other_provider_credentials(self) -> None:
+        launch = dataclasses.replace(
+            _example_launch(Path("/eval")),
+            agent_runtime="codex",
+            codex=Path("/eval/codex"),
+        )
+        inherited = {
+            "ANTHROPIC_AUTH_TOKEN": "glm-secret",
+            "ANTHROPIC_API_KEY": "api-secret",
+            "CLAUDE_CODE_OAUTH_TOKEN": "oauth-secret",
+            "ANTHROPIC_BASE_URL": "https://provider.invalid",
+            "SSL_CERT_FILE": "/etc/ssl/cert.pem",
+        }
+        with patch.dict(os.environ, inherited, clear=True):
+            environment = build_bwrap_environment(launch)
+        for name in (
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+        ):
+            self.assertNotIn(name, environment)
+        self.assertEqual("/etc/ssl/cert.pem", environment["SSL_CERT_FILE"])
 
     def test_the_agent_is_confined_more_narrowly_than_the_sandbox(self) -> None:
         launch = _example_launch(Path("/eval"))

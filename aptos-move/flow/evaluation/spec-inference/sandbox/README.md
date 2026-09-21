@@ -73,7 +73,9 @@ below.
 Truncation is governed too, from Landlock ABI 3 onwards: it is a right of its
 own, and left out of the policy a file the ruleset keeps read-only could still
 be emptied through `O_TRUNC` or `ftruncate`. Preflight probes that a read-only
-file cannot be truncated.
+file cannot be truncated. Writable trees deliberately omit the symlink-creation
+right, and preflight verifies that omission, so a workspace cannot redirect a
+controller-side package walk into the pristine baseline.
 
 The rest of the run directory — `run.json`, the judge's results, the event
 logs — is the controller's. An agent that could write it could forge the record
@@ -163,6 +165,10 @@ token is in the environment of a process whose `/proc/self` the agent can read.
 **An agent that wants its own credential can obtain it.** The sandbox does not
 try to prevent that; it prevents the credential from *leaving*, by ensuring there
 is no agent-accessible egress channel (see Network and Tools above).
+
+Only the selected runtime's provider variables enter the namespace. In
+particular a Codex run never inherits Anthropic or Claude credentials that
+happen to exist in the launcher's environment; TLS root settings remain shared.
 
 For Codex, saved login state is copied into a private per-cell `CODEX_HOME` and
 removed with the unpublished staging tree. The controller also treats long
