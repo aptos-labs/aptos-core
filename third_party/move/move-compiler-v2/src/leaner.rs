@@ -313,7 +313,7 @@ fn elaborate_source(
     let xir_path = xir_dir.path().join("module.xir.json");
     let leaner_root = std::env::var_os("LEANER_ROOT")
         .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move"));
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move"));
     let _elaboration_permit = LeanElaborationPermit::acquire();
     let output = Command::new("lake")
         .args(["env", "lean", "--json"])
@@ -471,7 +471,7 @@ mod tests {
 
     #[test]
     fn extracts_lean_file() {
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
         let mut options = Options {
             sources: vec![lean_root
                 .join("Move/Tests/Verification/Account.lean")
@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn deduplicates_equivalent_lean_paths() {
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
         let mut options = Options {
             sources: vec![lean_root
                 .join("Move/Tests/Verification/Account.lean")
@@ -510,7 +510,7 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
         let options = Options {
             sources: vec![lean_root
                 .join("Move/Tests/Verification/Account.lean")
@@ -537,7 +537,7 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
         // Intentionally put the client first: XIR loading must use declared
         // Move dependencies, not filesystem or command-line order.
         let options = Options {
@@ -595,7 +595,7 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
         let options = Options {
             sources: vec![lean_root
                 .join("Move/Tests/Compiler/MultipleModules.lean")

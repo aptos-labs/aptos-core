@@ -736,7 +736,7 @@ def parseModule (text : String) : Except String Module := do
     throw s!"unexpected XAST schema `{schema}` (expected `{Xast.schema}`)"
   let version ← (natField j "version") {}
   unless version == Xast.version do
-    throw s!"unsupported XAST version {version} (this transpiler reads version {Xast.version})"
+    throw s!"unsupported XAST version {version} (this frontend reads version {Xast.version})"
   decodeModule j
 
 /-- Reads and parses an XAST document from a file. -/

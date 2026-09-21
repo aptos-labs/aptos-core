@@ -29,17 +29,25 @@ argument and result value rows. -/
 abbrev FunctionContract :=
   Contract RuntimeState Failure (Array RuntimeValue) (Array RuntimeValue)
 
+/-- Relational meaning of one LIR function invoked under a type
+instantiation, derived from the big-step judgment. -/
+def functionSpecAt (unit : ExecutableUnit) (function : FunctionHandle)
+    (typeInstantiation : Array (TypeId × TypeId)) (arguments : Array RuntimeValue) :
+    Spec RuntimeState Failure (Array RuntimeValue) where
+  ok := fun initial results final =>
+    BigStep.EvalFunction unit function typeInstantiation initial arguments final
+      (.returned results)
+  aborts := fun initial failure =>
+    ∃ final,
+      BigStep.EvalFunction unit function typeInstantiation initial arguments final
+        (.threw failure.1 failure.2)
+
 /-- Relational meaning of one LIR function, derived from the big-step
 judgment. -/
 def functionSpec (unit : ExecutableUnit) (function : FunctionHandle)
     (arguments : Array RuntimeValue) :
-    Spec RuntimeState Failure (Array RuntimeValue) where
-  ok := fun initial results final =>
-    BigStep.EvalFunction unit function #[] initial arguments final (.returned results)
-  aborts := fun initial failure =>
-    ∃ final,
-      BigStep.EvalFunction unit function #[] initial arguments final
-        (.threw failure.1 failure.2)
+    Spec RuntimeState Failure (Array RuntimeValue) :=
+  functionSpecAt unit function #[] arguments
 
 /-- The M1 executable subset owes no unchecked proofs. -/
 @[simp] theorem functionSpec_total (unit : ExecutableUnit)

@@ -43,7 +43,7 @@ leaner module 0x42::enum_reference_patterns where
     if slot is Empty then abort(7)
     else
       let value := &mut slot.value
-      return value
+      value
 
   fun replace(slot : &mut Slot<u64>, replacement : u64) -> u64 :=
     if slot is Empty then abort(7)
@@ -51,4 +51,4 @@ leaner module 0x42::enum_reference_patterns where
       let value := &mut slot.value
       let previous := *value
       *value := replacement
-      return previous
+      previous

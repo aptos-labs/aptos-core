@@ -40,7 +40,7 @@ leaner module 0x1::aptos_hash where
   -/
   public fun sip_hash_from_value {MoveValue}(v : &MoveValue) -> u64 := do
     let bytes := to_bytes(v)
-    return sip_hash(bytes)
+    sip_hash(bytes)
 
   /--
   Returns the Keccak-256 hash of `bytes`.
@@ -53,11 +53,11 @@ leaner module 0x1::aptos_hash where
   public fun sha2_512(bytes : Vector<u8>) -> Vector<u8> := do
     if !sha_512_and_ripemd_160_enabled() then
       abort(invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    return sha2_512_internal(bytes)
+    sha2_512_internal(bytes)
 
   public fun sha2_512_value {T}(val : &T) -> Vector<u8> := do
     let bytes := to_bytes(val)
-    return sha2_512(bytes)
+    sha2_512(bytes)
 
   /--
   Returns the SHA3-512 hash of `bytes`.
@@ -65,7 +65,7 @@ leaner module 0x1::aptos_hash where
   public fun sha3_512(bytes : Vector<u8>) -> Vector<u8> := do
     if !sha_512_and_ripemd_160_enabled() then
       abort(invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    return sha3_512_internal(bytes)
+    sha3_512_internal(bytes)
 
   /--
   Returns the RIPEMD-160 hash of `bytes`.
@@ -76,7 +76,7 @@ leaner module 0x1::aptos_hash where
   public fun ripemd160(bytes : Vector<u8>) -> Vector<u8> := do
     if !sha_512_and_ripemd_160_enabled() then
       abort(invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    return ripemd160_internal(bytes)
+    ripemd160_internal(bytes)
 
   /--
   Returns the BLAKE2B-256 hash of `bytes`.
@@ -84,7 +84,7 @@ leaner module 0x1::aptos_hash where
   public fun blake2b_256(bytes : Vector<u8>) -> Vector<u8> := do
     if !blake2b_256_enabled() then
       abort(invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    return blake2b_256_internal(bytes)
+    blake2b_256_internal(bytes)
 
   --
   -- Private native functions

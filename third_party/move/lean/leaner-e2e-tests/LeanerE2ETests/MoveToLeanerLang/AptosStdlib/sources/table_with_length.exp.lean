@@ -131,7 +131,7 @@ leaner module 0x1::table_with_length where
       table::add(&mut self.inner, key, default)
       let _t1 := &mut self.length
       *_t1 := *_t1 + 1
-      return table::borrow_mut(&mut self.inner, key)
+      table::borrow_mut(&mut self.inner, key)
 
   spec borrow_mut_with_default where
     pragma intrinsic
@@ -165,7 +165,7 @@ leaner module 0x1::table_with_length where
     let val := table::remove(&mut self.inner, key)
     let _t1 := &mut self.length
     *_t1 := *_t1 - 1
-    return val
+    val
 
   spec remove where
     pragma intrinsic

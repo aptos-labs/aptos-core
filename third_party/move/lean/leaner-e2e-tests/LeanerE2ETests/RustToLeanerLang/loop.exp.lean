@@ -8,4 +8,4 @@ leaner namespace «loop» where
     while flag do
       flag := false
       continue
-    return flag
+    flag

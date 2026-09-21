@@ -80,7 +80,7 @@ leaner module 0x1::simple_map where
   ) -> SimpleMap<«Key», Value> := do
     let mut map := new::<«Key», Value>()
     map.add_all(keys, values)
-    return map
+    map
 
   spec new_from where
     pragma opaque
@@ -110,7 +110,7 @@ leaner module 0x1::simple_map where
     let mut maybe_idx := self.find(key)
     assert!(is_some(&maybe_idx), invalid_argument(EKEY_NOT_FOUND))
     let idx := extract(&mut maybe_idx)
-    return &self.data[idx].value
+    &self.data[idx].value
 
   spec borrow where
     pragma intrinsic
@@ -122,7 +122,7 @@ leaner module 0x1::simple_map where
     let mut maybe_idx := self.find(key)
     assert!(is_some(&maybe_idx), invalid_argument(EKEY_NOT_FOUND))
     let idx := extract(&mut maybe_idx)
-    return &mut self.data[idx].value
+    &mut self.data[idx].value
 
   spec borrow_mut where
     pragma intrinsic
@@ -132,7 +132,7 @@ leaner module 0x1::simple_map where
     self : &SimpleMap<«Key», Value>, key : &«Key»
   ) -> Bool := do
     let maybe_idx := self.find(key)
-    return is_some(&maybe_idx)
+    is_some(&maybe_idx)
 
   spec contains_key where
     pragma intrinsic
@@ -220,7 +220,7 @@ leaner module 0x1::simple_map where
     self.data := core.prim.pushVector(
       self.data, new Element<«Key», Value> { key, value }
     )
-    return (none::<«Key»>(), none::<Value>())
+    (none::<«Key»>(), none::<Value>())
 
   spec upsert where
     pragma opaque
@@ -259,7 +259,7 @@ leaner module 0x1::simple_map where
             result,
             do
               let e := &self[i]
-              return e.key)
+              e.key)
           i := i + 1
         where
           invariant i <= len
@@ -268,10 +268,10 @@ leaner module 0x1::simple_map where
           invariant !«spec_map_ref_aborts$lambda$1»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].key
           invariant ∀ (j in 0 .. i), !false
-        return result
+        result
     spec assert _inline_summary_result_46
       == «spec_map_ref$lambda$0»(self, self.length)
-    return _inline_summary_result_46
+    _inline_summary_result_46
 
   spec keys where
     pragma verify = false
@@ -297,7 +297,7 @@ leaner module 0x1::simple_map where
             result,
             do
               let e := &self[i]
-              return e.value)
+              e.value)
           i := i + 1
         where
           invariant i <= len
@@ -306,10 +306,10 @@ leaner module 0x1::simple_map where
           invariant !«spec_map_ref_aborts$lambda$3»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].value
           invariant ∀ (j in 0 .. i), !false
-        return result
+        result
     spec assert _inline_summary_result_51
       == «spec_map_ref$lambda$2»(self, self.length)
-    return _inline_summary_result_51
+    _inline_summary_result_51
 
   spec values where
     pragma verify = false
@@ -352,7 +352,7 @@ leaner module 0x1::simple_map where
           with_state_anchor!(52, old(self))
         )
     self.destroy_empty()
-    return (keys, values)
+    (keys, values)
 
   spec to_vec_pair where
     pragma opaque
@@ -376,7 +376,7 @@ leaner module 0x1::simple_map where
     let placement := extract(&mut maybe_idx)
     let Element<«Key», Value> { key := key, value := value } :=
       self.data.swap_remove(placement)
-    return (key, value)
+    (key, value)
 
   spec remove where
     pragma intrinsic
@@ -388,7 +388,7 @@ leaner module 0x1::simple_map where
     for i in 0..len do
       let element := &self.data[i]
       if &element.key == key then return some(i);
-    return none::<u64>()
+    none::<u64>()
 
   spec find where
     pragma verify = false
@@ -454,7 +454,7 @@ leaner module 0x1::simple_map where
           «keys$init», «values$init», _end
             - 1, _fold_anchor_ctx_0
         )
-      return (concat(
+      (concat(
           «keys$acc»,
           vec(
             _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1

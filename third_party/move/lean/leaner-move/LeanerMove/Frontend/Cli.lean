@@ -8,7 +8,7 @@ import LeanerMove.Frontend.Effects
 /-!
 # The Move CLI bridge
 
-The transpiler's input is Move source; the XAST export is an internal
+The frontend's input is Move source; the XAST export is an internal
 exchange step. This module runs standalone `move exchange --format ast` (or
 the backward-compatible `aptos move exchange`) on a Move file or package and
 decodes the result, so neither the tool nor the tests store XAST documents.

@@ -688,6 +688,8 @@ private def primitiveText : PrimitiveOperation → Except String String
   | .reverseSliceVector => pure "reverseSliceVector"
   | .destroyEmptyVector => pure "destroyEmptyVector"
   | .containsVector => pure "containsVector"
+  | .compare => pure "compare"
+  | .signerAddress => pure "signerAddress"
   | .indexOfVector => pure "indexOfVector"
   | .checkVectorIndex failure => checkedPrimitiveText "checkVectorIndex" failure
   | .length => pure "length"
@@ -990,6 +992,11 @@ private structure Context where
   logicalLocals : Array LocalId := #[]
   specification : Bool := false
   constantLocals : Array (LocalId × String) := #[]
+  /-- Index expressions whose bounds check the surface implies: `&v[i]`,
+  `v[i]`, and `v[i] := x` lower to a `checkVectorIndex` binding before the
+  element place, so the binding is not spelled and the access keeps its
+  sugar. Recorded by the index node the check and the place share. -/
+  elidedIndexChecks : Array ExprId := #[]
   /-- Shared pattern binders rendered as implicitly read field selections. -/
   fieldAliasLocals : Array LocalId := #[]
   temporaryLocals : Array LocalId := #[]
@@ -1211,12 +1218,52 @@ private def temporaryConstant? (context : Context) (pattern : PatternId)
       let some source := sourceLocal? | return none
       let some sourceDecl := context.locals[source.index]? | return none
       if sourceDecl.mutable then return none
+      -- A `$t` temporary exists only to sequence a value before the index
+      -- effects of the place it is stored to; naming the immutable local it
+      -- copies re-lowers to the same temporary, whatever the type.
+      let sequencing := localDecl.name.startsWith "$t"
       let scalar := match context.unit.tables.types[valueNode.typeId.index]? with
         | some .unit | some .bool | some .character | some .address |
             some .signer | some (.integer ..) => true
         | _ => false
-      unless scalar do return none
+      unless scalar || sequencing do return none
       pure (some (localId, ← localValueText context source))
+
+/-- The index a wildcard binding checks: `let _ := checkVectorIndex(v, i)`. -/
+private def indexCheck? (context : Context) (pattern : PatternId) (value : ExprId) :
+    Option ExprId := do
+  let patternNode ← context.ns.patterns[pattern.index]?
+  let .wildcard := patternNode.kind | none
+  let valueNode ← context.ns.expressions[value.index]?
+  let .operation (.primitive (.checkVectorIndex _)) _ #[_, index] _ := valueNode.kind | none
+  some index
+
+/-- A hidden `$t` temporary holding a computed element index, whose only
+role is the check and the element place that follow it. -/
+private def indexTemporary? (context : Context) (pattern : PatternId) (body : ExprId) :
+    Option LocalId := do
+  let patternNode ← context.ns.patterns[pattern.index]?
+  let .variable slot := patternNode.kind | none
+  let localDecl ← context.locals[slot.index]?
+  unless localDecl.name.startsWith "$t" do none
+  let bodyNode ← context.ns.expressions[body.index]?
+  let .letDecl checkPattern (some check) _ := bodyNode.kind | none
+  let index ← indexCheck? context checkPattern check
+  let .localVar read ← (context.ns.expressions[index.index]?).map (·.kind) | none
+  guard (read == slot)
+  some slot
+
+/-- Whether every index of a place had its check elided, so the place can
+keep the surface's index sugar. -/
+private def placeIndexesElided (context : Context) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, id => match context.ns.places[id.index]? with
+    | some (.index base index) =>
+        context.elidedIndexChecks.contains index && placeIndexesElided context fuel base
+    | some (.deref base) | some (.field base ..) | some (.downcast base _) |
+        some (.subslice base ..) => placeIndexesElided context fuel base
+    | some (.localVar _) => true
+    | _ => false
 
 /-- A hidden holder bound to a storage borrow.  A field-focused mutable
 borrow of a resource reborrows through such a holder, because a place is
@@ -1416,6 +1463,27 @@ private def incrementedContinue? (ns : ValidatedNamespace) (iterator : LocalId)
     let .continue_ 0 := continueNode.kind | none
     pure true).getD false
 
+/-- Whether a `break` or `continue` nested in a further loop inside `body`
+exits the loop owning `body`. Frontends erase loop labels into nesting
+depths, so such a loop needs a label its exits can name. -/
+private def exitedNonlocally (ns : ValidatedNamespace) (body : ExprId) : Bool :=
+  let rec go (pending : List (ExprId × Nat)) : Nat → Bool
+    | 0 => false
+    | fuel + 1 =>
+      match pending with
+      | [] => false
+      | (id, depth) :: rest =>
+        match ns.expressions[id.index]? with
+        | none => go rest fuel
+        | some expression =>
+          match expression.kind with
+          | .break_ nest _ | .continue_ nest =>
+              if nest == depth && depth > 0 then true
+              else go ((expressionChildren expression.kind).toList.map (·, depth) ++ rest) fuel
+          | .loop _ inner => go ((inner, depth + 1) :: rest) fuel
+          | kind => go ((expressionChildren kind).toList.map (·, depth) ++ rest) fuel
+  go [(body, 0)] (ns.expressions.size + 1)
+
 /-- Recognize the stable compiler-v2 expansion of a half-open range loop:
 `let $lb = lower; let i = $lb; let $ub = upper; while i < $ub { body; i += 1 }`.
 The hidden bound locals ensure both bounds retain their one-time evaluation
@@ -1451,6 +1519,7 @@ private def forRangeShape? (context : Context) (root : ExprId) : Option ForRange
     | _ => pure (none, loopId)
   let loopNode ← context.ns.expressions[loopId.index]?
   let .loop none guardedId := loopNode.kind | none
+  guard (!exitedNonlocally context.ns guardedId)
   let guardedNode ← context.ns.expressions[guardedId.index]?
   let .ifElse conditionId iterationId (some stopId) := guardedNode.kind | none
   guard (entryCondition?.all (· == conditionId))
@@ -1711,6 +1780,7 @@ private def returningWhile? (ns : ValidatedNamespace) (id : ExprId) :
     Option (ExprId × ExprId × ExprId) := do
   let loopNode ← ns.expressions[id.index]?
   let .loop none loopBody := loopNode.kind | none
+  guard (!exitedNonlocally ns loopBody)
   let bodyNode ← ns.expressions[loopBody.index]?
   let .block setupStatements (some branchId) := bodyNode.kind | none
   let branch ← ns.expressions[branchId.index]?
@@ -2130,10 +2200,49 @@ private def statementTerminator (ns : ValidatedNamespace) (id : ExprId)
     (text : String) : String :=
   if text.contains '\n' && endsInsideBlock ns id (ns.expressions.size + 1) then "" else ";"
 
-/-- Undo only the single-write holder introduced by `pushReferenceMutation`.
-The holder must not occur in the value (including through a place). This is
-not general reference substitution: shared/user-written bindings keep their
-identity and evaluation order. -/
+/-- Whether nothing reachable from `pending` reads the holder local. Place
+IDs are namespace-wide but local IDs are function-relative, so only places
+reachable from the roots are followed; an unrelated function can use the
+same local number without referring to this holder. -/
+private def holderUnused (context : Context) (holder : LocalId) :
+    List (Sum ExprId PlaceId) → Std.HashSet ExprId → Std.HashSet PlaceId → Nat → Bool
+  | [], _, _, _ => true
+  | .inl node :: rest, seenExpr, seenPlace, fuel =>
+      if seenExpr.contains node then holderUnused context holder rest seenExpr seenPlace fuel else
+      match fuel, context.ns.expressions[node.index]? with
+      | 0, _ | _, none => false
+      | fuel + 1, some expression =>
+          if expression.kind == .localVar holder then false else
+          let place? := match expression.kind with
+            | .assign place _ => some place
+            | .operation operation _ _ _ => match operation with
+              | .move place | .copy place | .borrow _ place | .read place |
+                  .write place | .drop place => some place
+              | _ => none
+            | _ => none
+          let pending := (expressionChildren expression.kind).toList.map Sum.inl ++ rest
+          let pending := place?.map (fun place => Sum.inr place :: pending) |>.getD pending
+          holderUnused context holder pending (seenExpr.insert node) seenPlace fuel
+  | .inr node :: rest, seenExpr, seenPlace, fuel =>
+      if seenPlace.contains node then holderUnused context holder rest seenExpr seenPlace fuel else
+      match fuel, context.ns.places[node.index]? with
+      | 0, _ | _, none => false
+      | fuel + 1, some place =>
+          let next := fun pending =>
+            holderUnused context holder pending seenExpr (seenPlace.insert node) fuel
+          match place with
+          | .localVar localId => localId != holder && next rest
+          | .index base index => next (.inr base :: .inl index :: rest)
+          | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
+              next (.inr base :: rest)
+  termination_by pending _ _ fuel => (fuel, pending.length)
+  decreasing_by all_goals simp_wf; simp_all [wfParam]; omega
+
+/-- Undo only the single-write holder introduced by `pushReferenceMutation`,
+`let $t := e; *$t := v`, which spells `*e := v`. The holder must not occur
+in the value (including through a place). This is not general reference
+substitution: shared/user-written bindings keep their identity and
+evaluation order. -/
 private def hiddenReferenceMutation? (context : Context) (pattern : PatternId)
     (body : ExprId) : Option ExprId := do
   let .variable holder := (← context.ns.patterns[pattern.index]?).kind | none
@@ -2143,46 +2252,32 @@ private def hiddenReferenceMutation? (context : Context) (pattern : PatternId)
     (← context.ns.expressions[body.index]?).kind | none
   let .localVar target := (← context.ns.expressions[reference.index]?).kind | none
   if target != holder then none else
-  -- Place IDs are namespace-wide but local IDs are function-relative. Only
-  -- follow places reachable from this value; an unrelated function can use
-  -- the same local number without referring to this holder.
-  let rec independent (pending : List (Sum ExprId PlaceId))
-      (seenExpr : Std.HashSet ExprId) (seenPlace : Std.HashSet PlaceId)
-      (fuel : Nat) : Bool :=
-    match pending with
-    | [] => true
-    | .inl node :: rest =>
-        if seenExpr.contains node then independent rest seenExpr seenPlace fuel else
-        match fuel, context.ns.expressions[node.index]? with
-        | 0, _ | _, none => false
-        | fuel + 1, some expression =>
-            if expression.kind == .localVar holder then false else
-            let place? := match expression.kind with
-              | .assign place _ => some place
-              | .operation operation _ _ _ => match operation with
-                | .move place | .copy place | .borrow _ place | .read place |
-                    .write place | .drop place => some place
-                | _ => none
-              | _ => none
-            let pending := (expressionChildren expression.kind).toList.map Sum.inl ++ rest
-            let pending := place?.map (fun place => Sum.inr place :: pending) |>.getD pending
-            independent pending (seenExpr.insert node) seenPlace fuel
-    | .inr node :: rest =>
-        if seenPlace.contains node then independent rest seenExpr seenPlace fuel else
-        match fuel, context.ns.places[node.index]? with
-        | 0, _ | _, none => false
-        | fuel + 1, some place =>
-            let next := fun pending => independent pending seenExpr (seenPlace.insert node) fuel
-            match place with
-            | .localVar localId => localId != holder && next rest
-            | .index base index => next (.inr base :: .inl index :: rest)
-            | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
-                next (.inr base :: rest)
-    termination_by (fuel, pending.length)
-    decreasing_by all_goals simp_wf; simp_all [wfParam]; omega
-  if independent [.inl value] {} {} (context.ns.expressions.size + context.ns.places.size + 1) then
-    some value
-  else none
+  let fuel := context.ns.expressions.size + context.ns.places.size + 1
+  if holderUnused context holder [.inl value] {} {} fuel then some value else none
+
+/-- The holder of a computed reference that one assignment writes through as
+a place, `let $t := e; (*$t).f := v`, which spells `e.f := v`. The holder
+roots the place through field projections and appears nowhere else. -/
+private def hiddenPlaceMutation? (context : Context) (pattern : PatternId)
+    (body : ExprId) : Option LocalId := do
+  let .variable holder := (← context.ns.patterns[pattern.index]?).kind | none
+  let declaration ← context.locals[holder.index]?
+  if !declaration.name.startsWith "$t" then none else
+  let .assign place value := (← context.ns.expressions[body.index]?).kind | none
+  let rec rootedAtHolder (place : PlaceId) : Nat → Bool
+    | 0 => false
+    | fuel + 1 =>
+      match context.ns.places[place.index]? with
+      | some (.field base ..) => rootedAtHolder base fuel
+      | some (.deref base) =>
+          match context.ns.places[base.index]? with
+          | some (.localVar root) => root == holder
+          | _ => false
+      | _ => false
+  guard (rootedAtHolder place (context.ns.places.size + 1))
+  let fuel := context.ns.expressions.size + context.ns.places.size + 1
+  guard (holderUnused context holder [.inl value] {} {} fuel)
+  some holder
 
 private def referenceMutationText (context : Context) (referenceId : ExprId)
     (reference value : String) : String :=
@@ -2227,6 +2322,12 @@ private partial def expressionText (context : Context) (id : ExprId)
   | .value _ (some sourceConstant) =>
       pure (sourceIdentifier sourceConstant)
   | .value (.integer value) none =>
+      if context.specification then
+        if let some name := specificationBoundName? value then
+          let shadowed := context.localNames.contains name ||
+            context.ns.constants.any fun constant =>
+              context.ns.tables.names[constant.name.index]?.any (·.name == name)
+          unless shadowed do return name
       integerLiteralText context.unit context.ns context.specification expression.typeId value
   | .value value none => constText value
   | .constant reference =>
@@ -2298,7 +2399,8 @@ private partial def expressionText (context : Context) (id : ExprId)
             | .mutable => pure "mut"
             | .profile value => throw s!"profile borrow `{value.tag}` has no core spelling"
           if context.ns.profile == some .move &&
-              placeContainsIndex context.ns (context.ns.places.size + 1) place then
+              placeContainsIndex context.ns (context.ns.places.size + 1) place &&
+              !placeIndexesElided context (context.ns.places.size + 1) place then
             return s!"core.borrowPlace({kind}, {← placeText context
               (fun index => expressionText context index (fuel - 1)) place})"
           pure s!"({if kind == "mut" then "&mut " else "&"}{
@@ -2480,6 +2582,11 @@ private partial def expressionText (context : Context) (id : ExprId)
               let argument := (borrowedReferentText? argument).getD argument
               let argument := implicitDerefReceiverText argument
               pure s!"{argument}.length"
+          | .signerAddress =>
+              let [argument] := arguments.toList
+                | throw "a signer's address expects one operand"
+              let argument := (borrowedReferentText? argument).getD argument
+              pure s!"{implicitDerefReceiverText argument}.address"
           | .index =>
               let [value, index] := arguments.toList
                 | throw "vector indexing expects two operands"
@@ -2811,6 +2918,11 @@ private partial def expressionText (context : Context) (id : ExprId)
           -- A multi-result signature names its later results by index; Move
           -- packs them into one tuple-typed row.
           pure (if index == 0 then "result" else s!"spec.result[{index}]")
+      | .specification .final =>
+          unless instantiations.isEmpty && arguments.size == 1 do
+            throw "`final` must have one operand"
+          let argument ← expressionText context arguments[0]! (fuel - 1)
+          pure s!"final({argument})"
       | .specification .old =>
           let some typeIds := typeInstantiationIds? instantiations
             | throw "spec.old requires an inferred type argument"
@@ -2868,7 +2980,7 @@ private partial def expressionText (context : Context) (id : ExprId)
           | some (.integer .unbounded true) =>
               -- Compiler-v2 can retain a bv-to-int coercion after its operand
               -- has already entered the logical integer domain. It is then
-              -- the identity conversion, as in the legacy transpiler.
+              -- the identity conversion.
               unless argumentNode.typeId == expression.typeId do
                 throw "a projected bit-vector conversion changes its logical integer type"
               pure argument
@@ -3082,8 +3194,10 @@ private partial def expressionText (context : Context) (id : ExprId)
                 resultNode.kind matches .throw_ ..
               let exitTerminator : String :=
                 if statementPosition && resultNode.kind matches .return_ .. then ";" else ""
+              -- A block's value is its final bare expression; only an exit
+              -- (already spelled `return`) or a diverging result is terminal.
               pure (statements.push <|
-                if terminal then s!"{result}{exitTerminator}" else s!"return {result}")
+                if terminal then s!"{result}{exitTerminator}" else result)
           else pure statements
         return blockText entries
   | .letDecl pattern none body =>
@@ -3096,10 +3210,24 @@ private partial def expressionText (context : Context) (id : ExprId)
         temporaryLocals := context.temporaryLocals ++ temporaryLocals }
         body (fuel - 1) tailPosition
   | .letDecl pattern (some value) body =>
+      if let some slot := indexTemporary? context pattern body then
+        let valueText ← expressionText context value (fuel - 1)
+        return ← expressionText
+          { context with constantLocals := context.constantLocals.push (slot, valueText) }
+          body (fuel - 1) tailPosition statementPosition
+      if let some index := indexCheck? context pattern value then
+        return ← expressionText
+          { context with elidedIndexChecks := context.elidedIndexChecks.push index }
+          body (fuel - 1) tailPosition statementPosition
       if let some assigned := hiddenReferenceMutation? context pattern body then
         return referenceMutationText context value
           (← expressionText context value (fuel - 1))
           (← expressionText context assigned (fuel - 1))
+      if let some holder := hiddenPlaceMutation? context pattern body then
+        let referenceText ← expressionText context value (fuel - 1)
+        return ← expressionText
+          { context with constantLocals := context.constantLocals.push (holder, referenceText) }
+          body (fuel - 1) tailPosition statementPosition
       if let some substitution ← temporaryConstant? context pattern value then
         return ← expressionText
           { context with constantLocals := context.constantLocals.push substitution }
@@ -3146,8 +3274,20 @@ private partial def expressionText (context : Context) (id : ExprId)
           return (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
         match expression.kind with
         | .letDecl pattern (some value) body =>
-            if (hiddenReferenceMutation? active pattern body).isSome then
+            if let some slot := indexTemporary? active pattern body then
+              let valueText ← expressionText active value (fuel - 1)
+              collectTail { active with
+                constantLocals := active.constantLocals.push (slot, valueText) } body (fuel - 1)
+            else if let some index := indexCheck? active pattern value then
+              collectTail { active with
+                elidedIndexChecks := active.elidedIndexChecks.push index } body (fuel - 1)
+            else if (hiddenReferenceMutation? active pattern body).isSome then
               pure (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
+            else if let some holder := hiddenPlaceMutation? active pattern body then
+              let referenceText ← expressionText active value (fuel - 1)
+              collectTail { active with
+                constantLocals := active.constantLocals.push (holder, referenceText) }
+                body (fuel - 1)
             else if let some substitution ← temporaryConstant? active pattern value then
               collectTail { active with
                 constantLocals := active.constantLocals.push substitution } body (fuel - 1)
@@ -3207,7 +3347,7 @@ private partial def expressionText (context : Context) (id : ExprId)
                 entries.push s!"{result}{separator}"
             else if isDivergingExpression context.ns node then
               entries.push s!"{result}{exitTerminator node}"
-            else entries.push s!"return {result}"
+            else entries.push result
         | none => entries
       if entries.isEmpty then pure "()" else
         pure (blockText entries)
@@ -3289,6 +3429,14 @@ private partial def expressionText (context : Context) (id : ExprId)
         pure s!"| {← bindingPatternText context arm.pattern}{guard} => {body}"
       pure s!"match {scrutinee} with\n{indent (lines arms)}"
   | .loop label body =>
+      let label := label <|> do
+        guard (exitedNonlocally context.ns body)
+        let rec fresh (index : Nat) : Nat → String
+          | 0 => s!"l{index}"
+          | fuel + 1 =>
+            let name := s!"l{index}"
+            if context.loopLabels.contains (some name) then fresh (index + 1) fuel else name
+        some (fresh context.loopLabels.size (context.loopLabels.size + 1))
       let loopContext := { context with loopLabels := #[label] ++ context.loopLabels }
       let rec isLoopExit (node : ExprId) (fuel : Nat) : Bool :=
         if fuel == 0 then false else
@@ -3352,7 +3500,8 @@ private partial def expressionText (context : Context) (id : ExprId)
       pure s!"continue{suffix}"
   | .assign place value =>
       if context.ns.profile == some .move &&
-          placeContainsIndex context.ns (context.ns.places.size + 1) place then
+          placeContainsIndex context.ns (context.ns.places.size + 1) place &&
+          !placeIndexesElided context (context.ns.places.size + 1) place then
         return s!"core.assignPlace({← placeText context
           (fun index => expressionText context index (fuel - 1)) place}, \
           {← expressionText context value (fuel - 1)})"
@@ -3938,7 +4087,11 @@ private def specFunctionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
   unless declaration.signature.parameters.all fun parameter => !parameter.mutable do
     throw "mutable specification-function parameters have no LeanerLang spelling"
   let contract := declaration.contract
-  unless contract.conditions.isEmpty && contract.modifies.isEmpty && contract.reads.isEmpty &&
+  let decreases? ← match contract.conditions.toList with
+    | [] => pure none
+    | [{ kind := .decreases, expression, .. }] => pure (some expression)
+    | _ => throw "specification-function contracts are outside the current LeanerLang printer"
+  unless contract.modifies.isEmpty && contract.reads.isEmpty &&
       !contract.hasFrame && !contract.modifiesAll && !contract.readsAll do
     throw "specification-function contracts are outside the current LeanerLang printer"
   match declaration.body with
@@ -3971,6 +4124,10 @@ private def specFunctionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
           declaration.signature.parameters.size (some root)
         binders := declaration.signature.generics
         specification := true }
+      let signature ← match decreases? with
+        | some measure =>
+            pure s!"{signature} decreases {← expressionText context measure (ns.expressions.size + 1) true}"
+        | none => pure signature
       let body ← expressionText context root (ns.expressions.size + 1) true
       let compact := s!"{signature} := {body}"
       if fitsIndentedLine compact then pure compact
@@ -4026,8 +4183,7 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
       "namespace specification variables are outside the current LeanerLang printer"
   -- Intrinsic declarations print inverted, as source attributes on their
   -- owner and target declarations (`@[intrinsic_map]` on the owner,
-  -- `@[map_new (Owner)]` on each bound function or specification function),
-  -- following the attribute design the legacy transpiler settled.
+  -- `@[map_new (Owner)]` on each bound function or specification function).
   let mut intrinsicAttributes : Array (Nat × String) := #[]
   for declaration in ns.intrinsics do
     let some owner := ns.tables.names[declaration.owner.index]?

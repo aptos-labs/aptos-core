@@ -54,8 +54,13 @@ prints is the baseline, verbatim, beside the source as `<name>.exp`,
 following compiler-v2's baseline convention: a clean check has no
 expectation file, a check that prints anything has exactly that output as
 its expectation, and `UB=1` writes or removes the file. Positive and
-negative tests are the same kind of file. Everything under `Check/` is
-LeanerLang; the frontend paths keep their own directories.
+negative tests are the same kind of file. Checks are grouped by language
+feature (`Scalars/`, `Structs/`, `Enums/`, `Vectors/`, `Control/`,
+`References/`, `Storage/`, `Calls/`, `Generics/`, `Specifications/`,
+`Modules/`), with larger programs under `Examples/`; a file whose name ends
+in `Errors` holds negative cases. The ledger is
+[`designs/test-organization.md`](../designs/test-organization.md). Everything
+under `Check/` is LeanerLang; the frontend paths keep their own directories.
 
 The `LEANER_E2E_SUITE` environment variable selects one suite: `move`, `rust`,
 `check`, `monovm`, or `monodiff`. The `monovm` suite is the linked MonoVM smoke check: it calls the

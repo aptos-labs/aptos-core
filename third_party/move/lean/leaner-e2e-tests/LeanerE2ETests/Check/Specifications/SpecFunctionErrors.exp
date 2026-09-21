@@ -1,0 +1,13 @@
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:53:4: error: the specification clause `ensures result == bump(coin)` is not established
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:51:7: error: leaner verification failed
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:55:0: error: `host_value` has no specification version: it has no body (a native); `spec fun host_value` can declare one
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:69:0: error: LIR-DECLARATION-NAME-DUPLICATE: duplicate specification function declaration `is_empty`
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:92:0: error: LIR-DECLARATION-NAME-DUPLICATE: duplicate specification function declaration `balance`
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:110:0: error: the recursive specification function `loops` needs a `decreases` measure
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:118:0: error: the recursive call of `grows` does not decrease its measure under the conditions on its path: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  a ≥ 1
+where
+ a := if bundle.fst ≤ 0 then 0 else bundle.fst
+goal: (bundle.fst + 1).toNat < bundle.fst.toNat
+conditions: [0 < bundle.fst]

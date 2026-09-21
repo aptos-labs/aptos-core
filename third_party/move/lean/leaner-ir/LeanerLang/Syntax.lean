@@ -73,12 +73,12 @@ private def kwAssertBang := Lean.Parser.nonReservedSymbol "assert!" true
 private def kwAssume := Lean.Parser.nonReservedSymbol "assume" true
 private def kwInvariant := Lean.Parser.nonReservedSymbol "invariant" true
 private def kwSpec := Lean.Parser.symbol "spec"
-private def kwVerify := Lean.Parser.nonReservedSymbol "verify" true
 private def kwFun := Lean.Parser.nonReservedSymbol "fun" true
 private def kwNamespace := Lean.Parser.nonReservedSymbol "namespace" true
 private def kwModule := Lean.Parser.nonReservedSymbol "module" true
 private def kwUsing := Lean.Parser.nonReservedSymbol "using" true
 private def kwWhere := Lean.Parser.nonReservedSymbol "where" true
+private def kwDecreases := Lean.Parser.nonReservedSymbol "decreases" true
 private def kwUse := Lean.Parser.symbol "use"
 private def kwStruct := Lean.Parser.nonReservedSymbol "struct" true
 private def kwEnum := Lean.Parser.nonReservedSymbol "enum" true
@@ -296,8 +296,10 @@ syntax (name := leanerStandardAppliedType)
 syntax (name := leanerNamedType) (priority := low) leanerPath : leanerType
 
 declare_syntax_cat leanerGenericBinder
+/-- A phantom type parameter; any other type parameter is written bare, as
+`{T}` or `{T has Copy}`. -/
 syntax (name := leanerTypeBinder)
-  "{" leanerIdentifier ":" (kwPhantom)? kwType (kwHas leanerAbility,+)? "}" :
+  "{" leanerIdentifier ":" kwPhantom kwType (kwHas leanerAbility,+)? "}" :
     leanerGenericBinder
 syntax (name := leanerInferredTypeBinder)
   "{" leanerIdentifier (kwHas leanerAbility,+)? "}" : leanerGenericBinder
@@ -785,9 +787,12 @@ syntax (name := leanerEnumItem)
 syntax (name := leanerFunctionItem)
   (docComment)? (leanerAttributeListSyntax)? leanerModifier* kwFun leanerIdentifier leanerGenericBinder* "(" leanerParameter,* ")"
     "->" leanerType (":=" leanerExpr)? : leanerItem
+declare_syntax_cat leanerSpecDecreases
+/-- The measure a recursive specification function decreases. -/
+syntax (name := leanerSpecDecreasesSyntax) kwDecreases leanerExpr:2 : leanerSpecDecreases
 syntax (name := leanerSpecFunctionItem) (priority := high)
   (docComment)? (leanerAttributeListSyntax)? (kwOpaque)? kwSpec kwFun leanerIdentifier leanerGenericBinder* "(" leanerParameter,* ")"
-    ":" leanerType (":=" leanerExpr)? : leanerItem
+    ":" leanerType (leanerSpecDecreases)? (":=" leanerExpr)? : leanerItem
 syntax (name := leanerContractItem)
   kwSpec leanerIdentifier "{" leanerClause* "}" : leanerItem
 syntax (name := leanerContractWhereItem)
@@ -798,18 +803,32 @@ syntax (name := leanerNamespaceInvariantMemberSyntax)
     leanerNamespaceInvariantMember
 syntax (name := leanerNamespaceInvariantItem) (priority := high)
   kwSpec kwModule kwWhere ppLine ppIndent(leanerNamespaceInvariantMember*) : leanerItem
+/-- A theorem among a module's items: a lemma about the module's
+specification functions for its authored proofs. -/
+def leanerTheorem : Lean.Parser.Parser :=
+  Lean.Parser.node `LeanerLang.leanerTheorem
+    (Lean.Parser.Command.declModifiers false >> Lean.Parser.Command.theorem)
+
+attribute [run_builtin_parser_attribute_hooks] leanerTheorem
+
+builtin_initialize register_parser_alias leanerTheorem
+
+/-- Theorems are elaborated in the module's namespace once its items are
+registered, in source order, and `verify` items after them. -/
+syntax (name := leanerTheoremItem)
+  (atomic(Lean.Parser.Command.open " in "))? leanerTheorem : leanerItem
 syntax (name := leanerVerifyItem)
-  kwVerify leanerIdentifier ("by" Lean.Parser.Tactic.tacticSeq)? : leanerItem
+  "verify" leanerIdentifier ("by" Lean.Parser.Tactic.tacticSeq)? : leanerItem
 
 syntax (name := leanerNamespaceCommand)
   "leaner" kwNamespace leanerPath kwUsing leanerProfile kwWhere
-    ppLine ppIndent(leanerItem*) : command
+    ppLine ppIndent(manyIndent(leanerItem)) : command
 syntax (name := leanerMoveModuleCommand)
   "leaner" kwModule leanerPath kwWhere
-    ppLine ppIndent(leanerItem*) : command
+    ppLine ppIndent(manyIndent(leanerItem)) : command
 syntax (name := leanerRustNamespaceCommand)
   "leaner" kwNamespace leanerPath kwWhere
-    ppLine ppIndent(leanerItem*) : command
+    ppLine ppIndent(manyIndent(leanerItem)) : command
 
 syntax (name := checkLeanerCommand) "#check_leaner" leanerPath : command
 

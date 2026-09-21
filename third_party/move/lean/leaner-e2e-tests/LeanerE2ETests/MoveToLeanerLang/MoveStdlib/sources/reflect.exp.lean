@@ -50,7 +50,7 @@ leaner module 0x1::reflect where
         E_FEATURE_NOT_ENABLED
       )
     )
-    return native_resolve::<FuncType>(addr, module_name, func_name)
+    native_resolve::<FuncType>(addr, module_name, func_name)
 
   spec resolve where
     pragma opaque

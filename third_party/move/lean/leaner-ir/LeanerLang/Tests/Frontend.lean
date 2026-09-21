@@ -155,7 +155,6 @@ leaner module 0x42::enum_payload_reborrow where
   spec replace where
     ensures self == new Slot::Filled { value } && result == old(self).value
     aborts_if !(self is Filled) with 7
-  verify replace
 
 -- A shared field name need not have one type across enum variants. Preserve
 -- the typed pattern instead of replacing it with an ambiguous projection.
@@ -220,10 +219,12 @@ run_cmd do
     throwError "mutation printing is not a fixed point:\n{printed}\nsecond:\n{formatted}"
 
 leaner module 0x42::math where
+  -- A frontend fixture: its contracts are not verified.
+  pragma verify = false
   const ZERO : UInt<64> := 0
   const GREETING : string := "hello"
   const HEADER : Bytes := b[0, 127, 255]
-  struct Pair {T : type has Copy, Drop} has Copy, Drop where
+  struct Pair {T has Copy, Drop} has Copy, Drop where
     first : T
     second : T
   struct Holder where
@@ -240,7 +241,7 @@ leaner module 0x42::math where
     ensures core.prim.equal(result, core.prim.add(value, 1));
 
 leaner namespace examples::rust_identity using rust where
-  fun identity {T : type} (value : T) -> T := value
+  fun identity {T} (value : T) -> T := value
 
 leaner namespace examples::rust_implicit_copy using rust where
   fun tuple_first(pair : (u32, Bool)) -> u32 := pair[0u32]
@@ -274,7 +275,7 @@ leaner module 0x42::constant_references where
       | false => ABORT_CODE
 
 leaner module 0x42::specification_declarations where
-  opaque spec fun choose {T : type} (value : T) : T
+  opaque spec fun choose {T} (value : T) : T
   spec fun positive (value : Int) : Bool := core.prim.greater(value, 0)
   spec fun nonnegative (value : Int) : Bool := positive(value)
 
@@ -333,10 +334,10 @@ leaner module 0x42::behavior_generic_inference where
         aborts_of<f>(values[end_ - 1]))
 
 leaner module 0x42::contract_surface where
-  opaque spec fun serialize {T : type} (value : T) : Vector<UInt<8> >
-  public native fun maybe_size {T : type} () -> examples::option::Option::<UInt<64> >
-  public native fun size {T : type} (value : &T) -> UInt<64>
-  public native fun apply {T : type} (callback : Fn(T) -> T, value : T) -> T
+  opaque spec fun serialize {T} (value : T) : Vector<UInt<8> >
+  public native fun maybe_size {T} () -> examples::option::Option::<UInt<64> >
+  public native fun size {T} (value : &T) -> UInt<64>
+  public native fun apply {T} (callback : Fn(T) -> T, value : T) -> T
   spec size where
     aborts_if [abstract] false;
     ensures core.prim.equal(result, core.prim.length(serialize(value)));
@@ -368,7 +369,7 @@ leaner module 0x42::nominal_contracts where
   fun let_value (value : UInt<64>) -> UInt<64> := do
     let doubled : UInt<64> := core.prim.add(value, value);
     return doubled
-  fun same {T : type} (value : T) -> T := value
+  fun same {T} (value : T) -> T := value
   fun same_u64 (value : UInt<64>) -> UInt<64> := core.call same::<UInt<64> >(value)
   fun widen (value : UInt<64>) -> UInt<128> := value as UInt<128>
   fun borrow_bounded (value : Bounded) -> &Bounded := core.borrow(immutable, value)
@@ -383,9 +384,9 @@ leaner module 0x42::nominal_contracts where
   fun destructure (bounded : Bounded) -> UInt<64> := do
     let Bounded { value := field } : Bounded := bounded;
     return field
-  fun element_at {T : type} (values : Vector<T>, index : UInt<64>) -> T :=
+  fun element_at {T} (values : Vector<T>, index : UInt<64>) -> T :=
     core.prim.index(values, index)
-  fun subvector {T : type} (values : Vector<T>, start : UInt<64>, stop : UInt<64>) -> Vector<T> :=
+  fun subvector {T} (values : Vector<T>, start : UInt<64>, stop : UInt<64>) -> Vector<T> :=
     core.prim.slice(values, start, stop)
   fun destructure_pair (pair : (UInt<64>, Bool)) -> UInt<64> := do
     let (first, _) : (UInt<64>, Bool) := pair;
@@ -419,35 +420,35 @@ leaner module 0x42::nominal_contracts where
 
 leaner module 0x42::logical_range where
   spec fun interval (start : Int, stop : Int) : Range := core.prim.range(start, stop)
-  spec fun contains {T : type} (values : Vector<T>, needle : T) : Bool :=
+  spec fun contains {T} (values : Vector<T>, needle : T) : Bool :=
     ∃ (value in values), value == needle
-  spec fun empty {T : type} () : Vector<T> := spec.emptyVector::<T>()
-  spec fun singleton {T : type} (value : T) : Vector<T> :=
+  spec fun empty {T} () : Vector<T> := spec.emptyVector::<T>()
+  spec fun singleton {T} (value : T) : Vector<T> :=
     spec.singletonVector::<T>(value)
-  spec fun update {T : type} (values : Vector<T>, index : Int, value : T) : Vector<T> :=
+  spec fun update {T} (values : Vector<T>, index : Int, value : T) : Vector<T> :=
     spec.updateVector::<T>(values, index, value)
-  spec fun concat {T : type} (left : Vector<T>, right : Vector<T>) : Vector<T> :=
+  spec fun concat {T} (left : Vector<T>, right : Vector<T>) : Vector<T> :=
     spec.concatVector::<T>(left, right)
-  spec fun index_of {T : type} (values : Vector<T>, value : T) : Int :=
+  spec fun index_of {T} (values : Vector<T>, value : T) : Int :=
     spec.indexOfVector::<T>(values, value)
-  spec fun contains_value {T : type} (values : Vector<T>, value : T) : Bool :=
+  spec fun contains_value {T} (values : Vector<T>, value : T) : Bool :=
     spec.containsVector::<T>(values, value)
-  spec fun size {T : type} (values : Vector<T>) : Int :=
+  spec fun size {T} (values : Vector<T>) : Int :=
     spec.lengthVector::<T>(values)
-  spec fun get {T : type} (values : Vector<T>, index : Int) : T :=
+  spec fun get {T} (values : Vector<T>, index : Int) : T :=
     spec.indexVector::<T>(values, index)
-  spec fun slice {T : type} (values : Vector<T>, bounds : Range) : Vector<T> :=
+  spec fun slice {T} (values : Vector<T>, bounds : Range) : Vector<T> :=
     spec.sliceVector::<T>(values, bounds)
   spec fun logical_int (value : UInt<64>) : Int := spec.bitVectorToInt(value)
-  spec fun in_bounds {T : type} (values : Vector<T>, index : Int) : Bool :=
+  spec fun in_bounds {T} (values : Vector<T>, index : Int) : Bool :=
     spec.inVectorRange::<T>(values, index)
-  spec fun indices {T : type} (values : Vector<T>) : Range :=
+  spec fun indices {T} (values : Vector<T>) : Range :=
     spec.vectorRange::<T>(values)
   spec fun range_contains (values : Range, index : Int) : Bool := spec.inRange(values, index)
 
 leaner module 0x42::vector_regressions where
-  public native fun native_length {T : type} (values : &Vector<T>) -> UInt<64>
-  fun call_length {T : type} (values : &Vector<T>) -> UInt<64> :=
+  public native fun native_length {T} (values : &Vector<T>) -> UInt<64>
+  fun call_length {T} (values : &Vector<T>) -> UInt<64> :=
     core.call native_length::<T>(values)
   fun pair_zero () -> (Bool, UInt<64>) := core.prim.tuple(false, 0)
   fun intrinsic_early_return (flag : Bool) -> Bool := do
@@ -455,9 +456,9 @@ leaner module 0x42::vector_regressions where
     return false
   spec intrinsic_early_return where
     pragma intrinsic;
-  fun external_identity {T : type} (value : T) -> T :=
+  fun external_identity {T} (value : T) -> T :=
     value
-  fun generic_or_abort {T : type} (value : T, available : Bool) -> T :=
+  fun generic_or_abort {T} (value : T, available : Bool) -> T :=
     if available then value else abort()
 
 leaner module 0x42::statement_order where
@@ -842,10 +843,10 @@ elab "#guard_leaner_frontend" : command => do
     "  fun observe(value : u64) -> Unit := ()\n\n" ++
     "  fun sequence(value : u64) -> u64 := do\n" ++
     "    observe(value)\n" ++
-    "    return value\n\n" ++
+    "    value\n\n" ++
     "  fun let_value(value : u64) -> u64 := do\n" ++
     "    let doubled := value + value\n" ++
-    "    return doubled\n\n" ++
+    "    doubled\n\n" ++
     "  fun same {T}(value : T) -> T := value\n\n" ++
     "  fun same_u64(value : u64) -> u64 := same(value)\n\n" ++
     "  fun widen(value : u64) -> u128 := value as u128\n\n" ++
@@ -858,13 +859,13 @@ elab "#guard_leaner_frontend" : command => do
     "    *target := value\n\n" ++
     "  fun destructure(bounded : Bounded) -> u64 := do\n" ++
     "    let Bounded { value := field } := bounded\n" ++
-    "    return field\n\n" ++
+    "    field\n\n" ++
     "  fun element_at {T}(values : Vector<T>, index : u64) -> T := values[index]\n\n" ++
     "  fun subvector {T}(values : Vector<T>, start : u64, stop : u64) -> Vector<T> :=\n" ++
     "    slice(values, start, stop)\n\n" ++
     "  fun destructure_pair(pair : (u64, Bool)) -> u64 := do\n" ++
     "    let (first, _) := pair\n" ++
-    "    return first\n\n" ++
+    "    first\n\n" ++
     "  fun singleton_tuple(value : u64) -> (u64) := (value,)\n\n" ++
     "  fun assume_true() -> Unit := spec assume true\n\n" ++
     "  fun capture_state() -> Unit := spec do\n" ++
@@ -881,7 +882,7 @@ elab "#guard_leaner_frontend" : command => do
     "    where\n" ++
     "      let bound := limit\n" ++
     "      invariant current <= bound\n" ++
-    "    return current\n\n" ++
+    "    current\n\n" ++
     "  fun keyword_parameter(end : u64) -> u64 := end\n\n" ++
     "  fun checked_equal(value : u64) -> Bool := value + 1 == value\n\n" ++
     "  fun assign_pair(left : u64, right : Bool, pair : (u64, Bool)) -> Unit :=\n" ++
@@ -899,7 +900,7 @@ elab "#guard_leaner_frontend" : command => do
       unless printed.contains
           "while i < len do\n      let mut target := elem\n      *target := false\n      i := i + 1" &&
           printed.contains
-            "if flag then\n      let next := value + 1\n      return next\n    else\n      value := value + 2\n      return value" &&
+            "if flag then\n      let next := value + 1\n      next\n    else\n      value := value + 2\n      value" &&
           !printed.contains "then do" && !printed.contains "else do" &&
           !printed.contains "while i < len do\n      do" &&
           printed.contains "fun discard_result(value : u64) -> Unit := do\n    value + 1" &&
@@ -990,9 +991,12 @@ elab "#guard_leaner_frontend" : command => do
   | .error error => throwError "the Move 2 index-syntax fixture did not render: {error}"
   | .ok printed =>
       unless printed.contains "self.values[index]" &&
-          printed.contains "core.prim.checkVectorIndex[moveVectorError](self.values, index)" &&
-          printed.contains "core.borrowPlace(mut, self.values[index])" &&
-          printed.contains "core.assignPlace(self.values[index], value)" &&
+          -- An element access lowers to its bounds check and the element
+          -- place; the source keeps the sugar, which implies the check.
+          !printed.contains "checkVectorIndex" &&
+          printed.contains "&self.values[index]" &&
+          printed.contains "&mut self.values[index]" &&
+          printed.contains "self.values[index] := value" &&
           printed.contains "&Resource[address]" &&
           printed.contains "&mut Resource[address].value" &&
           printed.contains "Resource[address] := value" &&

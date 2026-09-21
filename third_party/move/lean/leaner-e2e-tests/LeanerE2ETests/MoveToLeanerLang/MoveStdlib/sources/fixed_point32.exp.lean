@@ -60,7 +60,7 @@ leaner module 0x1::fixed_point32 where
     let unscaled_product := val as u128 * (multiplier.value as u128)
     let product := unscaled_product >> 32u8
     assert!(product <= MAX_U64, EMULTIPLICATION)
-    return product as u64
+    product as u64
 
   spec multiply_u64 where
     pragma opaque
@@ -86,7 +86,7 @@ leaner module 0x1::fixed_point32 where
     let scaled_value := val as u128 << 32u8
     let quotient := scaled_value / (divisor.value as u128)
     assert!(quotient <= MAX_U64, EDIVISION)
-    return quotient as u64
+    quotient as u64
 
   spec divide_u64 where
     pragma opaque
@@ -124,7 +124,7 @@ leaner module 0x1::fixed_point32 where
     let quotient := scaled_numerator / scaled_denominator
     assert!(quotient != 0u128 || numerator == 0, ERATIO_OUT_OF_RANGE)
     assert!(quotient <= MAX_U64, ERATIO_OUT_OF_RANGE)
-    return new FixedPoint32 { value := quotient as u64 }
+    new FixedPoint32 { value := quotient as u64 }
 
   spec create_from_rational where
     pragma opaque
@@ -204,7 +204,7 @@ leaner module 0x1::fixed_point32 where
   public fun create_from_u64(val : u64) -> FixedPoint32 := do
     let value := val as u128 << 32u8
     assert!(value <= MAX_U64, ERATIO_OUT_OF_RANGE)
-    return new FixedPoint32 { value := value as u64 }
+    new FixedPoint32 { value := value as u64 }
 
   spec create_from_u64 where
     pragma opaque
@@ -236,7 +236,7 @@ leaner module 0x1::fixed_point32 where
     let floored_num := self.floor() << 32u8
     if self.value == floored_num then return floored_num >> 32u8;
     let val := floored_num as u128 + (1u128 << 32u8)
-    return (val >> 32u8) as u64
+    (val >> 32u8) as u64
 
   spec ceil where
     pragma opaque
@@ -245,7 +245,7 @@ leaner module 0x1::fixed_point32 where
 
   spec fun spec_ceil(self : FixedPoint32) : Int := do
     let floor_val := self.value >> 32
-    return if self.value == floor_val << 32 then floor_val else floor_val + 1
+    if self.value == floor_val << 32 then floor_val else floor_val + 1
 
   -- Expressed in terms of floor_val to avoid modulo: the else branch
   -- (self.value - fractional + 2^32) >> 32 = floor_val + 1, and
@@ -256,7 +256,7 @@ leaner module 0x1::fixed_point32 where
   public fun round(self : FixedPoint32) -> u64 := do
     let floored_num := self.floor() << 32u8
     let boundary := floored_num + (1 << 32u8) / 2
-    return if self.value < boundary then floored_num >> 32u8 else self.ceil()
+    if self.value < boundary then floored_num >> 32u8 else self.ceil()
 
   spec round where
     pragma opaque
@@ -265,7 +265,7 @@ leaner module 0x1::fixed_point32 where
 
   spec fun spec_round(self : FixedPoint32) : Int := do
     let floor_val := self.value >> 32
-    return if self.value < (floor_val << 32) + (1 << 31) then floor_val
+    if self.value < (floor_val << 32) + (1 << 31) then floor_val
     else floor_val + 1
 
   -- Expressed in terms of floor_val to avoid modulo: both result branches

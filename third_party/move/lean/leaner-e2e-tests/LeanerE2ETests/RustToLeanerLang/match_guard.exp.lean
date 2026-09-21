@@ -12,5 +12,5 @@ leaner namespace match_guard where
     match discriminant[Maybe, isize](value) with
       | 1 => do
         let candidate' := &value.0
-        return if *candidate' > 0u32 then value.0 else fallback
+        if *candidate' > 0u32 then value.0 else fallback
       | 0 => fallback

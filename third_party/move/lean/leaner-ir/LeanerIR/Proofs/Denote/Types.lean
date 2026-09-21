@@ -6,6 +6,7 @@ import LeanerIR.Proofs.IntegerArithmetic
 import LeanerIR.Proofs.IntegerEvaluation
 import LeanerIR.Proofs.Meaning
 import LeanerIR.Proofs.Denote.Attr
+import LeanerIR.Semantics.Focus
 
 /-!
 # Native types of the denotation
@@ -43,8 +44,12 @@ inductive NTy where
   | struct (source : StructHandle) (fields : NRow)
   | enum (source : StructHandle) (names : List String) (rows : NRows)
       (distinct : names.Nodup)
+  /-- A growable vector of one element type. -/
+  | vector (element : NTy)
   /-- A mutable reference: its loan and the current value it owns. -/
   | ref (referent : NTy)
+  /-- A type parameter of a generic function: its skolem family's carrier. -/
+  | param (index : Nat)
 
 /-- A row of types: tuple elements, declared fields, or the locals of a body. -/
 inductive NRow where
@@ -64,7 +69,7 @@ instance : Inhabited NRow := ⟨.nil⟩
 
 /-- Whether a type is a scalar: one whose values a clause compares directly. -/
 def NTy.isScalar : NTy → Bool
-  | .tuple _ | .struct _ _ | .enum _ _ _ _ | .ref _ => false
+  | .tuple _ | .struct _ _ | .enum _ _ _ _ | .vector _ | .ref _ | .param _ => false
   | _ => true
 
 def NRow.length : NRow → Nat
@@ -101,6 +106,54 @@ def NRows.toList : NRows → List NRow
   | .nil => []
   | .cons row rest => row :: rest.toList
 
+/-- A codec is tight when a runtime value that decodes is the encoding of
+the value it decodes to: decoding and encoding are inverse on the image. -/
+def _root_.LeanerIR.Proofs.Codec.Tight {Native Runtime : Type} (codec : Codec Native Runtime) : Prop :=
+  ∀ raw value, codec.decode? raw = some value → codec.encode value = raw
+
+/-- The carriers of a generic function's type parameters: per index an
+inhabited type, a tight codec whose encodings are loan-free, and decidable
+equality.  A generic function is proved over every family
+(`designs/denotation.md`, Generics). -/
+class Skolems where
+  carrier : Nat → Type
+  codec : (index : Nat) → Codec (carrier index) RuntimeValue
+  decEq : (index : Nat) → DecidableEq (carrier index)
+  inhabited : (index : Nat) → Inhabited (carrier index)
+  tight : ∀ index, (codec index).Tight
+  plain : ∀ index value, LeanerIR.SemanticOperations.Plain ((codec index).encode value)
+
+instance [Θ : Skolems] (index : Nat) : Inhabited (Skolems.carrier index) := Θ.inhabited index
+
+/-- The family of literals, which never have a type parameter's type. -/
+@[reducible] def Skolems.ground : Skolems where
+  carrier := fun _ => Unit
+  codec := fun _ => Codec.unit
+  decEq := fun _ => inferInstanceAs (DecidableEq Unit)
+  inhabited := fun _ => ⟨()⟩
+  tight := fun _ raw value decoded => by
+    cases raw <;> simp [Codec.unit, decodeUnit?] at decoded ⊢
+  plain := fun _ _ => .unit
+
+open Classical in
+/-- The family of the public theorem: every type parameter carried as a
+loan-free runtime value. -/
+@[reducible] noncomputable def Skolems.runtime : Skolems where
+  carrier := fun _ => { value : RuntimeValue // Plain value }
+  codec := fun _ =>
+    ⟨Subtype.val, fun raw => if plain : Plain raw then some ⟨raw, plain⟩ else none,
+      fun value => by simp [value.property]⟩
+  decEq := fun _ left right => Classical.propDecidable (left = right)
+  inhabited := fun _ => ⟨⟨.unit, .unit⟩⟩
+  tight := fun _ raw value decoded => by
+    by_cases plain : Plain raw <;> simp [plain] at decoded
+    subst decoded
+    rfl
+  plain := fun _ value => value.property
+
+section Carriers
+variable [Skolems]
+
 mutual
 /-- The Lean type a native value of one type inhabits. -/
 @[reducible] def NTy.carrier : NTy → Type
@@ -114,7 +167,9 @@ mutual
   | .tuple elements => HList elements
   | .struct _ fields => HList fields
   | .enum _ names rows _ => variantCarrier names rows
-  | .ref referent => Nat × referent.carrier
+  | .vector element => SpecVector element.carrier
+  | .ref referent => referent.carrier × referent.carrier
+  | .param index => Skolems.carrier index
 
 /-- A row of values, one per type.  Not reducible: a row type is a key of
 the lemmas that rewrite values of it. -/
@@ -129,6 +184,62 @@ def variantCarrier : List String → NRows → Type
   | [], .cons _ _ => Empty
   | _ :: names, .cons fields rest => HList fields ⊕ variantCarrier names rest
 end
+
+/-- The carrier a literal's value inhabits: the ground family's, where a
+type parameter has no values. -/
+@[reducible] def NTy.groundCarrier (τ : NTy) : Type := @NTy.carrier Skolems.ground τ
+
+mutual
+/-- A literal's value at the current family. -/
+def NTy.ofGround : (τ : NTy) → τ.groundCarrier → τ.carrier
+  | .unit, value => value
+  | .bool, value => value
+  | .int _ _, value => value
+  | .address, value => value
+  | .signer, value => value
+  | .string, value => value
+  | .bytes, value => value
+  | .tuple elements, values => HList.ofGround elements values
+  | .struct _ fields, values => HList.ofGround fields values
+  | .enum _ names rows _, value => variantCarrier.ofGround names rows value
+  | .vector element, vector =>
+      ⟨vector.values.map element.ofGround, by simpa using vector.bounded⟩
+  | .ref referent, value => (referent.ofGround value.1, referent.ofGround value.2)
+  | .param _, _ => default
+
+def HList.ofGround : (row : NRow) → @HList Skolems.ground row → HList row
+  | .nil, _ => ()
+  | .cons τ rest, values => (τ.ofGround values.1, HList.ofGround rest values.2)
+
+def variantCarrier.ofGround : (names : List String) → (rows : NRows) →
+    @variantCarrier Skolems.ground names rows → variantCarrier names rows
+  | _, .nil, value => (value : Empty).elim
+  | [], .cons _ _, value => (value : Empty).elim
+  | _ :: _, .cons fields _, .inl value => .inl (HList.ofGround fields value)
+  | _ :: names, .cons _ rest, .inr value => .inr (variantCarrier.ofGround names rest value)
+end
+
+/-- The injections of a variant value, declared at the folded carrier type
+so that an `Option` of decoded variants keeps that type; applied, they are
+the sum constructors. -/
+def variantCarrier.first {name : String} {names : List String} {fields : NRow} {rest : NRows}
+    (value : HList fields) : variantCarrier (name :: names) (.cons fields rest) := Sum.inl value
+def variantCarrier.later {name : String} {names : List String} {fields : NRow} {rest : NRows}
+    (value : variantCarrier names rest) : variantCarrier (name :: names) (.cons fields rest) :=
+  Sum.inr value
+@[simp] theorem variantCarrier.first_eq (name : String) (names : List String) (fields : NRow)
+    (rest : NRows) (value : HList fields) :
+    (variantCarrier.first (name := name) (names := names) (fields := fields) (rest := rest) value) =
+      (Sum.inl value : HList fields ⊕ variantCarrier names rest) := rfl
+@[simp] theorem variantCarrier.later_eq (name : String) (names : List String) (fields : NRow)
+    (rest : NRows) (value : variantCarrier names rest) :
+    (variantCarrier.later (name := name) (names := names) (fields := fields) (rest := rest) value) =
+      (Sum.inr value : HList fields ⊕ variantCarrier names rest) := rfl
+
+/-- A bounded vector decides equality by its elements. -/
+instance instDecidableEqSpecVector {α : Type} [DecidableEq α] : DecidableEq (SpecVector α) := fun a b =>
+  if h : a.values = b.values then isTrue (SpecVector.ext h)
+  else isFalse fun equal => h (congrArg SpecVector.values equal)
 
 /-- A certified integer decides equality by its value. -/
 instance {width : IntWidth} {signed : Bool} : DecidableEq (SpecInt width signed) := fun a b =>
@@ -148,7 +259,9 @@ def NTy.decEq : (τ : NTy) → DecidableEq τ.carrier
   | .tuple elements => HList.decEq elements
   | .struct _ fields => HList.decEq fields
   | .enum _ names rows _ => variantCarrier.decEq names rows
-  | .ref referent => @instDecidableEqProd _ _ inferInstance referent.decEq
+  | .vector element => @instDecidableEqSpecVector _ element.decEq
+  | .ref referent => @instDecidableEqProd _ _ referent.decEq referent.decEq
+  | .param index => Skolems.decEq index
 
 def HList.decEq : (row : NRow) → DecidableEq (HList row)
   | .nil => inferInstanceAs (DecidableEq Unit)
@@ -176,11 +289,20 @@ def Codec.nominalRow (source : StructHandle) (variant : Option String)
     intro value
     simp [row.decode_encode]
 
-/-- A mutable reference: the loan it holds and the encoded current value. -/
-def Codec.mutRef (codec : Codec Native RuntimeValue) : Codec (Nat × Native) RuntimeValue where
-  encode := fun value => .borrow value.1 (codec.encode value.2)
+/-- A mutable reference's carrier, its current value and its prophecy, as a
+pair. The runtime has no value for a reference apart from a loan: the
+agreement lends each argument reference under a loan it assigns
+(`Denote.Agreement`). This codec only keeps `NTy.codec` total; no
+denotation encodes a reference with it. -/
+def Codec.prophecyPair (codec : Codec Native RuntimeValue) :
+    Codec (Native × Native) RuntimeValue where
+  encode := fun value => .tuple #[codec.encode value.1, codec.encode value.2]
   decode?
-    | .borrow loan current => (codec.decode? current).map fun decoded => (loan, decoded)
+    | .tuple values => match values.toList with
+      | [current, prophecy] =>
+          (codec.decode? current).bind fun current =>
+            (codec.decode? prophecy).map fun prophecy => (current, prophecy)
+      | _ => none
     | _ => none
   decode_encode := by
     intro value
@@ -268,7 +390,9 @@ def NTy.codec : (τ : NTy) → Codec τ.carrier RuntimeValue
   | .tuple elements => Codec.tuple (rowCodec elements)
   | .struct source fields => Codec.nominalRow source none (rowCodec fields)
   | .enum source names rows distinct => variantCodec source names rows (rowCodecs rows) distinct
-  | .ref referent => Codec.mutRef referent.codec
+  | .vector element => Codec.boundedVector element.codec
+  | .ref referent => Codec.prophecyPair referent.codec
+  | .param index => Skolems.codec index
 
 /-- The codec of a row of values. -/
 def rowCodec : (row : NRow) → Codec (HList row) (List RuntimeValue)
@@ -296,6 +420,8 @@ def NTy.encode (τ : NTy) (value : τ.carrier) : RuntimeValue := τ.codec.encode
     NTy.encode .string value = .string value := rfl
 @[simp] theorem NTy.encode_bytes (value : Array UInt8) :
     NTy.encode .bytes value = .bytes value := rfl
+@[simp] theorem NTy.encode_vector (element : NTy) (value : SpecVector element.carrier) :
+    NTy.encode (.vector element) value = .vector (value.values.map element.codec.encode) := rfl
 
 /-- The runtime row a row of values denotes. -/
 def HList.encode {Γ : NRow} (values : HList Γ) : List RuntimeValue := (rowCodec Γ).encode values
@@ -314,8 +440,9 @@ def HList.encode {Γ : NRow} (values : HList Γ) : List RuntimeValue := (rowCode
     (value : HList fields) :
     NTy.encode (.enum source (name :: names) (.cons fields rest) distinct) (.inl value) =
       .nominal source (some name) value.encode.toArray := rfl
-@[simp] theorem NTy.encode_ref (referent : NTy) (value : Nat × referent.carrier) :
-    NTy.encode (.ref referent) value = .borrow value.1 (referent.encode value.2) := rfl
+@[simp] theorem NTy.encode_ref (referent : NTy) (value : referent.carrier × referent.carrier) :
+    NTy.encode (.ref referent) value =
+      .tuple #[referent.encode value.1, referent.encode value.2] := rfl
 @[simp] theorem NTy.encode_enum_inr (source : StructHandle) (name : String)
     (names : List String) (fields : NRow) (rest : NRows) (distinct : (name :: names).Nodup)
     (value : variantCarrier names rest) :
@@ -340,6 +467,7 @@ theorem NTy.encode_not_borrow (τ : NTy) (scalar : τ.isScalar = true) (value : 
 The `==` primitive decides structural equality of runtime values.  On the
 encoding of a native value it is the native decision. -/
 
+omit [Skolems] in
 private theorem beq_eq_decide {α : Type} [BEq α] [LawfulBEq α] [DecidableEq α]
     (left right : α) : (left == right) = decide (left = right) := by
   by_cases h : left = right
@@ -347,23 +475,27 @@ private theorem beq_eq_decide {α : Type} [BEq α] [LawfulBEq α] [DecidableEq �
     simp
   · simp [h]
 
+omit [Skolems] in
 theorem RuntimeValue.beq_unit : (RuntimeValue.unit == RuntimeValue.unit) = true := by
   show RuntimeValue.beq _ _ = true
   unfold RuntimeValue.beq
   rfl
 
+omit [Skolems] in
 theorem RuntimeValue.beq_signer (left right : String) :
     (RuntimeValue.signer left == RuntimeValue.signer right) = decide (left = right) := by
   show RuntimeValue.beq _ _ = _
   unfold RuntimeValue.beq
   exact beq_eq_decide _ _
 
+omit [Skolems] in
 theorem RuntimeValue.beq_string (left right : String) :
     (RuntimeValue.string left == RuntimeValue.string right) = decide (left = right) := by
   show RuntimeValue.beq _ _ = _
   unfold RuntimeValue.beq
   exact beq_eq_decide _ _
 
+omit [Skolems] in
 theorem RuntimeValue.beq_bytes (left right : Array UInt8) :
     (RuntimeValue.bytes left == RuntimeValue.bytes right) = decide (left = right) := by
   show RuntimeValue.beq _ _ = _
@@ -385,7 +517,11 @@ def NTy.eqb : (τ : NTy) → τ.carrier → τ.carrier → Bool
   | .tuple elements, left, right => rowEqb elements left right
   | .struct _ fields, left, right => rowEqb fields left right
   | .enum _ names rows _, left, right => variantEqb names rows left right
+  | .vector element, left, right =>
+      left.values.size == right.values.size &&
+        (left.values.toList.zip right.values.toList).all fun pair => element.eqb pair.1 pair.2
   | .ref _, _, _ => false
+  | .param index, left, right => @decide (left = right) (Skolems.decEq index left right)
 
 /-- Structural equality of rows, component by component. -/
 def rowEqb : (row : NRow) → HList row → HList row → Bool
@@ -413,6 +549,10 @@ end
 @[simp] theorem NTy.eqb_enum (source : StructHandle) (names : List String) (rows : NRows)
     (distinct : names.Nodup) (left right : variantCarrier names rows) :
     NTy.eqb (.enum source names rows distinct) left right = variantEqb names rows left right := rfl
+@[simp] theorem NTy.eqb_vector (element : NTy) (left right : SpecVector element.carrier) :
+    NTy.eqb (.vector element) left right =
+      (left.values.size == right.values.size &&
+        (left.values.toList.zip right.values.toList).all fun pair => element.eqb pair.1 pair.2) := rfl
 @[simp] theorem rowEqb_nil (left right : HList .nil) : rowEqb .nil left right = true := rfl
 @[simp] theorem rowEqb_cons (τ : NTy) (rest : NRow) (left right : HList (.cons τ rest)) :
     rowEqb (.cons τ rest) left right = (τ.eqb left.1 right.1 && rowEqb rest left.2 right.2) := rfl
@@ -436,7 +576,9 @@ def namedIn (name : String) : List String → Bool
   | [] => false
   | test :: rest => name == test || namedIn name rest
 
+omit [Skolems] in
 @[simp] theorem namedIn_nil (name : String) : namedIn name [] = false := rfl
+omit [Skolems] in
 @[simp] theorem namedIn_cons (name test : String) (rest : List String) :
     namedIn name (test :: rest) = (name == test || namedIn name rest) := rfl
 
@@ -456,6 +598,9 @@ theorem NTy.beq_encode (τ : NTy) (scalar : τ.isScalar = true) (left right : τ
 @[simp] theorem NTy.eqb_address (left right : String) :
     NTy.eqb .address left right = decide (left = right) := rfl
 @[simp] theorem NTy.eqb_unit (left right : Unit) : NTy.eqb .unit left right = true := rfl
+@[simp] theorem NTy.eqb_param (index : Nat) (left right : (NTy.param index).carrier) :
+    NTy.eqb (.param index) left right = @decide (left = right) (Skolems.decEq index left right) :=
+  rfl
 
 /-! ## Environments
 
@@ -488,6 +633,11 @@ def Var.set : {Γ : NRow} → {τ : NTy} → Var Γ τ → τ.carrier → HEnv �
   | _, _, .here, value, env => (some value, env.2)
   | _, _, .there rest, value, env => (env.1, rest.set value env.2)
 
+/-- Empty a slot: the value has moved out. -/
+def Var.clear : {Γ : NRow} → {τ : NTy} → Var Γ τ → HEnv Γ → HEnv Γ
+  | _, _, .here, env => (none, env.2)
+  | _, _, .there rest, env => (env.1, rest.clear env.2)
+
 /-- The component of a row at a position. -/
 def Var.select : {Γ : NRow} → {τ : NTy} → Var Γ τ → HList Γ → τ.carrier
   | _, _, .here, values => values.1
@@ -503,6 +653,10 @@ def Var.select : {Γ : NRow} → {τ : NTy} → Var Γ τ → HList Γ → τ.ca
 @[simp] theorem Var.set_there {Γ : NRow} {σ τ : NTy} (rest : Var Γ τ)
     (value : τ.carrier) (env : HEnv (.cons σ Γ)) :
     (Var.there rest).set value env = (env.1, rest.set value env.2) := rfl
+@[simp] theorem Var.clear_here {Γ : NRow} {τ : NTy} (env : HEnv (.cons τ Γ)) :
+    (Var.here : Var (.cons τ Γ) τ).clear env = (none, env.2) := rfl
+@[simp] theorem Var.clear_there {Γ : NRow} {σ τ : NTy} (rest : Var Γ τ)
+    (env : HEnv (.cons σ Γ)) : (Var.there rest).clear env = (env.1, rest.clear env.2) := rfl
 @[simp] theorem Var.select_here {Γ : NRow} {τ : NTy} (values : HList (.cons τ Γ)) :
     (Var.here : Var (.cons τ Γ) τ).select values = values.1 := rfl
 @[simp] theorem Var.select_there {Γ : NRow} {σ τ : NTy} (rest : Var Γ τ)
@@ -558,6 +712,7 @@ theorem readLocal?_envFrame : {Γ : NRow} → {τ : NTy} → (x : Var Γ τ) →
         List.getElem?_cons_succ, Var.get_there] at ih ⊢
       exact ih
 
+omit [Skolems] in
 theorem Var.index_lt : {Γ : NRow} → {τ : NTy} → (x : Var Γ τ) → x.index < Γ.length
   | _, _, .here => by simp [Var.index, NRow.length]
   | _, _, .there rest => by simp [Var.index, Var.index_lt rest, NRow.length]
@@ -621,6 +776,8 @@ def initialEnv : (params rest : NRow) → HList params → HEnv (params ++ rest)
   | .nil, .cons _ rest, _ => (none, initialEnv .nil rest ())
   | .cons _ params, rest, values => (some values.1, initialEnv params rest values.2)
 
+end Carriers
+
 /-! ## Native operations
 
 Each operation is the `Spec` a checked primitive denotes on native
@@ -653,6 +810,170 @@ theorem IntegerValueFits_signed_succ (n : Nat) (value : Int) :
     IntegerValueFits (.bits (n + 1)) true value ↔
       -(2 : Int) ^ n ≤ value ∧ value ≤ 2 ^ n - 1 := by
   simp [IntegerValueFits, Ty.integerValueFits?, Ty.integerBounds?]
+
+/-- The length of a bounded vector, which fits `u64` by its bound. -/
+def vectorLength {α : Type} (vector : SpecVector α) : SpecInt (.bits 64) false :=
+  ⟨vector.values.size, (IntegerValueFits_unsigned_succ 63 _).mpr
+    ⟨Int.natCast_nonneg _, by have := vector.bounded; omega⟩⟩
+
+@[simp] theorem vectorLength_val {α : Type} (vector : SpecVector α) :
+    (vectorLength vector).val = vector.values.size := rfl
+
+/-- An array as a bounded vector, when its size is below the bound. -/
+def _root_.LeanerIR.SpecVector.ofArray? {α : Type} (values : Array α) : Option (SpecVector α) :=
+  if bounded : values.size < 2 ^ 64 then some ⟨values, bounded⟩ else none
+
+theorem _root_.LeanerIR.SpecVector.ofArray?_eq {α : Type} (values : Array α) :
+    SpecVector.ofArray? values =
+      if bounded : values.size < 2 ^ 64 then some ⟨values, bounded⟩ else none := rfl
+
+/-- The runtime's in-place range reversal (`reverseVectorRange`), on any
+element type: a swap schedule over the range, from both ends inward. -/
+def reverseRange {α : Type} : Nat → Nat → Nat → Array α → Array α
+  | 0, _, _, elements => elements
+  | count + 1, left, right, elements =>
+      reverseRange count (left + 1) (right - 1) (elements.swapIfInBounds left right)
+
+@[simp] theorem reverseRange_zero {α : Type} (left right : Nat) (elements : Array α) :
+    reverseRange 0 left right elements = elements := rfl
+
+/-- The runtime's search (`findVectorIndex`): the first position whose
+element the equality accepts. -/
+def findIndex? {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    Nat → Nat → Option Nat
+  | 0, _ => none
+  | count + 1, index =>
+      if elements[index]?.any (eq · needle) then some index
+      else findIndex? eq elements needle count (index + 1)
+
+theorem findIndex?_lt {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    ∀ (count index found : Nat), findIndex? eq elements needle count index = some found →
+      found < elements.size := by
+  intro count
+  induction count with
+  | zero => intro _ _ h; simp [findIndex?] at h
+  | succ n ih =>
+      intro index found h
+      simp only [findIndex?] at h
+      split at h
+      · rename_i hit
+        cases h
+        cases present : elements[index]? with
+        | none => rw [present] at hit; simp [Option.any] at hit
+        | some _ => exact (Array.getElem?_eq_some_iff.mp present).1
+      · exact ih _ _ h
+
+private theorem findIndex?_eq_none_from {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    ∀ (count index : Nat), index + count = elements.size →
+      (findIndex? eq elements needle count index = none ↔
+        ∀ i (h : i < elements.size), index ≤ i → eq elements[i] needle = false) := by
+  intro count
+  induction count with
+  | zero =>
+      intro index sum
+      simp only [findIndex?, true_iff]
+      intro i h low
+      omega
+  | succ n ih =>
+      intro index sum
+      have inBounds : index < elements.size := by omega
+      simp only [findIndex?, Array.getElem?_eq_getElem inBounds, Option.any_some]
+      split
+      · rename_i hit
+        simp only [reduceCtorEq, false_iff, Classical.not_forall]
+        exact ⟨index, inBounds, Nat.le_refl _, by simp [hit]⟩
+      · rename_i miss
+        rw [ih (index + 1) (by omega)]
+        constructor
+        · intro rest i h low
+          by_cases same : i = index
+          · subst same; simpa using miss
+          · exact rest i h (by omega)
+        · intro all i h low
+          exact all i h (by omega)
+
+/-- An insertion at a position within the vector (the end included). -/
+theorem insertIdxIfInBounds_of_le {α : Type} (xs : Array α) (i : Nat) (a : α) (h : i ≤ xs.size) :
+    xs.insertIdxIfInBounds i a = xs.insertIdx i a h := by
+  simp [Array.insertIdxIfInBounds, h]
+
+/-- A removal at a position within the vector. -/
+theorem eraseIdxIfInBounds_of_lt {α : Type} (xs : Array α) (i : Nat) (h : i < xs.size) :
+    xs.eraseIdxIfInBounds i = xs.eraseIdx i h := by
+  simp [Array.eraseIdxIfInBounds, h]
+
+/-- A field of an element looked up in a vector is looked up as that field
+of the element, so that it reduces once the element's encoding does. -/
+theorem getD_map_field {α : Type} (element : Option α) (encode : α → RuntimeValue)
+    (index : Nat) :
+    ((element.map encode).getD .unit).field index =
+      (element.map fun value => (encode value).field index).getD .unit := by
+  cases element <;> rfl
+
+/-- A search over the whole vector fails exactly when no element is accepted. -/
+theorem findIndex?_eq_none_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    findIndex? eq elements needle elements.size 0 = none ↔
+      ∀ x ∈ elements, eq x needle = false := by
+  rw [findIndex?_eq_none_from eq elements needle elements.size 0 (by omega)]
+  constructor
+  · intro all x mem
+    obtain ⟨i, h, rfl⟩ := Array.getElem_of_mem mem
+    exact all i h (Nat.zero_le _)
+  · intro all i h _
+    exact all _ (Array.getElem_mem h)
+
+/-- A search over the whole vector succeeds exactly when some element is
+accepted. -/
+theorem findIndex?_isSome_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    (findIndex? eq elements needle elements.size 0).isSome = true ↔
+      ∃ x ∈ elements, eq x needle = true := by
+  rw [← Bool.not_eq_false, Option.isSome_eq_false_iff, Option.isNone_iff_eq_none,
+    findIndex?_eq_none_iff]
+  simp
+
+/-- The found position of a search, as a `u64`: below the vector's size,
+which is below the bound. -/
+def foundIndex {α : Type} (vector : SpecVector α) (found : Option Nat)
+    (bound : ∀ i, found = some i → i < vector.values.size) : SpecInt (.bits 64) false :=
+  ⟨found.getD 0, (IntegerValueFits_unsigned_succ 63 _).mpr ⟨Int.natCast_nonneg _, by
+    have := vector.bounded
+    cases h : found with
+    | none => simp
+    | some i => have := bound i h; simp; omega⟩⟩
+
+/-- The first position of the needle in a bounded vector, as a `u64`. -/
+def foundIndexOf {α : Type} (eq : α → α → Bool) (vector : SpecVector α) (needle : α) :
+    SpecInt (.bits 64) false :=
+  foundIndex vector (findIndex? eq vector.values needle vector.values.size 0)
+    (fun _ h => findIndex?_lt eq vector.values needle _ _ _ h)
+
+@[simp] theorem foundIndex_val {α : Type} (vector : SpecVector α) (found : Option Nat)
+    (bound : ∀ i, found = some i → i < vector.values.size) :
+    (foundIndex vector found bound).val = found.getD 0 := rfl
+
+/-- The structural order of two runtime values as the `i8` `compare`
+returns. -/
+def compareResult (orders : Array (Array (Array String))) (left right : RuntimeValue) :
+    SpecInt (.bits 8) true :=
+  ⟨orderValue (RuntimeValue.order (SemanticOperations.variantRank orders) left right), by
+    rw [IntegerValueFits_signed_succ]
+    cases RuntimeValue.order (SemanticOperations.variantRank orders) left right <;>
+      simp [orderValue]⟩
+
+@[simp] theorem compareResult_val (orders : Array (Array (Array String)))
+    (left right : RuntimeValue) :
+    (compareResult orders left right).val =
+      orderValue (RuntimeValue.order (SemanticOperations.variantRank orders) left right) := rfl
+
+/-- A bounded vector with one element replaced; the size is unchanged. -/
+def _root_.LeanerIR.SpecVector.set {α : Type} (vector : SpecVector α) (index : Nat) (value : α) : SpecVector α :=
+  ⟨vector.values.set! index value, by rw [Array.size_set!]; exact vector.bounded⟩
+
+@[simp] theorem _root_.LeanerIR.SpecVector.values_set {α : Type} (vector : SpecVector α) (index : Nat) (value : α) :
+    (vector.set index value).values = vector.values.set! index value := rfl
+
+@[simp] theorem _root_.LeanerIR.SpecVector.values_mk {α : Type} (values : Array α) (bounded : values.size < 2 ^ 64) :
+    (SpecVector.mk values bounded).values = values := rfl
 
 /-- The bounds a range certificate carries, as facts a leaf adds beside it
 rather than rewrites into it: a term's certificate keeps its type. -/
@@ -842,6 +1163,95 @@ def CheckedOp.run (op : CheckedOp) (failure : ThrowKind) {width : Nat} {signed :
       if right.val = 0 then Spec.abort (failure, #[])
       else Spec.bind (checkedInt failure width signed (left.val.tdiv right.val)) fun _ =>
         checkedInt failure width signed (left.val.tmod right.val)
+
+/-- Modular arithmetic: the operations the runtime evaluates with
+`modularInteger`, wrapping the mathematical result into the width. -/
+inductive ModularOp where
+  | add
+  | subtract
+  | multiply
+  deriving DecidableEq, Repr, Inhabited
+
+/-- The mathematical value of a modular operation before wrapping. -/
+def ModularOp.eval : ModularOp → Int → Int → Int
+  | .add, left, right => left + right
+  | .subtract, left, right => left - right
+  | .multiply, left, right => left * right
+
+@[simp] theorem ModularOp.eval_add (left right : Int) :
+    ModularOp.add.eval left right = left + right := rfl
+@[simp] theorem ModularOp.eval_subtract (left right : Int) :
+    ModularOp.subtract.eval left right = left - right := rfl
+@[simp] theorem ModularOp.eval_multiply (left right : Int) :
+    ModularOp.multiply.eval left right = left * right := rfl
+
+/-- The residue of a value in the representable range of a width, as the
+runtime's `modularInteger` computes it: the least nonnegative residue
+modulo `2 ^ width`, shifted below zero for a signed width. -/
+def wrapInt (width : Nat) (signed : Bool) (value : Int) : Int :=
+  let modulus : Int := (2 : Int) ^ width
+  let residue := ((value % modulus) + modulus) % modulus
+  if signed && residue ≥ (2 : Int) ^ (width - 1) then residue - modulus else residue
+
+theorem wrapInt_unsigned (width : Nat) (value : Int) :
+    wrapInt width false value =
+      ((value % (2 : Int) ^ width) + (2 : Int) ^ width) % (2 : Int) ^ width := by
+  simp [wrapInt]
+
+theorem wrapInt_signed (width : Nat) (value : Int) :
+    wrapInt width true value =
+      if ((value % (2 : Int) ^ width) + (2 : Int) ^ width) % (2 : Int) ^ width ≥
+          (2 : Int) ^ (width - 1) then
+        ((value % (2 : Int) ^ width) + (2 : Int) ^ width) % (2 : Int) ^ width - (2 : Int) ^ width
+      else ((value % (2 : Int) ^ width) + (2 : Int) ^ width) % (2 : Int) ^ width := by
+  simp [wrapInt]
+
+theorem residue_bounds (modulus value : Int) (positive : 0 < modulus) :
+    0 ≤ ((value % modulus) + modulus) % modulus ∧
+      ((value % modulus) + modulus) % modulus < modulus :=
+  ⟨Int.emod_nonneg _ (Int.ne_of_gt positive), Int.emod_lt_of_pos _ positive⟩
+
+theorem wrapInt_fits (width : Nat) (signed : Bool) (value : Int) (nonzero : width ≠ 0) :
+    IntegerValueFits (.bits width) signed (wrapInt width signed value) := by
+  obtain ⟨n, rfl⟩ : ∃ n, width = n + 1 := ⟨width - 1, by omega⟩
+  have half : (0 : Int) < 2 ^ n := by
+    have := Nat.two_pow_pos n
+    have cast : ((2 ^ n : Nat) : Int) = (2 : Int) ^ n := Int.natCast_pow 2 n
+    omega
+  have modulus : (2 : Int) ^ (n + 1) = 2 * 2 ^ n := by
+    rw [Int.pow_succ]; exact Int.mul_comm _ _
+  have residue := residue_bounds ((2 : Int) ^ (n + 1)) value (by omega)
+  cases signed with
+  | false =>
+      rw [IntegerValueFits_unsigned_succ, wrapInt_unsigned]
+      omega
+  | true =>
+      rw [IntegerValueFits_signed_succ, wrapInt_signed]
+      simp only [Nat.add_sub_cancel]
+      split <;> omega
+
+/-- Zero fits every integer width. -/
+theorem zero_fits (width : Nat) (signed : Bool) (nonzero : width ≠ 0) :
+    IntegerValueFits (.bits width) signed 0 := by
+  obtain ⟨n, rfl⟩ : ∃ n, width = n + 1 := ⟨width - 1, by omega⟩
+  have half : (0 : Int) < 2 ^ n := by
+    have := Nat.two_pow_pos n
+    have cast : ((2 ^ n : Nat) : Int) = (2 : Int) ^ n := Int.natCast_pow 2 n
+    omega
+  have modulus : (2 : Int) ^ (n + 1) = 2 * 2 ^ n := by
+    rw [Int.pow_succ]; exact Int.mul_comm _ _
+  cases signed with
+  | false => rw [IntegerValueFits_unsigned_succ]; omega
+  | true => rw [IntegerValueFits_signed_succ]; omega
+
+/-- A modular operation on certified integers, wrapped into their width. -/
+def ModularOp.run (op : ModularOp) {width : Nat} {signed : Bool}
+    (left right : SpecInt (.bits width) signed) : SpecInt (.bits width) signed :=
+  ⟨wrapInt width signed (op.eval left.val right.val), wrapInt_fits _ _ _ left.width_nonzero⟩
+
+@[simp] theorem ModularOp.run_val (op : ModularOp) {width : Nat} {signed : Bool}
+    (left right : SpecInt (.bits width) signed) :
+    (op.run left right).val = wrapInt width signed (op.eval left.val right.val) := rfl
 
 /-- Bitwise operations on unsigned integers. -/
 inductive BitOp where
@@ -1107,8 +1517,12 @@ theorem wp_checkedInt_succ (failure : ThrowKind) (n : Nat) (signed : Bool) (valu
 attribute [lir_denote] wp_ite wp_bottom wp_checked_add wp_checked_subtract wp_checked_multiply
   wp_checked_divide wp_checked_modulo wp_checkedShiftLeft wp_checkedShiftRight wp_checkedInt_succ
   Var.get_here Var.get_there Var.set_here Var.set_there SpecInt.ofBounds_val BitOp.run_val
+  ModularOp.run_val ModularOp.eval_add ModularOp.eval_subtract ModularOp.eval_multiply
+  foundIndex_val foundIndexOf reverseRange_zero
+  wrapInt_unsigned wrapInt_signed
   BitOp.eval_and CompareOp.decide_less CompareOp.decide_greater CompareOp.decide_lessEqual
   CompareOp.decide_greaterEqual NTy.eqb_int NTy.eqb_bool NTy.eqb_address NTy.eqb_unit
+  NTy.eqb_param
   IntegerValueFits_unsigned_succ IntegerValueFits_signed_succ initialEnv
 
 /-! ## State operations
@@ -1152,6 +1566,44 @@ structure Family where
 def Family.key (family : Family) (key : RuntimeValue) : GlobalKey :=
   LeanerIR.SemanticOperations.globalKey family.namespaceId family.typeId key
 
+/-- A family of a generic frame at its type instantiation, as the runtime
+keys it. -/
+def Family.instantiate (typeInstantiation : Array (TypeId × TypeId)) (family : Family) : Family :=
+  { family with typeId := instantiatedTypeId typeInstantiation family.typeId }
+
+@[simp] theorem Family.instantiate_empty (family : Family) : family.instantiate #[] = family := by
+  simp [Family.instantiate]
+
+/-- An instantiation given as a literal is looked up entry by entry. -/
+theorem instantiatedTypeId_cons (entry : TypeId × TypeId) (rest : List (TypeId × TypeId))
+    (typeId : TypeId) :
+    instantiatedTypeId (entry :: rest).toArray typeId =
+      if entry.1 = typeId then entry.2 else instantiatedTypeId rest.toArray typeId := by
+  unfold instantiatedTypeId
+  obtain ⟨⟨source⟩, target⟩ := entry
+  obtain ⟨index⟩ := typeId
+  have beq : ((⟨source⟩ : TypeId) == ⟨index⟩) = (source == index) := rfl
+  by_cases same : source = index
+  · subst same
+    simp [List.find?_cons, beq]
+  · simp [List.find?_cons, beq, same]
+
+theorem instantiatedTypeId_nil (typeId : TypeId) :
+    instantiatedTypeId ([] : List (TypeId × TypeId)).toArray typeId = typeId :=
+  instantiatedTypeId_empty typeId
+
+@[simp] theorem Family.instantiate_namespaceId (typeInstantiation : Array (TypeId × TypeId))
+    (family : Family) : (family.instantiate typeInstantiation).namespaceId = family.namespaceId :=
+  rfl
+@[simp] theorem Family.instantiate_typeId (typeInstantiation : Array (TypeId × TypeId))
+    (family : Family) :
+    (family.instantiate typeInstantiation).typeId =
+      instantiatedTypeId typeInstantiation family.typeId :=
+  rfl
+
+attribute [lir_denote] Family.instantiate_empty Family.instantiate_namespaceId
+  Family.instantiate_typeId
+
 @[simp] theorem Family.key_eq (family : Family) (key : RuntimeValue) :
     family.key key = ⟨family.namespaceId, family.typeId, key.storageKey⟩ := rfl
 @[simp] theorem storageKey_address (address : String) :
@@ -1159,19 +1611,6 @@ def Family.key (family : Family) (key : RuntimeValue) : GlobalKey :=
 @[simp] theorem storageKey_signer (address : String) :
     (RuntimeValue.signer address).storageKey = .address address := rfl
 
-/-- Mint a fresh loan: its identity, with the frontier advanced. -/
-def mintLoan : Comp Nat :=
-  Spec.bind Spec.get fun state =>
-    Spec.bind (Spec.modify fun state => { state with nextLoan := state.nextLoan + 1 }) fun _ =>
-      Spec.pure state.nextLoan
-
-theorem wp_mintLoan (ensures : Nat → RuntimeState → Prop) (aborts : Failure → Prop)
-    (state : RuntimeState) :
-    wp mintLoan ensures aborts state ↔
-      ensures state.nextLoan { state with nextLoan := state.nextLoan + 1 } := by
-  simp [mintLoan, wp_bind, wp_get, wp_modify, wp_pure]
-
-attribute [lir_denote] wp_mintLoan
 
 /-- The write-backs a callee appended past the pending set it inherited. -/
 def exportsAfter (inherited final : Array (Nat × RuntimeValue)) : List (Nat × RuntimeValue) :=
@@ -1251,13 +1690,13 @@ theorem Array.push_eq_push_iff {α : Type} (left right : Array α) (x y : α) :
 @[simp] theorem bool_encode (value : Bool) : Codec.bool.encode value = .bool value := rfl
 @[simp] theorem address_encode (value : String) : Codec.address.encode value = .address value := rfl
 
-@[simp] theorem NTy.codec_int (width : Nat) (signed : Bool) :
+@[simp] theorem NTy.codec_int [Skolems] (width : Nat) (signed : Bool) :
     (NTy.int width signed).codec = Codec.specInt (.bits width) signed := rfl
-@[simp] theorem NTy.codec_bool : NTy.bool.codec = Codec.bool := rfl
-@[simp] theorem NTy.codec_address : NTy.address.codec = Codec.address := rfl
-@[simp] theorem NTy.codec_unit : NTy.unit.codec = Codec.unit := rfl
-@[simp] theorem NTy.codec_ref (referent : NTy) :
-    (NTy.ref referent).codec = Codec.mutRef referent.codec := rfl
+@[simp] theorem NTy.codec_bool [Skolems] : NTy.bool.codec = Codec.bool := rfl
+@[simp] theorem NTy.codec_address [Skolems] : NTy.address.codec = Codec.address := rfl
+@[simp] theorem NTy.codec_unit [Skolems] : NTy.unit.codec = Codec.unit := rfl
+@[simp] theorem NTy.codec_ref [Skolems] (referent : NTy) :
+    (NTy.ref referent).codec = Codec.prophecyPair referent.codec := rfl
 
 /-- Decoding a runtime integer at a certified width: the value, when it fits. -/
 theorem specInt_decode_integer (width : IntWidth) (signed : Bool) (value : Int) :
@@ -1273,6 +1712,69 @@ theorem address_decode_address (value : String) :
 theorem signer_decode_signer (value : String) :
     Codec.signer.decode? (.signer value) = some value := rfl
 
+/-- An encoding equation read as a decoding: the runtime value a native
+value encodes to decodes back to it, so a literal encoding names the value. -/
+theorem NTy.decode?_of_encode [Skolems] (τ : NTy) {value : τ.carrier} {raw : RuntimeValue}
+    (encoded : τ.encode value = raw) : τ.codec.decode? raw = some value :=
+  encoded ▸ τ.codec.decode_encode value
+
+/-- The same, once an encoding of a vector has been split element-wise. -/
+theorem NTy.decode?_vector_of_map [Skolems] (τ : NTy) {value : SpecVector τ.carrier} {raw : Array RuntimeValue}
+    (encoded : value.values.map τ.encode = raw) :
+    (NTy.vector τ).codec.decode? (.vector raw) = some value :=
+  NTy.decode?_of_encode (.vector τ) (congrArg RuntimeValue.vector encoded)
+
+/-- An array is the array of its list. -/
+theorem array_eq_of_toList_eq {α : Type} {xs : Array α} {l : List α} (h : xs.toList = l) :
+    xs = l.toArray :=
+  Array.toList_inj.mp (h.trans (List.toList_toArray (as := l)).symm)
+
+@[simp] theorem NTy.codec_vector [Skolems] (element : NTy) :
+    (NTy.vector element).codec = Codec.boundedVector element.codec := rfl
+
+/-- Decoding the elements of a vector one by one, as explicit binds. -/
+def decodeElements? (codec : Codec Native RuntimeValue) : List RuntimeValue → Option (List Native)
+  | [] => some []
+  | value :: values =>
+      (codec.decode? value).bind fun head => (decodeElements? codec values).map fun tail => head :: tail
+
+@[simp] theorem decodeElements?_nil (codec : Codec Native RuntimeValue) :
+    decodeElements? codec [] = some [] := rfl
+@[simp] theorem decodeElements?_cons (codec : Codec Native RuntimeValue) (value : RuntimeValue)
+    (values : List RuntimeValue) :
+    decodeElements? codec (value :: values) =
+      (codec.decode? value).bind fun head =>
+        (decodeElements? codec values).map fun tail => head :: tail := rfl
+
+theorem mapM_eq_decodeElements? (codec : Codec Native RuntimeValue) (values : List RuntimeValue) :
+    values.mapM codec.decode? = decodeElements? codec values := by
+  induction values with
+  | nil => rfl
+  | cons value values ih =>
+      rw [List.mapM_cons, ih, decodeElements?_cons]
+      rcases codec.decode? value with _ | head <;>
+        rcases decodeElements? codec values with _ | tail <;> rfl
+
+/-- Decoding a vector literal: its elements, then the bound. -/
+theorem boundedVector_decode?_vector (codec : Codec Native RuntimeValue) (values : Array RuntimeValue) :
+    (Codec.boundedVector codec).decode? (.vector values) =
+      (decodeElements? codec values.toList).bind fun decoded =>
+        if bounded : decoded.length < 2 ^ 64 then
+          some ⟨decoded.toArray, by simpa only [List.size_toArray] using bounded⟩
+        else none := by
+  show (values.toList.mapM codec.decode? >>= fun decoded => _) = _
+  rw [mapM_eq_decodeElements?]
+  rcases decodeElements? codec values.toList with _ | decoded <;> rfl
+
+theorem toArray_inj_iff {α : Type} (as bs : List α) : as.toArray = bs.toArray ↔ as = bs :=
+  ⟨List.toArray_inj, fun equal => equal ▸ rfl⟩
+
+theorem SpecInt.val_ne_of_ne {width : IntWidth} {signed : Bool} {a b : SpecInt width signed}
+    (different : a ≠ b) : a.val ≠ b.val := fun h => different (SpecInt.ext h)
+
+theorem SpecVector.values_ne_of_ne {α : Type} {a b : SpecVector α} (different : a ≠ b) :
+    a.values ≠ b.values := fun h => different (SpecVector.ext h)
+
 /-- A frontier never equals itself advanced. -/
 @[simp] theorem nat_self_eq_add_iff (n m : Nat) : (n = n + m) ↔ m = 0 := by omega
 @[simp] theorem nat_add_eq_self_iff (n m : Nat) : (n + m = n) ↔ m = 0 := by omega
@@ -1286,97 +1788,648 @@ theorem signer_decode_signer (value : String) :
 @[simp] theorem nat_succ_eq_iff (n : Nat) : (n + 1 = n) ↔ False := iff_false_intro (by omega)
 
 /-- A codec's encoding at a type is the type's encoding. -/
-@[simp] theorem NTy.codec_encode (τ : NTy) (value : τ.carrier) :
+@[simp] theorem NTy.codec_encode [Skolems] (τ : NTy) (value : τ.carrier) :
     τ.codec.encode value = τ.encode value := rfl
 
 /-- Encodings at one type are equal exactly when the values are. -/
-@[simp] theorem NTy.encode_inj (τ : NTy) (left right : τ.carrier) :
+@[simp] theorem NTy.encode_inj [Skolems] (τ : NTy) (left right : τ.carrier) :
     (τ.encode left = τ.encode right) ↔ left = right :=
   ⟨τ.encode_injective, fun equal => equal ▸ rfl⟩
 
 /-- Encoded rows are equal exactly when the rows are. -/
-@[simp] theorem HList.encode_inj {Γ : NRow} (left right : HList Γ) :
+@[simp] theorem HList.encode_inj [Skolems] {Γ : NRow} (left right : HList Γ) :
     (HList.encode left = HList.encode right) ↔ left = right :=
   ⟨fun equal => (rowCodec Γ).encode_injective equal, fun equal => equal ▸ rfl⟩
 
 /-- Decoding a nominal literal at a struct type: the row decodes the fields. -/
-@[simp] theorem NTy.decode?_struct_nominal (source : StructHandle) (fields : NRow)
+@[simp] theorem NTy.decode?_struct_nominal [Skolems] (source : StructHandle) (fields : NRow)
     (values : Array RuntimeValue) :
     (NTy.struct source fields).codec.decode? (.nominal source none values) =
       (rowCodec fields).decode? values.toList := by
   simp [NTy.codec, Codec.nominalRow]
 
 /-- Decoding a row literal, component by component. -/
-@[simp] theorem rowCodec_decode?_cons (τ : NTy) (rest : NRow) (value : RuntimeValue)
+@[simp] theorem rowCodec_decode?_cons [Skolems] (τ : NTy) (rest : NRow) (value : RuntimeValue)
     (values : List RuntimeValue) :
     (rowCodec (.cons τ rest)).decode? (value :: values) =
       (τ.codec.decode? value).bind fun head =>
         ((rowCodec rest).decode? values).bind fun tail =>
           (some (head, tail) : Option (HList (.cons τ rest))) := rfl
 
-@[simp] theorem rowCodec_decode?_nil :
+@[simp] theorem rowCodec_decode?_nil [Skolems] :
     (rowCodec .nil).decode? [] = @some (HList .nil) () := rfl
 
 /-- Decoding the unfolded encoding of a struct value. -/
-@[simp] theorem NTy.decode?_struct_literal (source : StructHandle) (fields : NRow)
+@[simp] theorem NTy.decode?_struct_literal [Skolems] (source : StructHandle) (fields : NRow)
     (value : HList fields) :
     (NTy.struct source fields).codec.decode? (.nominal source none value.encode.toArray) =
       some value := (NTy.struct source fields).codec.decode_encode value
 
+/-- Decoding a nominal literal at an enum type, variant by variant: the
+named variant decodes its row, any other is looked up among the later
+variants. -/
+@[simp] theorem NTy.decode?_enum_cons_nominal [Skolems] (source : StructHandle) (name : String)
+    (names : List String) (fields : NRow) (rest : NRows) (distinct : (name :: names).Nodup)
+    (variant : String) (values : Array RuntimeValue) :
+    (NTy.enum source (name :: names) (.cons fields rest) distinct).codec.decode?
+        (.nominal source (some variant) values) =
+      if variant = name then
+        ((rowCodec fields).decode? values.toList).map variantCarrier.first
+      else ((NTy.enum source names rest (List.nodup_cons.mp distinct).2).codec.decode?
+          (.nominal source (some variant) values)).map variantCarrier.later := by
+  by_cases equal : variant = name <;>
+    simp [NTy.codec, variantCodec, variantDecode?, Codec.nominalRow, equal,
+      variantCarrier.first, variantCarrier.later] <;> rfl
+
+/-- No literal decodes at an enum type without variants. -/
+@[simp] theorem NTy.decode?_enum_nil [Skolems] (source : StructHandle) (names : List String)
+    (distinct : names.Nodup) (runtime : RuntimeValue) :
+    (NTy.enum source names .nil distinct).codec.decode? runtime = none := by
+  cases names <;> rfl
+
+/-- Decoding an integer literal at its own width, in the form the integer
+codec unfolds to. -/
+@[simp] theorem Codec.specInt_decode?_val (width : IntWidth) (signed : Bool)
+    (value : SpecInt width signed) :
+    (Codec.specInt width signed).decode? (.integer value.val) = some value :=
+  (Codec.specInt width signed).decode_encode value
+
 /-- Decoding the unfolded encoding of a tuple value. -/
-@[simp] theorem NTy.decode?_tuple_literal (elements : NRow) (value : HList elements) :
+@[simp] theorem NTy.decode?_tuple_literal [Skolems] (elements : NRow) (value : HList elements) :
     (NTy.tuple elements).codec.decode? (.tuple value.encode.toArray) = some value :=
   (NTy.tuple elements).codec.decode_encode value
 
 /-- Decoding an encoded value at its own type. -/
-@[simp] theorem NTy.decode?_encode (τ : NTy) (value : τ.carrier) :
+@[simp] theorem NTy.decode?_encode [Skolems] (τ : NTy) (value : τ.carrier) :
     τ.codec.decode? (τ.encode value) = some value := τ.codec.decode_encode value
 
-/-- A registry lookup steps through a registration. -/
-@[simp] theorem globalLoanKeyIn?_cons (registered loan : Nat) (key : GlobalKey)
-    (rest : List (Nat × GlobalKey)) :
-    LeanerIR.SemanticOperations.globalLoanKeyIn? ((registered, key) :: rest) loan =
-      if registered = loan then some key
-      else LeanerIR.SemanticOperations.globalLoanKeyIn? rest loan := by
-  by_cases equal : registered = loan
-  · subst equal
-    simp [LeanerIR.SemanticOperations.globalLoanKeyIn?]
-  · simp [LeanerIR.SemanticOperations.globalLoanKeyIn?, List.find?_cons, equal]
+/-! ## Tightness of the codecs -/
 
-/-- The loan discipline through a global loan that a body registers, keeps
-across a callee, and retires: from the entry state to the state after the
-retirement, whatever the callee did to the registry. -/
-theorem LoanDiscipline.through_global_loan {initial registered final retired : RuntimeState}
-    {loan : Nat} {key : GlobalKey}
-    (registry : registered.globalLoans = (loan, key) :: initial.globalLoans)
-    (minted : initial.nextLoan ≤ loan) (live : loan < registered.nextLoan)
-    (discipline : LeanerIR.SemanticOperations.LoanDiscipline registered final)
-    (retiredRegistry : retired.globalLoans =
-      LeanerIR.SemanticOperations.removeGlobalLoan final.globalLoans loan)
-    (retiredFrontier : retired.nextLoan = final.nextLoan) :
-    LeanerIR.SemanticOperations.LoanDiscipline initial retired := by
-  obtain ⟨fresh, stable, monotone⟩ := discipline
-  refine ⟨fun freshInitial other bound => ?_, fun other bound => ?_, by omega⟩
-  · rw [retiredRegistry, LeanerIR.SemanticOperations.globalLoanKeyIn?_remove_other _ _ _ (by omega)]
-    have freshRegistered : LeanerIR.SemanticOperations.FreshGlobalLoanIds registered := by
-      intro candidate above
-      rw [registry]
-      exact LeanerIR.SemanticOperations.globalLoanKeyIn?_cons_none (by omega)
-        (freshInitial candidate (by omega))
-    exact fresh freshRegistered other (by omega)
-  · rw [retiredRegistry, LeanerIR.SemanticOperations.globalLoanKeyIn?_remove_other _ _ _ (by omega),
-      stable other (by omega), registry]
-    have different : (loan == other) = false := by
-      simp only [beq_eq_false_iff_ne]
-      omega
-    simp only [LeanerIR.SemanticOperations.globalLoanKeyIn?, List.find?_cons, different]
+theorem specInt_tight (width : IntWidth) (signed : Bool) : (Codec.specInt width signed).Tight := by
+  intro raw value h
+  cases raw <;> simp only [Codec.specInt, decodeInt?, reduceCtorEq] at h
+  split at h
+  · cases h; rfl
+  · cases h
 
-/-- The loan discipline holds between a state and any state that keeps its
-registry and does not lower its frontier. -/
-theorem LoanDiscipline_of_same_registry {initial final : RuntimeState}
-    (registry : final.globalLoans = initial.globalLoans)
-    (frontier : initial.nextLoan ≤ final.nextLoan) :
-    LeanerIR.SemanticOperations.LoanDiscipline initial final :=
-  LeanerIR.SemanticOperations.LoanDiscipline.of_eq registry frontier
+theorem bool_tight : Codec.bool.Tight := by
+  intro raw value h; cases raw <;> simp only [Codec.bool, decodeBool?, reduceCtorEq] at h; cases h; rfl
+theorem string_tight : Codec.string.Tight := by
+  intro raw value h; cases raw <;> simp only [Codec.string, decodeString?, reduceCtorEq] at h; cases h; rfl
+theorem address_tight : Codec.address.Tight := by
+  intro raw value h; cases raw <;> simp only [Codec.address, decodeAddress?, reduceCtorEq] at h; cases h; rfl
+theorem signer_tight : Codec.signer.Tight := by
+  intro raw value h; cases raw <;> simp only [Codec.signer, decodeSigner?, reduceCtorEq] at h; cases h; rfl
+theorem bytes_tight : Codec.bytes.Tight := by
+  intro raw value h; cases raw <;> simp only [Codec.bytes, decodeBytes?, reduceCtorEq] at h; cases h; rfl
+theorem unit_tight : Codec.unit.Tight := by
+  intro raw value h; cases raw <;> simp only [Codec.unit, decodeUnit?, reduceCtorEq] at h; rfl
+
+theorem tupleNil_tight : Codec.tupleNil.Tight := by
+  intro raw value h
+  cases raw <;> simp only [Codec.tupleNil, reduceCtorEq] at h
+  rfl
+
+theorem tupleCons_tight {Head Tail : Type} {head : Codec Head RuntimeValue}
+    {tail : Codec Tail (List RuntimeValue)} (headTight : head.Tight) (tailTight : tail.Tight) :
+    (Codec.tupleCons head tail).Tight := by
+  intro raw value h
+  cases raw with
+  | nil => simp [Codec.tupleCons] at h
+  | cons first rest =>
+      simp only [Codec.tupleCons, Option.bind_eq_bind, Option.bind_eq_some_iff, Option.pure_def,
+        Option.some.injEq] at h
+      obtain ⟨dh, hh, dt, ht, rfl⟩ := h
+      simp only [Codec.tupleCons, headTight first dh hh, tailTight rest dt ht]
+
+theorem tuple_tight {Native : Type} {row : Codec Native (List RuntimeValue)} (rowTight : row.Tight) :
+    (Codec.tuple row).Tight := by
+  intro raw value h
+  cases raw <;> simp only [Codec.tuple, reduceCtorEq] at h
+  simp only [Codec.tuple, rowTight _ _ h, Array.toArray_toList]
+
+theorem nominalRow_tight {Native : Type} (source : StructHandle) (variant : Option String)
+    {row : Codec Native (List RuntimeValue)} (rowTight : row.Tight) :
+    (Codec.nominalRow source variant row).Tight := by
+  intro raw value h
+  cases raw <;> simp only [Codec.nominalRow, reduceCtorEq] at h
+  split at h
+  · rename_i equal
+    obtain ⟨rfl, rfl⟩ := equal
+    simp only [Codec.nominalRow, rowTight _ _ h, Array.toArray_toList]
+  · cases h
+
+theorem prophecyPair_tight {Native : Type} {codec : Codec Native RuntimeValue}
+    (tight : codec.Tight) : (Codec.prophecyPair codec).Tight := by
+  intro raw value h
+  cases raw with
+  | tuple values =>
+      simp only [Codec.prophecyPair] at h
+      split at h
+      · rename_i current prophecy listed
+        simp only [Option.bind_eq_some_iff, Option.map_eq_some_iff] at h
+        obtain ⟨c, hc, p, hp, rfl⟩ := h
+        simp only [Codec.prophecyPair, tight _ _ hc, tight _ _ hp]
+        exact congrArg RuntimeValue.tuple (Array.toList_inj.mp (by simp [listed]))
+      · cases h
+  | _ => simp [Codec.prophecyPair] at h
+
+theorem decodeElements?_tight {Native : Type} {codec : Codec Native RuntimeValue} (tight : codec.Tight) :
+    ∀ (values : List RuntimeValue) (decoded : List Native),
+      decodeElements? codec values = some decoded → decoded.map codec.encode = values := by
+  intro values
+  induction values with
+  | nil => intro decoded h; simp only [decodeElements?_nil, Option.some.injEq] at h; subst h; rfl
+  | cons value rest ih =>
+      intro decoded h
+      simp only [decodeElements?_cons, Option.bind_eq_some_iff, Option.map_eq_some_iff] at h
+      obtain ⟨head, hh, tail, ht, rfl⟩ := h
+      simp only [List.map_cons, tight _ _ hh, ih tail ht]
+
+theorem boundedVector_tight {Native : Type} {codec : Codec Native RuntimeValue} (tight : codec.Tight) :
+    (Codec.boundedVector codec).Tight := by
+  intro raw value h
+  cases raw
+  case vector values =>
+    rw [boundedVector_decode?_vector] at h
+    simp only [Option.bind_eq_some_iff] at h
+    obtain ⟨decoded, hd, hv⟩ := h
+    split at hv
+    · cases hv
+      simp only [Codec.boundedVector, List.map_toArray, decodeElements?_tight tight _ _ hd,
+        Array.toArray_toList]
+    · cases hv
+  all_goals simp [Codec.boundedVector] at h
+
+/-- Tightness of the row codecs of an enum's variants. -/
+def RowCodecsTight [Skolems] : (rows : NRows) → RowCodecs rows → Prop
+  | .nil, _ => True
+  | .cons _ rest, (codec, codecs) => codec.Tight ∧ RowCodecsTight rest codecs
+
+theorem variantDecode?_tight [Skolems] (source : StructHandle) : (names : List String) → (rows : NRows) →
+    (codecs : RowCodecs rows) → RowCodecsTight rows codecs →
+    ∀ raw value, variantDecode? source names rows codecs raw = some value →
+      variantEncode source names rows codecs value = raw
+  | _, .nil, _, _, _, value, _ => nomatch value
+  | [], .cons _ _, _, _, _, value, _ => nomatch value
+  | name :: names, .cons fields rest, (codec, codecs), ⟨tight, tights⟩, raw, value, h => by
+      unfold variantDecode? at h
+      split at h
+      · rename_i actualSource actualVariant runtimeFields
+        split at h
+        · rename_i equal
+          obtain ⟨rfl, rfl⟩ := equal
+          simp only [Option.map_eq_some_iff] at h
+          obtain ⟨decoded, hd, rfl⟩ := h
+          exact nominalRow_tight _ _ tight _ _ hd
+        · simp only [Option.map_eq_some_iff] at h
+          obtain ⟨decoded, hd, rfl⟩ := h
+          exact variantDecode?_tight source names rest codecs tights _ _ hd
+      · cases h
+
+mutual
+theorem NTy.codec_tight [Skolems] : (τ : NTy) → τ.codec.Tight
+  | .unit => unit_tight
+  | .bool => bool_tight
+  | .int width signed => specInt_tight (.bits width) signed
+  | .address => address_tight
+  | .signer => signer_tight
+  | .string => string_tight
+  | .bytes => bytes_tight
+  | .tuple elements => tuple_tight (rowCodec_tight elements)
+  | .struct source fields => nominalRow_tight source none (rowCodec_tight fields)
+  | .enum source names rows _ => fun raw value h =>
+      variantDecode?_tight source names rows (rowCodecs rows) (rowCodecs_tight rows) raw value h
+  | .vector element => boundedVector_tight (NTy.codec_tight element)
+  | .ref referent => prophecyPair_tight (NTy.codec_tight referent)
+  | .param index => Skolems.tight index
+
+theorem rowCodec_tight [Skolems] : (row : NRow) → (rowCodec row).Tight
+  | .nil => tupleNil_tight
+  | .cons τ rest => tupleCons_tight (NTy.codec_tight τ) (rowCodec_tight rest)
+
+theorem rowCodecs_tight [Skolems] : (rows : NRows) → RowCodecsTight rows (rowCodecs rows)
+  | .nil => trivial
+  | .cons fields rest => ⟨rowCodec_tight fields, rowCodecs_tight rest⟩
+end
+
+/-- An encoding equation is a decoding equation: the codecs are tight. -/
+theorem NTy.encode_eq_iff [Skolems] (τ : NTy) (value : τ.carrier) (raw : RuntimeValue) :
+    τ.encode value = raw ↔ τ.codec.decode? raw = some value :=
+  ⟨τ.decode?_of_encode, τ.codec_tight raw value⟩
+
+
+section Equality
+variable [Skolems]
+
+/-! ## Structural equality decides equality -/
+
+mutual
+/-- Whether a type holds no reference: structural equality of its values
+then decides their equality. -/
+def NTy.refFree : NTy → Bool
+  | .ref _ => false
+  | .tuple elements => elements.refFree
+  | .struct _ fields => fields.refFree
+  | .enum _ _ rows _ => rows.refFree
+  | .vector element => element.refFree
+  | _ => true
+
+def NRow.refFree : NRow → Bool
+  | .nil => true
+  | .cons τ rest => τ.refFree && rest.refFree
+
+def NRows.refFree : NRows → Bool
+  | .nil => true
+  | .cons fields rest => fields.refFree && rest.refFree
+end
+
+omit [Skolems] in
+theorem eqb_zip_iff {α : Type} (eqb : α → α → Bool) (sound : ∀ a b, eqb a b = true ↔ a = b) :
+    ∀ (l r : List α), ((l.length == r.length) && (l.zip r).all fun p => eqb p.1 p.2) = true ↔ l = r
+  | [], [] => by simp
+  | [], _ :: _ => by simp
+  | _ :: _, [] => by simp
+  | a :: l, b :: r => by
+      have ih := eqb_zip_iff eqb sound l r
+      simp only [List.length_cons, List.zip_cons_cons, List.all_cons, Bool.and_eq_true, beq_iff_eq,
+        Nat.add_right_cancel_iff, List.cons.injEq, sound] at ih ⊢
+      constructor
+      · rintro ⟨hlen, hab, hall⟩
+        exact ⟨hab, ih.mp ⟨hlen, hall⟩⟩
+      · rintro ⟨rfl, rfl⟩
+        exact ⟨rfl, rfl, (ih.mpr rfl).2⟩
+
+mutual
+theorem NTy.eqb_iff : (τ : NTy) → τ.refFree = true → ∀ l r : τ.carrier, τ.eqb l r = true ↔ l = r
+  | .unit, _, l, r => by simp [NTy.eqb]
+  | .bool, _, l, r => by simp [NTy.eqb]
+  | .int width signed, _, l, r => by
+      simp only [NTy.eqb, decide_eq_true_eq]
+      exact ⟨fun h => SpecInt.ext h, fun h => h ▸ rfl⟩
+  | .address, _, l, r => by simp [NTy.eqb]
+  | .signer, _, l, r => by simp [NTy.eqb]
+  | .string, _, l, r => by simp [NTy.eqb]
+  | .bytes, _, l, r => by simp [NTy.eqb]
+  | .tuple elements, free, l, r => rowEqb_iff elements free l r
+  | .struct _ fields, free, l, r => rowEqb_iff fields free l r
+  | .enum _ names rows _, free, l, r => variantEqb_iff names rows free l r
+  | .vector element, free, l, r => by
+      rw [NTy.eqb_vector]
+      have sound := NTy.eqb_iff element free
+      constructor
+      · intro h
+        have := (eqb_zip_iff element.eqb sound l.values.toList r.values.toList).mp (by
+          simpa only [Array.length_toList] using h)
+        exact SpecVector.ext (Array.toList_inj.mp this)
+      · rintro rfl
+        simpa only [Array.length_toList] using
+          (eqb_zip_iff element.eqb sound l.values.toList l.values.toList).mpr rfl
+  | .ref _, free, _, _ => by simp [NTy.refFree] at free
+  | .param _, _, l, r => by simp [NTy.eqb]
+
+theorem rowEqb_iff : (row : NRow) → row.refFree = true → ∀ l r : HList row, rowEqb row l r = true ↔ l = r
+  | .nil, _, l, r => by
+      cases l; cases r; simp [rowEqb]
+  | .cons τ rest, free, l, r => by
+      simp only [NRow.refFree, Bool.and_eq_true] at free
+      obtain ⟨l1, l2⟩ := l
+      obtain ⟨r1, r2⟩ := r
+      simp only [rowEqb, Bool.and_eq_true, NTy.eqb_iff τ free.1, rowEqb_iff rest free.2]
+      constructor
+      · rintro ⟨rfl, rfl⟩; rfl
+      · intro h; injection h with a b; exact ⟨a, b⟩
+
+theorem variantEqb_iff : (names : List String) → (rows : NRows) → rows.refFree = true →
+    ∀ l r : variantCarrier names rows, variantEqb names rows l r = true ↔ l = r
+  | _, .nil, _, l, _ => nomatch l
+  | [], .cons _ _, _, l, _ => nomatch l
+  | _ :: names, .cons fields rest, free, l, r => by
+      simp only [NRows.refFree, Bool.and_eq_true] at free
+      cases l <;> cases r <;>
+        simp only [variantEqb, rowEqb_iff fields free.1, variantEqb_iff names rest free.2,
+          Bool.false_eq_true, reduceCtorEq] <;>
+        (constructor <;> intro h) <;> first | (subst h; rfl) | (injection h)
+end
+
+
+/-- Structural equality of vectors over a reference-free element type
+decides equality; a spec literal then meets a symbolic vector as a
+decoding. -/
+theorem NTy.eqb_vector_decide (element : NTy) (free : element.refFree = true)
+    (left right : SpecVector element.carrier) :
+    NTy.eqb (.vector element) left right =
+      @decide (left = right) (NTy.decEq (.vector element) left right) := by
+  have := NTy.eqb_iff (.vector element) free left right
+  by_cases equal : left = right
+  · rw [@decide_eq_true _ (NTy.decEq (.vector element) left right) equal]; exact this.mpr equal
+  · rw [@decide_eq_false _ (NTy.decEq (.vector element) left right) equal]
+    exact Bool.eq_false_iff.mpr (fun h => equal (this.mp h))
+
+/-- A value that does not encode to a runtime value is not what it decodes to. -/
+theorem NTy.decode?_ne_of_encode_ne (τ : NTy) {value : τ.carrier} {raw : RuntimeValue}
+    (different : τ.encode value ≠ raw) : τ.codec.decode? raw ≠ some value :=
+  fun decoded => different (τ.codec_tight raw value decoded)
+
+theorem NTy.decode?_vector_ne_of_map_ne (τ : NTy) {value : SpecVector τ.carrier}
+    {raw : Array RuntimeValue} (different : value.values.map τ.codec.encode ≠ raw) :
+    (NTy.vector τ).codec.decode? (.vector raw) ≠ some value :=
+  fun decoded => different (RuntimeValue.vector.inj ((NTy.vector τ).codec_tight (.vector raw) value decoded))
+
+
+end Equality
+
+/-! ## Instantiation
+
+A generic call carries its type arguments as a row: the callee's
+parameter `i` is the caller's `i`-th argument.  The callee's meaning is
+taken at the family they induce, and values cross the call through the
+transports between the two views of one runtime value. -/
+
+/-- The `index`-th type of a row, or `default` beyond it. -/
+@[reducible] def NRow.getD : NRow → Nat → NTy → NTy
+  | .nil, _, default => default
+  | .cons τ _, 0, _ => τ
+  | .cons _ rest, index + 1, default => rest.getD index default
+
+mutual
+/-- A type with its parameters replaced by type arguments. -/
+@[reducible] def NTy.subst (θ : NRow) : NTy → NTy
+  | .tuple elements => .tuple (NRow.subst θ elements)
+  | .struct source fields => .struct source (NRow.subst θ fields)
+  | .enum source names rows distinct => .enum source names (rows.subst θ) distinct
+  | .vector element => .vector (element.subst θ)
+  | .ref referent => .ref (referent.subst θ)
+  | .param index => θ.getD index (.param index)
+  | τ => τ
+
+@[reducible] def NRow.subst (θ : NRow) : NRow → NRow
+  | .nil => .nil
+  | .cons τ rest => .cons (τ.subst θ) (NRow.subst θ rest)
+
+@[reducible] def NRows.subst (θ : NRow) : NRows → NRows
+  | .nil => .nil
+  | .cons fields rest => .cons (NRow.subst θ fields) (rest.subst θ)
+end
+
+mutual
+/-- Whether a type mentions no type parameter. -/
+def NTy.paramFree : NTy → Bool
+  | .param _ => false
+  | .tuple elements => elements.paramFree
+  | .struct _ fields => fields.paramFree
+  | .enum _ _ rows _ => rows.paramFree
+  | .vector element => element.paramFree
+  | .ref referent => referent.paramFree
+  | _ => true
+
+def NRow.paramFree : NRow → Bool
+  | .nil => true
+  | .cons τ rest => τ.paramFree && rest.paramFree
+
+def NRows.paramFree : NRows → Bool
+  | .nil => true
+  | .cons fields rest => fields.paramFree && rest.paramFree
+end
+
+/-- A shape with its parameters replaced by type arguments. -/
+@[reducible] def ResultShape.subst (θ : NRow) : ResultShape → ResultShape
+  | .none => .none
+  | .one τ => .one (τ.subst θ)
+
+section Plain
+variable [Skolems]
+
+mutual
+/-- Every encoding is loan-free: a reference's codec encodes its current
+value and prophecy as a pair. -/
+theorem NTy.encode_plain : (τ : NTy) → (value : τ.carrier) → Plain (τ.codec.encode value)
+  | .unit, _ => .unit
+  | .bool, value => .bool value
+  | .int _ _, value => .integer value.val
+  | .address, value => .address value
+  | .signer, value => .signer value
+  | .string, value => .string value
+  | .bytes, value => .bytes value
+  | .tuple elements, values => .tuple _ fun element member =>
+      rowCodec_plain elements values element (by simpa using member)
+  | .struct source fields, values => .nominal source none _ fun field member =>
+      rowCodec_plain fields values field (by simpa using member)
+  | .enum source names rows _, value => variantEncode_plain source names rows value
+  | .vector element, value => .vector _ fun encoded member => by
+      obtain ⟨item, _, rfl⟩ := Array.mem_map.mp member
+      exact NTy.encode_plain element item
+  | .ref referent, value => .tuple _ fun encoded member => by
+      simp only [List.mem_toArray, List.mem_cons, List.not_mem_nil, or_false] at member
+      rcases member with rfl | rfl
+      · exact NTy.encode_plain referent value.1
+      · exact NTy.encode_plain referent value.2
+  | .param index, value => Skolems.plain index value
+
+theorem rowCodec_plain : (row : NRow) → (values : HList row) →
+    ∀ encoded ∈ (rowCodec row).encode values, Plain encoded
+  | .nil, _, _, member => nomatch member
+  | .cons τ rest, values, encoded, member => by
+      rcases List.mem_cons.mp member with rfl | later
+      · exact NTy.encode_plain τ values.1
+      · exact rowCodec_plain rest values.2 encoded later
+
+theorem variantEncode_plain (source : StructHandle) : (names : List String) → (rows : NRows) →
+    (value : variantCarrier names rows) →
+    Plain (variantEncode source names rows (rowCodecs rows) value)
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | name :: names, .cons fields rest, .inl values => .nominal source (some name) _ fun field member =>
+      rowCodec_plain fields values field (by simpa using member)
+  | _ :: names, .cons _ rest, .inr value => variantEncode_plain source names rest value
+end
+
+end Plain
+
+mutual
+/-- Whether a type has values: an integer has a width, and an enum a first
+variant whose fields have values.  Every type the compiler builds has. -/
+def NTy.inhabitable : NTy → Bool
+  | .int width _ => width != 0
+  | .tuple elements => elements.inhabitable
+  | .struct _ fields => fields.inhabitable
+  | .enum _ names rows _ => NRows.firstInhabitable names rows
+  | .ref referent => referent.inhabitable
+  | _ => true
+
+def NRow.inhabitable : NRow → Bool
+  | .nil => true
+  | .cons τ rest => τ.inhabitable && rest.inhabitable
+
+def NRows.firstInhabitable : List String → NRows → Bool
+  | _ :: _, .cons fields _ => fields.inhabitable
+  | _, _ => false
+end
+
+/-- Type arguments of a call: a row whose types have values. -/
+abbrev TypeArgs : Type := { row : NRow // row.inhabitable = true }
+
+theorem NRow.getD_inhabitable : (row : NRow) → row.inhabitable = true → (index : Nat) →
+    (default : NTy) → default.inhabitable = true → (row.getD index default).inhabitable = true
+  | .nil, _, _, _, inhabited => inhabited
+  | .cons _ _, inhabitable, 0, _, _ => by
+      simp only [NRow.inhabitable, Bool.and_eq_true] at inhabitable
+      exact inhabitable.1
+  | .cons _ rest, inhabitable, index + 1, default, inhabited => by
+      simp only [NRow.inhabitable, Bool.and_eq_true] at inhabitable
+      exact NRow.getD_inhabitable rest inhabitable.2 index default inhabited
+
+section Inhabitant
+variable [Skolems]
+
+mutual
+/-- A value of a type that has values. -/
+def NTy.inhabitant : (τ : NTy) → τ.inhabitable = true → τ.carrier
+  | .unit, _ => ()
+  | .bool, _ => false
+  | .int width signed, inhabitable =>
+      ⟨0, zero_fits width signed (by simpa [NTy.inhabitable] using inhabitable)⟩
+  | .address, _ => ""
+  | .signer, _ => ""
+  | .string, _ => ""
+  | .bytes, _ => #[]
+  | .tuple elements, inhabitable =>
+      HList.inhabitant elements (by simpa [NTy.inhabitable] using inhabitable)
+  | .struct _ fields, inhabitable =>
+      HList.inhabitant fields (by simpa [NTy.inhabitable] using inhabitable)
+  | .enum _ names rows _, inhabitable =>
+      variantCarrier.inhabitant names rows (by simpa [NTy.inhabitable] using inhabitable)
+  | .vector _, _ => default
+  | .ref referent, inhabitable =>
+      let value := referent.inhabitant (by simpa [NTy.inhabitable] using inhabitable)
+      (value, value)
+  | .param _, _ => default
+
+def HList.inhabitant : (row : NRow) → row.inhabitable = true → HList row
+  | .nil, _ => ()
+  | .cons τ rest, inhabitable =>
+      (τ.inhabitant (by simp_all [NRow.inhabitable]),
+        HList.inhabitant rest (by simp_all [NRow.inhabitable]))
+
+def variantCarrier.inhabitant : (names : List String) → (rows : NRows) →
+    NRows.firstInhabitable names rows = true → variantCarrier names rows
+  | _ :: _, .cons fields _, inhabitable => .inl (HList.inhabitant fields inhabitable)
+  | [], _, inhabitable => absurd inhabitable (by simp [NRows.firstInhabitable])
+  | _ :: _, .nil, inhabitable => absurd inhabitable (by simp [NRows.firstInhabitable])
+end
+
+end Inhabitant
+
+/-- The family a generic call's type arguments induce: parameter `i` is
+carried as the `i`-th argument at the caller's family. -/
+@[reducible] def Skolems.instantiate (θ : TypeArgs) (outer : Skolems) : Skolems where
+  carrier := fun index => @NTy.carrier outer ((NTy.param index).subst θ.1)
+  codec := fun index => @NTy.codec outer ((NTy.param index).subst θ.1)
+  decEq := fun index => @NTy.decEq outer ((NTy.param index).subst θ.1)
+  inhabited := fun index =>
+    ⟨@NTy.inhabitant outer ((NTy.param index).subst θ.1)
+      (NRow.getD_inhabitable θ.1 θ.2 index (.param index) rfl)⟩
+  tight := fun index => @NTy.codec_tight outer ((NTy.param index).subst θ.1)
+  plain := fun index => @NTy.encode_plain outer ((NTy.param index).subst θ.1)
+
+section Transport
+variable [Θ : Skolems]
+
+mutual
+/-- A caller's value in the callee's view: the same runtime value, carried
+at the family the call's type arguments induce. -/
+def NTy.toSkolem (θ : TypeArgs) : (τ : NTy) → (τ.subst θ.1).carrier →
+    @NTy.carrier (Skolems.instantiate θ Θ) τ
+  | .unit, value => value
+  | .bool, value => value
+  | .int _ _, value => value
+  | .address, value => value
+  | .signer, value => value
+  | .string, value => value
+  | .bytes, value => value
+  | .tuple elements, values => HList.toSkolem θ elements values
+  | .struct _ fields, values => HList.toSkolem θ fields values
+  | .enum _ names rows _, value => variantCarrier.toSkolem θ names rows value
+  | .vector element, vector =>
+      ⟨vector.values.map (NTy.toSkolem θ element), by simpa using vector.bounded⟩
+  | .ref referent, value => (NTy.toSkolem θ referent value.1, NTy.toSkolem θ referent value.2)
+  | .param _, value => value
+
+def HList.toSkolem (θ : TypeArgs) : (row : NRow) → HList (NRow.subst θ.1 row) →
+    @HList (Skolems.instantiate θ Θ) row
+  | .nil, _ => ()
+  | .cons τ rest, values => (NTy.toSkolem θ τ values.1, HList.toSkolem θ rest values.2)
+
+def variantCarrier.toSkolem (θ : TypeArgs) : (names : List String) → (rows : NRows) →
+    variantCarrier names (NRows.subst θ.1 rows) → @variantCarrier (Skolems.instantiate θ Θ) names rows
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons fields _, .inl values => .inl (HList.toSkolem θ fields values)
+  | _ :: names, .cons _ rest, .inr value => .inr (variantCarrier.toSkolem θ names rest value)
+end
+
+mutual
+/-- A callee's value in the caller's view. -/
+def NTy.ofSkolem (θ : TypeArgs) : (τ : NTy) → @NTy.carrier (Skolems.instantiate θ Θ) τ →
+    (τ.subst θ.1).carrier
+  | .unit, value => value
+  | .bool, value => value
+  | .int _ _, value => value
+  | .address, value => value
+  | .signer, value => value
+  | .string, value => value
+  | .bytes, value => value
+  | .tuple elements, values => HList.ofSkolem θ elements values
+  | .struct _ fields, values => HList.ofSkolem θ fields values
+  | .enum _ names rows _, value => variantCarrier.ofSkolem θ names rows value
+  | .vector element, vector =>
+      ⟨vector.values.map (NTy.ofSkolem θ element), by simpa using vector.bounded⟩
+  | .ref referent, value => (NTy.ofSkolem θ referent value.1, NTy.ofSkolem θ referent value.2)
+  | .param _, value => value
+
+def HList.ofSkolem (θ : TypeArgs) : (row : NRow) → @HList (Skolems.instantiate θ Θ) row →
+    HList (NRow.subst θ.1 row)
+  | .nil, _ => ()
+  | .cons τ rest, values => (NTy.ofSkolem θ τ values.1, HList.ofSkolem θ rest values.2)
+
+def variantCarrier.ofSkolem (θ : TypeArgs) : (names : List String) → (rows : NRows) →
+    @variantCarrier (Skolems.instantiate θ Θ) names rows → variantCarrier names (NRows.subst θ.1 rows)
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons fields _, .inl values => .inl (HList.ofSkolem θ fields values)
+  | _ :: names, .cons _ rest, .inr value => .inr (variantCarrier.ofSkolem θ names rest value)
+end
+
+/-- A callee's result in the caller's view. -/
+def ResultShape.ofSkolem (θ : TypeArgs) : (shape : ResultShape) →
+    @ResultShape.carrier (Skolems.instantiate θ Θ) shape → (shape.subst θ.1).carrier
+  | .none, value => value
+  | .one τ, value => NTy.ofSkolem θ τ value
+
+/-- The default of a parameter under an induced family is its argument's
+value, the one a twin of the argument's type defaults to. -/
+theorem Skolems.default_instantiate (θ : TypeArgs) (index : Nat) :
+    (default : (Skolems.instantiate θ Θ).carrier index) =
+      NTy.inhabitant ((NTy.param index).subst θ.1)
+        (NRow.getD_inhabitable θ.1 θ.2 index (.param index) rfl) := rfl
+
+/-- A type parameter's codec is its family's. -/
+theorem NTy.codec_param (index : Nat) : (NTy.param index).codec = Skolems.codec index := rfl
+
+/-- A type parameter's encoding is its family's codec. -/
+theorem NTy.encode_param (index : Nat) (value : (NTy.param index).carrier) :
+    NTy.encode (.param index) value = (Skolems.codec index).encode value := rfl
+
+/-- The codec an induced family gives a parameter is its argument's. -/
+theorem Skolems.codec_instantiate (θ : TypeArgs) (index : Nat) :
+    (Skolems.instantiate θ Θ).codec index = NTy.codec ((NTy.param index).subst θ.1) := rfl
+
+end Transport
+
+attribute [lir_denote] NTy.inhabitant HList.inhabitant variantCarrier.inhabitant
+  Skolems.default_instantiate
+attribute [lir_denote] NTy.toSkolem HList.toSkolem variantCarrier.toSkolem NTy.ofSkolem
+  HList.ofSkolem variantCarrier.ofSkolem ResultShape.ofSkolem NTy.codec_param NTy.encode_param
+  Skolems.codec_instantiate
 
 end LeanerIR.Proofs.Denote

@@ -42,7 +42,7 @@ leaner module 0x1::type_info where
   public fun chain_id() -> u8 := do
     if !aptos_stdlib_chain_id_enabled() then
       abort(invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    return chain_id_internal()
+    chain_id_internal()
 
   spec chain_id where
     aborts_if !spec_is_enabled(4)
