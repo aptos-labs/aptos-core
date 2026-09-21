@@ -138,21 +138,48 @@ def _implementation_offset(baseline_text: str, candidate_text: str, at: int) -> 
     the mutated expression, sometimes at the same indentation, and the word
     `spec` also appears in prose comments.
     """
-    baseline_lines = baseline_text.splitlines(keepends=True)
-    candidate_lines = candidate_text.splitlines(keepends=True)
     # Alignment is quadratic in what it aligns. A candidate that has grown far
     # beyond the source it was given did not merely add a specification to it,
     # and is not aligned at all; the caller then reports the mutant as not
     # applicable rather than spending the round's time on it.
     if len(candidate_text) > MAX_ALIGNMENT_GROWTH * len(baseline_text) + MAX_ALIGNMENT_SLACK:
         return None
+    # Remove specifications, comments, and strings before alignment. In
+    # particular, a newly inserted invariant may quote the exact expression at
+    # `at`; aligning raw text can then map the source expression into the spec
+    # instead of the unchanged implementation below it.
+    def implementation_projection(source: str) -> tuple[str, list[int]]:
+        excluded = sorted(_non_implementation_ranges(source))
+        positions = []
+        range_index = 0
+        for index in range(len(source)):
+            while (
+                range_index < len(excluded)
+                and index >= excluded[range_index][1]
+            ):
+                range_index += 1
+            if (
+                range_index >= len(excluded)
+                or index < excluded[range_index][0]
+            ):
+                positions.append(index)
+        return "".join(source[index] for index in positions), positions
+
+    baseline_code, baseline_positions = implementation_projection(baseline_text)
+    candidate_code, candidate_positions = implementation_projection(candidate_text)
+    try:
+        code_at = baseline_positions.index(at)
+    except ValueError:
+        return None
+    baseline_lines = baseline_code.splitlines(keepends=True)
+    candidate_lines = candidate_code.splitlines(keepends=True)
     # Lines first: a specification is added as whole lines, so this is both
     # cheap and exact for the common case.
     consumed = 0
     line_index = column = None
     for index, line in enumerate(baseline_lines):
-        if consumed <= at < consumed + len(line):
-            line_index, column = index, at - consumed
+        if consumed <= code_at < consumed + len(line):
+            line_index, column = index, code_at - consumed
             break
         consumed += len(line)
     if line_index is not None:
@@ -163,15 +190,16 @@ def _implementation_offset(baseline_text: str, candidate_text: str, at: int) -> 
             None, baseline_lines, candidate_lines, autojunk=False
         ).get_opcodes():
             if tag == "equal" and i1 <= line_index < i2:
-                return starts[j1 + (line_index - i1)] + column
+                projected = starts[j1 + (line_index - i1)] + column
+                return candidate_positions[projected]
     # A loop invariant rewrites the loop's closing line, so the line containing
     # a fragment may itself have changed; characters still align it, within
     # the size bound above.
     for tag, i1, i2, j1, j2 in SequenceMatcher(
-        None, baseline_text, candidate_text, autojunk=False
+        None, baseline_code, candidate_code, autojunk=False
     ).get_opcodes():
-        if tag == "equal" and i1 <= at < i2:
-            return j1 + (at - i1)
+        if tag == "equal" and i1 <= code_at < i2:
+            return candidate_positions[j1 + (code_at - i1)]
     return None
 
 
@@ -375,13 +403,25 @@ def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
 
     # Inserting a loop invariant wraps the guard's source line, so the whole
     # anchor is no longer contiguous even though the expression being mutated
-    # remains unchanged. Align a small local context around the actual edit.
-    # The context prevents an edit to a neighboring operand from being mistaken
-    # for specification text inserted around otherwise identical code.
+    # remains unchanged. Align both ends of the original anchor, then locate a
+    # small local context around the edit inside that region. Restricting the
+    # search to the aligned region distinguishes the intended expression from
+    # identical implementation text elsewhere; excluding specification ranges
+    # distinguishes it from a restatement inserted inside the wrapper.
     context_start = max(0, relative_at - 2)
     context_end = min(len(fragment), relative_at + length + 2)
     original_context = fragment[context_start:context_end]
-    candidate_contexts = _implementation_occurrences(text, original_context)
+    candidate_end = _implementation_offset(
+        pristine, text, offset + len(fragment) - 1
+    )
+    candidate_contexts = [
+        occurrence
+        for occurrence in _implementation_occurrences(text, original_context)
+        if candidate_at is not None
+        and candidate_end is not None
+        and candidate_at <= occurrence
+        and occurrence + len(original_context) <= candidate_end + 1
+    ]
     if len(candidate_contexts) != 1:
         raise ValueError(
             f"cannot apply mutant {case['mutant_id']}: the implementation it "
