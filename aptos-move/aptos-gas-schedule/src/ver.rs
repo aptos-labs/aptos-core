@@ -8,6 +8,9 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V50:
+///   - Raise the abstract value size of a closure from 40 to 200
+///   - Include the cost of a closure's type arguments in its abstract value size
 /// - V49:
 ///   - Count the closure function-type node towards type size and depth limits
 /// - V48:

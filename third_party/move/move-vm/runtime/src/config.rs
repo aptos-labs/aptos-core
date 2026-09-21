@@ -84,6 +84,10 @@ pub struct VMConfig {
     /// version (hash) of its defining module before use, and re-resolved if the
     /// module was republished since the resolution.
     pub revalidate_resolved_closures: bool,
+    /// When enabled, a closure records the pseudo-gas cost of its type arguments
+    /// so that it can be priced by the size of its instantiation rather than by
+    /// a flat amount.
+    pub meter_closure_ty_args: bool,
 }
 
 impl Default for VMConfig {
@@ -118,6 +122,7 @@ impl Default for VMConfig {
             enable_public_struct_args: true,
             include_closure_mask_in_cmp: true,
             revalidate_resolved_closures: true,
+            meter_closure_ty_args: true,
         }
     }
 }
