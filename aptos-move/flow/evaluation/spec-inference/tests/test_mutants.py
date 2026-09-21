@@ -111,6 +111,58 @@ class ApplyMutantTest(unittest.TestCase):
             self.assertIn("invariant [inferred] i <= n;", text)
             self.assertIn("\n            i <= n\n", text)
 
+    def test_a_mutant_does_not_rewrite_a_restated_specification(self) -> None:
+        candidate = SOURCE.replace(
+            "while (i < n) {",
+            """while ({
+            spec {
+                invariant [inferred] i < n;
+            };
+            i < n
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate)
+            anchor = "while (i < n) {"
+            case = _case(
+                anchor,
+                {
+                    "kind": "substitute",
+                    "at": anchor.index("<"),
+                    "length": 1,
+                    "to": "<=",
+                },
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("invariant [inferred] i < n;", text)
+            self.assertIn("\n            i <= n\n", text)
+
+    def test_a_full_anchor_does_not_rewrite_a_restated_specification(self) -> None:
+        candidate = SOURCE.replace(
+            "while (i < n) {",
+            """while ({
+            spec {
+                invariant [inferred] i < n;
+            };
+            i < n
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate)
+            case = _case(
+                "i < n",
+                {"kind": "substitute", "at": 2, "length": 1, "to": "<="},
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("invariant [inferred] i < n;", text)
+            self.assertIn("\n            i <= n\n", text)
+
     def test_a_stale_anchor_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             package, baseline = self._packages(Path(tmp))

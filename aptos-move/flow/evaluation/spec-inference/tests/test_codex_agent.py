@@ -41,9 +41,13 @@ class CodexAgentSessionTest(unittest.TestCase):
             executable.write_text(
                 "#!/bin/sh\n"
                 "if [ \"${1:-}\" = --version ]; then echo 'codex-cli 0.153.2'; exit; fi\n"
+                "grep -q 'features.code_mode_host = true' \"$CODEX_HOME/config.toml\" || exit 42\n"
                 "printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"thread-1\"}'\n"
                 "printf '%s\\n' '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"done\"}}'\n"
-                "printf '%s\\n' '{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":3,\"cached_input_tokens\":1,\"output_tokens\":2}}'\n",
+                "printf '%s\\n' '{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":3,\"cached_input_tokens\":1,\"output_tokens\":2}}'\n"
+                "if [ \"${2:-}\" != resume ]; then\n"
+                "  sed -i 's/features.code_mode_host = true/features.code_mode_host = false/' \"$CODEX_HOME/config.toml\"\n"
+                "fi\n",
                 encoding="utf-8",
             )
             executable.chmod(0o755)
