@@ -54,12 +54,13 @@ impl FlowSession {
             .candidate_check
             .clone()
             .filter(|_| self.evaluation().task_criteria_enabled());
-        let package = self.resolve_package_path(&params.package_path);
+        let package = self.resolve_package_path(&params.package_path)?;
         let filter = params.filter.clone();
         let baseline = params
             .baseline_path
             .as_ref()
-            .map(|path| self.resolve_package_path(path));
+            .map(|path| self.resolve_package_path(path))
+            .transpose()?;
         let timeout = params.timeout.unwrap_or(DEFAULT_CHECK_TIMEOUT_SECS).max(1);
         let telemetry = self.telemetry().clone();
         // Per-condition progress is what the `progress` feedback level adds.
@@ -70,7 +71,7 @@ impl FlowSession {
         let package_key = package.clone();
         // The check builds its own model rather than resolving through the
         // session cache, so it guards the manifest itself.
-        self.refuse_remote_dependencies(std::path::Path::new(&package))?;
+        self.refuse_untrusted_dependencies(std::path::Path::new(&package))?;
         // No tool-level deadline: the prover's watchdog bounds each run.
         let verdict = tokio::task::spawn_blocking(move || {
             let config = match configured {

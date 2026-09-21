@@ -679,7 +679,7 @@ class Controller:
         tactic = ARM_TO_TACTIC[self.run.spec.arm]
         level = self._feedback_level()
         command = (
-            f"mcp --no-package-cache --inference-tactic {tactic} --evaluation-mode "
+            f"mcp --package-root . --no-package-cache --inference-tactic {tactic} --evaluation-mode "
             f"--feedback-level {level}"
         )
         # The task criteria are the acceptance intervention. A baseline cell

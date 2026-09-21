@@ -262,7 +262,7 @@ class CodexAgentSession:
             f"model_reasoning_effort = {json.dumps(self._config.effort)}",
             'approval_policy = "never"',
             # The outer bwrap plus per-process Landlock policy is the sandbox.
-            # The code-mode host receives an additional TCP-denying ruleset;
+            # The code-mode host receives an additional network-denying ruleset;
             # asking Codex to nest its own bwrap inside that namespace fails.
             'sandbox_mode = "danger-full-access"',
             'web_search = "disabled"',

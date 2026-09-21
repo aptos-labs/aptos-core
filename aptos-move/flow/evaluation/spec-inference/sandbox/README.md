@@ -117,8 +117,11 @@ and `Task`.
 Codex needs its local code-mode host to inspect and edit a package. The outer
 bubblewrap and Landlock policy is its filesystem sandbox; nesting Codex's own
 bubblewrap inside that namespace is disabled. The digest-pinned, version-paired
-code-mode host is mounted through a second Landlock wrapper that denies TCP to
-it and every command it starts. Web search, apps, goals, and multi-agent tools
+code-mode host is mounted through a second Landlock wrapper that denies IPv4
+and IPv6 sockets to it and every command it starts. Landlock also denies TCP
+bind/connect, while seccomp closes its UDP gap and blocks io_uring setup. That
+inner wrapper also omits the private Codex home containing `auth.json`. Web
+search, apps, goals, and multi-agent tools
 are disabled. The real `move-flow` executable is not
 readable in the Codex Landlock domain: the controller starts it with the
 arm-specific configuration and Codex receives only a one-connection Unix-socket
@@ -140,7 +143,8 @@ inventory is asserted by a test, not left to review.
 Networking is not isolated for the parent Codex or Claude process: there is no
 `--unshare-net`, because the session has to reach the model endpoint. Codex's
 code-mode host and its command descendants receive a second Landlock ruleset
-with no TCP bind or connect grants. Claude has no shell in this evaluation.
+with no TCP bind or connect grants plus a seccomp filter that refuses IPv4 and
+IPv6 sockets, including UDP. Claude has no shell in this evaluation.
 
 Everything else in the design assumes this. Confidentiality of anything the agent
 can read therefore rests on the agent having no way to *send* — which is why the

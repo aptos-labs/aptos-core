@@ -117,8 +117,9 @@ impl FlowSession {
         std::time::Duration::from_secs(self.args.tool_timeout)
     }
 
-    /// In an evaluation session, refuse a package whose manifest names a
-    /// dependency that building it would fetch over the network.
+    /// Refuse dependencies that would cross an active evaluation boundary.
+    /// Evaluation mode rejects network dependencies, and `package_root` also
+    /// confines every local dependency to the caller-visible tree.
     ///
     /// Every tool that builds a package calls this before building, so the
     /// refusal does not depend on which tool the agent reaches for first:
@@ -126,11 +127,14 @@ impl FlowSession {
     /// builds its own. The verify tool's loop-invariant evidence also rebuilds
     /// from disk, but only after `resolve_package` succeeded for the package in
     /// the same call, and a manifest edit invalidates the cache.
-    pub(crate) fn refuse_remote_dependencies(&self, package: &Path) -> Result<(), rmcp::ErrorData> {
-        if !self.evaluation().evaluation_mode {
+    pub(crate) fn refuse_untrusted_dependencies(
+        &self,
+        package: &Path,
+    ) -> Result<(), rmcp::ErrorData> {
+        if !self.evaluation().evaluation_mode && self.args.package_root.is_none() {
             return Ok(());
         }
-        crate::experiment::reject_remote_dependencies(package)
+        crate::experiment::reject_untrusted_dependencies(package, self.args.package_root.as_deref())
             .map_err(|message| rmcp::ErrorData::invalid_params(message, None))
     }
 
@@ -197,7 +201,9 @@ impl FlowSession {
     /// `PackageData` with its own mutex, rather than deadlocking on the
     /// mutex still held by the timed-out `spawn_blocking` task.
     pub(crate) fn invalidate_package(&self, package_path: &str) {
-        let key = self.resolve_package_path(package_path);
+        let Ok(key) = self.resolve_package_path(package_path) else {
+            return;
+        };
         if self
             .package_cache
             .lock()
@@ -209,13 +215,39 @@ impl FlowSession {
         }
     }
 
-    /// Resolve and canonicalize the given package path, returning a string key.
-    pub(crate) fn resolve_package_path(&self, package_path: &str) -> String {
+    /// Resolve and canonicalize a package path, enforcing the configured root.
+    pub(crate) fn resolve_package_path(
+        &self,
+        package_path: &str,
+    ) -> Result<String, rmcp::ErrorData> {
         let path = PathBuf::from(package_path);
-        path.canonicalize()
-            .unwrap_or(path)
-            .to_string_lossy()
-            .into_owned()
+        let resolved = path.canonicalize().unwrap_or(path);
+        if let Some(root) = &self.args.package_root {
+            let root = root.canonicalize().map_err(|error| {
+                rmcp::ErrorData::invalid_params(
+                    format!("cannot resolve package root `{}`: {error}", root.display()),
+                    None,
+                )
+            })?;
+            let resolved = resolved.canonicalize().map_err(|error| {
+                rmcp::ErrorData::invalid_params(
+                    format!("cannot resolve package path `{package_path}`: {error}"),
+                    None,
+                )
+            })?;
+            if !resolved.starts_with(&root) {
+                return Err(rmcp::ErrorData::invalid_params(
+                    format!(
+                        "package path `{}` is outside the configured root `{}`",
+                        resolved.display(),
+                        root.display()
+                    ),
+                    None,
+                ));
+            }
+            return Ok(resolved.to_string_lossy().into_owned());
+        }
+        Ok(resolved.to_string_lossy().into_owned())
     }
 
     /// Record the outcome of one `resolve_package` call.
@@ -256,12 +288,12 @@ impl FlowSession {
         package_path: &str,
     ) -> Result<(Arc<Mutex<PackageData>>, bool), rmcp::ErrorData> {
         let resolve_start = std::time::Instant::now();
-        let key = self.resolve_package_path(package_path);
+        let key = self.resolve_package_path(package_path)?;
         // Before the cache can answer: a cached package whose manifest has
         // since gained a remote dependency would otherwise be served, and a
         // later filtered rebuild reads that manifest from disk. Watcher
         // invalidation is asynchronous, so it cannot be relied on here.
-        if let Err(error) = self.refuse_remote_dependencies(Path::new(&key)) {
+        if let Err(error) = self.refuse_untrusted_dependencies(Path::new(&key)) {
             self.emit_package_resolve(&key, false, resolve_start, "error", None);
             return Err(error);
         }
@@ -378,7 +410,7 @@ impl ServerHandler for FlowSession {
                     .as_ref()
                     .and_then(|args| args.get("package_path"))
                     .and_then(|value| value.as_str())
-                    .map(|path| self.resolve_package_path(path))
+                    .and_then(|path| self.resolve_package_path(path).ok())
             })
             .flatten();
         let filter = recording
@@ -395,6 +427,18 @@ impl ServerHandler for FlowSession {
         } else {
             serde_json::Value::Null
         };
+        // Enforce the package boundary before dispatch. Some tools run tests
+        // directly before constructing cached package data, so guarding only
+        // `resolve_package` would still leave a confused-deputy path.
+        if let Some(package_path) = request
+            .arguments
+            .as_ref()
+            .and_then(|args| args.get("package_path"))
+            .and_then(|value| value.as_str())
+        {
+            let package = self.resolve_package_path(package_path)?;
+            self.refuse_untrusted_dependencies(Path::new(&package))?;
+        }
         self.telemetry.emit(
             "tool_start",
             serde_json::json!({

@@ -73,7 +73,7 @@ impl FlowSession {
         let filter = params.filter.clone();
         let spec_output = params.spec_output;
         let telemetry = self.telemetry().clone();
-        let telemetry_package = self.resolve_package_path(&params.package_path);
+        let telemetry_package = self.resolve_package_path(&params.package_path)?;
         let telemetry_filter = filter.clone();
         let evidence_depth = Some(LOOP_INVARIANT_EVIDENCE_DEPTH);
         let uninvariant_loop_is_error = self.evaluation().uninvariant_loop_is_error();

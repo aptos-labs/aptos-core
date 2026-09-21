@@ -102,6 +102,23 @@ pub async fn make_evaluation_client_at_level(
         true,
         feedback_level,
         false,
+        None,
+    )
+    .await
+}
+
+/// Create an evaluation client whose tool paths cannot leave `package_root`.
+pub async fn make_evaluation_client_with_package_root(
+    package_root: &Path,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_session_client(
+        InferenceTactic::AgentOnly,
+        None,
+        None,
+        true,
+        FeedbackLevel::Baseline,
+        true,
+        Some(package_root.to_path_buf()),
     )
     .await
 }
@@ -111,7 +128,7 @@ pub async fn make_client_at_level(
     tactic: InferenceTactic,
     feedback_level: FeedbackLevel,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
-    make_session_client(tactic, None, None, false, feedback_level, false).await
+    make_session_client(tactic, None, None, false, feedback_level, false, None).await
 }
 
 async fn make_client_for_config(
@@ -126,6 +143,7 @@ async fn make_client_for_config(
         false,
         FeedbackLevel::Acceptance,
         no_package_cache,
+        None,
     )
     .await
 }
@@ -137,6 +155,7 @@ async fn make_session_client(
     evaluation_mode: bool,
     feedback_level: FeedbackLevel,
     no_package_cache: bool,
+    package_root: Option<PathBuf>,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     // Suppress movefmt so baselines are deterministic across platforms.
     // SAFETY: test-only; each test process is single-threaded at this point.
@@ -152,6 +171,7 @@ async fn make_session_client(
         experiments: vec![],
         tool_timeout: 120,
         no_package_cache,
+        package_root,
         telemetry_jsonl: None,
     };
     let global = GlobalOpts {

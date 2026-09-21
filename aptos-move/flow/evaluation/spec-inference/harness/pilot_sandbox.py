@@ -33,7 +33,7 @@ from .codex_metrics import write_codex_metrics
 from .codex_otel import write_codex_request_metrics
 
 
-POLICY_VERSION = 6
+POLICY_VERSION = 7
 # Landlock confines the agent process itself to a subset of what the sandbox
 # mounts, so the outer namespace and the inner ruleset are two independent
 # layers rather than one repeated.
@@ -192,12 +192,13 @@ def preflight() -> dict[str, object]:
                 "    pass\n"
                 "else:\n"
                 "    raise SystemExit('a read-only file can be truncated')\n"
-                "try:\n"
-                "    socket.create_connection(('127.0.0.1', 9), timeout=0.1)\n"
-                "except OSError as error:\n"
-                "    assert error.errno in (errno.EACCES, errno.EPERM), error\n"
-                "else:\n"
-                "    raise SystemExit('TCP networking is available')\n"
+                "for family, kind, label in ((socket.AF_INET, socket.SOCK_STREAM, 'IPv4 TCP'), (socket.AF_INET, socket.SOCK_DGRAM, 'IPv4 UDP'), (socket.AF_INET6, socket.SOCK_DGRAM, 'IPv6 UDP')):\n"
+                "    try:\n"
+                "        socket.socket(family, kind)\n"
+                "    except OSError as error:\n"
+                "        assert error.errno in (errno.EACCES, errno.EPERM), error\n"
+                "    else:\n"
+                "        raise SystemExit(f'{label} networking is available')\n"
             ),
         ]
         process = subprocess.run(
@@ -212,7 +213,7 @@ def preflight() -> dict[str, object]:
         f"policy={POLICY_VERSION}, bwrap={bwrap_path}, "
         f"sha256={sha256_file(bwrap_path)}, landlock={landlock}, "
         f"landlock_sha256={sha256_file(landlock)}, "
-        f"host-path-agent-proc-and-network-isolation={'passed' if passed else 'failed'}"
+        f"host-path-agent-proc-and-all-protocol-network-isolation={'passed' if passed else 'failed'}"
     )
     diagnostics = (process.stderr or process.stdout).strip()
     if diagnostics:
@@ -1094,8 +1095,14 @@ def _write_agent_wrapper(launch: Launch, staging: Path) -> Path:
 
 
 def _write_code_mode_host_wrapper(launch: Launch, staging: Path) -> Path:
-    """Deny TCP to commands while Codex itself retains its API connection."""
+    """Deny Internet sockets to commands while Codex retains its API connection."""
     readable, writable = agent_landlock_paths(launch)
+    # Authentication belongs to the parent Codex process. The code-mode host
+    # and commands it starts need the workspace and /tmp, not the private home
+    # containing auth.json; keep the credential outside their filesystem view
+    # as a second boundary behind the network filter.
+    private_home = launch.artifacts / ".sandbox-home"
+    writable = [path for path in writable if path != private_home]
     arguments = ["--deny-network"]
     for path in readable:
         arguments.extend(("--ro", str(path)))

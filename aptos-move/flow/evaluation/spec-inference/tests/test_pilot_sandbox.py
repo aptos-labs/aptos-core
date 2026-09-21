@@ -18,6 +18,7 @@ from harness.pilot_sandbox import (
     _require_inside_round,
     _required_solver,
     _round_directory,
+    _write_code_mode_host_wrapper,
     agent_landlock_paths,
     build_bwrap_command,
     build_bwrap_environment,
@@ -110,10 +111,11 @@ class PilotSandboxTest(unittest.TestCase):
         # The security property, asserted unconditionally: this is the only
         # test that runs the real `landlock-exec`, and nothing in CI runs it.
         result = preflight()
-        self.assertEqual(6, result["policy_version"])
+        self.assertEqual(7, result["policy_version"])
         self.assertTrue(result["isolation"], result["detail"])
         self.assertIn(
-            "host-path-agent-proc-and-network-isolation=passed", result["detail"]
+            "host-path-agent-proc-and-all-protocol-network-isolation=passed",
+            result["detail"],
         )
 
     def test_preflight_runs_the_prover_chain_as_an_agent_grandchild(self) -> None:
@@ -238,6 +240,19 @@ class PilotSandboxTest(unittest.TestCase):
         self.assertNotIn(run_dir / "baseline", readable)
         self.assertNotIn(run_dir / "flow-events.jsonl", writable)
         self.assertIn(Path("/opt"), readable)
+
+    def test_codex_code_mode_host_cannot_read_the_private_auth_home(self) -> None:
+        launch = dataclasses.replace(
+            _example_launch(Path("/eval")),
+            agent_runtime="codex",
+            codex=Path("/eval/codex"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            wrapper = _write_code_mode_host_wrapper(launch, Path(temporary))
+            command = wrapper.read_text()
+        private_home = str(launch.artifacts / ".sandbox-home")
+        self.assertNotIn(f"--rw {private_home}", command)
+        self.assertIn(str(launch.artifacts / launch.run_id / "workspace"), command)
 
     def test_the_agent_boogie_is_the_proxy_client(self) -> None:
         launch = _example_launch(Path("/eval"))

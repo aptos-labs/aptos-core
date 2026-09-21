@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+import signal
 import sys
 import tempfile
 import unittest
@@ -70,6 +71,84 @@ class StdioProxyTest(unittest.TestCase):
         self.assertEqual(b"HELLO\n", stdout)
         self.assertEqual(b"", stderr)
         self.assertEqual(0, returncode)
+
+    def test_child_exit_closes_a_client_that_keeps_stdin_open(self) -> None:
+        async def exercise(root: Path) -> bytes:
+            socket_path = root / "mcp.sock"
+            async with StdioProxy(
+                socket_path,
+                [sys.executable, "-c", "pass"],
+                dict(os.environ),
+                root,
+                lambda _: None,
+            ):
+                reader, writer = await asyncio.open_unix_connection(str(socket_path))
+                try:
+                    return await asyncio.wait_for(reader.read(), timeout=2)
+                finally:
+                    writer.close()
+                    await writer.wait_closed()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            response = asyncio.run(exercise(Path(temporary)))
+        self.assertEqual(b"", response)
+
+    def test_teardown_terminates_the_child_process_group(self) -> None:
+        async def exercise(root: Path) -> tuple[int, Path]:
+            socket_path = root / "mcp.sock"
+            pid_path = root / "child.pid"
+            stopped_path = root / "child.stopped"
+            child = (
+                "import os, pathlib, signal, sys, time\n"
+                "pid, stopped = map(pathlib.Path, sys.argv[1:])\n"
+                "pid.write_text(str(os.getpid()))\n"
+                "def stop(*_):\n"
+                " stopped.write_text('stopped')\n"
+                " raise SystemExit(0)\n"
+                "signal.signal(signal.SIGTERM, stop)\n"
+                "while True: time.sleep(1)\n"
+            )
+            parent = (
+                "import subprocess, sys, time\n"
+                "subprocess.Popen([sys.executable, '-c', sys.argv[1], *sys.argv[2:]])\n"
+                "while True: time.sleep(1)\n"
+            )
+            async with StdioProxy(
+                socket_path,
+                [
+                    sys.executable,
+                    "-c",
+                    parent,
+                    child,
+                    str(pid_path),
+                    str(stopped_path),
+                ],
+                dict(os.environ),
+                root,
+                lambda _: None,
+            ):
+                reader, writer = await asyncio.open_unix_connection(str(socket_path))
+                del reader
+                for _ in range(200):
+                    if pid_path.is_file():
+                        break
+                    await asyncio.sleep(0.01)
+                self.assertTrue(pid_path.is_file(), "child process did not start")
+                child_pid = int(pid_path.read_text())
+                writer.close()
+            return child_pid, stopped_path
+
+        child_pid = -1
+        try:
+            with tempfile.TemporaryDirectory() as temporary:
+                child_pid, stopped_path = asyncio.run(exercise(Path(temporary)))
+                self.assertTrue(stopped_path.is_file())
+        finally:
+            if child_pid > 0:
+                try:
+                    os.kill(child_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
 
 if __name__ == "__main__":
     unittest.main()
