@@ -5994,8 +5994,8 @@ impl Container {
 
 impl Closure {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
-        let Self(_, captured) = self;
-        if visitor.visit_closure(depth, captured.len())? {
+        let Self(fun, captured) = self;
+        if visitor.visit_closure(depth, fun.as_ref(), captured.len())? {
             for val in captured.iter() {
                 val.visit_impl(visitor, depth + 1)?;
             }
@@ -6711,7 +6711,12 @@ impl ValueVisitor for DepthCheckingVisitor {
         Ok(true) // continue into fields
     }
 
-    fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+    fn visit_closure(
+        &mut self,
+        depth: u64,
+        _fun: &(dyn AbstractFunction + 'static),
+        _len: usize,
+    ) -> PartialVMResult<bool> {
         self.check(depth)?;
         Ok(true) // continue into captured values
     }
