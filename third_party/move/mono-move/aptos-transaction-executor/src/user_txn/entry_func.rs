@@ -10,9 +10,13 @@ use mono_move_core::{
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
     Interner, PreparedModule,
 };
-use mono_move_global_context::ExecutionGuard;
+use mono_move_global_context::{ExecutionGuard, LoadedModule};
+use mono_move_natives::RandomnessContext;
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
-use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{FunctionDefinitionIndex, Visibility},
+};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 /// Checks that the function `def_idx` of `module` is one a user transaction
@@ -118,6 +122,18 @@ fn is_allowed_framework_struct(
     }
 }
 
+/// Whether the function `def_idx` of `module`, named `name`, may call the
+/// randomness API: a private or friend function carrying the `#[randomness]`
+/// annotation.
+fn is_unbiasable_entry_function(
+    module: &LoadedModule,
+    def_idx: FunctionDefinitionIndex,
+    name: InternedIdentifier,
+) -> bool {
+    module.ir().module.function_def_at(def_idx).visibility != Visibility::Public
+        && module.has_randomness_annotation(&name)
+}
+
 /// Runs the transaction's entry function, metered against the transaction's gas budget.
 pub(crate) fn call_entry_function<'a>(
     guard: &ExecutionGuard<'a>,
@@ -139,9 +155,14 @@ pub(crate) fn call_entry_function<'a>(
     if let Some(def_idx) = module.function_def_idx(function_name) {
         check_callable_definition(&module.ir().module, def_idx)
             .map_err(MoveExecutionFailure::InvalidArguments)?;
+        if is_unbiasable_entry_function(module, def_idx, function_name) {
+            interp
+                .extensions()
+                .get_mut::<RandomnessContext>()
+                .map_err(MoveExecutionFailure::RuntimeError)?
+                .mark_unbiasable();
+        }
     }
-    // TODO(completeness): AptosVM marks the session unbiasable when a friend
-    // or private entry function carries the `#[randomness]` annotation.
     let func = interp
         .load_function(module_id, function_name, ty_args)
         .map_err(MoveExecutionFailure::RuntimeError)?;

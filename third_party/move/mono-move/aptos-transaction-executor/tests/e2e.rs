@@ -729,25 +729,20 @@ fn call_txn(
         .sign()
 }
 
-/// Asserts that v1 keeps `txn` with the miscellaneous error `code`, and that
-/// v2 agrees on the status and, modulo gas, on the output.
+/// Asserts that both VMs keep `txn` with the miscellaneous error `code` and
+/// agree, modulo gas, on the output.
 fn assert_kept_with_code_like_v1(
     fx: &FakeExecutor,
     sender: &AccountData,
     txn: SignedTransaction,
     code: StatusCode,
 ) {
-    let v1_output = fx.execute_transaction(txn.clone());
+    let output = assert_output_matches_v1(fx, &txn, *sender.address());
     assert_eq!(
-        v1_output.status(),
+        output.status(),
         &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code))),
         "v1 did not keep the transaction with {code:?}"
     );
-
-    let v2_output = execute_v2(fx.get_state_view(), &txn);
-    assert_eq!(v2_output.status(), v1_output.status());
-
-    compare_outputs(&v1_output, &v2_output, *sender.address());
 }
 
 /// Entry functions with signatures a transaction may not call. Assembled from
@@ -1135,6 +1130,161 @@ fn empty_payload_discarded_like_v1() {
     assert_eq!(execute_v2(fx.get_state_view(), &txn).status(), &v1_status);
 }
 
+/// `status` with any abort info stripped.
+//
+// TODO(correctness): compare the abort info too, once the executor resolves it.
+fn without_abort_info(status: &TransactionStatus) -> TransactionStatus {
+    match status {
+        TransactionStatus::Keep(ExecutionStatus::MoveAbort { location, code, .. }) => {
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: location.clone(),
+                code: *code,
+                info: None,
+            })
+        },
+        TransactionStatus::Keep(
+            ExecutionStatus::Success
+            | ExecutionStatus::OutOfGas
+            | ExecutionStatus::ExecutionFailure { .. }
+            | ExecutionStatus::MiscellaneousError(_),
+        )
+        | TransactionStatus::Discard(_)
+        | TransactionStatus::Retry => status.clone(),
+    }
+}
+
+/// Asserts both VMs agree on `txn`, modulo gas, and returns V1's output.
+fn assert_output_matches_v1(
+    fx: &FakeExecutor,
+    txn: &SignedTransaction,
+    fee_payer: move_core_types::account_address::AccountAddress,
+) -> TransactionOutput {
+    let v1_output = fx.execute_transaction(txn.clone());
+    let v2_output = execute_v2(fx.get_state_view(), txn);
+    assert_eq!(
+        without_abort_info(v2_output.status()),
+        without_abort_info(v1_output.status()),
+        "v2 status differs from v1"
+    );
+    compare_outputs(&v1_output, &v2_output, fee_payer);
+    v1_output
+}
+
+/// Entry functions that call the randomness API, of every visibility. All but
+/// `unannotated` get the `#[randomness]` annotation when published.
+const RANDOMNESS_ENTRY_FUNCTIONS: &str = r#"
+module 0xcafe::randomness_users
+use 0x1::randomness
+
+entry fun annotated()
+    call randomness::u64_integer
+    pop
+    ret
+
+entry friend fun friend_annotated()
+    call randomness::u64_integer
+    pop
+    ret
+
+entry fun unannotated()
+    call randomness::u64_integer
+    pop
+    ret
+
+entry public fun public_annotated()
+    call randomness::u64_integer
+    pop
+    ret
+"#;
+
+/// Publishes `RANDOMNESS_ENTRY_FUNCTIONS` with the annotation attached to the
+/// functions whose name says so, and returns the module's address.
+fn publish_randomness_module(
+    fx: &mut FakeExecutor,
+) -> move_core_types::account_address::AccountAddress {
+    use aptos_types::vm::module_metadata::{
+        KnownAttribute, RuntimeModuleMetadataV1, APTOS_METADATA_KEY_V1,
+    };
+    use move_core_types::metadata::Metadata;
+
+    let (mut module, _) =
+        aptos_language_e2e_tests::compile::compile_module(RANDOMNESS_ENTRY_FUNCTIONS);
+    let metadata = RuntimeModuleMetadataV1 {
+        fun_attributes: ["annotated", "friend_annotated", "public_annotated"]
+            .into_iter()
+            .map(|name| (name.to_string(), vec![KnownAttribute::randomness(None)]))
+            .collect(),
+        ..Default::default()
+    };
+    module.metadata.push(Metadata {
+        key: APTOS_METADATA_KEY_V1.to_vec(),
+        value: bcs::to_bytes(&metadata).expect("the metadata serializes"),
+    });
+
+    let mut blob = vec![];
+    module
+        .serialize(&mut blob)
+        .expect("the annotated module serializes");
+    fx.add_module(&module.self_id(), blob);
+    *module.self_id().address()
+}
+
+/// Runs a block prologue carrying a randomness seed, which genesis leaves
+/// unset, so the randomness API has something to derive from.
+fn seed_block_randomness(fx: &mut FakeExecutor) {
+    let block_metadata_ext = block_metadata_with_randomness_seed(fx);
+    let outputs = fx
+        .execute_transaction_block(vec![Transaction::BlockMetadataExt(block_metadata_ext)])
+        .expect("v1 executes the block");
+    fx.apply_write_set(outputs[0].write_set());
+}
+
+/// Only a private or friend entry function carrying the `#[randomness]`
+/// annotation may call the randomness API. Each case is compared against V1
+/// rather than against fixed abort codes.
+#[test]
+fn randomness_api_matches_v1() {
+    const RANDOMNESS_EVENT: &str = "0x1::randomness::RandomnessGeneratedEvent";
+
+    let (mut fx, alice, _bob) = setup();
+    seed_block_randomness(&mut fx);
+    let module = publish_randomness_module(&mut fx);
+    let call = |function: &str| call_txn(&alice, module, "randomness_users", function, vec![]);
+
+    for function in ["annotated", "friend_annotated"] {
+        let output = assert_output_matches_v1(&fx, &call(function), *alice.address());
+        assert_eq!(
+            output.status(),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
+            "{function} could not use randomness"
+        );
+        assert!(
+            output
+                .events()
+                .iter()
+                .any(|event| event.type_tag().to_canonical_string() == RANDOMNESS_EVENT),
+            "{function} used randomness without the framework recording it"
+        );
+    }
+
+    let unannotated = assert_output_matches_v1(&fx, &call("unannotated"), *alice.address());
+    assert!(
+        matches!(
+            unannotated.status(),
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
+        ),
+        "an unannotated function used randomness: {:?}",
+        unannotated.status()
+    );
+    let public_annotated =
+        assert_output_matches_v1(&fx, &call("public_annotated"), *alice.address());
+    assert_eq!(
+        public_annotated.status(),
+        unannotated.status(),
+        "a public entry function must not be allowed to use randomness"
+    );
+}
+
 /// A block-metadata transaction produces byte-identical outputs on both VMs:
 /// the block prologue runs unmetered on both, so nothing is gas-masked.
 #[test]
@@ -1184,35 +1334,8 @@ fn block_metadata_matches_v1() {
 /// encrypted transactions.
 #[test]
 fn block_metadata_ext_v3_matches_v1() {
-    use aptos_types::{
-        block_metadata_ext::BlockMetadataExt,
-        on_chain_config::{OnChainConfig, ValidatorSet},
-        randomness::{RandMetadata, Randomness},
-    };
-
     let (mut fx, _alice, _bob) = setup();
-    let validator_set = ValidatorSet::fetch_config(fx.get_state_view())
-        .expect("the validator set is readable")
-        .expect("genesis has a validator set");
-    let proposer = *validator_set
-        .payload()
-        .next()
-        .expect("genesis has a validator")
-        .account_address();
-    let block_metadata_ext = BlockMetadataExt::new_v3(
-        aptos_crypto::HashValue::sha3_256_of(b"mono-move ext block"),
-        1,
-        1,
-        proposer,
-        vec![],
-        vec![],
-        fx.get_block_time() + 100,
-        Some(Randomness::new(
-            RandMetadata { epoch: 1, round: 1 },
-            vec![7u8; 32],
-        )),
-        None,
-    );
+    let block_metadata_ext = block_metadata_with_randomness_seed(&mut fx);
 
     let v1_outputs = fx
         .execute_transaction_block(vec![Transaction::BlockMetadataExt(
@@ -1234,6 +1357,41 @@ fn block_metadata_ext_v3_matches_v1() {
         )
     });
     compare_system_outputs(v1_output, &v2_output);
+}
+
+/// Extended block metadata carrying a randomness seed and no decryption
+/// payload, proposed by a genesis validator.
+fn block_metadata_with_randomness_seed(
+    fx: &mut FakeExecutor,
+) -> aptos_types::block_metadata_ext::BlockMetadataExt {
+    use aptos_types::{
+        block_metadata_ext::BlockMetadataExt,
+        on_chain_config::{OnChainConfig, ValidatorSet},
+        randomness::{RandMetadata, Randomness},
+    };
+
+    let validator_set = ValidatorSet::fetch_config(fx.get_state_view())
+        .expect("the validator set is readable")
+        .expect("genesis has a validator set");
+    let proposer = *validator_set
+        .payload()
+        .next()
+        .expect("genesis has a validator")
+        .account_address();
+    BlockMetadataExt::new_v3(
+        aptos_crypto::HashValue::sha3_256_of(b"mono-move ext block"),
+        1,
+        1,
+        proposer,
+        vec![],
+        vec![],
+        fx.get_block_time() + 100,
+        Some(Randomness::new(
+            RandMetadata { epoch: 1, round: 1 },
+            vec![7u8; 32],
+        )),
+        None,
+    )
 }
 
 /// Both system-transaction outputs must be fee-free and match byte-for-byte,
