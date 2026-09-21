@@ -37,6 +37,7 @@ use move_model::{
         INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_TYPE_MAP,
         INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
     },
+    spec_derivation,
     symbol::Symbol,
     ty::{NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext, Variance},
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
@@ -1538,7 +1539,19 @@ impl Analyzer<'_> {
         // For monomorphization, we only need to analyze function calls, not `pack` or other
         // instructions because the types those are using are reflected in locals which are analyzed
         // elsewhere.
+        //
+        // `Exists` is the exception: its operands are an address and a bool, so the resource type
+        // appears only in the operation itself and is reflected in no local. Without registering it
+        // here the struct is never translated, yet the translator still emits
+        // `$ResourceExists(<T>_$memory, ..)`, and Boogie rejects the program with an undeclared
+        // identifier. The other memory operations do not need this: `BorrowGlobal` yields `&T`,
+        // `MoveFrom` yields `T`, and `MoveTo` consumes `T`.
         match bc {
+            Call(_, _, Exists(mid, sid, inst), ..) => {
+                let inst = self.instantiate_vec(inst);
+                let struct_env = self.env.get_module(*mid).into_struct(*sid);
+                self.add_struct(struct_env, &inst);
+            },
             Call(_, _, Invoke, srcs, _) => {
                 if let Some(fun) = srcs.last() {
                     let fun_type =
@@ -1699,7 +1712,7 @@ impl Analyzer<'_> {
             self.add_struct(struct_env, &mem.inst);
         }
 
-        let exps = {
+        let mut exps = {
             let spec = fun_env.get_spec();
             spec.conditions
                 .iter()
@@ -1707,6 +1720,25 @@ impl Analyzer<'_> {
                 .chain(spec.proof_exps().into_iter().cloned())
                 .collect::<Vec<_>>()
         };
+
+        // When no caller-visible `aborts_if` constrains the aborts, the Boogie
+        // backend does not default `aborts_of` to `false`; it derives the abort
+        // behavior from the body instead (`derived_aborts` in
+        // `bytecode_translator::translate_fun_spec_conditions`). Those derived
+        // expressions call the functions the body calls, so unless they are walked
+        // here the callees are never registered and the emitted predicate refers to
+        // declarations that were never produced. Reachable whenever a spec-less
+        // lambda is named by a behavioral predicate -- its spec is empty by design,
+        // so the loop above sees nothing.
+        if !spec_derivation::spec_aborts_are_exact(self.env, fun.to_qualified_id()) {
+            if let Some(derived) = spec_derivation::derive_fun_aborts_conditions(
+                self.env,
+                fun.to_qualified_id(),
+                &fun.inst,
+            ) {
+                exps.extend(derived);
+            }
+        }
         let saved_inst = self.inst_opt.replace(fun.inst.clone());
         for exp in exps {
             self.analyze_exp(&exp);
