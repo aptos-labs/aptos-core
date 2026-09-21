@@ -110,8 +110,13 @@ pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>) -> TxnOutcome {
 /// Closes a system session whose effects are not published. The block either
 /// aborts or absorbs the failure, so the effects are dropped; finishing is what
 /// returns the worker's stack and heap.
-pub(super) fn discard_system_session(interp: InterpreterContext<'_>) {
-    drop(interp.finish());
+///
+/// Closing can still fail on its own — evacuation runs here — so the caller
+/// decides what a second failure means.
+pub(super) fn discard_system_session(
+    interp: InterpreterContext<'_>,
+) -> Result<(), VMInternalError> {
+    interp.finish().map(drop)
 }
 
 /// Calls `0x1::block::<function>` as the VM, with `place` filling the call

@@ -31,7 +31,6 @@ use crate::{
     value_cmp, value_conv,
     value_conv::rust::write_value,
 };
-use mono_move_alloc::RegionKind;
 use mono_move_core::{
     captured_values_size,
     interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
@@ -154,23 +153,6 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
     );
     // SAFETY: the offset is within `stack`, checked above.
     unsafe { stack.as_ptr().add(FRAME_METADATA_SIZE) }
-}
-
-/// A fresh interpreter stack. Its contents are unspecified and must be written
-/// before they are read.
-///
-/// Release builds zero the region, so a slot read before it is written holds a
-/// defined value instead of an undefined one. A worker allocates one stack and
-/// reuses it, so the zeroing costs nothing per transaction. Debug builds poison
-/// and Miri gets genuinely uninitialized memory, so both still catch a read
-/// before write.
-fn new_stack_region() -> MemoryRegion {
-    if cfg!(miri) {
-        return MemoryRegion::new_uninit(DEFAULT_STACK_SIZE);
-    }
-    let mut region = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
-    region.recycle();
-    region
 }
 
 /// The function pointer saved in the metadata below the frame at `fp`: that
@@ -462,13 +444,8 @@ impl<'guard> InterpreterContext<'guard> {
         //
         // INVARIANT: the root frame's metadata sits below every frame, so no
         // call writes it. It is written explicitly below.
-        let stack = loader
-            .guard()
-            .take_region(RegionKind::Stack)
-            .unwrap_or_else(new_stack_region);
-        debug_assert_eq!(stack.len(), DEFAULT_STACK_SIZE);
-
-        let heap = Heap::new_session(loader.guard(), options.heap_size);
+        let stack = loader.guard().take_region(DEFAULT_STACK_SIZE);
+        let heap = Heap::from_region(loader.guard().take_region(options.heap_size));
 
         // Built before the metadata writes below: it asserts the region is
         // large enough to hold them.
@@ -677,10 +654,15 @@ impl<'guard> InterpreterContext<'guard> {
             invariant_violation!(LiveRootAtSessionEnd);
         }
 
+        let guard = loader.guard();
+        // TODO(perf): the evacuated region is never returned to the pool. It
+        // outlives the session inside an `Arc<FrozenHeap>`, so returning it
+        // needs a hook on the last drop.
+        let to_space = guard.take_region(heap.used().max(MAX_ALIGN));
         let evacuated =
-            evacuate_session_roots(&heap, loader.guard(), &mut read_write_set, &extensions)?;
-        heap.release(loader.guard());
-        loader.guard().return_region(RegionKind::Stack, stack);
+            evacuate_session_roots(&heap, to_space, guard, &mut read_write_set, &extensions)?;
+        guard.return_region(heap.into_region());
+        guard.return_region(stack);
 
         Ok(SessionEffects {
             read_write_set,
@@ -2661,12 +2643,11 @@ impl InterpreterContext<'_> {
         unsafe {
             let dst = regs.fp.add(usize::from(dst));
             deserialize_or_gc(
-                self.loader.guard(),
                 &mut self.heap,
+                self.loader.guard(),
                 ty,
                 bytes,
                 dst,
-                self.loader.guard(),
                 &mut self.read_write_set,
                 &self.root_pool,
                 &self.extensions,
@@ -3344,7 +3325,6 @@ impl InterpreterContext<'_> {
                 abi,
                 view_type_list(ty_args),
                 &mut self.gas_meter,
-                guard,
                 guard,
                 self.resource_provider,
                 &resolve_resource_group,

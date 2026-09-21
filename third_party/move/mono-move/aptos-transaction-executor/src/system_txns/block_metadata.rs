@@ -36,7 +36,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         match run_block_prologue(&mut interp, self.guard, block_metadata) {
             Ok(()) => system_txn_outcome(interp),
             Err(failure) => {
-                discard_system_session(interp);
+                // The prologue failure already aborts the block, so a failure
+                // while closing the session adds nothing.
+                //
+                // TODO(cleanup): refactor the returned results so that we have
+                // a single source of truth locally.
+                let _ = discard_system_session(interp);
                 TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
                     call: "block_prologue",
                     failure,
@@ -61,7 +66,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         match run_block_prologue_ext(&mut interp, self.guard, block_metadata_ext) {
             Ok(()) => system_txn_outcome(interp),
             Err(failure) => {
-                discard_system_session(interp);
+                // The prologue failure already aborts the block, so a failure
+                // while closing the session adds nothing.
+                //
+                // TODO(cleanup): refactor the returned results so that we have
+                // a single source of truth locally.
+                let _ = discard_system_session(interp);
                 TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
                     call: "block_prologue_ext",
                     failure,

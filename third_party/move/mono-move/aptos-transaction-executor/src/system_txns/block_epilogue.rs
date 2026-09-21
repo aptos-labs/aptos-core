@@ -46,9 +46,13 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         });
         match result {
             Ok(()) => system_txn_outcome(interp),
-            Err(failure) => {
-                discard_system_session(interp);
-                TxnOutcome::ExecutedNoEffects(NoEffectsReason::BlockEpilogueFailed(failure))
+            Err(failure) => match discard_system_session(interp) {
+                Ok(()) => {
+                    TxnOutcome::ExecutedNoEffects(NoEffectsReason::BlockEpilogueFailed(failure))
+                },
+                // The epilogue's own failure is absorbed, but a VM error while
+                // closing the session is not: nothing else would report it.
+                Err(e) => TxnOutcome::Panic(e),
             },
         }
     }

@@ -6,7 +6,7 @@ use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
 use parking_lot::{Mutex, MutexGuard};
 use std::{
-    cell::Cell,
+    cell::RefCell,
     hash::{Hash, Hasher},
     ptr::NonNull,
 };
@@ -108,46 +108,38 @@ impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
     }
 }
 
-/// Which of a worker's parked regions a call refers to.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RegionKind {
-    /// The interpreter stack.
-    Stack,
-    /// The session heap.
-    Heap,
+/// Smallest pooled region size, 32 KiB.
+const MIN_POOLED_LOG2: u32 = 15;
+/// Largest pooled region size, 4 MiB — the default session heap.
+const MAX_POOLED_LOG2: u32 = 22;
+/// One bucket per supported power of two, inclusive at both ends.
+const NUM_BUCKETS: usize = (MAX_POOLED_LOG2 - MIN_POOLED_LOG2 + 1) as usize;
+
+/// The bucket holding regions of exactly `size` bytes, or [`None`] if that
+/// size is not pooled. Sizes match exactly: nothing is rounded up, so a region
+/// handed out always has the size the caller asked for.
+fn bucket_index(size: usize) -> Option<usize> {
+    if !size.is_power_of_two() {
+        return None;
+    }
+    let log2 = size.trailing_zeros();
+    (MIN_POOLED_LOG2..=MAX_POOLED_LOG2)
+        .contains(&log2)
+        .then(|| (log2 - MIN_POOLED_LOG2) as usize)
 }
 
-/// The memory one worker holds exclusively: its bump arena, plus the
-/// interpreter stack and session heap parked between executions.
-///
-/// Each kind of parked buffer gets its own field rather than sharing one pool
-/// of interchangeable regions. A region is handed out as is, with no size
-/// check, so a shared pool could give a caller one too small for it. A field
-/// holds at most one region: the slot is locked by one worker at a time, and
-/// that worker has at most one region of each kind live.
+/// The memory one worker holds exclusively: its bump arena, plus the regions
+/// parked between executions, bucketed by size.
 struct ArenaSlot {
     bump: Bump,
-    /// The interpreter's call stack, left behind by the last execution on this
-    /// worker. Empty until the first execution returns one.
-    stack: Cell<Option<MemoryRegion>>,
-    /// The session heap, left behind by the last execution on this worker.
-    /// Empty until the first execution returns one.
-    heap: Cell<Option<MemoryRegion>>,
+    regions: RefCell<[Vec<MemoryRegion>; NUM_BUCKETS]>,
 }
 
 impl ArenaSlot {
     fn with_capacity(arena_capacity: usize) -> Self {
         Self {
             bump: Bump::with_capacity(arena_capacity),
-            stack: Cell::new(None),
-            heap: Cell::new(None),
-        }
-    }
-
-    fn region(&self, kind: RegionKind) -> &Cell<Option<MemoryRegion>> {
-        match kind {
-            RegionKind::Stack => &self.stack,
-            RegionKind::Heap => &self.heap,
+            regions: RefCell::new(std::array::from_fn(|_| vec![])),
         }
     }
 }
@@ -275,35 +267,41 @@ impl<'pool> GlobalArenaShard<'pool> {
         GlobalArenaPtr(NonNull::from(self.guard.bump.alloc_slice_copy(src)))
     }
 
-    /// Takes this arena's parked region of the given kind, or [`None`] if
-    /// there is none parked.
+    /// A region of exactly `size` bytes, reusing one parked on this arena when
+    /// there is one. Return it with [`Self::return_region`].
     ///
-    /// The region is not zeroed: it holds whatever the previous owner left
-    /// behind, so the caller must write every byte before reading it.
-    pub fn take_region(&self, kind: RegionKind) -> Option<MemoryRegion> {
+    /// The region's contents are unspecified: it may hold whatever its
+    /// previous owner left behind. The caller must write every byte before
+    /// reading it, and zero the region itself if it needs zeroed memory.
+    pub fn take_region(&self, size: usize) -> MemoryRegion {
         // Reuse hides read-before-write bugs from Miri, since a recycled
         // region is ordinary initialized memory rather than uninitialized.
         // Hand out a fresh allocation instead so Miri still catches them.
         if cfg!(miri) {
-            return None;
+            return MemoryRegion::new_uninit(size);
         }
 
-        let mut region = self.guard.region(kind).take()?;
-        region.recycle();
-        Some(region)
+        if let Some(bucket) = bucket_index(size) {
+            if let Some(mut region) = self.guard.regions.borrow_mut()[bucket].pop() {
+                region.recycle();
+                return region;
+            }
+        }
+        MemoryRegion::new_scratch(size)
     }
 
-    /// Parks a region on this arena for its next user. Keeps one region per
-    /// kind; a surplus region (the caller allocated its own because none was
-    /// parked) is dropped here.
+    /// Parks a region on this arena for its next user. A region whose size is
+    /// not pooled is dropped here.
     ///
-    /// INVARIANT: every user of an arena's region of a given kind agrees on
-    /// its size. The region is parked and handed out as is, with no size
-    /// check.
-    pub fn return_region(&self, kind: RegionKind, region: MemoryRegion) {
+    /// Bucket depth needs no bound: a region only reaches a bucket if it came
+    /// out of one, so the parked count for a size never exceeds the peak
+    /// number of regions of that size live at once.
+    pub fn return_region(&self, region: MemoryRegion) {
         if cfg!(miri) {
             return;
         }
-        self.guard.region(kind).set(Some(region));
+        if let Some(bucket) = bucket_index(region.len()) {
+            self.guard.regions.borrow_mut()[bucket].push(region);
+        }
     }
 }
