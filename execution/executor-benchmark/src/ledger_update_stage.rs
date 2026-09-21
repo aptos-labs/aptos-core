@@ -11,6 +11,7 @@ use move_core_types::language_storage::StructTag;
 use std::{
     collections::BTreeMap,
     sync::{mpsc, Arc},
+    time::Instant,
 };
 
 pub enum CommitProcessing {
@@ -55,7 +56,6 @@ where
     }
 
     pub fn ledger_update(&mut self, ledger_update_message: LedgerUpdateMessage) {
-        // let ledger_update_start_time = Instant::now();
         let LedgerUpdateMessage {
             first_block_start_time,
             current_block_start_time,
@@ -67,10 +67,16 @@ where
             stage,
         } = ledger_update_message;
 
+        // Times the executor call alone. The event summary below takes a
+        // process-wide lock and walks every output, so including it would make
+        // this track event volume instead.
+        let ledger_update_start_time = Instant::now();
         let output = self
             .executor
             .ledger_update(block_id, parent_block_id)
             .unwrap();
+        let ledger_update_time = ledger_update_start_time.elapsed();
+
         output.execution_output.check_aborts_discards_retries(
             self.allow_aborts,
             self.allow_discards,
@@ -110,6 +116,7 @@ where
                     current_block_start_time,
                     partition_time,
                     execution_time,
+                    ledger_update_time,
                     output,
                 };
                 commit_sender.send(msg).unwrap();

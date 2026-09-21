@@ -42,9 +42,12 @@ COLUMNS = [
 ]
 KEY_COLUMNS = 2
 
-# Metrics that get a calibrated row. `execution` is the one verdicts are read
-# from; the rest are recorded so drift in them is visible.
-CALIBRATED_METRICS = ["total", "execution", "inner_block_executor", "output_bytes_per_txn"]
+# Metrics that get a calibrated row. Only execution: it is what verdicts are
+# read from, and it is the only metric repeatable enough for a band to mean
+# anything. End-to-end throughput tracks whichever pipeline stage is slowest,
+# which makes it several times noisier without catching anything execution
+# would miss.
+CALIBRATED_METRICS = ["execution"]
 
 
 # Expected range of `n` samples drawn from a normal distribution, in standard

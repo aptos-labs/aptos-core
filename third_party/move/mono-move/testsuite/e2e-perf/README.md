@@ -13,6 +13,12 @@ For each workload, `run_e2e_perf_test.py`:
 3. Replays that file `REPEATS` times per VM, alternating V1 and MonoMove.
 4. Takes the median per VM and reports `median(MonoMove) / median(V1)`.
 
+Every workload runs the same block size, `BLOCK_SIZE` (1000). Block overhead is
+charged per block, so a smaller block carries more of it per transaction; giving
+each workload its own natural batch size would move its speedup for a reason
+that has nothing to do with the workload and would make the suite's numbers
+incomparable to each other.
+
 The recording step exists because the transaction generators draw from entropy.
 Two independent runs of the same workload produce different transactions, and on
 workloads whose cost depends on earlier transactions — orderbook, liquidity pool
@@ -100,8 +106,29 @@ not agree, and neither direction is a bug on its own:
   where the value did not change. That pulls its output above V1's.
 
 Either can change as MonoMove gains metering or a finer write set, so the
-absolute numbers are not the point. The ratio is calibrated, and what the
-calibration catches is the ratio moving away from where it was measured.
+absolute numbers are not the point. The ratio is reported, not calibrated; read
+it alongside the ledger update and commit columns, which move with it.
+
+## Per-block charts
+
+Set `CHART_DIR` and the harness renders one SVG per workload: every block's
+execution, ledger update, and commit time, one panel per VM. In CI the SVGs are
+uploaded as the `mono-move-e2e-perf-charts` artifact and the report links to it.
+
+The bars are grouped, never stacked. The four pipeline stages run concurrently,
+so their times overlap in wall clock and do not sum to block latency; stacking
+them would claim a part-to-whole relationship that does not hold.
+
+Each panel is scaled to its own peak, which is named in its top right. A shared
+scale would flatten MonoMove into the baseline, since V1 execution runs several
+times longer than anything MonoMove does. What the chart shows is the shape
+within one VM: which stage dominates, and whether the tail is a fixed warmup
+cost or a recurring stall. That is where to look when end-to-end moves but
+execution does not. To compare the two VMs, read the axis rather than the bar
+height.
+
+`block_stage_chart.py` writes the SVG by hand and pulls in no dependency. The
+CI job installs exactly one Python package and this adds none.
 
 ## Running locally
 
@@ -133,6 +160,9 @@ RUN_SOURCE=local python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_p
 | `RUN_SOURCE` | `local` | `ci`, `manual`, or `local`; tags the JSON lines |
 | `RUNNER_NAME` | `none` | Tags the JSON lines; in CI it also picks the runner |
 | `REPORT_PATH` | unset | Write the markdown report here |
+| `CHART_DIR` | unset | Write one per-block chart SVG per workload here |
+| `RUN_URL` | unset | CI run URL the report links its chart artifact from |
+| `WARMUP_BLOCKS` | `2` | Blocks dropped from the head of the steady-state window |
 | `HIDE_OUTPUT` | unset | Suppress the benchmark's own log lines |
 | `SILENCE_TIMEOUT_SECS` | `1800` | Kill a subprocess that has printed nothing for this long |
 
@@ -158,9 +188,9 @@ without touching the label again. Removing the label stops further runs.
 The label only works on same-repo branches. A pull request from a fork is
 skipped, because the job builds and runs the PR's code on a self-hosted runner.
 
-Results land in three places: the job's step summary, a sticky PR comment that is
-rewritten on each run, and one JSON line per calibrated metric in the job log for
-Humio to pick up.
+Results land in four places: the job's step summary, a sticky PR comment that is
+rewritten on each run, one JSON line per calibrated metric in the job log for
+Humio to pick up, and the `mono-move-e2e-perf-charts` artifact.
 
 `workflow_dispatch` runs the same job on a branch without a PR, and takes
 `REPEATS`, `NUM_BLOCKS_PER_TEST`, `SELF_COMPARE`, `BUILD`, and `RUNNER_NAME` as
@@ -180,7 +210,7 @@ above it.
 SELF_COMPARE=1 python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_perf_test.py
 ```
 
-The report prints a noise floor line under the headline table. Run this once per
+The report prints a noise floor line under the execution table. Run this once per
 runner type before trusting any band, and record the result here:
 
 | runner | date | config | largest deviation from 1.00x | largest run-to-run range |
@@ -188,16 +218,22 @@ runner type before trusting any band, and record the result here:
 | Apple M-series laptop | 2026-09-03 | 5 blocks, 3 repeats, 20k accounts | 0.7% | 3.6% |
 | `benchmark-c3d-60` | 2026-09-17 | 30 blocks, 3 repeats, 2M accounts | 1.2% | 2.6% |
 
-Both numbers cover `total`, `execution`, and `inner_block_executor`. The verdict
-itself rests on the last two only. Every other stage is disk bound or takes
-single-digit milliseconds per block, so its range across two identical runs
-reaches tens of percent. Those stages are reported and calibrated but do not
-decide a verdict.
+Both numbers cover `execution` and `inner_block_executor`. The verdict rests on
+`execution` alone. Every other metric is disk bound or takes single-digit
+milliseconds per block, so its range across two identical runs reaches tens of
+percent. Those are reported but neither calibrated nor able to decide a verdict.
 
 A self-compare warns when a ratio lands more than `SELF_COMPARE_MAX_DEVIATION`
 (3%) away from 1.00x. Tighten it if a runner turns out to be quieter than that.
 
 ## Calibration
+
+Only `execution` is calibrated. It is what verdicts are read from, and it is the
+only metric repeatable enough for a band to mean anything: measured across this
+file, its mean run-to-run range is 3.0% against 10.3% for end-to-end throughput.
+End-to-end tracks whichever pipeline stage is slowest, and MonoMove is fast
+enough that the slowest one is commit, so a band on it would be three times
+wider without catching anything `execution` would miss.
 
 `e2e_perf_speedup.tsv` holds the calibrated speedups. Columns:
 
@@ -209,7 +245,7 @@ A self-compare warns when a ratio lands more than `SELF_COMPARE_MAX_DEVIATION`
 - `median_speedup` — the calibrated number. MonoMove throughput over V1
   throughput, not a TPS.
 
-A verdict is read from the `execution` row. `speedup_band` estimates the
+`speedup_band` estimates the
 run-to-run deviation and allows `BAND_DEVIATIONS` (3) of it either side of
 `median_speedup`, plus a `BAND_FLOOR` (3%) floor. The estimate divides the
 observed range by the range a normal distribution is expected to cover in that
@@ -222,10 +258,9 @@ but is drawn from the same distribution, so the band converges on the real noise
 instead of tightening as samples accumulate. More samples make it accurate, not
 narrow. Today that lands at roughly ±6% for most workloads.
 
-The floor covers what repeats inside one run cannot see, and gives a band to a
-row whose runs came out identical — every `output_bytes_per_txn` row has a zero
-range, since both VMs write deterministically. It has to sit above the
-self-compare deviation measured on the runner.
+The floor covers what repeats inside one run cannot see: a workload can be
+quiet across five CI runs and still move when the runner is busy. It has to sit
+above the self-compare deviation measured on the runner.
 
 The remaining weakness is the range itself: one bad run widens a row's band
 until it is re-seeded, which is why `account-generation` sits at ±12.7% while

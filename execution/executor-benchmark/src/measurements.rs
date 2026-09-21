@@ -11,7 +11,9 @@ use aptos_executor::metrics::{
 };
 use aptos_logger::info;
 use aptos_metrics_core::Histogram;
+use aptos_types::transaction::Version;
 use move_core_types::language_storage::StructTag;
+use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Write,
@@ -491,6 +493,75 @@ impl OverallMeasurement {
             "exe gas/txn": format!("{:.2}", self.get_execution_gpt()),
             "output/txn": format!("{:.2}", self.get_output_per_txn()),
         })
+    }
+}
+
+/// One block's time in each pipeline stage.
+///
+/// The stages run concurrently, so these do not sum to `latency_ms`.
+#[derive(Debug, Clone, Serialize)]
+pub struct BlockMeasurement {
+    pub version: Version,
+    /// The block's input transactions: the user transactions plus the block
+    /// metadata. The epilogue the VM appends is left out of the count, but its
+    /// execution is inside every stage time below.
+    pub num_txns: usize,
+    pub partition_ms: f64,
+    pub execution_ms: f64,
+    pub ledger_update_ms: f64,
+    pub commit_ms: f64,
+    pub latency_ms: f64,
+    /// Measured from the moment the first block entered the pipeline, so a
+    /// window over these gives throughput with the warmup blocks dropped.
+    pub committed_at_ms: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BlockMeasurements {
+    pub blocks: Vec<BlockMeasurement>,
+}
+
+impl BlockMeasurements {
+    pub fn print_end_table(&self) {
+        if self.blocks.is_empty() {
+            return;
+        }
+        println!("Per-block stages (ms):");
+        println!(
+            "{: >6}{: >12}{: >9}{: >12}{: >12}{: >14}{: >10}{: >10}{: >14}",
+            "block",
+            "version",
+            "txns",
+            "partition",
+            "execution",
+            "ledger update",
+            "commit",
+            "latency",
+            "committed at",
+        );
+        for (index, b) in self.blocks.iter().enumerate() {
+            println!(
+                "{: >6}{: >12}{: >9}{: >12.1}{: >12.1}{: >14.1}{: >10.1}{: >10.1}{: >14.1}",
+                index,
+                b.version,
+                b.num_txns,
+                b.partition_ms,
+                b.execution_ms,
+                b.ledger_update_ms,
+                b.commit_ms,
+                b.latency_ms,
+                b.committed_at_ms,
+            );
+        }
+    }
+
+    /// One line the e2e-perf harness greps for. Keep the marker in sync with
+    /// `BLOCK_MEASUREMENTS_MARKER` in `run_e2e_perf_test.py`.
+    pub fn print_json_line(&self) {
+        println!(
+            "BLOCK_MEASUREMENTS_JSON: {}",
+            serde_json::to_string(self).expect("block measurements serialize")
+        );
     }
 }
 

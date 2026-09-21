@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{metrics::NUM_TXNS, pipeline::CommitBlockMessage};
+use crate::{measurements::BlockMeasurement, metrics::NUM_TXNS, pipeline::CommitBlockMessage};
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
@@ -11,6 +11,7 @@ use aptos_executor::{
     },
 };
 use aptos_executor_types::BlockExecutorTrait;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
@@ -51,6 +52,7 @@ pub struct TransactionCommitter<V> {
     executor: Arc<BlockExecutor<V>>,
     start_version: Version,
     block_receiver: mpsc::Receiver<CommitBlockMessage>,
+    staged_blocks: Arc<Mutex<Vec<BlockMeasurement>>>,
 }
 
 impl<V> TransactionCommitter<V>
@@ -61,11 +63,13 @@ where
         executor: Arc<BlockExecutor<V>>,
         start_version: Version,
         block_receiver: mpsc::Receiver<CommitBlockMessage>,
+        staged_blocks: Arc<Mutex<Vec<BlockMeasurement>>>,
     ) -> Self {
         Self {
             executor,
             start_version,
             block_receiver,
+            staged_blocks,
         }
     }
 
@@ -80,6 +84,7 @@ where
                 current_block_start_time,
                 partition_time,
                 execution_time,
+                ledger_update_time,
                 output,
             } = msg;
             let root_hash = output
@@ -96,6 +101,7 @@ where
             self.executor.pre_commit_block(block_id).unwrap();
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
 
+            let commit_time = Instant::now().duration_since(commit_start);
             report_block(
                 self.start_version,
                 version,
@@ -103,9 +109,20 @@ where
                 current_block_start_time,
                 partition_time,
                 execution_time,
-                Instant::now().duration_since(commit_start),
+                commit_time,
                 num_input_txns,
             );
+
+            self.staged_blocks.lock().push(BlockMeasurement {
+                version,
+                num_txns: num_input_txns,
+                partition_ms: partition_time.as_secs_f64() * 1000.0,
+                execution_ms: execution_time.as_secs_f64() * 1000.0,
+                ledger_update_ms: ledger_update_time.as_secs_f64() * 1000.0,
+                commit_ms: commit_time.as_secs_f64() * 1000.0,
+                latency_ms: current_block_start_time.elapsed().as_secs_f64() * 1000.0,
+                committed_at_ms: first_block_start_time.elapsed().as_secs_f64() * 1000.0,
+            });
         }
         last_version
     }

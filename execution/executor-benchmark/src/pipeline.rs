@@ -5,7 +5,7 @@ use crate::{
     block_preparation::BlockPreparationStage,
     indexer_grpc_waiter::IndexerGrpcWaiter,
     ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
-    measurements::{EventMeasurements, OverallMeasuring},
+    measurements::{BlockMeasurement, BlockMeasurements, EventMeasurements, OverallMeasuring},
     metrics::NUM_TXNS,
     OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
@@ -64,6 +64,7 @@ pub struct Pipeline<V> {
     start_pipeline_tx: Option<SyncSender<()>>,
     staged_result: Arc<Mutex<Vec<OverallMeasurement>>>,
     staged_events: Arc<Mutex<BTreeMap<(usize, StructTag), usize>>>,
+    staged_blocks: Arc<Mutex<Vec<BlockMeasurement>>>,
 }
 
 impl<V> Pipeline<V>
@@ -297,14 +298,24 @@ where
         let target_version = Arc::new(Mutex::new(None));
         let target_version_clone = target_version.clone();
 
+        // Declared outside the branch below because `join` unwraps this Arc
+        // whether or not a committer was spawned, and the unwrap needs the
+        // refcount back at one.
+        let staged_blocks = Arc::new(Mutex::new(Vec::new()));
+        let staged_blocks_clone = staged_blocks.clone();
+
         if !config.skip_commit {
             let commit_thread = std::thread::Builder::new()
                 .name("txn_committer".to_string())
                 .spawn(move || {
                     start_commit_rx.map(|rx| rx.recv());
                     info!("Starting commit thread");
-                    let mut committer =
-                        TransactionCommitter::new(executor_3, start_version, commit_receiver);
+                    let mut committer = TransactionCommitter::new(
+                        executor_3,
+                        start_version,
+                        commit_receiver,
+                        staged_blocks_clone,
+                    );
                     let final_version = committer.run();
 
                     // Store the final version for indexer_grpc waiter
@@ -359,6 +370,7 @@ where
                 start_pipeline_tx,
                 staged_result,
                 staged_events,
+                staged_blocks,
             },
             raw_block_sender,
         )
@@ -368,7 +380,14 @@ where
         self.start_pipeline_tx.as_ref().map(|tx| tx.send(()));
     }
 
-    pub fn join(self) -> (Option<u64>, Vec<OverallMeasurement>, EventMeasurements) {
+    pub fn join(
+        self,
+    ) -> (
+        Option<u64>,
+        Vec<OverallMeasurement>,
+        EventMeasurements,
+        BlockMeasurements,
+    ) {
         let mut counts = vec![];
         for handle in self.join_handles {
             let count = handle.join().unwrap();
@@ -381,6 +400,9 @@ where
             Arc::try_unwrap(self.staged_result).unwrap().into_inner(),
             EventMeasurements {
                 staged_events: Arc::try_unwrap(self.staged_events).unwrap().into_inner(),
+            },
+            BlockMeasurements {
+                blocks: Arc::try_unwrap(self.staged_blocks).unwrap().into_inner(),
             },
         )
     }
@@ -421,5 +443,6 @@ pub struct CommitBlockMessage {
     pub(crate) current_block_start_time: Instant,
     pub(crate) execution_time: Duration,
     pub(crate) partition_time: Duration,
+    pub(crate) ledger_update_time: Duration,
     pub(crate) output: StateComputeResult,
 }

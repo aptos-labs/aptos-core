@@ -85,6 +85,8 @@ jobs:
           SELF_COMPARE: ${{ inputs.SELF_COMPARE && '1' || '' }}
           BUILD: ${{ inputs.BUILD || 'release' }}
           REPORT_PATH: ${{ runner.temp }}/mono-move-e2e-perf.md
+          CHART_DIR: ${{ runner.temp }}/mono-move-e2e-perf-charts
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set +e
           python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_perf_test.py
@@ -98,6 +100,17 @@ jobs:
       - name: Write step summary
         if: always()
         run: cat "${{ runner.temp }}/mono-move-e2e-perf.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # The report links here by name; keep the two in sync.
+      - name: Upload per-block stage charts
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: mono-move-e2e-perf-charts
+          path: ${{ runner.temp }}/mono-move-e2e-perf-charts
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Post sticky PR comment
         # A read-only token cannot comment; don't fail the job over it.
