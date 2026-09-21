@@ -238,17 +238,19 @@ class CodexAgentSession:
         self._process: asyncio.subprocess.Process | None = None
         self._request_telemetry = request_telemetry
         self._turn_index = 0
+        self._plugin = plugin
+        self._mcp_config = mcp_config
+        self._mcp_proxy_socket = mcp_proxy_socket
         self._manifest = json.loads(
             (plugin / "move-flow-manifest.json").read_text(encoding="utf-8")
         )
-        self._write_config(plugin, mcp_config, mcp_proxy_socket)
+        self._write_config()
 
-    def _write_config(
-        self, plugin: Path, mcp_config: Path, mcp_proxy_socket: Path
-    ) -> None:
+    def _write_config(self) -> None:
+        """Restore the controller-owned configuration before every Codex process."""
         codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
         codex_home.mkdir(parents=True, exist_ok=True)
-        runtime = json.loads(mcp_config.read_text(encoding="utf-8"))
+        runtime = json.loads(self._mcp_config.read_text(encoding="utf-8"))
         if "move-flow" not in runtime.get("mcpServers", {}):
             raise RuntimeError("runtime MCP config lacks move-flow")
         tools = list(self._manifest["mcp_tools"])
@@ -281,7 +283,7 @@ class CodexAgentSession:
             'features.skill_mcp_dependency_install = false',
             '',
             '[[skills.config]]',
-            f"path = {json.dumps(str(plugin / 'skills/move-inf'))}",
+            f"path = {json.dumps(str(self._plugin / 'skills/move-inf'))}",
             'enabled = true',
             '',
             '[shell_environment_policy]',
@@ -289,7 +291,7 @@ class CodexAgentSession:
             '',
             '[mcp_servers.move-flow]',
             'command = "/usr/bin/python3"',
-            f"args = {json.dumps([mcp_client, str(mcp_proxy_socket)])}",
+            f"args = {json.dumps([mcp_client, str(self._mcp_proxy_socket)])}",
             f"enabled_tools = {json.dumps(tools)}",
             'required = true',
             'startup_timeout_sec = 30',
@@ -326,6 +328,10 @@ class CodexAgentSession:
             self._process.send_signal(signal.SIGINT)
 
     async def send(self, prompt: str) -> AgentTurn:
+        # The preceding agent turn can write CODEX_HOME. Codex rereads this
+        # file at process startup, so restore the pinned policy only after that
+        # turn has exited and immediately before launching its successor.
+        self._write_config()
         self._turn_index += 1
         telemetry_marker = (
             self._request_telemetry.begin_turn(self._turn_index)

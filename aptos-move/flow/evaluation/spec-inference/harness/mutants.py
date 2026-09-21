@@ -175,6 +175,105 @@ def _implementation_offset(baseline_text: str, candidate_text: str, at: int) -> 
     return None
 
 
+def _move_tokens_and_non_code_ranges(
+    source: str,
+) -> tuple[list[tuple[str, int, int]], list[tuple[int, int]]]:
+    """Tokenize enough Move to distinguish code from comments and strings."""
+    tokens: list[tuple[str, int, int]] = []
+    non_code: list[tuple[int, int]] = []
+    index = 0
+    while index < len(source):
+        if source.startswith("//", index):
+            end = source.find("\n", index + 2)
+            end = len(source) if end < 0 else end
+            non_code.append((index, end))
+            index = end
+        elif source.startswith("/*", index):
+            start = index
+            index += 2
+            depth = 1
+            while index < len(source) and depth:
+                if source.startswith("/*", index):
+                    depth += 1
+                    index += 2
+                elif source.startswith("*/", index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            non_code.append((start, index))
+        elif source[index] == '"':
+            start = index
+            index += 1
+            while index < len(source):
+                if source[index] == "\\":
+                    index = min(index + 2, len(source))
+                elif source[index] == '"':
+                    index += 1
+                    break
+                else:
+                    index += 1
+            non_code.append((start, index))
+        elif source[index].isalpha() or source[index] == "_":
+            start = index
+            index += 1
+            while index < len(source) and (
+                source[index].isalnum() or source[index] == "_"
+            ):
+                index += 1
+            tokens.append((source[start:index], start, index))
+        elif source[index] in "{};":
+            tokens.append((source[index], index, index + 1))
+            index += 1
+        else:
+            index += 1
+    return tokens, non_code
+
+
+def _non_implementation_ranges(source: str) -> list[tuple[int, int]]:
+    """Return comments, strings, and specification blocks in Move source."""
+    tokens, ranges = _move_tokens_and_non_code_ranges(source)
+    index = 0
+    while index < len(tokens):
+        token, start, _ = tokens[index]
+        if token != "spec":
+            index += 1
+            continue
+        opening = index + 1
+        while opening < len(tokens) and tokens[opening][0] not in ("{", ";"):
+            opening += 1
+        if opening >= len(tokens) or tokens[opening][0] != "{":
+            index += 1
+            continue
+        depth = 1
+        closing = opening + 1
+        while closing < len(tokens) and depth:
+            depth += tokens[closing][0] == "{"
+            depth -= tokens[closing][0] == "}"
+            closing += 1
+        if depth:
+            # Compilation will reject the unfinished block. Treat the rest as
+            # specification text so scoring never mutates uncertain source.
+            ranges.append((start, len(source)))
+            break
+        ranges.append((start, tokens[closing - 1][2]))
+        index = closing
+    return ranges
+
+
+def _implementation_occurrences(source: str, fragment: str) -> list[int]:
+    """Find exact fragment occurrences outside specs, comments, and strings."""
+    excluded = _non_implementation_ranges(source)
+    result = []
+    start = 0
+    while (found := source.find(fragment, start)) >= 0:
+        end = found + len(fragment)
+        if all(end <= low or found >= high for low, high in excluded):
+            result.append(found)
+        start = found + 1
+    return result
+
+
 def _anchored_fragment(pristine: str, case: dict[str, Any]) -> tuple[int, str]:
     """Recover the fragment a mutant rewrites, from the pristine source.
 
@@ -261,7 +360,12 @@ def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
         fragment, case["edit"], case["mutant_id"]
     )
     candidate_at = _implementation_offset(pristine, text, offset)
-    if candidate_at is not None and text.startswith(fragment, candidate_at):
+    implementation_fragments = _implementation_occurrences(text, fragment)
+    if (
+        candidate_at is not None
+        and candidate_at in implementation_fragments
+        and text.startswith(fragment, candidate_at)
+    ):
         mutated = _mutate(fragment, case["edit"], case["mutant_id"])
         source.write_text(
             text[:candidate_at] + mutated + text[candidate_at + len(fragment):],
@@ -276,19 +380,15 @@ def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
     # for specification text inserted around otherwise identical code.
     context_start = max(0, relative_at - 2)
     context_end = min(len(fragment), relative_at + length + 2)
-    pristine_context_at = offset + context_start
     original_context = fragment[context_start:context_end]
-    candidate_context_at = _implementation_offset(
-        pristine, text, pristine_context_at
-    )
-    if (
-        candidate_context_at is None
-        or not text.startswith(original_context, candidate_context_at)
-    ):
+    candidate_contexts = _implementation_occurrences(text, original_context)
+    if len(candidate_contexts) != 1:
         raise ValueError(
             f"cannot apply mutant {case['mutant_id']}: the implementation it "
-            f"rewrites is not present unchanged in {relative}"
+            f"rewrites is not present unchanged and unambiguously outside "
+            f"specifications in {relative}"
         )
+    candidate_context_at = candidate_contexts[0]
     candidate_at = candidate_context_at + relative_at - context_start
     source.write_text(
         text[:candidate_at] + replacement + text[candidate_at + length:],
