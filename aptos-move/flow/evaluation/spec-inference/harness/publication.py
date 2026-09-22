@@ -73,6 +73,8 @@ MOVE_PUNCTUATION = {
     ord(">"): b">",
     ord(","): b",",
     ord(";"): b";",
+    ord(":"): b":",
+    ord('"'): b'"',
 }
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}

@@ -106,6 +106,18 @@ class PublicationTest(unittest.TestCase):
                     archive.getnames(),
                 )
 
+    def test_builder_accepts_json_keyword_objects(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "analysis.json").write_text(
+                '{"script": {}, "module": {}, "address": {}, '
+                '"fun": {}, "struct": {}, "enum": {}}\n',
+                encoding="utf-8",
+            )
+            archive_path = root / "archive.tar.gz"
+            build_public_archive(root, archive_path, "round")
+            scan_public_archive(archive_path)
+
     def test_builder_rejects_raw_run_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
