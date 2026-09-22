@@ -369,28 +369,30 @@ def _check_content(
 
 
 def _decode_unicode_text_candidates(data: bytes) -> Iterator[bytes]:
-    if not data or data.count(b"\0") * 4 < len(data):
+    if data.count(b"\0") < 4:
         return
-    encodings: list[str] = []
-    if len(data) % 2 == 0:
-        if data[1::2].count(0) * 4 >= len(data):
-            encodings.append("utf-16-le")
-        if data[0::2].count(0) * 4 >= len(data):
-            encodings.append("utf-16-be")
-    if len(data) % 4 == 0:
-        if sum(data[index::4].count(0) for index in (1, 2, 3)) * 2 >= len(data):
-            encodings.append("utf-32-le")
-        if sum(data[index::4].count(0) for index in (0, 1, 2)) * 2 >= len(data):
-            encodings.append("utf-32-be")
     seen: set[bytes] = set()
-    for encoding in encodings:
-        try:
-            normalized = data.decode(encoding).encode("utf-8")
-        except UnicodeError:
-            continue
-        if normalized != data and normalized not in seen:
-            seen.add(normalized)
-            yield normalized
+    for unit_bytes, encodings in (
+        (2, ("utf-16-le", "utf-16-be")),
+        (4, ("utf-32-le", "utf-32-be")),
+    ):
+        for offset in range(unit_bytes):
+            end = len(data) - (len(data) - offset) % unit_bytes
+            if end - offset < unit_bytes:
+                continue
+            candidate = data[offset:end]
+            for encoding in encodings:
+                text = candidate.decode(encoding, errors="ignore")
+                ascii_text_bytes = sum(
+                    character in "\t\n\r" or " " <= character <= "~"
+                    for character in text
+                )
+                if ascii_text_bytes < MIN_BASE_N_BYTES:
+                    continue
+                normalized = text.encode("utf-8")
+                if normalized != data and normalized not in seen:
+                    seen.add(normalized)
+                    yield normalized
 
 
 def _check_encoded_content(

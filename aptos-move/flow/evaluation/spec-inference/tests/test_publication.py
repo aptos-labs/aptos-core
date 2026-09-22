@@ -973,13 +973,25 @@ class PublicationTest(unittest.TestCase):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_base64_encoded_utf16_move_source(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            source = "module 0x1::sample { public fun value(): u64 { 1 } }"
-            encoded = base64.b64encode(source.encode("utf-16-le"))
-            (root / "REPORT.md").write_bytes(encoded + b"\n")
-            with self.assertRaisesRegex(PublicationError, "Move source content"):
-                build_public_archive(root, root / "archive.tar.gz", "round")
+        source = "module 0x1::sample { public fun value(): u64 { 1 } }"
+        encoded_source = source.encode("utf-16-le")
+        payloads = {
+            "plain": encoded_source,
+            "prefixed": b"X" + encoded_source,
+            "suffixed": encoded_source + b"Y",
+        }
+        for encoding, payload in payloads.items():
+            with self.subTest(encoding=encoding):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    encoded = base64.b64encode(payload)
+                    (root / "REPORT.md").write_bytes(encoded + b"\n")
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
 
     def test_nested_json_escape_chain_normalizes_in_one_pass(self) -> None:
         chain = b"\\u005c" + b"u005c" * 1000 + b"u006d"
