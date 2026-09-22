@@ -22,6 +22,7 @@ from harness.publication import (
     _decode_html_entities,
     _decode_json_escapes,
     _decode_structured_content,
+    _scan_file,
     build_public_archive,
     scan_public_archive,
 )
@@ -166,6 +167,22 @@ def _scan_result_archives(results: Path) -> None:
             raise PublicationError(
                 f"{results}: aggregate result archives exceed "
                 f"{MAX_TRACKED_ARCHIVE_BYTES} bytes"
+            )
+    archive_set = set(archives)
+    legacy_set = {results / relative for relative in LEGACY_ARCHIVES}
+    for artifact in results.rglob("*"):
+        if (
+            not artifact.is_file()
+            or artifact in archive_set
+            or artifact in legacy_set
+        ):
+            continue
+        with artifact.open("rb") as stream:
+            _scan_file(
+                stream,
+                artifact.stat().st_size,
+                str(artifact),
+                check_source_paths=False,
             )
 
 
@@ -497,6 +514,19 @@ class PublicationTest(unittest.TestCase):
                             root, root / "archive.tar.gz", "round"
                         )
 
+    def test_builder_rejects_wrapped_base_n_after_prose(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b16encode(source)
+            wrapped = b"\n".join(
+                encoded[offset : offset + 2]
+                for offset in range(0, len(encoded), 2)
+            )
+            (root / "REPORT.md").write_bytes(b"report 2026\n" + wrapped + b"\n")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_delimited_base_n_move_source(self) -> None:
         source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
         encoders = {
@@ -564,6 +594,16 @@ class PublicationTest(unittest.TestCase):
                 for offset in range(0, len(encoded), 3)
             )
             (root / "REPORT.md").write_text(wrapped + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_zero_width_separated_base64(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            separated = "\u200b".join(encoded)
+            (root / "REPORT.md").write_text(separated + "\n", encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
@@ -773,6 +813,22 @@ class PublicationTest(unittest.TestCase):
                 (root / name).write_text(content, encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_scan_rejects_source_in_result_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "REPORT.md").write_text("aggregate report\n")
+            results = root / "results"
+            results.mkdir()
+            build_public_archive(source, results / "bundle.tar.gz", "round")
+            (results / "extra.md").write_text("module 0x1::sample {}\n")
+            with patch.dict(LEGACY_ARCHIVES, clear=True):
+                with self.assertRaisesRegex(
+                    PublicationError, "Move source content"
+                ):
+                    _scan_result_archives(results)
 
     def test_builder_rejects_source_path_in_allowed_file(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

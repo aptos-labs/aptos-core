@@ -315,15 +315,21 @@ def _safe_member_path(archive: Path, name: str) -> PurePosixPath:
     return path
 
 
-def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
+def _scan_file(
+    stream: BinaryIO,
+    size: int,
+    name: str,
+    *,
+    check_source_paths: bool = True,
+) -> tuple[bytes, str]:
     if size > MAX_MEMBER_BYTES:
         raise PublicationError(f"{name}: file exceeds {MAX_MEMBER_BYTES} bytes")
     data = stream.read(MAX_MEMBER_BYTES + 1)
     if len(data) != size:
         raise PublicationError(f"{name}: declared size does not match content")
     _validate_utf8(data, name)
-    _check_content(data, name)
-    _check_encoded_content(data, name)
+    _check_content(data, name, check_source_paths=check_source_paths)
+    _check_encoded_content(data, name, check_source_paths=check_source_paths)
     return data, hashlib.sha256(data).hexdigest()
 
 
@@ -338,8 +344,10 @@ def _validate_utf8(data: bytes, name: str) -> None:
         raise PublicationError(f"{name}: publication content is not UTF-8") from error
 
 
-def _check_content(data: bytes, name: str) -> None:
-    if SOURCE_PATH.search(data):
+def _check_content(
+    data: bytes, name: str, *, check_source_paths: bool = True
+) -> None:
+    if check_source_paths and SOURCE_PATH.search(data):
         raise PublicationError(f"{name}: contains a disallowed source path")
     if DIFF_LINE.search(data):
         raise PublicationError(f"{name}: contains unified-diff source content")
@@ -347,7 +355,9 @@ def _check_content(data: bytes, name: str) -> None:
         raise PublicationError(f"{name}: contains Move source content")
 
 
-def _check_encoded_content(data: bytes, name: str) -> None:
+def _check_encoded_content(
+    data: bytes, name: str, *, check_source_paths: bool = True
+) -> None:
     pending = [data]
     seen = {hashlib.sha256(data).digest()}
     candidate_count = 0
@@ -371,7 +381,9 @@ def _check_encoded_content(data: bytes, name: str) -> None:
     while pending:
         current = pending.pop()
         if current is not data:
-            _check_content(current, name)
+            _check_content(
+                current, name, check_source_paths=check_source_paths
+            )
         expanded = _decode_deflate(
             current, MAX_ENCODED_DECODE_BYTES - decoded_bytes, name
         )
@@ -445,6 +457,9 @@ def _contains_zip_end_record(data: bytes) -> bool:
 
 def _base64_candidates(data: bytes) -> Iterator[bytes]:
     yield from _coalesced_candidates(data, BASE64_CHUNK, MIN_BASE64_BYTES)
+    yield from _equal_width_fragment_candidates(
+        data, BASE64_CHUNK, MIN_BASE64_BYTES
+    )
 
 
 def _coalesced_candidates(
@@ -542,12 +557,27 @@ def _base_n_candidates(
     data: bytes, pattern: re.Pattern[bytes]
 ) -> Iterator[bytes]:
     yield from _coalesced_candidates(data, pattern, MIN_BASE_N_BYTES)
+    yield from _equal_width_fragment_candidates(data, pattern, MIN_BASE_N_BYTES)
+
+
+def _equal_width_fragment_candidates(
+    data: bytes, pattern: re.Pattern[bytes], min_bytes: int
+) -> Iterator[bytes]:
     fragments = bytearray()
+    fragment_width = 0
     fragment_count = 0
     for match in pattern.finditer(data):
-        fragments.extend(match.group(1))
+        token = match.group(1)
+        if fragment_count and len(token) != fragment_width:
+            if fragment_count > 1 and len(fragments) >= min_bytes:
+                yield bytes(fragments)
+            fragments.clear()
+            fragment_count = 0
+        if not fragment_count:
+            fragment_width = len(token)
+        fragments.extend(token)
         fragment_count += 1
-    if fragment_count > 1 and len(fragments) >= MIN_BASE_N_BYTES:
+    if fragment_count > 1 and len(fragments) >= min_bytes:
         yield bytes(fragments)
 
 
