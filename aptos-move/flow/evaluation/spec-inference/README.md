@@ -36,6 +36,23 @@ This file is the runbook. It says how to run things, not how they work.
 - `tests/` — dependency-free fixtures; `analysis/` — round analysis.
 - `evaluation-artifacts/` — generated round material, gitignored.
 
+## Publishing result archives
+
+Stage aggregate reports and tables in a new directory, then build and scan the
+archive through the publication helper:
+
+```text
+python3 -m harness.publication build \
+  --source PUBLIC-AGGREGATES --output results/ROUND.tar.gz --name ROUND
+python3 -m harness.publication scan results/ROUND.tar.gz
+```
+
+The helper accepts only the documented top-level aggregate files, creates and
+checks `SHA256SUMS`, and validates member names, types, sizes, and archive
+structure. Workspace diffs and other raw per-run artifacts are not part of the
+format. Construct result archives through this helper so they remain
+deterministic and compact.
+
 ## Environment
 
 The base package has no third-party dependencies. Claude runs use the optional

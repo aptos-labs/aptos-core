@@ -45,7 +45,6 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v4
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because python-lint-tests requires it.
       - name: Run general lints
@@ -53,8 +52,11 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - run: echo "Skipping general lints! Unrelated changes detected."
+      - name: Validate evaluation publication bundles
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+        run: |
+          cd aptos-move/flow/evaluation/spec-inference
+          python3 -W error::ResourceWarning -m unittest tests.test_publication
 
   # Run the crypto hasher domain separation checks
   rust-cryptohasher-domain-separation-check:

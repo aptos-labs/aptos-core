@@ -149,11 +149,9 @@ two process groups.
   [`corpus3.2-run9-codex-terra56-high.tar.gz`](corpus3.2-run9-codex-terra56-high.tar.gz).
 - Post-hoc recovery archive:
   [`corpus3.2-run9-codex-terra56-posthoc-disqualification.tar.gz`](corpus3.2-run9-codex-terra56-posthoc-disqualification.tar.gz),
-  SHA-256 `90fc9ef8ced7cd322f1548ef20219bdf7430248e7b0420e82f79b3adbb8e652c`.
+  SHA-256 `cf78a947074da91195b6154b82c35bec4c2c8c00a4126780d42a66a9578988fb`.
 - Combined comparison:
   [`corpus3.2-opus5-sol56-terra56-comparison.md`](corpus3.2-opus5-sol56-terra56-comparison.md).
 
-The original archive remains unchanged so its scheduling defect is auditable.
-The recovery archive contains the gate runner, compact summary, all per-cell
-gate results, the preserved first inconclusive score, retry events, and internal
-SHA-256 checksums.
+Both archives now use the compact aggregate publication format. The original
+scheduling defect remains documented in the report.

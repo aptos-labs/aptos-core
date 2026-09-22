@@ -16,3 +16,9 @@ runs:
         sudo apt-get install shellcheck --assume-yes --no-install-recommends
         shellcheck scripts/dev_setup.sh
       shell: bash
+
+    - name: Validate evaluation publication bundles
+      run: |
+        cd aptos-move/flow/evaluation/spec-inference
+        python3 -W error::ResourceWarning -m unittest tests.test_publication
+      shell: bash

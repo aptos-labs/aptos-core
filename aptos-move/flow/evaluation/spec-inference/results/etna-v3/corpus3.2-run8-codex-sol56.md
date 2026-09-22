@@ -183,11 +183,8 @@ replicas. Most tasks were 12/12 strict; the failures are concentrated as above.
   `5b2a6e2cdf55c78be8d0751d331bb734022d2b991342afbd7f3eeb12651460f2`.
 - Final audit: 240/240, zero issues and zero retained infrastructure-invalid cells.
 
-The companion archive contains this report, per-cell and per-turn tables,
-corrected cost and task-cluster analyses, all final mutant verdicts, schedule
-manifests, audit/config/apparatus data, operator events, and compact recovery
-evidence. Raw transcripts, workspaces, binaries, credentials, private source,
-and solver scratch are excluded.
+The companion archive uses the compact publication format for aggregate
+reports, tables, configuration, pricing, and audit data.
 
 The archive is [`corpus3.2-run8-codex-sol56.tar.gz`](corpus3.2-run8-codex-sol56.tar.gz); SHA-256
-`b2a532309fae78e9b8a7708ac146885d4a1a38dfa668c6e003a9b7de8f1be034`.
+`fd09909ea0b5aaac57d892e7692f70e43dbbc15704193bc864934b5a8da1865f`.
