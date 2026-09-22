@@ -128,6 +128,7 @@ MIN_FRAGMENT_DECODE_WORK = 64 * 1024
 MAX_FRAGMENT_DECODE_WORK = 16 * 1024 * 1024
 FRAGMENT_DECODE_WORK_FACTOR = 4
 MAX_FRAGMENT_COUNT = 65_536
+MAX_FRAGMENT_BUFFER_BYTES = 16 * 1024 * 1024
 MAX_GZIP_INPUT_OVERHEAD = 64 * 1024
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
@@ -370,9 +371,18 @@ def _check_content(
 
 
 def _decode_unicode_text_candidates(data: bytes) -> Iterator[bytes]:
+    seen: set[bytes] = set()
+    if b"+" in data and b"-" in data:
+        try:
+            normalized = data.decode("utf-7").encode("utf-8")
+        except UnicodeError:
+            pass
+        else:
+            if normalized != data:
+                seen.add(normalized)
+                yield normalized
     if data.count(b"\0") < 4:
         return
-    seen: set[bytes] = set()
     for unit_bytes, encodings in (
         (2, ("utf-16-le", "utf-16-be")),
         (4, ("utf-32-le", "utf-32-be")),
@@ -589,41 +599,37 @@ def _decode_base64(data: bytes) -> bytes | None:
 
 
 def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
-    for token in _base_n_candidates(data, BASE16_CHUNK, 2):
-        decoded = _decode_base16(token)
-        if decoded is not None:
-            yield decoded
-    yield from _decode_same_delimiter_candidates(
-        data, BASE16_CHUNK, MIN_BASE_N_BYTES, _decode_base16
+    encodings = (
+        (BASE16_CHUNK, 2, _decode_base16),
+        (BASE32_CHUNK, 4, _decode_base32),
+        (BASE32HEX_CHUNK, 4, _decode_base32hex),
+        (BASE85_CHUNK, 5, _decode_base85),
+        (ASCII85_CHUNK, 5, _decode_ascii85),
     )
-    for token in _base_n_candidates(data, BASE32_CHUNK, 4):
-        decoded = _decode_base32(token)
-        if decoded is not None:
-            yield decoded
-    yield from _decode_same_delimiter_candidates(
-        data, BASE32_CHUNK, MIN_BASE_N_BYTES, _decode_base32
-    )
-    for token in _base_n_candidates(data, BASE32HEX_CHUNK, 4):
-        decoded = _decode_base32hex(token)
-        if decoded is not None:
-            yield decoded
-    yield from _decode_same_delimiter_candidates(
-        data, BASE32HEX_CHUNK, MIN_BASE_N_BYTES, _decode_base32hex
-    )
-    for token in _base_n_candidates(data, BASE85_CHUNK, 5):
-        decoded = _decode_base85(token)
-        if decoded is not None:
-            yield decoded
-    yield from _decode_same_delimiter_candidates(
-        data, BASE85_CHUNK, MIN_BASE_N_BYTES, _decode_base85
-    )
-    for token in _base_n_candidates(data, ASCII85_CHUNK, 5):
-        decoded = _decode_ascii85(token)
-        if decoded is not None:
-            yield decoded
-    yield from _decode_same_delimiter_candidates(
-        data, ASCII85_CHUNK, MIN_BASE_N_BYTES, _decode_ascii85
-    )
+    for pattern, fragment_width, decode in encodings:
+        for token in _base_n_candidates(data, pattern, fragment_width):
+            decoded = decode(token)
+            if decoded is not None:
+                yield decoded
+        yield from _decode_same_delimiter_candidates(
+            data, pattern, MIN_BASE_N_BYTES, decode
+        )
+        for run, _fragment_ends in _variable_delimiter_fragment_runs(
+            data,
+            pattern,
+            MIN_BASE_N_BYTES,
+            require_monotonic=False,
+        ):
+            decoded = decode(run)
+            if decoded is not None and _decoded_candidate_is_textlike(decoded):
+                yield decoded
+
+
+def _decoded_candidate_is_textlike(data: bytes) -> bool:
+    if not data:
+        return False
+    printable = sum(byte in b"\t\n\r" or 32 <= byte <= 126 for byte in data)
+    return printable * 4 >= len(data) * 3 or data.count(b"\0") >= 4
 
 
 def _decode_base16(token: bytes) -> bytes | None:
@@ -700,7 +706,11 @@ def _same_delimiter_fragment_runs(
 
 
 def _variable_delimiter_fragment_runs(
-    data: bytes, pattern: re.Pattern[bytes], min_bytes: int
+    data: bytes,
+    pattern: re.Pattern[bytes],
+    min_bytes: int,
+    *,
+    require_monotonic: bool = True,
 ) -> Iterator[tuple[bytes, tuple[int, ...]]]:
     previous: re.Match[bytes] | None = None
     delimiter: bytes | None = None
@@ -722,7 +732,10 @@ def _variable_delimiter_fragment_runs(
             if (
                 varied
                 and len(fragments) >= min_bytes
-                and _fragment_widths_are_monotonic(fragment_ends)
+                and (
+                    not require_monotonic
+                    or _fragment_widths_are_monotonic(fragment_ends)
+                )
             ):
                 yield bytes(fragments), tuple(fragment_ends)
             delimiter = None
@@ -745,7 +758,10 @@ def _variable_delimiter_fragment_runs(
     if (
         varied
         and len(fragments) >= min_bytes
-        and _fragment_widths_are_monotonic(fragment_ends)
+        and (
+            not require_monotonic
+            or _fragment_widths_are_monotonic(fragment_ends)
+        )
     ):
         yield bytes(fragments), tuple(fragment_ends)
 
@@ -878,6 +894,7 @@ def _equal_width_fragment_candidates(
     fragment_widths: set[int],
 ) -> Iterator[bytes]:
     runs: dict[int, tuple[bytearray, int]] = {}
+    buffered_bytes = 0
     for match in pattern.finditer(data):
         token = match.group(1)
         token_width = len(token)
@@ -885,15 +902,20 @@ def _equal_width_fragment_candidates(
         for width, (fragments, fragment_count) in runs.items():
             if token_width <= width:
                 fragments.extend(token)
+                buffered_bytes += token_width
                 runs[width] = fragments, fragment_count + 1
             else:
                 if fragment_count > 1 and len(fragments) >= min_bytes:
                     yield bytes(fragments)
+                buffered_bytes -= len(fragments)
                 completed.append(width)
         for width in completed:
             del runs[width]
         if token_width in fragment_widths and token_width not in runs:
             runs[token_width] = bytearray(token), 1
+            buffered_bytes += token_width
+        if buffered_bytes > MAX_FRAGMENT_BUFFER_BYTES:
+            raise PublicationError("encoded content exceeds fragment buffer limit")
     for fragments, fragment_count in runs.values():
         if fragment_count > 1 and len(fragments) >= min_bytes:
             yield bytes(fragments)
