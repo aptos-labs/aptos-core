@@ -76,6 +76,16 @@ MOVE_PUNCTUATION = {
     ord(":"): b":",
     ord('"'): b'"',
 }
+JSON_SIMPLE_ESCAPES = {
+    ord('"'): ord('"'),
+    ord("\\"): ord("\\"),
+    ord("/"): ord("/"),
+    ord("b"): ord("\b"),
+    ord("f"): ord("\f"),
+    ord("n"): ord("\n"),
+    ord("r"): ord("\r"),
+    ord("t"): ord("\t"),
+}
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -255,13 +265,49 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
     data = stream.read(MAX_MEMBER_BYTES + 1)
     if len(data) != size:
         raise PublicationError(f"{name}: declared size does not match content")
+    _check_content(data, name)
+    if name.endswith(".json"):
+        decoded = _decode_json_escapes(data)
+        if decoded is not data:
+            _check_content(decoded, name)
+    return data, hashlib.sha256(data).hexdigest()
+
+
+def _check_content(data: bytes, name: str) -> None:
     if SOURCE_PATH.search(data):
         raise PublicationError(f"{name}: contains a disallowed source path")
     if DIFF_LINE.search(data):
         raise PublicationError(f"{name}: contains unified-diff source content")
     if _contains_move_source(data):
         raise PublicationError(f"{name}: contains Move source content")
-    return data, hashlib.sha256(data).hexdigest()
+
+
+def _decode_json_escapes(data: bytes) -> bytes:
+    if b"\\" not in data:
+        return data
+    output = bytearray()
+    index = 0
+    while index < len(data):
+        if data[index] != ord("\\") or index + 1 >= len(data):
+            output.append(data[index])
+            index += 1
+            continue
+        escaped = data[index + 1]
+        if escaped == ord("u") and index + 6 <= len(data):
+            digits = data[index + 2 : index + 6]
+            if all(_is_ascii_hex(byte) for byte in digits):
+                codepoint = int(digits, 16)
+                output.append(codepoint if codepoint <= 0x7F else ord(" "))
+                index += 6
+                continue
+        replacement = JSON_SIMPLE_ESCAPES.get(escaped)
+        if replacement is not None:
+            output.append(replacement)
+            index += 2
+            continue
+        output.append(data[index])
+        index += 1
+    return bytes(output)
 
 
 def _contains_move_source(data: bytes) -> bool:

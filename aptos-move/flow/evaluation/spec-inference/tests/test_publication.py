@@ -118,6 +118,27 @@ class PublicationTest(unittest.TestCase):
             build_public_archive(root, archive_path, "round")
             scan_public_archive(archive_path)
 
+    def test_builder_rejects_json_escaped_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = "module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = "".join(f"\\u{ord(character):04x}" for character in source)
+            (root / "analysis.json").write_text(
+                f'{{"payload": "{encoded}"}}\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_json_escaped_source_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "analysis.json").write_text(
+                '{"path": "sources\\/internal\\/implementation.move"}\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "disallowed source path"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_raw_run_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
