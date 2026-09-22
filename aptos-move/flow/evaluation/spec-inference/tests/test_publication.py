@@ -506,6 +506,28 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_concatenated_zlib_streams(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            compressed = zlib.compress(b"prefix") + zlib.compress(source)
+            encoded = base64.b64encode(compressed).decode("ascii")
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_preserves_compressed_bytes_before_text_decoding(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            prefix = hashlib.sha256(b"128").digest()
+            compressed = zlib.compress(prefix + source)
+            self.assertIn(b'\\"', compressed)
+            encoded = base64.b64encode(compressed).decode("ascii")
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_base64_encoded_raw_deflate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -535,6 +557,15 @@ class PublicationTest(unittest.TestCase):
             encoded = "".join(f"%{byte:02x}" for byte in source)
             (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_percent_encoded_gzip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = "".join(f"%{byte:02x}" for byte in gzip.compress(source))
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "binary container"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_bounds_base64_candidate_work(self) -> None:

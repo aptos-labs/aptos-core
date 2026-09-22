@@ -326,32 +326,42 @@ def _check_content(data: bytes, name: str) -> None:
 
 
 def _check_encoded_content(data: bytes, name: str) -> None:
-    pending = [(_decode_structured_content(data), False)]
+    pending = [data]
+    seen = {hashlib.sha256(data).digest()}
     candidate_count = 0
     decoded_bytes = 0
 
     def enqueue(decoded: bytes) -> None:
         nonlocal decoded_bytes
-        decoded_bytes += len(decoded)
-        if decoded_bytes > MAX_BASE64_DECODE_BYTES:
-            raise PublicationError(f"{name}: encoded content exceeds decode limit")
         if _contains_encoded_container(decoded):
             raise PublicationError(
                 f"{name}: encoded content contains a binary container"
             )
-        pending.append((_decode_structured_content(decoded), True))
+        digest = hashlib.sha256(decoded).digest()
+        if digest in seen:
+            return
+        decoded_bytes += len(decoded)
+        if decoded_bytes > MAX_BASE64_DECODE_BYTES:
+            raise PublicationError(f"{name}: encoded content exceeds decode limit")
+        seen.add(digest)
+        pending.append(decoded)
 
     while pending:
-        normalized, is_encoded = pending.pop()
-        if normalized is not data:
-            _check_content(normalized, name)
-        if is_encoded:
-            expanded = _decode_deflate(
-                normalized, MAX_BASE64_DECODE_BYTES - decoded_bytes, name
-            )
-            if expanded is not None:
-                enqueue(expanded)
-        for candidate in _base64_candidates(normalized):
+        current = pending.pop()
+        if current is not data:
+            _check_content(current, name)
+        expanded = _decode_deflate(
+            current, MAX_BASE64_DECODE_BYTES - decoded_bytes, name
+        )
+        if expanded is not None:
+            decoded, remainder = expanded
+            enqueue(decoded)
+            if remainder:
+                enqueue(remainder)
+        normalized = _decode_structured_content(current)
+        if normalized is not current:
+            enqueue(normalized)
+        for candidate in _base64_candidates(current):
             candidate_count += 1
             if candidate_count > MAX_BASE64_CANDIDATES:
                 raise PublicationError(
@@ -361,7 +371,7 @@ def _check_encoded_content(data: bytes, name: str) -> None:
             if decoded is None:
                 continue
             enqueue(decoded)
-        for decoded in _decode_base64_fragments(normalized):
+        for decoded in _decode_base64_fragments(current):
             candidate_count += 1
             if candidate_count > MAX_BASE64_CANDIDATES:
                 raise PublicationError(
@@ -451,7 +461,33 @@ def _decode_base64(data: bytes) -> bytes | None:
         return None
 
 
-def _decode_deflate(data: bytes, max_bytes: int, name: str) -> bytes | None:
+def _decode_deflate(
+    data: bytes, max_bytes: int, name: str
+) -> tuple[bytes, bytes] | None:
+    remaining = data
+    combined = bytearray()
+    stream_count = 0
+    while remaining:
+        decoded_stream = _decode_one_deflate(
+            remaining, max_bytes - len(combined), name
+        )
+        if decoded_stream is None:
+            break
+        decoded, unused = decoded_stream
+        combined.extend(decoded)
+        stream_count += 1
+        if not unused or len(unused) >= len(remaining):
+            remaining = unused
+            break
+        remaining = unused
+    if not stream_count:
+        return None
+    return bytes(combined), remaining
+
+
+def _decode_one_deflate(
+    data: bytes, max_bytes: int, name: str
+) -> tuple[bytes, bytes] | None:
     for window_bits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
         decoder = zlib.decompressobj(window_bits)
         try:
@@ -461,7 +497,7 @@ def _decode_deflate(data: bytes, max_bytes: int, name: str) -> bytes | None:
         if len(decoded) > max_bytes:
             raise PublicationError(f"{name}: encoded content exceeds decode limit")
         if decoder.eof:
-            return decoded
+            return decoded, decoder.unused_data
     return None
 
 
