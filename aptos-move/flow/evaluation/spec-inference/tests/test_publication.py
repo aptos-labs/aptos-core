@@ -85,6 +85,25 @@ class PublicationTest(unittest.TestCase):
                     archive.getnames(),
                 )
 
+    def test_builds_archive_with_ustar_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "REPORT.md").write_text("report\n", encoding="utf-8")
+            output = root / "long-name.tar.gz"
+            archive_name = "r" * 100
+            build_public_archive(source, output, archive_name)
+            scan_public_archive(output)
+            with tarfile.open(output, "r:gz") as archive:
+                self.assertEqual(
+                    [
+                        f"{archive_name}/REPORT.md",
+                        f"{archive_name}/SHA256SUMS",
+                    ],
+                    archive.getnames(),
+                )
+
     def test_builder_rejects_raw_run_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

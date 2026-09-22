@@ -219,6 +219,13 @@ def _publication_files(source: Path) -> list[Path]:
 def _validate_archive_name(name: str) -> None:
     if name in (".", "..") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
         raise PublicationError("archive name must be a safe path component")
+    for filename in (*PUBLIC_AGGREGATE_FILES, CHECKSUM_FILE):
+        try:
+            tarfile.TarInfo(f"{name}/{filename}").tobuf(format=tarfile.USTAR_FORMAT)
+        except ValueError as error:
+            raise PublicationError(
+                "archive name is too long for the publication format"
+            ) from error
 
 
 def _safe_member_path(archive: Path, name: str) -> PurePosixPath:
@@ -359,14 +366,10 @@ def _parse_tar_size(path: Path, field: bytes) -> int:
 
 
 def _check_canonical_tar_header(path: Path, block: bytes, size: int) -> None:
-    name_bytes, separator, padding = block[:100].partition(b"\0")
-    if not separator or padding.strip(b"\0"):
-        raise PublicationError(f"{path}: non-canonical tar header")
-    try:
-        name = name_bytes.decode("ascii")
-    except UnicodeDecodeError as error:
-        raise PublicationError(f"{path}: non-canonical tar header") from error
-    info = tarfile.TarInfo(name)
+    name = _decode_ustar_field(path, block[:100])
+    prefix = _decode_ustar_field(path, block[345:500])
+    full_name = f"{prefix}/{name}" if prefix else name
+    info = tarfile.TarInfo(full_name)
     info.size = size
     info.mode = 0o644
     info.mtime = 0
@@ -380,6 +383,17 @@ def _check_canonical_tar_header(path: Path, block: bytes, size: int) -> None:
         raise PublicationError(f"{path}: non-canonical tar header") from error
     if block != expected:
         raise PublicationError(f"{path}: non-canonical tar header")
+
+
+def _decode_ustar_field(path: Path, field: bytes) -> str:
+    content, separator, padding = field.partition(b"\0")
+    if separator and padding.strip(b"\0"):
+        raise PublicationError(f"{path}: non-canonical tar header")
+    encoded = content if separator else field
+    try:
+        return encoded.decode("ascii")
+    except UnicodeDecodeError as error:
+        raise PublicationError(f"{path}: non-canonical tar header") from error
 
 
 def _discard_exact(path: Path, stream: BinaryIO, size: int) -> None:
