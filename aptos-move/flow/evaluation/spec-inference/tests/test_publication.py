@@ -517,6 +517,17 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "binary container"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_base64_encoded_prefixed_gzip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(b"X" + gzip.compress(source)).decode(
+                "ascii"
+            )
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "binary container"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_base64_encoded_zlib(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -575,6 +586,35 @@ class PublicationTest(unittest.TestCase):
             root = Path(temporary)
             source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
             encoded = base64.b64encode(source).decode("ascii")
+            fragmented = ",".join(
+                encoded[offset : offset + 4]
+                for offset in range(0, len(encoded), 4)
+            )
+            (root / "REPORT.md").write_text(
+                fragmented + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_long_delimited_base64_fragments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            fragmented = ",".join(
+                encoded[offset : offset + 16]
+                for offset in range(0, len(encoded), 16)
+            )
+            (root / "REPORT.md").write_text(
+                fragmented + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_short_delimited_base64_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            encoded = base64.b64encode(b"module a {}").decode("ascii")
             fragmented = ",".join(
                 encoded[offset : offset + 4]
                 for offset in range(0, len(encoded), 4)
@@ -648,6 +688,20 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 PublicationError, "forbidden publication artifact"
             ):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_source_split_across_members(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fragments = {
+                "DEBRIEF.md": "module 0x1::sample",
+                "REPORT.md": " { public fun",
+                "mined.md": " value",
+                "status.md": "(): u64 { 1 } }",
+            }
+            for name, content in fragments.items():
+                (root / name).write_text(content, encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_source_path_in_allowed_file(self) -> None:

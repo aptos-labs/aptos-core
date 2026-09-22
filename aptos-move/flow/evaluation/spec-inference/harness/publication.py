@@ -112,20 +112,17 @@ BASE85_TOKEN = re.compile(
     + rb"])"
 )
 ASCII85_TOKEN = re.compile(br"(?<![!-u])([!-u]{20,})(?![!-u])")
-MAX_ENCODED_CANDIDATES = 32_768
+MAX_ENCODED_CANDIDATES = 131_072
 MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 ENCODED_CONTAINER_MAGICS = (
-    b"\x1f\x8b",
-    b"PK\x03\x04",
-    b"PK\x05\x06",
-    b"PK\x07\x08",
     b"7z\xbc\xaf\x27\x1c",
     b"Rar!\x1a\x07",
     b"BZh",
     b"\xfd7zXZ\x00",
     b"\x28\xb5\x2f\xfd",
 )
-ZIP_CONTAINER_MARKERS = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x06\x06")
+GZIP_MAGIC = b"\x1f\x8b"
+ZIP_END_MAGIC = b"PK\x05\x06"
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -140,9 +137,13 @@ def build_public_archive(source: Path, output: Path, archive_name: str) -> None:
     files = _publication_files(source)
     if not files:
         raise PublicationError(f"{source}: no public aggregate files")
+    aggregate_content = bytearray()
     for path in files:
         with path.open("rb") as stream:
-            _scan_file(stream, path.stat().st_size, path.name)
+            data, _ = _scan_file(stream, path.stat().st_size, path.name)
+        aggregate_content.extend(data)
+    _check_content(bytes(aggregate_content), str(source))
+    _check_encoded_content(bytes(aggregate_content), str(source))
 
     checksums = "".join(
         f"{_sha256_path(path)}  {path.name}\n" for path in files
@@ -195,6 +196,7 @@ def scan_public_archive(
     roots: set[str] = set()
     digests: dict[str, str] = {}
     checksum_data: bytes | None = None
+    aggregate_content = bytearray()
     total_bytes = 0
     file_count = 0
     try:
@@ -249,12 +251,16 @@ def scan_public_archive(
                 checksum_data = data
             else:
                 digests[name] = digest
+                aggregate_content.extend(data)
     if len(roots) != 1:
         raise PublicationError(f"{path}: archive must have exactly one root directory")
     if checksum_data is None:
         raise PublicationError(f"{path}: archive is missing {CHECKSUM_FILE}")
     if not digests:
         raise PublicationError(f"{path}: archive contains no public aggregate files")
+    combined = bytes(aggregate_content)
+    _check_content(combined, str(path))
+    _check_encoded_content(combined, str(path))
     _check_checksums(path, checksum_data, digests)
     return total_bytes
 
@@ -403,9 +409,37 @@ def _check_encoded_content(data: bytes, name: str) -> None:
 
 
 def _contains_encoded_container(data: bytes) -> bool:
-    return any(data.startswith(magic) for magic in ENCODED_CONTAINER_MAGICS) or any(
-        marker in data for marker in ZIP_CONTAINER_MARKERS
+    return (
+        any(data.startswith(magic) for magic in ENCODED_CONTAINER_MAGICS)
+        or _contains_gzip_stream(data)
+        or _contains_zip_end_record(data)
     )
+
+
+def _contains_gzip_stream(data: bytes) -> bool:
+    offset = data.find(GZIP_MAGIC)
+    while offset >= 0:
+        decoder = zlib.decompressobj(zlib.MAX_WBITS | 16)
+        try:
+            decoded = decoder.decompress(data[offset:], 1025)
+        except zlib.error:
+            offset = data.find(GZIP_MAGIC, offset + 1)
+            continue
+        if decoder.eof or len(decoded) > 1024:
+            return True
+        offset = data.find(GZIP_MAGIC, offset + 1)
+    return False
+
+
+def _contains_zip_end_record(data: bytes) -> bool:
+    offset = data.rfind(ZIP_END_MAGIC)
+    while offset >= 0:
+        if len(data) - offset >= 22:
+            comment_size = int.from_bytes(data[offset + 20 : offset + 22], "little")
+            if offset + 22 + comment_size <= len(data):
+                return True
+        offset = data.rfind(ZIP_END_MAGIC, 0, offset)
+    return False
 
 
 def _base64_candidates(data: bytes) -> Iterator[bytes]:
@@ -449,22 +483,16 @@ def _decode_base64_fragments(data: bytes) -> Iterator[bytes]:
     fragment_count = 0
     for match in BASE64_CHUNK.finditer(data):
         token = match.group(1)
-        if len(token) >= MIN_BASE64_BYTES:
-            if fragment_count > 1 and len(combined) >= MIN_BASE64_BYTES:
-                yield bytes(combined)
-            combined.clear()
-            fragment_count = 0
-            continue
         decoded = _decode_base64(token)
         if decoded is None:
-            if fragment_count > 1 and len(combined) >= MIN_BASE64_BYTES:
+            if fragment_count > 1:
                 yield bytes(combined)
             combined.clear()
             fragment_count = 0
         else:
             combined.extend(decoded)
             fragment_count += 1
-    if fragment_count > 1 and len(combined) >= MIN_BASE64_BYTES:
+    if fragment_count > 1:
         yield bytes(combined)
 
 
@@ -482,24 +510,28 @@ def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
         try:
             yield base64.b16decode(match.group(1), casefold=True)
         except (binascii.Error, ValueError):
-            pass
+            # Ordinary text overlaps this alphabet; invalid candidates are expected.
+            continue
     for match in BASE32_TOKEN.finditer(data):
         token = match.group(1)
         token += b"=" * (-len(token) % 8)
         try:
             yield base64.b32decode(token, casefold=True)
         except (binascii.Error, ValueError):
-            pass
+            # Ordinary text overlaps this alphabet; invalid candidates are expected.
+            continue
     for match in BASE85_TOKEN.finditer(data):
         try:
             yield base64.b85decode(match.group(1))
         except (binascii.Error, ValueError):
-            pass
+            # Ordinary text overlaps this alphabet; invalid candidates are expected.
+            continue
     for match in ASCII85_TOKEN.finditer(data):
         try:
             yield base64.a85decode(match.group(1), ignorechars=b"")
         except (binascii.Error, ValueError):
-            pass
+            # Ordinary text overlaps this alphabet; invalid candidates are expected.
+            continue
 
 
 def _decode_deflate(
