@@ -7,7 +7,7 @@ use crate::{
     compiled_script_paths, verify_checksums, BundleManifest, BYTECODE_DIR, METADATA_JSON,
     SCRIPTS_DIR, SUMMARY_DIR,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use sha3::{Digest, Sha3_256};
 use std::{
     collections::BTreeMap,
@@ -91,8 +91,14 @@ fn layout_errors(bundle_path: &Path) -> Vec<String> {
 /// blob), without needing a compiler.
 fn source_errors(bundle_path: &Path) -> Vec<String> {
     let mut errors = vec![];
-    let sources = files_by_stem(&bundle_path.join(SCRIPTS_DIR), "move");
-    let blobs = files_by_stem(&bundle_path.join(BYTECODE_DIR), "mv");
+    let sources = match files_by_stem(&bundle_path.join(SCRIPTS_DIR), "move") {
+        Ok(sources) => sources,
+        Err(e) => return vec![e.to_string()],
+    };
+    let blobs = match files_by_stem(&bundle_path.join(BYTECODE_DIR), "mv") {
+        Ok(blobs) => blobs,
+        Err(e) => return vec![e.to_string()],
+    };
     if sources.is_empty() {
         errors.push(format!("{}/ has no .move scripts", SCRIPTS_DIR));
     }
@@ -148,20 +154,27 @@ fn source_errors(bundle_path: &Path) -> Vec<String> {
 }
 
 /// The files with the given extension directly under `dir`, keyed by file
-/// stem; an absent or unreadable directory yields an empty map.
-fn files_by_stem(dir: &Path, extension: &str) -> BTreeMap<String, PathBuf> {
+/// stem; an absent or unreadable directory yields an empty map. Errors on a
+/// non-UTF-8 stem or two files sharing a stem, so no file is silently dropped.
+fn files_by_stem(dir: &Path, extension: &str) -> Result<BTreeMap<String, PathBuf>> {
     let Ok(entries) = fs::read_dir(dir) else {
-        return BTreeMap::new();
+        return Ok(BTreeMap::new());
     };
-    entries
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.extension().map(|x| x == extension).unwrap_or(false))
-        .filter_map(|p| {
-            let stem = p.file_stem()?.to_string_lossy().into_owned();
-            Some((stem, p))
-        })
-        .collect()
+    let mut out = BTreeMap::new();
+    for path in entries.flatten().map(|e| e.path()) {
+        if path.extension().map(|x| x == extension).unwrap_or(false) {
+            let stem = path
+                .file_stem()
+                .with_context(|| format!("no file stem: {}", path.display()))?
+                .to_str()
+                .with_context(|| format!("non-UTF-8 file name in bundle: {}", path.display()))?
+                .to_owned();
+            if out.insert(stem.clone(), path).is_some() {
+                bail!("two files resolve to the same stem: {}", stem);
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// The execution hash stamped as the script's first line by generate-bundle.
