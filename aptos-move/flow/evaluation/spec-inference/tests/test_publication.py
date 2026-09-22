@@ -105,9 +105,27 @@ def _file_header(path: Path) -> bytes:
 
 
 def _is_archive_header(header: bytes) -> bool:
-    return header[257:262] == b"ustar" or any(
+    return _has_tar_checksum(header) or any(
         header.startswith(magic) for magic in UNSUPPORTED_ARCHIVE_MAGICS
     )
+
+
+def _has_tar_checksum(header: bytes) -> bool:
+    if len(header) < 512:
+        return False
+    digits = header[148:156].strip(b"\0 ")
+    if not digits:
+        return False
+    try:
+        stored_checksum = int(digits, 8)
+    except ValueError:
+        return False
+    checksum_header = header[:148] + b" " * 8 + header[156:512]
+    unsigned_checksum = sum(checksum_header)
+    signed_checksum = sum(
+        byte if byte < 128 else byte - 256 for byte in checksum_header
+    )
+    return stored_checksum in (unsigned_checksum, signed_checksum)
 
 
 def _scan_result_archives(results: Path) -> None:
@@ -164,6 +182,21 @@ class PublicationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             results = Path(temporary)
             (results / "archive.zip").write_bytes(b"PK\x03\x04")
+            with self.assertRaisesRegex(
+                PublicationError, "unsupported result archive"
+            ):
+                _result_archives(results)
+
+    def test_rejects_v7_tar_with_opaque_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            info = tarfile.TarInfo("source.move")
+            header = bytearray(info.tobuf(format=tarfile.USTAR_FORMAT))
+            header[257:265] = b"\0" * 8
+            header[148:156] = b" " * 8
+            checksum = sum(header)
+            header[148:156] = f"{checksum:06o}\0 ".encode()
+            (results / "opaque.data").write_bytes(header + bytes(1024))
             with self.assertRaisesRegex(
                 PublicationError, "unsupported result archive"
             ):
