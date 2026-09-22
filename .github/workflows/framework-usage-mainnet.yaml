@@ -127,6 +127,7 @@ jobs:
     needs: [prepare-range, collect]
     if: ${{ !cancelled() && needs.collect.result == 'success' && inputs.DRY_RUN == false }}
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Post published report to #feed-move-alerts
         continue-on-error: true
