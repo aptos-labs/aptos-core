@@ -8,6 +8,7 @@ when tracked bundles are tested.
 from __future__ import annotations
 
 import argparse
+import codecs
 import gzip
 import hashlib
 import io
@@ -265,12 +266,28 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
     data = stream.read(MAX_MEMBER_BYTES + 1)
     if len(data) != size:
         raise PublicationError(f"{name}: declared size does not match content")
+    _validate_utf8(data, name)
     _check_content(data, name)
     if name.endswith(".json"):
-        decoded = _decode_json_escapes(data)
-        if decoded is not data:
+        decoded = data
+        while True:
+            normalized = _decode_json_escapes(decoded)
+            if normalized is decoded:
+                break
+            decoded = normalized
             _check_content(decoded, name)
     return data, hashlib.sha256(data).hexdigest()
+
+
+def _validate_utf8(data: bytes, name: str) -> None:
+    decoder = codecs.getincrementaldecoder("utf-8")("strict")
+    try:
+        view = memoryview(data)
+        for offset in range(0, len(data), 1024 * 1024):
+            decoder.decode(view[offset : offset + 1024 * 1024], final=False)
+        decoder.decode(b"", final=True)
+    except UnicodeDecodeError as error:
+        raise PublicationError(f"{name}: publication content is not UTF-8") from error
 
 
 def _check_content(data: bytes, name: str) -> None:
@@ -287,6 +304,7 @@ def _decode_json_escapes(data: bytes) -> bytes:
         return data
     output = bytearray()
     index = 0
+    changed = False
     while index < len(data):
         if data[index] != ord("\\") or index + 1 >= len(data):
             output.append(data[index])
@@ -299,15 +317,17 @@ def _decode_json_escapes(data: bytes) -> bytes:
                 codepoint = int(digits, 16)
                 output.append(codepoint if codepoint <= 0x7F else ord(" "))
                 index += 6
+                changed = True
                 continue
         replacement = JSON_SIMPLE_ESCAPES.get(escaped)
         if replacement is not None:
             output.append(replacement)
             index += 2
+            changed = True
             continue
         output.append(data[index])
         index += 1
-    return bytes(output)
+    return bytes(output) if changed else data
 
 
 def _contains_move_source(data: bytes) -> bool:

@@ -139,6 +139,27 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "disallowed source path"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_nested_json_escaped_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = "module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = "".join(f"\\u{ord(character):04x}" for character in source)
+            nested = encoded.replace("\\", "\\\\")
+            (root / "analysis.json").write_text(
+                f'{{"payload": "{nested}"}}\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_utf16_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "analysis.json").write_bytes(
+                '{"payload": "module 0x1::sample {}"}\n'.encode("utf-16")
+            )
+            with self.assertRaisesRegex(PublicationError, "UTF-8"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_raw_run_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
