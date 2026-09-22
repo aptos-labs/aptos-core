@@ -269,12 +269,8 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
     _validate_utf8(data, name)
     _check_content(data, name)
     if name.endswith(".json"):
-        decoded = data
-        while True:
-            normalized = _decode_json_escapes(decoded)
-            if normalized is decoded:
-                break
-            decoded = normalized
+        decoded = _decode_json_escapes(data)
+        if decoded is not data:
             _check_content(decoded, name)
     return data, hashlib.sha256(data).hexdigest()
 
@@ -306,28 +302,53 @@ def _decode_json_escapes(data: bytes) -> bytes:
     index = 0
     changed = False
     while index < len(data):
-        if data[index] != ord("\\") or index + 1 >= len(data):
+        decoded = None
+        if data[index] == ord("\\"):
+            decoded = _decode_json_escape_body(data, index + 1)
+        if decoded is None:
             output.append(data[index])
             index += 1
-            continue
-        escaped = data[index + 1]
-        if escaped == ord("u") and index + 6 <= len(data):
-            digits = data[index + 2 : index + 6]
-            if all(_is_ascii_hex(byte) for byte in digits):
-                codepoint = int(digits, 16)
-                output.append(codepoint if codepoint <= 0x7F else ord(" "))
-                index += 6
-                changed = True
-                continue
-        replacement = JSON_SIMPLE_ESCAPES.get(escaped)
-        if replacement is not None:
+        else:
+            replacement, index = decoded
             output.append(replacement)
-            index += 2
             changed = True
-            continue
-        output.append(data[index])
-        index += 1
+        while True:
+            replacement: int | None = None
+            escape_size = 0
+            if len(output) >= 2 and output[-2] == ord("\\"):
+                replacement = JSON_SIMPLE_ESCAPES.get(output[-1])
+                escape_size = 2
+            if (
+                replacement is None
+                and len(output) >= 6
+                and output[-6] == ord("\\")
+                and output[-5] == ord("u")
+                and all(_is_ascii_hex(digit) for digit in output[-4:])
+            ):
+                codepoint = int(bytes(output[-4:]), 16)
+                replacement = codepoint if codepoint <= 0x7F else ord(" ")
+                escape_size = 6
+            if replacement is None:
+                break
+            del output[-escape_size:]
+            output.append(replacement)
+            changed = True
     return bytes(output) if changed else data
+
+
+def _decode_json_escape_body(data: bytes, index: int) -> tuple[int, int] | None:
+    if index >= len(data):
+        return None
+    escaped = data[index]
+    if escaped == ord("u") and index + 5 <= len(data):
+        digits = data[index + 1 : index + 5]
+        if all(_is_ascii_hex(byte) for byte in digits):
+            codepoint = int(digits, 16)
+            return (codepoint if codepoint <= 0x7F else ord(" "), index + 5)
+    replacement = JSON_SIMPLE_ESCAPES.get(escaped)
+    if replacement is None:
+        return None
+    return replacement, index + 1
 
 
 def _contains_move_source(data: bytes) -> bool:

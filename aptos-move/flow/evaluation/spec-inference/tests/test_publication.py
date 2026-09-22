@@ -14,6 +14,7 @@ from typing import Iterator
 from harness.publication import (
     PublicationError,
     _contains_move_source,
+    _decode_json_escapes,
     build_public_archive,
     scan_public_archive,
 )
@@ -159,6 +160,15 @@ class PublicationTest(unittest.TestCase):
             )
             with self.assertRaisesRegex(PublicationError, "UTF-8"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_nested_json_escape_chain_normalizes_in_one_pass(self) -> None:
+        chain = b"\\u005c" + b"u005c" * 1000 + b"u006d"
+        self.assertEqual(b"m", _decode_json_escapes(chain))
+
+        encoded_components = (
+            b"\\u005c\\u0075\\u0030\\u0030\\u0036\\u0064"
+        )
+        self.assertEqual(b"m", _decode_json_escapes(encoded_components))
 
     def test_builder_rejects_raw_run_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
