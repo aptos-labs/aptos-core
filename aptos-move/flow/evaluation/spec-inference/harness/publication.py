@@ -323,6 +323,7 @@ def _decode_encoded_content(
     if not ((decode_json and b"\\" in data) or (decode_html and b"&" in data)):
         return data
     output = bytearray()
+    entity_offsets = bytearray()
     entity_start: int | None = None
     index = 0
     changed = False
@@ -342,7 +343,7 @@ def _decode_encoded_content(
             replacement, index = decoded
             changed = True
         entity_start = _append_encoded_replacement(
-            output, entity_start, replacement
+            output, entity_offsets, entity_start, replacement
         )
 
         while True:
@@ -352,7 +353,10 @@ def _decode_encoded_content(
                     escape_start, replacement = json_suffix
                     del output[escape_start:]
                     entity_start = _append_encoded_replacement(
-                        output, entity_start, bytes((replacement,))
+                        output,
+                        entity_offsets,
+                        entity_start,
+                        bytes((replacement,)),
                     )
                     changed = True
                     continue
@@ -360,11 +364,12 @@ def _decode_encoded_content(
                 html_suffix = _decode_html_entity_body(output, entity_start + 1)
                 if html_suffix is not None and html_suffix[1] == len(output):
                     replacement, _ = html_suffix
-                    previous_start = output.rfind(b"&", 0, entity_start)
                     del output[entity_start:]
-                    entity_start = previous_start if previous_start >= 0 else None
+                    entity_start = _pop_entity_offset(
+                        entity_offsets, entity_start
+                    )
                     entity_start = _append_encoded_replacement(
-                        output, entity_start, replacement
+                        output, entity_offsets, entity_start, replacement
                     )
                     changed = True
                     continue
@@ -404,14 +409,50 @@ def _decode_json_escape_suffix(data: bytearray) -> tuple[int, int] | None:
 
 
 def _append_encoded_replacement(
-    output: bytearray, entity_start: int | None, replacement: bytes
+    output: bytearray,
+    entity_offsets: bytearray,
+    entity_start: int | None,
+    replacement: bytes,
 ) -> int | None:
     offset = len(output)
     output.extend(replacement)
-    last_ampersand = replacement.rfind(b"&")
-    if last_ampersand >= 0:
-        return offset + last_ampersand
+    if b"&" not in replacement:
+        return entity_start
+    for relative in _find_ampersands(replacement):
+        position = offset + relative
+        delta = position + 1 if entity_start is None else position - entity_start
+        _push_offset_delta(entity_offsets, delta)
+        entity_start = position
     return entity_start
+
+
+def _find_ampersands(data: bytes) -> Iterator[int]:
+    index = data.find(b"&")
+    while index >= 0:
+        yield index
+        index = data.find(b"&", index + 1)
+
+
+def _push_offset_delta(encoded: bytearray, delta: int) -> None:
+    while delta >= 0x80:
+        encoded.append((delta & 0x7F) | 0x80)
+        delta >>= 7
+    encoded.append(delta)
+
+
+def _pop_entity_offset(encoded: bytearray, current: int) -> int | None:
+    end = len(encoded)
+    start = end - 1
+    while start > 0 and encoded[start - 1] & 0x80:
+        start -= 1
+    delta = 0
+    shift = 0
+    for byte in encoded[start:end]:
+        delta |= (byte & 0x7F) << shift
+        shift += 7
+    del encoded[start:end]
+    previous = current - delta
+    return previous if previous >= 0 else None
 
 
 def _decode_html_entity_body(

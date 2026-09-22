@@ -188,6 +188,13 @@ class PublicationTest(unittest.TestCase):
         chain = b"&#92;u0026#92;" * 1000 + b"u006d"
         self.assertEqual(b"m", _decode_structured_content(chain))
 
+    def test_repeated_entities_after_large_prefix_normalize(self) -> None:
+        prefix = b"x" * 4096
+        content = prefix + b"\\u0026#111;" * 1000
+        self.assertEqual(
+            prefix + b"o" * 1000, _decode_structured_content(content)
+        )
+
     def test_html_entity_scan_has_bounded_state_memory(self) -> None:
         content = b"&" * (1024 * 1024)
         tracemalloc.start()
