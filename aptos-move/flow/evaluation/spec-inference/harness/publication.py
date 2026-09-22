@@ -425,30 +425,24 @@ def _base64_candidates(data: bytes) -> Iterator[bytes]:
 def _decode_base64_fragments(data: bytes) -> Iterator[bytes]:
     combined = bytearray()
     fragment_count = 0
-    saw_padding = False
-    previous_end = 0
     for match in BASE64_CHUNK.finditer(data):
-        separated = fragment_count and not BASE64_WHITESPACE.fullmatch(
-            data, previous_end, match.start()
-        )
-        if separated:
-            if fragment_count > 1 and saw_padding:
+        token = match.group(1)
+        if len(token) >= MIN_BASE64_BYTES:
+            if fragment_count > 1 and len(combined) >= MIN_BASE64_BYTES:
                 yield bytes(combined)
             combined.clear()
             fragment_count = 0
-            saw_padding = False
-        token = match.group(1)
+            continue
         decoded = _decode_base64(token)
         if decoded is None:
+            if fragment_count > 1 and len(combined) >= MIN_BASE64_BYTES:
+                yield bytes(combined)
             combined.clear()
             fragment_count = 0
-            saw_padding = False
         else:
             combined.extend(decoded)
             fragment_count += 1
-            saw_padding = saw_padding or b"=" in token
-        previous_end = match.end()
-    if fragment_count > 1 and saw_padding:
+    if fragment_count > 1 and len(combined) >= MIN_BASE64_BYTES:
         yield bytes(combined)
 
 
