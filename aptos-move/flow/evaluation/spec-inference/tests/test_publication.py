@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import bz2
 import gzip
 import hashlib
 import io
@@ -654,6 +655,15 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "binary container"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_base64_encoded_prefixed_bzip2(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(b"X" + bz2.compress(source))
+            (root / "REPORT.md").write_bytes(encoded + b"\n")
+            with self.assertRaisesRegex(PublicationError, "binary container"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_base64_encoded_prefixed_gzip(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -710,10 +720,12 @@ class PublicationTest(unittest.TestCase):
     def test_builder_rejects_prefixed_deflate_streams(self) -> None:
         source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
         compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+        raw_stream = compressor.compress(source) + compressor.flush()
         streams = {
             "zlib": b"X" + zlib.compress(source),
             "zlib-after-long-prefix": b"X" * 65 + zlib.compress(source),
-            "raw": b"X" + compressor.compress(source) + compressor.flush(),
+            "raw": b"X" + raw_stream,
+            "raw-after-long-prefix": b"X" * 65 + raw_stream,
         }
         for encoding, payload in streams.items():
             with self.subTest(encoding=encoding):

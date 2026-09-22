@@ -121,14 +121,18 @@ MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 MAX_CONTAINER_PROBES = 4096
 MAX_DEFLATE_PREFIX_BYTES = 64
 MAX_DEFLATE_PROBE_BYTES = 8
+MIN_RAW_DEFLATE_PROBE_WORK = 64 * 1024
+MAX_RAW_DEFLATE_PROBE_WORK = 16 * 1024 * 1024
+RAW_DEFLATE_PROBE_WORK_FACTOR = 4
+RAW_DEFLATE_PROBE_CHUNK_BYTES = 8
 MAX_GZIP_INPUT_OVERHEAD = 64 * 1024
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
     b"Rar!\x1a\x07",
-    b"BZh",
     b"\xfd7zXZ\x00",
     b"\x28\xb5\x2f\xfd",
 )
+BZIP2_MAGIC = re.compile(br"BZh[1-9]")
 GZIP_MAGIC = b"\x1f\x8b"
 ZIP_END_MAGIC = b"PK\x05\x06"
 _ZERO_BLOCK = b"\0" * 512
@@ -392,7 +396,10 @@ def _check_encoded_content(
                 current, name, check_source_paths=check_source_paths
             )
         for decoded, remainder in _decode_deflate_candidates(
-            current, MAX_ENCODED_DECODE_BYTES - decoded_bytes, name
+            current,
+            MAX_ENCODED_DECODE_BYTES - decoded_bytes,
+            name,
+            scan_raw=current is not data,
         ):
             enqueue(decoded)
             if remainder:
@@ -428,7 +435,8 @@ def _check_encoded_content(
 
 def _contains_encoded_container(data: bytes) -> bool:
     return (
-        any(data.startswith(magic) for magic in ENCODED_CONTAINER_MAGICS)
+        any(magic in data for magic in ENCODED_CONTAINER_MAGICS)
+        or BZIP2_MAGIC.search(data) is not None
         or _contains_gzip_stream(data)
         or _contains_zip_end_record(data)
     )
@@ -691,7 +699,7 @@ def _equal_width_fragment_candidates(
 
 
 def _decode_deflate_candidates(
-    data: bytes, max_bytes: int, name: str
+    data: bytes, max_bytes: int, name: str, *, scan_raw: bool
 ) -> Iterator[tuple[bytes, bytes]]:
     max_prefix = min(len(data), MAX_DEFLATE_PREFIX_BYTES)
     for offset in range(max_prefix + 1):
@@ -712,6 +720,10 @@ def _decode_deflate_candidates(
         )
         if decoded is not None:
             yield decoded
+    if scan_raw:
+        yield from _decode_raw_deflate_candidates(
+            data, max_prefix + 1, max_bytes, name
+        )
 
 
 def _is_zlib_header(data: bytes, offset: int) -> bool:
@@ -726,6 +738,70 @@ def _is_zlib_header(data: bytes, offset: int) -> bool:
 
 def _is_plausible_zlib_stream(data: bytes, offset: int) -> bool:
     decoder = zlib.decompressobj(zlib.MAX_WBITS)
+    end = min(len(data), offset + MAX_DEFLATE_PROBE_BYTES)
+    try:
+        decoder.decompress(memoryview(data)[offset:end], 1)
+    except zlib.error:
+        return False
+    return True
+
+
+def _decode_raw_deflate_candidates(
+    data: bytes, start: int, max_bytes: int, name: str
+) -> Iterator[tuple[bytes, bytes]]:
+    view = memoryview(data)
+    work = 0
+    work_limit = max(
+        MIN_RAW_DEFLATE_PROBE_WORK,
+        len(data) * RAW_DEFLATE_PROBE_WORK_FACTOR,
+        min(len(data) * len(data), MAX_RAW_DEFLATE_PROBE_WORK),
+    )
+    for offset in range(start, len(data)):
+        if not _is_plausible_raw_deflate_stream(data, offset):
+            continue
+        decoder = zlib.decompressobj(-zlib.MAX_WBITS)
+        decoded = bytearray()
+        cursor = offset
+        while cursor < len(data):
+            end = min(
+                len(data), cursor + RAW_DEFLATE_PROBE_CHUNK_BYTES
+            )
+            work += end - cursor
+            if work > work_limit:
+                raise PublicationError(
+                    f"{name}: encoded content exceeds raw DEFLATE probe limit"
+                )
+            try:
+                output = decoder.decompress(
+                    view[cursor:end], max_bytes - len(decoded) + 1
+                )
+            except zlib.error:
+                break
+            decoded.extend(output)
+            if len(decoded) > max_bytes:
+                raise PublicationError(
+                    f"{name}: encoded content exceeds decode limit"
+                )
+            if decoder.eof:
+                yield bytes(decoded), b""
+                break
+            if decoder.unconsumed_tail:
+                cursor = end - len(decoder.unconsumed_tail)
+            else:
+                cursor = end
+
+
+def _is_plausible_raw_deflate_stream(data: bytes, offset: int) -> bool:
+    block_type = data[offset] >> 1 & 0x03
+    if block_type == 0:
+        if offset + 5 > len(data):
+            return False
+        length = int.from_bytes(data[offset + 1 : offset + 3], "little")
+        complement = int.from_bytes(data[offset + 3 : offset + 5], "little")
+        return length ^ complement == 0xFFFF and offset + 5 + length <= len(data)
+    if block_type == 3:
+        return False
+    decoder = zlib.decompressobj(-zlib.MAX_WBITS)
     end = min(len(data), offset + MAX_DEFLATE_PROBE_BYTES)
     try:
         decoder.decompress(memoryview(data)[offset:end], 1)
