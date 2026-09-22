@@ -402,7 +402,7 @@ The usage workflow therefore follows these rules:
 
 ## Distributed Execution and CI
 
-The workflow is scheduled weekly and can also be triggered manually. It is
+The workflow is scheduled every two weeks and can also be triggered manually. It is
 separate from replay verify, for example:
 
 ```text
@@ -412,19 +412,21 @@ separate from replay verify, for example:
 
 Inputs mirror replay verify:
 
-- `PREVIOUS_WEEK`
+- `PREVIOUS_THREE_WEEKS`
 - `IMAGE_TAG`
 - `START_VERSION` and `END_VERSION`
 - `START_TIME` and `END_TIME`
 - `DRY_RUN`
 
-Version and time inputs remain mutually exclusive. `PREVIOUS_WEEK` cannot be
-combined with an explicit range. UTC times are resolved to versions before
-tasks are created, and the resolved range is included in the manifest. Aptos's
-PIES scheduler dispatches the workflow with `PREVIOUS_WEEK=true` every Monday
-at 06:17 UTC, after allowing archive snapshots and images to settle. Scheduled
-runs analyze the previous completed UTC week. Using fixed week boundaries makes
-successive reports comparable and prevents scheduler delays from shifting the
+Version and time inputs remain mutually exclusive. `PREVIOUS_THREE_WEEKS`
+cannot be combined with an explicit range. UTC times are resolved to versions
+before tasks are created, and the resolved range is included in the manifest.
+Aptos's PIES scheduler dispatches the workflow with
+`PREVIOUS_THREE_WEEKS=true` every 336 hours. Scheduled runs analyze the
+previous three completed UTC weeks, from 00:00 UTC Monday three weeks earlier
+through 00:00 UTC on the dispatch week's Monday. The two-week cadence leaves
+one week of overlap between successive reports. Using fixed week boundaries
+makes reports comparable and prevents scheduler delays from shifting the
 intended observation window.
 
 The replay scheduler is extended with a framework-usage worker mode while
@@ -433,11 +435,11 @@ workers upload deterministic result shards to a run-specific prefix in the
 private GCS bucket configured by the `FRAMEWORK_USAGE_BUCKET` Actions variable.
 The workflow requires public access prevention and uniform bucket-level access
 before scheduling workers. The variable contains the bare bucket name. The
-replay worker's Kubernetes service account needs object-create access, and the
-GitHub Actions identity needs bucket metadata, object-list, and object-read
-access. A bounded Kubernetes pod-log transport remains available for direct
-development runs of at most 10,000 transactions, but it is not used by the
-scheduled workflow.
+replay worker's Kubernetes service account needs object-create and object-read
+access. The GitHub Actions identity needs bucket metadata plus object-list,
+object-read, and object-delete access. A bounded Kubernetes pod-log transport
+remains available for direct development runs of at most 10,000 transactions,
+but it is not used by the scheduled workflow.
 
 After every task succeeds, the GitHub runner downloads and merges the shards.
 The merge step rejects:
@@ -447,6 +449,11 @@ The merge step rejects:
 - overlapping ranges
 - unexplained gaps
 - failed replay verification
+
+After the report is published and its temporary GCS shards are deleted, the
+workflow posts a best-effort FYI with the stable HTML report link to
+`#feed-move-alerts`. Notification failures do not fail an otherwise successful
+analysis run.
 
 The final private report contains:
 
@@ -469,10 +476,11 @@ the rendered HTML from the latest successful run. Failed scheduled runs leave
 the previous successful report in place. The merged JSON records its UTC
 generation timestamp, which the HTML displays in its header.
 
-CI cleanup always removes pods and temporary PVCs. Raw result shards are
-retained in GCS, and final reports remain available through the private Pages
-site. Any future retention policy must preserve the published historical
-reports and be explicitly approved.
+After the merged report is committed and pushed to private Pages, CI deletes
+that run's temporary GCS shards. A publication failure leaves its shards in GCS
+for diagnosis. CI cleanup always removes pods and temporary PVCs. Final merged
+JSON and HTML reports, including historical run-specific reports, remain
+available through the private Pages site.
 
 ## Report Interpretation
 
