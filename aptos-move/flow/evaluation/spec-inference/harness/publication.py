@@ -113,8 +113,10 @@ BASE85_CHUNK = re.compile(
 )
 ASCII85_CHUNK = re.compile(br"(?<![!-uz])([!-uz]+)(?![!-uz])")
 MIN_BASE_N_BYTES = 8
-MAX_ENCODED_CANDIDATES = 393_216
+MAX_ENCODED_CANDIDATES = 2_097_152
 MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
+MAX_CONTAINER_PROBES = 4096
+MAX_DEFLATE_PREFIX_BYTES = 64
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
     b"Rar!\x1a\x07",
@@ -430,11 +432,16 @@ def _contains_encoded_container(data: bytes) -> bool:
 
 
 def _contains_gzip_stream(data: bytes) -> bool:
+    view = memoryview(data)
     offset = data.find(GZIP_MAGIC)
+    probe_count = 0
     while offset >= 0:
+        probe_count += 1
+        if probe_count > MAX_CONTAINER_PROBES:
+            return True
         decoder = zlib.decompressobj(zlib.MAX_WBITS | 16)
         try:
-            decoded = decoder.decompress(data[offset:], 1025)
+            decoded = decoder.decompress(view[offset:], 1025)
         except zlib.error:
             offset = data.find(GZIP_MAGIC, offset + 1)
             continue
@@ -560,6 +567,34 @@ def _base_n_candidates(
     yield from _equal_width_fragment_candidates(
         data, pattern, MIN_BASE_N_BYTES, {fragment_width}
     )
+    yield from _same_delimiter_fragment_candidates(
+        data, pattern, MIN_BASE_N_BYTES
+    )
+
+
+def _same_delimiter_fragment_candidates(
+    data: bytes, pattern: re.Pattern[bytes], min_bytes: int
+) -> Iterator[bytes]:
+    previous: re.Match[bytes] | None = None
+    delimiter: bytes | None = None
+    fragments = bytearray()
+    fragment_count = 0
+    for match in pattern.finditer(data):
+        if previous is None:
+            previous = match
+            continue
+        separator = data[previous.end() : match.start()]
+        if delimiter is None or separator != delimiter:
+            if fragment_count > 1 and len(fragments) >= min_bytes:
+                yield bytes(fragments)
+            delimiter = separator
+            fragments = bytearray(previous.group(1))
+            fragment_count = 1
+        fragments.extend(match.group(1))
+        fragment_count += 1
+        previous = match
+    if fragment_count > 1 and len(fragments) >= min_bytes:
+        yield bytes(fragments)
 
 
 def _equal_width_fragment_candidates(
@@ -593,7 +628,18 @@ def _equal_width_fragment_candidates(
 def _decode_deflate(
     data: bytes, max_bytes: int, name: str
 ) -> tuple[bytes, bytes] | None:
-    remaining = data
+    max_prefix = min(len(data), MAX_DEFLATE_PREFIX_BYTES)
+    for offset in range(max_prefix + 1):
+        decoded = _decode_deflate_at_offset(data, offset, max_bytes, name)
+        if decoded is not None:
+            return decoded
+    return None
+
+
+def _decode_deflate_at_offset(
+    data: bytes, offset: int, max_bytes: int, name: str
+) -> tuple[bytes, bytes] | None:
+    remaining = data[offset:]
     combined = bytearray()
     stream_count = 0
     while remaining:

@@ -16,8 +16,9 @@ from typing import Iterator
 from unittest.mock import patch
 
 from harness.publication import (
-    MAX_ENCODED_CANDIDATES,
     PublicationError,
+    _check_content,
+    _check_encoded_content,
     _contains_move_source,
     _decode_html_entities,
     _decode_json_escapes,
@@ -170,7 +171,8 @@ def _scan_result_archives(results: Path) -> None:
             )
     archive_set = set(archives)
     legacy_set = {results / relative for relative in LEGACY_ARCHIVES}
-    for artifact in results.rglob("*"):
+    sidecar_content = bytearray()
+    for artifact in sorted(results.rglob("*")):
         if (
             not artifact.is_file()
             or artifact in archive_set
@@ -178,12 +180,16 @@ def _scan_result_archives(results: Path) -> None:
         ):
             continue
         with artifact.open("rb") as stream:
-            _scan_file(
+            data, _ = _scan_file(
                 stream,
                 artifact.stat().st_size,
                 str(artifact),
                 check_source_paths=False,
             )
+        sidecar_content.extend(data)
+    combined = bytes(sidecar_content)
+    _check_content(combined, str(results), check_source_paths=False)
+    _check_encoded_content(combined, str(results), check_source_paths=False)
 
 
 class PublicationTest(unittest.TestCase):
@@ -552,6 +558,17 @@ class PublicationTest(unittest.TestCase):
                             root, root / "archive.tar.gz", "round"
                         )
 
+    def test_builder_rejects_variable_width_base16_fragments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            encoded = (
+                "6d6f6475~6c65203078~313a3a657669~6c207b2066756e~"
+                "206c6561~6b2829207b~7d207d"
+            )
+            (root / "REPORT.md").write_text(encoded + "\n")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_ascii85_zero_shorthand(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -682,6 +699,34 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_prefixed_deflate_streams(self) -> None:
+        source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+        compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+        streams = {
+            "zlib": zlib.compress(source),
+            "raw": compressor.compress(source) + compressor.flush(),
+        }
+        for encoding, compressed in streams.items():
+            with self.subTest(encoding=encoding):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    encoded = base64.b64encode(b"X" + compressed)
+                    (root / "REPORT.md").write_bytes(encoded + b"\n")
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
+
+    def test_builder_bounds_invalid_gzip_marker_probes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            encoded = base64.b64encode(b"\x1f\x8b" * 4097)
+            (root / "REPORT.md").write_bytes(encoded + b"\n")
+            with self.assertRaisesRegex(PublicationError, "binary container"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_padded_base64_fragments(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -758,10 +803,11 @@ class PublicationTest(unittest.TestCase):
     def test_builder_bounds_base64_candidate_work(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            content = (("A" * 16 + ",") * (MAX_ENCODED_CANDIDATES + 1)) + "\n"
+            content = (("A" * 16 + ",") * 65) + "\n"
             (root / "REPORT.md").write_text(content, encoding="utf-8")
-            with self.assertRaisesRegex(PublicationError, "candidate limit"):
-                build_public_archive(root, root / "archive.tar.gz", "round")
+            with patch("harness.publication.MAX_ENCODED_CANDIDATES", 64):
+                with self.assertRaisesRegex(PublicationError, "candidate limit"):
+                    build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_nested_base64_and_json_move_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -826,6 +872,28 @@ class PublicationTest(unittest.TestCase):
             results.mkdir()
             build_public_archive(source, results / "bundle.tar.gz", "round")
             (results / "extra.md").write_text("module 0x1::sample {}\n")
+            with patch.dict(LEGACY_ARCHIVES, clear=True):
+                with self.assertRaisesRegex(
+                    PublicationError, "Move source content"
+                ):
+                    _scan_result_archives(results)
+
+    def test_scan_rejects_source_split_across_sidecars(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "REPORT.md").write_text("aggregate report\n")
+            results = root / "results"
+            results.mkdir()
+            build_public_archive(source, results / "bundle.tar.gz", "round")
+            fragments = {
+                "a.md": "module 0x1::sample ",
+                "b.json": "{ public fun value",
+                "c.md": "(): u64 { 1 } }",
+            }
+            for name, content in fragments.items():
+                (results / name).write_text(content)
             with patch.dict(LEGACY_ARCHIVES, clear=True):
                 with self.assertRaisesRegex(
                     PublicationError, "Move source content"
