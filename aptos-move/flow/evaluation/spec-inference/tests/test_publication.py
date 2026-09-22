@@ -16,7 +16,7 @@ from typing import Iterator
 from unittest.mock import patch
 
 from harness.publication import (
-    MAX_BASE64_CANDIDATES,
+    MAX_ENCODED_CANDIDATES,
     PublicationError,
     _contains_move_source,
     _decode_html_entities,
@@ -440,6 +440,26 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_other_base_encoded_move_source(self) -> None:
+        source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+        encoders = {
+            "base16": base64.b16encode,
+            "base32": base64.b32encode,
+            "base85": base64.b85encode,
+            "ascii85": base64.a85encode,
+        }
+        for encoding, encoder in encoders.items():
+            with self.subTest(encoding=encoding):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    (root / "REPORT.md").write_bytes(encoder(source) + b"\n")
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
+
     def test_builder_rejects_base64_next_to_markdown_text(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -586,7 +606,7 @@ class PublicationTest(unittest.TestCase):
     def test_builder_bounds_base64_candidate_work(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            content = (("A" * 16 + ",") * (MAX_BASE64_CANDIDATES + 1)) + "\n"
+            content = (("A" * 16 + ",") * (MAX_ENCODED_CANDIDATES + 1)) + "\n"
             (root / "REPORT.md").write_text(content, encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "candidate limit"):
                 build_public_archive(root, root / "archive.tar.gz", "round")

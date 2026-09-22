@@ -97,8 +97,23 @@ BASE64_CHUNK = re.compile(
 )
 BASE64_WHITESPACE = re.compile(br"[ \t\r\n]*")
 MIN_BASE64_BYTES = 16
-MAX_BASE64_CANDIDATES = 16_384
-MAX_BASE64_DECODE_BYTES = MAX_MEMBER_BYTES
+BASE16_TOKEN = re.compile(br"(?<![0-9A-Fa-f])([0-9A-Fa-f]{32,})(?![0-9A-Fa-f])")
+BASE32_TOKEN = re.compile(
+    br"(?<![A-Za-z2-7])([A-Za-z2-7]{24,}={0,6})(?![A-Za-z2-7=])"
+)
+BASE85_ALPHABET = (
+    b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    b"!#$%&()*+-;<=>?@^_`{|}~"
+)
+BASE85_CLASS = re.escape(BASE85_ALPHABET)
+BASE85_TOKEN = re.compile(
+    rb"(?<![" + BASE85_CLASS + rb"])([" + BASE85_CLASS + rb"]{20,})(?!["
+    + BASE85_CLASS
+    + rb"])"
+)
+ASCII85_TOKEN = re.compile(br"(?<![!-u])([!-u]{20,})(?![!-u])")
+MAX_ENCODED_CANDIDATES = 32_768
+MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 ENCODED_CONTAINER_MAGICS = (
     b"\x1f\x8b",
     b"PK\x03\x04",
@@ -341,7 +356,7 @@ def _check_encoded_content(data: bytes, name: str) -> None:
         if digest in seen:
             return
         decoded_bytes += len(decoded)
-        if decoded_bytes > MAX_BASE64_DECODE_BYTES:
+        if decoded_bytes > MAX_ENCODED_DECODE_BYTES:
             raise PublicationError(f"{name}: encoded content exceeds decode limit")
         seen.add(digest)
         pending.append(decoded)
@@ -351,7 +366,7 @@ def _check_encoded_content(data: bytes, name: str) -> None:
         if current is not data:
             _check_content(current, name)
         expanded = _decode_deflate(
-            current, MAX_BASE64_DECODE_BYTES - decoded_bytes, name
+            current, MAX_ENCODED_DECODE_BYTES - decoded_bytes, name
         )
         if expanded is not None:
             decoded, remainder = expanded
@@ -363,7 +378,7 @@ def _check_encoded_content(data: bytes, name: str) -> None:
             enqueue(normalized)
         for candidate in _base64_candidates(current):
             candidate_count += 1
-            if candidate_count > MAX_BASE64_CANDIDATES:
+            if candidate_count > MAX_ENCODED_CANDIDATES:
                 raise PublicationError(
                     f"{name}: encoded content exceeds candidate limit"
                 )
@@ -373,7 +388,14 @@ def _check_encoded_content(data: bytes, name: str) -> None:
             enqueue(decoded)
         for decoded in _decode_base64_fragments(current):
             candidate_count += 1
-            if candidate_count > MAX_BASE64_CANDIDATES:
+            if candidate_count > MAX_ENCODED_CANDIDATES:
+                raise PublicationError(
+                    f"{name}: encoded content exceeds candidate limit"
+                )
+            enqueue(decoded)
+        for decoded in _decode_base_n_candidates(current):
+            candidate_count += 1
+            if candidate_count > MAX_ENCODED_CANDIDATES:
                 raise PublicationError(
                     f"{name}: encoded content exceeds candidate limit"
                 )
@@ -453,6 +475,31 @@ def _decode_base64(data: bytes) -> bytes | None:
         return base64.b64decode(standard, validate=True)
     except (binascii.Error, ValueError):
         return None
+
+
+def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
+    for match in BASE16_TOKEN.finditer(data):
+        try:
+            yield base64.b16decode(match.group(1), casefold=True)
+        except (binascii.Error, ValueError):
+            pass
+    for match in BASE32_TOKEN.finditer(data):
+        token = match.group(1)
+        token += b"=" * (-len(token) % 8)
+        try:
+            yield base64.b32decode(token, casefold=True)
+        except (binascii.Error, ValueError):
+            pass
+    for match in BASE85_TOKEN.finditer(data):
+        try:
+            yield base64.b85decode(match.group(1))
+        except (binascii.Error, ValueError):
+            pass
+    for match in ASCII85_TOKEN.finditer(data):
+        try:
+            yield base64.a85decode(match.group(1), ignorechars=b"")
+        except (binascii.Error, ValueError):
+            pass
 
 
 def _decode_deflate(
