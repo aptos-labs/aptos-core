@@ -720,13 +720,23 @@ class PublicationTest(unittest.TestCase):
 
     def test_builder_rejects_prefixed_deflate_streams(self) -> None:
         source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
-        compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
-        raw_stream = compressor.compress(source) + compressor.flush()
+
+        def raw_compress(data: bytes) -> bytes:
+            compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+            return compressor.compress(data) + compressor.flush()
+
+        raw_stream = raw_compress(source)
+        concatenated_raw = b"".join(
+            raw_compress(source[offset : offset + 4])
+            for offset in range(0, len(source), 4)
+        )
         streams = {
             "zlib": b"X" + zlib.compress(source),
             "zlib-after-long-prefix": b"X" * 65 + zlib.compress(source),
             "raw": b"X" + raw_stream,
             "raw-after-long-prefix": b"X" * 65 + raw_stream,
+            "concatenated-raw-after-long-prefix": b"X" * 65
+            + concatenated_raw,
         }
         for encoding, payload in streams.items():
             with self.subTest(encoding=encoding):

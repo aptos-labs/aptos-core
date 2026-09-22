@@ -763,9 +763,9 @@ def _decode_raw_deflate_candidates(
         len(data) * RAW_DEFLATE_PROBE_WORK_FACTOR,
         min(len(data) * len(data), MAX_RAW_DEFLATE_PROBE_WORK),
     )
-    for offset in range(start, len(data)):
-        if not _is_plausible_raw_deflate_stream(data, offset):
-            continue
+
+    def decode_at(offset: int, output_limit: int) -> tuple[bytes, int] | None:
+        nonlocal work
         decoder = zlib.decompressobj(-zlib.MAX_WBITS)
         decoded = bytearray()
         cursor = offset
@@ -780,22 +780,44 @@ def _decode_raw_deflate_candidates(
                 )
             try:
                 output = decoder.decompress(
-                    view[cursor:end], max_bytes - len(decoded) + 1
+                    view[cursor:end], output_limit - len(decoded) + 1
                 )
             except zlib.error:
                 break
             decoded.extend(output)
-            if len(decoded) > max_bytes:
+            if len(decoded) > output_limit:
                 raise PublicationError(
                     f"{name}: encoded content exceeds decode limit"
                 )
             if decoder.eof:
-                yield bytes(decoded), b""
-                break
+                consumed = end - cursor - len(decoder.unused_data)
+                return bytes(decoded), cursor + consumed
             if decoder.unconsumed_tail:
                 cursor = end - len(decoder.unconsumed_tail)
             else:
                 cursor = end
+        return None
+
+    for offset in range(start, len(data)):
+        if not _is_plausible_raw_deflate_stream(data, offset):
+            continue
+        first = decode_at(offset, max_bytes)
+        if first is None:
+            continue
+        first_decoded, next_offset = first
+        combined = bytearray(first_decoded)
+        while next_offset < len(data) and _is_plausible_raw_deflate_stream(
+            data, next_offset
+        ):
+            following = decode_at(next_offset, max_bytes - len(combined))
+            if following is None:
+                break
+            following_decoded, following_offset = following
+            if following_offset <= next_offset:
+                break
+            combined.extend(following_decoded)
+            next_offset = following_offset
+        yield bytes(combined), b""
 
 
 def _is_plausible_raw_deflate_stream(data: bytes, offset: int) -> bool:
