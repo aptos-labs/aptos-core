@@ -65,7 +65,7 @@ MAX_MEMBER_BYTES = 64 * 1024 * 1024
 MAX_TOTAL_BYTES = 256 * 1024 * 1024
 MAX_TAR_BYTES = MAX_TOTAL_BYTES + (MAX_MEMBERS + 20) * 1024
 SOURCE_PATH = re.compile(
-    br"(?i)(?<![A-Za-z0-9_.-])sources[/\\][A-Za-z0-9_.-]+"
+    br"(?i)(?<![A-Za-z0-9_.-])sources(?:[/\\])+[A-Za-z0-9_.-]+"
 )
 DIFF_LINE = re.compile(br"(?m)^(?:diff --git |--- a/|\+\+\+ b/|@@ )")
 MOVE_PUNCTUATION = {
@@ -93,12 +93,23 @@ JSON_SIMPLE_ESCAPES = {
 }
 MAX_HTML_ENTITY_NAME_BYTES = max(len(name) for name in HTML_ENTITIES)
 BASE64_CHUNK = re.compile(
-    br"(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]{4,}={0,2})(?![A-Za-z0-9+/_=-])"
+    br"(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]+={0,2})(?![A-Za-z0-9+/_=-])"
 )
 BASE64_WHITESPACE = re.compile(br"[ \t\r\n]*")
 MIN_BASE64_BYTES = 16
 MAX_BASE64_CANDIDATES = 16_384
 MAX_BASE64_DECODE_BYTES = MAX_MEMBER_BYTES
+ENCODED_CONTAINER_MAGICS = (
+    b"\x1f\x8b",
+    b"PK\x03\x04",
+    b"PK\x05\x06",
+    b"PK\x07\x08",
+    b"7z\xbc\xaf\x27\x1c",
+    b"Rar!\x1a\x07",
+    b"BZh",
+    b"\xfd7zXZ\x00",
+    b"\x28\xb5\x2f\xfd",
+)
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -334,6 +345,12 @@ def _check_encoded_content(data: bytes, name: str) -> None:
             if decoded_bytes > MAX_BASE64_DECODE_BYTES:
                 raise PublicationError(
                     f"{name}: encoded content exceeds decode limit"
+                )
+            if any(
+                decoded.startswith(magic) for magic in ENCODED_CONTAINER_MAGICS
+            ):
+                raise PublicationError(
+                    f"{name}: encoded content contains a binary container"
                 )
             _check_content(decoded, name)
             pending.append(_decode_structured_content(decoded))

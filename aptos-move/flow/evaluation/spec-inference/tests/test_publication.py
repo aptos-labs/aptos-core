@@ -436,6 +436,28 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_narrowly_wrapped_base64_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            wrapped = "\n".join(
+                encoded[offset : offset + 3]
+                for offset in range(0, len(encoded), 3)
+            )
+            (root / "REPORT.md").write_text(wrapped + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_base64_encoded_gzip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(gzip.compress(source)).decode("ascii")
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "binary container"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_bounds_base64_candidate_work(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -488,6 +510,16 @@ class PublicationTest(unittest.TestCase):
             root = Path(temporary)
             (root / "cells.csv").write_text(
                 "target\nsources/internal/implementation.move\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "disallowed source path"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_source_path_with_repeated_separators(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "target: sources//internal/implementation.move\n",
+                encoding="utf-8",
             )
             with self.assertRaisesRegex(PublicationError, "disallowed source path"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
