@@ -58,7 +58,7 @@ class PublicationTest(unittest.TestCase):
             )
         archives = sorted(
             archive
-            for archive in results.glob("*/*.tar.gz")
+            for archive in results.rglob("*.tar.gz")
             if archive.relative_to(results).as_posix() not in LEGACY_ARCHIVES
         )
         self.assertTrue(archives)
@@ -155,6 +155,28 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_multiline_move_source_in_allowed_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "module\nexample::sample\n{\npublic\nfun\nvalue(): u64\n{ 1 }\n}\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_comment_split_move_source_in_allowed_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "module /* gap */ example::sample {\n"
+                "    public /* gap */ fun value(): u64 { 1 }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_scanner_rejects_nested_or_linked_members(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -175,6 +197,25 @@ class PublicationTest(unittest.TestCase):
                 archive.addfile(info)
             with self.assertRaisesRegex(PublicationError, "unsupported member type"):
                 scan_public_archive(linked)
+
+    def test_scanner_rejects_invalid_archive_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            archive_path = Path(temporary) / "invalid-root.tar.gz"
+            report = b"report\n"
+            checksum = (
+                f"{hashlib.sha256(report).hexdigest()}  REPORT.md\n".encode("utf-8")
+            )
+            invalid_root = "module 0x1::sample { public fun value() {} }"
+            with _archive_writer(archive_path) as archive:
+                for name, data in (
+                    (f"{invalid_root}/REPORT.md", report),
+                    (f"{invalid_root}/SHA256SUMS", checksum),
+                ):
+                    info = tarfile.TarInfo(name)
+                    info.size = len(data)
+                    archive.addfile(info, io.BytesIO(data))
+            with self.assertRaisesRegex(PublicationError, "archive root"):
+                scan_public_archive(archive_path)
 
     def test_scanner_rejects_bad_checksums(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

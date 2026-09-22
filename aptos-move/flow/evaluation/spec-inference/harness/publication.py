@@ -64,15 +64,8 @@ SOURCE_PATH = re.compile(
     br"(?i)(?<![A-Za-z0-9_.-])sources[/\\][A-Za-z0-9_.-]+"
 )
 DIFF_LINE = re.compile(br"(?m)^(?:diff --git |--- a/|\+\+\+ b/|@@ )")
-MOVE_SOURCE_LINE = re.compile(
-    br"(?i)(?<![A-Za-z0-9_])(?:"
-    br"(?:spec[ \t]+)?module[ \t]+(?:0x[0-9a-f]+|[A-Za-z_]\w*)::[A-Za-z_]\w*"
-    br"|(?:(?:public(?:\([^\r\n)]*\))?|entry|native)[ \t]+)*"
-    br"fun[ \t]+[A-Za-z_]\w*[ \t]*(?:<[^\r\n>]*>[ \t]*)?\("
-    br"|(?:struct|enum)[ \t]+[A-Za-z_]\w*(?:[ \t]*<[^\r\n>]*>)?"
-    br"[ \t]*(?:has[ \t]+[^\r\n{]+)?[ \t]*\{"
-    br")"
-)
+MOVE_TOKEN = re.compile(br"0x[0-9a-fA-F]+|[A-Za-z_][A-Za-z0-9_]*|::|[{}()<>,]")
+MOVE_IDENTIFIER = re.compile(br"[A-Za-z_][A-Za-z0-9_]*")
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -147,7 +140,12 @@ def scan_public_archive(path: Path) -> None:
             if normalized_name in seen:
                 raise PublicationError(f"{path}: duplicate archive member {member.name!r}")
             seen.add(normalized_name)
-            roots.add(member_path.parts[0])
+            root = member_path.parts[0]
+            try:
+                _validate_archive_name(root)
+            except PublicationError as error:
+                raise PublicationError(f"{path}: invalid archive root: {error}") from error
+            roots.add(root)
             if member.isdir():
                 if len(member_path.parts) != 1:
                     raise PublicationError(
@@ -251,9 +249,90 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
         raise PublicationError(f"{name}: contains a disallowed source path")
     if DIFF_LINE.search(data):
         raise PublicationError(f"{name}: contains unified-diff source content")
-    if MOVE_SOURCE_LINE.search(data):
+    if _contains_move_source(data):
         raise PublicationError(f"{name}: contains Move source content")
     return data, hashlib.sha256(data).hexdigest()
+
+
+def _contains_move_source(data: bytes) -> bool:
+    token_sets = (MOVE_TOKEN.findall(data), MOVE_TOKEN.findall(_strip_move_comments(data)))
+    return any(_move_tokens_contain_declaration(tokens) for tokens in token_sets)
+
+
+def _move_tokens_contain_declaration(tokens: list[bytes]) -> bool:
+    lowered = [token.lower() for token in tokens]
+    for index, token in enumerate(lowered):
+        if token == b"module" and index + 4 < len(lowered):
+            address, separator, module, opening = lowered[index + 1 : index + 5]
+            if (
+                _is_move_name(address)
+                and separator == b"::"
+                and MOVE_IDENTIFIER.fullmatch(module)
+                and opening == b"{"
+            ):
+                return True
+        if token == b"fun" and index + 2 < len(lowered):
+            if MOVE_IDENTIFIER.fullmatch(lowered[index + 1]):
+                next_index = _after_type_parameters(lowered, index + 2)
+                if next_index < len(lowered) and lowered[next_index] == b"(":
+                    return True
+        if token in (b"struct", b"enum") and index + 2 < len(lowered):
+            if MOVE_IDENTIFIER.fullmatch(lowered[index + 1]):
+                next_index = _after_type_parameters(lowered, index + 2)
+                if next_index < len(lowered) and lowered[next_index] == b"{":
+                    return True
+                if b"{" in lowered[next_index : next_index + 16]:
+                    return True
+    return False
+
+
+def _is_move_name(token: bytes) -> bool:
+    return bool(MOVE_IDENTIFIER.fullmatch(token) or re.fullmatch(br"0x[0-9a-f]+", token))
+
+
+def _after_type_parameters(tokens: list[bytes], index: int) -> int:
+    if index >= len(tokens) or tokens[index] != b"<":
+        return index
+    depth = 0
+    while index < len(tokens):
+        if tokens[index] == b"<":
+            depth += 1
+        elif tokens[index] == b">":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+        index += 1
+    return index
+
+
+def _strip_move_comments(data: bytes) -> bytes:
+    output = bytearray()
+    index = 0
+    while index < len(data):
+        if data[index : index + 2] == b"//":
+            newline = data.find(b"\n", index + 2)
+            if newline < 0:
+                break
+            output.append(ord("\n"))
+            index = newline + 1
+            continue
+        if data[index : index + 2] == b"/*":
+            index += 2
+            depth = 1
+            while index < len(data) and depth:
+                if data[index : index + 2] == b"/*":
+                    depth += 1
+                    index += 2
+                elif data[index : index + 2] == b"*/":
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            output.append(ord(" "))
+            continue
+        output.append(data[index])
+        index += 1
+    return bytes(output)
 
 
 def _preflight_tar(path: Path) -> None:
