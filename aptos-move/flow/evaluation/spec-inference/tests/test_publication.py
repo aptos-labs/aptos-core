@@ -15,6 +15,7 @@ from typing import Iterator
 from unittest.mock import patch
 
 from harness.publication import (
+    MAX_BASE64_CANDIDATES,
     PublicationError,
     _contains_move_source,
     _decode_html_entities,
@@ -433,6 +434,14 @@ class PublicationTest(unittest.TestCase):
             )
             (root / "REPORT.md").write_text(wrapped + "\n", encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_bounds_base64_candidate_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            content = (("A" * 16 + ",") * (MAX_BASE64_CANDIDATES + 1)) + "\n"
+            (root / "REPORT.md").write_text(content, encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "candidate limit"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_nested_base64_and_json_move_source(self) -> None:

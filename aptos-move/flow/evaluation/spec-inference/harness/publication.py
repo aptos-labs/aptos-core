@@ -95,7 +95,10 @@ MAX_HTML_ENTITY_NAME_BYTES = max(len(name) for name in HTML_ENTITIES)
 BASE64_CHUNK = re.compile(
     br"(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]{4,}={0,2})(?![A-Za-z0-9+/_=-])"
 )
+BASE64_WHITESPACE = re.compile(br"[ \t\r\n]*")
 MIN_BASE64_BYTES = 16
+MAX_BASE64_CANDIDATES = 16_384
+MAX_BASE64_DECODE_BYTES = MAX_MEMBER_BYTES
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -312,38 +315,45 @@ def _check_content(data: bytes, name: str) -> None:
 
 def _check_encoded_content(data: bytes, name: str) -> None:
     pending = [_decode_structured_content(data)]
+    candidate_count = 0
+    decoded_bytes = 0
     while pending:
         normalized = pending.pop()
         if normalized is not data:
             _check_content(normalized, name)
         for candidate in _base64_candidates(normalized):
+            candidate_count += 1
+            if candidate_count > MAX_BASE64_CANDIDATES:
+                raise PublicationError(
+                    f"{name}: encoded content exceeds candidate limit"
+                )
             decoded = _decode_base64(candidate)
             if decoded is None:
                 continue
+            decoded_bytes += len(decoded)
+            if decoded_bytes > MAX_BASE64_DECODE_BYTES:
+                raise PublicationError(
+                    f"{name}: encoded content exceeds decode limit"
+                )
             _check_content(decoded, name)
             pending.append(_decode_structured_content(decoded))
 
 
 def _base64_candidates(data: bytes) -> Iterator[bytes]:
     combined = bytearray()
-    chunk_count = 0
     previous_end = 0
     for match in BASE64_CHUNK.finditer(data):
         chunk = match.group(1)
-        separated = chunk_count and any(
-            byte not in b" \t\r\n" for byte in data[previous_end : match.start()]
+        separated = combined and not BASE64_WHITESPACE.fullmatch(
+            data, previous_end, match.start()
         )
         if separated:
-            if chunk_count > 1 and len(combined) >= MIN_BASE64_BYTES:
+            if len(combined) >= MIN_BASE64_BYTES:
                 yield bytes(combined)
             combined.clear()
-            chunk_count = 0
-        if len(chunk) >= MIN_BASE64_BYTES:
-            yield chunk
         combined.extend(chunk)
-        chunk_count += 1
         previous_end = match.end()
-    if chunk_count > 1 and len(combined) >= MIN_BASE64_BYTES:
+    if len(combined) >= MIN_BASE64_BYTES:
         yield bytes(combined)
 
 
