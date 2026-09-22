@@ -41,6 +41,29 @@ LEGACY_ARCHIVES = {
 }
 MAX_TRACKED_ARCHIVES = 16
 MAX_TRACKED_ARCHIVE_BYTES = 64 * 1024 * 1024
+SUPPORTED_ARCHIVE_SUFFIXES = (".tar.gz", ".tgz")
+UNSUPPORTED_ARCHIVE_SUFFIXES = (
+    ".7z",
+    ".rar",
+    ".tar",
+    ".tar.bz2",
+    ".tar.xz",
+    ".tar.zst",
+    ".tbz2",
+    ".txz",
+    ".zip",
+    ".zst",
+)
+UNSUPPORTED_ARCHIVE_MAGICS = (
+    b"PK\x03\x04",
+    b"PK\x05\x06",
+    b"PK\x07\x08",
+    b"7z\xbc\xaf\x27\x1c",
+    b"Rar!\x1a\x07",
+    b"BZh",
+    b"\xfd7zXZ\x00",
+    b"\x28\xb5\x2f\xfd",
+)
 
 
 @contextmanager
@@ -59,23 +82,32 @@ def _result_archives(results: Path) -> list[Path]:
     archives: list[Path] = []
     for archive in results.rglob("*"):
         relative = archive.relative_to(results).as_posix()
-        if (
-            archive.is_file()
-            and relative not in LEGACY_ARCHIVES
-            and (
-                archive.name.casefold().endswith((".tar.gz", ".tgz"))
-                or _has_gzip_header(archive)
-            )
+        if not archive.is_file() or relative in LEGACY_ARCHIVES:
+            continue
+        name = archive.name.casefold()
+        header = _file_header(archive)
+        if name.endswith(SUPPORTED_ARCHIVE_SUFFIXES) or header.startswith(
+            b"\x1f\x8b"
         ):
             archives.append(archive)
             if len(archives) > MAX_TRACKED_ARCHIVES:
                 raise PublicationError(f"{results}: too many result archives")
+        elif name.endswith(UNSUPPORTED_ARCHIVE_SUFFIXES) or _is_archive_header(
+            header
+        ):
+            raise PublicationError(f"{archive}: unsupported result archive")
     return sorted(archives)
 
 
-def _has_gzip_header(path: Path) -> bool:
+def _file_header(path: Path) -> bytes:
     with path.open("rb") as stream:
-        return stream.read(2) == b"\x1f\x8b"
+        return stream.read(512)
+
+
+def _is_archive_header(header: bytes) -> bool:
+    return header[257:262] == b"ustar" or any(
+        header.startswith(magic) for magic in UNSUPPORTED_ARCHIVE_MAGICS
+    )
 
 
 def _scan_result_archives(results: Path) -> None:
@@ -128,6 +160,15 @@ class PublicationTest(unittest.TestCase):
                 [archive.name for archive in _result_archives(results)],
             )
 
+    def test_rejects_unsupported_result_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            (results / "archive.zip").write_bytes(b"PK\x03\x04")
+            with self.assertRaisesRegex(
+                PublicationError, "unsupported result archive"
+            ):
+                _result_archives(results)
+
     def test_rejects_excessive_archive_count(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             results = Path(temporary)
@@ -176,6 +217,15 @@ class PublicationTest(unittest.TestCase):
                 "\\u0026#92;u006dodule 0x1::sample { "
                 "public \\u0026#92;u0066un value(): u64 { 1 } }\n",
                 encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_move_function_body(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "{\n    let value = 1;\n    value + 1\n}\n", encoding="utf-8"
             )
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")

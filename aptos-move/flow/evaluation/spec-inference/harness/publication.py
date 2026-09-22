@@ -76,6 +76,7 @@ MOVE_PUNCTUATION = {
     ord(","): b",",
     ord(";"): b";",
     ord(":"): b":",
+    ord("="): b"=",
     ord('"'): b'"',
 }
 JSON_SIMPLE_ESCAPES = {
@@ -503,7 +504,47 @@ def _decode_html_entity_body(
 def _contains_move_source(data: bytes) -> bool:
     return _move_tokens_contain_declaration(
         _iter_move_tokens(data, skip_comments=False)
-    ) or _move_tokens_contain_declaration(_iter_move_tokens(data, skip_comments=True))
+    ) or _move_tokens_contain_declaration(
+        _iter_move_tokens(data, skip_comments=True)
+    ) or _move_tokens_contain_body(_iter_move_tokens(data, skip_comments=True))
+
+
+def _move_tokens_contain_body(tokens: Iterable[bytes]) -> bool:
+    depth = 0
+    let_state = 0
+    type_tokens_left = 0
+    for token in tokens:
+        if token == b"{":
+            depth += 1
+            let_state = 0
+            continue
+        if token == b"}":
+            depth = max(0, depth - 1)
+            let_state = 0
+            continue
+        if not depth:
+            continue
+
+        if let_state == 0:
+            if token == b"let":
+                let_state = 1
+        elif let_state == 1:
+            let_state = 2 if _is_move_name(token) else 0
+        elif let_state == 2:
+            if token == b"=":
+                return True
+            if token == b":":
+                let_state = 3
+                type_tokens_left = 32
+            else:
+                let_state = 0
+        else:
+            if token == b"=":
+                return True
+            type_tokens_left -= 1
+            if token == b";" or type_tokens_left == 0:
+                let_state = 0
+    return False
 
 
 def _move_tokens_contain_declaration(tokens: Iterable[bytes]) -> bool:
