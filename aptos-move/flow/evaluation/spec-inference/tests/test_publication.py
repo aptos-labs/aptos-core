@@ -363,6 +363,7 @@ class PublicationTest(unittest.TestCase):
         self.assertEqual(b"module", _decode_structured_content(b"%256dodule"))
         long_numeric = b"\\u0026#" + b"0" * 10_000 + b"109odule"
         self.assertEqual(b"module", _decode_structured_content(long_numeric))
+        self.assertEqual(b"\\777", _decode_structured_content(b"\\777"))
 
     def test_repeated_entities_after_large_prefix_normalize(self) -> None:
         prefix = b"x" * 4096
@@ -480,6 +481,7 @@ class PublicationTest(unittest.TestCase):
         encoders = {
             "base16": base64.b16encode,
             "base32": base64.b32encode,
+            "base32hex": base64.b32hexencode,
             "base85": base64.b85encode,
             "ascii85": base64.a85encode,
         }
@@ -787,6 +789,15 @@ class PublicationTest(unittest.TestCase):
             root = Path(temporary)
             source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
             encoded = "".join(f"%{byte:02x}" for byte in source)
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_octal_encoded_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = "".join(f"\\{byte:03o}" for byte in source)
             (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
@@ -1139,6 +1150,28 @@ class PublicationTest(unittest.TestCase):
                 ) as compressed:
                     compressed.write(tar_data.getvalue())
             with self.assertRaisesRegex(PublicationError, "gzip header metadata"):
+                scan_public_archive(archive_path)
+
+    def test_scanner_bounds_compressed_gzip_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text("report\n", encoding="utf-8")
+            archive_path = root / "archive.tar.gz"
+            build_public_archive(root, archive_path, "round")
+            tar_data = gzip.decompress(archive_path.read_bytes())
+            compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+            compressed_tar = compressor.compress(tar_data) + compressor.flush()
+            header = b"\x1f\x8b\x08\x00" + b"\0" * 4 + b"\x00\xff"
+            empty_blocks = b"\x00\x00\x00\xff\xff" * 20_000
+            trailer = zlib.crc32(tar_data).to_bytes(4, "little") + (
+                len(tar_data) & 0xFFFF_FFFF
+            ).to_bytes(4, "little")
+            archive_path.write_bytes(
+                header + empty_blocks + compressed_tar + trailer
+            )
+            with self.assertRaisesRegex(
+                PublicationError, "compressed gzip stream exceeds input budget"
+            ):
                 scan_public_archive(archive_path)
 
     def test_scanner_rejects_tar_header_metadata(self) -> None:

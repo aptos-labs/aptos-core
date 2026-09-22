@@ -101,6 +101,9 @@ BASE16_CHUNK = re.compile(br"(?<![0-9A-Fa-f])([0-9A-Fa-f]+)(?![0-9A-Fa-f])")
 BASE32_CHUNK = re.compile(
     br"(?<![A-Za-z2-7])([A-Za-z2-7]+={0,6})(?![A-Za-z2-7=])"
 )
+BASE32HEX_CHUNK = re.compile(
+    br"(?<![A-Va-v0-9])([A-Va-v0-9]+={0,6})(?![A-Va-v0-9=])"
+)
 BASE85_ALPHABET = (
     b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     b"!#$%&()*+-;<=>?@^_`{|}~"
@@ -117,6 +120,7 @@ MAX_ENCODED_CANDIDATES = 2_097_152
 MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 MAX_CONTAINER_PROBES = 4096
 MAX_DEFLATE_PREFIX_BYTES = 64
+MAX_GZIP_INPUT_OVERHEAD = 64 * 1024
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
     b"Rar!\x1a\x07",
@@ -546,6 +550,13 @@ def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
+    for token in _base_n_candidates(data, BASE32HEX_CHUNK, 4):
+        token += b"=" * (-len(token) % 8)
+        try:
+            yield base64.b32hexdecode(token, casefold=True)
+        except (binascii.Error, ValueError):
+            # Ordinary text overlaps this alphabet; invalid candidates are expected.
+            continue
     for token in _base_n_candidates(data, BASE85_CHUNK, 5):
         try:
             yield base64.b85decode(token)
@@ -678,27 +689,45 @@ def _decode_one_deflate(
 
 def _decode_json_escapes(data: bytes) -> bytes:
     return _decode_encoded_content(
-        data, decode_json=True, decode_html=False, decode_percent=False
+        data,
+        decode_json=True,
+        decode_html=False,
+        decode_percent=False,
+        decode_octal=False,
     )
 
 
 def _decode_html_entities(data: bytes) -> bytes:
     return _decode_encoded_content(
-        data, decode_json=False, decode_html=True, decode_percent=False
+        data,
+        decode_json=False,
+        decode_html=True,
+        decode_percent=False,
+        decode_octal=False,
     )
 
 
 def _decode_structured_content(data: bytes) -> bytes:
     return _decode_encoded_content(
-        data, decode_json=True, decode_html=True, decode_percent=True
+        data,
+        decode_json=True,
+        decode_html=True,
+        decode_percent=True,
+        decode_octal=True,
     )
 
 
 def _decode_encoded_content(
-    data: bytes, *, decode_json: bool, decode_html: bool, decode_percent: bool
+    data: bytes,
+    *,
+    decode_json: bool,
+    decode_html: bool,
+    decode_percent: bool,
+    decode_octal: bool,
 ) -> bytes:
     if not (
         (decode_json and b"\\" in data)
+        or (decode_octal and b"\\" in data)
         or (decode_html and b"&" in data)
         or (decode_percent and b"%" in data)
     ):
@@ -715,9 +744,11 @@ def _decode_encoded_content(
             if json_decoded is not None:
                 replacement, end = json_decoded
                 decoded = bytes((replacement,)), end
-        elif decode_html and data[index] == ord("&"):
+        if decoded is None and decode_octal and data[index] == ord("\\"):
+            decoded = _decode_octal_escape_body(data, index + 1)
+        elif decoded is None and decode_html and data[index] == ord("&"):
             decoded = _decode_html_entity_body(data, index + 1)
-        elif decode_percent and data[index] == ord("%"):
+        elif decoded is None and decode_percent and data[index] == ord("%"):
             decoded = _decode_percent_escape_body(data, index + 1)
         if decoded is None:
             replacement = bytes((data[index],))
@@ -734,6 +765,19 @@ def _decode_encoded_content(
                 json_suffix = _decode_json_escape_suffix(output)
                 if json_suffix is not None:
                     escape_start, replacement = json_suffix
+                    del output[escape_start:]
+                    entity_start = _append_encoded_replacement(
+                        output,
+                        entity_offsets,
+                        entity_start,
+                        bytes((replacement,)),
+                    )
+                    changed = True
+                    continue
+            if decode_octal:
+                octal_suffix = _decode_octal_escape_suffix(output)
+                if octal_suffix is not None:
+                    escape_start, replacement = octal_suffix
                     del output[escape_start:]
                     entity_start = _append_encoded_replacement(
                         output,
@@ -804,6 +848,32 @@ def _decode_json_escape_body(data: bytes, index: int) -> tuple[int, int] | None:
     if replacement is None:
         return None
     return replacement, index + 1
+
+
+def _decode_octal_escape_body(
+    data: bytes, index: int
+) -> tuple[bytes, int] | None:
+    if index + 3 > len(data):
+        return None
+    digits = data[index : index + 3]
+    if not all(ord("0") <= digit <= ord("7") for digit in digits):
+        return None
+    value = int(digits, 8)
+    if value > 0xFF:
+        return None
+    return bytes((value,)), index + 3
+
+
+def _decode_octal_escape_suffix(data: bytearray) -> tuple[int, int] | None:
+    if (
+        len(data) >= 4
+        and data[-4] == ord("\\")
+        and all(ord("0") <= digit <= ord("7") for digit in data[-3:])
+    ):
+        value = int(bytes(data[-3:]), 8)
+        if value <= 0xFF:
+            return len(data) - 4, value
+    return None
 
 
 def _decode_json_escape_suffix(data: bytearray) -> tuple[int, int] | None:
@@ -1250,7 +1320,9 @@ def _validate_gzip_container(path: Path, max_tar_bytes: int) -> None:
             stream.seek(0)
             decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
             expanded = 0
+            compressed = 0
             while chunk := stream.read(64 * 1024):
+                compressed += len(chunk)
                 pending = chunk
                 while pending:
                     output = decoder.decompress(pending, 1024 * 1024)
@@ -1261,11 +1333,19 @@ def _validate_gzip_container(path: Path, max_tar_bytes: int) -> None:
                         )
                     pending = decoder.unconsumed_tail
                     if decoder.eof:
+                        if compressed > expanded + MAX_GZIP_INPUT_OVERHEAD:
+                            raise PublicationError(
+                                f"{path}: compressed gzip stream exceeds input budget"
+                            )
                         if decoder.unused_data or stream.read(1):
                             raise PublicationError(
                                 f"{path}: archive must contain a single gzip member"
                             )
                         return
+                if compressed > expanded + MAX_GZIP_INPUT_OVERHEAD:
+                    raise PublicationError(
+                        f"{path}: compressed gzip stream exceeds input budget"
+                    )
             raise PublicationError(f"{path}: truncated gzip stream")
     except PublicationError:
         raise
