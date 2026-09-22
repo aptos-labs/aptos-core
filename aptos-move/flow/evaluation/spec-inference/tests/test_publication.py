@@ -736,6 +736,14 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "binary container"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_accepts_repeated_zlib_header_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text("80" * 5000 + "\n")
+            archive_path = root / "archive.tar.gz"
+            build_public_archive(root, archive_path, "round")
+            scan_public_archive(archive_path)
+
     def test_builder_rejects_padded_base64_fragments(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

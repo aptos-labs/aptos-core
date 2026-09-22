@@ -120,6 +120,7 @@ MAX_ENCODED_CANDIDATES = 2_097_152
 MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 MAX_CONTAINER_PROBES = 4096
 MAX_DEFLATE_PREFIX_BYTES = 64
+MAX_DEFLATE_PROBE_BYTES = 8
 MAX_GZIP_INPUT_OVERHEAD = 64 * 1024
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
@@ -699,7 +700,9 @@ def _decode_deflate_candidates(
             yield decoded
     probe_count = 0
     for offset in range(max_prefix + 1, len(data) - 1):
-        if not _is_zlib_header(data, offset):
+        if not _is_zlib_header(data, offset) or not _is_plausible_zlib_stream(
+            data, offset
+        ):
             continue
         probe_count += 1
         if probe_count > MAX_CONTAINER_PROBES:
@@ -719,6 +722,16 @@ def _is_zlib_header(data: bytes, offset: int) -> bool:
         and cmf >> 4 <= 7
         and (cmf << 8 | flags) % 31 == 0
     )
+
+
+def _is_plausible_zlib_stream(data: bytes, offset: int) -> bool:
+    decoder = zlib.decompressobj(zlib.MAX_WBITS)
+    end = min(len(data), offset + MAX_DEFLATE_PROBE_BYTES)
+    try:
+        decoder.decompress(memoryview(data)[offset:end], 1)
+    except zlib.error:
+        return False
+    return True
 
 
 def _decode_deflate_at_offset(
