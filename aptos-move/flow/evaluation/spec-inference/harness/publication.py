@@ -279,10 +279,7 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
         raise PublicationError(f"{name}: declared size does not match content")
     _validate_utf8(data, name)
     _check_content(data, name)
-    decoded = data
-    if name.endswith(".json"):
-        decoded = _decode_json_escapes(data)
-    decoded = _decode_html_entities(decoded)
+    decoded = _decode_structured_content(data)
     if decoded is not data:
         _check_content(decoded, name)
     return data, hashlib.sha256(data).hexdigest()
@@ -309,43 +306,69 @@ def _check_content(data: bytes, name: str) -> None:
 
 
 def _decode_json_escapes(data: bytes) -> bytes:
-    if b"\\" not in data:
+    return _decode_encoded_content(data, decode_json=True, decode_html=False)
+
+
+def _decode_html_entities(data: bytes) -> bytes:
+    return _decode_encoded_content(data, decode_json=False, decode_html=True)
+
+
+def _decode_structured_content(data: bytes) -> bytes:
+    return _decode_encoded_content(data, decode_json=True, decode_html=True)
+
+
+def _decode_encoded_content(
+    data: bytes, *, decode_json: bool, decode_html: bool
+) -> bytes:
+    if not ((decode_json and b"\\" in data) or (decode_html and b"&" in data)):
         return data
     output = bytearray()
+    entity_start: int | None = None
     index = 0
     changed = False
     while index < len(data):
         decoded = None
-        if data[index] == ord("\\"):
-            decoded = _decode_json_escape_body(data, index + 1)
+        if decode_json and data[index] == ord("\\"):
+            json_decoded = _decode_json_escape_body(data, index + 1)
+            if json_decoded is not None:
+                replacement, end = json_decoded
+                decoded = bytes((replacement,)), end
+        elif decode_html and data[index] == ord("&"):
+            decoded = _decode_html_entity_body(data, index + 1)
         if decoded is None:
-            output.append(data[index])
+            replacement = bytes((data[index],))
             index += 1
         else:
             replacement, index = decoded
-            output.append(replacement)
             changed = True
+        entity_start = _append_encoded_replacement(
+            output, entity_start, replacement
+        )
+
         while True:
-            replacement: int | None = None
-            escape_size = 0
-            if len(output) >= 2 and output[-2] == ord("\\"):
-                replacement = JSON_SIMPLE_ESCAPES.get(output[-1])
-                escape_size = 2
-            if (
-                replacement is None
-                and len(output) >= 6
-                and output[-6] == ord("\\")
-                and output[-5] == ord("u")
-                and all(_is_ascii_hex(digit) for digit in output[-4:])
-            ):
-                codepoint = int(bytes(output[-4:]), 16)
-                replacement = codepoint if codepoint <= 0x7F else ord(" ")
-                escape_size = 6
-            if replacement is None:
-                break
-            del output[-escape_size:]
-            output.append(replacement)
-            changed = True
+            if decode_json:
+                json_suffix = _decode_json_escape_suffix(output)
+                if json_suffix is not None:
+                    escape_start, replacement = json_suffix
+                    del output[escape_start:]
+                    entity_start = _append_encoded_replacement(
+                        output, entity_start, bytes((replacement,))
+                    )
+                    changed = True
+                    continue
+            if decode_html and output[-1:] == b";" and entity_start is not None:
+                html_suffix = _decode_html_entity_body(output, entity_start + 1)
+                if html_suffix is not None and html_suffix[1] == len(output):
+                    replacement, _ = html_suffix
+                    previous_start = output.rfind(b"&", 0, entity_start)
+                    del output[entity_start:]
+                    entity_start = previous_start if previous_start >= 0 else None
+                    entity_start = _append_encoded_replacement(
+                        output, entity_start, replacement
+                    )
+                    changed = True
+                    continue
+            break
     return bytes(output) if changed else data
 
 
@@ -364,43 +387,23 @@ def _decode_json_escape_body(data: bytes, index: int) -> tuple[int, int] | None:
     return replacement, index + 1
 
 
-def _decode_html_entities(data: bytes) -> bytes:
-    if b"&" not in data:
-        return data
-    output = bytearray()
-    entity_start: int | None = None
-    index = 0
-    changed = False
-    while index < len(data):
-        decoded = None
-        if data[index] == ord("&"):
-            decoded = _decode_html_entity_body(data, index + 1)
-        if decoded is None:
-            replacement = bytes((data[index],))
-            index += 1
-        else:
-            replacement, index = decoded
-            changed = True
-        entity_start = _append_html_replacement(
-            output, entity_start, replacement
-        )
-
-        while output[-1:] == b";" and entity_start is not None:
-            nested = _decode_html_entity_body(output, entity_start + 1)
-            if nested is None or nested[1] != len(output):
-                break
-            replacement, _ = nested
-            previous_start = output.rfind(b"&", 0, entity_start)
-            del output[entity_start:]
-            entity_start = previous_start if previous_start >= 0 else None
-            entity_start = _append_html_replacement(
-                output, entity_start, replacement
-            )
-            changed = True
-    return bytes(output) if changed else data
+def _decode_json_escape_suffix(data: bytearray) -> tuple[int, int] | None:
+    if len(data) >= 2 and data[-2] == ord("\\"):
+        replacement = JSON_SIMPLE_ESCAPES.get(data[-1])
+        if replacement is not None:
+            return len(data) - 2, replacement
+    if (
+        len(data) >= 6
+        and data[-6] == ord("\\")
+        and data[-5] == ord("u")
+        and all(_is_ascii_hex(digit) for digit in data[-4:])
+    ):
+        codepoint = int(bytes(data[-4:]), 16)
+        return len(data) - 6, codepoint if codepoint <= 0x7F else ord(" ")
+    return None
 
 
-def _append_html_replacement(
+def _append_encoded_replacement(
     output: bytearray, entity_start: int | None, replacement: bytes
 ) -> int | None:
     offset = len(output)
