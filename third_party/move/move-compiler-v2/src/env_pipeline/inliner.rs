@@ -274,12 +274,7 @@ fn check_and_maybe_filter_targets(env: &GlobalEnv, targets: &mut RewriteTargets)
                     );
                 }
 
-                if func.has_module_lock()
-                    || func.has_attribute(|attr| {
-                        env.symbol_pool().string(attr.name()).as_str()
-                            == well_known::PERSISTENT_ATTRIBUTE
-                    })
-                {
+                if func.has_module_lock() || func.has_persistent() {
                     env.error(
                         &func.get_id_loc(),
                         "inline functions cannot have the following attributes: `#[persistent]`, `#[module_lock]`",
