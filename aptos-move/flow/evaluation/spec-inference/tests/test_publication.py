@@ -948,10 +948,10 @@ class PublicationTest(unittest.TestCase):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_variable_delimited_base16_fragments(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
-            encoded = base64.b16encode(source).decode("ascii")
+        source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+        payloads = {"plain": source, "compressed": b"X" + zlib.compress(source)}
+        for payload_name, payload in payloads.items():
+            encoded = base64.b16encode(payload).decode("ascii")
             widths = (3, 2, 5, 4, 7, 6)
             fragments = []
             offset = 0
@@ -965,9 +965,18 @@ class PublicationTest(unittest.TestCase):
                 fragment + (";" if index % 2 == 0 else ",")
                 for index, fragment in enumerate(fragments[:-1])
             ) + fragments[-1]
-            (root / "REPORT.md").write_text(fragmented + "\n", encoding="utf-8")
-            with self.assertRaisesRegex(PublicationError, "Move source content"):
-                build_public_archive(root, root / "archive.tar.gz", "round")
+            with self.subTest(payload=payload_name):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    (root / "REPORT.md").write_text(
+                        fragmented + "\n", encoding="utf-8"
+                    )
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
 
     def test_builder_rejects_delimited_base64_after_leading_fragment(
         self,
@@ -1123,16 +1132,23 @@ class PublicationTest(unittest.TestCase):
                         )
 
     def test_builder_rejects_utf7_move_source(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            source = "module 0x1::sample { public fun value(): u64 { 1 } }"
-            encoded = b"".join(
-                b"+" + base64.b64encode(character.encode("utf-16-be")).rstrip(b"=") + b"-"
-                for character in source
-            )
-            (root / "REPORT.md").write_bytes(encoded + b"\n")
-            with self.assertRaisesRegex(PublicationError, "Move source content"):
-                build_public_archive(root, root / "archive.tar.gz", "round")
+        source = "module 0x1::sample { public fun value(): u64 { 1 } }"
+        encoded = b"".join(
+            b"+" + base64.b64encode(character.encode("utf-16-be")).rstrip(b"=") + b"-"
+            for character in source
+        )
+        payloads = {"plain": encoded, "island": b"\xffinvalid+ " + encoded + b" +bad"}
+        for payload_name, payload in payloads.items():
+            with self.subTest(payload=payload_name):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    (root / "REPORT.md").write_bytes(base64.b64encode(payload) + b"\n")
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
 
     def test_nested_json_escape_chain_normalizes_in_one_pass(self) -> None:
         chain = b"\\u005c" + b"u005c" * 1000 + b"u006d"

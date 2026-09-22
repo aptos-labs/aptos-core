@@ -96,6 +96,7 @@ BASE64_CHUNK = re.compile(
     br"(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]+={0,2})(?![A-Za-z0-9+/_=-])"
 )
 BASE64_WHITESPACE = re.compile(br"[ \t\r\n]*")
+UTF7_RUN = re.compile(br"(?:\+[A-Za-z0-9/,]{2,}-){2,}")
 MIN_BASE64_BYTES = 16
 BASE16_CHUNK = re.compile(br"(?<![0-9A-Fa-f])([0-9A-Fa-f]+)(?![0-9A-Fa-f])")
 BASE32_CHUNK = re.compile(
@@ -381,6 +382,14 @@ def _decode_unicode_text_candidates(data: bytes) -> Iterator[bytes]:
             if normalized != data:
                 seen.add(normalized)
                 yield normalized
+        for match in UTF7_RUN.finditer(data):
+            try:
+                normalized = match.group().decode("utf-7").encode("utf-8")
+            except UnicodeError:
+                continue
+            if normalized not in seen:
+                seen.add(normalized)
+                yield normalized
     if data.count(b"\0") < 4:
         return
     for unit_bytes, encodings in (
@@ -629,7 +638,14 @@ def _decoded_candidate_is_textlike(data: bytes) -> bool:
     if not data:
         return False
     printable = sum(byte in b"\t\n\r" or 32 <= byte <= 126 for byte in data)
-    return printable * 4 >= len(data) * 3 or data.count(b"\0") >= 4
+    if printable * 4 >= len(data) * 3 or data.count(b"\0") >= 4:
+        return True
+    if _contains_encoded_container(data):
+        return True
+    return any(
+        _is_zlib_header(data, offset)
+        for offset in range(0, len(data) - 1)
+    )
 
 
 def _decode_base16(token: bytes) -> bytes | None:
