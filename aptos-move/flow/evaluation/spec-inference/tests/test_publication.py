@@ -1150,6 +1150,15 @@ class PublicationTest(unittest.TestCase):
                             root, root / "archive.tar.gz", "round"
                         )
 
+    def test_builder_rejects_standalone_move_statement(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "assert!(amount > 0, EINVALID);\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_nested_json_escape_chain_normalizes_in_one_pass(self) -> None:
         chain = b"\\u005c" + b"u005c" * 1000 + b"u006d"
         self.assertEqual(b"m", _decode_json_escapes(chain))

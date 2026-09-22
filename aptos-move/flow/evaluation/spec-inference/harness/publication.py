@@ -80,6 +80,7 @@ MOVE_PUNCTUATION = {
     ord(":"): b":",
     ord("="): b"=",
     ord('"'): b'"',
+    ord("!"): b"!",
 }
 JSON_SIMPLE_ESCAPES = {
     ord('"'): ord('"'),
@@ -1477,7 +1478,30 @@ def _contains_move_source(data: bytes) -> bool:
         _iter_move_tokens(data, skip_comments=False)
     ) or _move_tokens_contain_declaration(
         _iter_move_tokens(data, skip_comments=True)
-    ) or _move_tokens_contain_body(_iter_move_tokens(data, skip_comments=True))
+    ) or _move_tokens_contain_body(
+        _iter_move_tokens(data, skip_comments=True)
+    ) or _move_tokens_contain_statement(
+        _iter_move_tokens(data, skip_comments=True)
+    )
+
+
+def _move_tokens_contain_statement(tokens: Iterable[bytes]) -> bool:
+    previous: bytes | None = None
+    before_previous: bytes | None = None
+    resource_operations = {
+        b"borrow_global",
+        b"borrow_global_mut",
+        b"exists",
+        b"move_from",
+        b"move_to",
+    }
+    for token in tokens:
+        if before_previous == b"assert" and previous == b"!" and token == b"(":
+            return True
+        if previous in resource_operations and token in (b"<", b"("):
+            return True
+        before_previous, previous = previous, token
+    return False
 
 
 def _move_tokens_contain_body(tokens: Iterable[bytes]) -> bool:
