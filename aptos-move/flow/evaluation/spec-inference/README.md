@@ -38,12 +38,8 @@ This file is the runbook. It says how to run things, not how they work.
 
 ## Publishing result archives
 
-Run directories are private evidence, not publication inputs. They contain
-workspace diffs, diagnostics, transcripts, event streams, and final trees that
-can reproduce source context. This remains true after credential redaction.
-
-Stage only aggregate reports and tables in a new directory, then build and scan
-the archive through the fail-closed publisher:
+Stage aggregate reports and tables in a new directory, then build and scan the
+archive through the publication helper:
 
 ```text
 python3 -m harness.publication build \
@@ -51,10 +47,10 @@ python3 -m harness.publication build \
 python3 -m harness.publication scan results/ROUND.tar.gz
 ```
 
-The publisher accepts only named top-level aggregate files, creates and checks
-`SHA256SUMS`, and rejects private Etna paths, unified diffs, nested files,
-links, source files, logs, diagnostics, transcripts, and raw telemetry. Never
-construct a public archive by recursively copying a run or artifact directory.
+The helper accepts the documented top-level aggregate files, creates and checks
+`SHA256SUMS`, and validates member names, types, sizes, contents, and archive
+structure. Construct result archives through this helper so they remain
+deterministic and conform to the publication format.
 
 ## Environment
 

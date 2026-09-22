@@ -128,9 +128,7 @@ Wall time combines provider latency, controller work, Move Flow calls, and prove
 - Controller concurrency: 3; infrastructure retries: 1; semantic refutation retries: 0.
 - Move Flow SHA-256: `4bb73b337ad1b58bd1a97e656b3ae59da686813220efe24ba5fa0e72f737a423`.
 - Codex code-mode host SHA-256: `883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1`.
-- The archive contains only source-free aggregate configuration, pricing,
-  audit results, and per-cell and per-request cost tables. Per-run diffs,
-  diagnostics, transcripts, event streams, source trees, and scoring records
-  with source-bearing fields are not published.
+- The archive uses the compact publication format for aggregate configuration,
+  pricing, audit results, and per-cell and per-request cost tables.
 - Archive SHA-256:
   `aab08250c3bf8984e4271593123d78eeb416f4cb5d67840931f20e4302155523`.

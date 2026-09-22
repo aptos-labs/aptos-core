@@ -153,7 +153,5 @@ two process groups.
 - Combined comparison:
   [`corpus3.2-opus5-sol56-terra56-comparison.md`](corpus3.2-opus5-sol56-terra56-comparison.md).
 
-Both archives now contain source-free aggregate evidence only. The original
-scheduling defect remains documented in the report; executable gate code,
-per-cell records, retry events, diagnostics, and source-bearing recovery
-evidence are not published.
+Both archives now use the compact aggregate publication format. The original
+scheduling defect remains documented in the report.

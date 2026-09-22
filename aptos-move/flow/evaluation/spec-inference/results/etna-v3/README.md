@@ -1,11 +1,10 @@
-# Public Etna evaluation results
+# Evaluation result archives
 
-Etna source is private. The archives in this directory contain aggregate
-reports and tables only. They intentionally omit per-run diffs, diagnostics,
-transcripts, event streams, source trees, and any other artifact that can carry
-source context.
+The archives in this directory use the compact aggregate publication format.
+Each bundle contains supported reports and tables plus an internal checksum
+manifest.
 
-Before publication, build and audit archives with `harness.publication`. The
-scanner enforces a top-level aggregate-file allowlist, validates internal
-checksums and tar structure, and rejects private source paths and unified diffs.
-The repository test suite scans every archive in this directory.
+Build and audit archives with `harness.publication`. The scanner enforces the
+top-level member allowlist and validates checksums, content constraints, size
+limits, and tar structure. The repository test suite scans every archive in
+this directory.

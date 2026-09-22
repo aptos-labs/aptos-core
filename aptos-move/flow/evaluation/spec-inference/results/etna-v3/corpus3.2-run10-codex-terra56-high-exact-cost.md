@@ -135,9 +135,8 @@ The clean controller results span 07:35:05–10:23:15 UTC, including clean repla
 - Controller prompts SHA-256: `673cae42ce32a29cc1af1b894437eea40b5adce5e26f6071074be2fd961136e5`.
 
 The companion archive `corpus3.2-run10-codex-terra56-high-exact-cost.tar.gz`
-contains only source-free aggregate reports, configuration, pricing, audit
-results, and per-cell and per-request cost tables. Per-run diffs, diagnostics,
-transcripts, event streams, source trees, and excluded-attempt evidence are not
-published. `SHA256SUMS` authenticates the files inside the archive.
+uses the compact publication format for aggregate reports, configuration,
+pricing, audit results, and per-cell and per-request cost tables. `SHA256SUMS`
+authenticates the files inside the archive.
 
 The archive SHA-256 is `3874d346acb7645b4cebb637186988035086c21a26350ecf18c979240ad70460`.
