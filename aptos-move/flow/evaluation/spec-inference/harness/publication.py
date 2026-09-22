@@ -110,6 +110,7 @@ ENCODED_CONTAINER_MAGICS = (
     b"\xfd7zXZ\x00",
     b"\x28\xb5\x2f\xfd",
 )
+ZIP_CONTAINER_MARKERS = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x06\x06")
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -328,6 +329,18 @@ def _check_encoded_content(data: bytes, name: str) -> None:
     pending = [(_decode_structured_content(data), False)]
     candidate_count = 0
     decoded_bytes = 0
+
+    def enqueue(decoded: bytes) -> None:
+        nonlocal decoded_bytes
+        decoded_bytes += len(decoded)
+        if decoded_bytes > MAX_BASE64_DECODE_BYTES:
+            raise PublicationError(f"{name}: encoded content exceeds decode limit")
+        if _contains_encoded_container(decoded):
+            raise PublicationError(
+                f"{name}: encoded content contains a binary container"
+            )
+        pending.append((_decode_structured_content(decoded), True))
+
     while pending:
         normalized, is_encoded = pending.pop()
         if normalized is not data:
@@ -337,15 +350,7 @@ def _check_encoded_content(data: bytes, name: str) -> None:
                 normalized, MAX_BASE64_DECODE_BYTES - decoded_bytes, name
             )
             if expanded is not None:
-                decoded_bytes += len(expanded)
-                if any(
-                    expanded.startswith(magic)
-                    for magic in ENCODED_CONTAINER_MAGICS
-                ):
-                    raise PublicationError(
-                        f"{name}: encoded content contains a binary container"
-                    )
-                pending.append((_decode_structured_content(expanded), True))
+                enqueue(expanded)
         for candidate in _base64_candidates(normalized):
             candidate_count += 1
             if candidate_count > MAX_BASE64_CANDIDATES:
@@ -355,22 +360,26 @@ def _check_encoded_content(data: bytes, name: str) -> None:
             decoded = _decode_base64(candidate)
             if decoded is None:
                 continue
-            decoded_bytes += len(decoded)
-            if decoded_bytes > MAX_BASE64_DECODE_BYTES:
+            enqueue(decoded)
+        for decoded in _decode_base64_fragments(normalized):
+            candidate_count += 1
+            if candidate_count > MAX_BASE64_CANDIDATES:
                 raise PublicationError(
-                    f"{name}: encoded content exceeds decode limit"
+                    f"{name}: encoded content exceeds candidate limit"
                 )
-            if any(
-                decoded.startswith(magic) for magic in ENCODED_CONTAINER_MAGICS
-            ):
-                raise PublicationError(
-                    f"{name}: encoded content contains a binary container"
-                )
-            pending.append((_decode_structured_content(decoded), True))
+            enqueue(decoded)
+
+
+def _contains_encoded_container(data: bytes) -> bool:
+    return any(data.startswith(magic) for magic in ENCODED_CONTAINER_MAGICS) or any(
+        marker in data for marker in ZIP_CONTAINER_MARKERS
+    )
 
 
 def _base64_candidates(data: bytes) -> Iterator[bytes]:
     combined = bytearray()
+    group_start = 0
+    chunk_count = 0
     previous_end = 0
     for match in BASE64_CHUNK.finditer(data):
         chunk = match.group(1)
@@ -380,10 +389,56 @@ def _base64_candidates(data: bytes) -> Iterator[bytes]:
         if separated:
             if len(combined) >= MIN_BASE64_BYTES:
                 yield bytes(combined)
+            if chunk_count > 1:
+                for individual in BASE64_CHUNK.finditer(
+                    data, group_start, previous_end
+                ):
+                    token = individual.group(1)
+                    if len(token) >= MIN_BASE64_BYTES:
+                        yield token
             combined.clear()
+            chunk_count = 0
+        if not combined:
+            group_start = match.start()
         combined.extend(chunk)
+        chunk_count += 1
         previous_end = match.end()
     if len(combined) >= MIN_BASE64_BYTES:
+        yield bytes(combined)
+    if chunk_count > 1:
+        for individual in BASE64_CHUNK.finditer(data, group_start, previous_end):
+            token = individual.group(1)
+            if len(token) >= MIN_BASE64_BYTES:
+                yield token
+
+
+def _decode_base64_fragments(data: bytes) -> Iterator[bytes]:
+    combined = bytearray()
+    fragment_count = 0
+    saw_padding = False
+    previous_end = 0
+    for match in BASE64_CHUNK.finditer(data):
+        separated = fragment_count and not BASE64_WHITESPACE.fullmatch(
+            data, previous_end, match.start()
+        )
+        if separated:
+            if fragment_count > 1 and saw_padding:
+                yield bytes(combined)
+            combined.clear()
+            fragment_count = 0
+            saw_padding = False
+        token = match.group(1)
+        decoded = _decode_base64(token)
+        if decoded is None:
+            combined.clear()
+            fragment_count = 0
+            saw_padding = False
+        else:
+            combined.extend(decoded)
+            fragment_count += 1
+            saw_padding = saw_padding or b"=" in token
+        previous_end = match.end()
+    if fragment_count > 1 and saw_padding:
         yield bytes(combined)
 
 
@@ -411,21 +466,31 @@ def _decode_deflate(data: bytes, max_bytes: int, name: str) -> bytes | None:
 
 
 def _decode_json_escapes(data: bytes) -> bytes:
-    return _decode_encoded_content(data, decode_json=True, decode_html=False)
+    return _decode_encoded_content(
+        data, decode_json=True, decode_html=False, decode_percent=False
+    )
 
 
 def _decode_html_entities(data: bytes) -> bytes:
-    return _decode_encoded_content(data, decode_json=False, decode_html=True)
+    return _decode_encoded_content(
+        data, decode_json=False, decode_html=True, decode_percent=False
+    )
 
 
 def _decode_structured_content(data: bytes) -> bytes:
-    return _decode_encoded_content(data, decode_json=True, decode_html=True)
+    return _decode_encoded_content(
+        data, decode_json=True, decode_html=True, decode_percent=True
+    )
 
 
 def _decode_encoded_content(
-    data: bytes, *, decode_json: bool, decode_html: bool
+    data: bytes, *, decode_json: bool, decode_html: bool, decode_percent: bool
 ) -> bytes:
-    if not ((decode_json and b"\\" in data) or (decode_html and b"&" in data)):
+    if not (
+        (decode_json and b"\\" in data)
+        or (decode_html and b"&" in data)
+        or (decode_percent and b"%" in data)
+    ):
         return data
     output = bytearray()
     entity_offsets = bytearray()
@@ -441,6 +506,8 @@ def _decode_encoded_content(
                 decoded = bytes((replacement,)), end
         elif decode_html and data[index] == ord("&"):
             decoded = _decode_html_entity_body(data, index + 1)
+        elif decode_percent and data[index] == ord("%"):
+            decoded = _decode_percent_escape_body(data, index + 1)
         if decoded is None:
             replacement = bytes((data[index],))
             index += 1
@@ -456,6 +523,19 @@ def _decode_encoded_content(
                 json_suffix = _decode_json_escape_suffix(output)
                 if json_suffix is not None:
                     escape_start, replacement = json_suffix
+                    del output[escape_start:]
+                    entity_start = _append_encoded_replacement(
+                        output,
+                        entity_offsets,
+                        entity_start,
+                        bytes((replacement,)),
+                    )
+                    changed = True
+                    continue
+            if decode_percent:
+                percent_suffix = _decode_percent_escape_suffix(output)
+                if percent_suffix is not None:
+                    escape_start, replacement = percent_suffix
                     del output[escape_start:]
                     entity_start = _append_encoded_replacement(
                         output,
@@ -528,6 +608,27 @@ def _decode_json_escape_suffix(data: bytearray) -> tuple[int, int] | None:
     ):
         codepoint = int(bytes(data[-4:]), 16)
         return len(data) - 6, codepoint if codepoint <= 0x7F else ord(" ")
+    return None
+
+
+def _decode_percent_escape_body(
+    data: bytes | bytearray, index: int
+) -> tuple[bytes, int] | None:
+    if index + 2 > len(data):
+        return None
+    digits = data[index : index + 2]
+    if not all(_is_ascii_hex(digit) for digit in digits):
+        return None
+    return bytes((int(bytes(digits), 16),)), index + 2
+
+
+def _decode_percent_escape_suffix(data: bytearray) -> tuple[int, int] | None:
+    if (
+        len(data) >= 3
+        and data[-3] == ord("%")
+        and all(_is_ascii_hex(digit) for digit in data[-2:])
+    ):
+        return len(data) - 3, int(bytes(data[-2:]), 16)
     return None
 
 

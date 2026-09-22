@@ -48,6 +48,7 @@ MAX_TRACKED_ARCHIVE_BYTES = 64 * 1024 * 1024
 SUPPORTED_ARCHIVE_SUFFIXES = (".tar.gz", ".tgz")
 UNSUPPORTED_ARCHIVE_SUFFIXES = (
     ".7z",
+    ".cpio",
     ".rar",
     ".tar",
     ".tar.bz2",
@@ -67,6 +68,11 @@ UNSUPPORTED_ARCHIVE_MAGICS = (
     b"BZh",
     b"\xfd7zXZ\x00",
     b"\x28\xb5\x2f\xfd",
+    b"070701",
+    b"070702",
+    b"070707",
+    b"\x71\xc7",
+    b"\xc7\x71",
 )
 MAX_ZIP_TRAILER_BYTES = 65_557
 
@@ -229,6 +235,15 @@ class PublicationTest(unittest.TestCase):
             ):
                 _result_archives(results)
 
+    def test_rejects_cpio_with_opaque_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            (results / "opaque.data").write_bytes(b"070701" + bytes(506))
+            with self.assertRaisesRegex(
+                PublicationError, "unsupported result archive"
+            ):
+                _result_archives(results)
+
     def test_rejects_excessive_archive_count(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             results = Path(temporary)
@@ -310,6 +325,7 @@ class PublicationTest(unittest.TestCase):
         self.assertEqual(
             b"module", _decode_structured_content(b"\\u0026#109odule")
         )
+        self.assertEqual(b"module", _decode_structured_content(b"%256dodule"))
         long_numeric = b"\\u0026#" + b"0" * 10_000 + b"109odule"
         self.assertEqual(b"module", _decode_structured_content(long_numeric))
 
@@ -424,6 +440,17 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_base64_next_to_markdown_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            (root / "REPORT.md").write_text(
+                f"payload {encoded}\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_line_wrapped_base64_move_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -459,6 +486,17 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "binary container"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_base64_encoded_prefixed_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = io.BytesIO()
+            with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("source.move", "module 0x1::sample {}")
+            encoded = base64.b64encode(b"X" + payload.getvalue()).decode("ascii")
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "binary container"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_base64_encoded_zlib(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -475,6 +513,26 @@ class PublicationTest(unittest.TestCase):
             compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
             compressed = compressor.compress(source) + compressor.flush()
             encoded = base64.b64encode(compressed).decode("ascii")
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_padded_base64_fragments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = "\n".join(
+                base64.b64encode(bytes((byte,))).decode("ascii") for byte in source
+            )
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_percent_encoded_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = "".join(f"%{byte:02x}" for byte in source)
             (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
