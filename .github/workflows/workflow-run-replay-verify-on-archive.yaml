@@ -38,6 +38,10 @@ on:
         type: boolean
         description: Collect framework function usage instead of only replay-verifying.
         default: false
+      FRAMEWORK_USAGE_BUCKET:
+        required: false
+        type: string
+        description: Private GCS bucket name, without gs://, used to transport framework usage shards.
     secrets:
       APTOS_BOT_PAT:
         required: false
@@ -95,6 +99,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FRAMEWORK_USAGE_BUCKET: ${{ inputs.FRAMEWORK_USAGE_BUCKET || vars.FRAMEWORK_USAGE_BUCKET }}
+
 jobs:
   validate-inputs:
     runs-on: ubuntu-latest
@@ -116,6 +123,14 @@ jobs:
             exit 1
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
+            if [ -z "$FRAMEWORK_USAGE_BUCKET" ]; then
+              echo "::error::FRAMEWORK_USAGE_BUCKET is required for framework usage collection. Configure the repository variable or reusable-workflow input."
+              exit 1
+            fi
+            if [[ "$FRAMEWORK_USAGE_BUCKET" == gs://* ]]; then
+              echo "::error::FRAMEWORK_USAGE_BUCKET must be a bare bucket name without the gs:// prefix."
+              exit 1
+            fi
             if [ -z "$START_VERSION" ] && [ -z "$START_TIME" ]; then
               echo "::error::A START_VERSION or START_TIME is required for framework usage collection."
               exit 1
@@ -201,6 +216,20 @@ jobs:
         shell: bash
         run: gcloud config set project aptos-devinfra-0
 
+      - name: Verify private framework usage shard bucket
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
+        run: |
+          PUBLIC_ACCESS_PREVENTION="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(public_access_prevention)')"
+          UNIFORM_BUCKET_ACCESS="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(uniform_bucket_level_access)')"
+          if [ "$PUBLIC_ACCESS_PREVENTION" != "enforced" ]; then
+            echo "::error::Framework usage shard bucket must enforce public access prevention."
+            exit 1
+          fi
+          if [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
+            echo "::error::Framework usage shard bucket must use uniform bucket-level access."
+            exit 1
+          fi
+
       - uses: ./.github/actions/python-setup
         id: replay-verify-python
         with:
@@ -237,6 +266,7 @@ jobs:
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
             ARGS+=(--framework-usage-output-dir ../../framework-usage-results)
+            ARGS+=(--framework-usage-bucket "$FRAMEWORK_USAGE_BUCKET")
           fi
           ARGS+=(--image_profile performance)
           poetry run python main.py "${ARGS[@]}"
