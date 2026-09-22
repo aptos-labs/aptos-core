@@ -90,6 +90,18 @@ pub struct CompiledPackage {
     /// filename -> json bytes for ScriptABI. Can then be used to generate transaction builders in
     /// various languages.
     pub compiled_abis: Option<Vec<(String, Vec<u8>)>>,
+    /// module name -> XIR interface, the compilation interface of this
+    /// package's own modules.
+    ///
+    /// `None` when a module's interface could not be exported. Interfaces are
+    /// all-or-nothing per package: a partial set would give an interface hash
+    /// covering only part of the API, which is worse than having none.
+    pub compiled_interfaces: Option<Vec<(String, Vec<u8>)>>,
+    /// Digest of `compiled_interfaces`, present exactly when they are.
+    pub interface_hash: Option<String>,
+    /// What this package was compiled *against*, one key per transitive
+    /// dependency. Recompiling is unnecessary exactly when these still match.
+    pub dependency_keys: BTreeMap<PackageName, String>,
 }
 
 /// Represents a compiled package that has been saved to disk. This holds only the minimal metadata
@@ -102,6 +114,25 @@ pub struct OnDiskPackage {
     /// Dependency names for this package.
     pub dependencies: Vec<PackageName>,
     pub bytecode_deps: Vec<PackageName>,
+    /// Digest of this package's XIR interfaces, when they could all be
+    /// exported. Checked against the files on disk before a cached package is
+    /// reused, so that the metadata and the bytes it describes are accepted
+    /// together.
+    ///
+    /// `default` so that a build directory written before this field existed
+    /// still deserializes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface_hash: Option<String>,
+    /// The identity of each transitive dependency at the time this package was
+    /// compiled — its interface hash where it has one, and its source digest
+    /// otherwise.
+    ///
+    /// The fallback to a source digest is what keeps caching sound for a
+    /// package that could not use interfaces: it was compiled against that
+    /// dependency's *source*, so any edit to that source must invalidate it,
+    /// and an interface hash would not be available to notice.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub dependency_keys: BTreeMap<PackageName, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,6 +235,18 @@ impl OnDiskCompiledPackage {
             bytecode_deps: BTreeMap::new(),
             compiled_docs,
             compiled_abis,
+            // Not read back. This field carries interfaces from a build to
+            // `save_to_disk`, and a package loaded from disk is never saved
+            // again — the modular loop reuses it as-is. Callers asking whether
+            // a cached package published interfaces use `interface_hash`,
+            // which is recorded alongside them and answers the same question
+            // without reading every file.
+            compiled_interfaces: None,
+            // Recorded in `BuildInfo.yaml`, not recomputed here: recomputing
+            // would hash the *reloaded* interfaces, which is a different
+            // question from what the build that produced them recorded.
+            interface_hash: self.package.interface_hash.clone(),
+            dependency_keys: self.package.dependency_keys.clone(),
         })
     }
 
@@ -284,7 +327,6 @@ impl OnDiskCompiledPackage {
         std::fs::write(path_to_save, bytes).map_err(|err| err.into())
     }
 
-    #[allow(unused)]
     pub(crate) fn has_source_changed_since_last_compile(
         &self,
         resolved_package: &ResolvedPackage,
@@ -296,9 +338,30 @@ impl OnDiskCompiledPackage {
         }
     }
 
-    #[allow(unused)]
+    /// Whether the recorded flags differ from `build_config` in a way that
+    /// changes what a build *produces*.
+    ///
+    /// Where artifacts are written, where previously built ones are read from,
+    /// and whether the build takes the package lock are all excluded. They
+    /// decide where to look and how to synchronise, not what comes out — the
+    /// same sources under the same compiler settings produce the same bytecode
+    /// wherever it lands.
+    ///
+    /// Keeping them in would make a package reusable only from the exact
+    /// directory that produced it, which defeats a read-only shared cache: a
+    /// build reading one necessarily has a different `install_dir` from the
+    /// build that filled it, so every lookup would miss.
     pub(crate) fn are_build_flags_different(&self, build_config: &BuildConfig) -> bool {
-        build_config != &self.package.compiled_package_info.build_flags
+        fn affects_output(config: &BuildConfig) -> BuildConfig {
+            BuildConfig {
+                install_dir: None,
+                dependency_cache_dir: None,
+                exclusive_build_dir: false,
+                ..config.clone()
+            }
+        }
+        affects_output(build_config)
+            != affects_output(&self.package.compiled_package_info.build_flags)
     }
 
     fn get_compiled_units_paths(&self, package_name: Symbol) -> Result<Vec<String>> {
@@ -321,6 +384,56 @@ impl OnDiskCompiledPackage {
         find_filenames(&compiled_unit_paths, |path| {
             extension_equals(path, MOVE_COMPILED_EXTENSION)
         })
+    }
+
+    /// Writes a dependency's units into this package's build directory without
+    /// clearing anything.
+    ///
+    /// `save_to_disk` starts by removing the package directory, which is fine
+    /// for a freshly compiled package but destroys a *cached* one: units loaded
+    /// from disk carry a `source_path` pointing inside that very directory, so
+    /// the copy-back would read a file that had just been deleted. The modular
+    /// loop uses this when the root was reused but a dependency underneath it
+    /// was rebuilt — the root's own artifacts are still correct and only its
+    /// copies of the dependency need refreshing.
+    pub(crate) fn refresh_dependency_units(
+        &self,
+        units: &[(PackageName, CompiledUnitWithSource)],
+        bytecode_version: u32,
+    ) -> Result<()> {
+        // Replaced wholesale rather than written over. Writing over leaves the
+        // artifacts of a module or script that has since been deleted or
+        // renamed, and those are not inert: `get_compiled_units_paths` walks
+        // the category directories with `walkdir`, so anything left under
+        // `<category>/dependencies/` is loaded back as part of the package on
+        // the next cache hit.
+        //
+        // A dependency's scripts are not covered by its interface hash, so
+        // deleting one rebuilds that dependency while leaving every dependent
+        // — including the root that lands here — cache-valid. That is exactly
+        // the case where the stale file would survive.
+        //
+        // Only the `dependencies/` subtree is cleared; the root's own units
+        // live beside it and are still correct, which is why this path was
+        // taken instead of re-saving the package.
+        for category in [
+            CompiledPackageLayout::CompiledModules,
+            CompiledPackageLayout::CompiledScripts,
+            CompiledPackageLayout::SourceMaps,
+            CompiledPackageLayout::Sources,
+        ] {
+            let dir = self
+                .root_path
+                .join(category.path())
+                .join(CompiledPackageLayout::Dependencies.path());
+            if dir.is_dir() {
+                std::fs::remove_dir_all(&dir)?;
+            }
+        }
+        for (package_name, unit) in units {
+            self.save_compiled_unit(*package_name, unit, bytecode_version)?;
+        }
+        Ok(())
     }
 
     fn save_compiled_unit(
@@ -510,7 +623,95 @@ impl CompiledPackage {
             .filter(|unit| matches!(unit.unit, CompiledUnit::Script(_)))
     }
 
-    #[allow(unused)]
+    /// Whether a package on disk can be reused, given what it was compiled
+    /// against.
+    ///
+    /// `dependency_keys` is the identity of each transitive dependency *now*;
+    /// the recorded set is what the cached build saw. Equality of the two is
+    /// the part that makes per-package caching sound — everything else here
+    /// concerns the package's own inputs.
+    ///
+    /// Note this is only reachable under modular compilation. The monolithic
+    /// path compiles the whole graph in one invocation and has never consulted
+    /// it: `can_load_cached` was dead code before this, so a monolithic build
+    /// recompiles everything every time.
+    pub(crate) fn can_load_cached_modular(
+        package: &OnDiskCompiledPackage,
+        resolution_graph: &ResolvedGraph,
+        resolved_package: &ResolvedPackage,
+        is_root_package: bool,
+        dependency_keys: &BTreeMap<PackageName, String>,
+    ) -> bool {
+        package.package.dependency_keys == *dependency_keys
+            && Self::cached_interfaces_are_intact(package)
+            && Self::can_load_cached(package, resolution_graph, resolved_package, is_root_package)
+    }
+
+    /// Whether the interface files on disk still hash to the digest recorded
+    /// when the package was built.
+    ///
+    /// Everything else here trusts `BuildInfo.yaml`, but the *interface files*
+    /// beside it are what gets handed to the compiler, and they are no longer
+    /// only declarations: an interface carries inline function bodies as source
+    /// (`XirFunction::source`), which a dependent expands into its own
+    /// bytecode. `build/` is git-ignored and freely writable, so accepting the
+    /// metadata without the bytes it describes would let an edited cache change
+    /// what a build produces from unchanged sources.
+    ///
+    /// A package that published no interfaces has nothing to check. Anything
+    /// unreadable or mismatched is reported as a miss, so the failure mode is a
+    /// rebuild.
+    fn cached_interfaces_are_intact(package: &OnDiskCompiledPackage) -> bool {
+        let Some(recorded) = &package.package.interface_hash else {
+            return true;
+        };
+        let dir = package
+            .root_path
+            .join(CompiledPackageLayout::CompiledInterfaces.path());
+        // The same filtered listing the build uses when it hands these files
+        // to the compiler, so both see one set of files. Reading every entry
+        // here would let a stray `.DS_Store` fail the check permanently.
+        let Ok(entries) = find_filenames(&[dir.to_string_lossy().into_owned()], |path| {
+            extension_equals(path, "json")
+        }) else {
+            return false;
+        };
+        let mut hashes = vec![];
+        for path in entries {
+            let path = PathBuf::from(path);
+            let Ok(json) = std::fs::read_to_string(&path) else {
+                return false;
+            };
+            let Ok(source) = move_compiler_v2::xir::parse_interface(path, &json) else {
+                return false;
+            };
+            let module = source.module();
+            let name = format!("{}::{}", module.module.address, module.module.name);
+            let Ok(hash) = move_compiler_v2::xir_hash::interface_hash(module) else {
+                return false;
+            };
+            hashes.push((name, hash));
+        }
+        move_compiler_v2::xir_hash::package_interface_hash(
+            hashes
+                .iter()
+                .map(|(name, hash)| (name.as_str(), hash.as_str())),
+        ) == *recorded
+    }
+
+    /// Known gap: nothing here identifies the *compiler binary*.
+    ///
+    /// The inputs compared are the package's sources, its dependencies, the
+    /// build flags and the address resolution. `CompilerConfig` carries a
+    /// `CompilerVersion`, but that is a coarse language/mode enum — rebuild the
+    /// compiler with a code-generation change under the same version and a
+    /// cached package is still served, skipping the new behaviour.
+    ///
+    /// This predates modular compilation; `can_load_cached` was simply never
+    /// called before, so the gap was unreachable rather than absent. Closing it
+    /// needs a build-time revision stamp, which this crate has no facility for
+    /// today. Until then, `--force` is the way to invalidate after a compiler
+    /// change.
     fn can_load_cached(
         package: &OnDiskCompiledPackage,
         resolution_graph: &ResolvedGraph,
@@ -545,6 +746,10 @@ impl CompiledPackage {
         config: &CompilerConfig,
         external_checks: Vec<Arc<dyn ExternalChecks>>,
         resolution_graph: &ResolvedGraph,
+        // Paths to dependency XIR interfaces. When non-empty the caller is
+        // compiling this package *alone*, and `transitive_dependencies` is
+        // correspondingly empty — the interfaces stand in for those sources.
+        xir_dependencies: Vec<String>,
         mut compiler_driver: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
     ) -> Result<(CompiledPackage, Option<GlobalEnv>)> {
         let immediate_dependencies = transitive_dependencies
@@ -649,6 +854,7 @@ impl CompiledPackage {
                         .iter()
                         .flat_map(|x| to_str_vec(&x.paths))
                         .collect(),
+                    xir_dependencies: xir_dependencies.clone(),
                     named_address_mapping: global_address_map
                         .into_iter()
                         .map(|(k, v)| format!("{}={}", k, v))
@@ -707,6 +913,17 @@ impl CompiledPackage {
             .language_version
             .unwrap_or_default()
             .infer_bytecode_version(config.bytecode_version);
+        // Only the modular build consumes interfaces. Exporting them costs a
+        // sourcified rendering of every inline body plus a canonical hash per
+        // module, so a monolithic build — which is every build on the default
+        // path — must not pay for artifacts nothing will read.
+        let (compiled_interfaces, interface_hash) =
+            if resolution_graph.build_options.modular_compilation {
+                Self::build_interfaces(&model)
+            } else {
+                (None, None)
+            };
+
         let mut compiled_docs = None;
         let mut compiled_abis = None;
         let mut move_model = None;
@@ -759,6 +976,12 @@ impl CompiledPackage {
             },
             compiled_docs,
             compiled_abis,
+            compiled_interfaces,
+            interface_hash,
+            // Filled in by the modular build loop, which knows what it
+            // supplied; a monolithic build compiles everything at once and has
+            // no per-package dependency identity to record.
+            dependency_keys: BTreeMap::new(),
         };
 
         compiled_package.save_to_disk(
@@ -824,6 +1047,47 @@ impl CompiledPackage {
         Ok(())
     }
 
+    /// The metadata `BuildInfo.yaml` records, without any artifacts.
+    fn on_disk_package(&self) -> OnDiskPackage {
+        OnDiskPackage {
+            compiled_package_info: self.compiled_package_info.clone(),
+            dependencies: self
+                .deps_compiled_units
+                .iter()
+                .map(|(package_name, _)| *package_name)
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+            bytecode_deps: self
+                .bytecode_deps
+                .keys()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+            interface_hash: self.interface_hash.clone(),
+            dependency_keys: self.dependency_keys.clone(),
+        }
+    }
+
+    /// Rewrites only `BuildInfo.yaml`, leaving artifacts alone.
+    ///
+    /// The modular loop learns a package's `dependency_keys` after
+    /// [`Self::build_all`] has already written it out. Re-running
+    /// [`Self::save_to_disk`] to record them would delete the package
+    /// directory and rewrite every module, source map and source copy to
+    /// change one metadata field.
+    pub(crate) fn save_build_info(&self, under_path: &Path) -> Result<()> {
+        let on_disk_package = OnDiskCompiledPackage {
+            root_path: under_path.join(self.compiled_package_info.package_name.as_str()),
+            package: self.on_disk_package(),
+        };
+        on_disk_package.save_under(
+            CompiledPackageLayout::BuildInfo.path(),
+            serde_yaml::to_string(&on_disk_package.package)?.as_bytes(),
+        )
+    }
+
     pub(crate) fn save_to_disk(
         &self,
         under_path: PathBuf,
@@ -834,23 +1098,7 @@ impl CompiledPackage {
         let root_package = self.compiled_package_info.package_name;
         let on_disk_package = OnDiskCompiledPackage {
             root_path: under_path.join(root_package.as_str()),
-            package: OnDiskPackage {
-                compiled_package_info: self.compiled_package_info.clone(),
-                dependencies: self
-                    .deps_compiled_units
-                    .iter()
-                    .map(|(package_name, _)| *package_name)
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect(),
-                bytecode_deps: self
-                    .bytecode_deps
-                    .keys()
-                    .copied()
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect(),
-            },
+            package: self.on_disk_package(),
         };
 
         // Clear out the build dir for this package so we don't keep artifacts from previous
@@ -888,6 +1136,19 @@ impl CompiledPackage {
                         .join(filename)
                         .with_extension("abi"),
                     abi_bytes,
+                )?;
+            }
+        }
+
+        if let Some(interfaces) = &self.compiled_interfaces {
+            for (module_name, interface) in interfaces {
+                on_disk_package.save_under(
+                    CompiledPackageLayout::CompiledInterfaces
+                        .path()
+                        // `0x1::coin` is not a filename.
+                        .join(module_name.replace("::", "_"))
+                        .with_extension("xir.json"),
+                    interface,
                 )?;
             }
         }
@@ -933,6 +1194,55 @@ impl CompiledPackage {
         }
         error_strs.push("Please rename script functions to remove duplication".to_string());
         bail!(error_strs.join("\n"));
+    }
+
+    /// Exports an XIR interface for each of this package's own modules, with a
+    /// digest over the set.
+    ///
+    /// **This must never fail a build that would otherwise succeed.** Nothing
+    /// consumes interfaces yet, so a package that cannot export one — a
+    /// non-private constant, say — must still compile exactly as before. A
+    /// failure therefore yields `(None, None)` rather than an error.
+    ///
+    /// It is all-or-nothing per package. A partial set would produce a digest
+    /// covering only part of the API, and a hash that silently omits part of
+    /// its subject is worse than no hash: it would compare equal across a
+    /// change it never looked at.
+    fn build_interfaces(model: &GlobalEnv) -> (Option<Vec<(String, Vec<u8>)>>, Option<String>) {
+        let mut interfaces = vec![];
+        let mut hashes = vec![];
+        for module in model.get_modules() {
+            if !module.is_primary_target() {
+                continue;
+            }
+            // Note: a package exporting non-private `inline` functions used to
+            // publish no interface at all, because an interface carried no
+            // bodies and inlining needs one. Interfaces now carry the body as
+            // rendered Move source (`XirFunction::source`), so that rule is
+            // gone — which is what lets the framework participate, since all 36
+            // of `move-stdlib`'s non-private inline functions are higher-order.
+            let name = module.get_full_name_str();
+            let Ok(interface) = move_compiler_v2::xir_export::export_interface(&module) else {
+                return (None, None);
+            };
+            let (Ok(hash), Ok(bytes)) = (
+                move_compiler_v2::xir_hash::interface_hash(&interface),
+                serde_json::to_vec(&interface),
+            ) else {
+                return (None, None);
+            };
+            hashes.push((name.clone(), hash));
+            interfaces.push((name, bytes));
+        }
+        if interfaces.is_empty() {
+            return (None, None);
+        }
+        let package_hash = move_compiler_v2::xir_hash::package_interface_hash(
+            hashes
+                .iter()
+                .map(|(name, hash)| (name.as_str(), hash.as_str())),
+        );
+        (Some(interfaces), Some(package_hash))
     }
 
     fn build_abis(

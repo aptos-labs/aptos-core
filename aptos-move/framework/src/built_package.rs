@@ -90,6 +90,22 @@ pub struct BuildOptions {
     /// Installation directory for compiled artifacts. Defaults to `<package>/build`.
     #[clap(long, value_parser)]
     pub install_dir: Option<PathBuf>,
+    /// Previously built packages to reuse, read but never written. See
+    /// [`move_package::BuildConfig::dependency_cache_dir`].
+    ///
+    /// Not a command line option: it names a location a caller arranged, and
+    /// the guarantee it implies is not one a user can make from a flag.
+    #[clap(skip)]
+    pub dependency_cache_dir: Option<PathBuf>,
+    /// Asserts nothing else writes where this build does, letting it skip the
+    /// machine-global package lock. See
+    /// [`move_package::BuildConfig::exclusive_build_dir`].
+    ///
+    /// Not a command line option, and deliberately: setting it without meeting
+    /// its precondition corrupts concurrent builds, so it belongs to callers
+    /// that can establish the precondition, not to anyone holding a shell.
+    #[clap(skip)]
+    pub exclusive_build_dir: bool,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
     /// Named addresses that unconditionally win over conflicting package-level assignments.
@@ -103,6 +119,11 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
+    /// Compile each package separately against its dependencies' XIR
+    /// interfaces, reusing packages whose inputs are unchanged.
+    #[clap(long)]
+    #[serde(default)]
+    pub modular_compilation: bool,
     #[clap(long)]
     pub bytecode_version: Option<u32>,
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
@@ -134,6 +155,8 @@ impl Default for BuildOptions {
             with_error_map: true,
             with_docs: false,
             install_dir: None,
+            dependency_cache_dir: None,
+            exclusive_build_dir: false,
             named_addresses: Default::default(),
             forced_named_addresses: Default::default(),
             override_std: None,
@@ -141,6 +164,7 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
+            modular_compilation: false,
             bytecode_version: None,
             compiler_version: None,
             language_version: None,
@@ -272,12 +296,17 @@ fn make_model_build_config(
         generate_move_model: false,
         full_model_generation: false,
         install_dir: None,
+        dependency_cache_dir: None,
+        exclusive_build_dir: false,
         test_mode,
         verify_mode,
         override_std: None,
         force_recompilation: false,
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: true,
+        // Framework model building stays monolithic; modular compilation is
+        // opt-in from the package system, not from model construction.
+        modular_compilation: false,
         compiler_config: CompilerConfig {
             bytecode_version,
             compiler_version,
@@ -332,12 +361,15 @@ impl BuiltPackage {
             generate_move_model: true,
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
+            dependency_cache_dir: options.dependency_cache_dir.clone(),
+            exclusive_build_dir: options.exclusive_build_dir,
             verify_mode: false,
             test_mode: options.with_test_mode,
             override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,
+            modular_compilation: options.modular_compilation,
             compiler_config: CompilerConfig {
                 bytecode_version,
                 compiler_version,

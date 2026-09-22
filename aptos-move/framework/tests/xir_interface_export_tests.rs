@@ -171,6 +171,27 @@ fn check_generated_interfaces(package: &str, interfaces: &[(String, String)]) {
         // Aptos-specific and unknown to the compiler's built-in set; a real
         // build passes them in. Attribute *checking* is not what is under test.
         skip_attribute_checks: true,
+        // The same mapping the framework's `Move.toml` files declare. Needed
+        // because a specification function crosses as its original text, which
+        // still says `use std::features` — including on `use` declarations
+        // local to a specification block, which nothing outside the text can
+        // rewrite. A real build always has these; without them this check would
+        // be stricter than any build that exists.
+        named_address_mapping: [
+            "std=0x1",
+            "vm=0x0",
+            "vm_reserved=0x0",
+            "aptos_std=0x1",
+            "aptos_framework=0x1",
+            "aptos_fungible_asset=0xA",
+            "aptos_token=0x3",
+            "aptos_token_objects=0x4",
+            "core_resources=0xA550C18",
+            "Extensions=0x1",
+        ]
+        .iter()
+        .map(|entry| entry.to_string())
+        .collect(),
         ..Options::default()
     })
     .unwrap_or_else(|e| {

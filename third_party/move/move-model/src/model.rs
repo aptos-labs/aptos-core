@@ -2150,6 +2150,8 @@ impl GlobalEnv {
             vec![]
         };
 
+        self.backfill_called_struct_api_functions(&module);
+
         let mod_data = &mut self.module_data[module_id.0 as usize];
         mod_data.used_modules = used_modules;
         mod_data.use_decls = use_decls;
@@ -2162,6 +2164,75 @@ impl GlobalEnv {
         // `FunctionData` entries. Either can make arbitrary entries in the
         // cross-function call-graph caches stale.
         self.call_graph_cache.invalidate();
+    }
+
+    /// Declares the struct API wrappers `module` calls in *other* modules,
+    /// where the callee has no declaration for them.
+    ///
+    /// A wrapper reaches a callee's model one of two ways: the callee was
+    /// loaded from bytecode, which declares them above from its function
+    /// definitions, or it was compiled from source in this same run, which
+    /// synthesizes them during file format generation. A callee described by an
+    /// **XIR interface** gets neither — it is never compiled — so nothing
+    /// declares `pack$S` for it, while this module's bytecode legitimately
+    /// calls one: the *handle* is built from the struct declaration, which an
+    /// interface does carry. Anything mapping a bytecode handle back to a
+    /// `FunctionEnv` then fails to resolve a real call;
+    /// `aptos_framework::extended_checks` does exactly that.
+    ///
+    /// Driven by the calls actually present in the bytecode rather than by
+    /// enumerating the wrappers a struct could have. Predicting those means
+    /// reproducing the generator's naming, which is intricate — a borrow on an
+    /// enum is `borrow$S$<field-offset>$<type-order>` — and a second copy of it
+    /// would drift. Reading the names back needs no such knowledge.
+    ///
+    /// Nothing is overwritten and nothing is invented: a name that does not
+    /// parse as a wrapper, or whose struct the callee does not declare, is left
+    /// alone so that a genuinely unresolved call still fails loudly.
+    fn backfill_called_struct_api_functions(&mut self, module: &CompiledModule) {
+        let self_id = module.self_id();
+        // Resolving names borrows `self`, declaring them needs `&mut self`, so
+        // the two passes cannot be fused.
+        let mut missing = vec![];
+        for handle in &module.function_handles {
+            let view = FunctionHandleView::new(module, handle);
+            if view.module_id() == self_id {
+                continue;
+            }
+            let name = view.name().as_str();
+            let Some(struct_name) = struct_api_wrapper_struct_name(name) else {
+                continue;
+            };
+            let Some(callee) = self.find_module(&self.to_module_name(&view.module_id())) else {
+                continue;
+            };
+            let fun_id = FunId::new(self.symbol_pool.make(name));
+            if callee.data.function_data.contains_key(&fun_id) {
+                continue;
+            }
+            let Some(struct_env) = callee.find_struct(self.symbol_pool.make(struct_name)) else {
+                continue;
+            };
+            missing.push((
+                callee.get_id(),
+                fun_id,
+                struct_env.get_loc(),
+                struct_env.get_visibility(),
+            ));
+        }
+
+        for (callee_id, fun_id, loc, visibility) in missing {
+            let data = self.module_data[callee_id.to_usize()]
+                .function_data
+                .entry(fun_id)
+                .or_insert_with(|| FunctionData::new(fun_id.symbol(), loc));
+            // A declaration, not a definition: the wrapper's signature and body
+            // live in the callee's own build. What a consumer needs from this
+            // is that the name resolves and reports which struct it serves,
+            // which `get_struct_api_struct` reads back out of the name.
+            data.is_struct_api = true;
+            data.visibility = visibility;
+        }
     }
 
     /// Updates modules previously loaded into the environment
@@ -5350,6 +5421,37 @@ impl CallGraphCache {
     }
 }
 
+/// Every prefix a compiler-generated struct API wrapper can carry.
+///
+/// The generator builds each name as `<prefix>$<struct>` with further `$`
+/// separated parts for variants and field slots
+/// (`file_format_generator::module_generator`).
+const STRUCT_API_PREFIXES: [&str; 7] = [
+    language_storage::PACK,
+    language_storage::UNPACK,
+    language_storage::PACK_VARIANT,
+    language_storage::UNPACK_VARIANT,
+    language_storage::TEST_VARIANT,
+    language_storage::BORROW,
+    language_storage::BORROW_MUT,
+];
+
+/// The struct a compiler-generated struct API wrapper belongs to, read out of
+/// its name: `pack$S`, `test_variant$S$V` and `borrow_mut$S$0$1` all name `S`.
+///
+/// `None` for any other name. Callers rely on that to tell a synthetic wrapper
+/// from an ordinary function, so this must not guess: a genuinely missing
+/// function has to stay a loud failure rather than become a silently
+/// fabricated declaration.
+fn struct_api_wrapper_struct_name(name: &str) -> Option<&str> {
+    let (prefix, rest) = name.split_once(language_storage::DOLLAR_SIGN_DELIMITER)?;
+    if !STRUCT_API_PREFIXES.contains(&prefix) {
+        return None;
+    }
+    // `rest` is the struct name followed by any variant or field parts.
+    rest.split(language_storage::DOLLAR_SIGN_DELIMITER).next()
+}
+
 impl FunctionData {
     pub fn new(name: Symbol, loc: Loc) -> Self {
         Self {
@@ -5635,7 +5737,7 @@ impl<'env> FunctionEnv<'env> {
             return None;
         }
         let name = self.get_simple_name_string();
-        let struct_name = name.split('$').nth(1)?;
+        let struct_name = struct_api_wrapper_struct_name(&name)?;
         let sym = self.module_env.env.symbol_pool().make(struct_name);
         let struct_env = self.module_env.find_struct(sym)?;
         Some((self.module_env.get_id(), struct_env.get_id()))
