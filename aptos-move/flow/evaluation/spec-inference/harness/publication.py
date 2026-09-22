@@ -511,31 +511,44 @@ def _decode_base64(data: bytes) -> bytes | None:
 
 
 def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
-    for token in _coalesced_candidates(data, BASE16_CHUNK, MIN_BASE_N_BYTES):
+    for token in _base_n_candidates(data, BASE16_CHUNK):
         try:
             yield base64.b16decode(token, casefold=True)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for token in _coalesced_candidates(data, BASE32_CHUNK, MIN_BASE_N_BYTES):
+    for token in _base_n_candidates(data, BASE32_CHUNK):
         token += b"=" * (-len(token) % 8)
         try:
             yield base64.b32decode(token, casefold=True)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for token in _coalesced_candidates(data, BASE85_CHUNK, MIN_BASE_N_BYTES):
+    for token in _base_n_candidates(data, BASE85_CHUNK):
         try:
             yield base64.b85decode(token)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for token in _coalesced_candidates(data, ASCII85_CHUNK, MIN_BASE_N_BYTES):
+    for token in _base_n_candidates(data, ASCII85_CHUNK):
         try:
             yield base64.a85decode(token, ignorechars=b"")
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
+
+
+def _base_n_candidates(
+    data: bytes, pattern: re.Pattern[bytes]
+) -> Iterator[bytes]:
+    yield from _coalesced_candidates(data, pattern, MIN_BASE_N_BYTES)
+    fragments = bytearray()
+    fragment_count = 0
+    for match in pattern.finditer(data):
+        fragments.extend(match.group(1))
+        fragment_count += 1
+    if fragment_count > 1 and len(fragments) >= MIN_BASE_N_BYTES:
+        yield bytes(fragments)
 
 
 def _decode_deflate(
