@@ -97,22 +97,23 @@ BASE64_CHUNK = re.compile(
 )
 BASE64_WHITESPACE = re.compile(br"[ \t\r\n]*")
 MIN_BASE64_BYTES = 16
-BASE16_TOKEN = re.compile(br"(?<![0-9A-Fa-f])([0-9A-Fa-f]{32,})(?![0-9A-Fa-f])")
-BASE32_TOKEN = re.compile(
-    br"(?<![A-Za-z2-7])([A-Za-z2-7]{24,}={0,6})(?![A-Za-z2-7=])"
+BASE16_CHUNK = re.compile(br"(?<![0-9A-Fa-f])([0-9A-Fa-f]+)(?![0-9A-Fa-f])")
+BASE32_CHUNK = re.compile(
+    br"(?<![A-Za-z2-7])([A-Za-z2-7]+={0,6})(?![A-Za-z2-7=])"
 )
 BASE85_ALPHABET = (
     b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     b"!#$%&()*+-;<=>?@^_`{|}~"
 )
 BASE85_CLASS = re.escape(BASE85_ALPHABET)
-BASE85_TOKEN = re.compile(
-    rb"(?<![" + BASE85_CLASS + rb"])([" + BASE85_CLASS + rb"]{20,})(?!["
+BASE85_CHUNK = re.compile(
+    rb"(?<![" + BASE85_CLASS + rb"])([" + BASE85_CLASS + rb"]+)(?!["
     + BASE85_CLASS
     + rb"])"
 )
-ASCII85_TOKEN = re.compile(br"(?<![!-u])([!-u]{20,})(?![!-u])")
-MAX_ENCODED_CANDIDATES = 131_072
+ASCII85_CHUNK = re.compile(br"(?<![!-uz])([!-uz]+)(?![!-uz])")
+MIN_BASE_N_BYTES = 8
+MAX_ENCODED_CANDIDATES = 262_144
 MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
@@ -443,24 +444,28 @@ def _contains_zip_end_record(data: bytes) -> bool:
 
 
 def _base64_candidates(data: bytes) -> Iterator[bytes]:
+    yield from _coalesced_candidates(data, BASE64_CHUNK, MIN_BASE64_BYTES)
+
+
+def _coalesced_candidates(
+    data: bytes, pattern: re.Pattern[bytes], min_bytes: int
+) -> Iterator[bytes]:
     combined = bytearray()
     group_start = 0
     chunk_count = 0
     previous_end = 0
-    for match in BASE64_CHUNK.finditer(data):
+    for match in pattern.finditer(data):
         chunk = match.group(1)
         separated = combined and not BASE64_WHITESPACE.fullmatch(
             data, previous_end, match.start()
         )
         if separated:
-            if len(combined) >= MIN_BASE64_BYTES:
+            if len(combined) >= min_bytes:
                 yield bytes(combined)
             if chunk_count > 1:
-                for individual in BASE64_CHUNK.finditer(
-                    data, group_start, previous_end
-                ):
+                for individual in pattern.finditer(data, group_start, previous_end):
                     token = individual.group(1)
-                    if len(token) >= MIN_BASE64_BYTES:
+                    if len(token) >= min_bytes:
                         yield token
             combined.clear()
             chunk_count = 0
@@ -469,12 +474,12 @@ def _base64_candidates(data: bytes) -> Iterator[bytes]:
         combined.extend(chunk)
         chunk_count += 1
         previous_end = match.end()
-    if len(combined) >= MIN_BASE64_BYTES:
+    if len(combined) >= min_bytes:
         yield bytes(combined)
     if chunk_count > 1:
-        for individual in BASE64_CHUNK.finditer(data, group_start, previous_end):
+        for individual in pattern.finditer(data, group_start, previous_end):
             token = individual.group(1)
-            if len(token) >= MIN_BASE64_BYTES:
+            if len(token) >= min_bytes:
                 yield token
 
 
@@ -506,29 +511,28 @@ def _decode_base64(data: bytes) -> bytes | None:
 
 
 def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
-    for match in BASE16_TOKEN.finditer(data):
+    for token in _coalesced_candidates(data, BASE16_CHUNK, MIN_BASE_N_BYTES):
         try:
-            yield base64.b16decode(match.group(1), casefold=True)
+            yield base64.b16decode(token, casefold=True)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for match in BASE32_TOKEN.finditer(data):
-        token = match.group(1)
+    for token in _coalesced_candidates(data, BASE32_CHUNK, MIN_BASE_N_BYTES):
         token += b"=" * (-len(token) % 8)
         try:
             yield base64.b32decode(token, casefold=True)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for match in BASE85_TOKEN.finditer(data):
+    for token in _coalesced_candidates(data, BASE85_CHUNK, MIN_BASE_N_BYTES):
         try:
-            yield base64.b85decode(match.group(1))
+            yield base64.b85decode(token)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for match in ASCII85_TOKEN.finditer(data):
+    for token in _coalesced_candidates(data, ASCII85_CHUNK, MIN_BASE_N_BYTES):
         try:
-            yield base64.a85decode(match.group(1), ignorechars=b"")
+            yield base64.a85decode(token, ignorechars=b"")
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue

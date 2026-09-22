@@ -74,6 +74,7 @@ UNSUPPORTED_ARCHIVE_MAGICS = (
     b"\x71\xc7",
     b"\xc7\x71",
 )
+RESULT_SIDECAR_SUFFIXES = (".json", ".md")
 MAX_ZIP_TRAILER_BYTES = 65_557
 
 
@@ -109,6 +110,8 @@ def _result_archives(results: Path) -> list[Path]:
             or _has_zip_end_record(archive)
         ):
             raise PublicationError(f"{archive}: unsupported result archive")
+        elif not name.endswith(RESULT_SIDECAR_SUFFIXES):
+            raise PublicationError(f"{archive}: unsupported result artifact")
     return sorted(archives)
 
 
@@ -241,6 +244,15 @@ class PublicationTest(unittest.TestCase):
             (results / "opaque.data").write_bytes(b"070701" + bytes(506))
             with self.assertRaisesRegex(
                 PublicationError, "unsupported result archive"
+            ):
+                _result_archives(results)
+
+    def test_rejects_unexpected_result_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            (results / "raw.move").write_text("module 0x1::sample {}")
+            with self.assertRaisesRegex(
+                PublicationError, "unsupported result artifact"
             ):
                 _result_archives(results)
 
@@ -459,6 +471,41 @@ class PublicationTest(unittest.TestCase):
                         build_public_archive(
                             root, root / "archive.tar.gz", "round"
                         )
+
+    def test_builder_rejects_wrapped_base_n_move_source(self) -> None:
+        source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+        encoders = {
+            "base16": (base64.b16encode, 2),
+            "base32": (base64.b32encode, 4),
+            "base85": (base64.b85encode, 5),
+            "ascii85": (base64.a85encode, 5),
+        }
+        for encoding, (encoder, width) in encoders.items():
+            with self.subTest(encoding=encoding):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    encoded = encoder(source)
+                    wrapped = b"\n".join(
+                        encoded[offset : offset + width]
+                        for offset in range(0, len(encoded), width)
+                    )
+                    (root / "REPORT.md").write_bytes(wrapped + b"\n")
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
+
+    def test_builder_rejects_ascii85_zero_shorthand(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"\0" * 4 + b"module 0x1::sample {}"
+            encoded = base64.a85encode(source)
+            self.assertIn(b"z", encoded)
+            (root / "REPORT.md").write_bytes(encoded + b"\n")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_base64_next_to_markdown_text(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
