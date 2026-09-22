@@ -478,7 +478,11 @@ def _base64_candidates(data: bytes) -> Iterator[bytes]:
         data, BASE64_CHUNK, MIN_BASE64_BYTES, set(range(1, 17))
     )
     yield from _same_delimiter_tokens(
-        data, BASE64_CHUNK, MIN_BASE64_BYTES, _decode_base64
+        data,
+        BASE64_CHUNK,
+        MIN_BASE64_BYTES,
+        _decode_base64,
+        scan_leading_fragments=True,
     )
 
 
@@ -671,14 +675,67 @@ def _same_delimiter_tokens(
     pattern: re.Pattern[bytes],
     min_bytes: int,
     decode: Callable[[bytes], bytes | None],
+    *,
+    scan_leading_fragments: bool = False,
 ) -> Iterator[bytes]:
     for run, fragment_ends in _same_delimiter_fragment_runs(
         data, pattern, min_bytes
     ):
-        for end in reversed(fragment_ends[1:]):
-            if end < min_bytes:
+        if not scan_leading_fragments:
+            yield from _decodable_fragment_suffixes(
+                run, 0, fragment_ends, min_bytes, decode
+            )
+            continue
+
+        segment_start = 0
+        segment_first_fragment = 0
+        previous_end = 0
+        for fragment_index, end in enumerate(fragment_ends):
+            if b"=" in run[previous_end:end]:
+                yield from _decodable_fragment_suffixes(
+                    run,
+                    segment_start,
+                    fragment_ends[segment_first_fragment : fragment_index + 1],
+                    min_bytes,
+                    decode,
+                    scan_leading_fragments=True,
+                )
+                segment_start = end
+                segment_first_fragment = fragment_index + 1
+            previous_end = end
+        if segment_first_fragment < len(fragment_ends):
+            yield from _decodable_fragment_suffixes(
+                run,
+                segment_start,
+                fragment_ends[segment_first_fragment:],
+                min_bytes,
+                decode,
+                scan_leading_fragments=True,
+            )
+
+
+def _decodable_fragment_suffixes(
+    run: bytes,
+    segment_start: int,
+    fragment_ends: tuple[int, ...],
+    min_bytes: int,
+    decode: Callable[[bytes], bytes | None],
+    *,
+    scan_leading_fragments: bool = False,
+) -> Iterator[bytes]:
+    starts = [(segment_start, 0)]
+    if scan_leading_fragments:
+        seen_alignments = {segment_start % 4}
+        for fragment_index, start in enumerate(fragment_ends[:-1], start=1):
+            alignment = start % 4
+            if alignment not in seen_alignments:
+                starts.append((start, fragment_index))
+                seen_alignments.add(alignment)
+    for start, fragment_index in starts:
+        for end in reversed(fragment_ends[fragment_index + 1 :]):
+            if end - start < min_bytes:
                 break
-            token = run[:end]
+            token = run[start:end]
             if decode(token) is not None:
                 yield token
                 break

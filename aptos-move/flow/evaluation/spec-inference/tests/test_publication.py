@@ -814,6 +814,24 @@ class PublicationTest(unittest.TestCase):
                             root, root / "archive.tar.gz", "round"
                         )
 
+    def test_builder_rejects_delimited_base64_after_leading_fragment(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            fragments = ["A" * 17]
+            fragments.extend(
+                encoded[offset : offset + 17]
+                for offset in range(0, len(encoded), 17)
+            )
+            (root / "REPORT.md").write_text(
+                ",".join(fragments) + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_plain_text_avoids_full_deflate_probes(self) -> None:
         content = b"." * (256 * 1024)
         with patch("harness.publication._decode_deflate_at_offset") as decode:
