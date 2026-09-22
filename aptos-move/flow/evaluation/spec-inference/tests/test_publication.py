@@ -21,6 +21,7 @@ from harness.publication import (
     _check_content,
     _check_encoded_content,
     _contains_move_source,
+    _decode_deflate_candidates,
     _decode_html_entities,
     _decode_json_escapes,
     _decode_structured_content,
@@ -783,19 +784,38 @@ class PublicationTest(unittest.TestCase):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_long_delimited_base64_fragments(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
-            encoded = base64.b64encode(source).decode("ascii")
-            fragmented = ",".join(
-                encoded[offset : offset + 16]
-                for offset in range(0, len(encoded), 16)
+        source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+        encoded = base64.b64encode(source).decode("ascii")
+        for width in (16, 17):
+            with self.subTest(width=width):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    fragmented = ",".join(
+                        encoded[offset : offset + width]
+                        for offset in range(0, len(encoded), width)
+                    )
+                    (root / "REPORT.md").write_text(
+                        fragmented + "\n", encoding="utf-8"
+                    )
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
+
+    def test_plain_text_avoids_full_deflate_probes(self) -> None:
+        content = b"." * (256 * 1024)
+        with patch("harness.publication._decode_deflate_at_offset") as decode:
+            list(
+                _decode_deflate_candidates(
+                    content,
+                    64 * 1024 * 1024,
+                    "REPORT.md",
+                    scan_raw=False,
+                )
             )
-            (root / "REPORT.md").write_text(
-                fragmented + "\n", encoding="utf-8"
-            )
-            with self.assertRaisesRegex(PublicationError, "Move source content"):
-                build_public_archive(root, root / "archive.tar.gz", "round")
+        decode.assert_not_called()
 
     def test_builder_rejects_short_delimited_base64_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

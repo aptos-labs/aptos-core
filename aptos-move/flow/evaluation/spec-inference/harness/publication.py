@@ -119,7 +119,6 @@ MIN_BASE_N_BYTES = 8
 MAX_ENCODED_CANDIDATES = 2_097_152
 MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 MAX_CONTAINER_PROBES = 4096
-MAX_DEFLATE_PREFIX_BYTES = 64
 MAX_DEFLATE_PROBE_BYTES = 8
 MIN_RAW_DEFLATE_PROBE_WORK = 64 * 1024
 MAX_RAW_DEFLATE_PROBE_WORK = 16 * 1024 * 1024
@@ -478,6 +477,9 @@ def _base64_candidates(data: bytes) -> Iterator[bytes]:
     yield from _equal_width_fragment_candidates(
         data, BASE64_CHUNK, MIN_BASE64_BYTES, set(range(1, 17))
     )
+    yield from _same_delimiter_tokens(
+        data, BASE64_CHUNK, MIN_BASE64_BYTES, _decode_base64
+    )
 
 
 def _coalesced_candidates(
@@ -658,15 +660,27 @@ def _decode_same_delimiter_candidates(
     min_bytes: int,
     decode: Callable[[bytes], bytes | None],
 ) -> Iterator[bytes]:
+    for token in _same_delimiter_tokens(data, pattern, min_bytes, decode):
+        decoded = decode(token)
+        if decoded is not None:
+            yield decoded
+
+
+def _same_delimiter_tokens(
+    data: bytes,
+    pattern: re.Pattern[bytes],
+    min_bytes: int,
+    decode: Callable[[bytes], bytes | None],
+) -> Iterator[bytes]:
     for run, fragment_ends in _same_delimiter_fragment_runs(
         data, pattern, min_bytes
     ):
         for end in reversed(fragment_ends[1:]):
             if end < min_bytes:
                 break
-            decoded = decode(run[:end])
-            if decoded is not None:
-                yield decoded
+            token = run[:end]
+            if decode(token) is not None:
+                yield token
                 break
 
 
@@ -701,13 +715,8 @@ def _equal_width_fragment_candidates(
 def _decode_deflate_candidates(
     data: bytes, max_bytes: int, name: str, *, scan_raw: bool
 ) -> Iterator[tuple[bytes, bytes]]:
-    max_prefix = min(len(data), MAX_DEFLATE_PREFIX_BYTES)
-    for offset in range(max_prefix + 1):
-        decoded = _decode_deflate_at_offset(data, offset, max_bytes, name)
-        if decoded is not None:
-            yield decoded
     probe_count = 0
-    for offset in range(max_prefix + 1, len(data) - 1):
+    for offset in range(0, len(data) - 1):
         if not _is_zlib_header(data, offset) or not _is_plausible_zlib_stream(
             data, offset
         ):
@@ -721,9 +730,7 @@ def _decode_deflate_candidates(
         if decoded is not None:
             yield decoded
     if scan_raw:
-        yield from _decode_raw_deflate_candidates(
-            data, max_prefix + 1, max_bytes, name
-        )
+        yield from _decode_raw_deflate_candidates(data, 0, max_bytes, name)
 
 
 def _is_zlib_header(data: bytes, offset: int) -> bool:
