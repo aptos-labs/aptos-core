@@ -3,12 +3,15 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{memory_instrumentation::Instrumenter, options::ProverOptions};
+use crate::{
+    memory_instrumentation::Instrumenter, options::ProverOptions,
+    spec_inference::infer_loop_head_evidence, verification_analysis,
+};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{self, QuantKind},
+    ast::{self, QuantKind, TempIndex},
     exp_generator::ExpGenerator,
-    model::FunctionEnv,
+    model::{FunctionEnv, Loc},
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -22,6 +25,78 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const LOOP_INVARIANT_BASE_FAILED: &str = "base case of the loop invariant does not hold";
 const LOOP_INVARIANT_INDUCTION_FAILED: &str = "induction case of the loop invariant does not hold";
+
+/// Source locations of loops that were transformed without any invariant.
+///
+/// `LoopAnalysisProcessor` turns every loop into a DAG by havocking its modified
+/// targets.  This is enough for ordinary verification, but WP inference has to
+/// quantify those targets when it summarizes the function.  Keeping the source
+/// locations lets the inference pass report a resulting vacuous or solver-hard
+/// contract at the loop that needs a repair, rather than only at the enclosing
+/// function.
+#[derive(Clone, Debug, Default)]
+pub struct LoopsWithoutInvariants(pub Vec<LoopWithoutInvariant>);
+
+/// Source locations of summarized loops with user-supplied invariants.
+#[derive(Clone, Debug, Default)]
+pub struct LoopsWithInvariants(pub Vec<Loc>);
+
+#[derive(Clone, Debug)]
+pub struct LoopWithoutInvariant {
+    /// Stable within this function and this pipeline run.
+    pub loop_id: usize,
+    /// Header in the normalized, pre-transformation bytecode.
+    pub header: Label,
+    pub loc: Loc,
+    /// True when the loop's source location carries an inline-expansion chain.
+    /// Such a loop may be the body of an inline higher-order iterator, in which
+    /// case a `folds_of` invariant can be preferable to rewriting the call.
+    pub is_inlined: bool,
+    /// Source-visible value/reference locals modified by the loop.
+    pub carried: Vec<(TempIndex, String)>,
+    /// Number of modified user values or memories omitted from `carried`
+    /// because they have no usable source-level name. Compiler expression
+    /// temporaries are outside the source-level state and are not counted.
+    pub omitted_carried: usize,
+}
+
+/// Diagnostic-only bounded WP observations. This annotation never contributes
+/// conditions to the inferred specification.
+#[derive(Clone, Debug, Default)]
+pub struct LoopInvariantEvidence(pub Vec<LoopInvariantEvidenceForLoop>);
+
+#[derive(Clone, Debug)]
+pub struct LoopInvariantEvidenceForLoop {
+    pub loop_id: usize,
+    pub depth: usize,
+    pub carried_names: Vec<String>,
+    pub heads: Vec<LoopHeadObservation>,
+    pub partial_notes: Vec<String>,
+    pub unavailable: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct LoopHeadObservation {
+    pub index: usize,
+    pub facts: Vec<String>,
+}
+
+/// How much aggregate work the loop-invariant evidence diagnostic may perform
+/// before it declines.
+///
+/// One loop is unrolled per analysis, while all other loops are rebuilt and
+/// summarized. For `l` missing loops this costs roughly `l` full-function
+/// analyses over `l` loop regions, each with `depth + 1` bounded paths. The
+/// budget is what one function's diagnostic is worth, not a correctness bound:
+/// exceeding it produces a note and inference itself is unaffected.
+const MAX_BOUNDED_EVIDENCE_WORK: usize = 512;
+const MAX_BOUNDED_EVIDENCE_PATHS: usize = 512;
+
+fn bounded_evidence_work(loop_count: usize, depth: usize) -> usize {
+    loop_count
+        .saturating_mul(loop_count)
+        .saturating_mul(depth.saturating_add(1))
+}
 
 pub struct LoopAnalysisProcessor {}
 
@@ -44,12 +119,64 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
         }
         match fat_loop::build_loop_info_for_spec(&FunctionTarget::new(func_env, &data), targets) {
             Ok((loops_with_invariants, loops_for_unrolling)) => {
+                let loops_without_invariants =
+                    Self::loops_without_invariants(func_env, &data, &loops_with_invariants);
+                let invariant_locations = LoopsWithInvariants(
+                    loops_with_invariants
+                        .fat_loops
+                        .iter()
+                        .filter(|(_, info)| !info.spec_info().invariants.is_empty())
+                        .filter_map(|(header, _)| {
+                            data.code.iter().find_map(|bc| match bc {
+                                Bytecode::Label(attr, label) if label == header => Some(
+                                    data.locations
+                                        .get(attr)
+                                        .cloned()
+                                        .unwrap_or_else(|| func_env.get_loc()),
+                                ),
+                                _ => None,
+                            })
+                        })
+                        .collect(),
+                );
+                // Evidence is a diagnostic about the function the caller asked
+                // about. `module_env.is_target()` only says the module is a
+                // target, so on a package where every module is a target that
+                // was every function with a loop -- `--target m::f` still paid
+                // for bounded evidence across the whole package.
+                // `verification_analysis` has already computed the per-function
+                // answer by this point in the pipeline.
+                let in_scope =
+                    verification_analysis::get_info(&FunctionTarget::new(func_env, &data)).verified;
+                let loop_invariant_evidence = (func_env.module_env.is_target() && in_scope)
+                    .then(|| {
+                        ProverOptions::get(func_env.module_env.env).loop_invariant_evidence_depth
+                    })
+                    .flatten()
+                    .map(|depth| {
+                        Self::collect_loop_invariant_evidence(
+                            targets,
+                            func_env,
+                            &data,
+                            &loops_without_invariants,
+                            depth,
+                        )
+                    });
                 let mut data = Self::transform(func_env, data, &loops_with_invariants);
                 for (header_label, unrolling_instruction) in loops_for_unrolling.fat_loops {
-                    data = Self::unroll(func_env, data, &header_label, &unrolling_instruction);
+                    data = Self::unroll(func_env, data, &header_label, &unrolling_instruction).0;
                 }
                 // we have unrolled the loop into a DAG, and there will be no loop unrolling marks left
                 data.loop_unrolling.clear();
+                if !invariant_locations.0.is_empty() {
+                    data.annotations.set(invariant_locations, true);
+                }
+                if !loops_without_invariants.0.is_empty() {
+                    data.annotations.set(loops_without_invariants, true);
+                }
+                if let Some(evidence) = loop_invariant_evidence {
+                    data.annotations.set(evidence, true);
+                }
                 data
             },
             Err(err) => {
@@ -68,6 +195,308 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
 }
 
 impl LoopAnalysisProcessor {
+    fn loops_without_invariants(
+        func_env: &FunctionEnv<'_>,
+        data: &FunctionData,
+        loop_annotation: &FatLoopFunctionInfo,
+    ) -> LoopsWithoutInvariants {
+        let target = FunctionTarget::new(func_env, data);
+        let loops = loop_annotation
+            .fat_loops
+            .iter()
+            .filter(|(_, loop_info)| loop_info.spec_info().invariants.is_empty())
+            .filter_map(|(header_label, loop_info)| {
+                let attr_id = data.code.iter().find_map(|bytecode| match bytecode {
+                    Bytecode::Label(attr_id, label) if label == header_label => Some(*attr_id),
+                    _ => None,
+                })?;
+                let loc = data
+                    .locations
+                    .get(&attr_id)
+                    .cloned()
+                    .unwrap_or_else(|| func_env.get_loc());
+                let spec_info = loop_info.spec_info();
+                let carried_indices = spec_info
+                    .val_targets
+                    .iter()
+                    .copied()
+                    .chain(spec_info.mut_targets.keys().copied())
+                    .collect::<BTreeSet<_>>();
+                let omitted_carried = spec_info.mem_targets.len();
+                let carried = carried_indices
+                    .iter()
+                    .filter_map(|index| {
+                        if target.is_temporary(*index) {
+                            None
+                        } else {
+                            let name = target
+                                .get_local_name(*index)
+                                .display(func_env.symbol_pool())
+                                .to_string();
+                            if name.starts_with('$') {
+                                None
+                            } else {
+                                Some((*index, name))
+                            }
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                Some(LoopWithoutInvariant {
+                    loop_id: 0,
+                    header: *header_label,
+                    is_inlined: loc.is_inlined(),
+                    loc,
+                    carried,
+                    omitted_carried,
+                })
+            })
+            .enumerate()
+            .map(|(loop_id, mut loop_info)| {
+                loop_info.loop_id = loop_id;
+                loop_info
+            })
+            .collect();
+        LoopsWithoutInvariants(loops)
+    }
+
+    fn collect_loop_invariant_evidence(
+        targets: &FunctionTargetsHolder,
+        func_env: &FunctionEnv<'_>,
+        data: &FunctionData,
+        missing: &LoopsWithoutInvariants,
+        depth: usize,
+    ) -> LoopInvariantEvidence {
+        let loop_count = missing.0.len();
+        let estimated_work = bounded_evidence_work(loop_count, depth);
+        if estimated_work > MAX_BOUNDED_EVIDENCE_WORK {
+            return LoopInvariantEvidence(
+                missing
+                    .0
+                    .iter()
+                    .map(|loop_info| LoopInvariantEvidenceForLoop {
+                        loop_id: loop_info.loop_id,
+                        depth,
+                        carried_names: loop_info
+                            .carried
+                            .iter()
+                            .map(|(_, name)| name.clone())
+                            .collect(),
+                        heads: vec![],
+                        partial_notes: vec![],
+                        unavailable: Some(format!(
+                            "the function has {loop_count} loops requiring about {estimated_work} bounded-evidence work units at depth {depth} (budget {MAX_BOUNDED_EVIDENCE_WORK})"
+                        )),
+                    })
+                    .collect(),
+            );
+        }
+        LoopInvariantEvidence(
+            missing
+                .0
+                .iter()
+                .map(|loop_info| Self::evidence_for_loop(targets, func_env, data, loop_info, depth))
+                .collect(),
+        )
+    }
+
+    /// Bounded facts for one loop.
+    ///
+    /// Every invariant-less loop is unrolled, so a loop reached only through an
+    /// earlier one sees the facts of a bounded prefix rather than of all paths;
+    /// that restriction is recorded as a partial note.
+    fn evidence_for_loop(
+        targets: &FunctionTargetsHolder,
+        func_env: &FunctionEnv<'_>,
+        data: &FunctionData,
+        loop_info: &LoopWithoutInvariant,
+        depth: usize,
+    ) -> LoopInvariantEvidenceForLoop {
+        let carried_names = loop_info
+            .carried
+            .iter()
+            .map(|(_, name)| name.clone())
+            .collect::<Vec<_>>();
+        let unavailable = |reason: String| LoopInvariantEvidenceForLoop {
+            loop_id: loop_info.loop_id,
+            depth,
+            carried_names: carried_names.clone(),
+            heads: vec![],
+            partial_notes: vec![],
+            unavailable: Some(reason),
+        };
+
+        if loop_info.carried.is_empty() {
+            return unavailable(
+                "no source-visible loop-carried locals were found for bounded WP evidence"
+                    .to_string(),
+            );
+        }
+
+        let Ok((loops_for_transform, loops_for_unrolling)) =
+            fat_loop::build_loop_info_for_spec_with_forced_unroll_of(
+                &FunctionTarget::new(func_env, data),
+                targets,
+                depth,
+                // Only the loop being reported. Unrolling the others multiplies
+                // the paths through the bounded DAG -- `(depth + 1)^loops` --
+                // without saying anything more about this loop's heads, and it
+                // is what made a ten-loop function stop terminating.
+                Some(loop_info.header),
+            )
+        else {
+            return unavailable(
+                "the isolated bounded loop analysis could not be built".to_string(),
+            );
+        };
+        // Loops other than the one under report are summarized rather than
+        // unrolled, which is the point: their havoc leaves this loop's entry
+        // state unconstrained, so the facts below are weaker and still sound.
+        // Facts are emitted as guarded implications, and the diagnostic already
+        // states that bounded observations are not an invariant or a proof.
+        let summarized_loops = loops_for_transform.fat_loops.len();
+        let unrolled_loops = loops_for_unrolling.fat_loops.len();
+
+        // Bounded evidence unrolls the selected loop and summarizes the rest.
+        // Still guard the resulting DAG before computing a full weakest
+        // precondition once per displayed head. The aggregate cost of repeating
+        // this analysis for every missing loop is guarded above.
+        //
+        // This is a diagnostic: it exists to suggest an invariant, and declining
+        // to guess costs the caller a note while spending the budget costs them
+        // the run. The estimate is made before any unrolling, because building
+        // the DAG is itself part of the blowup.
+        let estimated_paths = (depth + 1).saturating_pow(unrolled_loops as u32);
+        if estimated_paths > MAX_BOUNDED_EVIDENCE_PATHS {
+            return unavailable(format!(
+                "the function has {} unrollable loop(s), so bounded evidence would explore about {} paths at depth {} (budget {})",
+                unrolled_loops, estimated_paths, depth, MAX_BOUNDED_EVIDENCE_PATHS
+            ));
+        }
+
+        let mut shadow = Self::transform(func_env, data.clone(), &loops_for_transform);
+        // `LoopUnrollingMark::back_edges` holds code offsets, and `transform` has
+        // just rewritten the body of every summarized loop, so offsets taken
+        // against the original code no longer address the same bytecodes -- the
+        // bridging pass would then redirect whatever now sits at that offset.
+        // Recompute the marks against the function that is actually unrolled.
+        // This only arises once some loops are summarized instead of unrolled;
+        // when every loop was unrolled, `transform` had nothing to rewrite.
+        let Ok((_, loops_for_unrolling)) = fat_loop::build_loop_info_for_spec_with_forced_unroll_of(
+            &FunctionTarget::new(func_env, &shadow),
+            targets,
+            depth,
+            Some(loop_info.header),
+        ) else {
+            return unavailable(
+                "the bounded loop analysis could not be rebuilt after loop summarization"
+                    .to_string(),
+            );
+        };
+        let mut selected_heads = None;
+        for (header, mark) in loops_for_unrolling.fat_loops {
+            let (next, heads) = Self::unroll(func_env, shadow, &header, &mark);
+            shadow = next;
+            if header == loop_info.header {
+                selected_heads = Some(heads);
+            }
+        }
+        shadow.loop_unrolling.clear();
+        let Some(selected_heads) = selected_heads else {
+            return unavailable("the missing loop was not present in the bounded DAG".to_string());
+        };
+
+        let mut heads = vec![];
+        let mut partial_notes = vec![];
+        let mut omitted_facts = 0;
+        let mut summarized_facts = 0;
+        if summarized_loops > 0 {
+            // Says why a fact is weaker than the reader might expect: another
+            // loop's havoc, not a gap in the analysis.
+            partial_notes.push(format!(
+                "{} other loop(s) in this function are summarized, so facts that depend on their results are unconstrained here",
+                summarized_loops
+            ));
+        }
+        if loop_info.omitted_carried > 0 {
+            partial_notes.push(format!(
+                "{} compiler-generated or memory loop target(s) were omitted from the source-level view",
+                loop_info.omitted_carried
+            ));
+        }
+        for (head_index, head_label) in selected_heads {
+            let mut cutpoint_data = shadow.clone();
+            let Some(label_offset) = cutpoint_data.code.iter().position(
+                |bytecode| matches!(bytecode, Bytecode::Label(_, label) if *label == head_label),
+            ) else {
+                partial_notes.push(format!(
+                    "head[{}] was absent from the bounded DAG",
+                    head_index
+                ));
+                continue;
+            };
+            let cutpoint_offset = label_offset + 1;
+            let attr_id = cutpoint_data.code[label_offset].get_attr_id();
+            cutpoint_data.code.insert(
+                cutpoint_offset,
+                Bytecode::Call(attr_id, vec![], Operation::Stop, vec![], None),
+            );
+            let observation = infer_loop_head_evidence(
+                func_env,
+                &cutpoint_data,
+                cutpoint_offset as CodeOffset,
+                head_index,
+                &loop_info.carried,
+            );
+            if observation.incomplete {
+                partial_notes.push(format!(
+                    "WP did not cover every path to head[{}]",
+                    head_index
+                ));
+            }
+            if observation.omitted_facts > 0 {
+                omitted_facts += observation.omitted_facts;
+            }
+            summarized_facts += observation.summarized_facts;
+            heads.push(LoopHeadObservation {
+                index: head_index,
+                facts: observation.facts,
+            });
+        }
+        if omitted_facts > 0 {
+            partial_notes.push(format!(
+                "{} fact(s) across the bounded heads used internal names or exceeded the display cap and were omitted",
+                omitted_facts
+            ));
+        }
+        if summarized_facts > 0 {
+            partial_notes.push(format!(
+                "{} fact(s) across the bounded heads depend on summarized loop state and were omitted",
+                summarized_facts
+            ));
+        }
+        if unrolled_loops > 1 {
+            partial_notes.push(format!(
+                "{} loops in this function are unrolled; facts at a loop reached through an \
+                 earlier one hold for that bounded prefix only",
+                unrolled_loops
+            ));
+        }
+        partial_notes.sort();
+        partial_notes.dedup();
+        let unavailable = heads
+            .iter()
+            .all(|head| head.facts.is_empty())
+            .then(|| "no source-level loop-head relation survived WP simplification".to_string());
+        LoopInvariantEvidenceForLoop {
+            loop_id: loop_info.loop_id,
+            depth,
+            carried_names,
+            heads,
+            partial_notes,
+            unavailable,
+        }
+    }
+
     /// Perform a loop transformation that eliminate back-edges in a loop and flatten the function
     /// CFG into a directed acyclic graph (DAG).
     ///
@@ -394,7 +823,7 @@ impl LoopAnalysisProcessor {
         data: FunctionData,
         loop_header: &Label,
         unrolling_mark: &LoopUnrollingMark,
-    ) -> FunctionData {
+    ) -> (FunctionData, BTreeMap<usize, Label>) {
         let options = ProverOptions::get(func_env.module_env.env);
         let mut builder =
             FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
@@ -439,6 +868,15 @@ impl LoopAnalysisProcessor {
         }
         // the last back edge points to the stop block
         label_remapping.insert((*loop_header, unrolling_mark.iter_count), stop_label);
+        let mut head_labels = BTreeMap::from([(0, *loop_header)]);
+        for i in 0..unrolling_mark.iter_count {
+            head_labels.insert(
+                i + 1,
+                *label_remapping
+                    .get(&(*loop_header, i))
+                    .expect("unrolled loop header label"),
+            );
+        }
 
         // pre-populate the bytecode in unrolled iterations
         for i in 0..unrolling_mark.iter_count {
@@ -508,6 +946,17 @@ impl LoopAnalysisProcessor {
             builder.emit(bytecode);
         }
 
-        builder.data
+        (builder.data, head_labels)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{bounded_evidence_work, MAX_BOUNDED_EVIDENCE_WORK};
+
+    #[test]
+    fn bounded_evidence_budget_counts_all_loop_analyses() {
+        assert!(bounded_evidence_work(11, 3) <= MAX_BOUNDED_EVIDENCE_WORK);
+        assert!(bounded_evidence_work(12, 3) > MAX_BOUNDED_EVIDENCE_WORK);
     }
 }

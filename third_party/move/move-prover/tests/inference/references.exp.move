@@ -134,9 +134,7 @@ module 0x42::references {
     spec sum_rgb(c: Color): u16 {
         pragma opaque = true;
         ensures [inferred] result == (c.r as u16) + (c.g as u16) + (c.b as u16);
-        aborts_if [inferred] (c.r as u16) + (c.g as u16) + (c.b as u16) > MAX_U16;
         aborts_if [inferred] c is Red;
-        aborts_if [inferred] (c.r as u16) + (c.g as u16) > MAX_U16;
     }
 
 }

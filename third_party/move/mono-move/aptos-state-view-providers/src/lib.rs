@@ -30,14 +30,13 @@ use mono_move_core::{
     OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap};
+use mono_move_runtime::{deserialize_into, Heap, SharedArena};
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
-use std::cell::RefCell;
+use std::{cell::RefCell, ptr::NonNull};
 use thiserror::Error;
-use triomphe::Arc;
 
 /// Default size of the provider's value arena. Occupancy is bounded by one
 /// materialization per distinct key read, so this fits any realistic use.
@@ -144,9 +143,10 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
     /// Bump arena holding the flat values that reads hand out pointers into.
-    /// Never collected or reset; occupancy is bounded by one materialization
-    /// per distinct key, thanks to the value cache.
-    arena: Heap,
+    /// Shared so each read can pin the source heap where the read points to.
+    /// Never collected or reset; occupancy is bounded by one materialization per
+    /// distinct key, thanks to the value cache.
+    arena: std::sync::Arc<SharedArena>,
     /// Materialized reads, including negative ones. Sound because execution
     /// never mutates a value through a `StorageRead` pointer (mutation copies
     /// into the transaction's own heap first).
@@ -162,7 +162,7 @@ struct ProviderState {
     ///
     /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
     /// gets hashed by its crypto digest.
-    groups: FxHashMap<StateKey, Option<Arc<GroupMembers>>>,
+    groups: FxHashMap<StateKey, Option<GroupMembers>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
@@ -180,7 +180,8 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             guard,
             state_view,
             inner: RefCell::new(ProviderState {
-                arena: Heap::new(arena_size),
+                #[allow(clippy::arc_with_non_send_sync)]
+                arena: std::sync::Arc::new(SharedArena::new(arena_size)),
                 values: FxHashMap::default(),
                 groups: FxHashMap::default(),
             }),
@@ -206,9 +207,10 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             Some(group_ty) => {
                 let tag = nominal_tag(group_ty)?;
                 let group_key = StateKey::resource_group(&key.address(), &tag);
+                let member_tag = nominal_tag(key.value_ty())?;
                 Ok(self
                     .group_members(&group_key)?
-                    .and_then(|members| members.get(&key.value_ty()).cloned()))
+                    .and_then(|members| members.get(&member_tag).cloned()))
             },
         }
     }
@@ -224,7 +226,7 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
     ) -> Result<StorageRead, ResourceProviderError> {
         let cache_key = (key.clone(), group);
         if let Some(read) = self.inner.borrow().values.get(&cache_key) {
-            return Ok(*read);
+            return Ok(read.clone());
         }
         let internal = |detail: String| ResourceProviderError::InvariantViolation(detail);
         let Some(blob) = self
@@ -252,19 +254,23 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
             .ok_or_else(|| internal(format!("no GC descriptor for {:?}", key.address())))?;
 
         let mut inner = self.inner.borrow_mut();
-        let obj = inner
-            .arena
-            .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
-            .ok_or_else(|| internal("resource arena is full".to_string()))?;
-        // SAFETY: `obj` is a freshly reserved object sized for the value's
-        // layout; `deserialize_into` writes the flat value there.
-        unsafe { deserialize_into(self.guard, &mut inner.arena, ty, &blob, obj.as_ptr()) }
-            .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
+        let arena = inner.arena.clone();
+        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<NonNull<u8>, _> {
+            let obj = heap
+                .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
+                .ok_or_else(|| internal("resource arena is full".to_string()))?;
+            // SAFETY: `obj` is a freshly reserved object sized for the value's
+            // layout; `deserialize_into` writes the flat value there.
+            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.as_ptr()) }
+                .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
+            Ok(obj)
+        })?;
         let read = StorageRead::ExternalHeap {
             ptr: obj,
             version: 0,
+            pin: arena,
         };
-        inner.values.insert(cache_key, read);
+        inner.values.insert(cache_key, read.clone());
         Ok(read)
     }
 }
@@ -272,16 +278,20 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
     /// Loaded from the state view on first access, caching absence as well so a
     /// missing group is read at most once.
-    fn group_members(&self, group_key: &StateKey) -> Result<Option<Arc<GroupMembers>>> {
+    // TODO(perf): Change read-API to be fine grained! We only need to get all members
+    //   for materialization on the write path where copy is needed. But read-path can
+    //   and should avoid full copies.
+    fn group_members(
+        &self,
+        group_key: &StateKey,
+    ) -> Result<Option<GroupMembers>, ResourceProviderError> {
         if let Some(members) = self.inner.borrow().groups.get(group_key) {
             return Ok(members.clone());
         }
-        let members = match self
-            .state_view
-            .get_state_value(group_key)
-            .map_err(|e| anyhow!("group read failed: {e}"))?
-        {
-            Some(value) => Some(Arc::new(decode_group_members(value.bytes(), self.guard)?)),
+        let members = match self.state_view.get_state_value(group_key).map_err(|e| {
+            ResourceProviderError::InvariantViolation(format!("group read failed: {e}"))
+        })? {
+            Some(value) => Some(decode_group_members(value.bytes())?),
             None => None,
         };
         self.inner

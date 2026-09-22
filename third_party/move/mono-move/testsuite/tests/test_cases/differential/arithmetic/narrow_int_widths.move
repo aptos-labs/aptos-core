@@ -114,15 +114,19 @@ module 0x1::test {
 // RUN: execute 0x1::test::add_u16 --args 65535, 1
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
 // CHECK-V2-SUBSTR: error:
+// CHECK-ERROR-PARITY
 // u32 division by zero.
 // RUN: execute 0x1::test::div_u32 --args 100, 0
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
 // CHECK-V2-SUBSTR: error:
+// CHECK-ERROR-PARITY
 // i32 multiply overflow.
 // RUN: execute 0x1::test::mul_i32 --args 100000, 100000
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
 // CHECK-V2-SUBSTR: error:
+// CHECK-ERROR-PARITY
 // Negate of i16::MIN overflows.
 // RUN: execute 0x1::test::neg_i16 --args -32768
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
 // CHECK-V2-SUBSTR: error:
+// CHECK-ERROR-PARITY

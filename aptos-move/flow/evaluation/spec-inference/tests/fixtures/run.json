@@ -1,0 +1,31 @@
+{
+ "allowed_edit_paths": [
+  "sources/**/*.move"
+ ],
+ "arm": "agent_only",
+ "block": 1,
+ "controller_harness_sha256": "cc5f07ede505e9d8f8fe112941a2d6d5ba8e0e50aa52584c051fee5c045d3113",
+ "experiment_config_sha256": "08011d36fca0a484c4bdaaa84cea6c8919317e01f441f5236ce84402b25741b9",
+ "feedback_level": "acceptance",
+ "initial_tree_sha256": "074c408ad3f4d7a888b98792ae733720c3521da732e15ac662f00a00c04c8d7c",
+ "move_flow_sha256": "da301542f2e8d01905a0b033e7a1c8a9f3bb65039416939d90eb04f9d1b27b27",
+ "mutant_manifest_sha256": "f06be25e83ce3fd7b9502c69a4e83a56ca26f4d5919b56bdb274ee05b71f6144",
+ "order": 2,
+ "package_relpath": ".",
+ "plugin_dir": "plugin",
+ "plugin_manifest_sha256": "a52c35e2039f645675f87a1e6478e841596b692e2b3e23b2f153fe80a29aa05d",
+ "plugin_tree_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+ "prove_timeout_seconds": null,
+ "replicate": 1,
+ "required_contract_categories": [
+  "normal-result",
+  "abort"
+ ],
+ "round_id": "smoke-001",
+ "run_id": "smoke-001-MD-median-015-r01-agent-only-acceptance",
+ "schema_version": 2,
+ "shared_package": "shared",
+ "target": "decibel_dex::extracted_median::get_median_price",
+ "task_id": "MD-median-015",
+ "task_patch": "task.patch"
+}

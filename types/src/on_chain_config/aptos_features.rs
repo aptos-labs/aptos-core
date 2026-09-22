@@ -11,6 +11,7 @@ use move_core_types::{
     language_storage::CORE_CODE_ADDRESS,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use strum_macros::{EnumString, FromRepr};
 
 /// The feature flags defined in the Move source. This must stay aligned with the constants there.
@@ -225,11 +226,35 @@ pub enum FeatureFlag {
     /// (a module self-initializes on first use rather than via a genesis-time `init_module`).
     /// While disabled, that entry point aborts.
     LAZY_MODULE_INITIALIZATION = 127,
+    /// When enabled, new MonoMove VM is used for execution instead of the V1 Move VM.
+    ENABLE_MONO_MOVE = 128,
+    /// When enabled, function types whose abilities are not a subset of `copy + drop + store`
+    /// are rejected during `TypeTag` construction and module or script verification. Modules
+    /// are verified on every load, so a previously published module with such a signature
+    /// stops loading once this is enabled.
+    CHECK_FUNCTION_TYPE_ABILITIES = 129,
+}
+
+/// Environment variable that adds [`FeatureFlag::ENABLE_MONO_MOVE`] to the default
+/// feature set.
+///
+/// Set for tests only to run testsuites as if MonoMove is enabled. Must never be
+/// set outside tests.
+pub const MONO_MOVE_ENV_VAR: &str = "MONO_MOVE_ENABLED";
+
+/// Returns true if [`MONO_MOVE_ENV_VAR`] is set to `1` or `true`. Anything else,
+/// including an unset variable, is off. Should be only used for testing.
+pub fn mono_move_env_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| match std::env::var(MONO_MOVE_ENV_VAR) {
+        Ok(value) => matches!(value.to_lowercase().as_str(), "1" | "true"),
+        Err(_) => false,
+    })
 }
 
 impl FeatureFlag {
     pub fn default_features() -> Vec<Self> {
-        vec![
+        let mut features = vec![
             Self::CODE_DEPENDENCY_CHECK,
             Self::TREAT_FRIEND_AS_PRIVATE,
             Self::SHA_512_AND_RIPEMD_160_NATIVES,
@@ -339,7 +364,12 @@ impl FeatureFlag {
             Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
             Self::HOTNESS_IN_EPILOGUE,
             Self::ENCRYPTED_TRANSACTIONS,
-        ]
+            Self::CHECK_FUNCTION_TYPE_ABILITIES,
+        ];
+        if mono_move_env_enabled() {
+            features.push(Self::ENABLE_MONO_MOVE);
+        }
+        features
     }
 }
 
@@ -588,6 +618,10 @@ impl Features {
 
     pub fn is_closure_bcs_serialization_disabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION)
+    }
+
+    pub fn is_mono_move_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_MONO_MOVE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

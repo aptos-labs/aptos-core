@@ -87,6 +87,13 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, BlockError> {
+        let local_config = BlockExecutorLocalConfig {
+            concurrency_level: NativeConfig::get_concurrency_level(),
+            enable_pre_write: false,
+            ..BlockExecutorLocalConfig::default_with_concurrency_level(
+                NativeConfig::get_concurrency_level(),
+            )
+        };
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block::<
             _,
             NoOpTransactionCommitHook<VMStatus>,
@@ -94,15 +101,9 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         >(
             txn_provider,
             state_view,
-            &AptosModuleCacheManager::new(),
+            &AptosModuleCacheManager::new(local_config.clone()),
             BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    concurrency_level: NativeConfig::get_concurrency_level(),
-                    enable_pre_write: false,
-                    ..BlockExecutorLocalConfig::default_with_concurrency_level(
-                        NativeConfig::get_concurrency_level(),
-                    )
-                },
+                local: local_config,
                 onchain: onchain_config,
             },
             transaction_slice_metadata,

@@ -1,0 +1,15 @@
+[package]
+name = "InferenceCorpusEtnaV3"
+version = "1.0.0"
+
+# No dependencies: everything the targets need is vendored under
+# sources/deps/, so the package can be copied anywhere. The screen and the
+# run controller both relocate it.
+
+[addresses]
+decibel_dex = "0x4e110"
+decibel_campaign = "0x4e110"
+decibel_vault = "0x4e110"
+aptos_experimental = "0x7"
+std = "0x1"
+aptos_std = "0x1"

@@ -1,0 +1,61 @@
+--- a/sources/etna/extracted_tier_lookup.move
++++ b/sources/etna/extracted_tier_lookup.move
+@@ -42,0 +43,6 @@ module decibel_campaign::extracted_tier_lookup {
++        } spec {
++            invariant i <= n;
++            invariant n == len(tiers);
++            invariant result_credits == last_credits(tiers, days, i);
++            invariant result_tier_rank == last_rank(tiers, days, i);
++            invariant result_leverage == last_leverage(tiers, days, i);
+@@ -57,0 +64,4 @@ module decibel_campaign::extracted_tier_lookup {
++        } spec {
++            invariant i <= n;
++            invariant n == len(tiers);
++            invariant result == last_leverage_for_rank(tiers, tier_rank, i);
+@@ -60,0 +71,46 @@ module decibel_campaign::extracted_tier_lookup {
++
++    spec module {
++        /// The credits a scan of the first `k` tiers leaves behind: the **last**
++        /// qualifying tier wins, because neither loop breaks. Stating the first
++        /// match instead states a different function.
++        fun last_credits(tiers: vector<Tier>, days: num, k: num): u8 {
++            if (k <= 0) { 0 }
++            else if (days >= tiers[k - 1].duration_days) { tiers[k - 1].credits }
++            else { last_credits(tiers, days, k - 1) }
++        }
++
++        fun last_rank(tiers: vector<Tier>, days: num, k: num): u8 {
++            if (k <= 0) { 0 }
++            else if (days >= tiers[k - 1].duration_days) { tiers[k - 1].tier_rank }
++            else { last_rank(tiers, days, k - 1) }
++        }
++
++        fun last_leverage(tiers: vector<Tier>, days: num, k: num): u64 {
++            if (k <= 0) { 0 }
++            else if (days >= tiers[k - 1].duration_days) { tiers[k - 1].leverage }
++            else { last_leverage(tiers, days, k - 1) }
++        }
++
++        fun last_leverage_for_rank(
++            tiers: vector<Tier>, rank: num, k: num
++        ): u64 {
++            if (k <= 0) { 0 }
++            else if (tiers[k - 1].tier_rank == rank) { tiers[k - 1].leverage }
++            else { last_leverage_for_rank(tiers, rank, k - 1) }
++        }
++    }
++
++    spec credits_for_duration_days {
++        pragma opaque;
++        aborts_if [inferred] false;
++        ensures [inferred] result_1 == last_credits(cfg.tiers, days, len(cfg.tiers));
++        ensures [inferred] result_2 == last_rank(cfg.tiers, days, len(cfg.tiers));
++        ensures [inferred] result_3 == last_leverage(cfg.tiers, days, len(cfg.tiers));
++    }
++
++    spec leverage_for_tier_rank {
++        pragma opaque;
++        aborts_if [inferred] false;
++        ensures [inferred] result
++            == last_leverage_for_rank(cfg.tiers, tier_rank, len(cfg.tiers));
++    }

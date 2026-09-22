@@ -33,7 +33,7 @@ module 0x42::ref_result_pred {
         pragma opaque = true;
         ensures [inferred] result == result_of<peek>(old(self));
         ensures [inferred] ensures_of<peek>(self, result, self);
-        aborts_if [inferred] aborts_of<peek>(self);
+        aborts_if [inferred] false;
     }
 
 }

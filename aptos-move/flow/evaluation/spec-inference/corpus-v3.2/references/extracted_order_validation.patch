@@ -1,0 +1,25 @@
+--- a/sources/etna/extracted_order_validation.move
++++ b/sources/etna/extracted_order_validation.move
+@@ -27,0 +28,22 @@ module decibel_dex::extracted_order_validation {
++
++    spec validate_order_input {
++        pragma opaque;
++        // `&&` short-circuits, so an operand is only evaluated once every
++        // earlier one held. The function is therefore abort-free unless the
++        // guards before a `%` have passed, which is exactly what reordering
++        // the conjuncts would change.
++        aborts_if [inferred] size >= min_size && lot_size == 0;
++        aborts_if [inferred] size >= min_size
++            && lot_size != 0
++            && size % lot_size == 0
++            && tick_size == 0;
++        // Any operand that could be undefined is guarded by an earlier
++        // conjunct, so the conjunction is false there whatever it denotes.
++        ensures [inferred] result == (
++            size >= min_size
++                && size % lot_size == 0
++                && price % tick_size == 0
++                && price >= min_price
++                && price <= max_price
++        );
++    }

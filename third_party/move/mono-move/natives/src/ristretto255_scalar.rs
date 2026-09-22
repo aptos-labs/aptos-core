@@ -22,7 +22,7 @@ const SCALAR_NUM_BYTES: usize = 32;
 /// high bit, matching V1's `scalar_from_valid_bytes`. The Move `Scalar` type
 /// guarantees the length, so a mismatch is an invariant violation, not a user
 /// abort.
-fn scalar_from_bytes(bytes: &[u8]) -> VMResult<Scalar> {
+pub(crate) fn scalar_from_bytes(bytes: &[u8]) -> VMResult<Scalar> {
     let slice = <[u8; SCALAR_NUM_BYTES]>::try_from(bytes)
         .map_err(|_| native_invariant_violation("ristretto255 scalar must be 32 bytes".into()))?;
     Ok(Scalar::from_bits(slice))

@@ -21,7 +21,7 @@ mod user_txn;
 
 pub use errors::{
     DiscardReason, ExecutionStage, ExecutionStatus, MaterializationError, MoveExecutionFailure,
-    PreExecutionCheckFailure, SystemTxnFailure,
+    NoEffectsReason, PreExecutionCheckFailure, SystemTxnFailure,
 };
 pub use executor::AptosTransactionExecutor;
 pub use natives::production_natives;

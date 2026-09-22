@@ -5,6 +5,8 @@ error: property `bar` is not valid in this context
   │
 7 │         pragma bar = true;
   │         ^^^^^^^^^^^^^^^^^^
+  │
+  = valid pragmas here are: aborts_if_is_partial, aborts_if_is_strict, emits_is_partial, emits_is_strict, inference, intrinsic, unroll, verify
 
 error: property `verify` specified more than once in the same pragma declaration
    ┌─ tests/checking/specs/pragmas_err.move:19:24

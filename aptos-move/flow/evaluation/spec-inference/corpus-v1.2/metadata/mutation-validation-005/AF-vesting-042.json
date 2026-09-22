@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-vesting-042/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-rjh8mwlo/package",
+            "--output",
+            "/tmp/move-inference-mutant-rjh8mwlo/unused.json"
+          ],
+          "duration_ms": 4467,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-vesting-042-bumps-last-vested",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-rjh8mwlo/package",
+            "--target",
+            "0x1::vesting::vesting_schedule",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-rjh8mwlo/prover-report.json"
+          ],
+          "duration_ms": 6147,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-tfryt37d/package",
+            "--output",
+            "/tmp/move-inference-mutant-tfryt37d/unused.json"
+          ],
+          "duration_ms": 3377,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-vesting-042-swaps-fields",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-tfryt37d/package",
+            "--target",
+            "0x1::vesting::vesting_schedule",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-tfryt37d/prover-report.json"
+          ],
+          "duration_ms": 5808,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-8g5atcom/package",
+            "--output",
+            "/tmp/move-inference-mutant-8g5atcom/unused.json"
+          ],
+          "duration_ms": 3124,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-vesting-042-drops-fractions",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-8g5atcom/package",
+            "--target",
+            "0x1::vesting::vesting_schedule",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-8g5atcom/prover-report.json"
+          ],
+          "duration_ms": 5943,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::vesting::vesting_schedule"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-vesting-042/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-bq2ngm28/package",
+            "--output",
+            "/tmp/move-inference-mutant-bq2ngm28/unused.json"
+          ],
+          "duration_ms": 4975,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-vesting-042-zeroes-start",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-bq2ngm28/package",
+            "--target",
+            "0x1::vesting::vesting_schedule",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-bq2ngm28/prover-report.json"
+          ],
+          "duration_ms": 6653,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-ufu37mx5/package",
+            "--output",
+            "/tmp/move-inference-mutant-ufu37mx5/unused.json"
+          ],
+          "duration_ms": 3372,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-vesting-042-bumps-period",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-ufu37mx5/package",
+            "--target",
+            "0x1::vesting::vesting_schedule",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-ufu37mx5/prover-report.json"
+          ],
+          "duration_ms": 5918,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-m6ktmukb/package",
+            "--output",
+            "/tmp/move-inference-mutant-m6ktmukb/unused.json"
+          ],
+          "duration_ms": 2868,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-vesting-042-zeroes-last-vested",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-m6ktmukb/package",
+            "--target",
+            "0x1::vesting::vesting_schedule",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-m6ktmukb/prover-report.json"
+          ],
+          "duration_ms": 6149,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::vesting::vesting_schedule"
+  }
+}

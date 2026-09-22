@@ -11,6 +11,8 @@
 //! scoreboard.
 
 use mono_move_testsuite::unit_test;
+use move_model::metadata::LanguageVersion;
+use move_package::BuildConfig;
 use std::path::Path;
 
 fn run_tests_for_pkg(pkg: &str, use_latest_language: bool) {
@@ -18,7 +20,15 @@ fn run_tests_for_pkg(pkg: &str, use_latest_language: bool) {
         .join("../../../../aptos-move/framework")
         .join(pkg);
 
-    let summary = unit_test::run_package_unit_tests(&path, use_latest_language)
+    let mut build_config = BuildConfig::default();
+    if use_latest_language {
+        let language_version = LanguageVersion::latest();
+        let bytecode_version = language_version.infer_bytecode_version(None);
+        build_config.compiler_config.language_version = Some(language_version);
+        build_config.compiler_config.bytecode_version = Some(bytecode_version);
+    }
+
+    let summary = unit_test::run_package_unit_tests(&path, build_config)
         .unwrap_or_else(|err| panic!("failed to run {pkg} unit tests: {err}"));
 
     println!("{}", summary.render());

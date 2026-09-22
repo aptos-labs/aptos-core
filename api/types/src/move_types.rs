@@ -952,7 +952,7 @@ impl TryFrom<&MoveType> for TypeTag {
             MoveType::Reference { .. } | MoveType::Unparsable(_) => {
                 return Err(anyhow::anyhow!(
                     "Invalid move type for converting into `TypeTag`: {:?}",
-                    &tag
+                    tag
                 ))
             },
         };

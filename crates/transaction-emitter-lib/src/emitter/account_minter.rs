@@ -357,10 +357,8 @@ impl<'t> AccountMinter<'t> {
         let txn_factory = self.txn_factory.clone();
 
         // For each seed account, create a future and transfer coins from that seed account to new accounts
-        let account_futures = seed_accounts
-            .into_iter()
-            .zip(local_accounts_by_seed.into_iter())
-            .map(|(seed_account, accounts)| {
+        let account_futures = seed_accounts.into_iter().zip(local_accounts_by_seed).map(
+            |(seed_account, accounts)| {
                 // Spawn new threads
                 create_and_fund_new_accounts(
                     seed_account,
@@ -371,7 +369,8 @@ impl<'t> AccountMinter<'t> {
                     &txn_factory,
                     &request_counters,
                 )
-            });
+            },
+        );
 
         // Each future creates 10 accounts, limit concurrency to 1000.
         let stream = futures::stream::iter(account_futures).buffer_unordered(CREATION_PARALLELISM);

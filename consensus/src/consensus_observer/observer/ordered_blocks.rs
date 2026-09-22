@@ -626,7 +626,7 @@ mod test {
         );
 
         // Verify the ordered blocks don't have any commit decisions
-        for (_, (_, commit_decision)) in all_ordered_blocks.iter() {
+        for (_, commit_decision) in all_ordered_blocks.values() {
             assert!(commit_decision.is_none());
         }
 

@@ -5,6 +5,7 @@
 
 mod cache;
 mod epoch_ending;
+mod hot_state_values;
 mod mock;
 mod new_transaction_outputs;
 mod new_transactions;

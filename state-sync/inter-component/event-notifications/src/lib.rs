@@ -267,7 +267,7 @@ impl EventSubscriptionService {
         }
 
         let new_configs = self.read_on_chain_configs(version)?;
-        for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
+        for reconfig_subscription in self.reconfig_subscriptions.values_mut() {
             reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
         }
 
@@ -350,7 +350,7 @@ impl EventSubscription {
 
     fn notify_subscriber_of_events(&mut self, version: Version) -> Result<(), Error> {
         let event_notification = EventNotification {
-            subscribed_events: self.event_buffer.drain(..).collect(),
+            subscribed_events: std::mem::take(&mut self.event_buffer),
             version,
         };
 

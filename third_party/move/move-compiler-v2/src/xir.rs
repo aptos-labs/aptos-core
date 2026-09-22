@@ -263,6 +263,12 @@ fn validate(module: &XirModule) -> Result<()> {
         valid_identifier("external module", &reference.module)?;
         valid_identifier("external function", &reference.function)?;
     }
+    for reference in &module.external_structs {
+        AccountAddress::from_hex_literal(&reference.address)
+            .with_context(|| format!("invalid external module address `{}`", reference.address))?;
+        valid_identifier("external module", &reference.module)?;
+        valid_identifier("external struct", &reference.name)?;
+    }
     Ok(())
 }
 
@@ -319,7 +325,9 @@ fn validate_operation_type_parameters(
         | Oper::ExistsInst(_, args)
         | Oper::FunctionInst(_, args)
         | Oper::BorrowFieldInst(_, args)
-        | Oper::BorrowGlobalInst(_, args) => args,
+        | Oper::BorrowGlobalInst(_, args)
+        | Oper::BorrowVariantFieldInst(_, _, args)
+        | Oper::TestVariantRefInst(_, args) => args,
         _ => return Ok(()),
     };
     for arg in args {
@@ -369,16 +377,75 @@ pub fn import_sources(
 }
 
 fn external_modules_available(env: &GlobalEnv, xir: &XirModule) -> bool {
-    xir.external_functions.iter().all(|reference| {
-        let Ok(address) = AccountAddress::from_hex_literal(&reference.address) else {
+    let available = |address: &str, module: &str| {
+        let Ok(address) = AccountAddress::from_hex_literal(address) else {
             return false;
         };
-        let name = ModuleName::new(
-            Address::Numerical(address),
-            env.symbol_pool().make(&reference.module),
-        );
+        let name = ModuleName::new(Address::Numerical(address), env.symbol_pool().make(module));
         env.find_module(&name).is_some()
-    })
+    };
+    xir.external_functions
+        .iter()
+        .all(|reference| available(&reference.address, &reference.module))
+        && xir
+            .external_structs
+            .iter()
+            .all(|reference| available(&reference.address, &reference.module))
+}
+
+/// Resolve the external struct table against the loaded modules, in table
+/// order, so struct ids beyond the local table index it.
+fn external_structs(env: &GlobalEnv, xir: &XirModule) -> Result<Vec<QualifiedId<StructId>>> {
+    xir.external_structs
+        .iter()
+        .map(|reference| {
+            let address = AccountAddress::from_hex_literal(&reference.address)?;
+            let module_name = ModuleName::new(
+                Address::Numerical(address),
+                env.symbol_pool().make(&reference.module),
+            );
+            let module = env.find_module(&module_name).with_context(|| {
+                format!(
+                    "external module `{}::{}` is not loaded",
+                    reference.address, reference.module
+                )
+            })?;
+            let struct_env = module
+                .find_struct(env.symbol_pool().make(&reference.name))
+                .with_context(|| {
+                    format!(
+                        "external module `{}::{}` has no struct `{}`",
+                        reference.address, reference.module, reference.name
+                    )
+                })?;
+            Ok(module.get_id().qualified(struct_env.get_id()))
+        })
+        .collect()
+}
+
+/// The structs a module's types may mention: its own, then the external
+/// ones, in table order.
+struct StructScope<'a> {
+    module_id: ModuleId,
+    local: &'a [StructId],
+    external: &'a [QualifiedId<StructId>],
+}
+
+impl StructScope<'_> {
+    fn resolve(&self, id: usize, kind: &str) -> Result<(ModuleId, StructId)> {
+        if let Some(struct_id) = self.local.get(id) {
+            return Ok((self.module_id, *struct_id));
+        }
+        let external_id = id
+            .checked_sub(self.local.len())
+            .with_context(|| format!("{kind} id underflow"))?;
+        self.external
+            .get(external_id)
+            .map(|qid| (qid.module_id, qid.id))
+            .with_context(|| {
+                format!("{kind} id {id} is outside the local and external struct tables")
+            })
+    }
 }
 
 fn model_attribute(env: &mut GlobalEnv, loc: &Loc, attribute: &XirAttribute) -> Result<Attribute> {
@@ -457,6 +524,12 @@ fn import_source(
         .iter()
         .map(|decl| FunId::new(env.symbol_pool().make(&decl.name)))
         .collect::<Vec<_>>();
+    let external_struct_ids = external_structs(env, xir)?;
+    let scope = StructScope {
+        module_id,
+        local: &struct_ids,
+        external: &external_struct_ids,
+    };
 
     let mut structs = vec![];
     for (decl, struct_id) in xir.structs.iter().zip(&struct_ids) {
@@ -468,7 +541,7 @@ fn import_source(
                 loc: loc.clone(),
                 offset,
                 variant: None,
-                ty: model_type(&field.ty, module_id, &struct_ids)?,
+                ty: model_type(&field.ty, &scope)?,
                 is_ghost: false,
                 init: None,
             });
@@ -491,7 +564,7 @@ fn import_source(
                         loc: loc.clone(),
                         offset,
                         variant: Some(variant_symbol),
-                        ty: model_type(&field.ty, module_id, &struct_ids)?,
+                        ty: model_type(&field.ty, &scope)?,
                         is_ghost: false,
                         init: None,
                     });
@@ -515,7 +588,7 @@ fn import_source(
         let local_types = decl
             .locals
             .iter()
-            .map(|ty| model_type(ty, module_id, &struct_ids))
+            .map(|ty| model_type(ty, &scope))
             .collect::<Result<Vec<_>>>()?;
         let params = local_types
             .iter()
@@ -538,7 +611,7 @@ fn import_source(
         let returns = Type::tuple(
             decl.returns
                 .iter()
-                .map(|ty| model_type(ty, module_id, &struct_ids))
+                .map(|ty| model_type(ty, &scope))
                 .collect::<Result<Vec<_>>>()?,
         );
         let acquired = decl
@@ -582,7 +655,16 @@ fn import_source(
     );
     for (decl, fun_id) in xir.functions.iter().zip(&function_ids) {
         let qid = module_id.qualified(*fun_id);
-        let data = translate_function(env, xir, module_id, &struct_ids, &function_ids, decl, qid)?;
+        let data = translate_function(
+            env,
+            xir,
+            module_id,
+            &struct_ids,
+            &external_struct_ids,
+            &function_ids,
+            decl,
+            qid,
+        )?;
         targets.insert_target_data(&qid, FunctionVariant::Baseline, data);
     }
     add_transitive_callee_targets(env, module_id, targets);
@@ -681,7 +763,7 @@ fn move_visibility(visibility: &XirVisibility) -> MoveVisibility {
     }
 }
 
-fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type> {
+fn model_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
     Ok(match ty {
         Ty::Bool => Type::Primitive(PrimitiveType::Bool),
         Ty::U8 => Type::Primitive(PrimitiveType::U8),
@@ -702,46 +784,42 @@ fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type
             );
             Type::TypeParameter(*index as u16)
         },
-        Ty::Struct(id) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("struct id {id} is out of range"))?,
-            vec![],
-        ),
-        Ty::StructInst(id, args) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("struct id {id} is out of range"))?,
-            args.iter()
-                .map(|arg| model_type(arg, module_id, structs))
-                .collect::<Result<Vec<_>>>()?,
-        ),
-        Ty::Enum(id) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("enum id {id} is out of range"))?,
-            vec![],
-        ),
-        Ty::EnumInst(id, args) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("enum id {id} is out of range"))?,
-            args.iter()
-                .map(|arg| model_type(arg, module_id, structs))
-                .collect::<Result<Vec<_>>>()?,
-        ),
-        Ty::Vector(element) => Type::Vector(Box::new(model_type(element, module_id, structs)?)),
+        Ty::Struct(id) => {
+            let (module_id, struct_id) = scope.resolve(*id, "struct")?;
+            Type::Struct(module_id, struct_id, vec![])
+        },
+        Ty::StructInst(id, args) => {
+            let (module_id, struct_id) = scope.resolve(*id, "struct")?;
+            Type::Struct(
+                module_id,
+                struct_id,
+                args.iter()
+                    .map(|arg| model_type(arg, scope))
+                    .collect::<Result<Vec<_>>>()?,
+            )
+        },
+        Ty::Enum(id) => {
+            let (module_id, struct_id) = scope.resolve(*id, "enum")?;
+            Type::Struct(module_id, struct_id, vec![])
+        },
+        Ty::EnumInst(id, args) => {
+            let (module_id, struct_id) = scope.resolve(*id, "enum")?;
+            Type::Struct(
+                module_id,
+                struct_id,
+                args.iter()
+                    .map(|arg| model_type(arg, scope))
+                    .collect::<Result<Vec<_>>>()?,
+            )
+        },
+        Ty::Vector(element) => Type::Vector(Box::new(model_type(element, scope)?)),
         Ty::Ref(referent) => Type::Reference(
             ReferenceKind::Immutable,
-            Box::new(model_type(referent, module_id, structs)?),
+            Box::new(model_type(referent, scope)?),
         ),
         Ty::MutRef(referent) => Type::Reference(
             ReferenceKind::Mutable,
-            Box::new(model_type(referent, module_id, structs)?),
+            Box::new(model_type(referent, scope)?),
         ),
     })
 }
@@ -834,16 +912,23 @@ fn translate_function(
     xir: &XirModule,
     module_id: ModuleId,
     struct_ids: &[StructId],
+    external_struct_ids: &[QualifiedId<StructId>],
     function_ids: &[FunId],
     decl: &FunctionDecl,
     qid: QualifiedId<FunId>,
 ) -> Result<TargetFunctionData> {
     let func_env = env.get_function(qid);
+    let scope = StructScope {
+        module_id,
+        local: struct_ids,
+        external: external_struct_ids,
+    };
     let mut translator = FunctionTranslator {
         env,
         xir,
         module_id,
         struct_ids,
+        external_struct_ids,
         function_ids,
         decl,
         loc: func_env.get_loc(),
@@ -853,7 +938,7 @@ fn translate_function(
         local_types: decl
             .locals
             .iter()
-            .map(|ty| model_type(ty, module_id, struct_ids))
+            .map(|ty| model_type(ty, &scope))
             .collect::<Result<Vec<_>>>()?,
         next_attr: 0,
         next_label: decl.blocks.len(),
@@ -912,7 +997,7 @@ fn translate_function(
     let result_type = Type::tuple(
         decl.returns
             .iter()
-            .map(|ty| model_type(ty, module_id, struct_ids))
+            .map(|ty| model_type(ty, &scope))
             .collect::<Result<Vec<_>>>()?,
     );
     let acquires = decl
@@ -980,6 +1065,7 @@ struct FunctionTranslator<'a> {
     xir: &'a XirModule,
     module_id: ModuleId,
     struct_ids: &'a [StructId],
+    external_struct_ids: &'a [QualifiedId<StructId>],
     function_ids: &'a [FunId],
     decl: &'a FunctionDecl,
     loc: Loc,
@@ -1667,6 +1753,56 @@ impl FunctionTranslator<'_> {
                 self.field(sid, *field)?;
                 StacklessOperation::BorrowField(self.module_id, sid, self.type_args(args)?, *field)
             },
+            Oper::BorrowVariantField(variants, field) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                let sid = self.struct_from_type(self.local(srcs[0])?)?;
+                let variants = variants
+                    .iter()
+                    .map(|variant| self.variant(sid, *variant))
+                    .collect::<Result<Vec<_>>>()?;
+                StacklessOperation::BorrowVariantField(
+                    self.module_id,
+                    sid,
+                    variants,
+                    vec![],
+                    *field,
+                )
+            },
+            Oper::BorrowVariantFieldInst(variants, field, args) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                let sid = self.struct_from_type(self.local(srcs[0])?)?;
+                let variants = variants
+                    .iter()
+                    .map(|variant| self.variant(sid, *variant))
+                    .collect::<Result<Vec<_>>>()?;
+                StacklessOperation::BorrowVariantField(
+                    self.module_id,
+                    sid,
+                    variants,
+                    self.type_args(args)?,
+                    *field,
+                )
+            },
+            Oper::TestVariantRef(variant) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                let sid = self.struct_from_type(self.local(srcs[0])?)?;
+                StacklessOperation::TestVariant(
+                    self.module_id,
+                    sid,
+                    self.variant(sid, *variant)?,
+                    vec![],
+                )
+            },
+            Oper::TestVariantRefInst(variant, args) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                let sid = self.struct_from_type(self.local(srcs[0])?)?;
+                StacklessOperation::TestVariant(
+                    self.module_id,
+                    sid,
+                    self.variant(sid, *variant)?,
+                    self.type_args(args)?,
+                )
+            },
             Oper::BorrowGlobal(id) => {
                 arity(dsts, srcs, 1, 1, oper)?;
                 StacklessOperation::BorrowGlobal(
@@ -1700,9 +1836,12 @@ impl FunctionTranslator<'_> {
     }
 
     fn type_args(&self, args: &[Ty]) -> Result<Vec<Type>> {
-        args.iter()
-            .map(|arg| model_type(arg, self.module_id, self.struct_ids))
-            .collect()
+        let scope = StructScope {
+            module_id: self.module_id,
+            local: self.struct_ids,
+            external: self.external_struct_ids,
+        };
+        args.iter().map(|arg| model_type(arg, &scope)).collect()
     }
 
     fn vector_element_type(&self, ty: &Type) -> Result<Type> {

@@ -1,0 +1,9 @@
+[
+  {"result": "fixture response for infrastructure failure"},
+  {"result": "fixture response for compile failure"},
+  {"result": "fixture response for forbidden weakening"},
+  {"result": "fixture response for prover failure"},
+  {"result": "fixture response for prover timeout"},
+  {"result": "fixture response for no progress"},
+  {"result": "fixture response for operational success"}
+]

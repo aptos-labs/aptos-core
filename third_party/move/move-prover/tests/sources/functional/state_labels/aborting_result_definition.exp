@@ -1,0 +1,38 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/state_labels/aborting_result_definition.move:16:5
+   │
+15 │       fun caller(addr: address): u64 { let _ = addr; fail() }
+   │                                                      ------ abort happened here with code 0x0
+16 │ ╭     spec caller {
+17 │ │         // Negative: the function always aborts.
+18 │ │         aborts_if false;
+19 │ │         ensures {
+   · │
+22 │ │         };
+23 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/state_labels/aborting_result_definition.move:15: caller
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/aborting_result_definition.move:15: caller
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/state_labels/aborting_result_definition.move:29:5
+   │
+26 │           let R { value } = move_from<R>(addr);
+   │                             ------------------ abort happened here with execution failure
+   ·
+29 │ ╭     spec missing {
+30 │ │         // Negative: the intermediate removal cannot assume that R existed
+31 │ │         // on the path where move_from aborted because it was absent.
+32 │ │         aborts_if false;
+33 │ │         ensures (..S |~ remove<R>(addr)) && !(S |~ exists<R>(addr));
+34 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/state_labels/aborting_result_definition.move:25: missing
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/aborting_result_definition.move:26: missing
+   =         ABORTED

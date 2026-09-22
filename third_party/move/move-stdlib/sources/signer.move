@@ -22,9 +22,17 @@ module std::signer {
     /// `borrow_address` borrows this inner field
     native public fun borrow_address(s: &signer): &address;
 
+    spec borrow_address {
+        aborts_if false;
+    }
+
     // Copies the address of the signer
     public fun address_of(s: &signer): address {
         *borrow_address(s)
+    }
+
+    spec address_of {
+        aborts_if false;
     }
 
     /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.

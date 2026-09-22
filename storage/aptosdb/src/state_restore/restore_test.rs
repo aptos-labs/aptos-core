@@ -187,7 +187,7 @@ proptest! {
         let restore_db = Arc::new(MockSnapshotStore::default());
         {
             let mut restore =
-                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
+                StateSnapshotRestore::new(Arc::clone(&restore_db), Arc::clone(&restore_db),  version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
             let proof = tree
                 .get_range_proof(batch1.last().map(|(key, _value)| *key).unwrap(), version)
                 .unwrap();
@@ -199,7 +199,7 @@ proptest! {
             let remaining_accounts: Vec<_> = all.clone().into_iter().skip(batch1_size - overlap_size).collect();
 
             let mut restore =
-                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash, true /* async commit */, StateSnapshotRestoreMode::Default ).unwrap();
+                StateSnapshotRestore::new(Arc::clone(&restore_db), Arc::clone(&restore_db),  version, expected_root_hash, true /* async commit */, StateSnapshotRestoreMode::Default ).unwrap();
             let proof = tree
                 .get_range_proof(
                     remaining_accounts.last().map(|(h, _)| *h).unwrap(),
@@ -275,8 +275,8 @@ fn restore_without_interruption<V>(
 
     let mut restore = if try_resume {
         StateSnapshotRestore::new(
-            target_db,
-            target_db,
+            Arc::clone(target_db),
+            Arc::clone(target_db),
             target_version,
             expected_root_hash,
             true, /* async_commit */
@@ -285,8 +285,8 @@ fn restore_without_interruption<V>(
         .unwrap()
     } else {
         StateSnapshotRestore::new_overwrite(
-            target_db,
-            target_db,
+            Arc::clone(target_db),
+            Arc::clone(target_db),
             target_version,
             expected_root_hash,
             StateSnapshotRestoreMode::Default,

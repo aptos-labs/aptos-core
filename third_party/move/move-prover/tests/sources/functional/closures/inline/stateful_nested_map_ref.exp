@@ -15,6 +15,23 @@ error: cannot resolve `result_of` for this lambda argument: add a spec block to 
     │ ╰─│───────────' from a call inlined at this callsite
     │   ╰──────────' lambda argument
 
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:620:42
+    │
+620 │             invariant forall j in 0..i: !aborts_of<f>(self[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/stateful_nested_map_ref.move:7:27
+    │
+  7 │             v.map_ref(|inner| inner.map_ref(|x| {
+    │ ╭─────────────────────────────'
+    │ │ ╭─────────────────────────────────────────'
+  8 │ │ │             R[@0x42].value = R[@0x42].value + 1;
+  9 │ │ │             *x + 1
+ 10 │ │ │         }))
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
 error: cannot resolve `aborts_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
     ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:620:42
     │

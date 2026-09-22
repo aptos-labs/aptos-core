@@ -150,7 +150,7 @@ impl AcquiredResources {
     /// Joins the resources acquired by `other_fun`
     fn join(&mut self, other_fun: FunId, other_fun_called_at: Loc, other_acquries: &Self) -> bool {
         let mut changed = false;
-        for (sid, _) in other_acquries.0.iter() {
+        for sid in other_acquries.0.keys() {
             use std::collections::btree_map::Entry::*;
             match self.0.entry(*sid) {
                 Vacant(e) => {
@@ -217,7 +217,7 @@ impl<'a> AcquireChecker<'a> {
         let reversed_call_graph = call_graph.iter().fold(
             BTreeMap::new(),
             |mut reversed: BTreeMap<FunId, BTreeSet<FunId>>, (caller, callees)| {
-                for (callee, _) in callees.iter() {
+                for callee in callees.keys() {
                     reversed.entry(*callee).or_default().insert(*caller);
                 }
                 reversed

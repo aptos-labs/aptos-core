@@ -12,8 +12,8 @@ use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionBlock,
-        TransactionExecutableRef, Version,
+        BlockEpiloguePayload, PersistedAuxiliaryInfo, SignedTransaction, Transaction,
+        TransactionBlock, TransactionExecutableRef, Version,
     },
 };
 use std::{collections::HashMap, path::Path as FsPath, sync::Arc};
@@ -24,6 +24,7 @@ pub enum BenchmarkTxn {
     User(SignedTransaction),
     BlockMetadata(BlockMetadata),
     BlockMetadataExt(BlockMetadataExt),
+    BlockEpilogue(BlockEpiloguePayload),
 }
 
 impl BenchmarkTxn {
@@ -33,6 +34,7 @@ impl BenchmarkTxn {
             BenchmarkTxn::User(txn) => Transaction::UserTransaction(txn.clone()),
             BenchmarkTxn::BlockMetadata(bm) => Transaction::BlockMetadata(bm.clone()),
             BenchmarkTxn::BlockMetadataExt(bme) => Transaction::BlockMetadataExt(bme.clone()),
+            BenchmarkTxn::BlockEpilogue(payload) => Transaction::BlockEpilogue(payload.clone()),
         }
     }
 
@@ -67,6 +69,11 @@ impl BenchmarkTxn {
                 BlockMetadataExt::V1(_) => "block_metadata_ext_v1".to_string(),
                 BlockMetadataExt::V2(_) => "block_metadata_ext_v2".to_string(),
                 BlockMetadataExt::V3(_) => "block_metadata_ext_v3".to_string(),
+            },
+            BenchmarkTxn::BlockEpilogue(payload) => match payload {
+                BlockEpiloguePayload::V0 { .. } => "block_epilogue_v0".to_string(),
+                BlockEpiloguePayload::V1 { .. } => "block_epilogue_v1".to_string(),
+                BlockEpiloguePayload::V2 { .. } => "block_epilogue_v2".to_string(),
             },
         }
     }
@@ -186,9 +193,9 @@ pub fn load_inputs_from_dir(dir: impl AsRef<FsPath>) -> anyhow::Result<Vec<Bench
 }
 
 /// The benchmark form of `txn`, if it is a kind the benchmark replays:
-/// entry-function user transactions and block-metadata transactions. Both
-/// executors derive everything else (signers, gas, session identity) from the
-/// transaction themselves.
+/// entry-function user transactions, block-metadata transactions, and
+/// block-epilogue transactions. Both executors derive everything else
+/// (signers, gas, session identity) from the transaction themselves.
 fn as_benchmark_transaction(txn: &Transaction) -> Option<BenchmarkTxn> {
     match txn {
         Transaction::UserTransaction(signed) => matches!(
@@ -198,9 +205,9 @@ fn as_benchmark_transaction(txn: &Transaction) -> Option<BenchmarkTxn> {
         .then(|| BenchmarkTxn::User(signed.clone())),
         Transaction::BlockMetadata(bm) => Some(BenchmarkTxn::BlockMetadata(bm.clone())),
         Transaction::BlockMetadataExt(bme) => Some(BenchmarkTxn::BlockMetadataExt(bme.clone())),
+        Transaction::BlockEpilogue(payload) => Some(BenchmarkTxn::BlockEpilogue(payload.clone())),
         Transaction::GenesisTransaction(_)
         | Transaction::StateCheckpoint(_)
-        | Transaction::ValidatorTransaction(_)
-        | Transaction::BlockEpilogue(_) => None,
+        | Transaction::ValidatorTransaction(_) => None,
     }
 }

@@ -64,6 +64,70 @@ impl PseudoGasContext {
     }
 }
 
+/// Returns the pseudo-gas cost of an already-built type tag. Must stay in sync with the formula
+/// [PseudoGasContext] applies while a tag is constructed from a runtime type.
+///
+/// Unlike tag construction, this does not enforce `type_max_cost`. Tags read back from storage
+/// were not necessarily built under the current limit, so failing here would reject values that
+/// are already stored. Costs saturate instead. The traversal is iterative because such a tag can
+/// also be nested more deeply than construction would allow.
+pub(crate) fn ty_tag_pseudo_gas_cost(ty_tag: &TypeTag, vm_config: &VMConfig) -> u64 {
+    let cost_base = vm_config.type_base_cost;
+    let cost_per_byte = vm_config.type_byte_cost;
+
+    let mut cost = 0u64;
+    let mut worklist = vec![ty_tag];
+
+    while let Some(ty_tag) = worklist.pop() {
+        cost = cost.saturating_add(cost_base);
+
+        match ty_tag {
+            TypeTag::Bool
+            | TypeTag::U8
+            | TypeTag::U16
+            | TypeTag::U32
+            | TypeTag::U64
+            | TypeTag::U128
+            | TypeTag::U256
+            | TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::I64
+            | TypeTag::I128
+            | TypeTag::I256
+            | TypeTag::Address
+            | TypeTag::Signer => {},
+
+            TypeTag::Vector(elem_ty_tag) => worklist.push(elem_ty_tag),
+
+            TypeTag::Struct(struct_tag) => {
+                let num_bytes = (struct_tag.address.len()
+                    + struct_tag.module.len()
+                    + struct_tag.name.len()) as u64;
+                cost = cost.saturating_add(num_bytes.saturating_mul(cost_per_byte));
+                worklist.extend(struct_tag.type_args.iter());
+            },
+
+            TypeTag::Function(fun_tag) => {
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities: _,
+                } = fun_tag.as_ref();
+                // A reference wrapper is not a node of its own: tag construction charges the base
+                // cost for the type it wraps, not for the wrapper.
+                worklist.extend(args.iter().chain(results).map(|tag| match tag {
+                    FunctionParamOrReturnTag::Value(ty_tag)
+                    | FunctionParamOrReturnTag::Reference(ty_tag)
+                    | FunctionParamOrReturnTag::MutableReference(ty_tag) => ty_tag,
+                }));
+            },
+        }
+    }
+
+    cost
+}
+
 /// Key type for [TypeTagCache] that corresponds to a fully-instantiated struct.
 #[derive(Clone, Eq, PartialEq)]
 struct StructKey {
@@ -480,7 +544,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag() {
-        let ty_builder = TypeBuilder::with_limits(10, 10, true, true);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
@@ -577,7 +641,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag_too_complex() {
-        let ty_builder = TypeBuilder::with_limits(10, 10, true, true);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
 
         let vm_config = VMConfig {
             type_base_cost: 1,
@@ -657,5 +721,81 @@ mod tests {
         ));
         assert_eq!(err.major_status(), StatusCode::TYPE_TAG_LIMIT_EXCEEDED);
         assert_none!(runtime_environment.ty_tag_cache().get_struct_tag(&idx, &[]));
+    }
+
+    #[test]
+    fn test_ty_tag_pseudo_gas_cost_matches_tag_construction() {
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
+
+        let vm_config = VMConfig {
+            type_base_cost: 3,
+            type_byte_cost: 2,
+            type_max_cost: u64::MAX,
+            ..VMConfig::default_for_test()
+        };
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
+
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let idx = runtime_environment
+            .struct_name_index_map()
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Foo").unwrap(),
+            ))
+            .unwrap();
+        let struct_ty = StructType {
+            idx,
+            layout: StructLayout::Single(vec![(
+                Identifier::new("field").unwrap(),
+                Type::TyParam(0),
+            )]),
+            phantom_ty_params_mask: Default::default(),
+            abilities: AbilitySet::EMPTY,
+            ty_params: vec![StructTypeParameter {
+                constraints: AbilitySet::EMPTY,
+                is_phantom: false,
+            }],
+        };
+
+        let u8_ty = ty_builder.create_u8_ty();
+        let vec_u8_ty = ty_builder.create_vec_ty(&u8_ty).unwrap();
+        let generic_struct_ty = ty_builder
+            .create_struct_instantiation_ty(
+                &struct_ty,
+                &[Type::TyParam(0)],
+                std::slice::from_ref(&vec_u8_ty),
+            )
+            .unwrap();
+
+        let tys = [
+            ty_builder.create_bool_ty(),
+            vec_u8_ty.clone(),
+            ty_builder.create_vec_ty(&vec_u8_ty).unwrap(),
+            generic_struct_ty.clone(),
+            ty_builder.create_vec_ty(&generic_struct_ty).unwrap(),
+            Type::Function {
+                args: vec![
+                    ty_builder.create_ref_ty(&generic_struct_ty, false).unwrap(),
+                    ty_builder.create_ref_ty(&u8_ty, true).unwrap(),
+                    vec_u8_ty,
+                ],
+                results: vec![generic_struct_ty],
+                abilities: AbilitySet::EMPTY,
+            },
+        ];
+
+        for ty in tys {
+            let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+            let ty_tag = assert_ok!(ty_tag_converter.ty_to_ty_tag_impl(&ty, &mut gas_context));
+
+            assert_eq!(
+                ty_tag_pseudo_gas_cost(&ty_tag, runtime_environment.vm_config()),
+                gas_context.current_cost(),
+                "cost mismatch for {:?}",
+                ty_tag
+            );
+        }
     }
 }

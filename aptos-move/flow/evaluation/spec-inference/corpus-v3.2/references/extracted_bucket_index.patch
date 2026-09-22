@@ -1,0 +1,20 @@
+--- a/sources/etna/extracted_bucket_index.move
++++ b/sources/etna/extracted_bucket_index.move
+@@ -22,0 +23,4 @@ module decibel_dex::extracted_bucket_index {
++        } spec {
++            invariant i <= n;
++            invariant n == len(buckets.cutoffs);
++            invariant forall j: u64 where j < i: buckets.cutoffs[j] < leverage;
+@@ -26,0 +31,12 @@ module decibel_dex::extracted_bucket_index {
++
++    spec get_bucket_index {
++        pragma opaque;
++        aborts_if [inferred] false;
++        // The *least* admitting index, stated as a prefix fact plus the
++        // stopping fact; `n` when no cutoff admits the leverage.
++        ensures [inferred] result <= len(buckets.cutoffs);
++        ensures [inferred] forall j: u64 where j < result:
++            buckets.cutoffs[j] < leverage;
++        ensures [inferred] result < len(buckets.cutoffs) ==>
++            leverage <= buckets.cutoffs[result];
++    }

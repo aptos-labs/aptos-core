@@ -30,12 +30,18 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, prelude::*};
+use mono_move_global_context::GlobalContext;
 use move_binary_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::Serialize;
-use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::atomic::AtomicU32};
+use std::{
+    cell::RefCell,
+    fmt::Debug,
+    hash::Hash,
+    sync::{atomic::AtomicU32, Arc},
+};
 
 /// Mode-invariant ingredients for a per-transaction view. The legacy code cache
 /// is isolated here; a VM with its own code caching ignores it.
@@ -67,7 +73,7 @@ pub enum ViewMode<'a, I: TxnInput> {
 pub trait SingleTransactionExecutor {
     type Txn: Transaction;
     type AuxiliaryInfo: AuxiliaryInfoTrait;
-    type Key: Ord + Send + Sync + Clone + Hash + Debug + 'static;
+    type Key: Eq + Send + Sync + Clone + Hash + Debug + 'static;
     type Tag: Ord + Send + Sync + Clone + Hash + Debug + Serialize + 'static;
     type Value: SpeculativeValue + 'static;
 
@@ -79,7 +85,9 @@ pub trait SingleTransactionExecutor {
     /// in; VMs that do not defer runtime checks ignore it.
     fn init(
         environment: &AptosEnvironment,
+        ctx: Arc<GlobalContext>,
         state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        worker_id: u32,
         async_runtime_checks_enabled: bool,
     ) -> Self;
 
@@ -122,6 +130,13 @@ pub trait SingleTransactionExecutor {
     fn pre_write_values(_txn: &Self::Txn) -> Vec<(Self::Key, Self::Value)> {
         vec![]
     }
+
+    /// Materializes a VM in-memory key into the storage key persisted at the
+    /// block epilogue.
+    fn materialize_storage_key(
+        &self,
+        key: Self::Key,
+    ) -> Result<<Self::Txn as Transaction>::Key, PanicError>;
 }
 
 /// Builds the legacy `LatestView` from the view ingredients.
@@ -178,7 +193,9 @@ impl<E: ExecutorTask> SingleTransactionExecutor for LegacyTransactionExecutor<E>
 
     fn init(
         environment: &AptosEnvironment,
+        _ctx: Arc<GlobalContext>,
         state_view: &impl TStateView<Key = <E::Txn as Transaction>::Key>,
+        _worker_id: u32,
         async_runtime_checks_enabled: bool,
     ) -> Self {
         Self {
@@ -275,5 +292,12 @@ impl<E: ExecutorTask> SingleTransactionExecutor for LegacyTransactionExecutor<E>
         ValueWithLayout<<E::Txn as Transaction>::Value>,
     )> {
         E::pre_write_values(txn)
+    }
+
+    fn materialize_storage_key(
+        &self,
+        key: Self::Key,
+    ) -> Result<<E::Txn as Transaction>::Key, PanicError> {
+        Ok(key)
     }
 }

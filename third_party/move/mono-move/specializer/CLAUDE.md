@@ -1,3 +1,1 @@
-# specializer
-
 @AGENTS.md

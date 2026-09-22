@@ -1,0 +1,16 @@
+[package]
+name = "InferenceCorpusFramework"
+version = "1.0.0"
+
+[addresses]
+Extensions = "0x1"
+aptos_experimental = "0x7"
+aptos_framework = "0x1"
+aptos_fungible_asset = "0xA"
+aptos_std = "0x1"
+aptos_token = "0x3"
+aptos_trading = "0x5"
+core_resources = "0xA550C18"
+std = "0x1"
+vm = "0x0"
+vm_reserved = "0x0"

@@ -59,7 +59,9 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
             };
             measure(timing, execute_once)
         },
-        BenchmarkTxn::BlockMetadata(_) | BenchmarkTxn::BlockMetadataExt(_) => {
+        BenchmarkTxn::BlockMetadata(_)
+        | BenchmarkTxn::BlockMetadataExt(_)
+        | BenchmarkTxn::BlockEpilogue(_) => {
             // System transactions go through the block-level entry point,
             // pre-marked as signature-verified like the block executor does.
             let txn = SignatureVerifiedTransaction::Valid(input.txn.to_transaction());

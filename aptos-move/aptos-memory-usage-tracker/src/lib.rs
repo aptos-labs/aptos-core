@@ -574,7 +574,7 @@ where
                             .vm_gas_params()
                             .misc
                             .abs_val
-                            .abstract_packed_size(val)?,
+                            .abstract_packed_size(val, self.feature_version())?,
                     )
                 })?,
         )?;
@@ -596,7 +596,7 @@ where
                         .vm_gas_params()
                         .misc
                         .abs_val
-                        .abstract_packed_size(val)?,
+                        .abstract_packed_size(val, self.feature_version())?,
                 )
             },
         )?);
@@ -610,7 +610,7 @@ where
             self.vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_packed_size(&val)?,
+                .abstract_packed_size(&val, self.feature_version())?,
         )?;
 
         self.base.charge_vec_push_back(val)
@@ -623,7 +623,7 @@ where
                 self.vm_gas_params()
                     .misc
                     .abs_val
-                    .abstract_packed_size(val)?,
+                    .abstract_packed_size(val, self.feature_version())?,
             );
         }
 

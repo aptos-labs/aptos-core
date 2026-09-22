@@ -1,0 +1,257 @@
+
+Diagnostics:
+error: cannot assign to `amount` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:21:46
+   │
+21 │             amount if ({ if (amount > limit) amount = limit; amount <= limit }) => amount,
+   │                                              ^^^^^^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot assign to `x` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:28:26
+   │
+28 │             (x, y) if ({ x = y; x > 1 }) => x,
+   │                          ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot assign to `y` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:35:33
+   │
+35 │             (W::W1(_), y) if ({ y = 1; true }) => y,
+   │                                 ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot assign to `x` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:42:28
+   │
+42 │             W::W1(x) if ({ x = 5; true }) => x,
+   │                            ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot assign to `x` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:49:28
+   │
+49 │             W::W1(x) if ({ x = &7; true }) => *x,
+   │                            ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot mutably borrow `amount` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:58:37
+   │
+58 │             amount if ({ clamp(&mut amount, limit); true }) => amount,
+   │                                     ^^^^^^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot write through mutable reference `r` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:65:22
+   │
+65 │             r if ({ *r = 2; false }) => 0,
+   │                      ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot write through mutable reference `p` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:73:29
+   │
+73 │             W::W1(p) if ({ *p = 7; false }) => 0,
+   │                             ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot pass or copy mutable reference `q` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:74:31
+   │
+74 │             W::W1(q) if (bump(q)) => 1,
+   │                               ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot pass or copy mutable reference `s` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:75:36
+   │
+75 │             W::W1(s) if ({ let t = s; *t = 1; false }) => 2,
+   │                                    ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot move `c` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:82:33
+   │
+82 │             E::V(c) if (consume(c)) => 1,
+   │                                 ^
+   │
+   = pattern variables are read-only until an arm is selected
+
+error: cannot assign to `w` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:91:28
+   │
+91 │             W::W1(_) if ({ w = other; false }) => 0,
+   │                            ^
+   │
+   = the value being matched must not change while guards are evaluated
+
+error: cannot assign to `y` inside a match guard
+   ┌─ tests/match-checks/guard_mutation_errors.move:99:21
+   │
+99 │             1 if ({ y = 2; false }) => 0,
+   │                     ^
+   │
+   = the value being matched must not change while guards are evaluated
+
+error: cannot mutably borrow `y` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:100:32
+    │
+100 │             1 if ({ clamp(&mut y, 0); false }) => 1,
+    │                                ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot pass or copy mutable reference `w` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:107:32
+    │
+107 │             W::W1(_) if (weird(w)) => 0,
+    │                                ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot write through mutable reference `w` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:108:29
+    │
+108 │             W::W1(_) if ({ *w = W::W2(1); false }) => 1,
+    │                             ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot write through mutable reference `w` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:109:28
+    │
+109 │             W::W1(_) if ({ w.0 = 3; false }) => 2,
+    │                            ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot pass or copy mutable reference `w` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:110:36
+    │
+110 │             W::W1(_) if ({ let d = w; false }) => 3,
+    │                                    ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot pass or copy mutable reference `w` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:117:33
+    │
+117 │             W::W1(_) if (match (w) { W::W1(p) => { *p = 1; true }, _ => false }) => 0,
+    │                                 ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot pass or copy mutable reference `w` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:124:37
+    │
+124 │             (W::W1(_), 1) if (weird(w)) => 0,
+    │                                     ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot assign to `k` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:125:33
+    │
+125 │             (W::W1(_), _) if ({ k = 2; false }) => 1,
+    │                                 ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot write through mutable reference `x` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:134:30
+    │
+134 │             1 if (bump(&mut *x)) => 0,
+    │                              ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot write through mutable reference `r` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:142:30
+    │
+142 │             r if (bump(&mut *r)) => 0,
+    │                              ^
+    │
+    = pattern variables are read-only until an arm is selected
+
+error: cannot write through mutable reference `w` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:150:38
+    │
+150 │             W::W1(_) if (weird(&mut *w)) => 0,
+    │                                      ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot write through mutable reference `p` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:151:37
+    │
+151 │             W::W1(p) if (bump(&mut *p)) => 1,
+    │                                     ^
+    │
+    = pattern variables are read-only until an arm is selected
+
+error: cannot modify `s` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:161:35
+    │
+161 │             (S { f: _ }, 1) if ({ s.f = 9; false }) => 0,
+    │                                   ^
+    │
+    = the value being matched must not change while guards are evaluated
+
+error: cannot modify `t` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:168:21
+    │
+168 │             t if ({ t.f = 5; true }) => t.f,
+    │                     ^
+    │
+    = pattern variables are read-only until an arm is selected
+
+error: cannot modify `t` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:175:32
+    │
+175 │             t if ({ set_f(&mut t.f); true }) => t.f,
+    │                                ^
+    │
+    = pattern variables are read-only until an arm is selected
+
+error: cannot modify `c` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:182:27
+    │
+182 │             E::V(c) if ({ c.v = 5; true }) => c.v,
+    │                           ^
+    │
+    = pattern variables are read-only until an arm is selected
+
+error: cannot move `c` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:191:38
+    │
+191 │             E::V(c) if ({ let f = || c.v > 3; f() }) => 1,
+    │                                      ^
+    │
+    = pattern variables are read-only until an arm is selected
+
+error: cannot move `c` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:198:62
+    │
+198 │             E::V(c) if ({ let f: ||bool has copy + drop = || c.v > 3; f() }) => 1,
+    │                                                              ^
+    │
+    = pattern variables are read-only until an arm is selected
+
+error: cannot move `e` inside a match guard
+    ┌─ tests/match-checks/guard_mutation_errors.move:207:48
+    │
+207 │             E::V(_) if ({ let f = || consume_e(e); f() }) => 1,
+    │                                                ^
+    │
+    = the value being matched must not change while guards are evaluated

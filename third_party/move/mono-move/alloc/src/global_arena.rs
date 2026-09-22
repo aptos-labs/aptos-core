@@ -72,6 +72,13 @@ unsafe impl<T: ?Sized + Sync> Send for GlobalArenaPtr<T> {}
 // `Sync` when T is also `Sync`.
 unsafe impl<T: ?Sized + Sync> Sync for GlobalArenaPtr<T> {}
 
+// TODO(security): Debug derivation is not safe! Remove before production.
+impl<T: ?Sized> std::fmt::Debug for GlobalArenaPtr<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GlobalArenaPtr({:p})", self.as_raw_ptr())
+    }
+}
+
 // Can be duplicated with bitwise copy.
 impl<T: ?Sized> Copy for GlobalArenaPtr<T> {}
 
@@ -119,16 +126,9 @@ impl GlobalArenaPool {
     }
 
     /// Creates the specified number of arenas in the pool, each with the
-    /// specified capacity.
-    ///
-    /// # Panics
-    ///
-    /// - If number of arenas is zero, or larger than 128.
+    /// specified capacity. The number of arenas is clamped to at least 1.
     pub fn with_capacity_and_num_arenas(arena_capacity: usize, num_arenas: usize) -> Self {
-        // Number of arenas is ~ number of working threads. Upper bound by 128
-        // is good enough to accommodate most of the CPUs.
-        assert!(num_arenas > 0);
-        assert!(num_arenas <= 128);
+        let num_arenas = num_arenas.max(1);
 
         let arenas = (0..num_arenas)
             .map(|_| CachePadded::new(Mutex::new(Bump::with_capacity(arena_capacity))))

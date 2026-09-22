@@ -104,9 +104,6 @@ where
     L: TransactionCommitHook<CommittedOutput<E>>,
     TP: TxnProvider<T, A> + Sync,
     A: AuxiliaryInfoTrait,
-    // The block epilogue persists the hot keys as storage keys; the in-memory key
-    // converts to the storage key at that boundary (identity for the legacy VM).
-    <T as BlockExecutableTransaction>::Key: From<E::Key>,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -250,7 +247,7 @@ where
                                 group_key,
                                 idx_to_execute,
                                 incarnation,
-                                group_ops.into_iter(),
+                                group_ops,
                                 group_size,
                                 prev_tags,
                             )?,
@@ -293,7 +290,7 @@ where
                 group_key,
                 idx_to_execute,
                 incarnation,
-                group_ops.into_iter(),
+                group_ops,
                 group_size,
                 HashSet::new(), // No previous tags since this is a new group write
             )?)?;
@@ -602,7 +599,7 @@ where
                     group_key,
                     idx_to_execute,
                     incarnation,
-                    group_ops.into_iter(),
+                    group_ops,
                     group_size,
                     prev_tags,
                 )? {
@@ -936,7 +933,7 @@ where
         num_workers: usize,
         runtime_environment: &RuntimeEnvironment,
         scheduler: SchedulerWrapper,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
@@ -1012,7 +1009,7 @@ where
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
         executor: &E,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<CommittedOutput<E>, PanicError> {
         let last_input_output = shared_sync_params.last_input_output;
 
@@ -1073,7 +1070,7 @@ where
         txn_idx: TxnIndex,
         output_idx: TxnIndex,
         committed_output: CommittedOutput<E>,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<(), PanicError> {
         if output_idx < txn_idx {
             return Err(code_invariant_error(format!(
@@ -1098,7 +1095,7 @@ where
         block: &TP,
         scheduler: &Scheduler,
         skip_module_reads_validation: &AtomicBool,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns();
@@ -1376,7 +1373,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<Option<T>, PanicError> {
         let _timer = PARALLEL_FINALIZE_SECONDS.start_timer();
         let mut maybe_block_epilogue_txn = None;
@@ -1432,7 +1429,12 @@ where
                 )));
             }
 
+            let executor = maybe_executor.as_ref().ok_or_else(|| {
+                code_invariant_error("Block epilogue txn requires executor to be initialized")
+            })?;
+
             if let Some(epilogue_txn) = self.generate_block_epilogue_if_needed(
+                executor,
                 signature_verified_block,
                 transaction_slice_metadata,
                 final_results.dereference().iter(),
@@ -1461,10 +1463,6 @@ where
                     // Fallback if no transactions in block
                     A::new_empty()
                 };
-
-                let executor = maybe_executor.as_ref().ok_or_else(|| {
-                    code_invariant_error("Block epilogue txn requires executor to be initialized")
-                })?;
 
                 let module_cache = shared_sync_params.global_module_cache;
                 let runtime_environment = environment.runtime_environment();
@@ -1600,11 +1598,14 @@ where
         WORKER_POOL.scope(num_workers as usize, |worker_id| {
             let worker_id = worker_id as u32;
             let environment = module_cache_manager_guard.environment();
+            let ctx = module_cache_manager_guard.global_context();
             let executor = {
                 let _init_timer = VM_INIT_SECONDS.start_timer();
                 E::init(
                     &environment.clone(),
+                    ctx,
                     shared_sync_params.base_view,
+                    worker_id,
                     async_runtime_checks_enabled,
                 )
             };
@@ -1786,11 +1787,14 @@ where
         WORKER_POOL.scope(num_workers, |worker_id| {
             let worker_id = worker_id as u32;
             let environment = module_cache_manager_guard.environment();
+            let ctx = module_cache_manager_guard.global_context();
             let executor = {
                 let _init_timer = VM_INIT_SECONDS.start_timer();
                 E::init(
                     &environment.clone(),
+                    ctx,
                     base_view,
+                    worker_id,
                     async_runtime_checks_enabled,
                 )
             };
@@ -1869,7 +1873,7 @@ where
         signature_verified_block: &TP,
         outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
         epilogue_txn_idx: TxnIndex,
-        block_end_info: TBlockEndInfoExt<E::Key>,
+        block_end_info: TBlockEndInfoExt<T::Key>,
         features: &Features,
     ) -> Result<T, PanicError> {
         // TODO(grao): Remove this check once AIP-88 is fully enabled.
@@ -1937,12 +1941,7 @@ where
             }
         }
         let fee_distribution = FeeDistribution::new(amount);
-        // Convert the in-memory hot keys to storage keys for the on-chain epilogue.
         let (inner, to_make_hot) = block_end_info.into_parts();
-        let to_make_hot = to_make_hot
-            .into_iter()
-            .map(<T::Key>::from)
-            .collect::<BTreeSet<_>>();
         if self.config.onchain.hotness_in_epilogue() {
             Ok(T::block_epilogue_v2(
                 block_id,
@@ -2059,13 +2058,15 @@ where
 
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
-        let executor = E::init(environment, base_view, false);
+        let ctx = module_cache_manager_guard.global_context();
+        let executor = E::init(environment, ctx, base_view, 0, false);
         drop(init_timer);
 
         let runtime_environment = environment.runtime_environment();
         let start_counter = gen_id_start_value(true);
         let counter = RefCell::new(start_counter);
-        let unsync_map = UnsyncMap::new();
+        let unsync_map =
+            UnsyncMap::new().with_mono_move_arena(environment.features().is_mono_move_enabled());
 
         let mut ret = Vec::with_capacity(num_txns + 1);
 
@@ -2288,12 +2289,14 @@ where
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
                     if !has_reconfig {
+                        let block_end_info = block_limit_processor
+                            .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
                         block_epilogue_txn = Some(self.gen_block_epilogue(
                             block_id,
                             signature_verified_block,
                             ret.iter(),
                             idx as TxnIndex,
-                            block_limit_processor.get_block_end_info(),
+                            block_end_info,
                             module_cache_manager_guard.environment().features(),
                         )?);
                     } else {
@@ -2439,6 +2442,7 @@ where
     /// changes are either all applied to shared state or will never be applied.
     fn generate_block_epilogue_if_needed<'a>(
         &self,
+        executor: &E,
         block: &TP,
         transaction_slice_metadata: &TransactionSliceMetadata,
         outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
@@ -2450,12 +2454,15 @@ where
         // like state sync or replay, the BlockEpilogue txn should already in the input
         // and we don't need to add one here.
         if let Some(block_id) = transaction_slice_metadata.append_state_checkpoint_to_block() {
+            let block_end_info = block_limit_processor
+                .acquire()
+                .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?;
             let epilogue_txn = self.gen_block_epilogue(
                 block_id,
                 block,
                 outputs,
                 epilogue_txn_idx,
-                block_limit_processor.acquire().get_block_end_info(),
+                block_end_info,
                 environment.features(),
             )?;
 

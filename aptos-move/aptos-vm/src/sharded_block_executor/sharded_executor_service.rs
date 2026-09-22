@@ -147,7 +147,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     aggr_overridden_state_view.as_ref(),
                     // Since we execute blocks in parallel, we cannot share module caches, so each
                     // thread has its own caches.
-                    &AptosModuleCacheManager::new(),
+                    &AptosModuleCacheManager::new(config.local.clone()),
                     config,
                     TransactionSliceMetadata::unknown(),
                     cross_shard_commit_sender,

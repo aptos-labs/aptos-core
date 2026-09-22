@@ -20,3 +20,19 @@ fn edit_hook_old_invalid() {
     let output = common::sanitize_output(&result.output);
     common::check_baseline(file!(), &output);
 }
+
+#[test]
+fn inferred_output_check_retains_spec_ast_validation() {
+    let source = r#"module 0xCAFE::old_invalid {
+    fun foo(x: u64): u64 { x + 1 }
+
+    spec foo {
+        requires old(x) > 0;
+    }
+}
+"#;
+    let result = source_check::check_inferred_output("old_invalid.move", source);
+    assert!(result.has_errors);
+    assert!(!result.has_parse_errors);
+    assert!(result.output.contains("`old(..)` is not allowed"));
+}

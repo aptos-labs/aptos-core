@@ -228,8 +228,8 @@ impl RestoreRunMode {
             Self::Verify => {
                 let mock_store = Arc::new(MockStore);
                 StateSnapshotRestore::new_overwrite(
-                    &mock_store,
-                    &mock_store,
+                    Arc::clone(&mock_store),
+                    mock_store,
                     version,
                     expected_root_hash,
                     restore_mode,

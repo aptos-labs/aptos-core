@@ -1,0 +1,15 @@
+-- error: LeanerE2ETests/RustToLeanerLang/borrow_conflict.rs:1:1: Rust exporter failed:
+-- error[E0499]: cannot borrow `*value` as mutable more than once at a time
+--  --> borrow_conflict.rs:6:18
+--   |
+-- 5 |     let first = &mut *value;
+--   |                 ----------- first mutable borrow occurs here
+-- 6 |     let second = &mut *value;
+--   |                  ^^^^^^^^^^^ second mutable borrow occurs here
+-- 7 |     *first += 1;
+--   |     ----------- first borrow later used here
+--
+-- error: aborting due to 1 previous error
+--
+-- For more information about this error, try `rustc --explain E0499`.
+-- leaner-rust-export: Rustc Public failed: Compilation Failed

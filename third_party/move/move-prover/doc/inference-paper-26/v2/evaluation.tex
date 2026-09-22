@@ -1,0 +1,91 @@
+% !TEX root = main.tex
+\Section{Evaluation}
+\label{sec:evaluation}
+
+The evaluation compares along two dimensions.
+\emph{Arm against arm} (Sec.~\ref{sec:eval-arms}) holds the model fixed and varies the tactic: \textit{agent-only}, \textit{hybrid-guided}, and \textit{hybrid-flexible}, run under the same conditions.
+\emph{Model against model} (Sec.~\ref{sec:eval-models}) repeats the design with two further models and asks how the contribution of \WP changes with the model.
+All rounds share the corpus, the scoring, and the cost accounting described first.
+
+\SubSection{Setup}
+\label{sec:eval-setup}
+
+\Paragraph{Corpus}
+The corpus is drawn from \Anon{Etna, the private Move code of the perpetual trading system Decibel}{the private Move code of a production perpetual trading system}: 23 targets from it, two from a public Move library that carry no upstream specification, and two written for the corpus.
+A private codebase matters here: the model cannot have seen these functions, or any specification of them, during training, so a contract has to be inferred rather than recalled.
+Every candidate is classified by the features (strata) its contract has to account for --- loops and accumulators, early returns and breaks, arithmetic overflow and underflow, casts and truncation, mutable references and in-place permutation, function values, quantifiers, composition through a callee's contract, and others, 38 in all.
+A target is admitted only if it proves within seconds against a hand-written reference specification, and before the round three \emph{mutants} are authored per target --- patches to the implementation, one per obligation the contract has to pin --- each shown to be killed by the reference.
+Twenty targets are selected to cover all 38 features across 15 modules, 10 of them with loops; three are deliberately guessable as controls, and five near-duplicates are held back.
+With 3 arms and 4 replicates, a model round has \textbf{240 cells}.
+
+\Paragraph{Arms and models}
+The three tactics of Sec.~\ref{sec:skills} run as arms that differ only in the rendered plugin: the reference material is byte-identical, and in agent-only the \WP tool is absent rather than discouraged.
+Three rounds use three models: Opus~5 at the highest effort setting through the Claude Code SDK, and Sol~5.6 and Terra~5.6 at high effort through the Codex CLI, with the same plugin rendered for each.
+\TODO{wg}{The Terra~5.6 round is pending; its rows and table currently hold GLM~5.3 data (maximum effort, Claude Code SDK against an Anthropic-compatible endpoint) as a placeholder, marked $^\dagger$.}
+Each session has a budget of 100--180k output tokens, one hour of wall time, and 40 seconds of solver time per verification condition.
+
+\Paragraph{Scoring}
+A cell reaches \emph{operational success} when a judge outside the agent's workspace confirms that the package compiles, the requested scope verifies, no weakening construct is present --- |pragma verify = false|, partial abort contracts, vacuous postconditions, invented preconditions --- the bytecode is unchanged, and the required contract categories are present.
+The agent's own claim is never a score.
+In some rounds the controller also applied a visible set of mutants after the agent's first attempt and, if one survived, handed the contract back for strengthening; whether it did so varied between rounds, and the agent was never told a second attempt might follow.
+Every round is therefore read the same way: a cell's outcome is the judge's verdict at the end of the agent's \emph{first attempt}, and its cost is what the agent spent up to then; later strengthening turns are not counted anywhere, and a contract that survived a visible mutant at the first attempt is a \emph{weak contract}, a failure.
+Operational success is necessary but weak: a vaguer contract passes it more easily.
+Completeness --- postconditions as strong as the behavior --- has no deductive check in general; \WP guarantees it only given complete loop invariants and callee contracts, and warns when it cannot, a mechanism the agent-only arm lacks.
+The second level is therefore \emph{mutation adequacy}: after the round, each held-out mutant is applied to the implementation and the prover rerun against the inferred specification.
+A mutant that still verifies has survived; a cell is \emph{complete} when its first attempt succeeded and killed every held-out mutant.
+Held-out scoring has finished for the Opus~5 round and is in progress for the other two.
+
+\Paragraph{Cost}
+Costs are in US dollars at each model's published prices at the time of its round, recomputed from the recorded token counters rather than taken from the harness's estimate.
+Per million tokens, Opus~5 is \$5 uncached input, \$0.50 cache read, \$10 or \$6.25 cache write, and \$25 output; Sol~5.6 is \$4 uncached input, \$0.40 cached input, \$5 cache write, and \$20 output; Terra~5.6 is \$2, \$0.20, \$2.50, and \$12.
+Thinking counts as output for all three.
+
+\SubSection{Arm against Arm}
+\label{sec:eval-arms}
+
+Table~\ref{tab:summary} summarizes all rounds; Tables~\ref{tab:opus}--\ref{tab:terra} in the appendix give every target.
+Under Opus~5, the hybrids succeeded at the first attempt in all 80 cells each and every one of those killed every held-out mutant.
+Agent-only failed 4 of its 80: all four replicates of |QP-part-025|, the in-place permutation, produced at the first attempt a contract that pinned where the partition point lands but not what the vector contains, and a visible mutant survived it.
+That is the completeness effect the mechanical baseline is meant to buy, and it lands on the one target whose contract has to characterize a whole data structure.
+
+Cost goes the other way.
+In the task-weighted mean, hybrid-guided costs 1.29$\times$ agent-only and hybrid-flexible 1.27$\times$; 95\% percentile bootstrap intervals, holding the 20 tasks fixed and resampling four replicate blocks within each task with the three arms kept together (100,000 draws), are [1.22, 1.37] and [1.20, 1.35].
+The hybrids are cheaper on only 5 and 1 of the 20 targets --- |TS-trial-019| under hybrid-guided at 54\% is the largest saving --- and cost most on the function-value target |SM-select-022| (2.0$\times$ and 1.5$\times$) and the lemma target |BA-base-012| (1.5$\times$ and 1.3$\times$).
+The |QP-part-025| comparison is not a cost comparison: agent-only's cheap cells there are failed first attempts.
+
+\begin{table}[t]
+\centering
+\caption{All rounds, per arm: mean cost in US dollars per cell, the hybrid/agent-only cost ratio with its 95\% bootstrap interval, cells that failed at the first attempt, cells that killed every held-out mutant over cells scored ($^\ast$: scoring in progress; ---: not yet scored), mean input/output tokens in thousands, and Edit, verify, and \WP calls summed over the arm's cells, all counted up to the end of the first attempt. $^\dagger$Placeholder: GLM~5.3 data until the Terra~5.6 round completes.}
+\label{tab:summary}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\input{tables/summary}
+\end{table}
+
+The mechanism is visible in the token and tool counts.
+The hybrids process two thirds more input (546k and 502k against 328k per cell) and emit a fifth more output (10.6k and 10.8k against 9.0k): the \WP output and its simplification enter the context and are re-read on every turn, and at cache-read prices that is where the extra cost lies.
+They also make more verify calls (160 and 174 against 105) on top of their 150 and 108 \WP calls, and more edits (182 and 177 against 131).
+
+\SubSection{Model against Model}
+\label{sec:eval-models}
+
+Under Sol~5.6 the picture shifts.
+The hybrids again succeeded at the first attempt in all 80 cells each, and agent-only failed 3 with a weak contract.
+At a near-identical price list, Sol~5.6 spends less per cell than Opus~5 in every arm (\$0.52 against \$0.69 for agent-only), because it emits two thirds of the output tokens; and here \WP pays: hybrid-guided and hybrid-flexible cost 0.95$\times$ and 0.94$\times$ agent-only, [0.85, 1.05] and [0.84, 1.04], and are cheaper on 13 and 15 of the 20 targets.
+The saving is spread rather than concentrated --- a third to a half off on the small arithmetic contracts (|VS-shares-002|, |VS-contrib-003|, |PM-curve-027|, |BK-bucket-016|) --- and the two targets that cost the hybrids most under Opus~5 cost them most here too: |QP-part-025| at 1.5$\times$ and 1.2$\times$, |BA-base-012| at 1.4$\times$ under hybrid-guided.
+The hybrids' input volume is no longer higher than agent-only's (450k and 444k against 479k), because the unaided model reads more of the package instead.
+
+Terra~5.6, the mid-tier model of the same family at a third of Sol's price list, is expected to lean on \WP most: hybrid-guided costs 0.X$\times$ agent-only [0.X, 0.X] and hybrid-flexible 0.X$\times$ [0.X, 0.X], cheaper on X and X of the 20 targets, and agent-only fails X cells at the first attempt against none for the hybrids.
+\TODO{wg}{Terra~5.6 round pending; the rows marked $^\dagger$ in Table~\ref{tab:summary} and Table~\ref{tab:terra} hold GLM~5.3 data as a placeholder. Fill in the 0.X figures, then refresh the Sol~5.6 scoring.}
+
+Since each model is priced at its own schedule, the comparison across models is between the within-model ratios, not the dollars.
+Read together, the rounds separate two contributions of \WP.
+The first is completeness, and it does not depend on the model: in every round the success rate with \WP is higher.
+Agent-only left a weak contract at the first attempt in 7 of 160 cells under Opus~5 and Sol~5.6 and X under Terra~5.6, the hybrids in none, and the failures sit on the targets whose contract has to pin down a data structure.
+The second is cost, and there different models make different use of the tool: \WP is not a fixed saving but a trade of exact contracts for context, and a model that writes the invariant unaided and re-reads a large context pays for it (Opus~5, 1.3$\times$), a model that reads more and writes less recovers it (Sol~5.6, 0.95$\times$), and a smaller model that would otherwise search recovers more (Terra~5.6, 0.X$\times$).
+The Sol~5.6 intervals include parity, so its size is indicative; the spread across the three models is the finding.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

@@ -1,4 +1,28 @@
 Move prover returns: exiting with verification errors
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/two_state_spec_fun.move:70:41
+   │
+70 │                 invariant forall j in 0..i: ensures_of<f>(v[j]); // error: entry delta is i, not 0, for the `loop_delta_false` caller
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+77 │ ╭           for_each_apply(v, a, |_y| { R[a].v = R[a].v + 1; }
+   │ │ ╭──────────────────────────────'
+78 │ │ │             spec { ensures spec_delta(a) <= 100; });
+   │ ╰─│───────────────────────────────────────────────────' from a call inlined at this callsite
+   │   ╰──────────────────────────────────────────────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/two_state_spec_fun.move:70:41
+   │
+70 │                 invariant forall j in 0..i: ensures_of<f>(v[j]); // error: entry delta is i, not 0, for the `loop_delta_false` caller
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+88 │ ╭           for_each_apply(v, a, |_y| { R[a].v = R[a].v + 1; }
+   │ │ ╭──────────────────────────────'
+89 │ │ │             spec { ensures spec_delta(a) == 0; });
+   │ ╰─│─────────────────────────────────────────────────' from a call inlined at this callsite
+   │   ╰────────────────────────────────────────────────' lambda argument
+
 error: unknown assertion failed
    ┌─ tests/sources/functional/closures/inline/two_state_spec_fun.move:30:13
    │
@@ -18,41 +42,3 @@ error: unknown assertion failed
    =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:51: delta_false
    =         res = <redacted>
    =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:30: bump_then_apply
-
-error: induction case of the loop invariant does not hold
-   ┌─ tests/sources/functional/closures/inline/two_state_spec_fun.move:70:13
-   │
-70 │             invariant forall j in 0..i: ensures_of<f>(v[j]); // error: entry delta is i, not 0, for the `loop_delta_false` caller
-   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:87: loop_delta_false
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:92: loop_delta_false (spec)
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:93: loop_delta_false (spec)
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:87: loop_delta_false
-   =         v = <redacted>
-   =         a = <redacted>
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:61: for_each_apply
-   =         a' = <redacted>
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:62: for_each_apply
-   =         i = <redacted>
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:63: for_each_apply
-   =         n = <redacted>
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:67: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:68: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:69: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:70: for_each_apply
-   =     enter loop, variable(s) i havocked and reassigned
-   =         i = <redacted>
-   =     loop invariant holds at current state
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:68: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:69: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:70: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:64: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:65: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:88: loop_delta_false
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:66: for_each_apply
-   =         i = <redacted>
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:64: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:68: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:69: for_each_apply
-   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:70: for_each_apply

@@ -33,7 +33,7 @@ where
     D: serde::de::Deserializer<'de>,
 {
     let s: Bytes = serde::de::Deserialize::deserialize(data)?;
-    let a = A::deserialize_with_mode(s.reader(), Compress::Yes, Validate::No);
+    let a = A::deserialize_with_mode(s.reader(), Compress::Yes, Validate::Yes);
     a.map_err(serde::de::Error::custom)
 }
 

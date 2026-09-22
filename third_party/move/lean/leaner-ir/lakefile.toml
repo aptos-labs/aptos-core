@@ -1,0 +1,13 @@
+name = "leaner-ir"
+defaultTargets = ["LeanerIR", "LeanerLang"]
+testDriver = "LeanerIRTests"
+
+[[lean_lib]]
+name = "LeanerIR"
+
+[[lean_lib]]
+name = "LeanerLang"
+
+[[lean_lib]]
+name = "LeanerIRTests"
+roots = ["LeanerIR.Tests.Validation", "LeanerIR.Tests.Json", "LeanerIR.Tests.Interpreter", "LeanerIR.Tests.Primitives", "LeanerIR.Tests.References", "LeanerIR.Tests.Closures", "LeanerIR.Tests.Finalization", "LeanerIR.Tests.Globals", "LeanerIR.Tests.Data", "LeanerIR.Tests.NominalPlaces", "LeanerIR.Tests.Generics", "LeanerIR.Tests.Abilities", "LeanerIR.Tests.Control", "LeanerIR.Tests.Declarations", "LeanerIR.Tests.Intrinsics", "LeanerIR.Tests.Representation", "LeanerIR.Tests.Computation", "LeanerIR.Tests.NativeLoop", "LeanerIR.Tests.NativeBoundary", "LeanerIR.Tests.NativeVectorMutation", "LeanerIR.Tests.Composition", "LeanerIR.Tests.OperationWP", "LeanerIR.Tests.Certify", "LeanerLang.Tests.Frontend", "LeanerLang.Tests.InvocationTypes", "LeanerLang.Tests.LooseFrame", "LeanerLang.Tests.SpecTypes", "LeanerLang.Tests.NativeComputation", "LeanerLang.Tests.NativeComputationRoutes", "LeanerLang.Tests.NativeGenerated", "LeanerLang.Tests.NativeArithmetic", "LeanerLang.Tests.NativeCasts", "LeanerLang.Tests.NativeConstants", "LeanerLang.Tests.NativeCalls", "LeanerLang.Tests.NativeSequence", "LeanerLang.Tests.NativeBranches", "LeanerLang.Tests.NativeAggregates", "LeanerLang.Tests.NativePayloads", "LeanerLang.Tests.NativeOwnedCalls", "LeanerLang.Tests.NativeBooleanPatterns", "LeanerLang.Tests.NativeEffectfulValues", "LeanerLang.Tests.NativeConditions", "LeanerLang.Tests.NativeBooleanOperations", "LeanerLang.Tests.NativeDivision", "LeanerLang.Tests.NativeBitwise", "LeanerLang.Tests.NativeShifts", "LeanerLang.Tests.NativeVectors", "LeanerLang.Tests.NativeReferences", "LeanerLang.Tests.NativeIndex", "LeanerLang.Tests.NativeAssignments", "LeanerLang.Tests.NativeConditionalAssignments", "LeanerLang.Tests.NativeStatements", "LeanerLang.Tests.NativeLoops", "LeanerLang.Tests.NativeLoopLocals", "LeanerLang.Tests.NativeNestedLoops", "LeanerLang.Tests.NativeEarlyReturns", "LeanerLang.Tests.NativeMutableBoundary", "LeanerLang.Tests.NativeMutableGenerated", "LeanerLang.Tests.NativeLocalCalls", "LeanerLang.Tests.NativeOperands", "LeanerLang.Tests.NativeRow", "LeanerLang.Tests.NativeCallRow", "LeanerLang.Tests.NativeStoreRow", "LeanerLang.Tests.Performance", "LeanerLang.Tests.CompositionPerformance", "LeanerLang.Tests.DenotePerformance", "LeanerLang.Tests.DenoteCache", "LeanerLang.Tests.DenoteCacheImport"]

@@ -1,0 +1,41 @@
+Move prover returns: exiting with verification errors
+error: recursive lemma application does not decrease the measure
+   ┌─ tests/sources/functional/proof/lemma_wf.move:39:13
+   │
+39 │             apply circular_same(n); // error: measure does not decrease
+   │             ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/lemma_wf.move:36: circular_same (spec)
+   =         n = <redacted>
+   =     at tests/sources/functional/proof/lemma_wf.move:39: circular_same (spec)
+
+error: recursive lemma application does not decrease the measure
+   ┌─ tests/sources/functional/proof/lemma_wf.move:45:13
+   │
+45 │             apply circular_ascending(n + 1); // error: measure does not decrease
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/lemma_wf.move:42: circular_ascending (spec)
+   =         n = <redacted>
+   =     at tests/sources/functional/proof/lemma_wf.move:45: circular_ascending (spec)
+
+error: recursive lemma application does not decrease the measure
+   ┌─ tests/sources/functional/proof/lemma_wf.move:52:13
+   │
+52 │             apply unbounded(n - 1); // error: measure does not decrease
+   │             ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/lemma_wf.move:49: unbounded (spec)
+   =         n = <redacted>
+   =     at tests/sources/functional/proof/lemma_wf.move:52: unbounded (spec)
+
+error: recursive lemma application does not decrease the measure
+   ┌─ tests/sources/functional/proof/lemma_wf.move:61:17
+   │
+61 │                 apply second_param_default(n + 1, i - 1); // error: measure does not decrease
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/lemma_wf.move:57: second_param_default (spec)
+   =         n = <redacted>
+   =         i = <redacted>
+   =     at tests/sources/functional/proof/lemma_wf.move:61: second_param_default (spec)

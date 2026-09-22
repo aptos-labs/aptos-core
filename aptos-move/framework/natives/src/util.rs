@@ -6,6 +6,7 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::on_chain_config::TimedFeatureFlag;
 use move_core_types::gas_algebra::NumBytes;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -53,6 +54,11 @@ fn native_from_bytes(
         Some(val) => val,
         None => return Err(SafeNativeError::abort(EFROM_BYTES)),
     };
+
+    if context.timed_feature_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize) {
+        let size = context.abs_val_size(&val)?;
+        context.charge_value_traversal(size)?;
+    }
 
     Ok(smallvec![val])
 }

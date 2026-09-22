@@ -84,7 +84,7 @@ fn native_exists_at(
     safely_assert_eq!(ty_args.len(), 1);
     safely_assert_eq!(args.len(), 1);
 
-    let type_ = &ty_args[0];
+    let ty = &ty_args[0];
     let address = safely_pop_arg!(args, AccountAddress);
 
     context.charge(OBJECT_EXISTS_AT_BASE)?;
@@ -92,24 +92,32 @@ fn native_exists_at(
     // Only structs can be resources in global storage. A non-struct type (e.g., a function type
     // that declared the `key` ability) would reach the data cache and trip a VM invariant
     // violation, so reject it here with a deterministic, kept abort instead.
-    if context.gas_feature_version() >= RELEASE_V1_50 && !type_.is_struct_or_enum() {
+    if context.gas_feature_version() >= RELEASE_V1_50 && !ty.is_struct_or_enum() {
         return Err(SafeNativeError::abort_with_message(
             ENOT_A_RESOURCE_TYPE,
             "Object type argument must be a resource (struct) type",
         ));
     }
 
-    let (exists, num_bytes) = context.exists_at(address, type_).map_err(|err| {
-        PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
-            "Failed to read resource: {:?} at {}. With error: {}",
-            type_, address, err
-        ))
-    })?;
+    let (gv, num_bytes, amount) =
+        context
+            .load_resource_with_abs_sizes(address, ty)
+            .map_err(|err| {
+                PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
+                    "Failed to read resource: {:?} at {}. With error: {}",
+                    ty, address, err
+                ))
+            })?;
+    let exists = gv.exists();
 
     if let Some(num_bytes) = num_bytes {
         context.charge(
             OBJECT_EXISTS_AT_PER_ITEM_LOADED + OBJECT_EXISTS_AT_PER_BYTE_LOADED * num_bytes,
         )?;
+    }
+    if let Some((heap_size, val_size)) = amount {
+        context.use_heap_memory(heap_size)?;
+        context.charge_value_traversal(val_size)?;
     }
 
     Ok(smallvec![Value::bool(exists)])

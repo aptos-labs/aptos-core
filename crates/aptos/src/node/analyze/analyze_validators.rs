@@ -370,7 +370,7 @@ impl AnalyzeValidators {
             if event.round() != expected_round {
                 println!(
                     "Missing failed AccountAddresss : {} {:?}",
-                    previous_round, &event
+                    previous_round, event
                 );
                 assert!(expected_round < event.round());
                 trimmed_rounds += event.round() - expected_round;

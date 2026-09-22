@@ -9,11 +9,21 @@ use std::fs;
 /// - Preserve the helper function
 /// - Append inferred conditions to the existing `add_one` spec block
 /// - Create a new spec block for `double` (which has no existing spec)
+/// - Fully qualify external types in a newly inserted block's signature
 #[tokio::test]
 async fn move_package_spec_infer_file_output_merge() {
-    let pkg = common::make_package("mergetest", &[(
-        "mergetest",
-        "module 0xCAFE::mergetest {
+    let pkg = common::make_package("mergetest", &[
+        (
+            "types",
+            "module 0xCAFE::types {
+    public struct External has copy, drop {}
+}",
+        ),
+        (
+            "mergetest",
+            "module 0xCAFE::mergetest {
+    use 0xCAFE::types::External;
+
     fun add_one(x: u64): u64 {
         x + 1
     }
@@ -21,8 +31,13 @@ async fn move_package_spec_infer_file_output_merge() {
     fun double(x: u64): u64 {
         x * 2
     }
+
+    fun identity(value: External): External {
+        value
+    }
 }",
-    )]);
+        ),
+    ]);
 
     // Write an existing .spec.move with a helper and a partial spec for add_one.
     let spec_path = pkg.path().join("sources/mergetest.spec.move");

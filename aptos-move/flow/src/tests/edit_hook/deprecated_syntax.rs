@@ -33,3 +33,24 @@ fn edit_hook_deprecated_syntax() {
     let output = common::sanitize_output(&result.output);
     common::check_baseline(file!(), &output);
 }
+
+#[test]
+fn inferred_output_check_ignores_preexisting_deprecated_syntax() {
+    let source = r#"module 0xCAFE::old_style {
+    struct Token has key { value: u64 }
+
+    fun get(addr: address): &Token acquires Token {
+        borrow_global<Token>(addr)
+    }
+
+    spec get {
+        pragma opaque = true;
+        aborts_if [inferred] false;
+    }
+}
+"#;
+    let result = source_check::check_inferred_output("deprecated_syntax.move", source);
+    assert!(!result.has_errors, "{}", result.output);
+    assert!(!result.has_parse_errors);
+    assert!(result.output.is_empty());
+}

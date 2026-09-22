@@ -7,9 +7,12 @@
 use crate::{
     gas_schedule::VMGasParameters,
     traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
-    ver::gas_feature_versions::{RELEASE_V1_33, RELEASE_V1_38},
+    ver::gas_feature_versions::{RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_50},
 };
-use aptos_gas_algebra::{AbstractValueSize, AbstractValueSizePerArg};
+use aptos_gas_algebra::{
+    AbstractValueSize, AbstractValueSizePerArg, AbstractValueSizePerTypeTagPseudoGasUnit,
+    NumTypeTagPseudoGasUnits,
+};
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::NumArgs,
@@ -19,7 +22,7 @@ use move_core_types::{
 use move_vm_types::{
     delayed_values::delayed_field_id::DelayedFieldID,
     natives::function::{PartialVMError, PartialVMResult},
-    values::DEFAULT_MAX_VM_VALUE_NESTED_DEPTH,
+    values::{AbstractFunction, DEFAULT_MAX_VM_VALUE_NESTED_DEPTH},
     views::{ValueView, ValueVisitor},
 };
 use std::collections::BTreeMap;
@@ -46,6 +49,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [address: AbstractValueSize, "address", 40],
         [struct_: AbstractValueSize, "struct", 40],
         [closure: AbstractValueSize, { RELEASE_V1_33.. => "closure" }, 40],
+        [closure_v2: AbstractValueSize, { RELEASE_V1_50.. => "closure_v2" }, 200],
+        [
+            closure_per_ty_tag_unit: AbstractValueSizePerTypeTagPseudoGasUnit,
+            { RELEASE_V1_50.. => "closure_per_ty_tag_unit" },
+            1
+        ],
         [vector: AbstractValueSize, "vector", 40],
         [reference: AbstractValueSize, "reference", 40],
         [per_u8_packed: AbstractValueSizePerArg, "per_u8_packed", 1],
@@ -72,6 +81,29 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
     ]
 );
+
+// `MeterClosureTypeArguments` can turn metering on before 1.50 puts
+// `closure_per_ty_tag_unit` on chain. Same value, so the switch does not
+// change pricing.
+const CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50: AbstractValueSizePerTypeTagPseudoGasUnit =
+    AbstractValueSizePerTypeTagPseudoGasUnit::new(1);
+
+/// Returns the abstract size of a closure value node itself, excluding the captured arguments.
+///
+/// Invariant: every `visit_closure` must get the size from here. The memory tracker charges quota
+/// with one visitor and releases it with another, so two visitors that disagree would leak quota.
+fn closure_abstract_size(
+    params: &AbstractValueSizeGasParameters,
+    feature_version: u64,
+    ty_args_pseudo_gas_cost: u64,
+) -> AbstractValueSize {
+    let units = NumTypeTagPseudoGasUnits::new(ty_args_pseudo_gas_cost);
+    if feature_version >= RELEASE_V1_50 {
+        params.closure_v2 + params.closure_per_ty_tag_unit * units
+    } else {
+        params.closure + CLOSURE_PER_TY_TAG_UNIT_BEFORE_V1_50 * units
+    }
+}
 
 struct DerefVisitor<V> {
     inner: V,
@@ -158,8 +190,13 @@ where
     }
 
     #[inline]
-    fn visit_closure(&mut self, depth: u64, len: usize) -> PartialVMResult<bool> {
-        self.inner.visit_closure(depth, len)
+    fn visit_closure(
+        &mut self,
+        depth: u64,
+        fun: &(dyn AbstractFunction + 'static),
+        len: usize,
+    ) -> PartialVMResult<bool> {
+        self.inner.visit_closure(depth, fun, len)
     }
 }
 
@@ -318,9 +355,18 @@ impl ValueVisitor for AbstractValueSizeVisitor<'_> {
     }
 
     #[inline]
-    fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+    fn visit_closure(
+        &mut self,
+        depth: u64,
+        fun: &(dyn AbstractFunction + 'static),
+        _len: usize,
+    ) -> PartialVMResult<bool> {
         self.check_depth(depth)?;
-        self.size += self.params.closure;
+        self.size += closure_abstract_size(
+            self.params,
+            self.feature_version,
+            fun.ty_args_pseudo_gas_cost(),
+        );
         Ok(true)
     }
 
@@ -622,9 +668,18 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
-            fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+            fn visit_closure(
+                &mut self,
+                depth: u64,
+                fun: &(dyn AbstractFunction + 'static),
+                _len: usize,
+            ) -> PartialVMResult<bool> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.closure);
+                self.res = Some(closure_abstract_size(
+                    self.params,
+                    self.feature_version,
+                    fun.ty_args_pseudo_gas_cost(),
+                ));
                 Ok(false)
             }
 
@@ -729,8 +784,13 @@ impl AbstractValueSizeGasParameters {
         })
     }
 
-    pub fn abstract_packed_size(&self, val: impl ValueView) -> PartialVMResult<AbstractValueSize> {
+    pub fn abstract_packed_size(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> PartialVMResult<AbstractValueSize> {
         struct Visitor<'a> {
+            feature_version: u64,
             params: &'a AbstractValueSizeGasParameters,
             res: Option<AbstractValueSize>,
             max_value_nest_depth: Option<u64>,
@@ -854,9 +914,18 @@ impl AbstractValueSizeGasParameters {
             }
 
             #[inline]
-            fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+            fn visit_closure(
+                &mut self,
+                depth: u64,
+                fun: &(dyn AbstractFunction + 'static),
+                _len: usize,
+            ) -> PartialVMResult<bool> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.closure);
+                self.res = Some(closure_abstract_size(
+                    self.params,
+                    self.feature_version,
+                    fun.ty_args_pseudo_gas_cost(),
+                ));
                 Ok(false)
             }
 
@@ -931,6 +1000,7 @@ impl AbstractValueSizeGasParameters {
         }
 
         let mut visitor = Visitor {
+            feature_version,
             params: self,
             res: None,
             max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
@@ -962,6 +1032,18 @@ impl AbstractValueSizeGasParameters {
         let abs_size = self.abstract_value_size(val, feature_version)?;
 
         Ok(abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into()))
+    }
+
+    pub fn abstract_heap_and_value_size(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> PartialVMResult<(AbstractValueSize, AbstractValueSize)> {
+        let stack_size = self.abstract_stack_size(&val, feature_version)?;
+        let abs_size = self.abstract_value_size(val, feature_version)?;
+
+        let heap_size = abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into());
+        Ok((heap_size, abs_size))
     }
 }
 
@@ -1004,5 +1086,34 @@ impl InitialGasSchedule for MiscGasParameters {
         Self {
             abs_val: InitialGasSchedule::initial(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ver::gas_feature_versions::RELEASE_V1_49;
+
+    #[test]
+    fn test_closure_abstract_size() {
+        let params = AbstractValueSizeGasParameters::initial();
+
+        assert_eq!(
+            closure_abstract_size(&params, RELEASE_V1_49, 0),
+            AbstractValueSize::new(40)
+        );
+        assert_eq!(
+            closure_abstract_size(&params, RELEASE_V1_49, 1000),
+            AbstractValueSize::new(1040)
+        );
+
+        assert_eq!(
+            closure_abstract_size(&params, RELEASE_V1_50, 0),
+            AbstractValueSize::new(200)
+        );
+        assert_eq!(
+            closure_abstract_size(&params, RELEASE_V1_50, 1000),
+            AbstractValueSize::new(1200)
+        );
     }
 }

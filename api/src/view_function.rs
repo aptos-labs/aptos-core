@@ -211,7 +211,7 @@ fn view_request(
 
             let move_vals = values
                 .into_iter()
-                .zip(return_types.into_iter())
+                .zip(return_types)
                 .map(|(v, ty)| {
                     state_view
                         .as_converter(context.db.clone(), context.indexer_reader.clone())

@@ -21,7 +21,7 @@ module 0x42::primitives {
     spec test_sub(x: u64, y: u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == x - y;
-        aborts_if [inferred] x - y < 0;
+        aborts_if [inferred] x < y;
     }
 
 
@@ -67,7 +67,6 @@ module 0x42::primitives {
         pragma opaque = true;
         ensures [inferred] result == (x + y) * 2;
         aborts_if [inferred] (x + y) * 2 > MAX_U64;
-        aborts_if [inferred] x + y > MAX_U64;
     }
 
 
@@ -147,8 +146,7 @@ module 0x42::primitives {
     }
     spec test_and(a: bool, b: bool): bool {
         pragma opaque = true;
-        ensures [inferred] a ==> result == b;
-        ensures [inferred] !a ==> result == false;
+        ensures [inferred] result == (a && b);
         aborts_if [inferred] false;
     }
 
@@ -159,8 +157,7 @@ module 0x42::primitives {
     }
     spec test_or(a: bool, b: bool): bool {
         pragma opaque = true;
-        ensures [inferred] a ==> result == true;
-        ensures [inferred] !a ==> result == b;
+        ensures [inferred] result == (a || b);
         aborts_if [inferred] false;
     }
 

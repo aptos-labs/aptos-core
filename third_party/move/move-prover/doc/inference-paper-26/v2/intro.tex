@@ -1,0 +1,25 @@
+% !TEX root = main.tex
+\Section{Introduction}
+\label{sec:intro}
+
+A roadblock in program verification adoption is the \emph{cost of specification}.
+The properties developers care about are high-level --- a call chain aborts only under stated preconditions, an entrypoint satisfies its postconditions, stored data respects an invariant --- but to prove any of them, the supporting functions need contracts of their own, and those are boilerplate: they restate what the code does.
+\emph{Specification inference} derives such contracts from the program, so that effort can go to the properties worth stating by hand.
+Verifiers abstract from imperative code with Dijkstra's weakest-precondition transformation (\WP)~\cite{dijkstra1975wp}, and \WP is the natural inference engine, but it stops at loops: a loop needs an invariant as induction hypothesis~\cite{BL05}, invariant synthesis has no complete technique despite a long history~\cite{CousotHalbwachs78}, and in practice invariants are written by hand.
+
+LLMs have been applied to inference since 2023~\cite{PeiEtAl23, KamathEtAl23}, and with today's frontier models a well-instructed agent that receives the verifier's diagnosis can realistically infer specifications, loop invariants included.
+This paper is a study of such inference for Move, a smart contract language with a specification language built in and strong verification support in the Move Prover (\MVP)~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
+We run inference with a coding agent, and equip it with a mechanical \WP tool that derives precise, simplified contracts once the loop invariants are in place: the agent asks for specs, the tool either succeeds or reports the loops that lack an invariant, the agent proposes invariants, and the cycle repeats.
+
+The setup is measured on a corpus of 20 inference problems drawn from a private codebase (\Anon{that of the perpetual trading system Decibel~\cite{Decibel}}{that of a production perpetual trading system}) --- private so that contracts must be inferred rather than recalled --- with three tactics, one without the \WP tool and two with, under three models, Opus~5, Sol~5.6, and Terra~5.6, and with completeness checked by held-out mutants.
+The study shows several things at once.
+Pure agent-based inference works surprisingly well: at its first attempt it produced a complete specification in 95\% of its cells under the two frontier models, including on targets that require inventing lemmas and recursive helper functions.
+Different models make different use of the \WP tool: relative to the unaided agent it costs about 1.3$\times$ under Opus~5, 0.95$\times$ under Sol~5.6, and 0.X$\times$ under Terra~5.6 --- a trade of exact contracts for context, and which side pays depends on how the model spends its tokens.
+In every case the success rate with \WP is higher: the tool removes the incomplete contracts the unaided agent leaves behind, all of them on the targets whose contract has to pin down a whole data structure.
+
+\MVP was developed for the Diem project and is \Anon{maintained at Aptos Labs since 2022}{since maintained by the blockchain company behind it}; it has verified Diem's payment system and critical components of \Anon{the Aptos blockchain}{a public blockchain}~\cite{ParkZGXGCLC24, AptosFrameworkBook}.
+Move shares Rust's safe references, linear types, algebraic data types, and higher-order functions~\cite{MoveOnAptosBook}; the mechanical half of our approach relies on exactly these traits --- above all reference elimination (Sec.~\ref{sec:wp}) --- so we expect it to carry over to verifiers for Rust-like languages.
+
+Sec.~\ref{sec:hybrid} presents hybrid inference, Sec.~\ref{sec:evaluation} the evaluation, and Sec.~\ref{sec:conclusion} discusses the results and concludes.
+
+\endinput

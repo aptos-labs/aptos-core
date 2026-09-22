@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Replays a full transaction (entry-function user transactions and
-//! block-metadata transactions) on
+//! Replays a full transaction (entry-function user transactions,
+//! block-metadata transactions, and block-epilogue transactions) on
 //! both the legacy AptosVM (V1) and the MonoMove-backed Aptos transaction
 //! executor (V2), reporting an execution-time comparison and a strict output
 //! comparison. Both replays run gas-free so the outputs carry no fee effects.

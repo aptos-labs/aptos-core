@@ -25,15 +25,17 @@ use crate::commands::verify;
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_cli_common::PromptOptions;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, ValidCryptoMaterialStringExt};
+use aptos_crypto::{
+    ed25519::Ed25519PrivateKey, HashValue, PrivateKey, ValidCryptoMaterialStringExt,
+};
+use aptos_infallible::duration_since_epoch;
 use aptos_move_cli::{compile_in_temp_dir, FrameworkPackageArgs};
 use aptos_rest_client::{aptos_api_types::ViewRequest, AptosBaseUrl, Client, Transaction};
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_test_root_address,
     chain_id::ChainId,
-    transaction::{Script, TransactionArgument, TransactionPayload},
+    transaction::{RawTransaction, Script, TransactionArgument, TransactionPayload},
 };
 use clap::Parser;
 use move_core_types::diag_writer::DiagWriter;
@@ -53,12 +55,18 @@ const FAST_RESOLUTION_SECS: u64 = 30;
 const MAX_GAS: u64 = 2_000_000;
 const GAS_UNIT_PRICE: u64 = 100;
 
+/// How long a submitted transaction stays valid.
+const TXN_EXPIRATION_SECS: u64 = 30;
+
 /// Octas minted to the validator with --mint-to-validator (1000 APT).
 const MINT_AMOUNT: u64 = 100_000_000_000;
 
 /// How long to wait for voting to close after the fast-resolve window.
 const VOTING_CLOSE_TIMEOUT: Duration = Duration::from_secs(180);
 const POLL_INTERVAL: Duration = Duration::from_secs(5);
+
+/// How many times [`submit`] retries on a lost sequence number race.
+const SUBMIT_ATTEMPTS: usize = 5;
 
 /// Everything needed to sign the ceremony's transactions.
 pub struct Signers {
@@ -107,13 +115,15 @@ pub async fn run(
 
     // 2. Network guard: never mainnet.
     let client = build_client(endpoint.clone(), node_api_key.as_deref())?;
-    let chain_id = client
-        .get_ledger_information()
-        .await
-        .context("failed to reach the network endpoint")?
-        .into_inner()
-        .chain_id;
-    if chain_id == ChainId::mainnet().id() {
+    let chain_id = ChainId::new(
+        client
+            .get_ledger_information()
+            .await
+            .context("failed to reach the network endpoint")?
+            .into_inner()
+            .chain_id,
+    );
+    if chain_id.is_mainnet() {
         bail!("refusing to deploy to mainnet: this command drives the test-network-only governance flow");
     }
 
@@ -150,27 +160,35 @@ pub async fn run(
     }
 
     // 5. The ceremony, with the voting period restored no matter what.
+    //
+    // One compile up front serves both the shrink and the restore, so the
+    // restore never waits on the compiler with the network left at 30s.
+    let config_script = compile_governance_config_script(core_path)
+        .context("failed to compile the governance-config script")?;
     let root_key = Ed25519PrivateKey::from_encoded_string(&signers.root_key)
         .map_err(|e| anyhow!("invalid root key: {}", e))?;
     let validator_key = Ed25519PrivateKey::from_encoded_string(&signers.validator_key)
         .map_err(|e| anyhow!("invalid validator key: {}", e))?;
-    let root = local_account(&client, aptos_test_root_address(), root_key).await?;
-    let validator = local_account(&client, signers.validator_address, validator_key).await?;
-    let factory = TransactionFactory::new(ChainId::new(chain_id))
-        .with_max_gas_amount(MAX_GAS)
-        .with_gas_unit_price(GAS_UNIT_PRICE);
+    let root = aptos_test_root_address();
+    let validator = signers.validator_address;
+
+    // Look both accounts up now, so a missing one fails before the ceremony
+    // has changed anything.
+    fetch_sequence_number(&client, root).await?;
+    fetch_sequence_number(&client, validator).await?;
 
     // Fund the validator's gas on throwaway networks (local swarms, forge).
     // Refused on testnet: its validator is expected to already be funded.
     if mint_to_validator {
-        if chain_id == ChainId::testnet().id() {
+        if chain_id.is_testnet() {
             bail!("--mint-to-validator is not allowed on testnet");
         }
         submit(
             &client,
-            &factory,
-            &root,
-            aptos_stdlib::aptos_coin_mint(validator.address(), MINT_AMOUNT),
+            chain_id,
+            root,
+            &root_key,
+            aptos_stdlib::aptos_coin_mint(validator, MINT_AMOUNT),
         )
         .await
         .context("failed to mint gas funds to the validator")?;
@@ -183,31 +201,46 @@ pub async fn run(
     let original_config = get_governance_config(&client)
         .await
         .context("failed to read the current governance config")?;
-    set_governance_config(&client, &factory, &root, core_path, GovernanceConfig {
-        voting_duration_secs: FAST_RESOLUTION_SECS,
-        ..original_config
-    })
+    set_governance_config(
+        &client,
+        chain_id,
+        root,
+        &root_key,
+        &config_script,
+        GovernanceConfig {
+            voting_duration_secs: FAST_RESOLUTION_SECS,
+            ..original_config
+        },
+    )
     .await?;
     let outcome = run_governance(
         &client,
-        &factory,
-        &validator,
+        chain_id,
+        validator,
+        &validator_key,
         &scripts,
         bundle_path,
         metadata_url,
     )
     .await;
-    let restore = set_governance_config(&client, &factory, &root, core_path, original_config)
-        .await
-        .with_context(|| {
-            format!(
-                "failed to restore the governance config -- restore it manually: \
+    let restore = set_governance_config(
+        &client,
+        chain_id,
+        root,
+        &root_key,
+        &config_script,
+        original_config,
+    )
+    .await
+    .with_context(|| {
+        format!(
+            "failed to restore the governance config -- restore it manually: \
                  min voting threshold {}, required proposer stake {}, voting period {}s",
-                original_config.min_voting_threshold,
-                original_config.required_proposer_stake,
-                original_config.voting_duration_secs
-            )
-        });
+            original_config.min_voting_threshold,
+            original_config.required_proposer_stake,
+            original_config.voting_duration_secs
+        )
+    });
 
     match (outcome, restore) {
         (Ok(proposal_id), Ok(())) => {
@@ -229,16 +262,18 @@ pub async fn run(
 /// carry enough state (proposal id, executed step count) for manual recovery.
 async fn run_governance(
     client: &Client,
-    factory: &TransactionFactory,
-    validator: &LocalAccount,
+    chain_id: ChainId,
+    validator: AccountAddress,
+    validator_key: &Ed25519PrivateKey,
     scripts: &[BundleScript],
     bundle_path: &Path,
     metadata_url: &str,
 ) -> Result<u64> {
     submit(
         client,
-        factory,
+        chain_id,
         validator,
+        validator_key,
         aptos_stdlib::stake_increase_lockup(),
     )
     .await
@@ -251,10 +286,11 @@ async fn run_governance(
         .ok_or_else(|| anyhow!("bundle has no scripts"))?;
     let txn = submit(
         client,
-        factory,
+        chain_id,
         validator,
+        validator_key,
         aptos_stdlib::aptos_governance_create_proposal_v2(
-            validator.address(),
+            validator,
             first.hash.to_vec(),
             metadata_url.as_bytes().to_vec(),
             HashValue::sha3_256_of(&metadata).to_hex().into_bytes(),
@@ -268,9 +304,10 @@ async fn run_governance(
 
     submit(
         client,
-        factory,
+        chain_id,
         validator,
-        aptos_stdlib::aptos_governance_vote(validator.address(), proposal_id, true),
+        validator_key,
+        aptos_stdlib::aptos_governance_vote(validator, proposal_id, true),
     )
     .await
     .with_context(|| format!("failed to vote on proposal {}", proposal_id))?;
@@ -284,8 +321,9 @@ async fn run_governance(
     // removes it -- no per-step approval is needed.
     submit(
         client,
-        factory,
+        chain_id,
         validator,
+        validator_key,
         aptos_stdlib::aptos_governance_add_approved_script_hash_script(proposal_id),
     )
     .await
@@ -308,8 +346,9 @@ async fn run_governance(
         };
         submit(
             client,
-            factory,
+            chain_id,
             validator,
+            validator_key,
             TransactionPayload::Script(Script::new(script.blob.clone(), vec![], vec![
                 TransactionArgument::U64(proposal_id),
             ])),
@@ -335,33 +374,60 @@ fn build_client(endpoint: Url, node_api_key: Option<&str>) -> Result<Client> {
     Ok(builder.build())
 }
 
-async fn local_account(
-    client: &Client,
-    address: AccountAddress,
-    key: Ed25519PrivateKey,
-) -> Result<LocalAccount> {
-    let sequence_number = client
+/// The account's current on-chain sequence number.
+async fn fetch_sequence_number(client: &Client, address: AccountAddress) -> Result<u64> {
+    Ok(client
         .get_account(address)
         .await
         .with_context(|| format!("failed to look up account {}", address))?
         .into_inner()
-        .sequence_number;
-    Ok(LocalAccount::new(address, key, sequence_number))
+        .sequence_number)
 }
 
-/// Sign `payload` with `account`, submit it, and wait for on-chain success.
+/// Sign `payload` as `sender`, submit it, and wait for on-chain success.
+///
+/// We have to assume that neither sender is exclusively ours and must account
+/// for potential race conditions. As a mitigation, read the sequence number
+/// fresh every time, and retry if it is too old.
 async fn submit(
     client: &Client,
-    factory: &TransactionFactory,
-    account: &LocalAccount,
+    chain_id: ChainId,
+    sender: AccountAddress,
+    key: &Ed25519PrivateKey,
     payload: TransactionPayload,
 ) -> Result<Transaction> {
-    let signed = account.sign_with_transaction_builder(factory.payload(payload));
-    let txn = client.submit_and_wait(&signed).await?.into_inner();
-    if !txn.success() {
-        bail!("transaction committed but failed: {}", txn.vm_status());
+    let mut conflict = None;
+    for _ in 0..SUBMIT_ATTEMPTS {
+        let txn = RawTransaction::new(
+            sender,
+            fetch_sequence_number(client, sender).await?,
+            payload.clone(),
+            MAX_GAS,
+            GAS_UNIT_PRICE,
+            duration_since_epoch().as_secs() + TXN_EXPIRATION_SECS,
+            chain_id,
+        )
+        .sign(key, key.public_key())?
+        .into_inner();
+        match client.submit_and_wait(&txn).await {
+            Ok(response) => {
+                let txn = response.into_inner();
+                if !txn.success() {
+                    bail!("transaction committed but failed: {}", txn.vm_status());
+                }
+                return Ok(txn);
+            },
+            // A number we just read can only be overtaken, never overshot.
+            Err(err) if err.to_string().contains("SEQUENCE_NUMBER_TOO_OLD") => conflict = Some(err),
+            Err(err) => return Err(err.into()),
+        }
     }
-    Ok(txn)
+    Err(anyhow!(
+        "{} lost a sequence number race {} times in a row: {}",
+        sender,
+        SUBMIT_ATTEMPTS,
+        conflict.expect("the loop only exits here after a conflict"),
+    ))
 }
 
 /// The on-chain governance config: everything the ceremony touches and must
@@ -400,9 +466,10 @@ async fn get_governance_config(client: &Client) -> Result<GovernanceConfig> {
 /// script leans on `aptos_governance::get_signer_testnet_only`.
 async fn set_governance_config(
     client: &Client,
-    factory: &TransactionFactory,
-    root: &LocalAccount,
-    core_path: &Path,
+    chain_id: ChainId,
+    root: AccountAddress,
+    root_key: &Ed25519PrivateKey,
+    config_script: &[u8],
     config: GovernanceConfig,
 ) -> Result<()> {
     println!(
@@ -410,35 +477,71 @@ async fn set_governance_config(
          voting period {}s...",
         config.min_voting_threshold, config.required_proposer_stake, config.voting_duration_secs
     );
-    let source = format!(
-        r#"
-script {{
-    use aptos_framework::aptos_governance;
-
-    fun main(core_resources: &signer) {{
-        let core_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        aptos_governance::update_governance_config(&core_signer, {}, {}, {});
-    }}
-}}
-"#,
-        config.min_voting_threshold, config.required_proposer_stake, config.voting_duration_secs
-    );
-    let temp = aptos_temppath::TempPath::new();
-    temp.create_as_file()?;
-    let mut path = temp.path().to_path_buf();
-    path.set_extension("move");
-    fs::write(&path, source)?;
-
-    let (blob, _) = compile_script(&path, core_path)?;
     submit(
         client,
-        factory,
+        chain_id,
         root,
-        TransactionPayload::Script(Script::new(blob, vec![], vec![])),
+        root_key,
+        TransactionPayload::Script(Script::new(config_script.to_vec(), vec![], vec![
+            TransactionArgument::U128(config.min_voting_threshold),
+            TransactionArgument::U64(config.required_proposer_stake),
+            TransactionArgument::U64(config.voting_duration_secs),
+        ])),
     )
     .await
     .context("failed to set the governance config")?;
     Ok(())
+}
+
+/// Compile the script that sets the governance config, parameterized so one
+/// blob serves every call.
+fn compile_governance_config_script(core_path: &Path) -> Result<Vec<u8>> {
+    const SOURCE: &str = r#"
+script {
+    use aptos_framework::aptos_governance;
+
+    fun main(
+        core_resources: &signer,
+        min_voting_threshold: u128,
+        required_proposer_stake: u64,
+        voting_duration_secs: u64,
+    ) {
+        let core_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        aptos_governance::update_governance_config(
+            &core_signer,
+            min_voting_threshold,
+            required_proposer_stake,
+            voting_duration_secs,
+        );
+    }
+}
+"#;
+    let temp = aptos_temppath::TempPath::new();
+    temp.create_as_file()?;
+    let mut path = temp.path().to_path_buf();
+    path.set_extension("move");
+    fs::write(&path, SOURCE)?;
+
+    let framework_dir = core_path.join("aptos-move/framework/aptos-framework");
+    let framework_package_args = FrameworkPackageArgs::try_parse_from([
+        "aptos-release-tool",
+        "--framework-local-dir",
+        &framework_dir.to_string_lossy(),
+        "--skip-fetch-latest-git-deps",
+    ])
+    .context("failed to build framework package args; this should not happen")?;
+    let (blob, _hash) = compile_in_temp_dir(
+        &DiagWriter::stderr(),
+        "script",
+        &path,
+        &framework_package_args,
+        PromptOptions::yes(),
+        None,
+        Some(LanguageVersion::latest_stable()),
+        Some(CompilerVersion::latest_stable()),
+    )
+    .map_err(|e| anyhow!("{:#}", e))?;
+    Ok(blob)
 }
 
 /// Poll `0x1::voting::is_voting_closed` until the proposal can be resolved.
@@ -507,9 +610,8 @@ async fn ledger_timestamp_secs(client: &Client) -> Result<u64> {
         / 1_000_000)
 }
 
-/// Compile every script in the bundle (in execution order) and require each to
-/// match the execution hash stamped at generation time. The compiled blobs are
-/// what later gets submitted, so what we validate is what we deploy.
+/// Load the bundle's compiled scripts (in execution order) and hash each blob.
+/// Nothing is recompiled.
 fn load_bundle_scripts(bundle_path: &Path) -> Result<Vec<BundleScript>> {
     Ok(crate::bundle::load_compiled_scripts(bundle_path)?
         .into_iter()
@@ -518,34 +620,6 @@ fn load_bundle_scripts(bundle_path: &Path) -> Result<Vec<BundleScript>> {
             BundleScript { name, blob, hash }
         })
         .collect())
-}
-
-fn compile_script(path: &Path, core_path: &Path) -> Result<(Vec<u8>, HashValue)> {
-    let framework_dir = core_path.join("aptos-move/framework/aptos-framework");
-    let framework_package_args = FrameworkPackageArgs::try_parse_from([
-        "aptos-release-tool",
-        "--framework-local-dir",
-        &framework_dir.to_string_lossy(),
-        "--skip-fetch-latest-git-deps",
-    ])
-    .context("failed to build framework package args; this should not happen")?;
-    let (blob, hash) = compile_in_temp_dir(
-        &DiagWriter::stderr(),
-        "script",
-        path,
-        &framework_package_args,
-        PromptOptions::yes(),
-        // The three compile options below must mirror CompileScriptFunction's
-        // fallbacks (the path generation stamps hashes through): the stamped
-        // hashes and the embedded next-execution-hash chain are computed from
-        // bytecode compiled with these exact settings, and on-chain execution
-        // compares the submitted blob's hash against that chain.
-        None,
-        Some(LanguageVersion::latest_stable()),
-        Some(CompilerVersion::latest_stable()),
-    )
-    .map_err(|e| anyhow!("{:#}", e))?;
-    Ok((blob, hash))
 }
 
 /// Pull the proposal id out of the create-proposal transaction's events.
@@ -565,4 +639,17 @@ fn extract_proposal_id(txn: &Transaction) -> Result<u64> {
         .and_then(|id| id.as_str())
         .and_then(|id| id.parse::<u64>().ok())
         .ok_or_else(|| anyhow!("no CreateProposal event found in the proposal transaction"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn governance_config_script_compiles() {
+        let core_path = crate::init_core_path();
+        let blob = compile_governance_config_script(&core_path)
+            .expect("the governance-config script should compile");
+        assert!(!blob.is_empty());
+    }
 }

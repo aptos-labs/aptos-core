@@ -326,7 +326,8 @@ procedure {:inline 1} $SubBv{{impl.base}}(src1: bv{{impl.base}}, src2: bv{{impl.
 
 procedure {:inline 1} $MulBv{{impl.base}}(src1: bv{{impl.base}}, src2: bv{{impl.base}}) returns (dst: bv{{impl.base}})
 {
-    if ($Lt'Bv{{impl.base}}'($Mul'Bv{{impl.base}}'(src1, src2), src1)) {
+    if (src2 != 0bv{{impl.base}} &&
+        $Gt'Bv{{impl.base}}'(src1, $Div'Bv{{impl.base}}'({{impl.max}}bv{{impl.base}}, src2))) {
         call $ExecFailureAbort();
         return;
     }
@@ -490,7 +491,7 @@ datatype $Memory<T> {
     $Memory(domain: [int]bool, contents: [int]T)
 }
 
-// Tuple Types (2-8 elements) for spec functions returning multiple values
+// Tuple Types (2-11 elements) for spec functions returning multiple values
 datatype $Tuple2<T1, T2> {
     $Tuple2($0: T1, $1: T2)
 }

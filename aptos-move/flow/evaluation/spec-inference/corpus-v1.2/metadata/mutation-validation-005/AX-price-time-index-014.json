@@ -1,0 +1,212 @@
+{
+  "mutants": {
+    "essential": 1,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-price-time-index-014/mutants.json",
+    "mutants": 1,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-o60k6xht/package",
+            "--output",
+            "/tmp/move-inference-mutant-o60k6xht/unused.json"
+          ],
+          "duration_ms": 5107,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-price-time-index-014-always-aborts",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-o60k6xht/package",
+            "--target",
+            "0x7::price_time_index::new_price_time_idx",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-o60k6xht/prover-report.json"
+          ],
+          "duration_ms": 3767,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::price_time_index::new_price_time_idx"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-price-time-index-014/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-8er5_dd_/package",
+            "--output",
+            "/tmp/move-inference-mutant-8er5_dd_/unused.json"
+          ],
+          "duration_ms": 4731,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-price-time-index-014-aborts-differently",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-8er5_dd_/package",
+            "--target",
+            "0x7::price_time_index::new_price_time_idx",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-8er5_dd_/prover-report.json"
+          ],
+          "duration_ms": 6329,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-ir1hlliq/package",
+            "--output",
+            "/tmp/move-inference-mutant-ir1hlliq/unused.json"
+          ],
+          "duration_ms": 3581,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-price-time-index-014-buy-map-aborts",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-ir1hlliq/package",
+            "--target",
+            "0x7::price_time_index::new_price_time_idx",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-ir1hlliq/prover-report.json"
+          ],
+          "duration_ms": 5729,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-xb9ewy2q/package",
+            "--output",
+            "/tmp/move-inference-mutant-xb9ewy2q/unused.json"
+          ],
+          "duration_ms": 3549,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-price-time-index-014-sell-map-aborts",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-xb9ewy2q/package",
+            "--target",
+            "0x7::price_time_index::new_price_time_idx",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-xb9ewy2q/prover-report.json"
+          ],
+          "duration_ms": 6227,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::price_time_index::new_price_time_idx"
+  }
+}

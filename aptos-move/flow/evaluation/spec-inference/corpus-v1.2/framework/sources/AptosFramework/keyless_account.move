@@ -1,0 +1,461 @@
+/// This module is responsible for configuring keyless blockchain accounts which were introduced in
+/// [AIP-61](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md).
+module aptos_framework::keyless_account {
+    use std::bn254_algebra;
+    use std::config_buffer;
+    use std::error;
+    use std::option::Option;
+    use std::signer;
+    use std::string::String;
+    use aptos_std::crypto_algebra;
+    use aptos_std::ed25519;
+    use aptos_std::multi_key;
+    use aptos_std::single_key;
+    use aptos_framework::account;
+    use aptos_framework::chain_status;
+    use aptos_framework::confidential_asset;
+    use aptos_framework::fungible_asset;
+    use aptos_framework::object::Object;
+    use aptos_framework::system_addresses;
+
+    // The `aptos_framework::reconfiguration_with_dkg` module needs to be able to call `on_new_epoch`.
+    friend aptos_framework::reconfiguration_with_dkg;
+
+    /// The training wheels PK needs to be 32 bytes long.
+    const E_TRAINING_WHEELS_PK_WRONG_SIZE : u64 = 1;
+
+    /// A serialized BN254 G1 point is invalid.
+    const E_INVALID_BN254_G1_SERIALIZATION: u64 = 2;
+
+    /// A serialized BN254 G2 point is invalid.
+    const E_INVALID_BN254_G2_SERIALIZATION: u64 = 3;
+
+    /// A DK has already been backed up for this keyless account. Please call `confidential_asset::register_raw` instead
+    /// with the corresponding EK.
+    const E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP: u64 = 4;
+
+    /// The account's authentication key does not match the multi-key derived from the provided keyless public key
+    /// and Ed25519 backup public key. Indicates this is not a keyless+Ed25519-backup account.
+    const E_NOT_KEYLESS_BACKUP_ACCOUNT: u64 = 5;
+
+    /// The supplied `keyless_public_key` is not a `Keyless` or `FederatedKeyless` single-key variant.
+    const E_NOT_KEYLESS_PUBLIC_KEY: u64 = 6;
+
+    #[resource_group(scope = global)]
+    struct Group {}
+
+    #[resource_group_member(group = aptos_framework::keyless_account::Group)]
+    /// The 288-byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts
+    struct Groth16VerificationKey has key, store, drop {
+        /// 32-byte serialization of `alpha * G`, where `G` is the generator of `G1`.
+        alpha_g1: vector<u8>,
+        /// 64-byte serialization of `alpha * H`, where `H` is the generator of `G2`.
+        beta_g2: vector<u8>,
+        /// 64-byte serialization of `gamma * H`, where `H` is the generator of `G2`.
+        gamma_g2: vector<u8>,
+        /// 64-byte serialization of `delta * H`, where `H` is the generator of `G2`.
+        delta_g2: vector<u8>,
+        /// `\forall i \in {0, ..., \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where
+        /// `H` is the generator of `G1` and `\ell` is 1 for the ZK relation.
+        gamma_abc_g1: vector<vector<u8>>,
+    }
+
+    #[resource_group_member(group = aptos_framework::keyless_account::Group)]
+    struct Configuration has key, store, drop, copy {
+        /// An override `aud` for the identity of a recovery service, which will help users recover their keyless accounts
+        /// associated with dapps or wallets that have disappeared.
+        /// IMPORTANT: This recovery service **cannot**, on its own, take over user accounts: a user must first sign in
+        /// via OAuth in the recovery service in order to allow it to rotate any of that user's keyless accounts.
+        ///
+        /// Furthermore, the ZKP eventually expires, so there is a limited window within which a malicious recovery
+        /// service could rotate accounts. In the future, we can make this window arbitrarily small by further lowering
+        /// the maximum expiration horizon for ZKPs used for recovery, instead of relying on the `max_exp_horizon_secs`
+        /// value in this resource.
+        ///
+        /// If changed: There is no prover service support yet for recovery mode => ZKPs with override aud's enabled
+        ///   will not be served by the prover service => as long as training wheels are "on," such recovery ZKPs will
+        ///   never arrive on chain.
+        ///   (Once support is implemented in the prover service, in an abundance of caution, the training wheel check
+        ///    should only pass if the override aud in the public statement matches one in this list. Therefore, changes
+        ///    to this value should be picked up automatically by the prover service.)
+        override_aud_vals: vector<String>,
+
+        /// No transaction can have more than this many keyless signatures.
+        ///
+        /// If changed: Only affects the Aptos validators; prover service not impacted.
+        max_signatures_per_txn: u16,
+
+        /// How far in the future from the JWT's issued-at-time can the EPK expiration date be set?
+        /// Specifically, validators enforce that the ZKP's expiration horizon is less than this `max_exp_horizon_secs`
+        /// value.
+        ///
+        /// If changed: Only affects the Aptos validators; prover service not impacted.
+        max_exp_horizon_secs: u64,
+
+        /// The training wheels PK, if training wheels are on.
+        ///
+        /// If changed: Prover service has to be re-deployed with the associated training wheel SK.
+        training_wheels_pubkey: Option<vector<u8>>,
+
+        /// The max length of an ephemeral public key supported in our circuit (93 bytes)
+        ///
+        /// Note: Currently, the circuit derives the JWT's nonce field by hashing the EPK as:
+        /// ```
+        /// Poseidon_6(
+        ///   epk_0, epk_1, epk_2,
+        ///   max_commited_epk_bytes,
+        ///   exp_date,
+        ///   epk_blinder
+        /// )
+        /// ```
+        /// and the public inputs hash by hashing the EPK with other inputs as:
+        /// ```
+        /// Poseidon_14(
+        ///   epk_0, epk_1, epk_2,
+        ///   max_commited_epk_bytes,
+        ///   [...]
+        /// )
+        /// ```
+        /// where `max_committed_epk_byte` is passed in as one of the witnesses to the circuit. As a result, (some)
+        /// changes to this field could technically be handled by the same circuit: e.g., if we let the epk_i chunks
+        /// exceed 31 bytes, but no more than 32, then `max_commited_epk_bytes` could now be in (93, 96]. Whether such a
+        /// restricted set of changes is useful remains unclear. Therefore, the verdict will be that...
+        ///
+        /// If changed: (Likely) requires a circuit change because over-decreasing (or increasing) it leads to fewer (or
+        ///   more) EPK chunks. This would break the current way the circuit hashes the nonce and the public inputs.
+        ///   => prover service redeployment.
+        max_commited_epk_bytes: u16,
+
+        /// The max length of the value of the JWT's `iss` field supported in our circuit (e.g., `"https://accounts.google.com"`)
+        ///
+        /// If changed: Requires a circuit change because the `iss` field value is hashed inside the circuit as
+        ///   `HashBytesToFieldWithLen(MAX_ISS_VALUE_LEN)(iss_value, iss_value_len)` where `MAX_ISS_VALUE_LEN` is a
+        ///   circuit constant hard-coded to `max_iss_val_bytes` (i.e., to 120) => prover service redeployment..
+        max_iss_val_bytes: u16,
+
+        /// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
+        ///
+        /// If changed: Requires a circuit change because the extra field key-value pair is hashed inside the circuit as
+        ///   `HashBytesToFieldWithLen(MAX_EXTRA_FIELD_KV_PAIR_LEN)(extra_field, extra_field_len)` where
+        ///   `MAX_EXTRA_FIELD_KV_PAIR_LEN` is a circuit constant hard-coded to `max_extra_field_bytes` (i.e., to 350)
+        ///    => prover service redeployment.
+        max_extra_field_bytes: u16,
+
+        /// The max length of the base64url-encoded JWT header in bytes supported in our circuit.
+        ///
+        /// If changed: Requires a circuit change because the JWT header is hashed inside the circuit as
+        ///   `HashBytesToFieldWithLen(MAX_B64U_JWT_HEADER_W_DOT_LEN)(b64u_jwt_header_w_dot, b64u_jwt_header_w_dot_len)`
+        ///   where `MAX_B64U_JWT_HEADER_W_DOT_LEN` is a circuit constant hard-coded to `max_jwt_header_b64_bytes`
+        ///   (i.e., to 350) => prover service redeployment.
+        max_jwt_header_b64_bytes: u32,
+    }
+
+    #[test_only]
+    public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
+        system_addresses::assert_aptos_framework(fx);
+
+        move_to(fx, vk);
+        move_to(fx, constants);
+    }
+
+    public fun new_groth16_verification_key(alpha_g1: vector<u8>,
+                                            beta_g2: vector<u8>,
+                                            gamma_g2: vector<u8>,
+                                            delta_g2: vector<u8>,
+                                            gamma_abc_g1: vector<vector<u8>>
+    ): Groth16VerificationKey {
+        Groth16VerificationKey {
+            alpha_g1,
+            beta_g2,
+            gamma_g2,
+            delta_g2,
+            gamma_abc_g1,
+        }
+    }
+
+    public fun new_configuration(
+        override_aud_val: vector<String>,
+        max_signatures_per_txn: u16,
+        max_exp_horizon_secs: u64,
+        training_wheels_pubkey: Option<vector<u8>>,
+        max_commited_epk_bytes: u16,
+        max_iss_val_bytes: u16,
+        max_extra_field_bytes: u16,
+        max_jwt_header_b64_bytes: u32
+    ): Configuration {
+        Configuration {
+            override_aud_vals: override_aud_val,
+            max_signatures_per_txn,
+            max_exp_horizon_secs,
+            training_wheels_pubkey,
+            max_commited_epk_bytes,
+            max_iss_val_bytes,
+            max_extra_field_bytes,
+            max_jwt_header_b64_bytes,
+        }
+    }
+
+    /// Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
+    fun validate_groth16_vk(vk: &Groth16VerificationKey) {
+        // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.
+        assert!(crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(&vk.alpha_g1).is_some(), E_INVALID_BN254_G1_SERIALIZATION);
+        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2).is_some(), E_INVALID_BN254_G2_SERIALIZATION);
+        for (i in 0..vk.gamma_abc_g1.length()) {
+            assert!(crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vk.gamma_abc_g1.borrow(i)).is_some(), E_INVALID_BN254_G1_SERIALIZATION);
+        };
+    }
+
+    /// Sets the Groth16 verification key, only callable during genesis. To call during governance proposals, use
+    /// `set_groth16_verification_key_for_next_epoch`.
+    ///
+    /// WARNING: See `set_groth16_verification_key_for_next_epoch` for caveats.
+    public fun update_groth16_verification_key(fx: &signer, vk: Groth16VerificationKey) {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+        // There should not be a previous resource set here.
+        move_to(fx, vk);
+    }
+
+    /// Sets the keyless configuration, only callable during genesis. To call during governance proposals, use
+    /// `set_configuration_for_next_epoch`.
+    ///
+    /// WARNING: See `set_configuration_for_next_epoch` for caveats.
+    public fun update_configuration(fx: &signer, config: Configuration) {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+        // There should not be a previous resource set here.
+        move_to(fx, config);
+    }
+
+    /// Atomically registers an EK for the specified `asset_type` and stores a DK ciphertext in the `account::EncryptedDK`
+    /// resource. This can only be called once: i.e., when registering an EK for the 1st time. Subsequent EK registrations
+    /// for other asset types should be done via `confidential_asset::register_raw`.
+    ///
+    /// `keyless_public_key` and `backup_public_key` must be the (1-of-2) keyless + Ed25519-backup multi-key currently
+    /// authorizing this account; otherwise the call aborts. This check pins the function to keyless+backup accounts and
+    /// prevents accidentally backing up a DK for an account whose auth key has a different (incompatible) shape.
+    ///
+    /// SECURITY: This function only verifies the ZKPoK for `ek` and *not* that `dk_ciphertext` is a well-formed
+    /// encryption of the DK matching `ek`, nor that the encryption key is one the account's owner actually controls.
+    /// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+    /// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
+    entry fun register_ek_and_encrypt_dk(
+        owner: &signer,
+        keyless_public_key: vector<u8>,
+        backup_public_key: vector<u8>,
+        asset_type: Object<fungible_asset::Metadata>,
+        ek: vector<u8>,
+        sigma_proto_comm: vector<vector<u8>>,
+        sigma_proto_resp: vector<vector<u8>>,
+        dk_ciphertext: vector<u8>)
+    {
+        let owner_addr = signer::address_of(owner);
+
+        // Step 1: Verify the account is currently authorized by a 1-of-2 multi-key over the supplied keyless PK and
+        // Ed25519 backup PK. This rejects calls on accounts that haven't gone through `upsert_ed25519_backup_key_*`.
+        // The keyless slot must actually be a `Keyless` or `FederatedKeyless` `AnyPublicKey`; without this check, a
+        // 1-of-2 multi-key built from two Ed25519 keys (or any other shape) with a matching auth key would slip past.
+        let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
+        assert!(
+            single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key),
+            error::invalid_argument(E_NOT_KEYLESS_PUBLIC_KEY)
+        );
+
+        let expected_auth_key = multi_key::new_multi_key_from_single_keys(
+            vector[
+                keyless_single_key,
+                single_key::from_ed25519_public_key(
+                    ed25519::new_validated_public_key_from_bytes(backup_public_key).extract()
+                )
+            ],
+            1
+        ).to_authentication_key();
+
+        assert!(
+            account::get_authentication_key(owner_addr) == expected_auth_key,
+            error::invalid_argument(E_NOT_KEYLESS_BACKUP_ACCOUNT)
+        );
+
+        // Step 2: We must only use this when first registering an EK. Subsequent EK registrations for other asset types
+        // must be done via `confidential_asset::register_raw` and are assumed to use the same DK backed up in `account::EncryptedDK`.
+        assert!(
+            account::encrypted_dk_exists(owner_addr) == false,
+            error::already_exists(E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP));
+
+        confidential_asset::register_raw(
+            owner,
+            asset_type,
+            ek,
+            sigma_proto_comm,
+            sigma_proto_resp
+        );
+
+        account::upsert_encrypted_dk(owner, dk_ciphertext);
+    }
+
+    #[deprecated]
+    public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        if (pk.is_some()) {
+            assert!(pk.borrow().length() == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
+        };
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.training_wheels_pubkey = pk;
+    }
+
+    #[deprecated]
+    public fun update_max_exp_horizon(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.max_exp_horizon_secs = max_exp_horizon_secs;
+    }
+
+    #[deprecated]
+    public fun remove_all_override_auds(fx: &signer) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.override_aud_vals = vector[];
+    }
+
+    #[deprecated]
+    public fun add_override_aud(fx: &signer, aud: String) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.override_aud_vals.push_back(aud);
+    }
+
+    /// Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.
+    /// Only callable via governance proposal.
+    ///
+    /// WARNING: To mitigate against DoS attacks, a VK change should be done together with a training wheels PK change,
+    /// so that old ZKPs for the old VK cannot be replayed as potentially-valid ZKPs.
+    ///
+    /// WARNING: If a malicious key is set, this would lead to stolen funds.
+    public fun set_groth16_verification_key_for_next_epoch(fx: &signer, vk: Groth16VerificationKey) {
+        system_addresses::assert_aptos_framework(fx);
+        config_buffer::upsert<Groth16VerificationKey>(vk);
+    }
+
+
+    /// Queues up a change to the keyless configuration. The change will only be effective after reconfiguration. Only
+    /// callable via governance proposal.
+    ///
+    /// WARNING: A malicious `Configuration` could lead to DoS attacks, create liveness issues, or enable a malicious
+    /// recovery service provider to phish users' accounts.
+    public fun set_configuration_for_next_epoch(fx: &signer, config: Configuration) {
+        system_addresses::assert_aptos_framework(fx);
+        config_buffer::upsert<Configuration>(config);
+    }
+
+    /// Convenience method to queue up a change to the training wheels PK. The change will only be effective after
+    /// reconfiguration. Only callable via governance proposal.
+    ///
+    /// WARNING: If a malicious key is set, this *could* lead to stolen funds.
+    public fun update_training_wheels_for_next_epoch(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        // If a PK is being set, validate it first.
+        if (pk.is_some()) {
+            let bytes = *pk.borrow();
+            let vpk = ed25519::new_validated_public_key_from_bytes(bytes);
+            assert!(vpk.is_some(), E_TRAINING_WHEELS_PK_WRONG_SIZE)
+        };
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract_v2<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        config.training_wheels_pubkey = pk;
+
+        set_configuration_for_next_epoch(fx, config);
+    }
+
+    /// Convenience method to queues up a change to the max expiration horizon. The change will only be effective after
+    /// reconfiguration. Only callable via governance proposal.
+    public fun update_max_exp_horizon_for_next_epoch(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract_v2<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        config.max_exp_horizon_secs = max_exp_horizon_secs;
+
+        set_configuration_for_next_epoch(fx, config);
+    }
+
+    /// Convenience method to queue up clearing the set of override `aud`'s. The change will only be effective after
+    /// reconfiguration. Only callable via governance proposal.
+    ///
+    /// WARNING: When no override `aud` is set, recovery of keyless accounts associated with applications that disappeared
+    /// is no longer possible.
+    public fun remove_all_override_auds_for_next_epoch(fx: &signer) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract_v2<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        config.override_aud_vals = vector[];
+
+        set_configuration_for_next_epoch(fx, config);
+    }
+
+    /// Convenience method to queue up an append to the set of override `aud`'s. The change will only be effective
+    /// after reconfiguration. Only callable via governance proposal.
+    ///
+    /// WARNING: If a malicious override `aud` is set, this *could* lead to stolen funds.
+    public fun add_override_aud_for_next_epoch(fx: &signer, aud: String) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract_v2<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        config.override_aud_vals.push_back(aud);
+
+        set_configuration_for_next_epoch(fx, config);
+    }
+
+    /// Only used in reconfigurations to apply the queued up configuration changes, if there are any.
+    public(friend) fun on_new_epoch(fx: &signer) acquires Groth16VerificationKey, Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        if (config_buffer::does_exist<Groth16VerificationKey>()) {
+            let vk = config_buffer::extract_v2();
+            if (exists<Groth16VerificationKey>(@aptos_framework)) {
+                *borrow_global_mut<Groth16VerificationKey>(@aptos_framework) = vk;
+            } else {
+                move_to(fx, vk);
+            }
+        };
+
+        if (config_buffer::does_exist<Configuration>()) {
+            let config = config_buffer::extract_v2();
+            if (exists<Configuration>(@aptos_framework)) {
+                *borrow_global_mut<Configuration>(@aptos_framework) = config;
+            } else {
+                move_to(fx, config);
+            }
+        };
+    }
+}

@@ -101,8 +101,8 @@ pub fn get_position_snapshot_receiver(
 ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
     let value_writer = Arc::new(PositionStateValueWriter::new(position_db));
     Ok(Box::new(StateSnapshotRestore::new(
-        position_merkle_db,
-        &value_writer,
+        Arc::clone(position_merkle_db),
+        value_writer,
         version,
         expected_root_hash,
         false, /* async_commit */

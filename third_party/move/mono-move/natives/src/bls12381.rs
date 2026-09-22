@@ -164,7 +164,7 @@ pub fn native_aggregate_pubkeys<C: NativeContext>(ctx: &C) -> VMResult<NativeSta
     // Deserialize every public key, stopping at the first that fails.
     let mut deserialized = Vec::with_capacity(num_pks as usize);
     for i in 0..num_pks {
-        let pk = pks.get(i);
+        let pk = pks.get_element(i)?;
         // SAFETY: byte slice consumed before any allocation.
         let Ok(pk) = PublicKey::try_from(unsafe { pk.as_bytes() }) else {
             break;
@@ -205,7 +205,7 @@ pub fn native_aggregate_signatures<C: NativeContext>(ctx: &C) -> VMResult<Native
     // Deserialize every signature, stopping at the first that fails.
     let mut deserialized = Vec::with_capacity(num_sigs as usize);
     for i in 0..num_sigs {
-        let sig = sigs.get(i);
+        let sig = sigs.get_element(i)?;
         // SAFETY: byte slice consumed before any allocation.
         let Ok(sig) = bls12381::Signature::try_from(unsafe { sig.as_bytes() }) else {
             break;
@@ -251,7 +251,7 @@ pub fn native_verify_aggregate_signature<C: NativeContext>(ctx: &C) -> VMResult<
     // Deserialize every public key, stopping at the first that fails.
     let mut pk_vals = Vec::with_capacity(num_pks as usize);
     for i in 0..num_pks {
-        let pk = pks.get(i);
+        let pk = pks.get_element(i)?;
         // SAFETY: byte slice consumed before any allocation.
         let Ok(pk) = PublicKey::try_from(unsafe { pk.as_bytes() }) else {
             break;
@@ -275,8 +275,8 @@ pub fn native_verify_aggregate_signature<C: NativeContext>(ctx: &C) -> VMResult<
     // verify call. No VM allocation happens in between, so the slices stay
     // valid.
     let msg_vecs = (0..messages.len())
-        .map(|i| messages.get(i))
-        .collect::<Vec<_>>();
+        .map(|i| messages.get_element(i))
+        .collect::<VMResult<Vec<_>>>()?;
     // SAFETY: byte slices consumed before any allocation.
     let msg_refs = msg_vecs
         .iter()

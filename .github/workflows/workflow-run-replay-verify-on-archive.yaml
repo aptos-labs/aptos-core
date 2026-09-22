@@ -27,7 +27,7 @@ on:
       END_TIME:
         required: false
         type: string
-        description: 'Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION.'
+        description: "Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION."
       DRY_RUN:
         required: false
         type: boolean
@@ -85,7 +85,7 @@ on:
       END_TIME:
         required: false
         type: string
-        description: 'Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION.'
+        description: "Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION."
       DRY_RUN:
         required: false
         type: boolean
@@ -196,11 +196,12 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          access_token_lifetime: "7200s" # 2 hours
           export_environment_variables: false
           create_credentials_file: true
 
       # This is required since we need to switch from aptos-ci to aptos-devinfra-0
-      - name: Setup credentials  
+      - name: Setup credentials
         run: |
           echo "GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
           echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV 

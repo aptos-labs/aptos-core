@@ -803,7 +803,11 @@ mod tests {
 
     #[test]
     fn tool_is_registered() {
-        let names = FlowSession::tool_names();
+        let names = FlowSession::tool_names(crate::evaluation::EvaluationConfig {
+            inference_tactic: crate::evaluation::InferenceTactic::HybridGuided,
+            evaluation_mode: false,
+            feedback_level: crate::evaluation::FeedbackLevel::Acceptance,
+        });
         assert!(
             names.iter().any(|n| n == "move_replay_transaction"),
             "expected move_replay_transaction in {:?}",

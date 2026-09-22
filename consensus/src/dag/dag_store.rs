@@ -539,8 +539,8 @@ impl DagStore {
         let to_prune = self.dag.write().commit_callback(commit_round);
         if let Some(to_prune) = to_prune {
             let digests = to_prune
-                .iter()
-                .flat_map(|(_, round_ref)| round_ref.iter().flatten())
+                .values()
+                .flat_map(|round_ref| round_ref.iter().flatten())
                 .map(|node_status| *node_status.as_node().metadata().digest())
                 .collect();
             if let Err(e) = self.storage.delete_certified_nodes(digests) {

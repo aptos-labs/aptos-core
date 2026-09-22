@@ -301,6 +301,7 @@ impl AptosDB {
         db_dir: &StorageDirPaths,
         target_version: Version,
     ) -> Result<()> {
+        // TODO(HotState): Preserve hot state during truncation and pass its config to catch-up.
         let delete_hot_state_on_restart = true;
         let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
             Self::open_dbs(

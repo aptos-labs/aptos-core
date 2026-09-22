@@ -4,7 +4,10 @@
 use crate::interner::ConcurrentBTreeInterner;
 use move_core_types::language_storage::ModuleId;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+// No `Ord`/`PartialOrd`: the wrapped index is assigned in first-seen order, so
+// its ordering depends on interner history and is not canonical. Order by
+// `ModuleId` instead.
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct InternedModuleId(usize);
 
 pub struct InternedModuleIdPool {

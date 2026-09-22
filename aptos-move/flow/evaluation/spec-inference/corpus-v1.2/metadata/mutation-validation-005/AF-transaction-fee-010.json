@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-transaction-fee-010/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-yhujp52w/package",
+            "--output",
+            "/tmp/move-inference-mutant-yhujp52w/unused.json"
+          ],
+          "duration_ms": 4666,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-transaction-fee-010-fa-cap-not-stored",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-yhujp52w/package",
+            "--target",
+            "0x1::transaction_fee::store_aptos_coin_mint_cap",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-yhujp52w/prover-report.json"
+          ],
+          "duration_ms": 6587,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-ilng429u/package",
+            "--output",
+            "/tmp/move-inference-mutant-ilng429u/unused.json"
+          ],
+          "duration_ms": 3393,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-transaction-fee-010-no-framework-check",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-ilng429u/package",
+            "--target",
+            "0x1::transaction_fee::store_aptos_coin_mint_cap",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-ilng429u/prover-report.json"
+          ],
+          "duration_ms": 6217,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-0_txt0uj/package",
+            "--output",
+            "/tmp/move-inference-mutant-0_txt0uj/unused.json"
+          ],
+          "duration_ms": 3347,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-transaction-fee-010-always-aborts-after-store",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-0_txt0uj/package",
+            "--target",
+            "0x1::transaction_fee::store_aptos_coin_mint_cap",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-0_txt0uj/prover-report.json"
+          ],
+          "duration_ms": 5908,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::transaction_fee::store_aptos_coin_mint_cap"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-transaction-fee-010/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-7nafx7s5/package",
+            "--output",
+            "/tmp/move-inference-mutant-7nafx7s5/unused.json"
+          ],
+          "duration_ms": 5848,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-transaction-fee-010-silently-skips-fa-cap",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-7nafx7s5/package",
+            "--target",
+            "0x1::transaction_fee::store_aptos_coin_mint_cap",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-7nafx7s5/prover-report.json"
+          ],
+          "duration_ms": 7145,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-_x76w1te/package",
+            "--output",
+            "/tmp/move-inference-mutant-_x76w1te/unused.json"
+          ],
+          "duration_ms": 3479,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-transaction-fee-010-aborts-after-coin-cap",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-_x76w1te/package",
+            "--target",
+            "0x1::transaction_fee::store_aptos_coin_mint_cap",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-_x76w1te/prover-report.json"
+          ],
+          "duration_ms": 6086,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-qkzbrnyk/package",
+            "--output",
+            "/tmp/move-inference-mutant-qkzbrnyk/unused.json"
+          ],
+          "duration_ms": 3579,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-transaction-fee-010-accepts-address-two",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-qkzbrnyk/package",
+            "--target",
+            "0x1::transaction_fee::store_aptos_coin_mint_cap",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-qkzbrnyk/prover-report.json"
+          ],
+          "duration_ms": 6866,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::transaction_fee::store_aptos_coin_mint_cap"
+  }
+}

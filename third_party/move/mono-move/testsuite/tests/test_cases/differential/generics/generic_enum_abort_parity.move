@@ -22,4 +22,5 @@ module 0x42::generic_enum_abort_parity {
 // CHECK: results: 7
 
 // RUN: execute 0x42::generic_enum_abort_parity::unpack_as_left --args 1
-// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V2-SUBSTR: enum variant mismatch

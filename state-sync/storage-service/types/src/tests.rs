@@ -3,9 +3,10 @@
 
 use crate::{
     requests::{
-        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
+        DataRequest, EpochEndingLedgerInfoRequest, HotStateValuesWithProofRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, StateValuesWithProofRequest,
+        SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
@@ -515,12 +516,14 @@ fn test_protocol_metadata_service() {
         assert!(metadata.can_service(&create_epoch_ending_request(100, 199, compression)));
         assert!(metadata.can_service(&create_outputs_request(200, 100, 100, compression)));
         assert!(metadata.can_service(&create_state_values_request(200, 100, 199, compression)));
+        assert!(metadata.can_service(&create_hot_state_values_request(200, 100, 199, compression)));
 
         // Requests with larger chunk sizes (beyond the max) can also be serviced
         assert!(metadata.can_service(&create_transactions_request(200, 100, 1000, compression)));
         assert!(metadata.can_service(&create_epoch_ending_request(100, 10000, compression)));
         assert!(metadata.can_service(&create_outputs_request(200, 100, 9999989, compression)));
         assert!(metadata.can_service(&create_state_values_request(200, 100, 200, compression)));
+        assert!(metadata.can_service(&create_hot_state_values_request(200, 100, 200, compression)));
     }
 }
 
@@ -871,6 +874,21 @@ fn create_state_values_request(
     StorageServiceRequest::new(data_request, use_compression)
 }
 
+/// Creates a request for hot state values.
+fn create_hot_state_values_request(
+    version: Version,
+    start_index: u64,
+    end_index: u64,
+    use_compression: bool,
+) -> StorageServiceRequest {
+    let data_request = DataRequest::GetHotStateValuesWithProof(HotStateValuesWithProofRequest {
+        version,
+        start_index,
+        end_index,
+    });
+    StorageServiceRequest::new(data_request, use_compression)
+}
+
 /// Creates a request for state values at a given version
 fn create_state_values_request_at_version(
     version: Version,
@@ -951,17 +969,19 @@ fn verify_can_service_state_chunk_requests(
     expect_service: bool,
 ) {
     for version in versions {
-        // Create the state chunk request
-        let request = create_state_values_request_at_version(version, use_compression);
-
-        // Verify the serviceability of the request
-        verify_serviceability(
-            data_client_config,
-            data_summary,
-            None,
-            request,
-            expect_service,
-        );
+        let requests = [
+            create_state_values_request_at_version(version, use_compression),
+            create_hot_state_values_request(version, 0, 1000, use_compression),
+        ];
+        for request in requests {
+            verify_serviceability(
+                data_client_config,
+                data_summary,
+                None,
+                request,
+                expect_service,
+            );
+        }
     }
 }
 

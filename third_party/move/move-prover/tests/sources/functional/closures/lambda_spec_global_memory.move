@@ -26,6 +26,12 @@ module 0x42::lambda_spec_global_memory {
     spec apply {
         pragma opaque;
         pragma verify = false;
+        // The boundary carries the memory the function value may touch: this
+        // is what saves the pre-state the two-state evaluators read and
+        // havocs the memory across the opaque call. Without it the pre-state
+        // label is never saved and `settle`'s contract cannot be established
+        // honestly.
+        modifies_of<f>(v: &mut u64) Counter[@0x42];
         requires requires_of<f>(x);
         aborts_if aborts_of<f>(x);
         ensures ensures_of<f>(old(x), x);

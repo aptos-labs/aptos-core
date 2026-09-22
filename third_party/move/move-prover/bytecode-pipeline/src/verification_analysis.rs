@@ -412,7 +412,10 @@ impl VerificationAnalysisProcessor {
         if fun_env.is_lemma() {
             return true;
         }
+        let env = fun_env.module_env.env;
+        let options = ProverOptions::get(env);
         if fun_env.is_test_only()
+            || (options.inference && fun_env.is_verify_only())
             || fun_env.is_intrinsic()
             || fun_env.is_native()
             || (fun_env.is_inline() && !fun_env.is_inline_verified())
@@ -422,8 +425,6 @@ impl VerificationAnalysisProcessor {
             // verified if they have an explicitly given spec
             return false;
         }
-        let env = fun_env.module_env.env;
-        let options = ProverOptions::get(env);
         // Scope matching and exclusions go by the spec-carrying function, so a
         // lifted lambda is in scope exactly when its enclosing function is.
         let in_scope = match &options.verify_scope {

@@ -21,11 +21,14 @@ mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
 move-core-types = { workspace = true }
+move-value-view = { workspace = true }
 rand = { workspace = true }
+shared-dsa = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-num-bigint = { workspace = true }
+move-value-view-derive = { workspace = true }
+num = { workspace = true }
 paste = { workspace = true }
 proptest = { workspace = true }
 serde = { workspace = true }

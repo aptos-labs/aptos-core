@@ -21,6 +21,7 @@
 //! through — the Lean model executes them; verifying borrow-based code goes
 //! through its reference elimination.
 
+mod ast;
 mod model_spec;
 mod source;
 mod spec;
@@ -30,6 +31,7 @@ use crate::exchange::{
     spec::{translate_clauses, FunSpecInput, SpecCtx, TranslatedSpec},
 };
 use anyhow::{anyhow, bail, Context, Result};
+pub use ast::dump_ast_module;
 use codespan_reporting::term::termcolor::Buffer;
 use either::Either;
 use move_asm::{
@@ -48,7 +50,7 @@ use move_stackless_bytecode::{
     graph::{DomRelation, Graph},
     stackless_bytecode::{AttrId, Bytecode, Constant, Label, Operation, PropKind},
 };
-pub use source::{move_file_to_module, move_source_to_module};
+pub use source::{move_file_to_ast, move_file_to_module, move_source_to_module};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Runs the full frontend: masm source to the exchange module.
@@ -781,7 +783,9 @@ fn constant_value(cons: &Constant) -> Result<exchange::Value> {
         Constant::U32(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::U64(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::U128(x) => Ok(exchange::Value::Num(x.to_string())),
-        Constant::U256(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::U256(x) => Ok(exchange::Value::Num(
+            move_core_types::int256::U256::from(*x).to_string(),
+        )),
         Constant::Address(Address::Numerical(a)) => {
             Ok(exchange::Value::Address(a.to_hex_literal()))
         },
@@ -1292,9 +1296,13 @@ fn collect_loops(
                             | Oper::BorrowLoc
                             | Oper::BorrowField(_)
                             | Oper::BorrowFieldInst(_, _)
+                            | Oper::BorrowVariantField(_, _)
+                            | Oper::BorrowVariantFieldInst(_, _, _)
                             | Oper::BorrowGlobal(_)
                             | Oper::BorrowGlobalInst(_, _)
                             | Oper::BorrowVecElem
+                            | Oper::TestVariantRef(_)
+                            | Oper::TestVariantRefInst(_, _)
                             | Oper::ReadRef
                             | Oper::FreezeRef => {},
                         }

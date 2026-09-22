@@ -1,0 +1,67 @@
+std::acl: clean -> Std/Acl.lean
+  relies on E1 nested namespace
+std::bcs: clean -> Std/Bcs.lean
+  relies on E1 nested namespace
+  axiom: `serialize_injective` (intrinsic model of `to_bytes`)
+  axiom: `serialize_nonempty` (intrinsic model of `to_bytes`)
+std::bit_vector: clean -> Std/BitVector.lean
+  relies on E12 loop invariant
+  relies on E14 spec statement
+  relies on E1 nested namespace
+std::cmp: clean -> Std/Cmp.lean
+  relies on E14 spec statement
+  relies on E1 nested namespace
+  dropped: struct `Ordering` pragma intrinsic
+  dropped: struct `SomeStruct_BV` pragma bv
+std::error: clean -> Std/Error.lean
+  relies on E1 nested namespace
+  dropped: function `canonical` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `canonical` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+std::features: clean -> Std/Features.lean
+  relies on E14 spec statement
+  relies on E12 loop invariant
+  relies on E1 nested namespace
+  dropped: struct `Features` pragma bv
+  dropped: struct `PendingFeatures` pragma bv
+  dropped: function `contains` pragma bv
+  dropped: function `set` pragma bv
+  dropped: function `is_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `is_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `abort_if_multisig_payload_mismatch_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `abort_if_multisig_payload_mismatch_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `apply_diff` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `apply_diff` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `apply_diff` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `is_default_account_resource_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `is_default_account_resource_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `is_multisig_timelock_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `is_multisig_timelock_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `is_storage_slot_natives_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `is_storage_slot_natives_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `module_event_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `module_event_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `partial_governance_voting_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `partial_governance_voting_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+  dropped: function `periodical_reward_rate_decrease_enabled` [abstract] Transpiler.Xast.ConditionKind.abortsIf condition
+  dropped: function `periodical_reward_rate_decrease_enabled` [abstract] Transpiler.Xast.ConditionKind.ensures condition
+std::fixed_point32: clean -> Std/FixedPoint32.lean
+  relies on E1 nested namespace
+std::hash: clean -> Std/Hash.lean
+  relies on E1 nested namespace
+  axiom: `spec_sha2_256_injective` (intrinsic model of `sha2_256`)
+  axiom: `spec_sha2_256_length` (intrinsic model of `sha2_256`)
+  axiom: `spec_sha3_256_injective` (intrinsic model of `sha3_256`)
+  axiom: `spec_sha3_256_length` (intrinsic model of `sha3_256`)
+std::mem: clean -> Std/Mem.lean
+  relies on E1 nested namespace
+std::option: clean -> Std/Option.lean
+  relies on E1 nested namespace
+std::reflect: clean -> Std/Reflect.lean
+  relies on E1 nested namespace
+std::result: clean -> Std/Result.lean
+  relies on E1 nested namespace
+std::signer: clean -> Std/Signer.lean
+  relies on E1 nested namespace
+std::string: clean -> Std/String.lean
+  relies on E1 nested namespace
+std::vector: curated (Move.Vector)

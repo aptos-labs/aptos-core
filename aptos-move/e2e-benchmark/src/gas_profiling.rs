@@ -318,7 +318,7 @@ async fn initialize_workflow_workload(
 fn execute_block_expect_success(txns: Vec<SignedTransaction>, harness: &mut MoveHarnessSend) {
     let outputs = harness.run_block_with_current_metadata(txns.clone());
 
-    for (idx, (status, txn)) in outputs.into_iter().zip(txns.into_iter()).enumerate() {
+    for (idx, (status, txn)) in outputs.into_iter().zip(txns).enumerate() {
         assert!(
             status.is_kept(),
             "[{idx}] status {:?} for txn {:.2000?}",

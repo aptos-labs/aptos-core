@@ -755,6 +755,18 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             },
         );
         trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("reverse_vector"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::ReverseVec,
+                type_params: vec![param_t_decl.clone()],
+                type_param_constraints: BTreeMap::default(),
+                params: vec![mk_param(trans, 1, vector_t.clone())],
+                result_type: vector_t.clone(),
+                visibility: Spec,
+            },
+        );
+        trans.define_spec_or_builtin_fun(
             trans.builtin_qualified_symbol("contains"),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
@@ -1012,6 +1024,22 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                     mk_param(trans, 1, address_t.clone()),
                     mk_param(trans, 2, param_t.clone()),
                 ],
+                result_type: bool_t.clone(),
+                visibility: Spec,
+            },
+        );
+        // `can_modify<R>(addr)` is emitted by specification inference for
+        // modify-target guards.  It must be a source-level builtin as well as
+        // an internal AST operation so sourcified inferred specifications can
+        // be parsed and verified again.
+        trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("can_modify"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::CanModify,
+                type_params: vec![param_t_with_key_decl.clone()],
+                type_param_constraints: BTreeMap::new(),
+                params: vec![mk_param(trans, 1, address_t.clone())],
                 result_type: bool_t.clone(),
                 visibility: Spec,
             },

@@ -1,0 +1,14 @@
+name = "leaner-move"
+defaultTargets = ["LeanerMove"]
+testDriver = "Tests"
+
+[[require]]
+name = "leaner-ir"
+path = "../leaner-ir"
+
+[[lean_lib]]
+name = "LeanerMove"
+
+[[lean_lib]]
+name = "Tests"
+roots = ["Tests.Profile", "Tests.Intrinsics"]

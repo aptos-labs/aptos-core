@@ -13,7 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ['poem-openapi']
+# `move-value-view` is only named inside the `MoveValueView` derive's expansion.
+ignored = ['move-value-view', 'poem-openapi']
 
 [features]
 default = []
@@ -63,6 +64,8 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-table-extension = { workspace = true }
+move-value-view = { workspace = true }
+move-value-view-derive = { workspace = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }
 num-derive = { workspace = true }

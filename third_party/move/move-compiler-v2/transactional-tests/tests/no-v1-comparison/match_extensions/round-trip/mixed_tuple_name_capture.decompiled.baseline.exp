@@ -1,0 +1,14 @@
+processed 7 tasks
+task 0 lines 3-51:  publish [module 0xc0ffee::m {]
+task 1 lines 54-54:  run 0xc0ffee::m::capture_literal --args 5u64 7u64
+return values: 0
+task 2 lines 56-56:  run 0xc0ffee::m::capture_literal --args 7u64 5u64
+return values: 7
+task 3 lines 58-58:  run 0xc0ffee::m::capture_binding --args 7u64 5u64
+return values: 7
+task 4 lines 60-60:  run 0xc0ffee::m::capture_binding --args 7u64 3u64
+return values: 307
+task 5 lines 62-62:  run 0xc0ffee::m::capture_swap --args 1u64 2u64
+return values: 201
+task 6 lines 64-64:  run 0xc0ffee::m::capture_after_inlining
+return values: 0

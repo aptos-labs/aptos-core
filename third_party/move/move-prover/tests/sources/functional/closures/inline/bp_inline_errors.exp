@@ -150,7 +150,7 @@ warning: the behavior of this lambda argument cannot be determined exactly; weak
     │ ╰─│──────────' from a call inlined at this callsite
     │   ╰─────────' lambda argument
 
-warning: cannot derive `ensures_of` exactly for this lambda argument: a lambda with multiple dependent global state effects cannot be constrained in a loop invariant: intermediate memory states are not expressible; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
     ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:207:41
     │
 207 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);

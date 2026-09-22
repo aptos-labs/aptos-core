@@ -18,6 +18,8 @@ error: property `map_no_such_fun` is not valid in this context
 22 │ ╭         pragma intrinsic = map,
 23 │ │             map_no_such_fun = new;
    │ ╰──────────────────────────────────^
+   │
+   = valid pragmas here are: bv, intrinsic
 
 error: invalid intrinsic function mapping: map_len
    ┌─ tests/checking/specs/intrinsic_decl_err.move:26:9

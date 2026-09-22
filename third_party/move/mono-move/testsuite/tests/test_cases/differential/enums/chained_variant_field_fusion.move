@@ -95,4 +95,5 @@ module 0x99::chained_variant_field_fusion {
 // CHECK: results: 9
 // Reading f.y.b on an Fa aborts with a variant mismatch on both VMs.
 // RUN: execute 0x99::chained_variant_field_fusion::run_read_f --args 0
-// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V2-SUBSTR: enum variant mismatch

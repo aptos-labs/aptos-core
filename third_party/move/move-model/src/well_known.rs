@@ -11,7 +11,9 @@
 use crate::{
     ast::{Exp, ExpData, Operation},
     exp_generator::ExpGenerator,
-    model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedId, SpecFunId},
+    model::{
+        FunId, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedId, QualifiedInstId, SpecFunId, StructId,
+    },
     ty::Type,
 };
 use move_core_types::function::ClosureMask;
@@ -55,7 +57,29 @@ pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
     "swap",
 ];
 
+/// Move-level `std::vector` functions whose bodies are replaced by procedures
+/// from the Boogie prelude via `pragma intrinsic`.
+pub const VECTOR_MOVE_INTRINSICS: &[&str] = &[
+    "reverse",
+    "reverse_slice",
+    "append",
+    "is_empty",
+    "reverse_append",
+    "trim",
+    "trim_reverse",
+    "contains",
+    "index_of",
+    "insert",
+    "remove",
+    "remove_value",
+    "swap_remove",
+    "rotate",
+    "rotate_slice",
+];
+
 pub const CMP_MODULE: &str = "cmp";
+
+pub const EVENT_MODULE: &str = "event";
 
 pub const STRING_MODULE: &str = "string";
 pub const STRING_UTILS_MODULE: &str = "string_utils";
@@ -68,6 +92,52 @@ pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";
 pub const TYPE_INFO_MOVE: &str = "type_info::type_of";
 pub const TYPE_INFO_SPEC: &str = "type_info::$type_of";
 pub const TYPE_SPEC_IS_STRUCT: &str = "type_info::spec_is_struct";
+/// A native Move operation whose specification has the exact meaning of a
+/// global resource-existence test.  Its special treatment is needed because
+/// Move permits `exists<T>` only in the module which defines `T`, whereas
+/// specifications are intentionally not subject to that visibility rule.
+pub const OBJECT_SPEC_EXISTS_AT: &str = "object::spec_exists_at";
+
+/// Whether the given spec function is [`OBJECT_SPEC_EXISTS_AT`], the one
+/// spec function whose footprint is the memory of its own type parameter.
+/// Callers of a spec function attribute that through
+/// `SpecFunDecl::generic_used_memory`, which the spec rewriter seeds for
+/// this declaration.
+pub fn is_object_spec_exists_at(env: &GlobalEnv, fun: QualifiedId<SpecFunId>) -> bool {
+    let module_env = env.get_module(fun.module_id);
+    if env.get_extlib_address() != *module_env.get_name().addr() {
+        return false;
+    }
+    let decl = module_env.get_spec_fun(fun.id);
+    format!(
+        "{}::{}",
+        module_env.get_name().name().display(env.symbol_pool()),
+        decl.name.display(env.symbol_pool()),
+    ) == OBJECT_SPEC_EXISTS_AT
+}
+
+/// The resource memory a call to [`OBJECT_SPEC_EXISTS_AT`] reads, at the
+/// call's instantiation. The declaration is bodyless and its footprint is
+/// the memory of its own type parameter, which `SpecFunDecl::used_memory`
+/// cannot name. Seeding `generic_used_memory` instead is not an option: it
+/// would also widen the spec function's own Boogie signature, for which the
+/// direct `$ResourceExists` translation supplies no argument. So the memory
+/// is reported here, to the memory-usage computations that need it. `None`
+/// when the call is not [`OBJECT_SPEC_EXISTS_AT`], or its instantiation is
+/// not (yet) a concrete resource type.
+pub fn object_spec_exists_at_memory(
+    env: &GlobalEnv,
+    fun: QualifiedId<SpecFunId>,
+    inst: &[Type],
+) -> Option<QualifiedInstId<StructId>> {
+    if !is_object_spec_exists_at(env, fun) {
+        return None;
+    }
+    let Some(Type::Struct(mid, sid, targs)) = inst.first().map(|ty| ty.skip_reference()) else {
+        return None;
+    };
+    Some(mid.qualified_inst(*sid, targs.clone()))
+}
 
 /// NOTE: `type_info::type_name` and `type_name::get` are very similar.
 /// The main difference (from a prover's perspective) include:
@@ -158,22 +228,66 @@ pub fn is_memory_free_native(fun_env: &FunctionEnv) -> bool {
         .any(|name| fun_env.module_env.is_module_in_std(name))
 }
 
+/// Whether the Boogie prelude defines a concrete `$` spec function for this
+/// native Move function. Bodyless native companions are safe as direct spec
+/// calls only for this closed set; all other native companions must remain
+/// behavioral and uninterpreted.
+pub fn is_boogie_prelude_spec_native(fun_env: &FunctionEnv) -> bool {
+    let module_functions: &[(&str, &[&str])] = &[
+        (VECTOR_MODULE, &[
+            "empty",
+            "push_back",
+            "length",
+            "borrow",
+            "borrow_mut",
+            "swap",
+        ]),
+        ("bcs", &["to_bytes"]),
+        ("from_bcs", &["from_bytes"]),
+        ("hash", &["sha2_256", "sha3_256"]),
+        (SIGNER_MODULE, &["borrow_address"]),
+    ];
+    let fun_name = fun_env.get_name_str();
+    module_functions.iter().any(|(module, functions)| {
+        fun_env.module_env.is_module_in_std(module) && functions.contains(&fun_name.as_str())
+    })
+}
+
+/// Whether the Boogie prelude implements this `pragma intrinsic` function.
+///
+/// `pragma intrinsic` says the prover implements the function itself, so the
+/// backend emits no body for it and a call site translates to a procedure the
+/// prelude is expected to declare. The built-in prelude mocks out `vector` and
+/// `event`, while Aptos's custom-native prelude implements `aggregator` and
+/// `aggregator_v2`.
+/// A native intrinsic is prelude-backed by construction. A function carrying
+/// the pragma outside those modules has no implementation anywhere, and a call
+/// to it would name a procedure that is never declared.
+///
+/// The modules mirror the `$1_<module>_<name>` procedure templates in
+/// `src/prelude/native.bpl`, `src/prelude/prelude.bpl`, and the configured
+/// Aptos `aptos-natives.bpl` template.
+pub fn is_boogie_prelude_intrinsic(fun_env: &FunctionEnv) -> bool {
+    const PRELUDE_INTRINSIC_MODULES: &[&str] =
+        &[VECTOR_MODULE, EVENT_MODULE, "aggregator", "aggregator_v2"];
+    PRELUDE_INTRINSIC_MODULES
+        .iter()
+        .any(|module| fun_env.module_env.is_module_in_std(module))
+}
+
 /// True when `fun_name` is the bare name of a `std::vector` function whose
 /// behavior is expressible directly in the spec language and therefore
 /// should not be the target of a behavioral predicate (`aborts_of`,
 /// `requires_of`, `result_of`, `ensures_of`).
 ///
 /// This covers the bytecode-instruction natives in
-/// [`VECTOR_FUNCS_WITH_BYTECODE_INSTRS`] plus the loop-implemented (but
-/// prover-intrinsic) functions with an exact WP arm in
-/// [`vector_intrinsic_wp`]: `singleton`, `contains`, `index_of`,
-/// `swap_remove`, `append`, `remove`, and `insert`.
+/// [`VECTOR_FUNCS_WITH_BYTECODE_INSTRS`], every Move-level prover intrinsic in
+/// [`VECTOR_MOVE_INTRINSICS`], the prelude-backed `move_range` native, and
+/// `singleton`, whose existing exact source contract has the same direct WP.
 pub(crate) fn is_special_vector_bp_fun_name(fun_name: &str) -> bool {
     VECTOR_FUNCS_WITH_BYTECODE_INSTRS.contains(&fun_name)
-        || matches!(
-            fun_name,
-            "singleton" | "contains" | "index_of" | "swap_remove" | "append" | "remove" | "insert"
-        )
+        || VECTOR_MOVE_INTRINSICS.contains(&fun_name)
+        || matches!(fun_name, "move_range" | "singleton")
 }
 
 /// If `fun_exp` is a closure with no captured arguments targeting a special
@@ -343,6 +457,84 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
                 )],
             }
         },
+        // is_empty(v): the intrinsic Boogie procedure returns exactly
+        // `len(v) == 0` and has no aborting path. Keep that meaning internal
+        // to WP rather than manufacturing a source-level spec block for the
+        // intrinsic itself.
+        "is_empty" => {
+            let v = arg(0)?;
+            IntrinsicWp {
+                aborts: g.mk_bool_const(false),
+                outputs: vec![g.mk_eq(g.mk_len(v), zero())],
+            }
+        },
+        "reverse" => {
+            let v = arg(0)?;
+            IntrinsicWp {
+                aborts: g.mk_bool_const(false),
+                outputs: vec![g.mk_reverse_vec(v, &vec_ty)],
+            }
+        },
+        "reverse_slice" => {
+            let v = arg(0)?;
+            let left = arg(1)?;
+            let right = arg(2)?;
+            let trivial = g.mk_bool_call(Operation::Le, vec![
+                right.clone(),
+                g.mk_num_add(left.clone(), one()),
+            ]);
+            let prefix = g.mk_slice(v.clone(), zero(), left.clone(), &vec_ty);
+            let middle = g.mk_reverse_vec(
+                g.mk_slice(v.clone(), left.clone(), right.clone(), &vec_ty),
+                &vec_ty,
+            );
+            let suffix = g.mk_slice(v.clone(), right.clone(), g.mk_len(v.clone()), &vec_ty);
+            let reversed =
+                g.mk_concat_vec(prefix, g.mk_concat_vec(middle, suffix, &vec_ty), &vec_ty);
+            let output = g.mk_ite(
+                trivial.as_ref().clone(),
+                v.as_ref().clone(),
+                reversed.as_ref().clone(),
+            );
+            IntrinsicWp {
+                // The implementation reaches no indexed swap for a range of
+                // zero or one element, and therefore performs no bounds check.
+                aborts: g.mk_or(
+                    g.mk_bool_call(Operation::Gt, vec![left.clone(), right.clone()]),
+                    g.mk_and(
+                        g.mk_bool_call(Operation::Gt, vec![
+                            right.clone(),
+                            g.mk_num_add(left, one()),
+                        ]),
+                        g.mk_bool_call(Operation::Gt, vec![right, g.mk_len(v)]),
+                    ),
+                ),
+                outputs: vec![output],
+            }
+        },
+        "reverse_append" => {
+            let v = arg(0)?;
+            let other = arg(1)?;
+            IntrinsicWp {
+                aborts: g.mk_bool_const(false),
+                outputs: vec![g.mk_concat_vec(v, g.mk_reverse_vec(other, &vec_ty), &vec_ty)],
+            }
+        },
+        "trim" | "trim_reverse" => {
+            let v = arg(0)?;
+            let new_len = arg(1)?;
+            let removed = g.mk_slice(v.clone(), new_len.clone(), g.mk_len(v.clone()), &vec_ty);
+            let result = if fun_name == "trim_reverse" {
+                g.mk_reverse_vec(removed, &vec_ty)
+            } else {
+                removed
+            };
+            let retained = g.mk_slice(v.clone(), zero(), new_len.clone(), &vec_ty);
+            IntrinsicWp {
+                aborts: g.mk_bool_call(Operation::Gt, vec![new_len, g.mk_len(v)]),
+                outputs: vec![result, retained],
+            }
+        },
         "contains" => {
             let v = arg(0)?;
             let e = arg(1)?;
@@ -402,6 +594,41 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
                 outputs: vec![g.mk_concat_vec(v, other, &vec_ty)],
             }
         },
+        "remove_value" => {
+            let v = arg(0)?;
+            let e = arg(1)?;
+            let contains = g.mk_contains_vec(v.clone(), e.clone(), &elem_ty);
+            let index = g.mk_call_with_inst(
+                &Type::Primitive(crate::ty::PrimitiveType::Num),
+                vec![elem_ty.clone()],
+                Operation::IndexOfVec,
+                vec![v.clone(), e],
+            );
+            let removed_element = g.mk_index(v.clone(), index.clone(), &elem_ty);
+            let result_if_found = g.mk_single_vec(removed_element, &elem_ty);
+            let result = g.mk_ite(
+                contains.as_ref().clone(),
+                result_if_found.as_ref().clone(),
+                g.mk_empty_vec(&elem_ty).as_ref().clone(),
+            );
+            let prefix = g.mk_slice(v.clone(), zero(), index.clone(), &vec_ty);
+            let suffix = g.mk_slice(
+                v.clone(),
+                g.mk_num_add(index, one()),
+                g.mk_len(v.clone()),
+                &vec_ty,
+            );
+            let removed = g.mk_concat_vec(prefix, suffix, &vec_ty);
+            let post = g.mk_ite(
+                contains.as_ref().clone(),
+                removed.as_ref().clone(),
+                v.as_ref().clone(),
+            );
+            IntrinsicWp {
+                aborts: g.mk_bool_const(false),
+                outputs: vec![result, post],
+            }
+        },
         // remove(v, i) returns v[i] and shifts the suffix down:
         // post-state `concat(v[0..i], v[i+1..len(v)])`.
         "remove" => {
@@ -434,6 +661,100 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
             IntrinsicWp {
                 aborts: g.mk_bool_call(Operation::Gt, vec![i, g.mk_len(v)]),
                 outputs: vec![g.mk_concat_vec(with_elem, suffix, &vec_ty)],
+            }
+        },
+        "rotate" => {
+            let v = arg(0)?;
+            let rot = arg(1)?;
+            let len = g.mk_len(v.clone());
+            let left = g.mk_slice(v.clone(), zero(), rot.clone(), &vec_ty);
+            let right = g.mk_slice(v.clone(), rot.clone(), len.clone(), &vec_ty);
+            IntrinsicWp {
+                aborts: g.mk_bool_call(Operation::Gt, vec![rot.clone(), len.clone()]),
+                outputs: vec![
+                    typed(0, Operation::Sub, vec![len, rot]),
+                    g.mk_concat_vec(right, left, &vec_ty),
+                ],
+            }
+        },
+        "rotate_slice" => {
+            let v = arg(0)?;
+            let left = arg(1)?;
+            let rot = arg(2)?;
+            let right = arg(3)?;
+            let prefix = g.mk_slice(v.clone(), zero(), left.clone(), &vec_ty);
+            let mid_left = g.mk_slice(v.clone(), left.clone(), rot.clone(), &vec_ty);
+            let mid_right = g.mk_slice(v.clone(), rot.clone(), right.clone(), &vec_ty);
+            let suffix = g.mk_slice(v.clone(), right.clone(), g.mk_len(v.clone()), &vec_ty);
+            let middle = g.mk_concat_vec(mid_right, mid_left, &vec_ty);
+            let post = g.mk_concat_vec(prefix, g.mk_concat_vec(middle, suffix, &vec_ty), &vec_ty);
+            let nontrivial = g.mk_bool_call(Operation::Gt, vec![
+                right.clone(),
+                g.mk_num_add(left.clone(), one()),
+            ]);
+            let output = g.mk_ite(
+                nontrivial.as_ref().clone(),
+                post.as_ref().clone(),
+                v.as_ref().clone(),
+            );
+            IntrinsicWp {
+                aborts: g.mk_or_n(vec![
+                    g.mk_bool_call(Operation::Gt, vec![left.clone(), rot.clone()]),
+                    g.mk_bool_call(Operation::Gt, vec![rot.clone(), right.clone()]),
+                    g.mk_and(
+                        nontrivial,
+                        g.mk_bool_call(Operation::Gt, vec![right.clone(), g.mk_len(v)]),
+                    ),
+                ]),
+                outputs: vec![
+                    typed(0, Operation::Add, vec![left, g.mk_num_sub(right, rot)]),
+                    output,
+                ],
+            }
+        },
+        "move_range" => {
+            let from = arg(0)?;
+            let removal_position = arg(1)?;
+            let length = arg(2)?;
+            let to = arg(3)?;
+            let insert_position = arg(4)?;
+            let removal_end = g.mk_num_add(removal_position.clone(), length);
+            let moved = g.mk_slice(
+                from.clone(),
+                removal_position.clone(),
+                removal_end.clone(),
+                &vec_ty,
+            );
+            let from_post = g.mk_concat_vec(
+                g.mk_slice(from.clone(), zero(), removal_position, &vec_ty),
+                g.mk_slice(
+                    from.clone(),
+                    removal_end.clone(),
+                    g.mk_len(from.clone()),
+                    &vec_ty,
+                ),
+                &vec_ty,
+            );
+            let to_post = g.mk_concat_vec(
+                g.mk_slice(to.clone(), zero(), insert_position.clone(), &vec_ty),
+                g.mk_concat_vec(
+                    moved,
+                    g.mk_slice(
+                        to.clone(),
+                        insert_position.clone(),
+                        g.mk_len(to.clone()),
+                        &vec_ty,
+                    ),
+                    &vec_ty,
+                ),
+                &vec_ty,
+            );
+            IntrinsicWp {
+                aborts: g.mk_or(
+                    g.mk_bool_call(Operation::Gt, vec![removal_end, g.mk_len(from)]),
+                    g.mk_bool_call(Operation::Gt, vec![insert_position, g.mk_len(to)]),
+                ),
+                outputs: vec![from_post, to_post],
             }
         },
         _ => return None,

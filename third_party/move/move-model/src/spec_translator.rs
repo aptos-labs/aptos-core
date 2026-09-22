@@ -26,6 +26,7 @@ use crate::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE},
+    well_known,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -762,6 +763,18 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         label
     }
 
+    /// Save already-instantiated resource memory under the shared old label.
+    fn save_memory_concrete(
+        &mut self,
+        used_memory: impl IntoIterator<Item = QualifiedInstId<StructId>>,
+    ) -> MemoryLabel {
+        let label = self.get_or_create_old_label();
+        for memory in used_memory {
+            self.result.saved_memory.insert((memory, label));
+        }
+        label
+    }
+
     /// Walks a `Proof` tree, rewrites all embedded expressions via `translate_exp`,
     /// and flattens the tree into `result.pre_proof` / `result.post_proof` vectors.
     /// Path conditions from enclosing `if/else` blocks are accumulated and applied
@@ -925,6 +938,42 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         let lemma = module_env.get_lemma(qid.id);
         let params = lemma.params.clone();
         let conditions = lemma.conditions.clone();
+        let applied_measure = lemma.measure(env);
+        let applied_group = lemma.recursion_group;
+
+        // An application within the lemma's own recursion group must decrease
+        // the measure; see doc/dev/lemma_well_foundedness.md.
+        if let Some(enclosing) = self.enclosing_lemma() {
+            let (enclosing_group, enclosing_measure) = {
+                let env = self.builder.global_env();
+                let module_env = env.get_module(enclosing.module_id);
+                let decl = module_env.get_lemma(enclosing.id);
+                (decl.recursion_group, decl.measure(env))
+            };
+            let same_group = applied_group.is_some()
+                && enclosing.module_id == qid.module_id
+                && enclosing_group == applied_group;
+            if same_group {
+                let current: Vec<Exp> = enclosing_measure
+                    .iter()
+                    .map(|e| self.translate_exp(e, false))
+                    .collect();
+                let env = self.builder.global_env();
+                let next: Vec<Exp> = applied_measure
+                    .iter()
+                    .map(|e| Self::substitute_lemma_params(env, &params, args, e))
+                    .collect();
+                let decreases = self.mk_lexicographic_decrease(loc, &next, &current);
+                let guarded = self.guard_proof_exp(decreases, path_cond);
+                self.push_proof_action(
+                    loc.clone(),
+                    ProofAction::Assert(
+                        guarded,
+                        "recursive lemma application does not decrease the measure".to_string(),
+                    ),
+                );
+            }
+        }
 
         // Process requires first (assert), then ensures (assume), to avoid
         // assuming conclusions before checking premises when conditions are
@@ -949,6 +998,51 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let subst_exp = Self::substitute_lemma_params(env, &params, args, &cond.exp);
             let guarded = self.guard_proof_exp(subst_exp, path_cond);
             self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
+        }
+    }
+
+    /// The lemma whose proof is being translated, if the current function is
+    /// a lemma's synthetic function.
+    fn enclosing_lemma(&self) -> Option<QualifiedId<crate::ast::LemmaId>> {
+        if !self.fun_env.is_lemma() {
+            return None;
+        }
+        let module_env = &self.fun_env.module_env;
+        module_env
+            .find_lemma_by_name(self.fun_env.get_name())
+            .map(|(id, _)| module_env.get_id().qualified(id))
+    }
+
+    /// `next <_lex current`, well-founded by bounding the component that
+    /// strictly decreases: `(n0 < c0 && 0 <= c0) || (n0 == c0 && (n1 < c1 && 0 <= c1)) || ...`
+    fn mk_lexicographic_decrease(&self, loc: &Loc, next: &[Exp], current: &[Exp]) -> Exp {
+        let env = self.builder.global_env();
+        let zero = || {
+            ExpData::Value(
+                env.new_node(loc.clone(), crate::ty::NUM_TYPE),
+                crate::ast::Value::Number(0.into()),
+            )
+            .into_exp()
+        };
+        let mut disjuncts = vec![];
+        for k in 0..next.len().min(current.len()) {
+            let mut conjuncts: Vec<Exp> = (0..k)
+                .map(|j| self.builder.mk_eq(next[j].clone(), current[j].clone()))
+                .collect();
+            conjuncts.push(
+                self.builder
+                    .mk_bool_call(Operation::Lt, vec![next[k].clone(), current[k].clone()]),
+            );
+            conjuncts.push(
+                self.builder
+                    .mk_bool_call(Operation::Le, vec![zero(), current[k].clone()]),
+            );
+            disjuncts.push(self.builder.mk_and_n(conjuncts));
+        }
+        if disjuncts.is_empty() {
+            self.builder.mk_bool_const(false)
+        } else {
+            self.builder.mk_or_n(disjuncts)
         }
     }
 
@@ -1296,7 +1390,8 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     self.builder.global_env().diag_with_labels(
                         Severity::Error,
                         &loc,
-                        "`old(..)` applied to expression which does not depend on state",
+                        "`old(..)` applied to expression which does not depend on state; \
+                         remove `old(..)` to use the state-independent value",
                         labels,
                     )
                 }
@@ -1391,18 +1486,12 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 )
                 .into_exp(),
             ),
-            // Memory mutation ops within a `WithStateAnchor` scope: an
-            // unlabeled pre-state range means "the pre-state of the
-            // enclosing scope". Outside of anchors that is function entry,
-            // which the backend realizes as Boogie-native `old(..)`; inside
-            // an anchor it is the anchored program point, so the range is
-            // relabeled to the anchor label (like `old(Global)` reads
-            // above). Without this, a mutation op derived from an anchored
-            // lambda would compare against function entry, wrongly failing
-            // when memory of the same resource changed before the anchor.
-            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range)
-                if range.pre.is_none() && self.current_anchor.is_some() =>
-            {
+            // Snapshot the enclosing pre-state explicitly, just as for old
+            // reads. It is function entry for a definition, but call entry
+            // for a callee contract and the anchor point for an inline spec.
+            // Boogie-native old() would incorrectly use the caller's entry
+            // when the resource changed before an opaque call.
+            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range) if range.pre.is_none() => {
                 let label = self.save_memory(self.builder.get_memory_of_node(id));
                 let new_range = MemoryRange {
                     pre: Some(label),
@@ -1421,18 +1510,18 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 // If the spec fun uses old() and has no pre-label, save memory
                 // for the pre-state. This happens with `..S |~ spec_fun(a)` where
                 // post=S but pre=None (function entry).
-                let (uses_old, has_old_memory, used_memory) = {
+                let inst = self.builder.global_env().get_node_instantiation(id);
+                let (uses_old, old_memory, used_memory) = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
                     (
                         decl.uses_old,
-                        !decl.old_memory.is_empty(),
-                        decl.used_memory.clone(),
+                        decl.old_memory_instantiated(&inst),
+                        decl.used_memory_instantiated(&inst),
                     )
                 };
-                if uses_old && has_old_memory && range.pre.is_none() {
-                    let inst = self.builder.global_env().get_node_instantiation(id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                if uses_old && !old_memory.is_empty() && range.pre.is_none() {
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
@@ -1444,13 +1533,19 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             },
             // SpecFunction in old context: save memory for pre-state
             SpecFunction(mid, fid, range) if self.in_old => {
-                let used_memory = {
-                    let module_env = self.builder.global_env().get_module(*mid);
-                    let decl = module_env.get_spec_fun(*fid);
-                    decl.used_memory.clone()
-                };
                 let inst = self.builder.global_env().get_node_instantiation(id);
-                let label = self.save_memory_shared(&used_memory, &inst);
+                let used_memory = {
+                    let env = self.builder.global_env();
+                    let decl = env.get_module(*mid).get_spec_fun(*fid).clone();
+                    let mut used_memory = decl.used_memory_instantiated(&inst);
+                    used_memory.extend(well_known::object_spec_exists_at_memory(
+                        env,
+                        mid.qualified(*fid),
+                        &inst,
+                    ));
+                    used_memory
+                };
+                let label = self.save_memory_concrete(used_memory);
                 let new_range = MemoryRange {
                     pre: Some(label),
                     post: range.post,
@@ -1459,18 +1554,18 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             },
             // SpecFunction outside old but uses_old: save memory for pre-state
             SpecFunction(mid, fid, range) if !self.in_old => {
-                let (uses_old, has_old_memory, used_memory) = {
+                let inst = self.builder.global_env().get_node_instantiation(id);
+                let (uses_old, old_memory, used_memory) = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
                     (
                         decl.uses_old,
-                        !decl.old_memory.is_empty(),
-                        decl.used_memory.clone(),
+                        decl.old_memory_instantiated(&inst),
+                        decl.used_memory_instantiated(&inst),
                     )
                 };
-                if uses_old && has_old_memory {
-                    let inst = self.builder.global_env().get_node_instantiation(id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                if uses_old && !old_memory.is_empty() {
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
@@ -1480,8 +1575,9 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     None
                 }
             },
-            // Behavior with labels already set: leave as-is
-            Behavior(_, range) if !range.is_default() => None,
+            // An explicit post label does not supply the implicit entry state.
+            // Save that entry state for `..S` just as for an unlabeled call.
+            Behavior(_, range) if range.pre.is_some() => None,
             // Behavior that needs a pre-state label. When the whole
             // evaluator is under `old(..)`, both of its states are the old
             // state: leaving `post` unlabeled would let `result_of` and other
@@ -1491,10 +1587,16 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
                     args.first().map(|a| a.as_ref())
                 {
-                    let fun_env = env.get_function(mid.qualified(*fid));
-                    let used_memory = fun_env.get_spec_used_memory().clone();
                     let inst = env.get_node_instantiation(*closure_id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let used_memory = crate::spec_derivation::behavioral_target_memory(
+                        env,
+                        mid.qualified(*fid),
+                        &inst,
+                    );
+                    if range.post.is_some() && used_memory.is_empty() {
+                        return None;
+                    }
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: self.in_old.then_some(label).or(range.post),
@@ -1512,6 +1614,9 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     let struct_env = env.get_module(*smid).into_struct(*sid);
                     let field_sym = field_id.symbol();
                     let memory = collect_field_access_memory(env, &struct_env, field_sym);
+                    if range.post.is_some() && memory.is_empty() {
+                        return None;
+                    }
                     let label = self.save_memory_shared(&memory, self.type_args);
                     let new_range = MemoryRange {
                         pre: Some(label),
@@ -1527,6 +1632,9 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     // the function's spec_used_memory / spec_old_memory, so
                     // this fallback covers the fun-param case too.
                     let used_memory = self.fun_env.get_spec_used_memory().clone();
+                    if range.post.is_some() && used_memory.is_empty() {
+                        return None;
+                    }
                     let label = self.save_memory_shared(&used_memory, self.type_args);
                     let new_range = MemoryRange {
                         pre: Some(label),

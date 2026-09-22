@@ -1,0 +1,6 @@
+processed 5 tasks
+task 0 lines 3-15:  publish [module 0xc0ffee::m {]
+task 1 lines 18-43:  publish [module 0xc0ffee::via_call {]
+task 2 lines 46-104:  publish [module 0xc0ffee::shapes {]
+task 3 lines 107-107:  run 0xc0ffee::via_call::main
+task 4 lines 109-109:  run 0xc0ffee::shapes::main

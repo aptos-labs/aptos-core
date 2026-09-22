@@ -1,4 +1,5 @@
 // Test spec inference for mutations via references
+// inference-reject-mutation: Counter[a3].value = v3; => Counter[a3].value = v2;
 module 0x42::mutations {
 
     struct Point has copy, drop {

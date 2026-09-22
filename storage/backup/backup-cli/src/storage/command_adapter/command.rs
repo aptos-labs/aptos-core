@@ -81,12 +81,12 @@ impl SpawnedCommand {
         ensure!(
             child.stdin.is_some(),
             "child.stdin is None. cmd: {:?}",
-            &command,
+            command,
         );
         ensure!(
             child.stdout.is_some(),
             "child.stdout is None. cmd: {:?}",
-            &command,
+            command,
         );
 
         Ok(Self { command, child })

@@ -572,6 +572,7 @@ module 0x42::N {
     }
 
     spec call_add(a: u64, b: u64): u64 {
+        use 0x42::M;
         ensures requires_of<M::add>(a, b);
         ensures ensures_of<M::add>(a, b, result);
     }
@@ -581,6 +582,7 @@ module 0x42::N {
     }
 
     spec call_increment(x: u64): u64 {
+        use 0x42::M;
         ensures requires_of<M::increment>(x);
         ensures ensures_of<M::increment>(x, result);
     }

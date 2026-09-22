@@ -113,7 +113,7 @@ fn run_test_impl(
                 Err(error) => format!("{:#}\n", error),
             },
             (_, _) => {
-                for (_, package) in resolved_package.package_table.iter_mut() {
+                for package in resolved_package.package_table.values_mut() {
                     package.package_path = PathBuf::from("ELIDED_FOR_TEST");
                     package.source_digest = PackageDigest::from("ELIDED_FOR_TEST");
                 }

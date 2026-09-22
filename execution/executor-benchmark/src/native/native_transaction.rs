@@ -134,10 +134,7 @@ pub fn compute_deltas_for_batch(
     sender_address: AccountAddress,
 ) -> (HashMap<AccountAddress, i64>, u64) {
     let mut deltas = HashMap::new();
-    for (recipient, amount) in recipient_addresses
-        .into_iter()
-        .zip(transfer_amounts.into_iter())
-    {
+    for (recipient, amount) in recipient_addresses.into_iter().zip(transfer_amounts) {
         let amount = amount as i64;
         deltas
             .entry(recipient)

@@ -784,6 +784,7 @@ return Tuple()
 
 === Sourcified Output ============================================
 module 0x1::m {
+    use std::vector;
     struct BitVector has copy, drop, store {
         length: u64,
         bit_field: vector<bool>,

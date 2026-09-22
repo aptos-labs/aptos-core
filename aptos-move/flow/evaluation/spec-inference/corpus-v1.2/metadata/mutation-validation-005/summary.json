@@ -1,0 +1,5981 @@
+{
+  "AF-account-025": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-account-025/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-gsx4uvpg/package",
+              "--output",
+              "/tmp/move-inference-mutant-gsx4uvpg/unused.json"
+            ],
+            "duration_ms": 4665,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-025-increment-by-two",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-gsx4uvpg/package",
+              "--target",
+              "0x1::account::increment_sequence_number",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-gsx4uvpg/prover-report.json"
+            ],
+            "duration_ms": 5936,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-x__eswwl/package",
+              "--output",
+              "/tmp/move-inference-mutant-x__eswwl/unused.json"
+            ],
+            "duration_ms": 3302,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-025-no-abort-at-max",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-x__eswwl/package",
+              "--target",
+              "0x1::account::increment_sequence_number",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-x__eswwl/prover-report.json"
+            ],
+            "duration_ms": 6099,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-6lpk_8jq/package",
+              "--output",
+              "/tmp/move-inference-mutant-6lpk_8jq/unused.json"
+            ],
+            "duration_ms": 3135,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-025-skip-when-zero",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-6lpk_8jq/package",
+              "--target",
+              "0x1::account::increment_sequence_number",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-6lpk_8jq/prover-report.json"
+            ],
+            "duration_ms": 5721,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::account::increment_sequence_number"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-account-025/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-3n8b8wxj/package",
+              "--output",
+              "/tmp/move-inference-mutant-3n8b8wxj/unused.json"
+            ],
+            "duration_ms": 4440,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-025-reset-to-zero",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-3n8b8wxj/package",
+              "--target",
+              "0x1::account::increment_sequence_number",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-3n8b8wxj/prover-report.json"
+            ],
+            "duration_ms": 6058,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-0ow9mazg/package",
+              "--output",
+              "/tmp/move-inference-mutant-0ow9mazg/unused.json"
+            ],
+            "duration_ms": 3329,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-025-skip-when-five",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-0ow9mazg/package",
+              "--target",
+              "0x1::account::increment_sequence_number",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-0ow9mazg/prover-report.json"
+            ],
+            "duration_ms": 5853,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-cpd87vox/package",
+              "--output",
+              "/tmp/move-inference-mutant-cpd87vox/unused.json"
+            ],
+            "duration_ms": 4051,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-025-abort-one-early",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-cpd87vox/package",
+              "--target",
+              "0x1::account::increment_sequence_number",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-cpd87vox/prover-report.json"
+            ],
+            "duration_ms": 6380,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::account::increment_sequence_number"
+    }
+  },
+  "AF-account-036": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-account-036/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-k9xnm679/package",
+              "--output",
+              "/tmp/move-inference-mutant-k9xnm679/unused.json"
+            ],
+            "duration_ms": 3967,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-036-no-account-check",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-k9xnm679/package",
+              "--target",
+              "0x1::account::revoke_any_signer_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-k9xnm679/prover-report.json"
+            ],
+            "duration_ms": 6158,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-bd9rq4or/package",
+              "--output",
+              "/tmp/move-inference-mutant-bd9rq4or/unused.json"
+            ],
+            "duration_ms": 3202,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-036-skip-when-none",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-bd9rq4or/package",
+              "--target",
+              "0x1::account::revoke_any_signer_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-bd9rq4or/prover-report.json"
+            ],
+            "duration_ms": 5778,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-pgejgtdp/package",
+              "--output",
+              "/tmp/move-inference-mutant-pgejgtdp/unused.json"
+            ],
+            "duration_ms": 3492,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-036-read-instead-of-extract",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-pgejgtdp/package",
+              "--target",
+              "0x1::account::revoke_any_signer_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-pgejgtdp/prover-report.json"
+            ],
+            "duration_ms": 5576,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::account::revoke_any_signer_capability"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-account-036/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-x5te5758/package",
+              "--output",
+              "/tmp/move-inference-mutant-x5te5758/unused.json"
+            ],
+            "duration_ms": 3894,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-036-refill-after-extract",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-x5te5758/package",
+              "--target",
+              "0x1::account::revoke_any_signer_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-x5te5758/prover-report.json"
+            ],
+            "duration_ms": 6134,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-damn722v/package",
+              "--output",
+              "/tmp/move-inference-mutant-damn722v/unused.json"
+            ],
+            "duration_ms": 3265,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-036-extra-abort-on-fresh-account",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-damn722v/package",
+              "--target",
+              "0x1::account::revoke_any_signer_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-damn722v/prover-report.json"
+            ],
+            "duration_ms": 5726,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-_s2onpzx/package",
+              "--output",
+              "/tmp/move-inference-mutant-_s2onpzx/unused.json"
+            ],
+            "duration_ms": 3510,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-account-036-clear-only-fresh-accounts",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-_s2onpzx/package",
+              "--target",
+              "0x1::account::revoke_any_signer_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-_s2onpzx/prover-report.json"
+            ],
+            "duration_ms": 7075,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::account::revoke_any_signer_capability"
+    }
+  },
+  "AF-aptos-coin-010": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-aptos-coin-010/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-5vcqtnxt/package",
+              "--output",
+              "/tmp/move-inference-mutant-5vcqtnxt/unused.json"
+            ],
+            "duration_ms": 3811,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-coin-010-store-dropped",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-5vcqtnxt/package",
+              "--target",
+              "0x1::aptos_coin",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-5vcqtnxt/prover-report.json"
+            ],
+            "duration_ms": 6609,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-4yhdiazv/package",
+              "--output",
+              "/tmp/move-inference-mutant-4yhdiazv/unused.json"
+            ],
+            "duration_ms": 3376,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-coin-010-destroy-returns-when-missing",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-4yhdiazv/package",
+              "--target",
+              "0x1::aptos_coin",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-4yhdiazv/prover-report.json"
+            ],
+            "duration_ms": 6466,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-edhpj1mm/package",
+              "--output",
+              "/tmp/move-inference-mutant-edhpj1mm/unused.json"
+            ],
+            "duration_ms": 2806,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-coin-010-find-wrong-match",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-edhpj1mm/package",
+              "--target",
+              "0x1::aptos_coin",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-edhpj1mm/prover-report.json"
+            ],
+            "duration_ms": 6389,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::aptos_coin"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-aptos-coin-010/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-r1hj2g4_/package",
+              "--output",
+              "/tmp/move-inference-mutant-r1hj2g4_/unused.json"
+            ],
+            "duration_ms": 3969,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-coin-010-store-skipped",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-r1hj2g4_/package",
+              "--target",
+              "0x1::aptos_coin",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-r1hj2g4_/prover-report.json"
+            ],
+            "duration_ms": 6267,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-40tid88f/package",
+              "--output",
+              "/tmp/move-inference-mutant-40tid88f/unused.json"
+            ],
+            "duration_ms": 2837,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-coin-010-destroy-no-framework-check",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-40tid88f/package",
+              "--target",
+              "0x1::aptos_coin",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-40tid88f/prover-report.json"
+            ],
+            "duration_ms": 6436,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-etz1aono/package",
+              "--output",
+              "/tmp/move-inference-mutant-etz1aono/unused.json"
+            ],
+            "duration_ms": 2757,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-coin-010-find-returns-when-missing",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-etz1aono/package",
+              "--target",
+              "0x1::aptos_coin",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-etz1aono/prover-report.json"
+            ],
+            "duration_ms": 6160,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::aptos_coin"
+    }
+  },
+  "AF-aptos-governance-034": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-aptos-governance-034/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-jmhg03k_/package",
+              "--output",
+              "/tmp/move-inference-mutant-jmhg03k_/unused.json"
+            ],
+            "duration_ms": 4384,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-governance-034-duration-off-by-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-jmhg03k_/package",
+              "--target",
+              "0x1::aptos_governance::update_governance_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-jmhg03k_/prover-report.json"
+            ],
+            "duration_ms": 6431,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-8gvqwzf2/package",
+              "--output",
+              "/tmp/move-inference-mutant-8gvqwzf2/unused.json"
+            ],
+            "duration_ms": 3594,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-governance-034-no-framework-check",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-8gvqwzf2/package",
+              "--target",
+              "0x1::aptos_governance::update_governance_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-8gvqwzf2/prover-report.json"
+            ],
+            "duration_ms": 5839,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: caller does not have permission to modify `aptos_governance::GovernanceConfig` at given address"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-y_ebj82z/package",
+              "--output",
+              "/tmp/move-inference-mutant-y_ebj82z/unused.json"
+            ],
+            "duration_ms": 3385,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-governance-034-threshold-halved",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-y_ebj82z/package",
+              "--target",
+              "0x1::aptos_governance::update_governance_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-y_ebj82z/prover-report.json"
+            ],
+            "duration_ms": 6013,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::aptos_governance::update_governance_config"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-aptos-governance-034/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-wr8q_hd3/package",
+              "--output",
+              "/tmp/move-inference-mutant-wr8q_hd3/unused.json"
+            ],
+            "duration_ms": 4326,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-governance-034-stake-unchanged",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-wr8q_hd3/package",
+              "--target",
+              "0x1::aptos_governance::update_governance_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-wr8q_hd3/prover-report.json"
+            ],
+            "duration_ms": 5859,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ss84wsq9/package",
+              "--output",
+              "/tmp/move-inference-mutant-ss84wsq9/unused.json"
+            ],
+            "duration_ms": 3252,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-governance-034-return-when-missing",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ss84wsq9/package",
+              "--target",
+              "0x1::aptos_governance::update_governance_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ss84wsq9/prover-report.json"
+            ],
+            "duration_ms": 5889,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-yx6e7c_a/package",
+              "--output",
+              "/tmp/move-inference-mutant-yx6e7c_a/unused.json"
+            ],
+            "duration_ms": 3327,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-aptos-governance-034-duration-zeroed",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-yx6e7c_a/package",
+              "--target",
+              "0x1::aptos_governance::update_governance_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-yx6e7c_a/prover-report.json"
+            ],
+            "duration_ms": 5706,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::aptos_governance::update_governance_config"
+    }
+  },
+  "AF-code-017": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-code-017/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-16y8kkrx/package",
+              "--output",
+              "/tmp/move-inference-mutant-16y8kkrx/unused.json"
+            ],
+            "duration_ms": 4615,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-code-017-weaker-upgrade-policy-allowed",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-16y8kkrx/package",
+              "--target",
+              "0x1::code",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-16y8kkrx/prover-report.json"
+            ],
+            "duration_ms": 9707,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-hlcgtgb3/package",
+              "--output",
+              "/tmp/move-inference-mutant-hlcgtgb3/unused.json"
+            ],
+            "duration_ms": 4450,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-code-017-module-names-skip-first",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-hlcgtgb3/package",
+              "--target",
+              "0x1::code",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-hlcgtgb3/prover-report.json"
+            ],
+            "duration_ms": 9184,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-eufou6c2/package",
+              "--output",
+              "/tmp/move-inference-mutant-eufou6c2/unused.json"
+            ],
+            "duration_ms": 3931,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-code-017-freeze-missing-registry-returns",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-eufou6c2/package",
+              "--target",
+              "0x1::code",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-eufou6c2/prover-report.json"
+            ],
+            "duration_ms": 8569,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::code"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-code-017/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-lejptrvw/package",
+              "--output",
+              "/tmp/move-inference-mutant-lejptrvw/unused.json"
+            ],
+            "duration_ms": 4687,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-code-017-upgrade-immutable-allowed",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-lejptrvw/package",
+              "--target",
+              "0x1::code",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-lejptrvw/prover-report.json"
+            ],
+            "duration_ms": 9986,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-eqhe8du6/package",
+              "--output",
+              "/tmp/move-inference-mutant-eqhe8du6/unused.json"
+            ],
+            "duration_ms": 2604,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-code-017-arbitrary-policy-allowed",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-eqhe8du6/package",
+              "--target",
+              "0x1::code",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-eqhe8du6/prover-report.json"
+            ],
+            "duration_ms": 9361,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-skpe2ye4/package",
+              "--output",
+              "/tmp/move-inference-mutant-skpe2ye4/unused.json"
+            ],
+            "duration_ms": 2926,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-code-017-freeze-by-anyone",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-skpe2ye4/package",
+              "--target",
+              "0x1::code",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-skpe2ye4/prover-report.json"
+            ],
+            "duration_ms": 10064,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::code"
+    }
+  },
+  "AF-coin-003": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-coin-003/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ncqyo140/package",
+              "--output",
+              "/tmp/move-inference-mutant-ncqyo140/unused.json"
+            ],
+            "duration_ms": 2580,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-coin-003-drops-coin-part",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ncqyo140/package",
+              "--target",
+              "0x1::coin::balance",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ncqyo140/prover-report.json"
+            ],
+            "duration_ms": 4170,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-6fuzyrh2/package",
+              "--output",
+              "/tmp/move-inference-mutant-6fuzyrh2/unused.json"
+            ],
+            "duration_ms": 2566,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-coin-003-unpaired-adds-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-6fuzyrh2/package",
+              "--target",
+              "0x1::coin::balance",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-6fuzyrh2/prover-report.json"
+            ],
+            "duration_ms": 6054,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-af3tiexj/package",
+              "--output",
+              "/tmp/move-inference-mutant-af3tiexj/unused.json"
+            ],
+            "duration_ms": 2822,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-coin-003-drops-fa-part",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-af3tiexj/package",
+              "--target",
+              "0x1::coin::balance",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-af3tiexj/prover-report.json"
+            ],
+            "duration_ms": 6189,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::coin::balance"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-coin-003/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-awmb1w9h/package",
+              "--output",
+              "/tmp/move-inference-mutant-awmb1w9h/unused.json"
+            ],
+            "duration_ms": 2449,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-coin-003-halves-coin-part",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-awmb1w9h/package",
+              "--target",
+              "0x1::coin::balance",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-awmb1w9h/prover-report.json"
+            ],
+            "duration_ms": 3769,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-rbcd7jml/package",
+              "--output",
+              "/tmp/move-inference-mutant-rbcd7jml/unused.json"
+            ],
+            "duration_ms": 2815,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-coin-003-wrong-owner-store",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-rbcd7jml/package",
+              "--target",
+              "0x1::coin::balance",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-rbcd7jml/prover-report.json"
+            ],
+            "duration_ms": 3894,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-zf1md109/package",
+              "--output",
+              "/tmp/move-inference-mutant-zf1md109/unused.json"
+            ],
+            "duration_ms": 2492,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-coin-003-coin-part-plus-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-zf1md109/package",
+              "--target",
+              "0x1::coin::balance",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-zf1md109/prover-report.json"
+            ],
+            "duration_ms": 3887,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::coin::balance"
+    }
+  },
+  "AF-epoch-timeout-config-007": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-epoch-timeout-config-007/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ehovesmf/package",
+              "--output",
+              "/tmp/move-inference-mutant-ehovesmf/unused.json"
+            ],
+            "duration_ms": 2372,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-epoch-timeout-config-007-zero-grace-period-allowed",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ehovesmf/package",
+              "--target",
+              "0x1::epoch_timeout_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ehovesmf/prover-report.json"
+            ],
+            "duration_ms": 4254,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-q6fze6_c/package",
+              "--output",
+              "/tmp/move-inference-mutant-q6fze6_c/unused.json"
+            ],
+            "duration_ms": 4138,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-epoch-timeout-config-007-getter-ignores-config",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-q6fze6_c/package",
+              "--target",
+              "0x1::epoch_timeout_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-q6fze6_c/prover-report.json"
+            ],
+            "duration_ms": 5904,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-904aeukd/package",
+              "--output",
+              "/tmp/move-inference-mutant-904aeukd/unused.json"
+            ],
+            "duration_ms": 2751,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-epoch-timeout-config-007-initialize-republishes",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-904aeukd/package",
+              "--target",
+              "0x1::epoch_timeout_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-904aeukd/prover-report.json"
+            ],
+            "duration_ms": 7209,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::epoch_timeout_config"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-epoch-timeout-config-007/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-8w89y4nw/package",
+              "--output",
+              "/tmp/move-inference-mutant-8w89y4nw/unused.json"
+            ],
+            "duration_ms": 4602,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-epoch-timeout-config-007-disabled-has-grace-period",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-8w89y4nw/package",
+              "--target",
+              "0x1::epoch_timeout_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-8w89y4nw/prover-report.json"
+            ],
+            "duration_ms": 7263,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-wewnxb1s/package",
+              "--output",
+              "/tmp/move-inference-mutant-wewnxb1s/unused.json"
+            ],
+            "duration_ms": 2466,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-epoch-timeout-config-007-grace-period-off-by-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-wewnxb1s/package",
+              "--target",
+              "0x1::epoch_timeout_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-wewnxb1s/prover-report.json"
+            ],
+            "duration_ms": 6404,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-h6u5tgo2/package",
+              "--output",
+              "/tmp/move-inference-mutant-h6u5tgo2/unused.json"
+            ],
+            "duration_ms": 3209,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-epoch-timeout-config-007-apply-branches-swapped",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-h6u5tgo2/package",
+              "--target",
+              "0x1::epoch_timeout_config",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-h6u5tgo2/prover-report.json"
+            ],
+            "duration_ms": 4220,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::epoch_timeout_config"
+    }
+  },
+  "AF-gas-schedule-002": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-gas-schedule-002/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ync7ftsj/package",
+              "--output",
+              "/tmp/move-inference-mutant-ync7ftsj/unused.json"
+            ],
+            "duration_ms": 4261,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-gas-schedule-002-never-applies",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ync7ftsj/package",
+              "--target",
+              "0x1::gas_schedule::on_new_epoch",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ync7ftsj/prover-report.json"
+            ],
+            "duration_ms": 6091,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-13lqllo7/package",
+              "--output",
+              "/tmp/move-inference-mutant-13lqllo7/unused.json"
+            ],
+            "duration_ms": 3075,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-gas-schedule-002-apply-branches-swapped",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-13lqllo7/package",
+              "--target",
+              "0x1::gas_schedule::on_new_epoch",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-13lqllo7/prover-report.json"
+            ],
+            "duration_ms": 5591,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-50uffa1w/package",
+              "--output",
+              "/tmp/move-inference-mutant-50uffa1w/unused.json"
+            ],
+            "duration_ms": 3336,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-gas-schedule-002-bumps-feature-version",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-50uffa1w/package",
+              "--target",
+              "0x1::gas_schedule::on_new_epoch",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-50uffa1w/prover-report.json"
+            ],
+            "duration_ms": 5917,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::gas_schedule::on_new_epoch"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-gas-schedule-002/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ao4ji_p_/package",
+              "--output",
+              "/tmp/move-inference-mutant-ao4ji_p_/unused.json"
+            ],
+            "duration_ms": 4567,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-gas-schedule-002-drops-entries",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ao4ji_p_/package",
+              "--target",
+              "0x1::gas_schedule::on_new_epoch",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ao4ji_p_/prover-report.json"
+            ],
+            "duration_ms": 3835,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-5joqhz02/package",
+              "--output",
+              "/tmp/move-inference-mutant-5joqhz02/unused.json"
+            ],
+            "duration_ms": 3253,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-gas-schedule-002-publishes-empty",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-5joqhz02/package",
+              "--target",
+              "0x1::gas_schedule::on_new_epoch",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-5joqhz02/prover-report.json"
+            ],
+            "duration_ms": 5676,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ugcya5it/package",
+              "--output",
+              "/tmp/move-inference-mutant-ugcya5it/unused.json"
+            ],
+            "duration_ms": 3298,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-gas-schedule-002-skips-first-apply",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ugcya5it/package",
+              "--target",
+              "0x1::gas_schedule::on_new_epoch",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ugcya5it/prover-report.json"
+            ],
+            "duration_ms": 6001,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::gas_schedule::on_new_epoch"
+    }
+  },
+  "AF-multisig-account-015": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-multisig-account-015/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-hamwjyrm/package",
+              "--output",
+              "/tmp/move-inference-mutant-hamwjyrm/unused.json"
+            ],
+            "duration_ms": 4758,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-015-ignore-owner",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-hamwjyrm/package",
+              "--target",
+              "0x1::multisig_account::can_execute",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-hamwjyrm/prover-report.json"
+            ],
+            "duration_ms": 6397,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-arjhth7t/package",
+              "--output",
+              "/tmp/move-inference-mutant-arjhth7t/unused.json"
+            ],
+            "duration_ms": 3381,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-015-out-of-range-returns-false",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-arjhth7t/package",
+              "--target",
+              "0x1::multisig_account::can_execute",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-arjhth7t/prover-report.json"
+            ],
+            "duration_ms": 6234,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-7whfdg14/package",
+              "--output",
+              "/tmp/move-inference-mutant-7whfdg14/unused.json"
+            ],
+            "duration_ms": 2529,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-015-sequence-inequality",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-7whfdg14/package",
+              "--target",
+              "0x1::multisig_account::can_execute",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-7whfdg14/prover-report.json"
+            ],
+            "duration_ms": 6140,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::multisig_account::can_execute"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-multisig-account-015/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-7ujxhcia/package",
+              "--output",
+              "/tmp/move-inference-mutant-7ujxhcia/unused.json"
+            ],
+            "duration_ms": 4311,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-015-owner-negated",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-7ujxhcia/package",
+              "--target",
+              "0x1::multisig_account::can_execute",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-7ujxhcia/prover-report.json"
+            ],
+            "duration_ms": 5786,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-909wr1sn/package",
+              "--output",
+              "/tmp/move-inference-mutant-909wr1sn/unused.json"
+            ],
+            "duration_ms": 3285,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-015-sequence-off-by-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-909wr1sn/package",
+              "--target",
+              "0x1::multisig_account::can_execute",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-909wr1sn/prover-report.json"
+            ],
+            "duration_ms": 5778,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-myvn87qa/package",
+              "--output",
+              "/tmp/move-inference-mutant-myvn87qa/unused.json"
+            ],
+            "duration_ms": 2506,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-015-zero-sequence-returns-false",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-myvn87qa/package",
+              "--target",
+              "0x1::multisig_account::can_execute",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-myvn87qa/prover-report.json"
+            ],
+            "duration_ms": 5695,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::multisig_account::can_execute"
+    }
+  },
+  "AF-multisig-account-067": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-multisig-account-067/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-dqwyd3lw/package",
+              "--output",
+              "/tmp/move-inference-mutant-dqwyd3lw/unused.json"
+            ],
+            "duration_ms": 4857,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-067-self-owner-allowed",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-dqwyd3lw/package",
+              "--target",
+              "0x1::multisig_account::validate_owners",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-dqwyd3lw/prover-report.json"
+            ],
+            "duration_ms": 6914,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-8jei0i1b/package",
+              "--output",
+              "/tmp/move-inference-mutant-8jei0i1b/unused.json"
+            ],
+            "duration_ms": 3475,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-067-duplicates-allowed",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-8jei0i1b/package",
+              "--target",
+              "0x1::multisig_account::validate_owners",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-8jei0i1b/prover-report.json"
+            ],
+            "duration_ms": 6118,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-8y3pftk3/package",
+              "--output",
+              "/tmp/move-inference-mutant-8y3pftk3/unused.json"
+            ],
+            "duration_ms": 3701,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-067-never-finds-duplicates",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-8y3pftk3/package",
+              "--target",
+              "0x1::multisig_account::validate_owners",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-8y3pftk3/prover-report.json"
+            ],
+            "duration_ms": 6099,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::multisig_account::validate_owners"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-multisig-account-067/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-8pgb9qup/package",
+              "--output",
+              "/tmp/move-inference-mutant-8pgb9qup/unused.json"
+            ],
+            "duration_ms": 4306,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-067-checks-half",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-8pgb9qup/package",
+              "--target",
+              "0x1::multisig_account::validate_owners",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-8pgb9qup/prover-report.json"
+            ],
+            "duration_ms": 6011,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: base case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-hi23zvjq/package",
+              "--output",
+              "/tmp/move-inference-mutant-hi23zvjq/unused.json"
+            ],
+            "duration_ms": 3295,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-067-self-owner-required",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-hi23zvjq/package",
+              "--target",
+              "0x1::multisig_account::validate_owners",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-hi23zvjq/prover-report.json"
+            ],
+            "duration_ms": 5746,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-mytvd30c/package",
+              "--output",
+              "/tmp/move-inference-mutant-mytvd30c/unused.json"
+            ],
+            "duration_ms": 3556,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-multisig-account-067-skips-last-owner",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-mytvd30c/package",
+              "--target",
+              "0x1::multisig_account::validate_owners",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-mytvd30c/prover-report.json"
+            ],
+            "duration_ms": 5705,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::multisig_account::validate_owners"
+    }
+  },
+  "AF-stake-004": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-stake-004/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ehvbrwsl/package",
+              "--output",
+              "/tmp/move-inference-mutant-ehvbrwsl/unused.json"
+            ],
+            "duration_ms": 4787,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-stake-004-leaves-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ehvbrwsl/package",
+              "--target",
+              "0x1::stake::append",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ehvbrwsl/prover-report.json"
+            ],
+            "duration_ms": 6346,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-u88sa1fw/package",
+              "--output",
+              "/tmp/move-inference-mutant-u88sa1fw/unused.json"
+            ],
+            "duration_ms": 3640,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-stake-004-inserts-at-front",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-u88sa1fw/package",
+              "--target",
+              "0x1::stake::append",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-u88sa1fw/prover-report.json"
+            ],
+            "duration_ms": 6725,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-v2ozztzu/package",
+              "--output",
+              "/tmp/move-inference-mutant-v2ozztzu/unused.json"
+            ],
+            "duration_ms": 3136,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-stake-004-takes-from-front",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-v2ozztzu/package",
+              "--target",
+              "0x1::stake::append",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-v2ozztzu/prover-report.json"
+            ],
+            "duration_ms": 7244,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::stake::append"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-stake-004/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-l064l1aa/package",
+              "--output",
+              "/tmp/move-inference-mutant-l064l1aa/unused.json"
+            ],
+            "duration_ms": 4620,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-stake-004-moves-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-l064l1aa/package",
+              "--target",
+              "0x1::stake::append",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-l064l1aa/prover-report.json"
+            ],
+            "duration_ms": 5437,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-gdiy2dih/package",
+              "--output",
+              "/tmp/move-inference-mutant-gdiy2dih/unused.json"
+            ],
+            "duration_ms": 3914,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-stake-004-stops-early",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-gdiy2dih/package",
+              "--target",
+              "0x1::stake::append",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-gdiy2dih/prover-report.json"
+            ],
+            "duration_ms": 5856,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-5imhfqen/package",
+              "--output",
+              "/tmp/move-inference-mutant-5imhfqen/unused.json"
+            ],
+            "duration_ms": 2891,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-stake-004-reverses-result",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-5imhfqen/package",
+              "--target",
+              "0x1::stake::append",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-5imhfqen/prover-report.json"
+            ],
+            "duration_ms": 6604,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::stake::append"
+    }
+  },
+  "AF-transaction-fee-010": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-transaction-fee-010/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-yhujp52w/package",
+              "--output",
+              "/tmp/move-inference-mutant-yhujp52w/unused.json"
+            ],
+            "duration_ms": 4666,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-transaction-fee-010-fa-cap-not-stored",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-yhujp52w/package",
+              "--target",
+              "0x1::transaction_fee::store_aptos_coin_mint_cap",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-yhujp52w/prover-report.json"
+            ],
+            "duration_ms": 6587,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ilng429u/package",
+              "--output",
+              "/tmp/move-inference-mutant-ilng429u/unused.json"
+            ],
+            "duration_ms": 3393,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-transaction-fee-010-no-framework-check",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ilng429u/package",
+              "--target",
+              "0x1::transaction_fee::store_aptos_coin_mint_cap",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ilng429u/prover-report.json"
+            ],
+            "duration_ms": 6217,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-0_txt0uj/package",
+              "--output",
+              "/tmp/move-inference-mutant-0_txt0uj/unused.json"
+            ],
+            "duration_ms": 3347,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-transaction-fee-010-always-aborts-after-store",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-0_txt0uj/package",
+              "--target",
+              "0x1::transaction_fee::store_aptos_coin_mint_cap",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-0_txt0uj/prover-report.json"
+            ],
+            "duration_ms": 5908,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::transaction_fee::store_aptos_coin_mint_cap"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-transaction-fee-010/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-7nafx7s5/package",
+              "--output",
+              "/tmp/move-inference-mutant-7nafx7s5/unused.json"
+            ],
+            "duration_ms": 5848,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-transaction-fee-010-silently-skips-fa-cap",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-7nafx7s5/package",
+              "--target",
+              "0x1::transaction_fee::store_aptos_coin_mint_cap",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-7nafx7s5/prover-report.json"
+            ],
+            "duration_ms": 7145,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-_x76w1te/package",
+              "--output",
+              "/tmp/move-inference-mutant-_x76w1te/unused.json"
+            ],
+            "duration_ms": 3479,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-transaction-fee-010-aborts-after-coin-cap",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-_x76w1te/package",
+              "--target",
+              "0x1::transaction_fee::store_aptos_coin_mint_cap",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-_x76w1te/prover-report.json"
+            ],
+            "duration_ms": 6086,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-qkzbrnyk/package",
+              "--output",
+              "/tmp/move-inference-mutant-qkzbrnyk/unused.json"
+            ],
+            "duration_ms": 3579,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-transaction-fee-010-accepts-address-two",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-qkzbrnyk/package",
+              "--target",
+              "0x1::transaction_fee::store_aptos_coin_mint_cap",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-qkzbrnyk/prover-report.json"
+            ],
+            "duration_ms": 6866,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::transaction_fee::store_aptos_coin_mint_cap"
+    }
+  },
+  "AF-vesting-042": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-vesting-042/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-rjh8mwlo/package",
+              "--output",
+              "/tmp/move-inference-mutant-rjh8mwlo/unused.json"
+            ],
+            "duration_ms": 4467,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-vesting-042-bumps-last-vested",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-rjh8mwlo/package",
+              "--target",
+              "0x1::vesting::vesting_schedule",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-rjh8mwlo/prover-report.json"
+            ],
+            "duration_ms": 6147,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-tfryt37d/package",
+              "--output",
+              "/tmp/move-inference-mutant-tfryt37d/unused.json"
+            ],
+            "duration_ms": 3377,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-vesting-042-swaps-fields",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-tfryt37d/package",
+              "--target",
+              "0x1::vesting::vesting_schedule",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-tfryt37d/prover-report.json"
+            ],
+            "duration_ms": 5808,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-8g5atcom/package",
+              "--output",
+              "/tmp/move-inference-mutant-8g5atcom/unused.json"
+            ],
+            "duration_ms": 3124,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-vesting-042-drops-fractions",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-8g5atcom/package",
+              "--target",
+              "0x1::vesting::vesting_schedule",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-8g5atcom/prover-report.json"
+            ],
+            "duration_ms": 5943,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::vesting::vesting_schedule"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-vesting-042/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-bq2ngm28/package",
+              "--output",
+              "/tmp/move-inference-mutant-bq2ngm28/unused.json"
+            ],
+            "duration_ms": 4975,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-vesting-042-zeroes-start",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-bq2ngm28/package",
+              "--target",
+              "0x1::vesting::vesting_schedule",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-bq2ngm28/prover-report.json"
+            ],
+            "duration_ms": 6653,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ufu37mx5/package",
+              "--output",
+              "/tmp/move-inference-mutant-ufu37mx5/unused.json"
+            ],
+            "duration_ms": 3372,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-vesting-042-bumps-period",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ufu37mx5/package",
+              "--target",
+              "0x1::vesting::vesting_schedule",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ufu37mx5/prover-report.json"
+            ],
+            "duration_ms": 5918,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-m6ktmukb/package",
+              "--output",
+              "/tmp/move-inference-mutant-m6ktmukb/unused.json"
+            ],
+            "duration_ms": 2868,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AF-vesting-042-zeroes-last-vested",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-m6ktmukb/package",
+              "--target",
+              "0x1::vesting::vesting_schedule",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-m6ktmukb/prover-report.json"
+            ],
+            "duration_ms": 6149,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x1::vesting::vesting_schedule"
+    }
+  },
+  "AX-bulk-order-book-009": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-bulk-order-book-009/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-jz17trs6/package",
+              "--output",
+              "/tmp/move-inference-mutant-jz17trs6/unused.json"
+            ],
+            "duration_ms": 4749,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-bulk-order-book-009-missing-order-returns-zero",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-jz17trs6/package",
+              "--target",
+              "0x7::bulk_order_book::get_remaining_size",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-jz17trs6/prover-report.json"
+            ],
+            "duration_ms": 3633,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-y4_j8_xr/package",
+              "--output",
+              "/tmp/move-inference-mutant-y4_j8_xr/unused.json"
+            ],
+            "duration_ms": 3344,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-bulk-order-book-009-wrong-side",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-y4_j8_xr/package",
+              "--target",
+              "0x7::bulk_order_book::get_remaining_size",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-y4_j8_xr/prover-report.json"
+            ],
+            "duration_ms": 6227,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-fmrwwxk6/package",
+              "--output",
+              "/tmp/move-inference-mutant-fmrwwxk6/unused.json"
+            ],
+            "duration_ms": 3988,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-bulk-order-book-009-halves-result",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-fmrwwxk6/package",
+              "--target",
+              "0x7::bulk_order_book::get_remaining_size",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-fmrwwxk6/prover-report.json"
+            ],
+            "duration_ms": 6024,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::bulk_order_book::get_remaining_size"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-bulk-order-book-009/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-jahq1omo/package",
+              "--output",
+              "/tmp/move-inference-mutant-jahq1omo/unused.json"
+            ],
+            "duration_ms": 4734,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-bulk-order-book-009-off-by-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-jahq1omo/package",
+              "--target",
+              "0x7::bulk_order_book::get_remaining_size",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-jahq1omo/prover-report.json"
+            ],
+            "duration_ms": 6102,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-40phc4k5/package",
+              "--output",
+              "/tmp/move-inference-mutant-40phc4k5/unused.json"
+            ],
+            "duration_ms": 3719,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-bulk-order-book-009-aborts-on-asks",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-40phc4k5/package",
+              "--target",
+              "0x7::bulk_order_book::get_remaining_size",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-40phc4k5/prover-report.json"
+            ],
+            "duration_ms": 6551,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-11rgii2i/package",
+              "--output",
+              "/tmp/move-inference-mutant-11rgii2i/unused.json"
+            ],
+            "duration_ms": 3373,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-bulk-order-book-009-always-bids",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-11rgii2i/package",
+              "--target",
+              "0x7::bulk_order_book::get_remaining_size",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-11rgii2i/prover-report.json"
+            ],
+            "duration_ms": 3716,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::bulk_order_book::get_remaining_size"
+    }
+  },
+  "AX-dead-mans-switch-operations-001": {
+    "mutants": {
+      "essential": 2,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-dead-mans-switch-operations-001/mutants.json",
+      "mutants": 2,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-dj3bq7jy/package",
+              "--output",
+              "/tmp/move-inference-mutant-dj3bq7jy/unused.json"
+            ],
+            "duration_ms": 2675,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-dead-mans-switch-operations-001-no-enabled-check",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-dj3bq7jy/package",
+              "--target",
+              "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-dj3bq7jy/prover-report.json"
+            ],
+            "duration_ms": 7887,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-z86vi_0u/package",
+              "--output",
+              "/tmp/move-inference-mutant-z86vi_0u/unused.json"
+            ],
+            "duration_ms": 4395,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-dead-mans-switch-operations-001-returns-when-disabled",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-z86vi_0u/package",
+              "--target",
+              "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-z86vi_0u/prover-report.json"
+            ],
+            "duration_ms": 7929,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-dead-mans-switch-operations-001/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-t7zbwvrr/package",
+              "--output",
+              "/tmp/move-inference-mutant-t7zbwvrr/unused.json"
+            ],
+            "duration_ms": 4529,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-dead-mans-switch-operations-001-enabled-check-always-passes",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-t7zbwvrr/package",
+              "--target",
+              "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-t7zbwvrr/prover-report.json"
+            ],
+            "duration_ms": 6817,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-6eed_ngc/package",
+              "--output",
+              "/tmp/move-inference-mutant-6eed_ngc/unused.json"
+            ],
+            "duration_ms": 2352,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-dead-mans-switch-operations-001-disabled-address-one-proceeds",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-6eed_ngc/package",
+              "--target",
+              "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-6eed_ngc/prover-report.json"
+            ],
+            "duration_ms": 6767,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ic6zfr0n/package",
+              "--output",
+              "/tmp/move-inference-mutant-ic6zfr0n/unused.json"
+            ],
+            "duration_ms": 4639,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-dead-mans-switch-operations-001-looks-up-address-one",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ic6zfr0n/package",
+              "--target",
+              "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ic6zfr0n/prover-report.json"
+            ],
+            "duration_ms": 7210,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order"
+    }
+  },
+  "AX-native-position-types-005": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-native-position-types-005/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-5s0assob/package",
+              "--output",
+              "/tmp/move-inference-mutant-5s0assob/unused.json"
+            ],
+            "duration_ms": 5315,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-native-position-types-005-flips-side",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-5s0assob/package",
+              "--target",
+              "0x7::native_position_types",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-5s0assob/prover-report.json"
+            ],
+            "duration_ms": 6585,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-0cuj7xng/package",
+              "--output",
+              "/tmp/move-inference-mutant-0cuj7xng/unused.json"
+            ],
+            "duration_ms": 3125,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-native-position-types-005-index-off-by-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-0cuj7xng/package",
+              "--target",
+              "0x7::native_position_types",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-0cuj7xng/prover-report.json"
+            ],
+            "duration_ms": 6391,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-97i2hahl/package",
+              "--output",
+              "/tmp/move-inference-mutant-97i2hahl/unused.json"
+            ],
+            "duration_ms": 3386,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-native-position-types-005-unpack-flips-side",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-97i2hahl/package",
+              "--target",
+              "0x7::native_position_types",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-97i2hahl/prover-report.json"
+            ],
+            "duration_ms": 6240,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::native_position_types"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-native-position-types-005/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-tvnhn4cn/package",
+              "--output",
+              "/tmp/move-inference-mutant-tvnhn4cn/unused.json"
+            ],
+            "duration_ms": 2488,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-native-position-types-005-zero-leverage",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-tvnhn4cn/package",
+              "--target",
+              "0x7::native_position_types",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-tvnhn4cn/prover-report.json"
+            ],
+            "duration_ms": 7210,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-amx9wezp/package",
+              "--output",
+              "/tmp/move-inference-mutant-amx9wezp/unused.json"
+            ],
+            "duration_ms": 3382,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-native-position-types-005-halved-index-value",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-amx9wezp/package",
+              "--target",
+              "0x7::native_position_types",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-amx9wezp/prover-report.json"
+            ],
+            "duration_ms": 7179,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-cdusw1ed/package",
+              "--output",
+              "/tmp/move-inference-mutant-cdusw1ed/unused.json"
+            ],
+            "duration_ms": 2862,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-native-position-types-005-unpack-bumps-timestamp",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-cdusw1ed/package",
+              "--target",
+              "0x7::native_position_types",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-cdusw1ed/prover-report.json"
+            ],
+            "duration_ms": 6243,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::native_position_types"
+    }
+  },
+  "AX-order-book-006": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-order-book-006/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-uq35q2zv/package",
+              "--output",
+              "/tmp/move-inference-mutant-uq35q2zv/unused.json"
+            ],
+            "duration_ms": 4867,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-order-book-006-negated",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-uq35q2zv/package",
+              "--target",
+              "0x7::order_book::client_order_id_exists",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-uq35q2zv/prover-report.json"
+            ],
+            "duration_ms": 6322,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-zpnsfnoe/package",
+              "--output",
+              "/tmp/move-inference-mutant-zpnsfnoe/unused.json"
+            ],
+            "duration_ms": 3855,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-order-book-006-always-false",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-zpnsfnoe/package",
+              "--target",
+              "0x7::order_book::client_order_id_exists",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-zpnsfnoe/prover-report.json"
+            ],
+            "duration_ms": 8347,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-nevygzx1/package",
+              "--output",
+              "/tmp/move-inference-mutant-nevygzx1/unused.json"
+            ],
+            "duration_ms": 3331,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-order-book-006-excludes-address-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-nevygzx1/package",
+              "--target",
+              "0x7::order_book::client_order_id_exists",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-nevygzx1/prover-report.json"
+            ],
+            "duration_ms": 8097,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::order_book::client_order_id_exists"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-order-book-006/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-gp4udhda/package",
+              "--output",
+              "/tmp/move-inference-mutant-gp4udhda/unused.json"
+            ],
+            "duration_ms": 4655,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-order-book-006-aborts-on-zero-address",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-gp4udhda/package",
+              "--target",
+              "0x7::order_book::client_order_id_exists",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-gp4udhda/prover-report.json"
+            ],
+            "duration_ms": 6441,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-hmajgppu/package",
+              "--output",
+              "/tmp/move-inference-mutant-hmajgppu/unused.json"
+            ],
+            "duration_ms": 2859,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-order-book-006-wrong-creator",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-hmajgppu/package",
+              "--target",
+              "0x7::order_book::client_order_id_exists",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-hmajgppu/prover-report.json"
+            ],
+            "duration_ms": 6524,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-i784ch2t/package",
+              "--output",
+              "/tmp/move-inference-mutant-i784ch2t/unused.json"
+            ],
+            "duration_ms": 3077,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-order-book-006-always-true",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-i784ch2t/package",
+              "--target",
+              "0x7::order_book::client_order_id_exists",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-i784ch2t/prover-report.json"
+            ],
+            "duration_ms": 6394,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::order_book::client_order_id_exists"
+    }
+  },
+  "AX-pending-order-book-index-006": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-pending-order-book-index-006/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-nwu44jze/package",
+              "--output",
+              "/tmp/move-inference-mutant-nwu44jze/unused.json"
+            ],
+            "duration_ms": 4808,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-pending-order-book-index-006-inserts-at-front",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-nwu44jze/package",
+              "--target",
+              "0x7::pending_order_book_index::take_ready_price_move_up_orders",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-nwu44jze/prover-report.json"
+            ],
+            "duration_ms": 6579,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-748nbvgv/package",
+              "--output",
+              "/tmp/move-inference-mutant-748nbvgv/unused.json"
+            ],
+            "duration_ms": 3287,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-pending-order-book-index-006-exceeds-limit",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-748nbvgv/package",
+              "--target",
+              "0x7::pending_order_book_index::take_ready_price_move_up_orders",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-748nbvgv/prover-report.json"
+            ],
+            "duration_ms": 6163,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-yuxlts45/package",
+              "--output",
+              "/tmp/move-inference-mutant-yuxlts45/unused.json"
+            ],
+            "duration_ms": 3761,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-pending-order-book-index-006-aborts-on-zero-limit",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-yuxlts45/package",
+              "--target",
+              "0x7::pending_order_book_index::take_ready_price_move_up_orders",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-yuxlts45/prover-report.json"
+            ],
+            "duration_ms": 6254,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::pending_order_book_index::take_ready_price_move_up_orders"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-pending-order-book-index-006/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-41rbf962/package",
+              "--output",
+              "/tmp/move-inference-mutant-41rbf962/unused.json"
+            ],
+            "duration_ms": 6487,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-pending-order-book-index-006-swaps-into-prefix",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-41rbf962/package",
+              "--target",
+              "0x7::pending_order_book_index::take_ready_price_move_up_orders",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-41rbf962/prover-report.json"
+            ],
+            "duration_ms": 7277,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-zb2yr0ud/package",
+              "--output",
+              "/tmp/move-inference-mutant-zb2yr0ud/unused.json"
+            ],
+            "duration_ms": 4446,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-pending-order-book-index-006-limit-plus-one",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-zb2yr0ud/package",
+              "--target",
+              "0x7::pending_order_book_index::take_ready_price_move_up_orders",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-zb2yr0ud/prover-report.json"
+            ],
+            "duration_ms": 6168,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: induction case of the loop invariant does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-3mr5cs1p/package",
+              "--output",
+              "/tmp/move-inference-mutant-3mr5cs1p/unused.json"
+            ],
+            "duration_ms": 3411,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-pending-order-book-index-006-reverses-prefix",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-3mr5cs1p/package",
+              "--target",
+              "0x7::pending_order_book_index::take_ready_price_move_up_orders",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-3mr5cs1p/prover-report.json"
+            ],
+            "duration_ms": 6900,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::pending_order_book_index::take_ready_price_move_up_orders"
+    }
+  },
+  "AX-price-time-index-014": {
+    "mutants": {
+      "essential": 1,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-price-time-index-014/mutants.json",
+      "mutants": 1,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-o60k6xht/package",
+              "--output",
+              "/tmp/move-inference-mutant-o60k6xht/unused.json"
+            ],
+            "duration_ms": 5107,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-price-time-index-014-always-aborts",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-o60k6xht/package",
+              "--target",
+              "0x7::price_time_index::new_price_time_idx",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-o60k6xht/prover-report.json"
+            ],
+            "duration_ms": 3767,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::price_time_index::new_price_time_idx"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-price-time-index-014/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-8er5_dd_/package",
+              "--output",
+              "/tmp/move-inference-mutant-8er5_dd_/unused.json"
+            ],
+            "duration_ms": 4731,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-price-time-index-014-aborts-differently",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-8er5_dd_/package",
+              "--target",
+              "0x7::price_time_index::new_price_time_idx",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-8er5_dd_/prover-report.json"
+            ],
+            "duration_ms": 6329,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-ir1hlliq/package",
+              "--output",
+              "/tmp/move-inference-mutant-ir1hlliq/unused.json"
+            ],
+            "duration_ms": 3581,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-price-time-index-014-buy-map-aborts",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-ir1hlliq/package",
+              "--target",
+              "0x7::price_time_index::new_price_time_idx",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-ir1hlliq/prover-report.json"
+            ],
+            "duration_ms": 5729,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-xb9ewy2q/package",
+              "--output",
+              "/tmp/move-inference-mutant-xb9ewy2q/unused.json"
+            ],
+            "duration_ms": 3549,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-price-time-index-014-sell-map-aborts",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-xb9ewy2q/package",
+              "--target",
+              "0x7::price_time_index::new_price_time_idx",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-xb9ewy2q/prover-report.json"
+            ],
+            "duration_ms": 6227,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: abort not covered by any of the `aborts_if` clauses"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::price_time_index::new_price_time_idx"
+    }
+  },
+  "AX-trading-native-capability-010": {
+    "mutants": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-trading-native-capability-010/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-dbk3bn1o/package",
+              "--output",
+              "/tmp/move-inference-mutant-dbk3bn1o/unused.json"
+            ],
+            "duration_ms": 2490,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-trading-native-capability-010-denied-reads-registered",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-dbk3bn1o/package",
+              "--target",
+              "0x7::trading_native_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-dbk3bn1o/prover-report.json"
+            ],
+            "duration_ms": 5104,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-1jcfy7m_/package",
+              "--output",
+              "/tmp/move-inference-mutant-1jcfy7m_/unused.json"
+            ],
+            "duration_ms": 2453,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-trading-native-capability-010-register-does-nothing",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-1jcfy7m_/package",
+              "--target",
+              "0x7::trading_native_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-1jcfy7m_/prover-report.json"
+            ],
+            "duration_ms": 4873,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-y792cg8e/package",
+              "--output",
+              "/tmp/move-inference-mutant-y792cg8e/unused.json"
+            ],
+            "duration_ms": 2459,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-trading-native-capability-010-denied-exchanges-active",
+          "obligation_category": "abort",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-y792cg8e/package",
+              "--target",
+              "0x7::trading_native_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-y792cg8e/prover-report.json"
+            ],
+            "duration_ms": 5114,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: function does not abort under this condition"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::trading_native_capability"
+    },
+    "mutants-scoring": {
+      "essential": 3,
+      "inconclusive": [],
+      "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-trading-native-capability-010/mutants.json",
+      "mutants": 3,
+      "not_essential": [],
+      "results": [
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-_dyzb7j2/package",
+              "--output",
+              "/tmp/move-inference-mutant-_dyzb7j2/unused.json"
+            ],
+            "duration_ms": 2515,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-trading-native-capability-010-deny-does-nothing",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-_dyzb7j2/package",
+              "--target",
+              "0x7::trading_native_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-_dyzb7j2/prover-report.json"
+            ],
+            "duration_ms": 4915,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-v5hlkdep/package",
+              "--output",
+              "/tmp/move-inference-mutant-v5hlkdep/unused.json"
+            ],
+            "duration_ms": 2411,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-trading-native-capability-010-reenable-does-nothing",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-v5hlkdep/package",
+              "--target",
+              "0x7::trading_native_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-v5hlkdep/prover-report.json"
+            ],
+            "duration_ms": 4781,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        },
+        {
+          "compile": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "check-package",
+              "--package",
+              "/tmp/move-inference-mutant-1nn44kxk/package",
+              "--output",
+              "/tmp/move-inference-mutant-1nn44kxk/unused.json"
+            ],
+            "duration_ms": 2619,
+            "infrastructure_error": null,
+            "returncode": 0,
+            "stderr": "",
+            "stdout": "",
+            "timed_out": false
+          },
+          "killed": true,
+          "mutant_id": "AX-trading-native-capability-010-capability-for-framework",
+          "obligation_category": "normal-result",
+          "outcome": "killed",
+          "prover": {
+            "argv": [
+              "move-flow",
+              "experiment",
+              "prove",
+              "--package",
+              "/tmp/move-inference-mutant-1nn44kxk/package",
+              "--target",
+              "0x7::trading_native_capability",
+              "--timeout",
+              "40",
+              "--output",
+              "/tmp/move-inference-mutant-1nn44kxk/prover-report.json"
+            ],
+            "duration_ms": 5021,
+            "infrastructure_error": null,
+            "returncode": 1,
+            "stderr": "Error: one or more targets did not verify\n",
+            "stdout": "",
+            "timed_out": false
+          },
+          "prover_errors": [
+            "error: post-condition does not hold"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "target": "0x7::trading_native_capability"
+    }
+  }
+}

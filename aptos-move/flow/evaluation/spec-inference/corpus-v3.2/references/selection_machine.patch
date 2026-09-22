@@ -1,0 +1,49 @@
+--- a/sources/etna/selection_machine.move
++++ b/sources/etna/selection_machine.move
+@@ -31,0 +32,4 @@ module decibel_dex::selection_machine {
++        } spec {
++            invariant i <= rounds;
++            invariant value == state_after(next, start, i);
++            invariant survived(next, admissible, start, i);
+@@ -34,0 +39,41 @@ module decibel_dex::selection_machine {
++
++    spec module {
++        /// Every draw before the `k`th was reached, rejected, and advanced
++        /// without either callback aborting.
++        fun survived(
++            next: |u64| u64, admissible: |u64| bool, start: num, k: num
++        ): bool {
++            forall j: num where 0 <= j && j < k:
++                !aborts_of<admissible>(state_after(next, start, j))
++                    && !result_of<admissible>(state_after(next, start, j))
++                    && !aborts_of<next>(state_after(next, start, j))
++        }
++
++        /// The candidate after `k` draws: the continuation applied `k` times.
++        /// The weight keeps the solver from unrolling the definition on its
++        /// own, which is what lets a refutation finish: without it a wrong
++        /// draw count or restart point exhausts the budget instead of failing.
++        fun state_after(next: |u64| u64, start: num, k: num): num [weight = 20] {
++            if (k <= 0) { start }
++            else { result_of<next>(state_after(next, start, k - 1)) }
++        }
++    }
++
++    spec select {
++        pragma opaque;
++        // Either callback may abort, and the machine only reaches a draw it
++        // has not already accepted or failed at.
++        aborts_if [inferred] exists j: u64 where j < rounds:
++            survived(next, admissible, start, j)
++                && (aborts_of<admissible>(state_after(next, start, j))
++                    || (!result_of<admissible>(state_after(next, start, j))
++                        && aborts_of<next>(state_after(next, start, j))));
++        ensures [inferred] (result is Outcome::Accepted) ==>
++            result.draws < rounds
++                && survived(next, admissible, start, result.draws)
++                && result.value == state_after(next, start, result.draws)
++                && result_of<admissible>(result.value);
++        ensures [inferred] (result is Outcome::Exhausted) ==>
++            survived(next, admissible, start, rounds)
++                && result.restart_from == state_after(next, start, rounds);
++    }

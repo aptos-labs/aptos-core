@@ -2051,26 +2051,44 @@ impl Container {
     fn swap_contents(&self, other: &Self) -> PartialVMResult<()> {
         use Container::*;
 
+        // The two references must point to different containers. If they
+        // alias, borrowing both mutably would panic, so return an invariant
+        // violation instead. In general, bytecode verifier should never allow
+        // this to happen.
+        macro_rules! swap {
+            ($l:ident, $r:ident) => {{
+                let (mut lref, mut rref) = match ($l.try_borrow_mut(), $r.try_borrow_mut()) {
+                    (Ok(lref), Ok(rref)) => (lref, rref),
+                    _ => {
+                        return Err(PartialVMError::new_invariant_violation(
+                            "cannot swap aliasing container references",
+                        ));
+                    },
+                };
+                mem::swap(&mut *lref, &mut *rref);
+            }};
+        }
+
         match (self, other) {
-            (Vec(l), Vec(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (Struct(l), Struct(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (Vec(l), Vec(r)) => swap!(l, r),
+            (Struct(l), Struct(r)) => swap!(l, r),
 
-            (VecBool(l), VecBool(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecAddress(l), VecAddress(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecBool(l), VecBool(r)) => swap!(l, r),
+            (VecAddress(l), VecAddress(r)) => swap!(l, r),
 
-            (VecU8(l), VecU8(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU16(l), VecU16(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU32(l), VecU32(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU64(l), VecU64(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU128(l), VecU128(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecU256(l), VecU256(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecU8(l), VecU8(r)) => swap!(l, r),
+            (VecU16(l), VecU16(r)) => swap!(l, r),
+            (VecU32(l), VecU32(r)) => swap!(l, r),
+            (VecU64(l), VecU64(r)) => swap!(l, r),
+            (VecU128(l), VecU128(r)) => swap!(l, r),
+            (VecU256(l), VecU256(r)) => swap!(l, r),
 
-            (VecI8(l), VecI8(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI16(l), VecI16(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI32(l), VecI32(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI64(l), VecI64(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI128(l), VecI128(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
-            (VecI256(l), VecI256(r)) => mem::swap(&mut *l.borrow_mut(), &mut *r.borrow_mut()),
+            (VecI8(l), VecI8(r)) => swap!(l, r),
+            (VecI16(l), VecI16(r)) => swap!(l, r),
+            (VecI32(l), VecI32(r)) => swap!(l, r),
+            (VecI64(l), VecI64(r)) => swap!(l, r),
+            (VecI128(l), VecI128(r)) => swap!(l, r),
+            (VecI256(l), VecI256(r)) => swap!(l, r),
 
             (
                 Locals(_) | Vec(_) | Struct(_) | VecBool(_) | VecAddress(_) | VecU8(_) | VecU16(_)
@@ -2366,7 +2384,7 @@ impl ContainerRef {
                         return Err(PartialVMError::new(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                         )
-                        .with_message(format!("cannot borrow vector element {:?}", &v[idx])))
+                        .with_message(format!("cannot borrow vector element {:?}", v[idx])))
                     },
                 }
             },
@@ -2400,7 +2418,7 @@ impl ContainerRef {
                         )
                         .with_message(format!(
                             "cannot borrow struct / locals element {:?}",
-                            &v[idx]
+                            v[idx]
                         )))
                     },
                 }
@@ -2504,7 +2522,7 @@ impl Locals {
 
             Value::ContainerRef(_) | Value::Invalid | Value::IndexedRef(_) => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("cannot borrow local {:?}", &v[idx])),
+                    .with_message(format!("cannot borrow local {:?}", v[idx])),
             ),
         }
     }
@@ -4131,8 +4149,20 @@ impl VectorRef {
 
         macro_rules! move_range {
             ($from:expr, $to:expr) => {{
-                let mut from_v = $from.borrow_mut();
-                let mut to_v = $to.borrow_mut();
+                // `from` and `to` must be distinct vectors. If they alias,
+                // borrowing both mutably would panic, so return an invariant
+                // violation instead.
+                let (mut from_v, mut to_v) = match ($from.try_borrow_mut(), $to.try_borrow_mut()) {
+                    (Ok(from_v), Ok(to_v)) => (from_v, to_v),
+                    _ => {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message(
+                            "cannot move range between aliasing vector references".to_string(),
+                        ));
+                    },
+                };
 
                 if removal_position.checked_add(length).map_or(true, |end| end > from_v.len())
                         || insert_position > to_v.len() {
@@ -4771,7 +4801,7 @@ impl Display for ContainerRef {
             Self::Global {
                 status,
                 container: _,
-            } => write!(f, "(&container -- {:?})", &*status.borrow()),
+            } => write!(f, "(&container -- {:?})", *status.borrow()),
         }
     }
 }
@@ -5964,8 +5994,8 @@ impl Container {
 
 impl Closure {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
-        let Self(_, captured) = self;
-        if visitor.visit_closure(depth, captured.len())? {
+        let Self(fun, captured) = self;
+        if visitor.visit_closure(depth, fun.as_ref(), captured.len())? {
             for val in captured.iter() {
                 val.visit_impl(visitor, depth + 1)?;
             }
@@ -6681,7 +6711,12 @@ impl ValueVisitor for DepthCheckingVisitor {
         Ok(true) // continue into fields
     }
 
-    fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+    fn visit_closure(
+        &mut self,
+        depth: u64,
+        _fun: &(dyn AbstractFunction + 'static),
+        _len: usize,
+    ) -> PartialVMResult<bool> {
         self.check(depth)?;
         Ok(true) // continue into captured values
     }

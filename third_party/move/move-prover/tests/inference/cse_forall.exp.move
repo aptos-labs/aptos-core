@@ -46,7 +46,7 @@ module 0x42::cse_forall {
     }
     spec check_bag(_bag: &Bag): bool {
         pragma opaque = true;
-        ensures [inferred] (forall x in 0..len(_bag.items): is_valid(_bag.items[x])) ==> result == true;
+        ensures [inferred] (forall x in 0..len(_bag.items): is_valid(_bag.items[x])) ==> result;
         aborts_if [inferred] false;
     }
 

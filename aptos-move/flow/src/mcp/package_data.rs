@@ -2,12 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::McpArgs;
+use codespan::Span;
 use codespan_reporting::{
-    diagnostic::Severity,
+    diagnostic::{LabelStyle, Severity},
     term::{emit, termcolor::NoColor, Config},
 };
 use move_compiler_v2::Experiment;
-use move_model::model::{FunId, GlobalEnv, ModuleId, QualifiedId};
+use move_model::model::{CwdRelativeFiles, FunId, GlobalEnv, Loc, ModuleId, QualifiedId};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -211,6 +212,18 @@ impl PackageData {
         self.has_compilation_errors
     }
 
+    /// Refusal message for tools that require a compiled package. Inlines the
+    /// stored compiler diagnostics so the caller does not need a second tool
+    /// call to see them.
+    pub(crate) fn compilation_errors_report(&self) -> String {
+        let messages = self.diagnostics(DiagnosticSource::Compiler);
+        if messages.is_empty() {
+            "package has compilation errors; run move_package_status for details".to_string()
+        } else {
+            format!("package has compilation errors:\n{}", messages.join("\n"))
+        }
+    }
+
     /// Returns stored diagnostic messages for the given source.
     pub(crate) fn diagnostics(&self, source: DiagnosticSource) -> &[String] {
         self.diagnostics
@@ -240,17 +253,121 @@ fn log_diagnostics(diagnostics: &[String], source: DiagnosticSource) {
     }
 }
 
-/// Render all diagnostics at Warning level or above from a `GlobalEnv`.
-pub(crate) fn render_diagnostics(env: &GlobalEnv) -> Vec<String> {
-    let mut messages = Vec::new();
+/// One diagnostic with its rendered text and its primary source position.
+///
+/// Reporting drains the environment's diagnostics, so text and position have to
+/// be collected in the same pass.
+#[derive(Debug, Clone)]
+pub(crate) struct DiagnosticRecord {
+    pub text: String,
+    pub headline: String,
+    pub file: Option<String>,
+    pub line: Option<usize>,
+    /// One-based column of the primary label.
+    pub column: Option<usize>,
+    /// The primary label's own message.
+    ///
+    /// `headline` is the diagnostic code's wording ("unused alias"); this is
+    /// what the caret points at ("Unused 'use' of alias 'dep'"), which is
+    /// where the specifics live.
+    pub label: Option<String>,
+    /// Notes attached below the diagnostic, as the producer wrote them.
+    pub notes: Vec<String>,
+    pub is_error: bool,
+}
+
+/// Inspect every recorded diagnostic at Warning level or above.
+///
+/// This reads diagnostics whether or not they have already been printed, so it
+/// still sees the prover's own verification failures, which the prover reports
+/// to its error writer before returning. Records carry no rendered `text`:
+/// rendering is the reporting path's job and would print each diagnostic twice.
+pub(crate) fn inspect_diagnostics(env: &GlobalEnv) -> Vec<DiagnosticRecord> {
+    let mut records = Vec::new();
+    env.inspect_diags(Severity::Warning, |diag| {
+        let primary = diag
+            .labels
+            .iter()
+            .find(|label| label.style == LabelStyle::Primary)
+            .or_else(|| diag.labels.first());
+        let (file, line, column) = match primary {
+            Some(label) => {
+                let loc = Loc::new(
+                    label.file_id,
+                    Span::new(label.range.start as u32, label.range.end as u32),
+                );
+                match env.get_file_and_location(&loc) {
+                    Some((file, location)) => (
+                        Some(file),
+                        Some(location.line.to_usize() + 1),
+                        Some(location.column.to_usize() + 1),
+                    ),
+                    None => (None, None, None),
+                }
+            },
+            None => (None, None, None),
+        };
+        records.push(DiagnosticRecord {
+            text: String::new(),
+            headline: diag.message.clone(),
+            file,
+            line,
+            column,
+            label: primary.map(|label| label.message.clone()),
+            notes: diag.notes.clone(),
+            is_error: diag.severity >= Severity::Error,
+        });
+    });
+    records
+}
+
+/// Collect all diagnostics at Warning level or above from a `GlobalEnv`.
+pub(crate) fn collect_diagnostics(env: &GlobalEnv) -> Vec<DiagnosticRecord> {
+    let mut records = Vec::new();
     env.report_diag_with_filter(
         |files, diag| {
             let mut buf = NoColor::new(Vec::new());
-            emit(&mut buf, &Config::default(), files, diag).expect("emit must not fail");
+            let display_files = CwdRelativeFiles::new(files);
+            emit(&mut buf, &Config::default(), &display_files, diag).expect("emit must not fail");
             let text = String::from_utf8(buf.into_inner()).unwrap_or_default();
-            messages.push(text);
+            let primary = diag
+                .labels
+                .iter()
+                .find(|label| label.style == LabelStyle::Primary)
+                .or_else(|| diag.labels.first());
+            let (file, line, column) = match primary {
+                Some(label) => {
+                    let location = files
+                        .location(label.file_id, codespan::ByteIndex(label.range.start as u32))
+                        .ok();
+                    (
+                        Some(files.name(label.file_id).to_string_lossy().to_string()),
+                        location.map(|location| location.line.to_usize() + 1),
+                        location.map(|location| location.column.to_usize() + 1),
+                    )
+                },
+                None => (None, None, None),
+            };
+            records.push(DiagnosticRecord {
+                text,
+                headline: diag.message.clone(),
+                column,
+                label: primary.map(|label| label.message.clone()),
+                notes: diag.notes.clone(),
+                file,
+                line,
+                is_error: diag.severity >= Severity::Error,
+            });
         },
         |d| d.severity >= Severity::Warning,
     );
-    messages
+    records
+}
+
+/// Render all diagnostics at Warning level or above from a `GlobalEnv`.
+pub(crate) fn render_diagnostics(env: &GlobalEnv) -> Vec<String> {
+    collect_diagnostics(env)
+        .into_iter()
+        .map(|record| record.text)
+        .collect()
 }

@@ -1,0 +1,43 @@
+--- a/sources/etna/extracted_liquidation_price.move
++++ b/sources/etna/extracted_liquidation_price.move
+@@ -40,0 +41,40 @@ module decibel_dex::extracted_liquidation_price {
++
++    spec module {
++        /// `math64::ceil_div`, which is zero for a zero numerator and otherwise
++        /// `(x - 1) / y + 1`.
++        fun ceil_value(x: num, y: num): num {
++            if (x == 0) { 0 } else { (x - 1) / y + 1 }
++        }
++
++        fun numerator(self: LiquidationConfig, mark_price: num, is_backstop: bool): num {
++            if (is_backstop) {
++                mark_price * self.backstop_margin_maintenance_multiplier
++            } else {
++                mark_price * self.maintenance_margin_leverage_multiplier
++            }
++        }
++
++        fun denominator(self: LiquidationConfig, leverage: num, is_backstop: bool): num {
++            if (is_backstop) {
++                leverage * self.backstop_margin_maintenance_divisor
++            } else {
++                leverage * self.maintenance_margin_leverage_divisor
++            }
++        }
++    }
++
++    spec get_liquidation_price {
++        pragma opaque;
++        // Both products are formed in `u64` before the division.
++        aborts_if [inferred] numerator(self, mark_price, is_backstop) > MAX_U64;
++        aborts_if [inferred]
++            denominator(self, market_max_leverage, is_backstop) > MAX_U64;
++        // The divisor is zero whenever the leverage is -- the case the source
++        // never mentions.
++        aborts_if [inferred]
++            denominator(self, market_max_leverage, is_backstop) == 0;
++        ensures [inferred] result == ceil_value(
++            numerator(self, mark_price, is_backstop),
++            denominator(self, market_max_leverage, is_backstop)
++        );
++    }

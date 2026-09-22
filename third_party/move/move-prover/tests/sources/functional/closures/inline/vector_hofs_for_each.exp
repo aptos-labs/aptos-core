@@ -1,4 +1,52 @@
 Move prover returns: exiting with verification errors
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:147:41
+    │
+147 │             invariant forall j in 0..i: ensures_of<f>(old(v)[j], v[j]);
+    │                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+238 │         for_each_mut(v, |e| *e = *e + Limit[a].max);
+    │         -------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:147:41
+    │
+147 │             invariant forall j in 0..i: ensures_of<f>(old(v)[j], v[j]);
+    │                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+259 │         for_each_mut(v, |e| *e = *e + limit_of(a));
+    │         ------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:148:42
+    │
+148 │             invariant forall j in 0..i: !aborts_of<f>(old(v)[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+238 │         for_each_mut(v, |e| *e = *e + Limit[a].max);
+    │         -------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:148:42
+    │
+148 │             invariant forall j in 0..i: !aborts_of<f>(old(v)[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+259 │         for_each_mut(v, |e| *e = *e + limit_of(a));
+    │         ------------------------------------------
+    │         │               │
+    │         │               lambda argument
+    │         from a call inlined at this callsite
+
 error: induction case of the loop invariant does not hold
    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:26:13
    │
@@ -44,3 +92,87 @@ error: induction case of the loop invariant does not hold
    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:24: map
    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:25: map
    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:26: map
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:244:9
+    │
+244 │         ensures forall i in 0..len(v): v[i] == old(v)[i] + Limit[a].max;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:237: bump_all
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:241: bump_all (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:242: bump_all (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:237: bump_all
+    =         v = <redacted>
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:137: for_each_mut
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:242: bump_all (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:138: for_each_mut
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:139: for_each_mut
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:143: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:144: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:145: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:146: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:147: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:148: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:149: for_each_mut
+    =     enter loop, variable(s) v, i havocked and reassigned
+    =         v = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:144: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:145: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:146: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:147: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:148: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:149: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:140: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:237: bump_all
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:243: bump_all (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:244: bump_all (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:265:9
+    │
+265 │         ensures forall i in 0..len(v): v[i] == old(v)[i] + Limit[a].max;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:258: bump_all_via_call
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:262: bump_all_via_call (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:263: bump_all_via_call (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:258: bump_all_via_call
+    =         v = <redacted>
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:137: for_each_mut
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:263: bump_all_via_call (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:138: for_each_mut
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:139: for_each_mut
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:143: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:144: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:145: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:146: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:147: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:148: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:149: for_each_mut
+    =     enter loop, variable(s) v, i havocked and reassigned
+    =         v = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:144: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:145: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:146: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:147: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:148: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:149: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:140: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:258: bump_all_via_call
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:264: bump_all_via_call (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:265: bump_all_via_call (spec)

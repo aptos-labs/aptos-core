@@ -11,7 +11,7 @@
 
 use mono_move_core::{types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
@@ -52,34 +52,28 @@ fn call_indirect_triggers_lazy_module_load() {
     let main_name = guard
         .intern_identifier(ident_str!("main"))
         .into_global_arena_ptr();
-    let mut read_set = ModuleReadSet::new();
-    let mut gas_meter = GasMeter::with_max_budget();
-    let main_ptr = loader
-        .load_function(
-            &mut read_set,
-            &mut gas_meter,
-            bar_id,
-            main_name,
-            EMPTY_TYPE_LIST,
-        )
-        .expect("bar::main should resolve");
-    assert_eq!(read_set.len(), 1, "only bar loaded so far");
-
-    // SAFETY: `main_ptr` came from the executable cache, which is kept
-    // alive by `guard` for the duration of this test.
-    let main_fn = unsafe { main_ptr.as_ref_unchecked() };
     let mut interp = InterpreterContext::new(
         loader,
-        read_set,
-        gas_meter,
+        GasMeter::with_max_budget(),
         &mono_move_core::NoResourceProvider,
         &natives,
-        main_fn,
     );
-    interp.set_root_arg(0, &41u64.to_le_bytes());
-    interp.run().expect("execution should succeed");
+    let main_fn = interp
+        .load_function(bar_id, main_name, EMPTY_TYPE_LIST)
+        .expect("bar::main should resolve");
+    assert_eq!(interp.read_set().len(), 1, "only bar loaded so far");
+    mono_move_runtime::assert_verified(main_fn, &guard);
+    let mut call = interp
+        .build_call(main_fn)
+        .expect("the root frame fits on the stack");
+    call.arg(&41u64).expect("argument placement succeeds");
+    call.run().expect("execution should succeed");
 
-    assert_eq!(interp.root_result(), 42, "expected foo::add_one(41) = 42");
+    assert_eq!(
+        interp.root_result_u64_for_test(),
+        42,
+        "expected foo::add_one(41) = 42"
+    );
 
     assert_eq!(
         interp.read_set().len(),

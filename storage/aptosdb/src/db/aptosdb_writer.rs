@@ -26,6 +26,7 @@ use crate::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
@@ -37,14 +38,14 @@ use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_config::new_block_event_key,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{hot_state::HotStateValue, state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionOutput, TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::{collections::HashMap, iter::Iterator, time::Instant};
+use std::{collections::HashMap, iter::Iterator, sync::Arc, time::Instant};
 
 impl DbWriter for AptosDB {
     fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
@@ -139,6 +140,21 @@ impl DbWriter for AptosDB {
                     expected_root_hash,
                 )
             },
+        })
+    }
+
+    fn get_hot_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
+        gauged_api("get_hot_state_snapshot_receiver", || {
+            crate::hot_state_restore::get_hot_state_snapshot_receiver(
+                Arc::clone(&self.state_store.hot_state_kv_db),
+                Arc::clone(&self.state_store.hot_state_merkle_db),
+                version,
+                expected_root_hash,
+            )
         })
     }
 
@@ -242,6 +258,7 @@ impl DbWriter for AptosDB {
             // state kv and SMT should use shared way of committing.
             self.ledger_db.write_schemas(ledger_db_batch)?;
 
+            // A restored snapshot provides no readable history before its version.
             self.ledger_pruner.save_min_readable_version(version)?;
             self.state_store
                 .state_pruner
@@ -255,8 +272,24 @@ impl DbWriter for AptosDB {
                 .state_pruner
                 .state_kv_pruner
                 .save_min_readable_version(version)?;
+            self.state_store
+                .state_pruner
+                .hot_state_merkle_pruner
+                .save_min_readable_version(version)?;
+            self.state_store
+                .state_pruner
+                .hot_epoch_snapshot_pruner
+                .save_min_readable_version(version)?;
+            self.state_store
+                .state_pruner
+                .hot_state_kv_pruner
+                .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
+            info!(
+                version = version,
+                "Finalizing state snapshot restore: pruners seeded, resetting state store."
+            );
             self.state_store.reset();
 
             Ok(())

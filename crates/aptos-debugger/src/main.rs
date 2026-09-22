@@ -8,7 +8,7 @@ use aptos_push_metrics::MetricsPusher;
 use clap::Parser;
 
 #[cfg(unix)]
-aptos_jemalloc::setup_jemalloc!();
+aptos_jemalloc::setup_jemalloc_for_tools!();
 
 #[tokio::main]
 async fn main() -> Result<()> {

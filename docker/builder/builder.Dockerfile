@@ -20,7 +20,7 @@ EOF
 
 # NOTE: the version of LLVM installed here MUST match the version of LLVM rustc
 # uses internally, so we may need to upgrade this when upgrading Rust versions.
-ARG CLANG_VERSION=21
+ARG CLANG_VERSION=22
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get --no-install-recommends install -y \

@@ -15,8 +15,11 @@ module 0x42::result_of_old_label {
         value: u64,
     }
 
-    struct Reader has key, drop {
-        f: |address|u64 has copy+store+drop,
+    // The callback itself is deliberately non-storable.  It must still be
+    // registered as a struct-field function variant so invoking it is related
+    // to `result_of<r.f>` below.
+    struct Reader has drop {
+        f: |address|u64 has copy+drop,
     }
     spec Reader {
         modifies_of<f> *;

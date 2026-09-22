@@ -375,10 +375,8 @@ pub fn test_state_merkle_pruning_impl(
 
         // Check strictly that all trees in the window accessible and all those nodes not needed
         // must be gone.
-        let non_pruned_versions: HashSet<_> = snapshots
-            .into_iter()
-            .chain(epoch_snapshots.into_iter())
-            .collect();
+        let non_pruned_versions: HashSet<_> =
+            snapshots.into_iter().chain(epoch_snapshots).collect();
 
         let expected_nodes: HashSet<_> = non_pruned_versions
             .iter()

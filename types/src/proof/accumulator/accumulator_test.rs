@@ -98,7 +98,7 @@ fn test_accumulator_append() {
     let mut accumulator = InMemoryAccumulator::<TestOnlyHasher>::default();
     // Append the leaves one at a time and check the root hashes match.
     for (i, (leaf, expected_root_hash)) in
-        itertools::zip_eq(leaves.into_iter(), expected_root_hashes).enumerate()
+        itertools::zip_eq(leaves, expected_root_hashes).enumerate()
     {
         assert_eq!(accumulator.root_hash(), expected_root_hash);
         assert_eq!(accumulator.num_leaves(), i as LeafCount);

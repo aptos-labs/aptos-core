@@ -1,4 +1,5 @@
 processed 3 tasks
-task 1 lines 7-28:  publish --private-key Alice [module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check]
-task 2 lines 31-31:  run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check::closure_type_rejected
-Error: Failed to execute transaction. ExecutionStatus: MoveAbort { location: 0000000000000000000000000000000000000000000000000000000000000001::object, code: 11, info: Some(AbortInfo { reason_name: "ENOT_A_RESOURCE_TYPE", description: "Object type argument must be a resource (struct) type" }) }
+task 1 lines 6-27:  publish --private-key Alice [module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check]
+Error: VMError with status CONSTRAINT_NOT_SATISFIED at location Module ModuleId { address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6, name: Identifier("object_type_check") } and message function type has invalid abilities: only copy, drop, and store are allowed at type 0 at index 7 for signature
+task 2 lines 30-30:  run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check::closure_type_rejected
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))

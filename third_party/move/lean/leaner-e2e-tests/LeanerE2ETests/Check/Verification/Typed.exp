@@ -1,0 +1,4 @@
+«0x42».verification_typed.carry_amount.typedDenotation : Validation.ExecutableUnit →
+  «0x42».verification_typed.carry_amount.Arguments → Spec RuntimeState Failure «0x42».verification_typed.Amount
+«0x42».verification_typed.carry_amount.typedContract : Contract RuntimeState Failure
+  «0x42».verification_typed.carry_amount.Arguments «0x42».verification_typed.Amount

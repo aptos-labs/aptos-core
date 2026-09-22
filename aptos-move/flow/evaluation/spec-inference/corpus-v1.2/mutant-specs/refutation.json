@@ -1,0 +1,555 @@
+{
+  "AF-account-025": [
+    {
+      "mutant_id": "AF-account-025-increment-by-two",
+      "file": "sources/AptosFramework/account/account.move",
+      "anchor": "        *sequence_number += 1;\n    }",
+      "replace": "*sequence_number += 1;",
+      "with": "*sequence_number += 2;",
+      "obligation_category": "normal-result",
+      "rationale": "The sequence number advances by exactly one. Pins `ensures sequence_number == old + 1`."
+    },
+    {
+      "mutant_id": "AF-account-025-no-abort-at-max",
+      "file": "sources/AptosFramework/account/account.move",
+      "anchor": "        assert!(\n            (*sequence_number as u128) < MAX_U64,\n            error::out_of_range(ESEQUENCE_NUMBER_TOO_BIG)\n        );",
+      "replace": "        assert!(\n            (*sequence_number as u128) < MAX_U64,\n            error::out_of_range(ESEQUENCE_NUMBER_TOO_BIG)\n        );",
+      "with": "if ((*sequence_number as u128) >= MAX_U64) { return };",
+      "obligation_category": "abort",
+      "rationale": "At `MAX_U64` the function must abort, not return silently. Pins `aborts_if sequence_number_pre == MAX_U64`."
+    },
+    {
+      "mutant_id": "AF-account-025-skip-when-zero",
+      "file": "sources/AptosFramework/account/account.move",
+      "anchor": "        let sequence_number = &mut Account[addr].sequence_number;",
+      "replace": "let sequence_number = &mut Account[addr].sequence_number;",
+      "with": "let sequence_number = &mut Account[addr].sequence_number;\n        if (*sequence_number == 0) { return };",
+      "obligation_category": "normal-result",
+      "rationale": "A fresh account must still be advanced. Pins the unconditional increment."
+    }
+  ],
+  "AF-account-036": [
+    {
+      "mutant_id": "AF-account-036-no-account-check",
+      "file": "sources/AptosFramework/account/account.move",
+      "anchor": "        assert_account_resource_with_error(offerer_addr, ENO_SUCH_SIGNER_CAPABILITY);\n        let account_resource = &mut Account[signer::address_of(account)];",
+      "replace": "assert_account_resource_with_error(offerer_addr, ENO_SUCH_SIGNER_CAPABILITY);",
+      "with": "if (!exists<Account>(offerer_addr)) { return };",
+      "obligation_category": "abort",
+      "rationale": "A missing account must abort. Pins `aborts_if !exists<Account>(addr)`."
+    },
+    {
+      "mutant_id": "AF-account-036-skip-when-none",
+      "file": "sources/AptosFramework/account/account.move",
+      "anchor": "        account_resource.signer_capability_offer.for.extract();",
+      "replace": "account_resource.signer_capability_offer.for.extract();",
+      "with": "if (account_resource.signer_capability_offer.for.is_some()) {\n            account_resource.signer_capability_offer.for.extract();\n        };",
+      "obligation_category": "abort",
+      "rationale": "Revoking without an offer must abort. Pins `aborts_if !is_some(offer.for)`."
+    },
+    {
+      "mutant_id": "AF-account-036-read-instead-of-extract",
+      "file": "sources/AptosFramework/account/account.move",
+      "anchor": "        account_resource.signer_capability_offer.for.extract();",
+      "replace": "account_resource.signer_capability_offer.for.extract();",
+      "with": "let _ = *account_resource.signer_capability_offer.for.borrow();",
+      "obligation_category": "normal-result",
+      "rationale": "The offer must be cleared. Pins `ensures is_none(offer.for)`."
+    }
+  ],
+  "AF-aptos-governance-034": [
+    {
+      "mutant_id": "AF-aptos-governance-034-duration-off-by-one",
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "anchor": "        governance_config.voting_duration_secs = voting_duration_secs;",
+      "replace": "= voting_duration_secs;",
+      "with": "= voting_duration_secs + 1;",
+      "obligation_category": "normal-result",
+      "rationale": "The stored duration is the argument. Pins `ensures voting_duration_secs == voting_duration_secs`."
+    },
+    {
+      "mutant_id": "AF-aptos-governance-034-no-framework-check",
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "anchor": "    ) acquires GovernanceConfig {\n        system_addresses::assert_aptos_framework(aptos_framework);\n\n        let governance_config = borrow_global_mut<GovernanceConfig>(@aptos_framework);",
+      "replace": "system_addresses::assert_aptos_framework(aptos_framework);",
+      "with": "",
+      "obligation_category": "abort",
+      "rationale": "Only the framework signer may update. Pins `aborts_if addr != @aptos_framework`."
+    },
+    {
+      "mutant_id": "AF-aptos-governance-034-threshold-halved",
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "anchor": "        governance_config.min_voting_threshold = min_voting_threshold;",
+      "replace": "= min_voting_threshold;",
+      "with": "= min_voting_threshold / 2;",
+      "obligation_category": "normal-result",
+      "rationale": "The stored threshold is the argument. Pins `ensures min_voting_threshold == min_voting_threshold`."
+    }
+  ],
+  "AF-epoch-timeout-config-007": [
+    {
+      "mutant_id": "AF-epoch-timeout-config-007-zero-grace-period-allowed",
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "anchor": "        assert!(\n            grace_period_secs > 0,",
+      "replace": "grace_period_secs > 0,",
+      "with": "true,",
+      "obligation_category": "abort",
+      "rationale": "A zero grace period must abort. Pins `aborts_if grace_period_secs == 0`."
+    },
+    {
+      "mutant_id": "AF-epoch-timeout-config-007-getter-ignores-config",
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "anchor": "            borrow_global<EpochTimeoutConfig>(@aptos_framework).force_end_grace_period_secs\n        } else {",
+      "replace": "borrow_global<EpochTimeoutConfig>(@aptos_framework).force_end_grace_period_secs",
+      "with": "{ let _ = borrow_global<EpochTimeoutConfig>(@aptos_framework).force_end_grace_period_secs; std::option::none<u64>() }",
+      "obligation_category": "normal-result",
+      "rationale": "The getter reports the stored value. Pins `ensures exists ==> result == stored`."
+    },
+    {
+      "mutant_id": "AF-epoch-timeout-config-007-initialize-republishes",
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "anchor": "        if (!exists<EpochTimeoutConfig>(@aptos_framework)) {\n            move_to(framework, new_disabled())",
+      "replace": "if (!exists<EpochTimeoutConfig>(@aptos_framework)) {",
+      "with": "if (true) {",
+      "obligation_category": "abort",
+      "rationale": "A second initialize keeps the resource and does not abort. Pins the idempotence of `InitializeResource`."
+    }
+  ],
+  "AF-gas-schedule-002": [
+    {
+      "mutant_id": "AF-gas-schedule-002-never-applies",
+      "file": "sources/AptosFramework/configs/gas_schedule.move",
+      "anchor": "    public(friend) fun on_new_epoch(framework: &signer) acquires GasScheduleV2 {\n        system_addresses::assert_aptos_framework(framework);\n        if (config_buffer::does_exist<GasScheduleV2>()) {",
+      "replace": "if (config_buffer::does_exist<GasScheduleV2>()) {",
+      "with": "if (false) {",
+      "obligation_category": "normal-result",
+      "rationale": "A pending schedule must be applied. Pins `OnNewEpochApply`."
+    },
+    {
+      "mutant_id": "AF-gas-schedule-002-apply-branches-swapped",
+      "file": "sources/AptosFramework/configs/gas_schedule.move",
+      "anchor": "            let new_gas_schedule = config_buffer::extract_v2<GasScheduleV2>();\n            if (exists<GasScheduleV2>(@aptos_framework)) {",
+      "replace": "if (exists<GasScheduleV2>(@aptos_framework)) {",
+      "with": "if (!exists<GasScheduleV2>(@aptos_framework)) {",
+      "obligation_category": "abort",
+      "rationale": "Applying never aborts. Pins `OnNewEpochApply`."
+    },
+    {
+      "mutant_id": "AF-gas-schedule-002-bumps-feature-version",
+      "file": "sources/AptosFramework/configs/gas_schedule.move",
+      "anchor": "            let new_gas_schedule = config_buffer::extract_v2<GasScheduleV2>();",
+      "replace": "let new_gas_schedule = config_buffer::extract_v2<GasScheduleV2>();",
+      "with": "let new_gas_schedule = config_buffer::extract_v2<GasScheduleV2>();\n            let new_gas_schedule = GasScheduleV2 { feature_version: new_gas_schedule.feature_version + 1, entries: new_gas_schedule.entries };",
+      "obligation_category": "normal-result",
+      "rationale": "The applied schedule is the pending one, unchanged. Pins `OnNewEpochApply`."
+    }
+  ],
+  "AF-multisig-account-015": [
+    {
+      "mutant_id": "AF-multisig-account-015-ignore-owner",
+      "file": "sources/AptosFramework/multisig_account.move",
+      "anchor": "        is_owner(owner, multisig_account) &&\n            sequence_number == last_resolved_sequence_number(multisig_account) + 1 &&\n            num_approvals >= num_signatures_required(multisig_account)",
+      "replace": "is_owner(owner, multisig_account)",
+      "with": "true",
+      "obligation_category": "normal-result",
+      "rationale": "A non-owner must never be able to execute. Pins `result ==> owner in owners`."
+    },
+    {
+      "mutant_id": "AF-multisig-account-015-out-of-range-returns-false",
+      "file": "sources/AptosFramework/multisig_account.move",
+      "anchor": "    public fun can_execute(owner: address, multisig_account: address, sequence_number: u64): bool {\n        assert_valid_sequence_number(multisig_account, sequence_number);",
+      "replace": "assert_valid_sequence_number(multisig_account, sequence_number);",
+      "with": "if (sequence_number == 0\n            || sequence_number >= MultisigAccount[multisig_account].next_sequence_number) {\n            return false\n        };",
+      "obligation_category": "abort",
+      "rationale": "An out-of-range sequence number must abort rather than answer `false`. Pins `aborts_if sequence_number == 0 || sequence_number >= next_sequence_number`. Deleting the assertion alone does not: `vote` aborts on the same range and the transaction table borrow aborts on the same key, so the abort is over-determined and no contract can see the deletion. Returning early removes every abort path."
+    },
+    {
+      "mutant_id": "AF-multisig-account-015-sequence-inequality",
+      "file": "sources/AptosFramework/multisig_account.move",
+      "anchor": "        is_owner(owner, multisig_account) &&\n            sequence_number == last_resolved_sequence_number(multisig_account) + 1 &&\n            num_approvals >= num_signatures_required(multisig_account)",
+      "replace": "sequence_number == last_resolved_sequence_number(multisig_account) + 1",
+      "with": "sequence_number >= last_resolved_sequence_number(multisig_account) + 1",
+      "obligation_category": "normal-result",
+      "rationale": "Only the next transaction may execute. Pins `result ==> sequence_number == last_executed + 1`."
+    }
+  ],
+  "AF-multisig-account-067": [
+    {
+      "mutant_id": "AF-multisig-account-067-self-owner-allowed",
+      "file": "sources/AptosFramework/multisig_account.move",
+      "anchor": "            assert!(owner != &multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));",
+      "replace": "assert!(owner != &multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));",
+      "with": "",
+      "obligation_category": "abort",
+      "rationale": "The multisig account cannot own itself. Pins `aborts_if exists i: owners[i] == multisig_account`."
+    },
+    {
+      "mutant_id": "AF-multisig-account-067-duplicates-allowed",
+      "file": "sources/AptosFramework/multisig_account.move",
+      "anchor": "            assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));",
+      "replace": "assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));",
+      "with": "",
+      "obligation_category": "abort",
+      "rationale": "Duplicate owners must abort. Pins the duplicate abort condition."
+    },
+    {
+      "mutant_id": "AF-multisig-account-067-never-finds-duplicates",
+      "file": "sources/AptosFramework/multisig_account.move",
+      "anchor": "            let (found, _) = distinct_owners.index_of(owner);",
+      "replace": "let (found, _) = distinct_owners.index_of(owner);",
+      "with": "let (found, _) = (false, 0);",
+      "obligation_category": "abort",
+      "rationale": "Duplicates are detected against every earlier owner. Pins the duplicate abort condition."
+    }
+  ],
+  "AF-stake-004": [
+    {
+      "mutant_id": "AF-stake-004-leaves-one",
+      "file": "sources/AptosFramework/stake.move",
+      "anchor": "        while (!v2.is_empty()) {\n            v1.push_back(v2.pop_back());",
+      "replace": "while (!v2.is_empty()) {",
+      "with": "while (v2.length() > 1) {",
+      "obligation_category": "normal-result",
+      "rationale": "Every element moves. Pins `ensures len(v2) == 0`."
+    },
+    {
+      "mutant_id": "AF-stake-004-inserts-at-front",
+      "file": "sources/AptosFramework/stake.move",
+      "anchor": "        while (!v2.is_empty()) {\n            v1.push_back(v2.pop_back());",
+      "replace": "v1.push_back(v2.pop_back());",
+      "with": "v1.insert(0, v2.pop_back());",
+      "obligation_category": "normal-result",
+      "rationale": "The old prefix of `v1` is preserved. Pins the prefix and suffix post-conditions."
+    },
+    {
+      "mutant_id": "AF-stake-004-takes-from-front",
+      "file": "sources/AptosFramework/stake.move",
+      "anchor": "        while (!v2.is_empty()) {\n            v1.push_back(v2.pop_back());",
+      "replace": "v1.push_back(v2.pop_back());",
+      "with": "v1.push_back(v2.remove(0));",
+      "obligation_category": "normal-result",
+      "rationale": "Elements arrive in reverse order of `v2`. Pins the suffix post-condition."
+    }
+  ],
+  "AF-transaction-fee-010": [
+    {
+      "mutant_id": "AF-transaction-fee-010-fa-cap-not-stored",
+      "file": "sources/AptosFramework/transaction_fee.move",
+      "anchor": "        // coin mint cap as the fallback, so the feature flag remains a safe two-way switch.\n        let mint_ref = coin::get_paired_mint_copy_ref(&mint_cap);\n        move_to(aptos_framework, AptosFAMintCapabilities { mint_ref });",
+      "replace": "move_to(aptos_framework, AptosFAMintCapabilities { mint_ref });",
+      "with": "",
+      "obligation_category": "normal-result",
+      "rationale": "The FA mint capability must be published. Pins `ensures exists<AptosFAMintCapabilities>(addr)`."
+    },
+    {
+      "mutant_id": "AF-transaction-fee-010-no-framework-check",
+      "file": "sources/AptosFramework/transaction_fee.move",
+      "anchor": "        system_addresses::assert_aptos_framework(aptos_framework);\n        // Store the FA mint ref",
+      "replace": "system_addresses::assert_aptos_framework(aptos_framework);",
+      "with": "",
+      "obligation_category": "abort",
+      "rationale": "Only the framework signer may store. Pins `aborts_if !is_aptos_framework_address(addr)`."
+    },
+    {
+      "mutant_id": "AF-transaction-fee-010-always-aborts-after-store",
+      "file": "sources/AptosFramework/transaction_fee.move",
+      "anchor": "        // coin mint cap as the fallback, so the feature flag remains a safe two-way switch.\n        let mint_ref = coin::get_paired_mint_copy_ref(&mint_cap);\n        move_to(aptos_framework, AptosFAMintCapabilities { mint_ref });",
+      "replace": "move_to(aptos_framework, AptosFAMintCapabilities { mint_ref });",
+      "with": "move_to(aptos_framework, AptosFAMintCapabilities { mint_ref });\n        assert!(false, 0);",
+      "obligation_category": "abort",
+      "rationale": "The function succeeds when its conditions hold. Pins the completeness of the abort conditions."
+    }
+  ],
+  "AF-vesting-042": [
+    {
+      "mutant_id": "AF-vesting-042-bumps-last-vested",
+      "file": "sources/AptosFramework/vesting.move",
+      "anchor": "    public fun vesting_schedule(vesting_contract_address: address): VestingSchedule acquires VestingContract {\n        assert_vesting_contract_exists(vesting_contract_address);\n        borrow_global<VestingContract>(vesting_contract_address).vesting_schedule\n    }",
+      "replace": "borrow_global<VestingContract>(vesting_contract_address).vesting_schedule\n    }",
+      "with": "let s = borrow_global<VestingContract>(vesting_contract_address).vesting_schedule;\n        s.last_vested_period = s.last_vested_period + 1;\n        s\n    }",
+      "obligation_category": "normal-result",
+      "rationale": "The schedule is returned unchanged. Pins `ensures result == stored.vesting_schedule`."
+    },
+    {
+      "mutant_id": "AF-vesting-042-swaps-fields",
+      "file": "sources/AptosFramework/vesting.move",
+      "anchor": "    public fun vesting_schedule(vesting_contract_address: address): VestingSchedule acquires VestingContract {\n        assert_vesting_contract_exists(vesting_contract_address);\n        borrow_global<VestingContract>(vesting_contract_address).vesting_schedule\n    }",
+      "replace": "borrow_global<VestingContract>(vesting_contract_address).vesting_schedule\n    }",
+      "with": "let s = borrow_global<VestingContract>(vesting_contract_address).vesting_schedule;\n        s.period_duration = s.start_timestamp_secs;\n        s\n    }",
+      "obligation_category": "normal-result",
+      "rationale": "The schedule is returned unchanged. Pins the result post-condition."
+    },
+    {
+      "mutant_id": "AF-vesting-042-drops-fractions",
+      "file": "sources/AptosFramework/vesting.move",
+      "anchor": "    public fun vesting_schedule(vesting_contract_address: address): VestingSchedule acquires VestingContract {\n        assert_vesting_contract_exists(vesting_contract_address);\n        borrow_global<VestingContract>(vesting_contract_address).vesting_schedule\n    }",
+      "replace": "borrow_global<VestingContract>(vesting_contract_address).vesting_schedule\n    }",
+      "with": "let s = borrow_global<VestingContract>(vesting_contract_address).vesting_schedule;\n        s.schedule = vector[];\n        s\n    }",
+      "obligation_category": "normal-result",
+      "rationale": "The schedule is returned unchanged. Pins the result post-condition."
+    }
+  ],
+  "AX-bulk-order-book-009": [
+    {
+      "mutant_id": "AX-bulk-order-book-009-missing-order-returns-zero",
+      "file": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+      "anchor": "        assert!(self.orders.contains(&account), EORDER_NOT_FOUND);\n        self.orders.borrow(&account)",
+      "replace": "assert!(self.orders.contains(&account), EORDER_NOT_FOUND);",
+      "with": "if (!self.orders.contains(&account)) { return 0 };",
+      "obligation_category": "abort",
+      "rationale": "A missing order must abort. Pins `aborts_if !spec_contains_key(orders, account)`."
+    },
+    {
+      "mutant_id": "AX-bulk-order-book-009-wrong-side",
+      "file": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+      "anchor": "        self.orders.borrow(&account).get_order_request().get_total_remaining_size(is_bid)\n    }",
+      "replace": "get_total_remaining_size(is_bid)",
+      "with": "get_total_remaining_size(!is_bid)",
+      "obligation_category": "normal-result",
+      "rationale": "The requested side is summed. Pins `ensures result == spec_sum_from(sizes, 0)`."
+    },
+    {
+      "mutant_id": "AX-bulk-order-book-009-halves-result",
+      "file": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+      "anchor": "        self.orders.borrow(&account).get_order_request().get_total_remaining_size(is_bid)\n    }",
+      "replace": "get_total_remaining_size(is_bid)",
+      "with": "get_total_remaining_size(is_bid) / 2",
+      "obligation_category": "normal-result",
+      "rationale": "The result is the full remaining size. Pins the result post-condition."
+    }
+  ],
+  "AX-dead-mans-switch-operations-001": [
+    {
+      "mutant_id": "AX-dead-mans-switch-operations-001-no-enabled-check",
+      "file": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "anchor": "        assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);\n\n        // Get the bulk order from the order book",
+      "replace": "assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);",
+      "with": "",
+      "obligation_category": "abort",
+      "rationale": "A disabled switch must abort. Pins `aborts_if !enable_dead_mans_switch`."
+    },
+    {
+      "mutant_id": "AX-dead-mans-switch-operations-001-returns-when-disabled",
+      "file": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "anchor": "        assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);\n\n        // Get the bulk order from the order book",
+      "replace": "assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);",
+      "with": "if (!market.is_dead_mans_switch_enabled()) { return };",
+      "obligation_category": "abort",
+      "rationale": "A disabled switch must abort, not return. Pins `aborts_if !enable_dead_mans_switch`."
+    }
+  ],
+  "AX-native-position-types-005": [
+    {
+      "mutant_id": "AX-native-position-types-005-flips-side",
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "anchor": "        Position::PerpV1 {\n            size,\n            is_long,\n            entry_px_times_size_sum,\n            avg_acquire_entry_px,\n            user_leverage,",
+      "replace": "is_long,",
+      "with": "is_long: !is_long,",
+      "obligation_category": "normal-result",
+      "rationale": "Every field is stored as given. Pins `ensures result == PerpV1 { ... }`."
+    },
+    {
+      "mutant_id": "AX-native-position-types-005-index-off-by-one",
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "anchor": "        AccumulativeIndex { index }",
+      "replace": "AccumulativeIndex { index }",
+      "with": "AccumulativeIndex { index: index + 1 }",
+      "obligation_category": "normal-result",
+      "rationale": "The index is stored as given. Pins `ensures result == AccumulativeIndex { index }`."
+    },
+    {
+      "mutant_id": "AX-native-position-types-005-unpack-flips-side",
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "anchor": "        (\n            size,\n            is_long,\n            entry_px_times_size_sum,",
+      "replace": "            is_long,",
+      "with": "            !is_long,",
+      "obligation_category": "normal-result",
+      "rationale": "Unpacking returns the stored fields. Pins `ensures result_2 == pos.is_long`."
+    }
+  ],
+  "AX-order-book-006": [
+    {
+      "mutant_id": "AX-order-book-006-negated",
+      "file": "sources/AptosExperimental/trading/order_book/order_book.move",
+      "anchor": "    ): bool {\n        self.single_order_book.client_order_id_exists(order_creator, client_order_id)\n    }",
+      "replace": "self.single_order_book.client_order_id_exists(order_creator, client_order_id)",
+      "with": "!self.single_order_book.client_order_id_exists(order_creator, client_order_id)",
+      "obligation_category": "normal-result",
+      "rationale": "The answer is membership of the client order id. Pins `ensures result == spec_contains_key(...)`."
+    },
+    {
+      "mutant_id": "AX-order-book-006-always-false",
+      "file": "sources/AptosExperimental/trading/order_book/order_book.move",
+      "anchor": "    ): bool {\n        self.single_order_book.client_order_id_exists(order_creator, client_order_id)\n    }",
+      "replace": "self.single_order_book.client_order_id_exists(order_creator, client_order_id)",
+      "with": "false",
+      "obligation_category": "normal-result",
+      "rationale": "The answer is membership of the client order id. Pins the result post-condition."
+    },
+    {
+      "mutant_id": "AX-order-book-006-excludes-address-one",
+      "file": "sources/AptosExperimental/trading/order_book/order_book.move",
+      "anchor": "    ): bool {\n        self.single_order_book.client_order_id_exists(order_creator, client_order_id)\n    }",
+      "replace": "self.single_order_book.client_order_id_exists(order_creator, client_order_id)",
+      "with": "self.single_order_book.client_order_id_exists(order_creator, client_order_id) && order_creator != @0x1",
+      "obligation_category": "normal-result",
+      "rationale": "No creator is special. Pins the result post-condition."
+    }
+  ],
+  "AX-price-time-index-014": [
+    {
+      "mutant_id": "AX-price-time-index-014-always-aborts",
+      "file": "sources/AptosExperimental/trading/order_book/price_time_index.move",
+      "anchor": "        PriceTimeIndex::V1 {\n            buys: order_book_utils::new_default_big_ordered_map(),",
+      "replace": "PriceTimeIndex::V1 {",
+      "with": "assert!(1 == 2, 1);\n        PriceTimeIndex::V1 {",
+      "obligation_category": "abort",
+      "rationale": "Construction never aborts. Pins `aborts_if false`."
+    }
+  ],
+  "AX-trading-native-capability-010": [
+    {
+      "mutant_id": "AX-trading-native-capability-010-denied-reads-registered",
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "anchor": "        let registry = borrow_global<ExchangeRegistry>(@aptos_experimental);\n        registry.denied.contains(&exchange)",
+      "replace": "registry.denied.contains(&exchange)",
+      "with": "registry.registered.contains(&exchange)",
+      "obligation_category": "normal-result",
+      "rationale": "`is_denied` reports the deny list. Pins `ensures result == spec_contains_key(denied, exchange)`."
+    },
+    {
+      "mutant_id": "AX-trading-native-capability-010-register-does-nothing",
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "anchor": "        if (!registry.registered.contains(&exchange)) {\n            registry.registered.add(exchange, Empty {});",
+      "replace": "registry.registered.add(exchange, Empty {});",
+      "with": "",
+      "obligation_category": "normal-result",
+      "rationale": "Registering records the exchange. Pins `ensures spec_contains_key(registered, exchange)`."
+    },
+    {
+      "mutant_id": "AX-trading-native-capability-010-denied-exchanges-active",
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "anchor": "            !registry.denied.contains(&addr),",
+      "replace": "!registry.denied.contains(&addr),",
+      "with": "true,",
+      "obligation_category": "abort",
+      "rationale": "A denied exchange is not active. Pins `spec_active_aborts`."
+    }
+  ],
+  "AF-code-017": [
+    {
+      "mutant_id": "AF-code-017-weaker-upgrade-policy-allowed",
+      "file": "sources/AptosFramework/code.move",
+      "anchor": "        assert!(can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy),\n            error::invalid_argument(EUPGRADE_WEAKER_POLICY));",
+      "replace": "assert!(can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy),\n            error::invalid_argument(EUPGRADE_WEAKER_POLICY));",
+      "with": "",
+      "obligation_category": "abort",
+      "rationale": "An upgrade may not weaken the policy. Pins the `check_upgradability` abort condition."
+    },
+    {
+      "mutant_id": "AF-code-017-module-names-skip-first",
+      "file": "sources/AptosFramework/code.move",
+      "anchor": "            vector::push_back(&mut module_names, pack.modules.borrow(i).name);",
+      "replace": "vector::push_back(&mut module_names, pack.modules.borrow(i).name);",
+      "with": "if (i != 0) { vector::push_back(&mut module_names, pack.modules.borrow(i).name) };",
+      "obligation_category": "normal-result",
+      "rationale": "Every module name is listed in order. Pins the `get_module_names` post-condition."
+    },
+    {
+      "mutant_id": "AF-code-017-freeze-missing-registry-returns",
+      "file": "sources/AptosFramework/code.move",
+      "anchor": "        assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));",
+      "replace": "assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));",
+      "with": "if (!exists<PackageRegistry>(code_object_addr)) { return };",
+      "obligation_category": "abort",
+      "rationale": "Freezing a missing registry must abort. Pins `aborts_if !exists<PackageRegistry>(code_object_addr)`."
+    }
+  ],
+  "AF-aptos-coin-010": [
+    {
+      "mutant_id": "AF-aptos-coin-010-store-dropped",
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "anchor": "        move_to(aptos_framework, MintCapStore { mint_cap });\n\n        coin::destroy_freeze_cap(freeze_cap);",
+      "replace": "move_to(aptos_framework, MintCapStore { mint_cap });",
+      "with": "",
+      "obligation_category": "normal-result",
+      "rationale": "The mint capability must be stored. Pins `ensures exists<MintCapStore>(addr)`."
+    },
+    {
+      "mutant_id": "AF-aptos-coin-010-destroy-returns-when-missing",
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "anchor": "        let MintCapStore { mint_cap } = move_from<MintCapStore>(@aptos_framework);",
+      "replace": "let MintCapStore { mint_cap } = move_from<MintCapStore>(@aptos_framework);",
+      "with": "if (!exists<MintCapStore>(@aptos_framework)) { return };\n        let MintCapStore { mint_cap } = move_from<MintCapStore>(@aptos_framework);",
+      "obligation_category": "abort",
+      "rationale": "Destroying a missing store must abort. Pins `aborts_if !exists<MintCapStore>`."
+    },
+    {
+      "mutant_id": "AF-aptos-coin-010-find-wrong-match",
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "anchor": "            if (element.to == addr) {",
+      "replace": "element.to == addr",
+      "with": "element.to != addr",
+      "obligation_category": "normal-result",
+      "rationale": "The index found names a delegation to `addr`. Pins the result post-condition."
+    }
+  ],
+  "AF-coin-003": [
+    {
+      "mutant_id": "AF-coin-003-drops-coin-part",
+      "file": "sources/AptosFramework/coin.move",
+      "anchor": "        let paired_metadata = paired_metadata<CoinType>();\n        coin_balance<CoinType>(owner)\n            + if (paired_metadata.is_some()) {",
+      "replace": "coin_balance<CoinType>(owner)",
+      "with": "(coin_balance<CoinType>(owner) * 0)",
+      "obligation_category": "normal-result",
+      "rationale": "The legacy store balance is part of the answer. Pins `ensures result == coin_part + fa_part`."
+    },
+    {
+      "mutant_id": "AF-coin-003-unpaired-adds-one",
+      "file": "sources/AptosFramework/coin.move",
+      "anchor": "                    owner, paired_metadata.extract()\n                )\n            } else { 0 }\n    }",
+      "replace": "} else { 0 }",
+      "with": "} else { 1 }",
+      "obligation_category": "normal-result",
+      "rationale": "Without a paired asset only the legacy balance counts. Pins the result post-condition."
+    },
+    {
+      "mutant_id": "AF-coin-003-drops-fa-part",
+      "file": "sources/AptosFramework/coin.move",
+      "anchor": "        let paired_metadata = paired_metadata<CoinType>();\n        coin_balance<CoinType>(owner)\n            + if (paired_metadata.is_some()) {",
+      "replace": "if (paired_metadata.is_some()) {",
+      "with": "if (false) {",
+      "obligation_category": "normal-result",
+      "rationale": "The paired fungible balance is part of the answer. Pins the result post-condition."
+    }
+  ],
+  "AX-pending-order-book-index-006": [
+    {
+      "mutant_id": "AX-pending-order-book-index-006-inserts-at-front",
+      "file": "sources/AptosExperimental/trading/order_book/pending_order_book_index.move",
+      "anchor": "                orders.push_back(*order_id);\n                self.price_move_up_index.remove(&key);",
+      "replace": "orders.push_back(*order_id);",
+      "with": "orders.insert(0, *order_id);",
+      "obligation_category": "normal-result",
+      "rationale": "Orders already collected keep their positions. Pins the prefix post-condition."
+    },
+    {
+      "mutant_id": "AX-pending-order-book-index-006-exceeds-limit",
+      "file": "sources/AptosExperimental/trading/order_book/pending_order_book_index.move",
+      "anchor": "        while (!self.price_move_up_index.is_empty() && orders.length() < limit) {",
+      "replace": "orders.length() < limit",
+      "with": "orders.length() <= limit",
+      "obligation_category": "normal-result",
+      "rationale": "The limit is respected. Pins `ensures len(orders) <= old(len) || len(orders) <= limit`."
+    },
+    {
+      "mutant_id": "AX-pending-order-book-index-006-aborts-on-zero-limit",
+      "file": "sources/AptosExperimental/trading/order_book/pending_order_book_index.move",
+      "anchor": "        let taken_from = orders.length();\n        let orders_before = *orders;",
+      "replace": "let taken_from = orders.length();",
+      "with": "let taken_from = orders.length();\n        assert!(limit > 0, 1);",
+      "obligation_category": "abort",
+      "rationale": "Taking never aborts. Pins `aborts_if false`."
+    }
+  ]
+}

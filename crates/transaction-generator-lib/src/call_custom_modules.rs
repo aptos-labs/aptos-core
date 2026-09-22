@@ -310,7 +310,7 @@ impl CustomModulesDelegationGeneratorCreator {
         )
         .await;
 
-        packages.into_iter().zip(accounts.into_iter()).collect()
+        packages.into_iter().zip(accounts).collect()
     }
 
     pub async fn publish_package_to_accounts(

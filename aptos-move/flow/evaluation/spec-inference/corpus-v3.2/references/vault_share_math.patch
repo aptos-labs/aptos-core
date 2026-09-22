@@ -1,0 +1,108 @@
+--- a/sources/etna/vault_share_math.move
++++ b/sources/etna/vault_share_math.move
+@@ -67,0 +68,40 @@ module decibel_vault::vault_share_math {
++    spec module {
++        /// Mathematical value of `math64::mul_div(a, b, c)`, which forms the
++        /// full `u128` product `a * b` before dividing by `c`.
++        fun mul_div_value(a: num, b: num, c: num): num {
++            a * b / c
++        }
++
++        /// `math64::mul_div` aborts when `c` is zero or when the `u128`
++        /// quotient does not fit in the `u64` result.
++        fun mul_div_aborts(a: num, b: num, c: num): bool {
++            c == 0 || a * b / c > MAX_U64
++        }
++
++        /// The `u64` value `calculate_unrealized_fees` produces, computed in
++        /// unbounded arithmetic. The branch guard `current_nav * last_shares >
++        /// last_nav * current_shares` implies `scaled_last_nav < current_nav`,
++        /// so the subtraction never underflows and the intermediate `u128`
++        /// quotient always fits in a `u64`.
++        fun unrealized_fees_value(
++            self: Vault, current_nav: num, current_shares: num
++        ): num {
++            if (self.fee_config.fee_bps == 0
++                || contribution_config_is_closed(self.contribution_config)) {
++                0
++            } else if (self.fee_state.last_fee_distribution_shares == 0
++                || current_shares == 0) {
++                0
++            } else if (current_nav * self.fee_state.last_fee_distribution_shares
++                > self.fee_state.last_fee_distribution_nav * current_shares) {
++                let scaled_last_nav =
++                    self.fee_state.last_fee_distribution_nav * current_shares
++                        / self.fee_state.last_fee_distribution_shares;
++                (current_nav - scaled_last_nav) * self.fee_config.fee_bps
++                    / BASIS_POINTS_MULTIPLIER
++            } else {
++                0
++            }
++        }
++    }
++
+@@ -83,0 +124,8 @@ module decibel_vault::vault_share_math {
++    spec calculate_unrealized_fees {
++        pragma opaque;
++        ensures [inferred] result
++            == unrealized_fees_value(self, current_nav, current_shares);
++        aborts_if [inferred] unrealized_fees_value(self, current_nav, current_shares)
++            > MAX_U64;
++    }
++
+@@ -112,0 +161,17 @@ module decibel_vault::vault_share_math {
++    spec convert_new_assets_to_share_count {
++        pragma opaque;
++        // `ENABLE_CONTRIBUTION_FEE_REDUCTION` is `false`, so the fee-reduction
++        // branch is dead and the second component is always zero. A contract
++        // that omits the zero-shares fast path, or that lets the second
++        // component float, does not pin this function.
++        ensures [inferred] current_shares == 0
++            ==> result_1 == assets && result_2 == 0;
++        ensures [inferred] current_shares != 0
++            ==> result_1 == mul_div_value(assets, current_shares, current_nav)
++                && result_2 == 0;
++        aborts_if [inferred] current_shares != 0 && (
++            current_nav == 0
++                || mul_div_aborts(assets, current_shares, current_nav)
++        );
++    }
++
+@@ -155,0 +221,37 @@ module decibel_vault::vault_share_math {
++    spec convert_existing_shares_to_asset_amount {
++        pragma opaque;
++        aborts_if [inferred] current_shares < shares;
++        aborts_if [inferred] mul_div_aborts(shares, current_nav, current_shares);
++        ensures [inferred] result
++            == mul_div_value(shares, current_nav, current_shares);
++    }
++
++    spec calculate_redemption_funds_and_fee {
++        pragma opaque;
++        let fee = unrealized_fees_value(self, vault_nav, vault_shares);
++        let shares_for_fee =
++            if (vault_nav == 0) {
++                0
++            } else {
++                mul_div_value(shares, fee, vault_nav)
++            };
++        let shares_for_user = shares - shares_for_fee;
++        let assets_to_user =
++            if (vault_shares == 0) {
++                0
++            } else {
++                mul_div_value(shares_for_user, vault_nav, vault_shares)
++            };
++
++        ensures [inferred] vault_nav == 0 ==> result_1 == 0 && result_2 == 0;
++        ensures [inferred] vault_nav != 0
++            ==> result_1 == assets_to_user && result_2 == shares_for_fee;
++        aborts_if [inferred] vault_nav != 0 && (
++            fee > MAX_U64
++                || mul_div_aborts(shares, fee, vault_nav)
++                || shares_for_fee > shares
++                || vault_shares < shares_for_user
++                || mul_div_aborts(shares_for_user, vault_nav, vault_shares)
++        );
++    }
++

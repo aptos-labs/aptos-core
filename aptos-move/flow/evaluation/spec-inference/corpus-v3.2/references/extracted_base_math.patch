@@ -1,0 +1,44 @@
+--- a/sources/etna/extracted_base_math.move
++++ b/sources/etna/extracted_base_math.move
+@@ -22,0 +23,4 @@ module decibel_dex::extracted_base_math {
++        } spec {
++            invariant i <= len(ask_sizes);
++            invariant total == size_sum(ask_sizes, i);
++            invariant total <= size_sum(ask_sizes, len(ask_sizes));
+@@ -26,0 +31,36 @@ module decibel_dex::extracted_base_math {
++
++    spec module {
++        /// The accumulated total over the first `k` sizes.
++        fun size_sum(sizes: vector<u64>, k: num): num {
++            if (k <= 0) { 0 } else { size_sum(sizes, k - 1) + sizes[k - 1] }
++        }
++
++        /// Every summand is non-negative, so the total is non-decreasing in the
++        /// element count. Proved by induction on `y`: one unfolding plus the
++        /// hypothesis. This is what rules out a `u128` overflow of the
++        /// accumulator before the assert -- on the non-aborting path the whole
++        /// sum fits in a `u64`, so every prefix does.
++        lemma size_sum_mono(sizes: vector<u64>, x: num, y: num) {
++            requires 0 <= x;
++            requires x <= y;
++            // Beyond the vector the summand is out of range and unconstrained,
++            // so the step below only holds inside it.
++            requires y <= len(sizes);
++            ensures size_sum(sizes, x) <= size_sum(sizes, y);
++        } proof {
++            if (x < y) {
++                assert size_sum(sizes, y - 1) <= size_sum(sizes, y);
++                apply size_sum_mono(sizes, x, y - 1);
++            }
++        }
++    }
++
++    spec compute_base_needed {
++        pragma opaque;
++        aborts_if [inferred] size_sum(ask_sizes, len(ask_sizes)) > MAX_U64;
++        ensures [inferred] result == size_sum(ask_sizes, len(ask_sizes));
++    } proof {
++        // Entry-point instantiation, so the bound reaches the loop VCs rather
++        // than holding at a single point.
++        forall k: num apply size_sum_mono(ask_sizes, k, len(ask_sizes));
++    }

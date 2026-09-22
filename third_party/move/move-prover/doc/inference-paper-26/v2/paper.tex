@@ -1,0 +1,77 @@
+% Shared body of the paper: everything the two drivers have in common.
+% `main.tex` builds the arXiv preprint, `main-anon.tex` the double-blind
+% submission; they differ only in the option passed to the workshop style,
+% which sets `\if@anonymous` and so drives every `\Anon{...}{...}` below and in
+% the section files.
+%
+% Do not add a \documentclass here -- the drivers own that.
+
+\usepackage[utf8]{inputenc}
+
+\input{prelude.tex}
+
+\bibliographystyle{plainnat}
+
+% The template requires both: \title is the paper, \workshoptitle the venue
+% named in the page-1 notice of a camera-ready copy.
+\title{Hybrid Mechanical and Agentic\\ Specification Inference: A Study}
+\workshoptitle{AI for Verifiable Coding}
+
+% Under double blind the style prints ``Anonymous Author(s)'' and ignores this
+% block -- but it still typesets \thanks, so the footnote has to go too.
+\author{%
+	\Anon{Wolfgang Grieskamp\thanks{Corresponding author: \texttt{wg@aptoslabs.com}},
+	Teng Zhang, and Vineeth Kashyap \\
+	Aptos Labs, Palo Alto, USA}{Anonymous Author(s)}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+	Formal verification stalls from the cost of specification: to establish high-level facts, contracts have to be written for many supporting functions. Specification inference is one technique which can help by deriving specs from programs which can then be used to prove the primarily interesting properties. In this paper, we present a study for inference in the Move smart contract language, which has a specification language built in and strong verification support. We use an agent to run inference, and equip it with mechanical tools based on \emph{weakest precondition analysis}. Inference performance and quality is measured for three different inference tactics: pure agent inference, and two forms of hybrid inference with WP, while running against Opus~5, Sol~5.6, and Terra~5.6. As a corpus we use extracts from a real-world private product, avoiding bias from known code examples. The study shows multiple interesting results: first, pure model based spec inference works surprisingly well, tackling hard problems which require the agent to invent lemmas and helpers. Second, different models make different use of \WP: the mid-level model, Terra, benfits most by a 25\% reduction in API cost, whereas the higher end models do less. All have a lower error rate using \WP. In comparison, with help of \WP, Terra solves with the same success rate than the other models, but with much lower cost.
+\end{abstract}
+
+\input{intro}
+\input{hybrid}
+\input{evaluation}
+\input{conclusion}
+
+\bibliography{biblio}
+
+\appendix
+\Section{Per-Target Results}
+\label{sec:appendix}
+
+Tables~\ref{tab:opus}--\ref{tab:terra} give, for each target and arm, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification succeeded at the first attempt and killed every held-out mutant (\Checkmark) or failed (\XSolidBrush, subscripted with the count where more than one replicate failed); $\ast$ marks cells whose scoring is still in progress and $\circ$ a cell lost to infrastructure.
+All figures count up to the end of the first attempt; input counts include uncached, cached, and cache-creation tokens.
+
+\begin{table}[htbp]
+\centering
+\caption{Opus~5 by target. Summed over the 20 targets the arms cost \$55.56, \$71.71, and \$70.65.}
+\label{tab:opus}
+\footnotesize
+\setlength{\tabcolsep}{2.2pt}
+\input{tables/opus}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Sol~5.6 by target. Summed over the 20 targets the arms cost \$41.35, \$39.30, and \$38.68.}
+\label{tab:sol}
+\footnotesize
+\setlength{\tabcolsep}{2.2pt}
+\input{tables/sol}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Terra~5.6 by target ($^\dagger$placeholder: GLM~5.3 data until the Terra~5.6 round completes). Summed over the 20 targets the arms cost \$21.59, \$23.30, and \$22.18.}
+\label{tab:terra}
+\footnotesize
+\setlength{\tabcolsep}{2.2pt}
+\input{tables/glm}
+\end{table}
+
+\end{document}

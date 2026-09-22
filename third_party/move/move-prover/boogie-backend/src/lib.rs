@@ -77,8 +77,10 @@ mod boogie_helpers;
 pub mod boogie_wrapper;
 pub mod bytecode_translator;
 pub mod options;
+mod process_group;
 mod prover_task_runner;
 mod spec_translator;
+mod timeout_analysis;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 struct TypeInfo {
@@ -241,7 +243,7 @@ fn bv_helper() -> Vec<BvInfo> {
     bv_info.push(bv_16);
     let bv_32 = BvInfo {
         base: 32,
-        max: "2147483647".to_string(),
+        max: "4294967295".to_string(),
     };
     bv_info.push(bv_32);
     let bv_64 = BvInfo {
@@ -426,8 +428,8 @@ pub fn add_prelude(
     context.insert("tuple_instances", &tuple_instances);
     let table_key_instances = mono_info
         .table_inst
-        .iter()
-        .flat_map(|(_, ty_args)| ty_args.iter().map(|(kty, _)| kty))
+        .values()
+        .flat_map(|ty_args| ty_args.iter().map(|(kty, _)| kty))
         .unique()
         .map(|ty| TypeInfo::new(env, options, ty, false))
         .collect_vec();

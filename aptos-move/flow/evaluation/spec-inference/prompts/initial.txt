@@ -1,0 +1,3 @@
+Infer complete specifications for {target} in the package rooted at {package},
+which is your current working directory; do not use `..` as the package path.
+Continue until the result is complete, or the experiment budget is exhausted.

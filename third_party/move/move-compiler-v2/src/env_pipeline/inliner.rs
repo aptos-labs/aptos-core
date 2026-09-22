@@ -1972,8 +1972,9 @@ enum BpContext {
     /// A regular condition of the expansion: two-state conditions are
     /// anchored at the parameter's unique application site.
     Plain,
-    /// A loop invariant: `old(..)` resolves to function entry, and memory
-    /// effect operations are projected to point facts over the current state.
+    /// A loop invariant: `old(..)` resolves to function entry, while
+    /// per-application two-state or stateful behavior that cannot name every
+    /// loop iteration is weakened.
     LoopInvariant,
     /// The body of a specialized spec function: a single-state context
     /// without an application site or an `old(..)` scope; two-state
@@ -2048,6 +2049,16 @@ fn substitute_bp_by_lambda_spec(
         args.push(lambda.clone());
         args.extend(bp_args.iter().cloned());
         ExpData::Call(id, Operation::Behavior(kind, range.clone()), args).into_exp()
+    };
+    // The predicate cannot be derived here: either weaken it (marked, so the
+    // conjunct-level weakening drops it -- substituting `true` at the
+    // occurrence would strengthen it under a negation), or leave it intact.
+    let underivable = || -> Exp {
+        if report_underivable_bp(env, &loc, &lambda_loc, kind, context) {
+            weaken_or_mark_unresolved(env, env.new_bool_const(&loc, true))
+        } else {
+            intact()
+        }
     };
     let ExpData::Lambda(_, pat, lambda_body, _, spec_opt) = lambda.as_ref() else {
         env.diag(
@@ -2271,10 +2282,10 @@ fn substitute_bp_by_lambda_spec(
     let substitute = |exp: &Exp| substitute_with(exp, allow_state_old);
     let param_set: BTreeSet<Symbol> = param_syms.iter().copied().collect();
     // Resolves a substituted condition whose source (lambda spec or derived
-    // conditions) references two states: in a loop invariant, its pre-state
-    // resolves to function entry and whole-memory effect operations are
-    // projected to point facts over the current state; otherwise the
-    // condition is wrapped in the anchor of the parameter's unique
+    // conditions) references two states, or whose loop use depends on each
+    // application's state. A generic loop invariant cannot name each prior
+    // application's pre/post states, so such a condition is weakened;
+    // otherwise it is wrapped in the anchor of the parameter's unique
     // application site, or an error is reported.
     let finalize = |env: &GlobalEnv, needs_anchor: bool, cond: Exp| -> Exp {
         if !env.is_verify_mode() || !needs_anchor {
@@ -2282,22 +2293,24 @@ fn substitute_bp_by_lambda_spec(
         }
         match context {
             BpContext::LoopInvariant => {
-                let projected = project_effects_to_point_facts(env, cond);
-                if let Some(msg) = loop_invariant_residual(&projected) {
-                    env.diag_with_labels(
-                        Severity::Warning,
-                        &loc,
-                        &format!(
-                            "cannot derive `{}` exactly for this lambda \
-                             argument: {}; weakening the enclosing loop \
-                             invariant; see {}",
-                            kind, msg, INLINE_HOF_WEAKENING_ISSUE
-                        ),
-                        vec![(lambda_loc.clone(), "lambda argument".to_string())],
-                    );
-                    return intact();
-                }
-                projected
+                env.diag_with_labels(
+                    Severity::Warning,
+                    &loc,
+                    &format!(
+                        "cannot derive `{}` exactly for this lambda argument: \
+                         per-application global pre/post states are not \
+                         expressible in a loop invariant; weakening the \
+                         enclosing loop invariant; see {}",
+                        kind, INLINE_HOF_WEAKENING_ISSUE
+                    ),
+                    vec![(lambda_loc.clone(), "lambda argument".to_string())],
+                );
+                // The occurrence cannot simply become `true`: under a
+                // negation (`!aborts_of<f>(..)`) that strengthens the
+                // invariant to `false` instead of weakening it. Mark the
+                // constant so `weaken_unresolved_conjuncts` drops the
+                // enclosing conjunct, which is polarity-independent.
+                weaken_or_mark_unresolved(env, env.new_bool_const(&loc, true))
             },
             BpContext::SpecFunBody => {
                 spec_error_with_labels(
@@ -2458,8 +2471,7 @@ fn substitute_bp_by_lambda_spec(
                 }
                 pre_state_conditions(source, Operation::Or, false)
             } else {
-                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
-                intact()
+                underivable()
             }
         },
         BehaviorKind::EnsuresOf => {
@@ -2477,8 +2489,7 @@ fn substitute_bp_by_lambda_spec(
                     .into_iter()
                     .any(|(_, ty)| ty.is_reference());
             if !has_explicit_ensures && mut_param_count > 0 && has_reference_capture {
-                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
-                return intact();
+                return underivable();
             }
             let derived = derive();
             let mut source = spec_or_derived(
@@ -2501,9 +2512,17 @@ fn substitute_bp_by_lambda_spec(
                 });
             }
             if let Some(source) = source {
-                let needs_anchor = source
-                    .iter()
-                    .any(|c| condition_needs_anchor(env, c, &param_set));
+                // A default-range behavioral predicate over a stateful
+                // callee still reads the callee application's memory. In a
+                // loop invariant there can be many such applications, whose
+                // post-states cannot all be represented by the current loop
+                // state. `condition_needs_anchor` deliberately classifies
+                // only explicit two-state syntax, so include ordinary state
+                // reads here for the repeated-application context.
+                let needs_anchor = source.iter().any(|c| {
+                    condition_needs_anchor(env, c, &param_set)
+                        || (context == BpContext::LoopInvariant && reads_global_state(env, c))
+                });
                 // If the only failure is a missing dynamic anchor, preserve
                 // stateful `old(..)` material through substitution so the
                 // primary anchor diagnostic is not followed by secondary
@@ -2516,8 +2535,7 @@ fn substitute_bp_by_lambda_spec(
                 let joined = env.new_bool_join(&loc, Operation::And, conds, true);
                 finalize(env, needs_anchor, joined)
             } else {
-                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
-                intact()
+                underivable()
             }
         },
         BehaviorKind::ResultOf => {
@@ -2690,8 +2708,7 @@ fn substitute_bp_by_lambda_spec(
                     env,
                     deferred.iter().flat_map(|(_, inputs, _)| inputs),
                 ) {
-                    report_underivable_bp(env, &loc, &lambda_loc, kind, context);
-                    return intact();
+                    return underivable();
                 }
                 let mut conds: Vec<Exp> = targets
                     .iter()
@@ -2715,8 +2732,7 @@ fn substitute_bp_by_lambda_spec(
                 }
                 env.new_bool_join(&loc, Operation::And, conds, true)
             } else {
-                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
-                intact()
+                underivable()
             }
         },
         BehaviorKind::FoldsOf => {
@@ -2778,74 +2794,6 @@ fn mk_unchanged_condition(env: &GlobalEnv, loc: &Loc, target: &Exp) -> Exp {
         frame_implies,
     ])
     .into_exp()
-}
-
-/// Projects whole-memory effect operations in a substituted condition to
-/// point facts over the current state, for consumption in loop invariants:
-/// `update<R>(A, V)` and `publish<R>(A, V)` become
-/// `exists<R>(A) && global<R>(A) == V`, and `remove<R>(A)` becomes
-/// `!exists<R>(A)`. The effect operations assert "the post memory equals the
-/// pre memory with exactly this change", which is false once further
-/// iterations change other cells; the point facts carry the per-element
-/// content. Value arguments keep their `old(..)`-wrapped pre-state reads,
-/// which resolve to function entry. Only default-range operations are
-/// projected; labeled ranges reference intermediate states and are left for
-/// the residual check.
-fn project_effects_to_point_facts(env: &GlobalEnv, exp: Exp) -> Exp {
-    struct Projector<'a> {
-        env: &'a GlobalEnv,
-    }
-    impl ExpRewriterFunctions for Projector<'_> {
-        fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
-            let (is_remove, range) = match oper {
-                Operation::SpecUpdate(range) | Operation::SpecPublish(range) => (false, range),
-                Operation::SpecRemove(range) => (true, range),
-                _ => return None,
-            };
-            if !range.is_default() {
-                return None;
-            }
-            let env = self.env;
-            let loc = env.get_node_loc(id);
-            let inst = env.get_node_instantiation(id);
-            let Some(resource_ty) = inst.first().cloned() else {
-                env.diag(
-                    Severity::Bug,
-                    &loc,
-                    "missing resource instantiation on memory effect operation",
-                );
-                return None;
-            };
-            let addr = args[0].clone();
-            let mk_read = |oper: Operation, ty: Type| -> Exp {
-                let read_id = env.new_node(loc.clone(), ty);
-                env.set_node_instantiation(read_id, inst.clone());
-                ExpData::Call(read_id, oper, vec![addr.clone()]).into_exp()
-            };
-            let exists = mk_read(
-                Operation::Exists(None),
-                Type::Primitive(PrimitiveType::Bool),
-            );
-            if is_remove {
-                return Some(
-                    ExpData::Call(env.new_bool_node(&loc), Operation::Not, vec![exists]).into_exp(),
-                );
-            }
-            let global = mk_read(Operation::Global(None), resource_ty);
-            let value_eq = ExpData::Call(env.new_bool_node(&loc), Operation::Eq, vec![
-                global,
-                args[1].clone(),
-            ])
-            .into_exp();
-            Some(
-                ExpData::Call(env.new_bool_node(&loc), Operation::And, vec![
-                    exists, value_eq,
-                ])
-                .into_exp(),
-            )
-        }
-    }
-    Projector { env }.rewrite_exp(exp)
 }
 
 /// Detects two-state material remaining in a loop-invariant condition after
@@ -3306,9 +3254,9 @@ fn report_underivable_bp(
     lambda_loc: &Loc,
     kind: BehaviorKind,
     context: BpContext,
-) {
+) -> bool {
     if context == BpContext::FoldTransformer {
-        return;
+        return false;
     }
     if context == BpContext::LoopInvariant
         && matches!(kind, BehaviorKind::UnchangedOf | BehaviorKind::EnsuresOf)
@@ -3333,7 +3281,7 @@ fn report_underivable_bp(
                 "lambda argument".to_string(),
             )]);
         }
-        return;
+        return true;
     }
     let msg = format!(
         "cannot resolve `{}` for this lambda argument: \
@@ -3345,6 +3293,7 @@ fn report_underivable_bp(
         lambda_loc.clone(),
         "lambda argument".to_string(),
     )]);
+    false
 }
 
 /// Checks whether the body of a spec-less lambda contains precondition
@@ -5491,7 +5440,9 @@ fn generate_multi_capture_recursion(
         params,
         result_type: remap_ty(result_type.clone()),
         used_memory: BTreeSet::new(),
+        generic_used_memory: BTreeSet::new(),
         old_memory: BTreeSet::new(),
+        generic_old_memory: BTreeSet::new(),
         uninterpreted: false,
         is_move_fun: false,
         is_native: false,
@@ -6872,7 +6823,9 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             params,
             result_type: remap_ty(result_type.clone()),
             used_memory: BTreeSet::new(),
+            generic_used_memory: BTreeSet::new(),
             old_memory: BTreeSet::new(),
+            generic_old_memory: BTreeSet::new(),
             uninterpreted: false,
             is_move_fun: decl.is_move_fun,
             is_native: false,
@@ -6923,7 +6876,17 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             failed: false,
         };
         let new_body = body_rewriter.rewrite_exp(inst_body);
-        if body_rewriter.failed {
+        let rewriter_failed = body_rewriter.failed;
+        // A behavioral predicate weakened inside this body (or inside a
+        // specialization it calls) makes every call of this specialization
+        // unresolved too: the polarity of the occurrence is a property of the
+        // use site, so only the conjunct-level weakening there can drop it
+        // soundly. Without this, `!spec_map_ref_aborts(f, v, i)` would read
+        // the weakened `aborts_of` under a negation and turn into `false`.
+        // Checked here, before the rewrites below allocate fresh node ids
+        // which no longer carry the mark.
+        let has_weakened_behavior = new_body.any(&mut |sub| is_unresolved_behavior(self.env, sub));
+        if rewriter_failed {
             // The body contains a use of an eliminated function parameter
             // which could not be resolved (an error has been reported):
             // installing it would leave a dangling reference to a parameter
@@ -6982,6 +6945,9 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
                 loc,
                 "dangling variable reference in the body of a specialized spec function",
             );
+        }
+        if has_weakened_behavior {
+            mark_unresolved_spec_fun(self.env, new_qid);
         }
         let callees = new_body.called_spec_funs(self.env);
         let new_decl = self.env.get_spec_fun_mut(new_qid);

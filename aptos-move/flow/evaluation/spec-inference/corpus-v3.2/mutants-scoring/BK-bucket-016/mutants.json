@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 17,
+        "offset": 797,
+        "sha256": "e6b6b2b6b59276b0e08abd12c171ff9aac3b7355f4f11e9367d103491c0c4121"
+      },
+      "edit": {
+        "at": 10,
+        "kind": "substitute",
+        "length": 4,
+        "to": "1..n"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_bucket_index.move",
+      "mutant_id": "BK-bucket-016-skips-first-cutoff",
+      "obligation_category": "normal-result",
+      "rationale": "The first cutoff is never considered, so an immediately admissible leverage can be assigned to a later bucket.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 70,
+        "offset": 898,
+        "sha256": "dc30121ab5cd988ed88e8adf0d75755e59a42ffbcf434030e01b42b17ebcf750"
+      },
+      "edit": {
+        "at": 60,
+        "kind": "substitute",
+        "length": 10,
+        "to": "\n        n - 1"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_bucket_index.move",
+      "mutant_id": "BK-bucket-016-no-match-decrements",
+      "obligation_category": "abort",
+      "rationale": "The no-match case returns the preceding index and underflows when the cutoff vector is empty.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 51,
+        "offset": 827,
+        "sha256": "f1ac2b3b5e6707d60d1faf3576f21c4a3aac2a3dacbf04c42ecf71b1bad62713"
+      },
+      "edit": {
+        "at": 40,
+        "kind": "substitute",
+        "length": 8,
+        "to": "return 0"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_bucket_index.move",
+      "mutant_id": "BK-bucket-016-match-returns-zero",
+      "obligation_category": "normal-result",
+      "rationale": "Every admitting cutoff is reported as the first bucket, losing the least matching index when it is positive.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "502fcb7c882c1c2eb296d3291e10debb786d096bc3658dd629faac9dad9fe206",
+  "task_id": "BK-bucket-016"
+}

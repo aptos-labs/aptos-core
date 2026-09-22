@@ -7,5 +7,5 @@
 mod txn_output;
 mod vm_status;
 
-pub(crate) use txn_output::{discarded_output, executed_output};
+pub(crate) use txn_output::{discarded_output, empty_success_output, executed_output};
 pub(crate) use vm_status::{discard_to_vm_status, executed_vm_status};

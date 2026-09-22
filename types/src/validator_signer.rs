@@ -58,7 +58,7 @@ impl ValidatorSigner {
     /// information.
     /// This takes an optional seed, which it initializes to
     /// `test_utils::TEST_SEED` if passed `None`
-    pub fn random(opt_rng_seed: impl for<'a> Into<Option<[u8; 32]>>) -> Self {
+    pub fn random(opt_rng_seed: impl Into<Option<[u8; 32]>>) -> Self {
         let mut rng = StdRng::from_seed(opt_rng_seed.into().unwrap_or(TEST_SEED));
         Self::new(
             AccountAddress::random(),

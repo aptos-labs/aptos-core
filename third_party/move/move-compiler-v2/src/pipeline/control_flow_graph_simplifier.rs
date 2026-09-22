@@ -554,7 +554,7 @@ impl ControlFlowGraphCodeGenerator {
         // check invariant 7
         assert!(self.entry_block != self.exit_block);
         // check invariant 8
-        for (_, succs) in self.successors.iter() {
+        for succs in self.successors.values() {
             succs.iter().all_unique();
         }
         // check invariant 9

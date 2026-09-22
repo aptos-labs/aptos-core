@@ -59,10 +59,6 @@ enum TempSymbol {
     Discriminator,
     /// Tuple discriminator element binding: `_$disc_0`, `_$disc_1`, etc.
     TupleDiscriminatorElement(usize),
-    /// Primitive-position temp in a mixed tuple: `_$prim_0`, `_$prim_1`, etc.
-    PrimitiveTemp(usize),
-    /// Non-primitive-position temp in a mixed tuple: `_$np_0`, `_$np_1`, etc.
-    NonPrimitiveTemp(usize),
     /// Nested literal extraction temp: `_$nlit_0`, `_$nlit_1`, etc.
     NestedLiteralTemp(usize),
 }
@@ -74,8 +70,6 @@ impl TempSymbol {
             TempSymbol::TupleDiscriminatorElement(idx) => {
                 env.symbol_pool().make(&format!("_$disc_{}", idx))
             },
-            TempSymbol::PrimitiveTemp(seq) => env.symbol_pool().make(&format!("_$prim_{}", seq)),
-            TempSymbol::NonPrimitiveTemp(seq) => env.symbol_pool().make(&format!("_$np_{}", seq)),
             TempSymbol::NestedLiteralTemp(seq) => {
                 env.symbol_pool().make(&format!("_$nlit_{}", seq))
             },
@@ -220,27 +214,13 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
             return None;
         }
         if fully_transformable {
-            let (new_disc, bind_pat, bind_init) = bind_discriminator(self.env, discriminator);
-            let chain = generate_if_else_chain(self.env, id, &new_disc, arms, 0);
-            Some(ExpBuilder::new(self.env).block(bind_pat, Some(bind_init), chain))
+            Some(bind_discriminator(self.env, discriminator, |disc| {
+                generate_if_else_chain(self.env, id, disc, arms, 0)
+            }))
         } else if mixed_tuple {
-            // `transform_mixed_tuple_match` expects an explicit tuple constructor
-            // as the discriminator. If the discriminator is already a tuple
-            // constructor, pass it directly. Otherwise (e.g. a function call
-            // returning a tuple), use `bind_discriminator` to bind each tuple
-            // element to a temporary and rebuild a synthetic tuple expression.
-            let result = match discriminator.as_ref() {
-                ExpData::Call(_, Operation::Tuple, _) => {
-                    transform_mixed_tuple_match(self.env, id, discriminator, arms)
-                },
-                _ => {
-                    let (new_disc, bind_pat, bind_init) =
-                        bind_discriminator(self.env, discriminator);
-                    let transformed = transform_mixed_tuple_match(self.env, id, &new_disc, arms);
-                    ExpBuilder::new(self.env).block(bind_pat, Some(bind_init), transformed)
-                },
-            };
-            Some(result)
+            Some(bind_discriminator(self.env, discriminator, |disc| {
+                transform_mixed_tuple_match(self.env, id, disc, arms)
+            }))
         } else if extracted.is_some() {
             // Phase 1 changed arms but Phase 2 does not apply (the match is
             // over non-primitive types only). Emit the modified match so the
@@ -494,16 +474,16 @@ fn extract_literals_from_pattern(
 // ================================================================================================
 // Match to If-Else Transformation
 
-/// Bind the discriminator to temporary variables so it is evaluated exactly once.
+/// Evaluate the discriminator once and pass its temporary bindings to `body`.
 ///
-/// For scalar types, produces a single `_$disc` binding.
-/// For tuple types, produces `(_$disc_0, _$disc_1, ..)` bindings and returns
-/// a `Tuple(LocalVar(_$disc_0), ..)` as the new discriminator expression.
-fn bind_discriminator(env: &GlobalEnv, discriminator: &Exp) -> (Exp, Pattern, Exp) {
+/// Scalars use `_$disc`; tuples use `(_$disc_0, _$disc_1, ..)` and pass a tuple of those
+/// variables. Binding even variable discriminators prevents capture by pattern variables
+/// in generated arm expressions and saves by-value discriminators before guards run.
+fn bind_discriminator(env: &GlobalEnv, discriminator: &Exp, body: impl FnOnce(&Exp) -> Exp) -> Exp {
     let loc = env.get_node_loc(discriminator.node_id());
     let disc_ty = env.get_node_type(discriminator.node_id());
 
-    match &disc_ty {
+    let (new_disc, pattern) = match &disc_ty {
         Type::Tuple(tys) => {
             let mut patterns = Vec::new();
             let mut var_exps = Vec::new();
@@ -517,16 +497,17 @@ fn bind_discriminator(env: &GlobalEnv, discriminator: &Exp) -> (Exp, Pattern, Ex
             let pattern = Pattern::Tuple(tuple_pat_id, patterns);
             let tuple_id = env.new_node(loc, disc_ty);
             let new_disc = ExpData::Call(tuple_id, Operation::Tuple, var_exps).into_exp();
-            (new_disc, pattern, discriminator.clone())
+            (new_disc, pattern)
         },
         _ => {
             let sym = TempSymbol::Discriminator.create(env);
             let pat_id = env.new_node(loc.clone(), disc_ty.clone());
             let pattern = Pattern::Var(pat_id, sym);
             let new_disc = make_local_var(env, &loc, disc_ty, sym);
-            (new_disc, pattern, discriminator.clone())
+            (new_disc, pattern)
         },
-    }
+    };
+    ExpBuilder::new(env).block(pattern, Some(discriminator.clone()), body(&new_disc))
 }
 
 /// Recursively generate if-else chain for match arms, starting from `arm_idx`.
@@ -557,17 +538,16 @@ fn generate_if_else_chain(
 
 /// Generate the condition and body expressions for a single match arm.
 ///
-/// When a guard references pattern variables, the bindings are scoped
-/// separately around the guard and body so they don't leak into the else
-/// branch. Otherwise, the pattern condition and guard are combined directly.
+/// Pattern bindings are scoped separately around the guard and body to keep them out of
+/// the else branch. Separate bindings preserve the value seen by the body because the
+/// front end rejects guards that modify pattern variables or the matched value.
+/// Guards without pattern bindings are combined directly with the pattern condition.
 fn generate_arm_test(
     env: &GlobalEnv,
     result_id: NodeId,
     discriminator: &Exp,
     arm: &MatchArm,
 ) -> (Exp, Exp) {
-    // When a guard is present and the pattern binds variables, scope those
-    // bindings to the guard and body *separately*.
     if let Some(guard) = &arm.condition {
         if is_catch_all_pattern(&arm.pattern) || pattern_has_vars(&arm.pattern) {
             let scoped_guard = maybe_bind_pattern(env, discriminator, &arm.pattern, guard);
@@ -799,9 +779,8 @@ fn is_mixed_tuple_match(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm])
 
 /// Transform a mixed tuple match by extracting primitive conditions to guards.
 ///
-/// All tuple elements are bound to temporaries in left-to-right order to
-/// preserve evaluation order and ensure each sub-expression is evaluated
-/// exactly once.
+/// The discriminator must be the tuple of `_$disc_N` temporaries produced by
+/// `bind_discriminator`, so its elements need not be evaluated again.
 ///
 /// ## Example
 ///
@@ -816,21 +795,18 @@ fn is_mixed_tuple_match(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm])
 /// }
 /// ```
 ///
-/// The transform binds each tuple element to a temporary (preserving
-/// left-to-right evaluation), strips the primitive position from the
-/// pattern, and moves its literal check into a guard.  User-written guards
-/// are wrapped so that primitive-position variable bindings are in scope,
-/// then combined with the synthesized primitive check via `&&`:
+/// Primitive positions are removed from the pattern and their literal checks become
+/// guards. Primitive pattern variables are bound around user guards, which are combined
+/// with the generated checks using `&&`:
 ///
 /// ```move
-/// { let _$np_0 = make_data();       // non-prim temp (pos 0)
-///   let _$prim_0 = compute_x();     // prim temp     (pos 1)
-///   match (_$np_0) {
+/// { let (_$disc_0, _$disc_1) = (make_data(), compute_x());
+///   match (_$disc_0) {
 ///     //  pattern: only non-prim positions remain
 ///     //  guard:   prim literal check && user_guard
-///     Data::V1 { f } if (_$prim_0 == 5 && f > 10) => f + 1,
+///     Data::V1 { f } if (_$disc_1 == 5 && f > 10) => f + 1,
 ///     //  pattern: non-prim only; prim var `y` bound via let in body
-///     Data::V2       => { let y = _$prim_0; y },
+///     Data::V2       => { let y = _$disc_1; y },
 ///     _              => 0,
 ///   }
 /// }
@@ -880,42 +856,13 @@ fn transform_mixed_tuple_match(
         }
     }
 
-    // Create temp variables for primitive-position discriminator args
-    let prim_temps: Vec<(Symbol, Exp)> = primitive_positions
-        .iter()
-        .enumerate()
-        .map(|(seq, &pos)| {
-            let sym = TempSymbol::PrimitiveTemp(seq).create(env);
-            let arg = disc_args[pos].clone();
-            (sym, arg)
-        })
-        .collect();
+    let prim_exps = select_positions(disc_args, &primitive_positions);
 
-    // Create temp variables for non-primitive-position discriminator args
-    let np_temps: Vec<(Symbol, Exp)> = non_primitive_positions
-        .iter()
-        .enumerate()
-        .map(|(seq, &pos)| {
-            let sym = TempSymbol::NonPrimitiveTemp(seq).create(env);
-            let arg = disc_args[pos].clone();
-            (sym, arg)
-        })
-        .collect();
-
-    // Build new discriminator from non-primitive temp references
+    // Only non-primitive elements remain in the match discriminator.
     let new_disc = if non_primitive_positions.len() == 1 {
-        let (sym, _) = &np_temps[0];
-        let pos = non_primitive_positions[0];
-        make_local_var(env, &loc, elem_tys[pos].clone(), *sym)
+        disc_args[non_primitive_positions[0]].clone()
     } else {
-        let np_args: Vec<Exp> = np_temps
-            .iter()
-            .enumerate()
-            .map(|(seq, (sym, _))| {
-                let pos = non_primitive_positions[seq];
-                make_local_var(env, &loc, elem_tys[pos].clone(), *sym)
-            })
-            .collect();
+        let np_args = select_positions(disc_args, &non_primitive_positions);
         let np_tys = select_positions(&elem_tys, &non_primitive_positions);
         let tuple_id = env.new_node(loc.clone(), Type::Tuple(np_tys));
         ExpData::Call(tuple_id, Operation::Tuple, np_args).into_exp()
@@ -931,52 +878,29 @@ fn transform_mixed_tuple_match(
                 &elem_tys,
                 &primitive_positions,
                 &non_primitive_positions,
-                &prim_temps,
+                &prim_exps,
             )
         })
         .collect();
 
-    // Build the new match expression
     let match_result_ty = env.get_node_type(match_id);
-    let new_match_id = env.new_node(loc.clone(), match_result_ty.clone());
-    let match_exp = ExpData::Match(new_match_id, new_disc, new_arms).into_exp();
-
-    // Collect all bindings sorted by position to preserve left-to-right evaluation order.
-    let mut all_bindings: Vec<(usize, Symbol, Exp)> = Vec::new();
-    for (seq, &pos) in primitive_positions.iter().enumerate() {
-        all_bindings.push((pos, prim_temps[seq].0, prim_temps[seq].1.clone()));
-    }
-    for (seq, &pos) in non_primitive_positions.iter().enumerate() {
-        all_bindings.push((pos, np_temps[seq].0, np_temps[seq].1.clone()));
-    }
-    all_bindings.sort_by_key(|(pos, _, _)| *pos);
-
-    // Wrap in blocks binding all elements in left-to-right order (build inside-out)
-    let builder = ExpBuilder::new(env);
-    all_bindings
-        .iter()
-        .rev()
-        .fold(match_exp, |inner, (pos, sym, arg)| {
-            let ty = elem_tys[*pos].clone();
-            let pat_id = env.new_node(loc.clone(), ty);
-            let pattern = Pattern::Var(pat_id, *sym);
-            builder.block(pattern, Some(arg.clone()), inner)
-        })
+    let new_match_id = env.new_node(loc, match_result_ty);
+    ExpData::Match(new_match_id, new_disc, new_arms).into_exp()
 }
 
 /// Transform a single arm of a mixed tuple match.
 ///
-/// For a `Pattern::Tuple` arm, the primitive sub-patterns are removed from
-/// the pattern and converted into guard conditions:
+/// Primitive sub-patterns are removed from tuple patterns and become guard conditions
+/// or bindings. Here `p_N` denotes `prim_exps[N]`, the corresponding discriminator temporary:
 ///
-/// - `LiteralValue(v)` -- `_$prim_N == v` added to the guard conjunction.
-/// - `Var(sym)`        -- `let sym = _$prim_N` injected into the guard and body.
+/// - `LiteralValue(v)` -- `p_N == v` added to the guard conjunction.
+/// - `Var(sym)`        -- `let sym = p_N` injected into the guard and body.
 /// - `Wildcard`        -- no condition or binding.
 ///
 /// When the arm already carries a user-written guard, the final guard is:
 ///
 /// ```text
-///   prim_check_0 && prim_check_1 && ... && { let y = _$prim_K; user_guard }
+///   prim_check_0 && prim_check_1 && ... && { let y = p_K; user_guard }
 /// ```
 ///
 /// The user guard is wrapped with any primitive-position variable bindings
@@ -990,7 +914,7 @@ fn transform_mixed_arm(
     elem_tys: &[Type],
     primitive_positions: &[usize],
     non_primitive_positions: &[usize],
-    prim_temps: &[(Symbol, Exp)],
+    prim_exps: &[Exp],
 ) -> MatchArm {
     match &arm.pattern {
         Pattern::Tuple(_, pats) => {
@@ -1008,23 +932,20 @@ fn transform_mixed_arm(
 
             // Generate guard conditions from primitive positions
             let mut conditions: Vec<Exp> = Vec::new();
-            let mut var_bindings: Vec<(Symbol, usize)> = Vec::new();
+            let mut var_bindings: Vec<(Symbol, Exp)> = Vec::new();
 
             for (seq, &pos) in primitive_positions.iter().enumerate() {
                 let pat = &pats[pos];
+                let prim_exp = var_at(env, &loc, &prim_exps[seq]);
                 match pat {
                     Pattern::LiteralValue(_, val) => {
-                        let (sym, _) = &prim_temps[seq];
-                        let var_exp = make_local_var(env, &loc, elem_tys[pos].clone(), *sym);
-                        conditions.push(make_deref_eq(env, &loc, var_exp, val));
+                        conditions.push(make_deref_eq(env, &loc, prim_exp, val));
                     },
                     Pattern::Range(_, lo, hi, inclusive) => {
-                        let (sym, _) = &prim_temps[seq];
-                        let var_exp = make_local_var(env, &loc, elem_tys[pos].clone(), *sym);
-                        conditions.push(make_range_check(env, &loc, var_exp, lo, hi, *inclusive));
+                        conditions.push(make_range_check(env, &loc, prim_exp, lo, hi, *inclusive));
                     },
                     Pattern::Var(_, var_sym) => {
-                        var_bindings.push((*var_sym, seq));
+                        var_bindings.push((*var_sym, prim_exp));
                     },
                     Pattern::Wildcard(_) => {},
                     _ => {
@@ -1039,34 +960,18 @@ fn transform_mixed_arm(
 
             let prim_guard = conjoin(env, &loc, conditions);
 
-            // Wrap the user's guard with primitive-position var bindings so they
-            // are in scope: { let y = _$prim_0; guard }
-            let wrapped_user_guard = arm.condition.as_ref().map(|og| {
-                wrap_with_prim_bindings(
-                    env,
-                    &loc,
-                    elem_tys,
-                    primitive_positions,
-                    prim_temps,
-                    &var_bindings,
-                    og.clone(),
-                )
-            });
+            // Primitive pattern variables must be in scope when the user's guard runs.
+            let wrapped_user_guard = arm
+                .condition
+                .as_ref()
+                .map(|og| wrap_with_prim_bindings(env, &loc, &var_bindings, og.clone()));
 
             // Combine with existing guard: prim_guard && wrapped_user_guard
             let guard_parts: Vec<Exp> = prim_guard.into_iter().chain(wrapped_user_guard).collect();
             let new_condition = conjoin(env, &loc, guard_parts);
 
             // Wrap the body with primitive-position var bindings
-            let new_body = wrap_with_prim_bindings(
-                env,
-                &loc,
-                elem_tys,
-                primitive_positions,
-                prim_temps,
-                &var_bindings,
-                arm.body.clone(),
-            );
+            let new_body = wrap_with_prim_bindings(env, &loc, &var_bindings, arm.body.clone());
 
             MatchArm {
                 loc: arm.loc.clone(),
@@ -1106,10 +1011,19 @@ fn transform_mixed_arm(
     }
 }
 
+/// Recreates a local-variable expression at `loc` so diagnostics point to its use site.
+/// Other expressions are returned unchanged.
+fn var_at(env: &GlobalEnv, loc: &Loc, var: &Exp) -> Exp {
+    match var.as_ref() {
+        ExpData::LocalVar(id, sym) => make_local_var(env, loc, env.get_node_type(*id), *sym),
+        _ => var.clone(),
+    }
+}
+
 /// Wrap an expression with nested let-bindings for primitive-position variables.
 ///
-/// For each `(var_sym, seq)` in `var_bindings`, generates:
-/// `{ let var_sym = _$prim_seq; inner }`
+/// For each `(var_sym, prim_exp)` in `var_bindings`, generates:
+/// `{ let var_sym = prim_exp; inner }`
 ///
 /// Only introduces bindings for variables that are actually free in `inner`,
 /// to avoid unused-variable warnings. Returns `inner` unchanged when no
@@ -1117,10 +1031,7 @@ fn transform_mixed_arm(
 fn wrap_with_prim_bindings(
     env: &GlobalEnv,
     loc: &Loc,
-    elem_tys: &[Type],
-    primitive_positions: &[usize],
-    prim_temps: &[(Symbol, Exp)],
-    var_bindings: &[(Symbol, usize)],
+    var_bindings: &[(Symbol, Exp)],
     inner: Exp,
 ) -> Exp {
     let builder = ExpBuilder::new(env);
@@ -1129,12 +1040,9 @@ fn wrap_with_prim_bindings(
         .iter()
         .rev()
         .filter(|(var_sym, _)| free.contains(var_sym))
-        .fold(inner, |acc, (var_sym, seq)| {
-            let pos = primitive_positions[*seq];
-            let (prim_sym, _) = &prim_temps[*seq];
-            let var_pat_id = env.new_node(loc.clone(), elem_tys[pos].clone());
+        .fold(inner, |acc, (var_sym, prim_exp)| {
+            let var_pat_id = env.new_node(loc.clone(), env.get_node_type(prim_exp.node_id()));
             let pattern = Pattern::Var(var_pat_id, *var_sym);
-            let prim_ref = make_local_var(env, loc, elem_tys[pos].clone(), *prim_sym);
-            builder.block(pattern, Some(prim_ref), acc)
+            builder.block(pattern, Some(var_at(env, loc, prim_exp)), acc)
         })
 }

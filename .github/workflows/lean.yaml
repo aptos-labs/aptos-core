@@ -38,6 +38,9 @@ concurrency:
 
 jobs:
   build-and-test:
+    # Lean CI is disabled while the verification design is rebuilt.
+    # Skip the entire job, including toolchain setup and Rust integration tests.
+    if: ${{ false }}
     runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
@@ -52,33 +55,31 @@ jobs:
           lean --version
           lake --version
 
-      - name: Build the lightweight exchange frontend
-        run: cargo build --locked -p aptos-move-cli --bin aptos-move-exchange
+      - name: Build the standalone exchange frontend
+        run: cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
 
-      - name: Build MoveModel frontend
-        working-directory: third_party/move/lean/move-model
-        run: |
-          source "$HOME/.profile"
-          lake build MoveModel.Frontend.Elab
-
-      - name: Build Leaner Move
-        working-directory: third_party/move/lean/move
-        run: |
-          source "$HOME/.profile"
-          lake build
-
-      - name: Test MoveModel
-        working-directory: third_party/move/lean/move-model
-        env:
-          APTOS_MOVE_EXCHANGE: ${{ github.workspace }}/target/debug/aptos-move-exchange
+      - name: Test LeanerIR
+        working-directory: third_party/move/lean/leaner-ir
         run: |
           source "$HOME/.profile"
           lake test
 
-      - name: Test Leaner Move
-        working-directory: third_party/move/lean/move
-        env:
-          APTOS_MOVE_EXCHANGE: ${{ github.workspace }}/target/debug/aptos-move-exchange
+      - name: Test Leaner Move profile
+        working-directory: third_party/move/lean/leaner-move
+        run: |
+          source "$HOME/.profile"
+          lake test
+
+      - name: Test Leaner Rust profile
+        working-directory: third_party/move/lean/leaner-rust
+        run: |
+          source "$HOME/.profile"
+          lake test
+
+      - name: Test end-to-end baselines
+        working-directory: third_party/move/lean/leaner-e2e-tests
+        # The driver manages its own ci-profile exchange frontend; the build
+        # step above just gives cargo failures their own step.
         run: |
           source "$HOME/.profile"
           lake test

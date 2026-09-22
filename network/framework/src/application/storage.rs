@@ -88,7 +88,7 @@ impl PeersAndMetadata {
         // Collect all peers
         let mut all_peers = Vec::new();
         for (network_id, peers_and_metadata) in cached_peers_and_metadata.iter() {
-            for (peer_id, _) in peers_and_metadata.iter() {
+            for peer_id in peers_and_metadata.keys() {
                 let peer_network_id = PeerNetworkId::new(*network_id, *peer_id);
                 all_peers.push(peer_network_id);
             }

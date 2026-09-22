@@ -17,8 +17,8 @@ use crate::{
     invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, read_vec_len,
-        write_descriptor, write_forwarding, write_object_header, write_ptr, write_u64,
-        MemoryRegion,
+        write_descriptor, write_enum_tag, write_forwarding, write_object_header, write_ptr,
+        write_u64, MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
@@ -30,11 +30,11 @@ use mono_move_core::{
     native::{NativeABI, NativeExtensions},
     types::InternedType,
     DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
-    RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
+    ReadPin, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
     FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
-use std::ptr::NonNull;
+use std::{cell::RefCell, ptr::NonNull};
 
 // ---------------------------------------------------------------------------
 // Macros
@@ -251,7 +251,7 @@ impl Heap {
     ///
     /// The caller must ensure no live references into the heap remain (reset the interpreter's frame
     /// and root set first, via [`InterpreterContext::reset`](crate::InterpreterContext::reset)).
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.bump_ptr = self.buffer.as_ptr();
         self.gc_count = 0;
     }
@@ -269,6 +269,51 @@ impl Heap {
         std::ptr::NonNull::new(ptr)
     }
 }
+
+/// A session heap that has been frozen: no further execution can mutate it, so
+/// its allocations never move. It exposes no APIs; wrapping keeps the raw [`Heap`]
+/// methods unreachable so the only thing a holder can do is keep the heap alive,
+/// which is exactly what pinning a read against another transaction's heap needs.
+pub struct FrozenHeap(#[allow(dead_code)] Heap);
+
+impl FrozenHeap {
+    /// Freezes a session heap.
+    pub fn new(heap: Heap) -> Self {
+        Self(heap)
+    }
+}
+
+// A frozen session heap pins reads that other transactions take against it.
+impl ReadPin for FrozenHeap {}
+
+/// A [`Heap`] that can be shared and appended to through a shared reference.
+///
+/// Storage providers materialize values lazily into a long-lived arena but hand
+/// out reads pinned by an `Arc`. This newtype gives them interior-mutable,
+/// append-only allocation while the arena stays shared. It is never
+/// garbage-collected or reset, so allocated objects never move and the pointers
+/// handed out stay valid for the arena's whole life.
+pub struct SharedArena {
+    heap: RefCell<Heap>,
+}
+
+impl SharedArena {
+    /// Creates a shared arena backed by an uninitialized buffer of `size` bytes.
+    pub fn new(size: usize) -> Self {
+        Self {
+            heap: RefCell::new(Heap::new(size)),
+        }
+    }
+
+    /// Runs `f` with exclusive access to the inner heap for one allocation
+    /// episode. A pointer `f` returns outlives the borrow: the arena is
+    /// append-only, so the object it points to is never moved or freed.
+    pub fn with_heap_mut<R>(&self, f: impl FnOnce(&mut Heap) -> R) -> R {
+        f(&mut self.heap.borrow_mut())
+    }
+}
+
+impl ReadPin for SharedArena {}
 
 /// Outcome of a bump-allocation attempt.
 #[derive(Debug)]
@@ -360,6 +405,69 @@ pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
     }
 }
 
+/// Deep-copies each of `sources`, returning the new root pointers in the same
+/// order. Automatically runs GC and retries when out of memory.
+///
+/// All sources are rooted for the whole batch, so a GC triggered partway through
+/// preserves and relocates the not-yet-copied ones. Because `try_deep_copy`
+/// never GCs mid-copy, a *successful* pass builds every result without an
+/// intervening GC, so the already-built results need no root of their own — only
+/// the sources are rooted. Mirrors [`deep_copy_or_gc`]'s single
+/// GC-then-retry-once policy, batched over all sources.
+///
+/// # Safety
+///
+/// Every source must point to the data region of a live object whose header is
+/// at `source - OBJECT_HEADER_SIZE`.
+pub(crate) unsafe fn deep_copy_batch_or_gc<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    sources: &[NonNull<u8>],
+) -> VMResult<Vec<NonNull<u8>>> {
+    // SAFETY: each source is a live object (this function's contract); the
+    // handle keeps it live and relocated across any GC during the batch.
+    let guards = sources
+        .iter()
+        .map(|&src| unsafe { extra_roots.root_object(src.as_ptr()) })
+        .collect::<Vec<_>>();
+
+    // First attempt. On out-of-memory, the partial copies are unrooted garbage;
+    // drop them, GC (which relocates the rooted sources), and retry the whole
+    // batch once.
+    let mut out = Vec::with_capacity(guards.len());
+    let mut needs_gc = false;
+    for guard in &guards {
+        // SAFETY: each root holds a live object; GC keeps `guard.ptr()` valid
+        // and relocated.
+        match unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(guard.ptr())) } {
+            Ok(ptr) => out.push(ptr),
+            Err(AllocationError::RuntimeError(err)) => return Err(VMInternalError::new(err)),
+            Err(AllocationError::OutOfHeapMemory { .. }) => {
+                needs_gc = true;
+                break;
+            },
+        }
+    }
+    if !needs_gc {
+        return Ok(out);
+    }
+
+    gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
+    out.clear();
+    for guard in &guards {
+        // SAFETY: as above, after relocation.
+        let ptr = unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(guard.ptr())) }
+            .map_err(|e| VMInternalError::new(e.into_runtime_error()))?;
+        out.push(ptr);
+    }
+    Ok(out)
+}
+
 /// Deserializes `bytes` into `dst` as a value of type `ty`. If the first attempt
 /// runs out of heap, collects garbage once (with the given roots) and retries.
 /// The deserialize counterpart to [`alloc_or_gc`] / [`deep_copy_or_gc`].
@@ -386,7 +494,7 @@ pub(crate) unsafe fn deserialize_or_gc<
     top_frame: TopFrame<'_>,
 ) -> VMResult<()> {
     // SAFETY: forwarded from this function's contract.
-    match unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) } {
+    match unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) } {
         Ok(()) => Ok(()),
         Err(AllocationError::RuntimeError(err)) => Err(VMInternalError::new(err)),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
@@ -400,7 +508,7 @@ pub(crate) unsafe fn deserialize_or_gc<
                 top_frame,
             )?;
             // SAFETY: as above.
-            unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) }
+            unsafe { crate::value_conv::bcs::deserialize(layouts, heap, ty, bytes, dst) }
                 .map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
     }
@@ -567,10 +675,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     elem_size: u32,
     capacity_in_elems: u64,
 ) -> VMResult<*mut u8> {
-    let total_size = (capacity_in_elems as usize)
-        .checked_mul(elem_size as usize)
-        .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
-        .ok_or(RuntimeError::VecAllocSizeOverflow)?;
+    let total_size = vec_alloc_size(capacity_in_elems, elem_size)?;
     // `length` defaults to 0 via heap_alloc's zero-init.
     alloc_sized(
         heap,
@@ -583,6 +688,47 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         total_size,
         descriptor_id,
     )
+}
+
+/// Total allocation size of a vector object holding `capacity_in_elems`
+/// elements.
+fn vec_alloc_size(capacity_in_elems: u64, elem_size: u32) -> Result<usize, RuntimeError> {
+    (capacity_in_elems as usize)
+        .checked_mul(elem_size as usize)
+        .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
+        .ok_or(RuntimeError::VecAllocSizeOverflow)
+}
+
+/// Like [`alloc_vec`], but fails rather than triggering GC when the heap is
+/// full, and stamps `len` as the vector's length.
+pub(crate) fn alloc_vec_no_gc(
+    heap: &mut Heap,
+    descriptor_id: DescriptorId,
+    elem_size: u32,
+    len: u64,
+) -> AllocationResult<*mut u8> {
+    let vec_ptr = heap_alloc(heap, vec_alloc_size(len, elem_size)?, descriptor_id)?;
+    // SAFETY: the allocation stores the vector length at this offset.
+    unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
+    Ok(vec_ptr)
+}
+
+/// Allocates an enum object sized for its widest variant with `tag` stamped,
+/// failing rather than triggering GC when the heap is full.
+pub(crate) fn alloc_enum_no_gc(
+    heap: &mut Heap,
+    descriptor_id: DescriptorId,
+    tag: u64,
+    max_size_across_variants: usize,
+) -> AllocationResult<*mut u8> {
+    let obj_ptr = heap_alloc(
+        heap,
+        OBJECT_HEADER_SIZE + max_size_across_variants,
+        descriptor_id,
+    )?;
+    // SAFETY: the allocation has enough size to write the tag.
+    unsafe { write_enum_tag(obj_ptr, tag) };
+    Ok(obj_ptr)
 }
 
 /// Allocate a new zeroed heap object (struct or enum). Size comes from the

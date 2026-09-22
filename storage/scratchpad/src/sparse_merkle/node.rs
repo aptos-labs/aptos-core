@@ -189,13 +189,9 @@ impl SubTree {
     pub fn get_node_if_in_mem(&self, min_generation: u64) -> Option<Arc<Node>> {
         match self {
             Self::Empty => None,
-            Self::NonEmpty { root, .. } => root.get_if_in_mem().and_then(|n| {
-                if n.generation >= min_generation {
-                    Some(n)
-                } else {
-                    None
-                }
-            }),
+            Self::NonEmpty { root, .. } => root
+                .get_if_in_mem()
+                .filter(|n| n.generation >= min_generation),
         }
     }
 

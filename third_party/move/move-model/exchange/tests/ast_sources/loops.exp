@@ -1,0 +1,2046 @@
+{
+  "schema": "move-xast-module",
+  "version": 4,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "loops",
+  "doc": "",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [],
+  "functions": [
+    {
+      "name": "build",
+      "doc": "",
+      "loc": 21,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 0
+        }
+      ],
+      "result": 1,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 1,
+        "loc": 20,
+        "kind": "block",
+        "pattern": {
+          "ty": 1,
+          "loc": 1,
+          "kind": "var",
+          "name": "v"
+        },
+        "binding": {
+          "ty": 1,
+          "loc": 2,
+          "kind": "call",
+          "op": {
+            "move_function": 0
+          },
+          "inst": [
+            0
+          ],
+          "args": [],
+          "surface": null
+        },
+        "body": {
+          "ty": 1,
+          "loc": 20,
+          "kind": "block",
+          "pattern": {
+            "ty": 0,
+            "loc": 3,
+            "kind": "var",
+            "name": "i"
+          },
+          "binding": {
+            "ty": 0,
+            "loc": 4,
+            "kind": "value",
+            "value": {
+              "number": "0"
+            },
+            "constant": null
+          },
+          "body": {
+            "ty": 1,
+            "loc": 20,
+            "kind": "sequence",
+            "exps": [
+              {
+                "ty": 4,
+                "loc": 18,
+                "kind": "loop",
+                "body": {
+                  "ty": 4,
+                  "loc": 18,
+                  "kind": "if",
+                  "cond": {
+                    "ty": 2,
+                    "loc": 7,
+                    "kind": "call",
+                    "op": "lt",
+                    "inst": [
+                      0
+                    ],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 5,
+                        "kind": "local",
+                        "name": "i"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 6,
+                        "kind": "param",
+                        "index": 0
+                      }
+                    ],
+                    "surface": null
+                  },
+                  "then_branch": {
+                    "ty": 4,
+                    "loc": 17,
+                    "kind": "sequence",
+                    "exps": [
+                      {
+                        "ty": 4,
+                        "loc": 11,
+                        "kind": "call",
+                        "op": {
+                          "move_function": 1
+                        },
+                        "inst": [
+                          0
+                        ],
+                        "args": [
+                          {
+                            "ty": 3,
+                            "loc": 9,
+                            "kind": "call",
+                            "op": {
+                              "borrow": "mutable"
+                            },
+                            "inst": [],
+                            "args": [
+                              {
+                                "ty": 1,
+                                "loc": 8,
+                                "kind": "local",
+                                "name": "v"
+                              }
+                            ],
+                            "surface": null
+                          },
+                          {
+                            "ty": 0,
+                            "loc": 10,
+                            "kind": "local",
+                            "name": "i"
+                          }
+                        ],
+                        "surface": null
+                      },
+                      {
+                        "ty": 4,
+                        "loc": 16,
+                        "kind": "assign",
+                        "pattern": {
+                          "ty": 0,
+                          "loc": 12,
+                          "kind": "var",
+                          "name": "i"
+                        },
+                        "value": {
+                          "ty": 0,
+                          "loc": 15,
+                          "kind": "call",
+                          "op": "add",
+                          "inst": [
+                            0
+                          ],
+                          "args": [
+                            {
+                              "ty": 0,
+                              "loc": 13,
+                              "kind": "local",
+                              "name": "i"
+                            },
+                            {
+                              "ty": 0,
+                              "loc": 14,
+                              "kind": "value",
+                              "value": {
+                                "number": "1"
+                              },
+                              "constant": null
+                            }
+                          ],
+                          "surface": null
+                        }
+                      }
+                    ]
+                  },
+                  "else_branch": {
+                    "ty": 4,
+                    "loc": 18,
+                    "kind": "loop_cont",
+                    "nest": 0,
+                    "is_continue": false
+                  }
+                }
+              },
+              {
+                "ty": 1,
+                "loc": 19,
+                "kind": "local",
+                "name": "v"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "count_down",
+      "doc": "",
+      "loc": 40,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": 39,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "ensures",
+            "loc": 35,
+            "properties": [],
+            "exp": {
+              "ty": 2,
+              "loc": 38,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 36,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 5,
+                  "loc": 37,
+                  "kind": "value",
+                  "value": {
+                    "number": "0"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 34,
+        "kind": "block",
+        "pattern": {
+          "ty": 0,
+          "loc": 22,
+          "kind": "var",
+          "name": "n"
+        },
+        "binding": {
+          "ty": 0,
+          "loc": 23,
+          "kind": "param",
+          "index": 0
+        },
+        "body": {
+          "ty": 0,
+          "loc": 34,
+          "kind": "sequence",
+          "exps": [
+            {
+              "ty": 4,
+              "loc": 32,
+              "kind": "loop",
+              "body": {
+                "ty": 4,
+                "loc": 32,
+                "kind": "if",
+                "cond": {
+                  "ty": 2,
+                  "loc": 26,
+                  "kind": "call",
+                  "op": "gt",
+                  "inst": [
+                    0
+                  ],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 24,
+                      "kind": "local",
+                      "name": "n"
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 25,
+                      "kind": "value",
+                      "value": {
+                        "number": "0"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                },
+                "then_branch": {
+                  "ty": 4,
+                  "loc": 31,
+                  "kind": "assign",
+                  "pattern": {
+                    "ty": 0,
+                    "loc": 27,
+                    "kind": "var",
+                    "name": "n"
+                  },
+                  "value": {
+                    "ty": 0,
+                    "loc": 30,
+                    "kind": "call",
+                    "op": "sub",
+                    "inst": [
+                      0
+                    ],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 28,
+                        "kind": "local",
+                        "name": "n"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 29,
+                        "kind": "value",
+                        "value": {
+                          "number": "1"
+                        },
+                        "constant": null
+                      }
+                    ],
+                    "surface": null
+                  }
+                },
+                "else_branch": {
+                  "ty": 4,
+                  "loc": 32,
+                  "kind": "loop_cont",
+                  "nest": 0,
+                  "is_continue": false
+                }
+              }
+            },
+            {
+              "ty": 0,
+              "loc": 33,
+              "kind": "local",
+              "name": "n"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "first_even",
+      "doc": "",
+      "loc": 72,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "v",
+          "ty": 6
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 71,
+        "kind": "block",
+        "pattern": {
+          "ty": 0,
+          "loc": 41,
+          "kind": "var",
+          "name": "i"
+        },
+        "binding": {
+          "ty": 0,
+          "loc": 42,
+          "kind": "value",
+          "value": {
+            "number": "0"
+          },
+          "constant": null
+        },
+        "body": {
+          "ty": 0,
+          "loc": 71,
+          "kind": "block",
+          "pattern": {
+            "ty": 0,
+            "loc": 43,
+            "kind": "var",
+            "name": "len"
+          },
+          "binding": {
+            "ty": 0,
+            "loc": 45,
+            "kind": "call",
+            "op": {
+              "move_function": 2
+            },
+            "inst": [
+              0
+            ],
+            "args": [
+              {
+                "ty": 6,
+                "loc": 44,
+                "kind": "param",
+                "index": 0
+              }
+            ],
+            "surface": null
+          },
+          "body": {
+            "ty": 0,
+            "loc": 71,
+            "kind": "sequence",
+            "exps": [
+              {
+                "ty": 4,
+                "loc": 69,
+                "kind": "loop",
+                "body": {
+                  "ty": 4,
+                  "loc": 69,
+                  "kind": "if",
+                  "cond": {
+                    "ty": 2,
+                    "loc": 48,
+                    "kind": "call",
+                    "op": "lt",
+                    "inst": [
+                      0
+                    ],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 46,
+                        "kind": "local",
+                        "name": "i"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 47,
+                        "kind": "local",
+                        "name": "len"
+                      }
+                    ],
+                    "surface": null
+                  },
+                  "then_branch": {
+                    "ty": 4,
+                    "loc": 68,
+                    "kind": "block",
+                    "pattern": {
+                      "ty": 0,
+                      "loc": 49,
+                      "kind": "var",
+                      "name": "x"
+                    },
+                    "binding": {
+                      "ty": 0,
+                      "loc": 53,
+                      "kind": "call",
+                      "op": "deref",
+                      "inst": [],
+                      "args": [
+                        {
+                          "ty": 7,
+                          "loc": 52,
+                          "kind": "call",
+                          "op": {
+                            "move_function": 3
+                          },
+                          "inst": [
+                            0
+                          ],
+                          "args": [
+                            {
+                              "ty": 6,
+                              "loc": 50,
+                              "kind": "param",
+                              "index": 0
+                            },
+                            {
+                              "ty": 0,
+                              "loc": 51,
+                              "kind": "local",
+                              "name": "i"
+                            }
+                          ],
+                          "surface": null
+                        }
+                      ],
+                      "surface": null
+                    },
+                    "body": {
+                      "ty": 4,
+                      "loc": 68,
+                      "kind": "sequence",
+                      "exps": [
+                        {
+                          "ty": 4,
+                          "loc": 61,
+                          "kind": "if",
+                          "cond": {
+                            "ty": 2,
+                            "loc": 58,
+                            "kind": "call",
+                            "op": "eq",
+                            "inst": [
+                              0
+                            ],
+                            "args": [
+                              {
+                                "ty": 0,
+                                "loc": 56,
+                                "kind": "call",
+                                "op": "mod",
+                                "inst": [
+                                  0
+                                ],
+                                "args": [
+                                  {
+                                    "ty": 0,
+                                    "loc": 54,
+                                    "kind": "local",
+                                    "name": "x"
+                                  },
+                                  {
+                                    "ty": 0,
+                                    "loc": 55,
+                                    "kind": "value",
+                                    "value": {
+                                      "number": "2"
+                                    },
+                                    "constant": null
+                                  }
+                                ],
+                                "surface": null
+                              },
+                              {
+                                "ty": 0,
+                                "loc": 57,
+                                "kind": "value",
+                                "value": {
+                                  "number": "0"
+                                },
+                                "constant": null
+                              }
+                            ],
+                            "surface": null
+                          },
+                          "then_branch": {
+                            "ty": 4,
+                            "loc": 60,
+                            "kind": "return",
+                            "value": {
+                              "ty": 0,
+                              "loc": 59,
+                              "kind": "local",
+                              "name": "x"
+                            }
+                          },
+                          "else_branch": {
+                            "ty": 4,
+                            "loc": 61,
+                            "kind": "call",
+                            "op": "tuple",
+                            "inst": [],
+                            "args": [],
+                            "surface": null
+                          }
+                        },
+                        {
+                          "ty": 4,
+                          "loc": 66,
+                          "kind": "assign",
+                          "pattern": {
+                            "ty": 0,
+                            "loc": 62,
+                            "kind": "var",
+                            "name": "i"
+                          },
+                          "value": {
+                            "ty": 0,
+                            "loc": 65,
+                            "kind": "call",
+                            "op": "add",
+                            "inst": [
+                              0
+                            ],
+                            "args": [
+                              {
+                                "ty": 0,
+                                "loc": 63,
+                                "kind": "local",
+                                "name": "i"
+                              },
+                              {
+                                "ty": 0,
+                                "loc": 64,
+                                "kind": "value",
+                                "value": {
+                                  "number": "1"
+                                },
+                                "constant": null
+                              }
+                            ],
+                            "surface": null
+                          }
+                        },
+                        {
+                          "ty": 4,
+                          "loc": 67,
+                          "kind": "call",
+                          "op": "tuple",
+                          "inst": [],
+                          "args": [],
+                          "surface": null
+                        }
+                      ]
+                    }
+                  },
+                  "else_branch": {
+                    "ty": 4,
+                    "loc": 69,
+                    "kind": "loop_cont",
+                    "nest": 0,
+                    "is_continue": false
+                  }
+                }
+              },
+              {
+                "ty": 0,
+                "loc": 70,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "for_sum",
+      "doc": "",
+      "loc": 86,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 85,
+        "kind": "block",
+        "pattern": {
+          "ty": 0,
+          "loc": 73,
+          "kind": "var",
+          "name": "total"
+        },
+        "binding": {
+          "ty": 0,
+          "loc": 74,
+          "kind": "value",
+          "value": {
+            "number": "0"
+          },
+          "constant": null
+        },
+        "body": {
+          "ty": 0,
+          "loc": 85,
+          "kind": "sequence",
+          "exps": [
+            {
+              "ty": 4,
+              "loc": 75,
+              "kind": "block",
+              "pattern": {
+                "ty": 0,
+                "loc": 75,
+                "kind": "var",
+                "name": "$lb"
+              },
+              "binding": {
+                "ty": 0,
+                "loc": 76,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              },
+              "body": {
+                "ty": 4,
+                "loc": 75,
+                "kind": "block",
+                "pattern": {
+                  "ty": 0,
+                  "loc": 77,
+                  "kind": "var",
+                  "name": "i"
+                },
+                "binding": {
+                  "ty": 0,
+                  "loc": 75,
+                  "kind": "local",
+                  "name": "$lb"
+                },
+                "body": {
+                  "ty": 4,
+                  "loc": 75,
+                  "kind": "block",
+                  "pattern": {
+                    "ty": 0,
+                    "loc": 75,
+                    "kind": "var",
+                    "name": "$ub"
+                  },
+                  "binding": {
+                    "ty": 0,
+                    "loc": 78,
+                    "kind": "param",
+                    "index": 0
+                  },
+                  "body": {
+                    "ty": 4,
+                    "loc": 75,
+                    "kind": "loop",
+                    "body": {
+                      "ty": 4,
+                      "loc": 75,
+                      "kind": "if",
+                      "cond": {
+                        "ty": 2,
+                        "loc": 75,
+                        "kind": "call",
+                        "op": "lt",
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 0,
+                            "loc": 77,
+                            "kind": "local",
+                            "name": "i"
+                          },
+                          {
+                            "ty": 0,
+                            "loc": 75,
+                            "kind": "local",
+                            "name": "$ub"
+                          }
+                        ],
+                        "surface": null
+                      },
+                      "then_branch": {
+                        "ty": 4,
+                        "loc": 75,
+                        "kind": "sequence",
+                        "exps": [
+                          {
+                            "ty": 4,
+                            "loc": 83,
+                            "kind": "assign",
+                            "pattern": {
+                              "ty": 0,
+                              "loc": 79,
+                              "kind": "var",
+                              "name": "total"
+                            },
+                            "value": {
+                              "ty": 0,
+                              "loc": 82,
+                              "kind": "call",
+                              "op": "add",
+                              "inst": [
+                                0
+                              ],
+                              "args": [
+                                {
+                                  "ty": 0,
+                                  "loc": 80,
+                                  "kind": "local",
+                                  "name": "total"
+                                },
+                                {
+                                  "ty": 0,
+                                  "loc": 81,
+                                  "kind": "local",
+                                  "name": "i"
+                                }
+                              ],
+                              "surface": null
+                            }
+                          },
+                          {
+                            "ty": 4,
+                            "loc": 77,
+                            "kind": "assign",
+                            "pattern": {
+                              "ty": 0,
+                              "loc": 77,
+                              "kind": "var",
+                              "name": "i"
+                            },
+                            "value": {
+                              "ty": 0,
+                              "loc": 77,
+                              "kind": "call",
+                              "op": "add",
+                              "inst": [],
+                              "args": [
+                                {
+                                  "ty": 0,
+                                  "loc": 77,
+                                  "kind": "local",
+                                  "name": "i"
+                                },
+                                {
+                                  "ty": 0,
+                                  "loc": 77,
+                                  "kind": "value",
+                                  "value": {
+                                    "number": "1"
+                                  },
+                                  "constant": null
+                                }
+                              ],
+                              "surface": null
+                            }
+                          }
+                        ]
+                      },
+                      "else_branch": {
+                        "ty": 4,
+                        "loc": 75,
+                        "kind": "loop_cont",
+                        "nest": 0,
+                        "is_continue": false
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "ty": 0,
+              "loc": 84,
+              "kind": "local",
+              "name": "total"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "labeled_exit",
+      "doc": "",
+      "loc": 105,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 104,
+        "kind": "block",
+        "pattern": {
+          "ty": 0,
+          "loc": 87,
+          "kind": "var",
+          "name": "n"
+        },
+        "binding": {
+          "ty": 0,
+          "loc": 88,
+          "kind": "param",
+          "index": 0
+        },
+        "body": {
+          "ty": 0,
+          "loc": 104,
+          "kind": "sequence",
+          "exps": [
+            {
+              "ty": 4,
+              "loc": 102,
+              "kind": "loop",
+              "body": {
+                "ty": 4,
+                "loc": 101,
+                "kind": "loop",
+                "body": {
+                  "ty": 4,
+                  "loc": 100,
+                  "kind": "sequence",
+                  "exps": [
+                    {
+                      "ty": 4,
+                      "loc": 93,
+                      "kind": "if",
+                      "cond": {
+                        "ty": 2,
+                        "loc": 91,
+                        "kind": "call",
+                        "op": "lt",
+                        "inst": [
+                          0
+                        ],
+                        "args": [
+                          {
+                            "ty": 0,
+                            "loc": 89,
+                            "kind": "local",
+                            "name": "n"
+                          },
+                          {
+                            "ty": 0,
+                            "loc": 90,
+                            "kind": "value",
+                            "value": {
+                              "number": "1"
+                            },
+                            "constant": null
+                          }
+                        ],
+                        "surface": null
+                      },
+                      "then_branch": {
+                        "ty": 4,
+                        "loc": 92,
+                        "kind": "loop_cont",
+                        "nest": 1,
+                        "is_continue": false
+                      },
+                      "else_branch": {
+                        "ty": 4,
+                        "loc": 93,
+                        "kind": "call",
+                        "op": "tuple",
+                        "inst": [],
+                        "args": [],
+                        "surface": null
+                      }
+                    },
+                    {
+                      "ty": 4,
+                      "loc": 98,
+                      "kind": "assign",
+                      "pattern": {
+                        "ty": 0,
+                        "loc": 94,
+                        "kind": "var",
+                        "name": "n"
+                      },
+                      "value": {
+                        "ty": 0,
+                        "loc": 97,
+                        "kind": "call",
+                        "op": "sub",
+                        "inst": [
+                          0
+                        ],
+                        "args": [
+                          {
+                            "ty": 0,
+                            "loc": 95,
+                            "kind": "local",
+                            "name": "n"
+                          },
+                          {
+                            "ty": 0,
+                            "loc": 96,
+                            "kind": "value",
+                            "value": {
+                              "number": "1"
+                            },
+                            "constant": null
+                          }
+                        ],
+                        "surface": null
+                      }
+                    },
+                    {
+                      "ty": 4,
+                      "loc": 99,
+                      "kind": "loop_cont",
+                      "nest": 0,
+                      "is_continue": false
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "ty": 0,
+              "loc": 103,
+              "kind": "local",
+              "name": "n"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "sum_to",
+      "doc": "",
+      "loc": 128,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 127,
+        "kind": "block",
+        "pattern": {
+          "ty": 0,
+          "loc": 106,
+          "kind": "var",
+          "name": "i"
+        },
+        "binding": {
+          "ty": 0,
+          "loc": 107,
+          "kind": "value",
+          "value": {
+            "number": "0"
+          },
+          "constant": null
+        },
+        "body": {
+          "ty": 0,
+          "loc": 127,
+          "kind": "block",
+          "pattern": {
+            "ty": 0,
+            "loc": 108,
+            "kind": "var",
+            "name": "total"
+          },
+          "binding": {
+            "ty": 0,
+            "loc": 109,
+            "kind": "value",
+            "value": {
+              "number": "0"
+            },
+            "constant": null
+          },
+          "body": {
+            "ty": 0,
+            "loc": 127,
+            "kind": "sequence",
+            "exps": [
+              {
+                "ty": 4,
+                "loc": 125,
+                "kind": "loop",
+                "body": {
+                  "ty": 4,
+                  "loc": 125,
+                  "kind": "if",
+                  "cond": {
+                    "ty": 2,
+                    "loc": 112,
+                    "kind": "call",
+                    "op": "lt",
+                    "inst": [
+                      0
+                    ],
+                    "args": [
+                      {
+                        "ty": 0,
+                        "loc": 110,
+                        "kind": "local",
+                        "name": "i"
+                      },
+                      {
+                        "ty": 0,
+                        "loc": 111,
+                        "kind": "param",
+                        "index": 0
+                      }
+                    ],
+                    "surface": null
+                  },
+                  "then_branch": {
+                    "ty": 4,
+                    "loc": 124,
+                    "kind": "sequence",
+                    "exps": [
+                      {
+                        "ty": 4,
+                        "loc": 117,
+                        "kind": "assign",
+                        "pattern": {
+                          "ty": 0,
+                          "loc": 113,
+                          "kind": "var",
+                          "name": "total"
+                        },
+                        "value": {
+                          "ty": 0,
+                          "loc": 116,
+                          "kind": "call",
+                          "op": "add",
+                          "inst": [
+                            0
+                          ],
+                          "args": [
+                            {
+                              "ty": 0,
+                              "loc": 114,
+                              "kind": "local",
+                              "name": "total"
+                            },
+                            {
+                              "ty": 0,
+                              "loc": 115,
+                              "kind": "local",
+                              "name": "i"
+                            }
+                          ],
+                          "surface": null
+                        }
+                      },
+                      {
+                        "ty": 4,
+                        "loc": 122,
+                        "kind": "assign",
+                        "pattern": {
+                          "ty": 0,
+                          "loc": 118,
+                          "kind": "var",
+                          "name": "i"
+                        },
+                        "value": {
+                          "ty": 0,
+                          "loc": 121,
+                          "kind": "call",
+                          "op": "add",
+                          "inst": [
+                            0
+                          ],
+                          "args": [
+                            {
+                              "ty": 0,
+                              "loc": 119,
+                              "kind": "local",
+                              "name": "i"
+                            },
+                            {
+                              "ty": 0,
+                              "loc": 120,
+                              "kind": "value",
+                              "value": {
+                                "number": "1"
+                              },
+                              "constant": null
+                            }
+                          ],
+                          "surface": null
+                        }
+                      },
+                      {
+                        "ty": 4,
+                        "loc": 123,
+                        "kind": "call",
+                        "op": "tuple",
+                        "inst": [],
+                        "args": [],
+                        "surface": null
+                      }
+                    ]
+                  },
+                  "else_branch": {
+                    "ty": 4,
+                    "loc": 125,
+                    "kind": "loop_cont",
+                    "nest": 0,
+                    "is_continue": false
+                  }
+                }
+              },
+              {
+                "ty": 0,
+                "loc": 126,
+                "kind": "local",
+                "name": "total"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "spec_funs": [],
+  "spec_vars": [],
+  "invariants": [],
+  "skipped": [],
+  "comments": [],
+  "sources": [
+    "loops.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 0,
+      "end": 1247
+    },
+    {
+      "file": 0,
+      "start": 944,
+      "end": 945
+    },
+    {
+      "file": 0,
+      "start": 948,
+      "end": 968
+    },
+    {
+      "file": 0,
+      "start": 982,
+      "end": 983
+    },
+    {
+      "file": 0,
+      "start": 986,
+      "end": 987
+    },
+    {
+      "file": 0,
+      "start": 1004,
+      "end": 1005
+    },
+    {
+      "file": 0,
+      "start": 1008,
+      "end": 1009
+    },
+    {
+      "file": 0,
+      "start": 1004,
+      "end": 1009
+    },
+    {
+      "file": 0,
+      "start": 1048,
+      "end": 1049
+    },
+    {
+      "file": 0,
+      "start": 1043,
+      "end": 1049
+    },
+    {
+      "file": 0,
+      "start": 1051,
+      "end": 1052
+    },
+    {
+      "file": 0,
+      "start": 1025,
+      "end": 1053
+    },
+    {
+      "file": 0,
+      "start": 1067,
+      "end": 1068
+    },
+    {
+      "file": 0,
+      "start": 1071,
+      "end": 1072
+    },
+    {
+      "file": 0,
+      "start": 1075,
+      "end": 1076
+    },
+    {
+      "file": 0,
+      "start": 1071,
+      "end": 1076
+    },
+    {
+      "file": 0,
+      "start": 1067,
+      "end": 1076
+    },
+    {
+      "file": 0,
+      "start": 1011,
+      "end": 1086
+    },
+    {
+      "file": 0,
+      "start": 997,
+      "end": 1086
+    },
+    {
+      "file": 0,
+      "start": 1096,
+      "end": 1097
+    },
+    {
+      "file": 0,
+      "start": 930,
+      "end": 1103
+    },
+    {
+      "file": 0,
+      "start": 899,
+      "end": 1103
+    },
+    {
+      "file": 0,
+      "start": 89,
+      "end": 90
+    },
+    {
+      "file": 0,
+      "start": 93,
+      "end": 94
+    },
+    {
+      "file": 0,
+      "start": 111,
+      "end": 112
+    },
+    {
+      "file": 0,
+      "start": 115,
+      "end": 116
+    },
+    {
+      "file": 0,
+      "start": 111,
+      "end": 116
+    },
+    {
+      "file": 0,
+      "start": 132,
+      "end": 133
+    },
+    {
+      "file": 0,
+      "start": 136,
+      "end": 137
+    },
+    {
+      "file": 0,
+      "start": 140,
+      "end": 141
+    },
+    {
+      "file": 0,
+      "start": 136,
+      "end": 141
+    },
+    {
+      "file": 0,
+      "start": 132,
+      "end": 141
+    },
+    {
+      "file": 0,
+      "start": 104,
+      "end": 151
+    },
+    {
+      "file": 0,
+      "start": 161,
+      "end": 162
+    },
+    {
+      "file": 0,
+      "start": 75,
+      "end": 168
+    },
+    {
+      "file": 0,
+      "start": 199,
+      "end": 219
+    },
+    {
+      "file": 0,
+      "start": 207,
+      "end": 213
+    },
+    {
+      "file": 0,
+      "start": 217,
+      "end": 218
+    },
+    {
+      "file": 0,
+      "start": 207,
+      "end": 218
+    },
+    {
+      "file": 0,
+      "start": 173,
+      "end": 225
+    },
+    {
+      "file": 0,
+      "start": 47,
+      "end": 168
+    },
+    {
+      "file": 0,
+      "start": 693,
+      "end": 694
+    },
+    {
+      "file": 0,
+      "start": 697,
+      "end": 698
+    },
+    {
+      "file": 0,
+      "start": 712,
+      "end": 715
+    },
+    {
+      "file": 0,
+      "start": 733,
+      "end": 734
+    },
+    {
+      "file": 0,
+      "start": 718,
+      "end": 735
+    },
+    {
+      "file": 0,
+      "start": 752,
+      "end": 753
+    },
+    {
+      "file": 0,
+      "start": 756,
+      "end": 759
+    },
+    {
+      "file": 0,
+      "start": 752,
+      "end": 759
+    },
+    {
+      "file": 0,
+      "start": 779,
+      "end": 780
+    },
+    {
+      "file": 0,
+      "start": 799,
+      "end": 800
+    },
+    {
+      "file": 0,
+      "start": 802,
+      "end": 803
+    },
+    {
+      "file": 0,
+      "start": 784,
+      "end": 804
+    },
+    {
+      "file": 0,
+      "start": 783,
+      "end": 804
+    },
+    {
+      "file": 0,
+      "start": 822,
+      "end": 823
+    },
+    {
+      "file": 0,
+      "start": 826,
+      "end": 827
+    },
+    {
+      "file": 0,
+      "start": 822,
+      "end": 827
+    },
+    {
+      "file": 0,
+      "start": 831,
+      "end": 832
+    },
+    {
+      "file": 0,
+      "start": 822,
+      "end": 832
+    },
+    {
+      "file": 0,
+      "start": 841,
+      "end": 842
+    },
+    {
+      "file": 0,
+      "start": 834,
+      "end": 842
+    },
+    {
+      "file": 0,
+      "start": 818,
+      "end": 842
+    },
+    {
+      "file": 0,
+      "start": 856,
+      "end": 857
+    },
+    {
+      "file": 0,
+      "start": 860,
+      "end": 861
+    },
+    {
+      "file": 0,
+      "start": 864,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 860,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 856,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 865,
+      "end": 866
+    },
+    {
+      "file": 0,
+      "start": 761,
+      "end": 876
+    },
+    {
+      "file": 0,
+      "start": 745,
+      "end": 876
+    },
+    {
+      "file": 0,
+      "start": 886,
+      "end": 887
+    },
+    {
+      "file": 0,
+      "start": 679,
+      "end": 893
+    },
+    {
+      "file": 0,
+      "start": 642,
+      "end": 893
+    },
+    {
+      "file": 0,
+      "start": 1148,
+      "end": 1153
+    },
+    {
+      "file": 0,
+      "start": 1156,
+      "end": 1157
+    },
+    {
+      "file": 0,
+      "start": 1167,
+      "end": 1224
+    },
+    {
+      "file": 0,
+      "start": 1177,
+      "end": 1178
+    },
+    {
+      "file": 0,
+      "start": 1172,
+      "end": 1173
+    },
+    {
+      "file": 0,
+      "start": 1180,
+      "end": 1181
+    },
+    {
+      "file": 0,
+      "start": 1197,
+      "end": 1202
+    },
+    {
+      "file": 0,
+      "start": 1205,
+      "end": 1210
+    },
+    {
+      "file": 0,
+      "start": 1213,
+      "end": 1214
+    },
+    {
+      "file": 0,
+      "start": 1205,
+      "end": 1214
+    },
+    {
+      "file": 0,
+      "start": 1197,
+      "end": 1214
+    },
+    {
+      "file": 0,
+      "start": 1234,
+      "end": 1239
+    },
+    {
+      "file": 0,
+      "start": 1134,
+      "end": 1245
+    },
+    {
+      "file": 0,
+      "start": 1109,
+      "end": 1245
+    },
+    {
+      "file": 0,
+      "start": 457,
+      "end": 458
+    },
+    {
+      "file": 0,
+      "start": 461,
+      "end": 462
+    },
+    {
+      "file": 0,
+      "start": 526,
+      "end": 527
+    },
+    {
+      "file": 0,
+      "start": 530,
+      "end": 531
+    },
+    {
+      "file": 0,
+      "start": 526,
+      "end": 531
+    },
+    {
+      "file": 0,
+      "start": 533,
+      "end": 545
+    },
+    {
+      "file": 0,
+      "start": 522,
+      "end": 545
+    },
+    {
+      "file": 0,
+      "start": 563,
+      "end": 564
+    },
+    {
+      "file": 0,
+      "start": 567,
+      "end": 568
+    },
+    {
+      "file": 0,
+      "start": 571,
+      "end": 572
+    },
+    {
+      "file": 0,
+      "start": 567,
+      "end": 572
+    },
+    {
+      "file": 0,
+      "start": 563,
+      "end": 572
+    },
+    {
+      "file": 0,
+      "start": 590,
+      "end": 595
+    },
+    {
+      "file": 0,
+      "start": 504,
+      "end": 609
+    },
+    {
+      "file": 0,
+      "start": 499,
+      "end": 609
+    },
+    {
+      "file": 0,
+      "start": 472,
+      "end": 619
+    },
+    {
+      "file": 0,
+      "start": 629,
+      "end": 630
+    },
+    {
+      "file": 0,
+      "start": 443,
+      "end": 636
+    },
+    {
+      "file": 0,
+      "start": 413,
+      "end": 636
+    },
+    {
+      "file": 0,
+      "start": 269,
+      "end": 270
+    },
+    {
+      "file": 0,
+      "start": 273,
+      "end": 274
+    },
+    {
+      "file": 0,
+      "start": 288,
+      "end": 293
+    },
+    {
+      "file": 0,
+      "start": 296,
+      "end": 297
+    },
+    {
+      "file": 0,
+      "start": 314,
+      "end": 315
+    },
+    {
+      "file": 0,
+      "start": 318,
+      "end": 319
+    },
+    {
+      "file": 0,
+      "start": 314,
+      "end": 319
+    },
+    {
+      "file": 0,
+      "start": 335,
+      "end": 340
+    },
+    {
+      "file": 0,
+      "start": 343,
+      "end": 348
+    },
+    {
+      "file": 0,
+      "start": 351,
+      "end": 352
+    },
+    {
+      "file": 0,
+      "start": 343,
+      "end": 352
+    },
+    {
+      "file": 0,
+      "start": 335,
+      "end": 352
+    },
+    {
+      "file": 0,
+      "start": 366,
+      "end": 367
+    },
+    {
+      "file": 0,
+      "start": 370,
+      "end": 371
+    },
+    {
+      "file": 0,
+      "start": 374,
+      "end": 375
+    },
+    {
+      "file": 0,
+      "start": 370,
+      "end": 375
+    },
+    {
+      "file": 0,
+      "start": 366,
+      "end": 375
+    },
+    {
+      "file": 0,
+      "start": 375,
+      "end": 376
+    },
+    {
+      "file": 0,
+      "start": 321,
+      "end": 386
+    },
+    {
+      "file": 0,
+      "start": 307,
+      "end": 386
+    },
+    {
+      "file": 0,
+      "start": 396,
+      "end": 401
+    },
+    {
+      "file": 0,
+      "start": 255,
+      "end": 407
+    },
+    {
+      "file": 0,
+      "start": 231,
+      "end": 407
+    }
+  ],
+  "types": [
+    "u64",
+    {
+      "vector": 0
+    },
+    "bool",
+    {
+      "reference": {
+        "mutable": true,
+        "ty": 1
+      }
+    },
+    {
+      "tuple": []
+    },
+    "u256",
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 1
+      }
+    },
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 0
+      }
+    }
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "loops"
+    },
+    {
+      "address": "0x1",
+      "address_alias": "std",
+      "name": "vector"
+    }
+  ],
+  "names": [
+    {
+      "module": 1,
+      "name": "empty"
+    },
+    {
+      "module": 1,
+      "name": "push_back"
+    },
+    {
+      "module": 1,
+      "name": "length"
+    },
+    {
+      "module": 1,
+      "name": "borrow"
+    }
+  ]
+}
