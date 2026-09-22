@@ -412,16 +412,20 @@ separate from replay verify, for example:
 
 Inputs mirror replay verify:
 
+- `PREVIOUS_WEEK`
 - `IMAGE_TAG`
 - `START_VERSION` and `END_VERSION`
 - `START_TIME` and `END_TIME`
 - `DRY_RUN`
 
-Version and time inputs remain mutually exclusive. UTC times are resolved to
-versions before tasks are created, and the resolved range is included in the
-manifest. Scheduled runs analyze the previous completed UTC week. Using fixed
-week boundaries makes successive reports comparable and prevents scheduler
-delays from shifting the intended observation window.
+Version and time inputs remain mutually exclusive. `PREVIOUS_WEEK` cannot be
+combined with an explicit range. UTC times are resolved to versions before
+tasks are created, and the resolved range is included in the manifest. Aptos's
+PIES scheduler dispatches the workflow with `PREVIOUS_WEEK=true` every Monday
+at 06:17 UTC, after allowing archive snapshots and images to settle. Scheduled
+runs analyze the previous completed UTC week. Using fixed week boundaries makes
+successive reports comparable and prevents scheduler delays from shifting the
+intended observation window.
 
 The replay scheduler is extended with a framework-usage worker mode while
 retaining the same archive snapshot provisioning and cleanup behavior. In CI,
