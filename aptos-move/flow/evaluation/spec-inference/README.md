@@ -47,10 +47,11 @@ python3 -m harness.publication build \
 python3 -m harness.publication scan results/ROUND.tar.gz
 ```
 
-The helper accepts the documented top-level aggregate files, creates and checks
-`SHA256SUMS`, and validates member names, types, sizes, contents, and archive
-structure. Construct result archives through this helper so they remain
-deterministic and conform to the publication format.
+The helper accepts only the documented top-level aggregate files, creates and
+checks `SHA256SUMS`, and validates member names, types, sizes, and archive
+structure. Workspace diffs and other raw per-run artifacts are not part of the
+format. Construct result archives through this helper so they remain
+deterministic and compact.
 
 ## Environment
 
