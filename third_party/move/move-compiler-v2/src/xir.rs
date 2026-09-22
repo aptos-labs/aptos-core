@@ -448,6 +448,59 @@ impl StructScope<'_> {
     }
 }
 
+/// The XIR width a model type carries, if it is an integer.
+/// The width an operation annotates on its value operand.
+///
+/// `Cast` is absent on purpose: its width names the destination, not an
+/// operand, so it is checked where it is translated.
+fn annotated_width(oper: &Oper) -> Option<IntType> {
+    match oper {
+        Oper::Add(width)
+        | Oper::Sub(width)
+        | Oper::Mul(width)
+        | Oper::Div(width)
+        | Oper::Mod(width)
+        | Oper::BitAnd(width)
+        | Oper::BitOr(width)
+        | Oper::BitXor(width)
+        | Oper::Shl(width)
+        | Oper::Shr(width)
+        | Oper::Negate(width) => Some(*width),
+        _ => None,
+    }
+}
+
+/// The XIR width a model type carries, if it is an integer.
+fn int_type_of(ty: &Type) -> Option<IntType> {
+    match ty {
+        Type::Primitive(PrimitiveType::U8) => Some(IntType::U8),
+        Type::Primitive(PrimitiveType::U16) => Some(IntType::U16),
+        Type::Primitive(PrimitiveType::U32) => Some(IntType::U32),
+        Type::Primitive(PrimitiveType::U64) => Some(IntType::U64),
+        Type::Primitive(PrimitiveType::U128) => Some(IntType::U128),
+        Type::Primitive(PrimitiveType::U256) => Some(IntType::U256),
+        Type::Primitive(PrimitiveType::I8) => Some(IntType::I8),
+        Type::Primitive(PrimitiveType::I16) => Some(IntType::I16),
+        Type::Primitive(PrimitiveType::I32) => Some(IntType::I32),
+        Type::Primitive(PrimitiveType::I64) => Some(IntType::I64),
+        Type::Primitive(PrimitiveType::I128) => Some(IntType::I128),
+        Type::Primitive(PrimitiveType::I256) => Some(IntType::I256),
+        _ => None,
+    }
+}
+
+/// The `std::cmp` predicate that reads an `Ordering`, for the operations
+/// `cmp_rewriter` lowers that way. `None` for everything else.
+fn cmp_predicate(oper: &Oper) -> Option<&'static str> {
+    match oper {
+        Oper::Lt => Some("is_lt"),
+        Oper::Le => Some("is_le"),
+        Oper::Gt => Some("is_gt"),
+        Oper::Ge => Some("is_ge"),
+        _ => None,
+    }
+}
+
 fn model_attribute(env: &mut GlobalEnv, loc: &Loc, attribute: &XirAttribute) -> Result<Attribute> {
     model_attribute_apply(env, loc, &attribute.name, &attribute.args)
 }
@@ -571,11 +624,17 @@ fn import_source(
                 }
             }
         }
+        let struct_attributes = decl
+            .attributes
+            .iter()
+            .map(|attribute| model_attribute(env, &loc, attribute))
+            .collect::<Result<Vec<_>>>()?;
         structs.push(ModelXirStructData {
             name: struct_id.symbol(),
             loc: loc.clone(),
             abilities: ability_set(decl)?,
             type_parameters: model_type_parameters(env, &loc, &decl.type_parameters)?,
+            attributes: struct_attributes,
             fields,
             variants,
             visibility: MoveVisibility::Private,
@@ -772,9 +831,15 @@ fn model_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
         Ty::U64 => Type::Primitive(PrimitiveType::U64),
         Ty::U128 => Type::Primitive(PrimitiveType::U128),
         Ty::U256 => Type::Primitive(PrimitiveType::U256),
-        Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128 | Ty::I256 => {
-            bail!("signed integer types are not representable in the move-model type system")
-        },
+        // Language version 2.3 added signed integers, and the model has
+        // carried `PrimitiveType::I8` and friends since. The refusal here
+        // predates that.
+        Ty::I8 => Type::Primitive(PrimitiveType::I8),
+        Ty::I16 => Type::Primitive(PrimitiveType::I16),
+        Ty::I32 => Type::Primitive(PrimitiveType::I32),
+        Ty::I64 => Type::Primitive(PrimitiveType::I64),
+        Ty::I128 => Type::Primitive(PrimitiveType::I128),
+        Ty::I256 => Type::Primitive(PrimitiveType::I256),
         Ty::Address => Type::Primitive(PrimitiveType::Address),
         Ty::Signer => Type::Primitive(PrimitiveType::Signer),
         Ty::TypeParameter(index) => {
@@ -870,27 +935,52 @@ fn called_functions(
     functions: &[FunId],
 ) -> Result<BTreeSet<QualifiedId<FunId>>> {
     let mut called = BTreeSet::new();
-    let mut uses_generic_comparison = false;
+    let mut predicates: BTreeSet<&'static str> = BTreeSet::new();
     for block in &decl.blocks {
         for instr in &block.instrs {
             if let Instr::Call(_, Oper::Function(id) | Oper::FunctionInst(id, _), _) = instr {
                 called.insert(function_at(env, xir, module_id, functions, *id)?);
             }
-            if let Instr::Call(_, Oper::Lt, srcs) = instr {
-                let source_type = srcs
-                    .first()
-                    .and_then(|id| decl.locals.get(*id))
-                    .with_context(|| format!("malformed comparison in `{}`", decl.name))?;
-                uses_generic_comparison |= !matches!(source_type, Ty::U64);
+            // Every ordering `cmp_rewriter` lowers, not just `lt`: each one
+            // calls `compare` and its own predicate, and a caller's declared
+            // callees must list them.
+            if let Instr::Call(_, oper, srcs) = instr {
+                if let Some(predicate) = cmp_predicate(oper) {
+                    let source_type = srcs
+                        .first()
+                        .and_then(|id| decl.locals.get(*id))
+                        .with_context(|| format!("malformed comparison in `{}`", decl.name))?;
+                    // The same test `translate_call` makes: the generic path is
+                    // taken only when the operand is not a number. Keying on
+                    // `U64` alone demanded the `cmp` module for `u8` and every
+                    // signed width, whose comparisons lower to a plain `Lt`.
+                    if !matches!(
+                        source_type,
+                        Ty::U8
+                            | Ty::U16
+                            | Ty::U32
+                            | Ty::U64
+                            | Ty::U128
+                            | Ty::U256
+                            | Ty::I8
+                            | Ty::I16
+                            | Ty::I32
+                            | Ty::I64
+                            | Ty::I128
+                            | Ty::I256
+                    ) {
+                        predicates.insert(predicate);
+                    }
+                }
             }
         }
     }
-    if uses_generic_comparison {
+    if !predicates.is_empty() {
         let module = env
             .get_modules()
             .find(|module| module.is_cmp())
             .context("generic comparison requires the standard `cmp` module")?;
-        for name in ["compare", "is_lt"] {
+        for name in std::iter::once("compare").chain(predicates) {
             let function = module
                 .find_function(env.symbol_pool().make(name))
                 .with_context(|| format!("the standard `cmp` module has no `{name}` function"))?;
@@ -943,7 +1033,25 @@ fn translate_function(
         next_attr: 0,
         next_label: decl.blocks.len(),
     };
-    translator.emit(|attr| Bytecode::Jump(attr, Label::new(decl.entry)))?;
+    // Blocks are emitted in index order, so an entry of `0` is already where
+    // control arrives and needs no jump — and therefore no label either.
+    let mut targeted = BTreeSet::new();
+    if decl.entry != 0 {
+        translator.emit(|attr| Bytecode::Jump(attr, Label::new(decl.entry)))?;
+        targeted.insert(decl.entry);
+    }
+    for block in &decl.blocks {
+        match &block.term {
+            Term::Jump(target) => {
+                targeted.insert(*target);
+            },
+            Term::Branch(_, then_block, else_block) => {
+                targeted.insert(*then_block);
+                targeted.insert(*else_block);
+            },
+            Term::Ret(_) | Term::Abort(_) => {},
+        }
+    }
     for (block_id, block) in decl.blocks.iter().enumerate() {
         let block_source_map = decl
             .source_map
@@ -953,7 +1061,9 @@ fn translate_function(
             .and_then(|source_map| source_map.instrs.iter().flatten().next().copied())
             .or_else(|| block_source_map.and_then(|source_map| source_map.term));
         translator.set_source_span(block_span);
-        translator.emit(|attr| Bytecode::Label(attr, Label::new(block_id)))?;
+        if targeted.contains(&block_id) {
+            translator.emit(|attr| Bytecode::Label(attr, Label::new(block_id)))?;
+        }
         let mut instruction_id = 0;
         while instruction_id < block.instrs.len() {
             translator.set_source_span(
@@ -1095,6 +1205,33 @@ impl FunctionTranslator<'_> {
         self.local_types
             .get(id)
             .with_context(|| format!("local l{id} is out of range in `{}`", self.decl.name))
+    }
+
+    /// The annotated width must be the type of the local it describes.
+    ///
+    /// XIR carries a width on arithmetic because signed and unsigned share an
+    /// operation and differ only in the range consulted. The stackless
+    /// operation has no width of its own — it takes its meaning from the
+    /// local's type — so an annotation that disagrees is silently ignored.
+    /// Without this a document could declare `u64` locals, annotate the
+    /// division `i64`, and compile with unsigned semantics: a consumer that
+    /// proved against the document would have proved about a different
+    /// program.
+    fn check_width(&self, oper: &Oper, annotated: IntType, local: usize) -> Result<()> {
+        let ty = self.local(local)?;
+        let actual = int_type_of(ty).with_context(|| {
+            format!(
+                "{oper:?} is annotated `{annotated:?}` but l{local} is `{ty:?}`, not an integer, \
+                 in `{}`",
+                self.decl.name
+            )
+        })?;
+        ensure!(
+            actual == annotated,
+            "{oper:?} is annotated `{annotated:?}` but l{local} is `{actual:?}` in `{}`",
+            self.decl.name
+        );
+        Ok(())
     }
 
     fn block(&self, id: usize) -> Result<&Block> {
@@ -1532,7 +1669,16 @@ impl FunctionTranslator<'_> {
                 })
             },
             Oper::Lt if !self.local(srcs[0])?.is_number() => {
-                self.translate_generic_less(dsts, srcs)
+                self.translate_generic_comparison(oper, "is_lt", dsts, srcs)
+            },
+            Oper::Le if !self.local(srcs[0])?.is_number() => {
+                self.translate_generic_comparison(oper, "is_le", dsts, srcs)
+            },
+            Oper::Gt if !self.local(srcs[0])?.is_number() => {
+                self.translate_generic_comparison(oper, "is_gt", dsts, srcs)
+            },
+            Oper::Ge if !self.local(srcs[0])?.is_number() => {
+                self.translate_generic_comparison(oper, "is_ge", dsts, srcs)
             },
             _ => {
                 let operation = self.operation(dsts, oper, srcs)?;
@@ -1543,6 +1689,11 @@ impl FunctionTranslator<'_> {
         }
     }
 
+    /// Maps an operation that translates to a single stackless instruction.
+    ///
+    /// Operations needing several — `get_field` borrows before reading, the
+    /// way the Move source path lowers a field read — are handled in
+    /// [`Self::translate_call`] and never reach here.
     fn operation(&self, dsts: &[usize], oper: &Oper, srcs: &[usize]) -> Result<StacklessOperation> {
         Ok(match oper {
             Oper::Add(_)
@@ -1558,9 +1709,28 @@ impl FunctionTranslator<'_> {
             | Oper::Lt
             | Oper::Le
             | Oper::Eq
+            | Oper::Gt
+            | Oper::Ge
+            | Oper::Neq
             | Oper::And
             | Oper::Or => {
                 arity(dsts, srcs, 1, 2, oper)?;
+                // An arithmetic operation's operands and result share one
+                // type, so all three must agree with the annotation. Checking
+                // only the first operand leaves `i64 / i64 -> u64`, which the
+                // file-format generator resolves by taking the type from the
+                // stackless locals — producing a module that verifies while
+                // the document said something else.
+                //
+                // A shift is the exception: its right operand is the `u8`
+                // count, which the annotation does not describe.
+                if let Some(annotated) = annotated_width(oper) {
+                    self.check_width(oper, annotated, srcs[0])?;
+                    self.check_width(oper, annotated, dsts[0])?;
+                    if !matches!(oper, Oper::Shl(_) | Oper::Shr(_)) {
+                        self.check_width(oper, annotated, srcs[1])?;
+                    }
+                }
                 match oper {
                     Oper::Add(_) => StacklessOperation::Add,
                     Oper::Sub(_) => StacklessOperation::Sub,
@@ -1575,6 +1745,9 @@ impl FunctionTranslator<'_> {
                     Oper::Lt => StacklessOperation::Lt,
                     Oper::Le => StacklessOperation::Le,
                     Oper::Eq => StacklessOperation::Eq,
+                    Oper::Gt => StacklessOperation::Gt,
+                    Oper::Ge => StacklessOperation::Ge,
+                    Oper::Neq => StacklessOperation::Neq,
                     Oper::And => StacklessOperation::And,
                     Oper::Or => StacklessOperation::Or,
                     _ => unreachable!(),
@@ -1582,6 +1755,9 @@ impl FunctionTranslator<'_> {
             },
             Oper::Cast(target) => {
                 arity(dsts, srcs, 1, 1, oper)?;
+                // A cast's width names its result, not its operand, so it is
+                // the destination that must agree.
+                self.check_width(oper, *target, dsts[0])?;
                 match target {
                     IntType::U8 => StacklessOperation::CastU8,
                     IntType::U16 => StacklessOperation::CastU16,
@@ -1589,19 +1765,27 @@ impl FunctionTranslator<'_> {
                     IntType::U64 => StacklessOperation::CastU64,
                     IntType::U128 => StacklessOperation::CastU128,
                     IntType::U256 => StacklessOperation::CastU256,
-                    IntType::I8
-                    | IntType::I16
-                    | IntType::I32
-                    | IntType::I64
-                    | IntType::I128
-                    | IntType::I256 => {
-                        bail!("signed integer casts are not representable in stackless bytecode")
-                    },
+                    IntType::I8 => StacklessOperation::CastI8,
+                    IntType::I16 => StacklessOperation::CastI16,
+                    IntType::I32 => StacklessOperation::CastI32,
+                    IntType::I64 => StacklessOperation::CastI64,
+                    IntType::I128 => StacklessOperation::CastI128,
+                    IntType::I256 => StacklessOperation::CastI256,
                 }
             },
             Oper::Not => {
                 arity(dsts, srcs, 1, 1, oper)?;
                 StacklessOperation::Not
+            },
+            // `StacklessOperation::Negate` has no width of its own; it takes
+            // one from the operand. Check the annotation agrees, or the
+            // document's claim is discarded here and nothing downstream can
+            // tell the two readings apart.
+            Oper::Negate(width) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                self.check_width(oper, *width, srcs[0])?;
+                self.check_width(oper, *width, dsts[0])?;
+                StacklessOperation::Negate
             },
             Oper::VecPack => {
                 ensure!(dsts.len() == 1, "vec_pack expects one destination");
@@ -1667,34 +1851,6 @@ impl FunctionTranslator<'_> {
                     self.type_args(args)?,
                 )
             },
-            Oper::GetField(field) => {
-                arity(dsts, srcs, 1, 1, oper)?;
-                let sid = self.struct_from_type(self.local(srcs[0])?)?;
-                self.field(sid, *field)?;
-                StacklessOperation::GetField(self.module_id, sid, vec![], *field)
-            },
-            Oper::GetFieldInst(field, args) => {
-                arity(dsts, srcs, 1, 1, oper)?;
-                let sid = self.struct_from_type(self.local(srcs[0])?)?;
-                self.field(sid, *field)?;
-                StacklessOperation::GetField(self.module_id, sid, self.type_args(args)?, *field)
-            },
-            Oper::MoveTo(id) => {
-                arity(dsts, srcs, 0, 2, oper)?;
-                StacklessOperation::MoveTo(
-                    self.module_id,
-                    struct_at(self.struct_ids, *id, &self.decl.name)?,
-                    vec![],
-                )
-            },
-            Oper::MoveToInst(id, args) => {
-                arity(dsts, srcs, 0, 2, oper)?;
-                StacklessOperation::MoveTo(
-                    self.module_id,
-                    struct_at(self.struct_ids, *id, &self.decl.name)?,
-                    self.type_args(args)?,
-                )
-            },
             Oper::MoveFrom(id) => {
                 arity(dsts, srcs, 1, 1, oper)?;
                 StacklessOperation::MoveFrom(
@@ -1730,11 +1886,13 @@ impl FunctionTranslator<'_> {
             Oper::Function(id) => {
                 let target =
                     function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
+                self.call_arity(dsts, srcs, target, oper)?;
                 StacklessOperation::Function(target.module_id, target.id, vec![])
             },
             Oper::FunctionInst(id, args) => {
                 let target =
                     function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
+                self.call_arity(dsts, srcs, target, oper)?;
                 StacklessOperation::Function(target.module_id, target.id, self.type_args(args)?)
             },
             Oper::BorrowLoc => {
@@ -1869,10 +2027,22 @@ impl FunctionTranslator<'_> {
     }
 
     /// XIR enters the model after compiler-v2's AST comparison rewriter has
-    /// run. Reproduce that rewrite here so generic `<` follows exactly the
-    /// production Move path: `std::cmp::compare<T>(&left, &right).is_lt()`.
-    fn translate_generic_less(&mut self, dsts: &[usize], srcs: &[usize]) -> Result<()> {
-        arity(dsts, srcs, 1, 2, &Oper::Lt)?;
+    /// run. Reproduce that rewrite here so a generic comparison follows
+    /// exactly the production Move path:
+    /// `std::cmp::compare<T>(&left, &right).is_lt()`.
+    ///
+    /// `cmp_rewriter` lowers all four orderings this way, so all four are
+    /// handled; `predicate` selects which of `is_lt`/`is_le`/`is_gt`/`is_ge`
+    /// reads the result. Only `lt` was handled before, which left `le` on a
+    /// non-numeric operand mapping straight to `StacklessOperation::Le`.
+    fn translate_generic_comparison(
+        &mut self,
+        oper: &Oper,
+        predicate: &str,
+        dsts: &[usize],
+        srcs: &[usize],
+    ) -> Result<()> {
+        arity(dsts, srcs, 1, 2, oper)?;
         let operand_type = self.local(srcs[0])?.clone();
         ensure!(
             self.local(srcs[1])? == &operand_type,
@@ -1888,8 +2058,8 @@ impl FunctionTranslator<'_> {
             .find_function(self.env.symbol_pool().make("compare"))
             .context("the standard `cmp` module has no `compare` function")?;
         let is_lt = module
-            .find_function(self.env.symbol_pool().make("is_lt"))
-            .context("the standard `cmp` module has no `is_lt` function")?;
+            .find_function(self.env.symbol_pool().make(predicate))
+            .with_context(|| format!("the standard `cmp` module has no `{predicate}` function"))?;
         let module_id = module.get_id();
 
         let (compare_type, left_ref, right_ref) = match operand_type {
@@ -2259,6 +2429,36 @@ impl FunctionTranslator<'_> {
         }
     }
 
+    /// Checks a call's operands against the callee's signature.
+    ///
+    /// The fixed-arity operations pass constants to [`arity`]. A call's shape
+    /// is a property of its callee instead, so it is read from the model —
+    /// which holds the module being translated as well as its dependencies,
+    /// so local and external callees need no distinction here.
+    ///
+    /// Without this the mismatch survives translation and surfaces from a
+    /// later stackless check as `use of unassigned value`, naming neither the
+    /// call nor the callee.
+    fn call_arity(
+        &self,
+        dsts: &[usize],
+        srcs: &[usize],
+        target: QualifiedId<FunId>,
+        oper: &Oper,
+    ) -> Result<()> {
+        let callee = self.env.get_function(target);
+        let (returns, params) = (callee.get_return_count(), callee.get_parameter_count());
+        ensure!(
+            dsts.len() == returns && srcs.len() == params,
+            "{oper:?} calls `{}`, which expects {returns} destinations and \
+             {params} sources, but got {} and {}",
+            callee.get_full_name_with_address(),
+            dsts.len(),
+            srcs.len()
+        );
+        Ok(())
+    }
+
     fn struct_from_type(&self, ty: &Type) -> Result<StructId> {
         match ty {
             Type::Struct(mid, sid, _) if *mid == self.module_id => Ok(*sid),
@@ -2388,6 +2588,27 @@ fn stackless_constant(constant: &Constant, ty: &Type) -> Result<StacklessConstan
                 },
                 Type::Primitive(PrimitiveType::U256) => {
                     StacklessConstant::U256(value.parse::<ethnum::U256>().with_context(parse_err)?)
+                },
+                // The format writes these as decimal like the rest, sign
+                // included; the local's own type is what says which width and
+                // signedness to read them back at.
+                Type::Primitive(PrimitiveType::I8) => {
+                    StacklessConstant::I8(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I16) => {
+                    StacklessConstant::I16(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I32) => {
+                    StacklessConstant::I32(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I64) => {
+                    StacklessConstant::I64(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I128) => {
+                    StacklessConstant::I128(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I256) => {
+                    StacklessConstant::I256(value.parse::<ethnum::I256>().with_context(parse_err)?)
                 },
                 other => bail!("integer constant loaded into non-integer type {other:?}"),
             }
@@ -2636,17 +2857,16 @@ mod tests {
         assert_eq!(target.get_local_name_for_error_message(1), "value");
         let internal_name = target.symbol_pool().make("_l1");
         assert_eq!(target.get_local_index(internal_name), Some(1));
+        // The entry block carries no label — nothing jumps to it — so the
+        // first bytecode is the first real instruction rather than a synthetic
+        // one standing in for the whole function.
         let code = target.get_bytecode();
         assert_eq!(
             target.get_bytecode_loc(code[0].get_attr_id()).span(),
-            Span::new(1, 90)
-        );
-        assert_eq!(
-            target.get_bytecode_loc(code[1].get_attr_id()).span(),
             Span::new(10, 20)
         );
         assert_eq!(
-            target.get_bytecode_loc(code[2].get_attr_id()).span(),
+            target.get_bytecode_loc(code[1].get_attr_id()).span(),
             Span::new(10, 20)
         );
     }

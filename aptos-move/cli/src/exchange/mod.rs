@@ -1264,9 +1264,13 @@ fn collect_loops(
                             | Oper::Lt
                             | Oper::Le
                             | Oper::Eq
+                            | Oper::Gt
+                            | Oper::Ge
+                            | Oper::Neq
                             | Oper::And
                             | Oper::Or
                             | Oper::Not
+                            | Oper::Negate(_)
                             | Oper::Pack
                             | Oper::PackInst(_)
                             | Oper::Unpack
