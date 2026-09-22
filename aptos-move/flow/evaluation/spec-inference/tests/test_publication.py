@@ -50,6 +50,16 @@ def _archive_writer(
                 yield archive
 
 
+def _result_archives(results: Path) -> list[Path]:
+    return sorted(
+        archive
+        for archive in results.rglob("*")
+        if archive.is_file()
+        and archive.name.casefold().endswith(".tar.gz")
+        and archive.relative_to(results).as_posix() not in LEGACY_ARCHIVES
+    )
+
+
 class PublicationTest(unittest.TestCase):
     def test_tracked_archives_follow_publication_contract(self) -> None:
         results = Path(__file__).resolve().parents[1] / "results"
@@ -59,15 +69,21 @@ class PublicationTest(unittest.TestCase):
             self.assertEqual(
                 expected_digest, hashlib.sha256(archive.read_bytes()).hexdigest()
             )
-        archives = sorted(
-            archive
-            for archive in results.rglob("*.tar.gz")
-            if archive.relative_to(results).as_posix() not in LEGACY_ARCHIVES
-        )
+        archives = _result_archives(results)
         self.assertTrue(archives)
         for archive in archives:
             with self.subTest(archive=archive.name):
                 scan_public_archive(archive)
+
+    def test_discovers_archives_case_insensitively(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            for name in ("lower.tar.gz", "upper.TAR.GZ", "mixed.Tar.Gz"):
+                (results / name).touch()
+            self.assertEqual(
+                ["lower.tar.gz", "mixed.Tar.Gz", "upper.TAR.GZ"],
+                [archive.name for archive in _result_archives(results)],
+            )
 
     def test_builds_deterministic_source_free_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
