@@ -3,11 +3,16 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/audit.h>
+#include <linux/filter.h>
 #include <linux/landlock.h>
+#include <linux/seccomp.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -31,7 +36,6 @@ static const __u64 WRITE_ACCESS = LANDLOCK_ACCESS_FS_WRITE_FILE |
                                   LANDLOCK_ACCESS_FS_MAKE_SOCK |
                                   LANDLOCK_ACCESS_FS_MAKE_FIFO |
                                   LANDLOCK_ACCESS_FS_MAKE_BLOCK |
-                                  LANDLOCK_ACCESS_FS_MAKE_SYM |
                                   LANDLOCK_ACCESS_FS_REFER;
 
 static void fail(const char *message, const char *path) {
@@ -70,12 +74,63 @@ static void add_path_rule(int ruleset_fd, const char *path, __u64 access) {
     close(path_fd);
 }
 
+#if defined(__x86_64__)
+#define NATIVE_AUDIT_ARCH AUDIT_ARCH_X86_64
+#elif defined(__aarch64__)
+#define NATIVE_AUDIT_ARCH AUDIT_ARCH_AARCH64
+#else
+#error "landlock-exec seccomp policy needs an audit architecture definition"
+#endif
+
+static void install_network_filter(void) {
+    // Landlock ABI 4 governs TCP bind/connect but has no UDP rights. Deny the
+    // creation of IPv4 and IPv6 sockets with seccomp, which is inherited by
+    // every command descendant. Block io_uring setup too: its socket opcode
+    // would otherwise bypass a filter that looked only at SYS_socket.
+    struct sock_filter instructions[] = {
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
+                 (unsigned int)offsetof(struct seccomp_data, arch)),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NATIVE_AUDIT_ARCH, 1, 0),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
+                 (unsigned int)offsetof(struct seccomp_data, nr)),
+#ifdef SYS_io_uring_setup
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_io_uring_setup, 0, 1),
+        BPF_STMT(BPF_RET | BPF_K,
+                 SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)),
+#endif
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_socket, 1, 0),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
+                 (unsigned int)offsetof(struct seccomp_data, args[0])),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_INET, 1, 0),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_INET6, 0, 1),
+        BPF_STMT(BPF_RET | BPF_K,
+                 SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
+    struct sock_fprog program = {
+        .len = (unsigned short)(sizeof(instructions) / sizeof(instructions[0])),
+        .filter = instructions,
+    };
+    if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &program) < 0) {
+        fail("cannot install network seccomp filter", NULL);
+    }
+}
+
 int main(int argc, char **argv) {
     int abi = syscall(SYS_landlock_create_ruleset, NULL, 0,
                       LANDLOCK_CREATE_RULESET_VERSION);
     if (abi < 1) {
         fail("Landlock is unavailable", NULL);
     }
+    int deny_network = 0;
+    for (int scan = 1; scan < argc; scan++) {
+        if (strcmp(argv[scan], "--deny-network") == 0) {
+            deny_network = 1;
+        }
+    }
+
     // Truncation is a distinct access right, and one the kernel cannot govern
     // before ABI 3: a read-only path could be emptied -- the pristine baseline
     // or the run record among them -- while the policy reported itself intact.
@@ -84,13 +139,25 @@ int main(int argc, char **argv) {
     if (abi < 3) {
         fail("Landlock ABI 3 or later is required to govern truncation", NULL);
     }
+    if (deny_network && abi < 4) {
+        fail("Landlock ABI 4 or later is required to deny TCP networking", NULL);
+    }
 
     // Governing an access the running kernel does not know rejects the ruleset
     // outright. A writable path is granted truncation too, or the agent could
     // not rewrite its own workspace.
     __u64 write_access = WRITE_ACCESS | LANDLOCK_ACCESS_FS_TRUNCATE;
-    __u64 handled = READ_ACCESS | write_access;
-    struct landlock_ruleset_attr ruleset = {.handled_access_fs = handled};
+    // Symlink creation is governed but never granted, including in writable
+    // trees. Otherwise a workspace could redirect controller-side package
+    // discovery into a withheld baseline after the path itself was checked.
+    __u64 handled = READ_ACCESS | write_access | LANDLOCK_ACCESS_FS_MAKE_SYM;
+    struct landlock_ruleset_attr ruleset = {
+        .handled_access_fs = handled,
+        .handled_access_net = deny_network
+                                  ? LANDLOCK_ACCESS_NET_BIND_TCP |
+                                        LANDLOCK_ACCESS_NET_CONNECT_TCP
+                                  : 0,
+    };
     int ruleset_fd = syscall(SYS_landlock_create_ruleset, &ruleset,
                              sizeof(ruleset), 0);
     if (ruleset_fd < 0) {
@@ -103,8 +170,11 @@ int main(int argc, char **argv) {
             index++;
             break;
         }
+        if (strcmp(argv[index], "--deny-network") == 0) {
+            continue;
+        }
         if (index + 1 >= argc) {
-            fprintf(stderr, "usage: landlock-exec [--ro PATH|--rw PATH]... -- COMMAND...\n");
+            fprintf(stderr, "usage: landlock-exec [--deny-network] [--ro PATH|--rw PATH]... -- COMMAND...\n");
             return 2;
         }
         __u64 access;
@@ -127,6 +197,9 @@ int main(int argc, char **argv) {
     }
     if (syscall(SYS_landlock_restrict_self, ruleset_fd, 0) < 0) {
         fail("cannot restrict process", NULL);
+    }
+    if (deny_network) {
+        install_network_filter();
     }
     close(ruleset_fd);
     execvp(argv[index], &argv[index]);

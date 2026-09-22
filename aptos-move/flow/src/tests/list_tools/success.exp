@@ -69,6 +69,11 @@
           "description": "Function to query (required for \"function_usage\"), in the form \"module_name::function_name\".",
           "type": "string",
           "nullable": true
+        },
+        "module": {
+          "description": "Optional module scope for \"module_summary\" and \"facts\", in the form\n\"module_name\" or \"address::module_name\". A simple name must be unambiguous.",
+          "type": "string",
+          "nullable": true
         }
       },
       "required": [

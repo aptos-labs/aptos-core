@@ -2112,10 +2112,49 @@ fn same_address(wanted: &str, actual: &str) -> bool {
 /// them too: a root that names only a local dependency could otherwise reach
 /// a `git` dependency one manifest down.
 pub(crate) fn reject_remote_dependencies(package: &Path) -> Result<(), String> {
+    reject_untrusted_dependencies(package, None)
+}
+
+/// Refuse dependencies that would let an evaluation MCP server leave its
+/// caller-visible package tree.
+pub(crate) fn reject_untrusted_dependencies(
+    package: &Path,
+    allowed_root: Option<&Path>,
+) -> Result<(), String> {
+    let allowed_root = allowed_root
+        .map(|root| {
+            root.canonicalize().map_err(|error| {
+                format!("cannot resolve package root `{}`: {error}", root.display())
+            })
+        })
+        .transpose()?;
+    if let Some(root) = &allowed_root {
+        for entry in walkdir::WalkDir::new(root).follow_links(false) {
+            let entry = entry.map_err(|error| {
+                format!("cannot inspect package root `{}`: {error}", root.display())
+            })?;
+            if entry.file_type().is_symlink() {
+                return Err(format!(
+                    "an evaluation package cannot contain symlink `{}`",
+                    entry.path().display()
+                ));
+            }
+        }
+    }
     let mut pending = vec![package.to_path_buf()];
     let mut seen = std::collections::BTreeSet::new();
     while let Some(dir) = pending.pop() {
         let dir = dir.canonicalize().unwrap_or(dir);
+        if allowed_root
+            .as_ref()
+            .is_some_and(|root| !dir.starts_with(root))
+        {
+            return Err(format!(
+                "an evaluation session cannot access package or local dependency `{}` outside `{}`",
+                dir.display(),
+                allowed_root.as_ref().expect("checked above").display()
+            ));
+        }
         if !seen.insert(dir.clone()) {
             continue;
         }

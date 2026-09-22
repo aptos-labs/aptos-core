@@ -57,12 +57,76 @@ class ModelProfileTest(unittest.TestCase):
             select_model(opus, glm, "glm")
             self.assertEqual(ExperimentConfig.load(glm).effort, "max")
 
+    def test_select_sonnet_uses_subscription_and_xhigh_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sonnet.json"
+            select_model(ROOT / "config/default.json", output, "sonnet")
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "claude-sonnet-5")
+            self.assertEqual(config.provider_base_url, "https://api.anthropic.com")
+            self.assertEqual(config.effort, "xhigh")
+            env = subscription_environment(config, {
+                "CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-secret",
+            })
+            self.assertEqual(env["ANTHROPIC_MODEL"], "claude-sonnet-5")
+            self.assertEqual(env["CLAUDE_CODE_EFFORT_LEVEL"], "xhigh")
+
+    def test_select_sol56_uses_codex_with_high_effort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sol56.json"
+            select_model(ROOT / "config/default.json", output, "sol56")
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "gpt-5.6-sol")
+            self.assertEqual(config.provider_base_url, "https://chatgpt.com/backend-api")
+            self.assertEqual(config.effort, "high")
+            self.assertEqual(config.agent_runtime, "codex")
+            self.assertEqual(config.codex_cli_version, "0.153.2")
+            self.assertEqual(
+                config.codex_code_mode_host_sha256,
+                "883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1",
+            )
+
+    def test_select_terra56_uses_codex_with_high_effort_and_no_retries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "terra56.json"
+            select_model(
+                ROOT / "config/default.json",
+                output,
+                "terra56",
+                infrastructure_retries=0,
+            )
+            config = ExperimentConfig.load(output)
+            self.assertEqual(config.model, "gpt-5.6-terra")
+            self.assertEqual(config.provider_base_url, "https://chatgpt.com/backend-api")
+            self.assertEqual(config.effort, "high")
+            self.assertEqual(config.agent_runtime, "codex")
+            self.assertEqual(config.infrastructure_retries, 0)
+            self.assertEqual(config.codex_cli_version, "0.153.2")
+            self.assertEqual(
+                config.codex_code_mode_host_sha256,
+                "883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1",
+            )
+
+    def test_select_rejects_negative_infrastructure_retries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "cannot be negative"):
+                select_model(
+                    ROOT / "config/default.json",
+                    Path(directory) / "config.json",
+                    "terra56",
+                    infrastructure_retries=-1,
+                )
+
     def test_effort_validation_preserves_history_and_rejects_glm_xhigh(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"
             path.write_text(json.dumps(asdict(replace(self.config, effort="max"))))
             self.assertEqual(ExperimentConfig.load(path).effort, "max")
-            for model, effort in (("glm-5.3[1m]", "xhigh"), ("claude-opus-5", "typo")):
+            for model, effort in (
+                ("glm-5.3[1m]", "xhigh"),
+                ("claude-opus-5", "typo"),
+                ("claude-sonnet-5", "typo"),
+            ):
                 path.write_text(json.dumps(asdict(replace(self.config, model=model, effort=effort))))
                 with self.assertRaisesRegex(ValueError, "effort must"):
                     ExperimentConfig.load(path)

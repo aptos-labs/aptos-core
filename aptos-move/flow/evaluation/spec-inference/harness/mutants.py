@@ -138,21 +138,48 @@ def _implementation_offset(baseline_text: str, candidate_text: str, at: int) -> 
     the mutated expression, sometimes at the same indentation, and the word
     `spec` also appears in prose comments.
     """
-    baseline_lines = baseline_text.splitlines(keepends=True)
-    candidate_lines = candidate_text.splitlines(keepends=True)
     # Alignment is quadratic in what it aligns. A candidate that has grown far
     # beyond the source it was given did not merely add a specification to it,
     # and is not aligned at all; the caller then reports the mutant as not
     # applicable rather than spending the round's time on it.
     if len(candidate_text) > MAX_ALIGNMENT_GROWTH * len(baseline_text) + MAX_ALIGNMENT_SLACK:
         return None
+    # Remove specifications, comments, and strings before alignment. In
+    # particular, a newly inserted invariant may quote the exact expression at
+    # `at`; aligning raw text can then map the source expression into the spec
+    # instead of the unchanged implementation below it.
+    def implementation_projection(source: str) -> tuple[str, list[int]]:
+        excluded = sorted(_non_implementation_ranges(source))
+        positions = []
+        range_index = 0
+        for index in range(len(source)):
+            while (
+                range_index < len(excluded)
+                and index >= excluded[range_index][1]
+            ):
+                range_index += 1
+            if (
+                range_index >= len(excluded)
+                or index < excluded[range_index][0]
+            ):
+                positions.append(index)
+        return "".join(source[index] for index in positions), positions
+
+    baseline_code, baseline_positions = implementation_projection(baseline_text)
+    candidate_code, candidate_positions = implementation_projection(candidate_text)
+    try:
+        code_at = baseline_positions.index(at)
+    except ValueError:
+        return None
+    baseline_lines = baseline_code.splitlines(keepends=True)
+    candidate_lines = candidate_code.splitlines(keepends=True)
     # Lines first: a specification is added as whole lines, so this is both
     # cheap and exact for the common case.
     consumed = 0
     line_index = column = None
     for index, line in enumerate(baseline_lines):
-        if consumed <= at < consumed + len(line):
-            line_index, column = index, at - consumed
+        if consumed <= code_at < consumed + len(line):
+            line_index, column = index, code_at - consumed
             break
         consumed += len(line)
     if line_index is not None:
@@ -163,16 +190,116 @@ def _implementation_offset(baseline_text: str, candidate_text: str, at: int) -> 
             None, baseline_lines, candidate_lines, autojunk=False
         ).get_opcodes():
             if tag == "equal" and i1 <= line_index < i2:
-                return starts[j1 + (line_index - i1)] + column
+                projected = starts[j1 + (line_index - i1)] + column
+                return candidate_positions[projected]
     # A loop invariant rewrites the loop's closing line, so the line containing
     # a fragment may itself have changed; characters still align it, within
     # the size bound above.
     for tag, i1, i2, j1, j2 in SequenceMatcher(
-        None, baseline_text, candidate_text, autojunk=False
+        None, baseline_code, candidate_code, autojunk=False
     ).get_opcodes():
-        if tag == "equal" and i1 <= at < i2:
-            return j1 + (at - i1)
+        if tag == "equal" and i1 <= code_at < i2:
+            return candidate_positions[j1 + (code_at - i1)]
     return None
+
+
+def _move_tokens_and_non_code_ranges(
+    source: str,
+) -> tuple[list[tuple[str, int, int]], list[tuple[int, int]]]:
+    """Tokenize enough Move to distinguish code from comments and strings."""
+    tokens: list[tuple[str, int, int]] = []
+    non_code: list[tuple[int, int]] = []
+    index = 0
+    while index < len(source):
+        if source.startswith("//", index):
+            end = source.find("\n", index + 2)
+            end = len(source) if end < 0 else end
+            non_code.append((index, end))
+            index = end
+        elif source.startswith("/*", index):
+            start = index
+            index += 2
+            depth = 1
+            while index < len(source) and depth:
+                if source.startswith("/*", index):
+                    depth += 1
+                    index += 2
+                elif source.startswith("*/", index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            non_code.append((start, index))
+        elif source[index] == '"':
+            start = index
+            index += 1
+            while index < len(source):
+                if source[index] == "\\":
+                    index = min(index + 2, len(source))
+                elif source[index] == '"':
+                    index += 1
+                    break
+                else:
+                    index += 1
+            non_code.append((start, index))
+        elif source[index].isalpha() or source[index] == "_":
+            start = index
+            index += 1
+            while index < len(source) and (
+                source[index].isalnum() or source[index] == "_"
+            ):
+                index += 1
+            tokens.append((source[start:index], start, index))
+        elif source[index] in "{};":
+            tokens.append((source[index], index, index + 1))
+            index += 1
+        else:
+            index += 1
+    return tokens, non_code
+
+
+def _non_implementation_ranges(source: str) -> list[tuple[int, int]]:
+    """Return comments, strings, and specification blocks in Move source."""
+    tokens, ranges = _move_tokens_and_non_code_ranges(source)
+    index = 0
+    while index < len(tokens):
+        token, start, _ = tokens[index]
+        if token != "spec":
+            index += 1
+            continue
+        opening = index + 1
+        while opening < len(tokens) and tokens[opening][0] not in ("{", ";"):
+            opening += 1
+        if opening >= len(tokens) or tokens[opening][0] != "{":
+            index += 1
+            continue
+        depth = 1
+        closing = opening + 1
+        while closing < len(tokens) and depth:
+            depth += tokens[closing][0] == "{"
+            depth -= tokens[closing][0] == "}"
+            closing += 1
+        if depth:
+            # Compilation will reject the unfinished block. Treat the rest as
+            # specification text so scoring never mutates uncertain source.
+            ranges.append((start, len(source)))
+            break
+        ranges.append((start, tokens[closing - 1][2]))
+        index = closing
+    return ranges
+
+
+def _implementation_occurrences(source: str, fragment: str) -> list[int]:
+    """Find exact fragment occurrences outside specs, comments, and strings."""
+    excluded = _non_implementation_ranges(source)
+    result = []
+    start = 0
+    while (found := source.find(fragment, start)) >= 0:
+        end = found + len(fragment)
+        if all(end <= low or found >= high for low, high in excluded):
+            result.append(found)
+        start = found + 1
+    return result
 
 
 def _anchored_fragment(pristine: str, case: dict[str, Any]) -> tuple[int, str]:
@@ -218,6 +345,26 @@ def _mutate(fragment: str, edit: dict[str, Any], mutant_id: str) -> str:
     raise ValueError(f"mutant {mutant_id} has unknown edit kind `{kind}`")
 
 
+def _mutation_span(
+    fragment: str, edit: dict[str, Any], mutant_id: str
+) -> tuple[int, int, str]:
+    """Return the part of an anchor that an edit actually replaces."""
+    kind = edit["kind"]
+    at = edit.get("at", 0)
+    if kind == "substitute":
+        return at, edit["length"], edit["to"]
+    if kind == "swap":
+        a, sep, b = (
+            edit["a_length"], edit["separator_length"], edit["b_length"]
+        )
+        rest = fragment[at:]
+        first = rest[:a]
+        separator = rest[a:a + sep]
+        second = rest[a + sep:a + sep + b]
+        return at, a + sep + b, second + separator + first
+    raise ValueError(f"mutant {mutant_id} has unknown edit kind `{kind}`")
+
+
 def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
     """Rewrite one exact fragment of the implementation.
 
@@ -237,15 +384,55 @@ def apply_mutant(package: Path, baseline: Path, case: dict[str, Any]) -> None:
     text = source.read_text(encoding="utf-8")
     pristine = (baseline / relative).read_text(encoding="utf-8")
     offset, fragment = _anchored_fragment(pristine, case)
-    at = _implementation_offset(pristine, text, offset)
-    if at is None or not text.startswith(fragment, at):
+    relative_at, length, replacement = _mutation_span(
+        fragment, case["edit"], case["mutant_id"]
+    )
+    candidate_at = _implementation_offset(pristine, text, offset)
+    implementation_fragments = _implementation_occurrences(text, fragment)
+    if (
+        candidate_at is not None
+        and candidate_at in implementation_fragments
+        and text.startswith(fragment, candidate_at)
+    ):
+        mutated = _mutate(fragment, case["edit"], case["mutant_id"])
+        source.write_text(
+            text[:candidate_at] + mutated + text[candidate_at + len(fragment):],
+            encoding="utf-8",
+        )
+        return
+
+    # Inserting a loop invariant wraps the guard's source line, so the whole
+    # anchor is no longer contiguous even though the expression being mutated
+    # remains unchanged. Align both ends of the original anchor, then locate a
+    # small local context around the edit inside that region. Restricting the
+    # search to the aligned region distinguishes the intended expression from
+    # identical implementation text elsewhere; excluding specification ranges
+    # distinguishes it from a restatement inserted inside the wrapper.
+    context_start = max(0, relative_at - 2)
+    context_end = min(len(fragment), relative_at + length + 2)
+    original_context = fragment[context_start:context_end]
+    candidate_end = _implementation_offset(
+        pristine, text, offset + len(fragment) - 1
+    )
+    candidate_contexts = [
+        occurrence
+        for occurrence in _implementation_occurrences(text, original_context)
+        if candidate_at is not None
+        and candidate_end is not None
+        and candidate_at <= occurrence
+        and occurrence + len(original_context) <= candidate_end + 1
+    ]
+    if len(candidate_contexts) != 1:
         raise ValueError(
             f"cannot apply mutant {case['mutant_id']}: the implementation it "
-            f"rewrites is not present unchanged in {relative}"
+            f"rewrites is not present unchanged and unambiguously outside "
+            f"specifications in {relative}"
         )
-    mutated = _mutate(fragment, case["edit"], case["mutant_id"])
+    candidate_context_at = candidate_contexts[0]
+    candidate_at = candidate_context_at + relative_at - context_start
     source.write_text(
-        text[:at] + mutated + text[at + len(fragment):], encoding="utf-8"
+        text[:candidate_at] + replacement + text[candidate_at + length:],
+        encoding="utf-8",
     )
 
 

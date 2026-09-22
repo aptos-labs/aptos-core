@@ -62,5 +62,16 @@ module 0x42::vacuous_abort_discharge {
 
 }
 /*
-Verification: Succeeded.
+Verification:
+warning: WP made no changes for 3 function(s) (0x42::vacuous_abort_discharge::interpolate, 0x42::vacuous_abort_discharge::interpolate_between, 0x42::vacuous_abort_discharge::widen_sum) because they already contain `[inferred]` function conditions. WP regenerates each function contract as a unit and does not merge with generated clauses. To refresh stale or partial results, remove all `[inferred]` function conditions plus their WP-generated `modifies` and `aborts_if_is_partial` clauses, then rerun; keep loop invariants and user-written conditions.
+   ┌─ vacuous_abort_discharge.enriched.move:13:5
+   │
+13 │ ╭     fun interpolate(lo: u64, hi: u64, x: u64): u64 {
+14 │ │         if (x < lo) { return 0 };
+15 │ │         if (x >= hi) { return 1 };
+16 │ │         let span = ((hi - lo) as u128);
+17 │ │         let delta = ((x - lo) as u128);
+18 │ │         ((delta * 100 / span) as u64)
+19 │ │     }
+   │ ╰─────^
 */

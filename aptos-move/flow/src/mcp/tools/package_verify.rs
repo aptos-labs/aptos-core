@@ -230,8 +230,8 @@ impl FlowSession {
         );
         // Loop-invariant evidence rebuilds from disk on the failure path, so
         // the manifest is guarded here and not only on a cache miss.
-        self.refuse_remote_dependencies(std::path::Path::new(
-            &self.resolve_package_path(&params.package_path),
+        self.refuse_untrusted_dependencies(std::path::Path::new(
+            &self.resolve_package_path(&params.package_path)?,
         ))?;
         let (pkg, _) = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
@@ -243,7 +243,7 @@ impl FlowSession {
         let split_vcs_by_assert = params.split_vcs_by_assert.unwrap_or(false);
         let error_limit = params.error_limit;
         let telemetry = self.telemetry().clone();
-        let telemetry_package = self.resolve_package_path(&params.package_path);
+        let telemetry_package = self.resolve_package_path(&params.package_path)?;
         let telemetry_filter = filter.clone();
         let package_timeout_secs = self.tool_timeout().as_secs().max(1);
 

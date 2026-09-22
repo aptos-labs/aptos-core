@@ -238,6 +238,14 @@ def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
     Boogie and Z3 decided, and swapping either changes what "proved" meant.
     """
     result: dict[str, dict[str, Any]] = {}
+    digests: dict[Path, str] = {}
+
+    def digest(path: Path) -> str:
+        resolved = path.resolve()
+        if resolved not in digests:
+            digests[resolved] = sha256_file(resolved)
+        return digests[resolved]
+
     for name, command in (
         ("compile", config.compile_command),
         ("wp_inference", config.inference_command),
@@ -254,13 +262,13 @@ def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
         if resolved is None:
             continue
         path = Path(resolved).resolve()
-        entry: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path)}
+        entry: dict[str, Any] = {"path": str(path), "sha256": digest(path)}
         # Later arguments that name a file are part of what runs.
         arguments = {}
         for argument in command[1:]:
             candidate = Path(argument)
             if candidate.is_file():
-                arguments[argument] = sha256_file(candidate.resolve())
+                arguments[argument] = digest(candidate)
         if arguments:
             entry["arguments"] = arguments
         result[name] = entry
@@ -271,7 +279,7 @@ def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
         located = os.environ.get(variable) or shutil.which(fallback)
         if located and Path(located).is_file():
             path = Path(located).resolve()
-            result[name] = {"path": str(path), "sha256": sha256_file(path)}
+            result[name] = {"path": str(path), "sha256": digest(path)}
     return result
 
 

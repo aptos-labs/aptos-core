@@ -1,0 +1,16 @@
+% !TEX root = main.tex
+\Section{Hybrid Inference}
+\label{sec:hybrid}
+
+Hybrid inference combines two sources of specifications: a mechanical \WP analysis, which is exact where it applies and stops at loops, and a coding agent, which proposes what the analysis cannot derive --- loop invariants and idiomatic, readable contracts --- and repairs against verifier feedback.
+The verifier is the oracle for both.
+We first walk through an inference session (Sec.~\ref{sec:example}), then describe the \WP analysis (Sec.~\ref{sec:wp}) and the tactics and skills that drive the agent (Sec.~\ref{sec:skills}).
+
+\input{example}
+\input{wp}
+\input{skills}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

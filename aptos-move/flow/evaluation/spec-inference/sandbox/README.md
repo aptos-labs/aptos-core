@@ -73,7 +73,9 @@ below.
 Truncation is governed too, from Landlock ABI 3 onwards: it is a right of its
 own, and left out of the policy a file the ruleset keeps read-only could still
 be emptied through `O_TRUNC` or `ftruncate`. Preflight probes that a read-only
-file cannot be truncated.
+file cannot be truncated. Writable trees deliberately omit the symlink-creation
+right, and preflight verifies that omission, so a workspace cannot redirect a
+controller-side package walk into the pristine baseline.
 
 The rest of the run directory — `run.json`, the judge's results, the event
 logs — is the controller's. An agent that could write it could forge the record
@@ -114,6 +116,20 @@ server's inventory. `config/default.json` allows `Read`, `Glob`, `Grep`, `Edit`,
 `Write`, and the task tools, and denies `Bash`, `WebSearch`, `WebFetch`, `Agent`,
 and `Task`.
 
+Codex needs its local code-mode host to inspect and edit a package. The outer
+bubblewrap and Landlock policy is its filesystem sandbox; nesting Codex's own
+bubblewrap inside that namespace is disabled. The digest-pinned, version-paired
+code-mode host is mounted through a second Landlock wrapper that denies IPv4
+and IPv6 sockets to it and every command it starts. Landlock also denies TCP
+bind/connect, while seccomp closes its UDP gap and blocks io_uring setup. That
+inner wrapper also omits the private Codex home containing `auth.json`. Web
+search, apps, goals, and multi-agent tools
+are disabled. The real `move-flow` executable is not
+readable in the Codex Landlock domain: the controller starts it with the
+arm-specific configuration and Codex receives only a one-connection Unix-socket
+stdio bridge. A shell therefore cannot recover a withheld WP tool by invoking
+the binary directly.
+
 Denying `Bash` and `WebFetch` matters more than it looks: with them gone, MCP
 tools are the *only* channel out of the process. That makes the MCP inventory a
 security boundary, not just an ergonomics choice — any tool that takes a URL is
@@ -126,8 +142,11 @@ inventory is asserted by a test, not left to review.
 
 ## Network
 
-Networking is **not** isolated: there is no `--unshare-net`. The session has to
-reach the model endpoint, and the round would not run without it.
+Networking is not isolated for the parent Codex or Claude process: there is no
+`--unshare-net`, because the session has to reach the model endpoint. Codex's
+code-mode host and its command descendants receive a second Landlock ruleset
+with no TCP bind or connect grants plus a seccomp filter that refuses IPv4 and
+IPv6 sockets, including UDP. Claude has no shell in this evaluation.
 
 Everything else in the design assumes this. Confidentiality of anything the agent
 can read therefore rests on the agent having no way to *send* — which is why the
@@ -145,7 +164,17 @@ The agent process needs the token — it is the thing calling the API — so the
 token is in the environment of a process whose `/proc/self` the agent can read.
 **An agent that wants its own credential can obtain it.** The sandbox does not
 try to prevent that; it prevents the credential from *leaving*, by ensuring there
-is no egress channel (see Network and Tools above).
+is no agent-accessible egress channel (see Network and Tools above).
+
+Only the selected runtime's provider variables enter the namespace. In
+particular a Codex run never inherits Anthropic or Claude credentials that
+happen to exist in the launcher's environment; TLS root settings remain shared.
+
+For Codex, saved login state is copied into a private per-cell `CODEX_HOME` and
+removed with the unpublished staging tree. The controller also treats long
+string values from that auth file as credentials during the final exact-value
+redaction sweep. Codex's shell does not receive network access; the parent
+Codex process still reaches the model service.
 
 The controller also sweeps the run's artifacts for the credential's exact
 bytes once the run is over, so an agent that merely echoes it does not put it
