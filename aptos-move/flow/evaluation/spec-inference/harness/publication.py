@@ -361,16 +361,34 @@ def _decode_encoded_content(
                     )
                     changed = True
                     continue
-            if decode_html and output[-1:] == b";" and entity_start is not None:
+            html_ready = (
+                output[-1:] == b";"
+                or index == len(data)
+                or not _is_ascii_hex(output[-1])
+            )
+            if decode_html and entity_start is not None and html_ready:
                 html_suffix = _decode_html_entity_body(output, entity_start + 1)
-                if html_suffix is not None and html_suffix[1] == len(output):
-                    replacement, _ = html_suffix
+                if html_suffix is not None:
+                    replacement, entity_end = html_suffix
+                    terminated = output[entity_end - 1 : entity_end] == b";"
+                    complete = (
+                        entity_end < len(output)
+                        or terminated
+                        or index == len(data)
+                    )
+                else:
+                    complete = False
+                if complete:
+                    tail = bytes(output[entity_end:])
                     del output[entity_start:]
                     entity_start = _pop_entity_offset(
                         entity_offsets, entity_start
                     )
                     entity_start = _append_encoded_replacement(
                         output, entity_offsets, entity_start, replacement
+                    )
+                    entity_start = _append_encoded_replacement(
+                        output, entity_offsets, entity_start, tail
                     )
                     changed = True
                     continue
@@ -470,8 +488,9 @@ def _decode_html_entity_body(
         predicate = _is_ascii_hex if hexadecimal else _is_ascii_digit
         while index < len(data) and predicate(data[index]):
             index += 1
-        if index == digits_start or index >= len(data) or data[index] != ord(";"):
+        if index == digits_start:
             return None
+        entity_end = index + 1 if data[index : index + 1] == b";" else index
         digits = bytes(data[digits_start:index]).lstrip(b"0") or b"0"
         max_digits = 2 if hexadecimal else 3
         codepoint = (
@@ -480,7 +499,7 @@ def _decode_html_entity_body(
             else 128
         )
         replacement = codepoint if codepoint <= 0x7F else ord(" ")
-        return bytes((replacement,)), index + 1
+        return bytes((replacement,)), entity_end
 
     entity_end = data.find(
         b";", index, min(len(data), index + MAX_HTML_ENTITY_NAME_BYTES)

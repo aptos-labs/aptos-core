@@ -210,6 +210,16 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_semicolonless_html_entities(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "&#109odule 0x1::sample { public &#102un value(): u64 { 1 } }\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_composed_content_encodings(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -237,6 +247,11 @@ class PublicationTest(unittest.TestCase):
     def test_alternating_encoding_chain_normalizes_in_one_pass(self) -> None:
         chain = b"&#92;u0026#92;" * 1000 + b"u006d"
         self.assertEqual(b"m", _decode_structured_content(chain))
+        self.assertEqual(
+            b"module", _decode_structured_content(b"\\u0026#109odule")
+        )
+        long_numeric = b"\\u0026#" + b"0" * 10_000 + b"109odule"
+        self.assertEqual(b"module", _decode_structured_content(long_numeric))
 
     def test_repeated_entities_after_large_prefix_normalize(self) -> None:
         prefix = b"x" * 4096
