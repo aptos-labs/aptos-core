@@ -9,6 +9,7 @@ import tempfile
 import tracemalloc
 import unittest
 import zipfile
+import zlib
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -456,6 +457,26 @@ class PublicationTest(unittest.TestCase):
             encoded = base64.b64encode(gzip.compress(source)).decode("ascii")
             (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
             with self.assertRaisesRegex(PublicationError, "binary container"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_base64_encoded_zlib(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(zlib.compress(source)).decode("ascii")
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_base64_encoded_raw_deflate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+            compressed = compressor.compress(source) + compressor.flush()
+            encoded = base64.b64encode(compressed).decode("ascii")
+            (root / "REPORT.md").write_text(encoded + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_bounds_base64_candidate_work(self) -> None:

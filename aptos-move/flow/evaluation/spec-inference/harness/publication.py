@@ -325,13 +325,27 @@ def _check_content(data: bytes, name: str) -> None:
 
 
 def _check_encoded_content(data: bytes, name: str) -> None:
-    pending = [_decode_structured_content(data)]
+    pending = [(_decode_structured_content(data), False)]
     candidate_count = 0
     decoded_bytes = 0
     while pending:
-        normalized = pending.pop()
+        normalized, is_encoded = pending.pop()
         if normalized is not data:
             _check_content(normalized, name)
+        if is_encoded:
+            expanded = _decode_deflate(
+                normalized, MAX_BASE64_DECODE_BYTES - decoded_bytes, name
+            )
+            if expanded is not None:
+                decoded_bytes += len(expanded)
+                if any(
+                    expanded.startswith(magic)
+                    for magic in ENCODED_CONTAINER_MAGICS
+                ):
+                    raise PublicationError(
+                        f"{name}: encoded content contains a binary container"
+                    )
+                pending.append((_decode_structured_content(expanded), True))
         for candidate in _base64_candidates(normalized):
             candidate_count += 1
             if candidate_count > MAX_BASE64_CANDIDATES:
@@ -352,8 +366,7 @@ def _check_encoded_content(data: bytes, name: str) -> None:
                 raise PublicationError(
                     f"{name}: encoded content contains a binary container"
                 )
-            _check_content(decoded, name)
-            pending.append(_decode_structured_content(decoded))
+            pending.append((_decode_structured_content(decoded), True))
 
 
 def _base64_candidates(data: bytes) -> Iterator[bytes]:
@@ -381,6 +394,20 @@ def _decode_base64(data: bytes) -> bytes | None:
         return base64.b64decode(standard, validate=True)
     except (binascii.Error, ValueError):
         return None
+
+
+def _decode_deflate(data: bytes, max_bytes: int, name: str) -> bytes | None:
+    for window_bits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
+        decoder = zlib.decompressobj(window_bits)
+        try:
+            decoded = decoder.decompress(data, max_bytes + 1)
+        except zlib.error:
+            continue
+        if len(decoded) > max_bytes:
+            raise PublicationError(f"{name}: encoded content exceeds decode limit")
+        if decoder.eof:
+            return decoded
+    return None
 
 
 def _decode_json_escapes(data: bytes) -> bytes:
