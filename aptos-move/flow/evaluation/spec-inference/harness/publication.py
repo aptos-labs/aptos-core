@@ -124,6 +124,9 @@ MIN_RAW_DEFLATE_PROBE_WORK = 64 * 1024
 MAX_RAW_DEFLATE_PROBE_WORK = 16 * 1024 * 1024
 RAW_DEFLATE_PROBE_WORK_FACTOR = 4
 RAW_DEFLATE_PROBE_CHUNK_BYTES = 8
+MIN_FRAGMENT_DECODE_WORK = 64 * 1024
+MAX_FRAGMENT_DECODE_WORK = 16 * 1024 * 1024
+FRAGMENT_DECODE_WORK_FACTOR = 4
 MAX_GZIP_INPUT_OVERHEAD = 64 * 1024
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
@@ -365,6 +368,31 @@ def _check_content(
         raise PublicationError(f"{name}: contains Move source content")
 
 
+def _decode_unicode_text_candidates(data: bytes) -> Iterator[bytes]:
+    if not data or data.count(b"\0") * 4 < len(data):
+        return
+    encodings: list[str] = []
+    if len(data) % 2 == 0:
+        if data[1::2].count(0) * 4 >= len(data):
+            encodings.append("utf-16-le")
+        if data[0::2].count(0) * 4 >= len(data):
+            encodings.append("utf-16-be")
+    if len(data) % 4 == 0:
+        if sum(data[index::4].count(0) for index in (1, 2, 3)) * 2 >= len(data):
+            encodings.append("utf-32-le")
+        if sum(data[index::4].count(0) for index in (0, 1, 2)) * 2 >= len(data):
+            encodings.append("utf-32-be")
+    seen: set[bytes] = set()
+    for encoding in encodings:
+        try:
+            normalized = data.decode(encoding).encode("utf-8")
+        except UnicodeError:
+            continue
+        if normalized != data and normalized not in seen:
+            seen.add(normalized)
+            yield normalized
+
+
 def _check_encoded_content(
     data: bytes, name: str, *, check_source_paths: bool = True
 ) -> None:
@@ -394,6 +422,8 @@ def _check_encoded_content(
             _check_content(
                 current, name, check_source_paths=check_source_paths
             )
+        for normalized_text in _decode_unicode_text_candidates(current):
+            enqueue(normalized_text)
         for decoded, remainder in _decode_deflate_candidates(
             current,
             MAX_ENCODED_DECODE_BYTES - decoded_bytes,
@@ -724,6 +754,11 @@ def _decodable_fragment_suffixes(
     scan_leading_fragments: bool = False,
 ) -> Iterator[bytes]:
     starts = [(segment_start, 0)]
+    decode_work = 0
+    decode_work_limit = max(
+        MIN_FRAGMENT_DECODE_WORK,
+        min(len(run) * FRAGMENT_DECODE_WORK_FACTOR, MAX_FRAGMENT_DECODE_WORK),
+    )
     if scan_leading_fragments:
         seen_alignments = {segment_start % 4}
         for fragment_index, start in enumerate(fragment_ends[:-1], start=1):
@@ -735,6 +770,11 @@ def _decodable_fragment_suffixes(
         for end in reversed(fragment_ends[fragment_index + 1 :]):
             if end - start < min_bytes:
                 break
+            decode_work += end - start
+            if decode_work > decode_work_limit:
+                raise PublicationError(
+                    "encoded content exceeds fragmented decode limit"
+                )
             token = run[start:end]
             if decode(token) is not None:
                 yield token
@@ -773,19 +813,35 @@ def _decode_deflate_candidates(
     data: bytes, max_bytes: int, name: str, *, scan_raw: bool
 ) -> Iterator[tuple[bytes, bytes]]:
     probe_count = 0
-    for offset in range(0, len(data) - 1):
+    offset = 0
+    while offset < len(data) - 1:
         if not _is_zlib_header(data, offset) or not _is_plausible_zlib_stream(
             data, offset
         ):
+            offset += 1
             continue
         probe_count += 1
         if probe_count > MAX_CONTAINER_PROBES:
             raise PublicationError(f"{name}: encoded content exceeds probe limit")
-        decoded = _decode_deflate_at_offset(
-            data, offset, max_bytes, name, window_bits=(zlib.MAX_WBITS,)
+        result = _decode_deflate_at_offset(
+            data,
+            offset,
+            max_bytes,
+            name,
+            window_bits=(zlib.MAX_WBITS,),
+            max_streams=MAX_CONTAINER_PROBES - probe_count + 1,
         )
-        if decoded is not None:
-            yield decoded
+        if result is None:
+            offset += 1
+            continue
+        decoded_streams, remainder = result
+        probe_count += len(decoded_streams) - 1
+        for stream_index, decoded in enumerate(decoded_streams):
+            trailing = remainder if stream_index + 1 == len(decoded_streams) else b""
+            yield decoded, trailing
+        if len(decoded_streams) > 1:
+            yield b"".join(decoded_streams), b""
+        offset = max(offset + 1, len(data) - len(remainder))
     if scan_raw:
         yield from _decode_raw_deflate_candidates(data, 0, max_bytes, name)
 
@@ -815,6 +871,7 @@ def _decode_raw_deflate_candidates(
 ) -> Iterator[tuple[bytes, bytes]]:
     view = memoryview(data)
     work = 0
+    probe_count = 0
     work_limit = max(
         MIN_RAW_DEFLATE_PROBE_WORK,
         len(data) * RAW_DEFLATE_PROBE_WORK_FACTOR,
@@ -855,26 +912,43 @@ def _decode_raw_deflate_candidates(
                 cursor = end
         return None
 
-    for offset in range(start, len(data)):
+    offset = start
+    while offset < len(data):
         if not _is_plausible_raw_deflate_stream(data, offset):
+            offset += 1
             continue
         first = decode_at(offset, max_bytes)
         if first is None:
+            offset += 1
             continue
+        probe_count += 1
+        if probe_count > MAX_CONTAINER_PROBES:
+            raise PublicationError(f"{name}: encoded content exceeds probe limit")
         first_decoded, next_offset = first
-        combined = bytearray(first_decoded)
+        decoded_streams = [first_decoded]
+        decoded_bytes = len(first_decoded)
         while next_offset < len(data) and _is_plausible_raw_deflate_stream(
             data, next_offset
         ):
-            following = decode_at(next_offset, max_bytes - len(combined))
+            following = decode_at(next_offset, max_bytes - decoded_bytes)
             if following is None:
                 break
+            probe_count += 1
+            if probe_count > MAX_CONTAINER_PROBES:
+                raise PublicationError(
+                    f"{name}: encoded content exceeds probe limit"
+                )
             following_decoded, following_offset = following
             if following_offset <= next_offset:
                 break
-            combined.extend(following_decoded)
+            decoded_streams.append(following_decoded)
+            decoded_bytes += len(following_decoded)
             next_offset = following_offset
-        yield bytes(combined), b""
+        for decoded in decoded_streams:
+            yield decoded, b""
+        if len(decoded_streams) > 1:
+            yield b"".join(decoded_streams), b""
+        offset = max(offset + 1, next_offset)
 
 
 def _is_plausible_raw_deflate_stream(data: bytes, offset: int) -> bool:
@@ -903,29 +977,32 @@ def _decode_deflate_at_offset(
     name: str,
     *,
     window_bits: tuple[int, ...] = (zlib.MAX_WBITS, -zlib.MAX_WBITS),
-) -> tuple[bytes, bytes] | None:
+    max_streams: int = MAX_CONTAINER_PROBES,
+) -> tuple[tuple[bytes, ...], bytes] | None:
     remaining = data[offset:]
-    combined = bytearray()
-    stream_count = 0
+    decoded_streams: list[bytes] = []
+    decoded_bytes = 0
     while remaining:
+        if len(decoded_streams) >= max_streams:
+            raise PublicationError(f"{name}: encoded content exceeds probe limit")
         decoded_stream = _decode_one_deflate(
             remaining,
-            max_bytes - len(combined),
+            max_bytes - decoded_bytes,
             name,
             window_bits=window_bits,
         )
         if decoded_stream is None:
             break
         decoded, unused = decoded_stream
-        combined.extend(decoded)
-        stream_count += 1
+        decoded_streams.append(decoded)
+        decoded_bytes += len(decoded)
         if not unused or len(unused) >= len(remaining):
             remaining = unused
             break
         remaining = unused
-    if not stream_count:
+    if not decoded_streams:
         return None
-    return bytes(combined), remaining
+    return tuple(decoded_streams), remaining
 
 
 def _decode_one_deflate(

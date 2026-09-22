@@ -24,6 +24,7 @@ from harness.publication import (
     _decode_deflate_candidates,
     _decode_html_entities,
     _decode_json_escapes,
+    _decode_one_deflate,
     _decode_structured_content,
     _scan_file,
     build_public_archive,
@@ -695,6 +696,49 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_encoded_text_in_earlier_deflate_stream(self) -> None:
+        source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+        encoded_source = base64.b64encode(source)
+
+        def raw_compress(data: bytes) -> bytes:
+            compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+            return compressor.compress(data) + compressor.flush()
+
+        streams = {
+            "zlib": zlib.compress(encoded_source) + zlib.compress(b"A"),
+            "raw": raw_compress(encoded_source) + raw_compress(b"A"),
+        }
+        for encoding, payload in streams.items():
+            with self.subTest(encoding=encoding):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    (root / "REPORT.md").write_bytes(
+                        base64.b64encode(payload) + b"\n"
+                    )
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
+
+    def test_zlib_stream_chain_is_decoded_once(self) -> None:
+        stream_count = 64
+        content = zlib.compress(b"") * stream_count
+        with patch(
+            "harness.publication._decode_one_deflate",
+            wraps=_decode_one_deflate,
+        ) as decode:
+            list(
+                _decode_deflate_candidates(
+                    content,
+                    64 * 1024 * 1024,
+                    "REPORT.md",
+                    scan_raw=False,
+                )
+            )
+        self.assertEqual(stream_count, decode.call_count)
+
     def test_builder_preserves_compressed_bytes_before_text_decoding(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -895,6 +939,19 @@ class PublicationTest(unittest.TestCase):
                 with self.assertRaisesRegex(PublicationError, "candidate limit"):
                     build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_bounds_fragment_decode_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_bytes(b",".join([b"A="] * 128))
+            with (
+                patch("harness.publication.MIN_FRAGMENT_DECODE_WORK", 256),
+                patch("harness.publication.MAX_FRAGMENT_DECODE_WORK", 256),
+            ):
+                with self.assertRaisesRegex(
+                    PublicationError, "fragmented decode limit"
+                ):
+                    build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_nested_base64_and_json_move_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -913,6 +970,15 @@ class PublicationTest(unittest.TestCase):
                 '{"payload": "module 0x1::sample {}"}\n'.encode("utf-16")
             )
             with self.assertRaisesRegex(PublicationError, "UTF-8"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_base64_encoded_utf16_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = "module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source.encode("utf-16-le"))
+            (root / "REPORT.md").write_bytes(encoded + b"\n")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_nested_json_escape_chain_normalizes_in_one_pass(self) -> None:
