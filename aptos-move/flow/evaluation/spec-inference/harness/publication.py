@@ -92,9 +92,10 @@ JSON_SIMPLE_ESCAPES = {
     ord("t"): ord("\t"),
 }
 MAX_HTML_ENTITY_NAME_BYTES = max(len(name) for name in HTML_ENTITIES)
-BASE64_TOKEN = re.compile(
-    br"(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]{16,}={0,2})(?![A-Za-z0-9+/_=-])"
+BASE64_CHUNK = re.compile(
+    br"(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]{4,}={0,2})(?![A-Za-z0-9+/_=-])"
 )
+MIN_BASE64_BYTES = 16
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -315,12 +316,35 @@ def _check_encoded_content(data: bytes, name: str) -> None:
         normalized = pending.pop()
         if normalized is not data:
             _check_content(normalized, name)
-        for match in BASE64_TOKEN.finditer(normalized):
-            decoded = _decode_base64(match.group(1))
+        for candidate in _base64_candidates(normalized):
+            decoded = _decode_base64(candidate)
             if decoded is None:
                 continue
             _check_content(decoded, name)
             pending.append(_decode_structured_content(decoded))
+
+
+def _base64_candidates(data: bytes) -> Iterator[bytes]:
+    combined = bytearray()
+    chunk_count = 0
+    previous_end = 0
+    for match in BASE64_CHUNK.finditer(data):
+        chunk = match.group(1)
+        separated = chunk_count and any(
+            byte not in b" \t\r\n" for byte in data[previous_end : match.start()]
+        )
+        if separated:
+            if chunk_count > 1 and len(combined) >= MIN_BASE64_BYTES:
+                yield bytes(combined)
+            combined.clear()
+            chunk_count = 0
+        if len(chunk) >= MIN_BASE64_BYTES:
+            yield chunk
+        combined.extend(chunk)
+        chunk_count += 1
+        previous_end = match.end()
+    if chunk_count > 1 and len(combined) >= MIN_BASE64_BYTES:
+        yield bytes(combined)
 
 
 def _decode_base64(data: bytes) -> bytes | None:

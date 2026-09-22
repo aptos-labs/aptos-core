@@ -422,6 +422,19 @@ class PublicationTest(unittest.TestCase):
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
 
+    def test_builder_rejects_line_wrapped_base64_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            wrapped = "\n".join(
+                encoded[offset : offset + 16]
+                for offset in range(0, len(encoded), 16)
+            )
+            (root / "REPORT.md").write_text(wrapped + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_nested_base64_and_json_move_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
