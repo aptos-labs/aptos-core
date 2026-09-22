@@ -1,0 +1,12 @@
+processed 4 tasks
+task 0 lines 4-10:  publish [module 0x42::m {]
+task 1 lines 12-16:  publish [module 0x42::n {]
+task 2 lines 18-23:  publish [module 0x42::e {]
+task 3 lines 25-25:  run 0x42::e::go
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::m,
+    indices: [],
+    offsets: [],
+}

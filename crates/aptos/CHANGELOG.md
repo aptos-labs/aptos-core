@@ -4,7 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- _No changes yet._
+- `aptos move compile --optimize extra` no longer inlines calls to functions in other modules.
 
 ## [9.5.1]
 - Change default REST URLs for `aptos init` from `fullnode.*.aptoslabs.com` to `api.*.aptoslabs.com` for mainnet, testnet, and devnet.
