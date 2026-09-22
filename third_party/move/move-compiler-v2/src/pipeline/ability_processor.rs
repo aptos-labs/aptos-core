@@ -276,7 +276,10 @@ impl Transformer<'_> {
                 .unwrap()
                 .released_and_unused_temps(instr)
             {
-                if temp < self.builder.fun_env.get_parameters().len() {
+                // A parameter the return hands back is moved, not dropped.
+                if temp < self.builder.fun_env.get_parameters().len()
+                    && !instr.sources().contains(&temp)
+                {
                     self.copy_drop.get_mut(&0).unwrap().needs_drop.insert(temp);
                 }
             }
