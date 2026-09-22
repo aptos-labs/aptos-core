@@ -15,6 +15,7 @@ from unittest.mock import patch
 from harness.publication import (
     PublicationError,
     _contains_move_source,
+    _decode_html_entities,
     _decode_json_escapes,
     build_public_archive,
     scan_public_archive,
@@ -56,15 +57,24 @@ def _archive_writer(
 def _result_archives(results: Path) -> list[Path]:
     archives: list[Path] = []
     for archive in results.rglob("*"):
+        relative = archive.relative_to(results).as_posix()
         if (
             archive.is_file()
-            and archive.name.casefold().endswith(".tar.gz")
-            and archive.relative_to(results).as_posix() not in LEGACY_ARCHIVES
+            and relative not in LEGACY_ARCHIVES
+            and (
+                archive.name.casefold().endswith((".tar.gz", ".tgz"))
+                or _has_gzip_header(archive)
+            )
         ):
             archives.append(archive)
             if len(archives) > MAX_TRACKED_ARCHIVES:
                 raise PublicationError(f"{results}: too many result archives")
     return sorted(archives)
+
+
+def _has_gzip_header(path: Path) -> bool:
+    with path.open("rb") as stream:
+        return stream.read(2) == b"\x1f\x8b"
 
 
 def _scan_result_archives(results: Path) -> None:
@@ -98,10 +108,22 @@ class PublicationTest(unittest.TestCase):
     def test_discovers_archives_case_insensitively(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             results = Path(temporary)
-            for name in ("lower.tar.gz", "upper.TAR.GZ", "mixed.Tar.Gz"):
+            for name in (
+                "lower.tar.gz",
+                "upper.TAR.GZ",
+                "mixed.Tar.Gz",
+                "compact.tgz",
+            ):
                 (results / name).touch()
+            (results / "opaque.data").write_bytes(b"\x1f\x8b")
             self.assertEqual(
-                ["lower.tar.gz", "mixed.Tar.Gz", "upper.TAR.GZ"],
+                [
+                    "compact.tgz",
+                    "lower.tar.gz",
+                    "mixed.Tar.Gz",
+                    "opaque.data",
+                    "upper.TAR.GZ",
+                ],
                 [archive.name for archive in _result_archives(results)],
             )
 
@@ -135,6 +157,20 @@ class PublicationTest(unittest.TestCase):
             build_public_archive(root, archive, "round")
             with self.assertRaisesRegex(PublicationError, "expanded archive exceeds"):
                 scan_public_archive(archive, max_total_bytes=1)
+
+    def test_builder_rejects_markdown_encoded_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "m&amp;#111;dule 0x1::sample { public f&#117;n value(): u64 { 1 } }\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_nested_html_entity_chain_normalizes_in_one_pass(self) -> None:
+        chain = b"&amp;" + b"amp;" * 1000
+        self.assertEqual(b"&", _decode_html_entities(chain))
 
     def test_builds_deterministic_source_free_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

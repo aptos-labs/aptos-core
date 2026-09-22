@@ -17,6 +17,7 @@ import sys
 import tarfile
 import tempfile
 import zlib
+from html.entities import html5 as HTML_ENTITIES
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO, Iterable, Iterator
 
@@ -87,6 +88,7 @@ JSON_SIMPLE_ESCAPES = {
     ord("r"): ord("\r"),
     ord("t"): ord("\t"),
 }
+MAX_HTML_ENTITY_NAME_BYTES = max(len(name) for name in HTML_ENTITIES)
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -277,10 +279,12 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
         raise PublicationError(f"{name}: declared size does not match content")
     _validate_utf8(data, name)
     _check_content(data, name)
+    decoded = data
     if name.endswith(".json"):
         decoded = _decode_json_escapes(data)
-        if decoded is not data:
-            _check_content(decoded, name)
+    decoded = _decode_html_entities(decoded)
+    if decoded is not data:
+        _check_content(decoded, name)
     return data, hashlib.sha256(data).hexdigest()
 
 
@@ -358,6 +362,92 @@ def _decode_json_escape_body(data: bytes, index: int) -> tuple[int, int] | None:
     if replacement is None:
         return None
     return replacement, index + 1
+
+
+def _decode_html_entities(data: bytes) -> bytes:
+    if b"&" not in data:
+        return data
+    output = bytearray()
+    ampersands: list[int] = []
+    index = 0
+    changed = False
+    while index < len(data):
+        decoded = None
+        if data[index] == ord("&"):
+            decoded = _decode_html_entity_body(data, index + 1)
+        if decoded is None:
+            replacement = bytes((data[index],))
+            index += 1
+        else:
+            replacement, index = decoded
+            changed = True
+        _append_html_replacement(output, ampersands, replacement)
+
+        while output[-1:] == b";" and ampersands:
+            entity_start = ampersands[-1]
+            nested = _decode_html_entity_body(output, entity_start + 1)
+            if nested is None or nested[1] != len(output):
+                break
+            replacement, _ = nested
+            del output[entity_start:]
+            ampersands.pop()
+            _append_html_replacement(output, ampersands, replacement)
+            changed = True
+    return bytes(output) if changed else data
+
+
+def _append_html_replacement(
+    output: bytearray, ampersands: list[int], replacement: bytes
+) -> None:
+    for byte in replacement:
+        if byte == ord("&"):
+            ampersands.append(len(output))
+        output.append(byte)
+
+
+def _decode_html_entity_body(
+    data: bytes | bytearray, index: int
+) -> tuple[bytes, int] | None:
+    if index >= len(data):
+        return None
+    if data[index] == ord("#"):
+        index += 1
+        hexadecimal = index < len(data) and data[index] in (ord("x"), ord("X"))
+        if hexadecimal:
+            index += 1
+        digits_start = index
+        predicate = _is_ascii_hex if hexadecimal else _is_ascii_digit
+        while index < len(data) and predicate(data[index]):
+            index += 1
+        if index == digits_start or index >= len(data) or data[index] != ord(";"):
+            return None
+        digits = bytes(data[digits_start:index]).lstrip(b"0") or b"0"
+        max_digits = 2 if hexadecimal else 3
+        codepoint = (
+            int(digits, 16 if hexadecimal else 10)
+            if len(digits) <= max_digits
+            else 128
+        )
+        replacement = codepoint if codepoint <= 0x7F else ord(" ")
+        return bytes((replacement,)), index + 1
+
+    entity_end = data.find(
+        b";", index, min(len(data), index + MAX_HTML_ENTITY_NAME_BYTES)
+    )
+    if entity_end < 0:
+        return None
+    try:
+        name = bytes(data[index : entity_end + 1]).decode("ascii")
+    except UnicodeDecodeError:
+        return None
+    value = HTML_ENTITIES.get(name)
+    if value is None:
+        return None
+    replacement = bytes(
+        ord(character) if ord(character) <= 0x7F else ord(" ")
+        for character in value
+    )
+    return replacement, entity_end + 1
 
 
 def _contains_move_source(data: bytes) -> bool:
@@ -549,6 +639,10 @@ def _is_ascii_hex(byte: int) -> bool:
         or ord("A") <= byte <= ord("F")
         or ord("a") <= byte <= ord("f")
     )
+
+
+def _is_ascii_digit(byte: int) -> bool:
+    return ord("0") <= byte <= ord("9")
 
 
 def _preflight_tar(
