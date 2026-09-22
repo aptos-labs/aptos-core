@@ -1,14 +1,14 @@
 name: "Framework function usage: Mainnet"
 
 on:
-  # The weekly schedule is managed by PIES, which dispatches this workflow
-  # with PREVIOUS_WEEK=true every Monday at 06:17 UTC.
+  # The fortnightly schedule is managed by PIES, which dispatches this workflow
+  # with PREVIOUS_THREE_WEEKS=true every 336 hours.
   workflow_dispatch:
     inputs:
-      PREVIOUS_WEEK:
+      PREVIOUS_THREE_WEEKS:
         required: false
         type: boolean
-        description: Analyze the previous completed UTC week; leave range inputs empty.
+        description: Analyze the previous three completed UTC weeks; leave range inputs empty.
         default: false
       IMAGE_TAG:
         required: false
@@ -58,7 +58,7 @@ jobs:
       - name: Select analysis range
         id: range
         env:
-          INPUT_PREVIOUS_WEEK: ${{ inputs.PREVIOUS_WEEK }}
+          INPUT_PREVIOUS_THREE_WEEKS: ${{ inputs.PREVIOUS_THREE_WEEKS }}
           INPUT_START_VERSION: ${{ inputs.START_VERSION }}
           INPUT_END_VERSION: ${{ inputs.END_VERSION }}
           INPUT_START_TIME: ${{ inputs.START_TIME }}
@@ -69,16 +69,16 @@ jobs:
           START_TIME="$INPUT_START_TIME"
           END_TIME="$INPUT_END_TIME"
 
-          if [ "$INPUT_PREVIOUS_WEEK" = "true" ]; then
+          if [ "$INPUT_PREVIOUS_THREE_WEEKS" = "true" ]; then
             if [ -n "$START_VERSION" ] || [ -n "$END_VERSION" ] || [ -n "$START_TIME" ] || [ -n "$END_TIME" ]; then
-              echo "::error::PREVIOUS_WEEK cannot be combined with explicit version or time inputs."
+              echo "::error::PREVIOUS_THREE_WEEKS cannot be combined with explicit version or time inputs."
               exit 1
             fi
             NOW_EPOCH="$(date --utc +%s)"
             DAY_START_EPOCH="$((NOW_EPOCH - NOW_EPOCH % 86400))"
             DAYS_SINCE_MONDAY="$(($(date --utc +%u) - 1))"
             END_EPOCH="$((DAY_START_EPOCH - DAYS_SINCE_MONDAY * 86400))"
-            START_EPOCH="$((END_EPOCH - 7 * 86400))"
+            START_EPOCH="$((END_EPOCH - 21 * 86400))"
             START_TIME="$(date --utc --date="@${START_EPOCH}" '+%Y-%m-%d %H:%M:%S UTC')"
             END_TIME="$(date --utc --date="@${END_EPOCH}" '+%Y-%m-%d %H:%M:%S UTC')"
           fi
@@ -122,3 +122,17 @@ jobs:
       FRAMEWORK_USAGE: true
       FRAMEWORK_USAGE_BUCKET: ${{ vars.FRAMEWORK_USAGE_BUCKET }}
       DRY_RUN: ${{ inputs.DRY_RUN || false }}
+
+  notify-slack:
+    needs: [prepare-range, collect]
+    if: ${{ !cancelled() && needs.collect.result == 'success' && inputs.DRY_RUN == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post published report to #feed-move-alerts
+        continue-on-error: true
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
+        with:
+          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: ":bar_chart: Mainnet framework usage report published for `${{ needs.prepare-range.outputs.start_time }}` through `${{ needs.prepare-range.outputs.end_time }}`: <${{ needs.collect.outputs.latest_html_report_url }}|open the latest report>"

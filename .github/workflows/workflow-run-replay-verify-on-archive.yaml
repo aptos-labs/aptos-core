@@ -3,6 +3,10 @@ name: "*run replay-verify on archive reusable workflow"
 on:
   # This allows the workflow to be triggered from another workflow
   workflow_call:
+    outputs:
+      latest_html_report_url:
+        description: Stable URL of the latest published framework usage HTML report.
+        value: ${{ jobs.run-replay-verify.outputs.latest_html_report_url }}
     inputs:
       NETWORK:
         required: true
@@ -165,6 +169,8 @@ jobs:
     runs-on: 4cpu-gh-ubuntu24-x64
     timeout-minutes: 420 # 7 hours
     needs: build-images
+    outputs:
+      latest_html_report_url: ${{ steps.publish-framework-usage.outputs.latest_html_report_url }}
     env:
       REPORT_BRANCH: gh-pages
       REPORT_REPOSITORY: aptos-labs/aptos-core-private
@@ -306,6 +312,7 @@ jobs:
           fetch-depth: 1
 
       - name: Publish framework usage reports
+        id: publish-framework-usage
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
         env:
           NETWORK: ${{ inputs.NETWORK }}
@@ -342,6 +349,7 @@ jobs:
           JSON_REPORT_URL="${PAGES_URL%/}/${REPORT_PREFIX}/framework-usage.json"
           LATEST_HTML_REPORT_URL="${PAGES_URL%/}/${LATEST_REPORT_PREFIX}/index.html"
           LATEST_JSON_REPORT_URL="${PAGES_URL%/}/${LATEST_REPORT_PREFIX}/framework-usage.json"
+          echo "latest_html_report_url=${LATEST_HTML_REPORT_URL}" >> "$GITHUB_OUTPUT"
 
           START_VERSION="$(jq -r '.start_version' "$REPORT_JSON")"
           END_VERSION="$(jq -r '.end_version' "$REPORT_JSON")"
@@ -371,6 +379,24 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           echo "::notice title=Framework function usage report::HTML: ${HTML_REPORT_URL} | JSON: ${JSON_REPORT_URL}"
+
+      - name: Delete published framework usage shards
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE && steps.publish-framework-usage.outcome == 'success' }}
+        run: |
+          REPORT_JSON="framework-usage-results/framework-usage.json"
+          GCS_PREFIX="$(jq -r '.gcs_prefix // empty' "$REPORT_JSON")"
+          case "$GCS_PREFIX" in
+            "gs://${FRAMEWORK_USAGE_BUCKET}/"*/)
+              ;;
+            *)
+              echo "::error::Refusing to delete unexpected framework usage prefix: '$GCS_PREFIX'"
+              exit 1
+              ;;
+          esac
+
+          SHARD_PREFIX="${GCS_PREFIX}shards"
+          gcloud storage rm --recursive "$SHARD_PREFIX"
+          echo "Deleted temporary framework usage shards from ${SHARD_PREFIX}"
 
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
