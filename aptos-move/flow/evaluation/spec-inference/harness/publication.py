@@ -113,7 +113,7 @@ BASE85_CHUNK = re.compile(
 )
 ASCII85_CHUNK = re.compile(br"(?<![!-uz])([!-uz]+)(?![!-uz])")
 MIN_BASE_N_BYTES = 8
-MAX_ENCODED_CANDIDATES = 262_144
+MAX_ENCODED_CANDIDATES = 393_216
 MAX_ENCODED_DECODE_BYTES = MAX_MEMBER_BYTES
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
@@ -458,7 +458,7 @@ def _contains_zip_end_record(data: bytes) -> bool:
 def _base64_candidates(data: bytes) -> Iterator[bytes]:
     yield from _coalesced_candidates(data, BASE64_CHUNK, MIN_BASE64_BYTES)
     yield from _equal_width_fragment_candidates(
-        data, BASE64_CHUNK, MIN_BASE64_BYTES
+        data, BASE64_CHUNK, MIN_BASE64_BYTES, set(range(1, 17))
     )
 
 
@@ -526,26 +526,26 @@ def _decode_base64(data: bytes) -> bytes | None:
 
 
 def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
-    for token in _base_n_candidates(data, BASE16_CHUNK):
+    for token in _base_n_candidates(data, BASE16_CHUNK, 2):
         try:
             yield base64.b16decode(token, casefold=True)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for token in _base_n_candidates(data, BASE32_CHUNK):
+    for token in _base_n_candidates(data, BASE32_CHUNK, 4):
         token += b"=" * (-len(token) % 8)
         try:
             yield base64.b32decode(token, casefold=True)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for token in _base_n_candidates(data, BASE85_CHUNK):
+    for token in _base_n_candidates(data, BASE85_CHUNK, 5):
         try:
             yield base64.b85decode(token)
         except (binascii.Error, ValueError):
             # Ordinary text overlaps this alphabet; invalid candidates are expected.
             continue
-    for token in _base_n_candidates(data, ASCII85_CHUNK):
+    for token in _base_n_candidates(data, ASCII85_CHUNK, 5):
         try:
             yield base64.a85decode(token, ignorechars=b"")
         except (binascii.Error, ValueError):
@@ -554,31 +554,40 @@ def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
 
 
 def _base_n_candidates(
-    data: bytes, pattern: re.Pattern[bytes]
+    data: bytes, pattern: re.Pattern[bytes], fragment_width: int
 ) -> Iterator[bytes]:
     yield from _coalesced_candidates(data, pattern, MIN_BASE_N_BYTES)
-    yield from _equal_width_fragment_candidates(data, pattern, MIN_BASE_N_BYTES)
+    yield from _equal_width_fragment_candidates(
+        data, pattern, MIN_BASE_N_BYTES, {fragment_width}
+    )
 
 
 def _equal_width_fragment_candidates(
-    data: bytes, pattern: re.Pattern[bytes], min_bytes: int
+    data: bytes,
+    pattern: re.Pattern[bytes],
+    min_bytes: int,
+    fragment_widths: set[int],
 ) -> Iterator[bytes]:
-    fragments = bytearray()
-    fragment_width = 0
-    fragment_count = 0
+    runs: dict[int, tuple[bytearray, int]] = {}
     for match in pattern.finditer(data):
         token = match.group(1)
-        if fragment_count and len(token) != fragment_width:
-            if fragment_count > 1 and len(fragments) >= min_bytes:
-                yield bytes(fragments)
-            fragments.clear()
-            fragment_count = 0
-        if not fragment_count:
-            fragment_width = len(token)
-        fragments.extend(token)
-        fragment_count += 1
-    if fragment_count > 1 and len(fragments) >= min_bytes:
-        yield bytes(fragments)
+        token_width = len(token)
+        completed: list[int] = []
+        for width, (fragments, fragment_count) in runs.items():
+            if token_width <= width:
+                fragments.extend(token)
+                runs[width] = fragments, fragment_count + 1
+            else:
+                if fragment_count > 1 and len(fragments) >= min_bytes:
+                    yield bytes(fragments)
+                completed.append(width)
+        for width in completed:
+            del runs[width]
+        if token_width in fragment_widths and token_width not in runs:
+            runs[token_width] = bytearray(token), 1
+    for fragments, fragment_count in runs.values():
+        if fragment_count > 1 and len(fragments) >= min_bytes:
+            yield bytes(fragments)
 
 
 def _decode_deflate(

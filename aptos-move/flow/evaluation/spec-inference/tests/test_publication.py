@@ -530,15 +530,17 @@ class PublicationTest(unittest.TestCase):
     def test_builder_rejects_delimited_base_n_move_source(self) -> None:
         source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
         encoders = {
-            "base16": (base64.b16encode, 2),
-            "base32": (base64.b32encode, 4),
+            "base16": (base64.b16encode, 2, b","),
+            "base32": (base64.b32encode, 4, b","),
+            "base85": (base64.b85encode, 5, b","),
+            "ascii85": (base64.a85encode, 5, b"|"),
         }
-        for encoding, (encoder, width) in encoders.items():
+        for encoding, (encoder, width, delimiter) in encoders.items():
             with self.subTest(encoding=encoding):
                 with tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
                     encoded = encoder(source)
-                    fragmented = b",".join(
+                    fragmented = delimiter.join(
                         encoded[offset : offset + width]
                         for offset in range(0, len(encoded), width)
                     )
