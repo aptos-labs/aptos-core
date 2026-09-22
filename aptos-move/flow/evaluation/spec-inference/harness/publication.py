@@ -65,7 +65,7 @@ SOURCE_PATH = re.compile(
 )
 DIFF_LINE = re.compile(br"(?m)^(?:diff --git |--- a/|\+\+\+ b/|@@ )")
 MOVE_SOURCE_LINE = re.compile(
-    br"(?im)^[ \t]*(?:"
+    br"(?i)(?<![A-Za-z0-9_])(?:"
     br"(?:spec[ \t]+)?module[ \t]+(?:0x[0-9a-f]+|[A-Za-z_]\w*)::[A-Za-z_]\w*"
     br"|(?:(?:public(?:\([^\r\n)]*\))?|entry|native)[ \t]+)*"
     br"fun[ \t]+[A-Za-z_]\w*[ \t]*(?:<[^\r\n>]*>[ \t]*)?\("

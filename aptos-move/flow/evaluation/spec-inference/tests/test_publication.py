@@ -16,6 +16,24 @@ from harness.publication import (
     scan_public_archive,
 )
 
+LEGACY_ARCHIVES = {
+    "corpus-v1.2/round-v1.2-005-opus-preparation.tar.gz": (
+        "03109546fd5bee94a7f929b127c5a436a2a9b6670a877195d04f8bd4dff3dfec"
+    ),
+    "corpus-v1.2/round-v1.2-005-opus-xhigh-preparation.tar.gz": (
+        "d703dd903f9b4d50fec37a947ab5c2286973e2ecb9a4c082da33cc1ab22a1b33"
+    ),
+    "corpus-v1.2/round-v1.2-005-opus-xhigh-results.tar.gz": (
+        "6e33cadcc17ad34ac59acaa07dea78decfd97c26afbaa3720419f2f636b10b03"
+    ),
+    "corpus-v1.2/round-v1.2-006-opus-xhigh-preparation.tar.gz": (
+        "1597c1203bb81c737e3f48c755a6b7e0c00dcef394cce24cfee3d930c1bdc007"
+    ),
+    "corpus-v1.2/round-v1.2-006-opus-xhigh-results.tar.gz": (
+        "93a462f43e6855824e87955fe54e2203f27f58feb2391bd3816dc55332bc4a46"
+    ),
+}
+
 
 @contextmanager
 def _archive_writer(
@@ -32,7 +50,17 @@ def _archive_writer(
 class PublicationTest(unittest.TestCase):
     def test_tracked_archives_follow_publication_contract(self) -> None:
         results = Path(__file__).resolve().parents[1] / "results"
-        archives = sorted(results.glob("*/corpus3.2-*.tar.gz"))
+        for relative, expected_digest in LEGACY_ARCHIVES.items():
+            archive = results / relative
+            self.assertTrue(archive.is_file())
+            self.assertEqual(
+                expected_digest, hashlib.sha256(archive.read_bytes()).hexdigest()
+            )
+        archives = sorted(
+            archive
+            for archive in results.glob("*/*.tar.gz")
+            if archive.relative_to(results).as_posix() not in LEGACY_ARCHIVES
+        )
         self.assertTrue(archives)
         for archive in archives:
             with self.subTest(archive=archive.name):
@@ -93,6 +121,16 @@ class PublicationTest(unittest.TestCase):
             root = Path(temporary)
             (root / "REPORT.md").write_text(
                 "module example::sample {\n    public fun value(): u64 { 1 }\n}\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_quoted_move_source_in_allowed_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "> module example::sample {\n>     public fun value(): u64 { 1 }\n> }\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(PublicationError, "Move source content"):
