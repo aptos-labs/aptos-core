@@ -172,6 +172,16 @@ class PublicationTest(unittest.TestCase):
         chain = b"&amp;" + b"amp;" * 1000
         self.assertEqual(b"&", _decode_html_entities(chain))
 
+    def test_html_entity_scan_has_bounded_state_memory(self) -> None:
+        content = b"&" * (1024 * 1024)
+        tracemalloc.start()
+        try:
+            self.assertIs(content, _decode_html_entities(content))
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, 8 * 1024 * 1024)
+
     def test_builds_deterministic_source_free_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

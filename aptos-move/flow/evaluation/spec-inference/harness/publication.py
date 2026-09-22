@@ -368,7 +368,7 @@ def _decode_html_entities(data: bytes) -> bytes:
     if b"&" not in data:
         return data
     output = bytearray()
-    ampersands: list[int] = []
+    entity_start: int | None = None
     index = 0
     changed = False
     while index < len(data):
@@ -381,28 +381,34 @@ def _decode_html_entities(data: bytes) -> bytes:
         else:
             replacement, index = decoded
             changed = True
-        _append_html_replacement(output, ampersands, replacement)
+        entity_start = _append_html_replacement(
+            output, entity_start, replacement
+        )
 
-        while output[-1:] == b";" and ampersands:
-            entity_start = ampersands[-1]
+        while output[-1:] == b";" and entity_start is not None:
             nested = _decode_html_entity_body(output, entity_start + 1)
             if nested is None or nested[1] != len(output):
                 break
             replacement, _ = nested
+            previous_start = output.rfind(b"&", 0, entity_start)
             del output[entity_start:]
-            ampersands.pop()
-            _append_html_replacement(output, ampersands, replacement)
+            entity_start = previous_start if previous_start >= 0 else None
+            entity_start = _append_html_replacement(
+                output, entity_start, replacement
+            )
             changed = True
     return bytes(output) if changed else data
 
 
 def _append_html_replacement(
-    output: bytearray, ampersands: list[int], replacement: bytes
-) -> None:
-    for byte in replacement:
-        if byte == ord("&"):
-            ampersands.append(len(output))
-        output.append(byte)
+    output: bytearray, entity_start: int | None, replacement: bytes
+) -> int | None:
+    offset = len(output)
+    output.extend(replacement)
+    last_ampersand = replacement.rfind(b"&")
+    if last_ampersand >= 0:
+        return offset + last_ampersand
+    return entity_start
 
 
 def _decode_html_entity_body(
