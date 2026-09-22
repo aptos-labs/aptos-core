@@ -16,7 +16,7 @@ jobs:
     outputs:
       changes: ${{ steps.check_changes.outputs.changes }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
         uses: bufbuild/buf-setup-action@v1.24.0
@@ -29,7 +29,7 @@ jobs:
         with:
           version: "25.x"
       # Set up pnpm.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       # Set up Poetry.
       - name: Install Python deps for generating code from protos
         uses: ./.github/actions/python-setup
@@ -67,7 +67,7 @@ jobs:
       )
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
@@ -90,13 +90,13 @@ jobs:
       
       - name: Google Cloud Auth
         id: auth
-        uses: "google-github-actions/auth@v2"
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
       - name: Get Secret Manager Secrets
         id: secrets
-        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        uses: google-github-actions/get-secretmanager-secrets@bc9c54b29fdffb8a47776820a7d26e77b379d262 # v3.0.0
         with:
           secrets: |-
             token:aptos-ci/github-actions-repository-dispatch
