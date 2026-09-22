@@ -1,0 +1,45 @@
+name: Select named E2E tests
+on:
+  workflow_call:
+    inputs:
+      ARTIFACT_NAME:
+        required: true
+        type: string
+      GIT_SHA:
+        required: true
+        type: string
+      FORCE_FULL:
+        default: false
+        type: boolean
+    outputs:
+      selected_e2e_tests:
+        description: JSON list of selected test names
+        value: ${{ jobs.select.outputs.selected_e2e_tests }}
+      mode:
+        description: Effective selection mode (legacy, compare, or subsystem)
+        value: ${{ jobs.select.outputs.mode }}
+permissions:
+  contents: read
+jobs:
+  select:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    env:
+      E2E_MODE: ${{ (inputs.FORCE_FULL || (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) && 'legacy' || vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
+    outputs:
+      selected_e2e_tests: ${{ steps.selection.outputs.selected_e2e_tests }}
+      mode: ${{ env.E2E_MODE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Only the planner sources are needed here; the action checks out the
+          # analyzed revision with history. Legacy selection also works for
+          # revisions predating the planner.
+          ref: ${{ env.E2E_MODE == 'legacy' && github.workflow_sha || github.event.pull_request.base.sha || github.workflow_sha }}
+          fetch-depth: 1
+      - uses: ./.github/actions/e2e-test-determinator
+        id: selection
+        with:
+          GIT_SHA: ${{ inputs.GIT_SHA }}
+          DETERMINATOR_MODE: ${{ env.E2E_MODE }}
+          ARTIFACT_NAME: ${{ inputs.ARTIFACT_NAME }}
+          BASE_REF: origin/${{ github.base_ref || 'main' }}

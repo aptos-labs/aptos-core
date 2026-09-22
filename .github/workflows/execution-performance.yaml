@@ -13,6 +13,7 @@ jobs:
       (
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') ||
         github.event.pull_request.auto_merge != null
@@ -25,6 +26,6 @@ jobs:
       # Run all tests only on the scheduled cadence, or explicitly requested
       FLOW: ${{ (github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || 'LAND_BLOCKING' }}
       # Ignore target determination if on the scheduled cadence, or explicitly requested
-      IGNORE_TARGET_DETERMINATION: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}
+      IGNORE_TARGET_DETERMINATION: ${{ contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}
       # Notify Slack only on scheduled runs (PIES triggers workflow_dispatch), not on PRs
       NOTIFY_SLACK: ${{ github.event_name == 'workflow_dispatch' }}

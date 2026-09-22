@@ -1,5 +1,11 @@
 name: "mono-move-e2e-perf"
 on:
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+
   workflow_dispatch:
     inputs:
       RUNNER_NAME:
@@ -36,8 +42,8 @@ on:
     types: [labeled, opened, synchronize, reopened]
 
 concurrency:
-  group: mono-move-e2e-perf-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-mono-move-e2e-perf-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -50,19 +56,21 @@ jobs:
   mono-move-e2e-perf:
     # Dispatch, or a same-repo (non-fork) PR carrying the label.
     if: |
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name != 'pull_request' ||
       (
         contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-perf') &&
         github.event.pull_request.head.repo.full_name == github.repository
       )
-    # Bands are machine-specific, so this and the RUNNER_NAME the run is tagged
-    # with have to be the same value. A pull request always gets the default.
     runs-on: ${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
+    concurrency:
+      group: execution-benchmark-${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
+      cancel-in-progress: false
+      queue: max
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
           # Nothing here runs git against the remote, and cargo authenticates
           # with GIT_CREDENTIALS instead, so the job never needs this token.
           # Leaving it out of the workspace keeps it away from PR code.

@@ -10,6 +10,14 @@ runs:
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
 
+    - name: Test nightly failure summaries
+      run: python3 -m unittest discover -s .github/actions/nightly-test-summary -p '*_test.py'
+      shell: bash
+
+    - name: Test E2E selection workflow integration
+      run: python3 -m unittest discover -s .github/actions/e2e-test-determinator -p '*_test.py'
+      shell: bash
+
     # Install shellcheck and run it on the dev_setup.sh script
     - name: Run shell lints
       run: |

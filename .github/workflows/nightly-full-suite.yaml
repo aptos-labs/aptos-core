@@ -1,0 +1,324 @@
+name: Nightly Full Test Suite
+
+on:
+  # PIES dispatches this workflow nightly on main. GitHub cron is prohibited by
+  # repository policy. See devtools/aptos-cargo-cli/README.md for rollout.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never cancel an in-flight backstop because a PR or another nightly starts.
+concurrency:
+  group: nightly-full-suite-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-tests:
+    name: Full suite (${{ matrix.suite }})
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 720
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: workspace
+            command: cargo nextest run --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit --exclude aptos-batch-encryption --profile ci --cargo-profile ci --no-fail-fast --retries 3
+          - suite: doc-tests
+            command: cargo test --locked --workspace --profile ci --doc
+          - suite: vm-features
+            command: cargo test --locked --profile ci --features check-vm-features -p aptos-node
+          - suite: cached-packages
+            command: scripts/cargo_build_aptos_cached_packages.sh --check
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - name: Run postgres database
+        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - name: Record full-suite coverage
+        run: |
+          awk '/^## Nightly backstop$/ { printing = 1 }
+               printing && /^## / && !/^## Nightly backstop$/ { exit }
+               printing { print }' devtools/aptos-cargo-cli/README.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Run full suite without target determination
+        # Commands are maintained in the static matrix, never user-provided.
+        run: ${{ matrix.command }} 2>&1 | tee nightly-test.log
+        shell: bash
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUST_MIN_STACK: "4297152"
+          MVP_TEST_ON_CI: "true"
+          Z3_EXE: /home/runner/bin/z3
+          CVC5_EXE: /home/runner/bin/cvc5
+          DOTNET_ROOT: /home/runner/.dotnet
+          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+          FORGE_JUNIT_XML_PATH: forge-junit.xml
+      - name: Preserve test logs and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.suite }}-${{ github.run_attempt }}
+          path: |
+            nightly-test.log
+            target/nextest/ci/junit.xml
+            forge-junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  batch-encryption:
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - name: Export pnpm path
+        run: echo "$HOME/.local/share/pnpm" >> "$GITHUB_PATH"
+      - uses: ./.github/actions/rust-batch-encryption
+      - name: Preserve test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-batch-encryption-${{ github.run_attempt }}
+          path: target/nextest/ci/junit.xml
+          retention-days: 14
+
+  smoke-tests:
+    uses: ./.github/workflows/smoke-tests.yaml
+    with:
+      git_sha: ${{ github.sha }}
+      only_docs_changed: ${{ 'false' }}
+
+  e2e-images:
+    strategy:
+      fail-fast: false
+      matrix:
+        features: ["", "consensus-only-perf-test"]
+    uses: ./.github/workflows/workflow-run-docker-rust-build.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      TARGET_CACHE_ID: nightly-e2e
+      FEATURES: ${{ matrix.features }}
+      PROFILE: release
+      BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: remote
+
+  cli-e2e:
+    needs: e2e-images
+    uses: ./.github/workflows/cli-e2e-tests.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      SKIP_JOB: false
+
+  node-api-compatibility:
+    needs: e2e-images
+    uses: ./.github/workflows/node-api-compatibility-tests.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      SKIP_JOB: false
+
+  execution-performance:
+    uses: ./.github/workflows/workflow-run-execution-performance.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      RUNNER_NAME: benchmark-c3d-60
+      IGNORE_TARGET_DETERMINATION: true
+      FLOW: CONTINUOUS
+      NOTIFY_SLACK: false
+
+  mono-move-performance:
+    uses: ./.github/workflows/mono-move-e2e-perf.yaml
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+
+  mono-move-parity:
+    uses: ./.github/workflows/mono-move-tests-parity.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+
+  faucet-current:
+    needs: e2e-images
+    uses: ./.github/workflows/faucet-tests-main.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      SKIP_JOB: false
+
+  faucet-release:
+    uses: ./.github/workflows/faucet-tests-prod.yaml
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+
+  docker-release-images:
+    uses: ./.github/workflows/test-copy-images-to-dockerhub.yaml
+    with:
+      GIT_SHA: ${{ github.sha }}
+
+  ci-helper-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - run: python3 -m unittest discover -s .github/actions/e2e-test-determinator -p '*_test.py'
+      - run: python3 -m unittest discover -s .github/actions/nightly-test-summary -p '*_test.py'
+
+  forge-baseline:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image_tag: ${{ steps.baseline.outputs.IMAGE_TAG }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - uses: ./.github/actions/determine-or-use-target-branch-and-get-last-released-image
+        id: baseline
+        with:
+          base-branch: main
+          variants: "failpoints performance"
+
+  forge-deployed:
+    needs: [e2e-images, forge-baseline]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: forge-e2e
+            suite: realistic_env_max_load
+            duration: 480
+          - name: forge-compatibility
+            suite: compat
+            duration: 300
+          - name: forge-framework-upgrade
+            suite: framework_upgrade
+            duration: 3600
+          - name: forge-consensus-only-performance
+            suite: consensus_only_realistic_env_max_tps
+            duration: 300
+          - name: forge-multiregion
+            suite: multiregion_benchmark_test
+            duration: 300
+    uses: ./.github/workflows/workflow-run-forge.yaml
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      FORGE_TEST_SUITE: ${{ matrix.suite }}
+      FORGE_RUNNER_DURATION_SECS: ${{ matrix.duration }}
+      IMAGE_TAG: ${{ (matrix.name == 'forge-compatibility' || matrix.name == 'forge-framework-upgrade') && needs.forge-baseline.outputs.image_tag || matrix.name == 'forge-consensus-only-performance' && format('consensus_only_perf_test_{0}', github.sha) || github.sha }}
+      FORGE_NAMESPACE: nightly-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+      FORGE_CLUSTER_NAME: ${{ matrix.name == 'forge-multiregion' && 'forge-multiregion' || '' }}
+      COMMENT_HEADER: nightly-${{ matrix.name }}
+      SKIP_JOB: false
+      POST_TO_SLACK: false
+
+  result:
+    name: Nightly full-suite result
+    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, execution-performance, mono-move-performance, mono-move-parity, faucet-current, faucet-release, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      failed: ${{ steps.summary.outputs.failed }}
+      payload: ${{ steps.summary.outputs.payload }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Summarize all required suites
+        id: summary
+        run: python3 .github/actions/nightly-test-summary/summary.py
+        env:
+          NIGHTLY_NEEDS: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+      - name: Require complete successful coverage
+        if: steps.summary.outputs.failed != 'false'
+        run: exit 1
+
+  # The result job fails whenever any suite is not green, so its status alone
+  # decides whether to alert.
+  notify:
+    name: Notify Move alerts
+    needs: result
+    if: ${{ always() && needs.result.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require configured webhook
+        env:
+          ALERT_WEBHOOK: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+        run: test -n "$ALERT_WEBHOOK"
+      - name: Prepare failure payload
+        id: payload
+        env:
+          SUMMARY_PAYLOAD: ${{ needs.result.outputs.payload }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          payload = os.environ['SUMMARY_PAYLOAD']
+          if not payload:
+              url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+              payload = json.dumps({'text': f"Nightly full-suite result could not be collected for {os.environ['GITHUB_SHA']}: <{url}|run and logs>"})
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('json=' + json.dumps(json.loads(payload)) + '\n')
+          PY
+      - name: Post nightly failure to Slack
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
+        with:
+          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: ${{ steps.payload.outputs.json }}

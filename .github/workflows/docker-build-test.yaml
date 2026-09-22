@@ -202,59 +202,85 @@ jobs:
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
+  # Preserve the existing event and permission gates. Pushes, manual dispatches,
+  # and the explicit full-run label always retain full E2E coverage.
+  e2e-test-determinator:
+    permissions:
+      contents: read
+    needs: [permission-check]
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf') ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
+      github.event.pull_request.auto_merge != null ||
+      contains(github.event.pull_request.body, '#e2e')
+    uses: ./.github/workflows/e2e-test-selection.yaml
+    with:
+      ARTIFACT_NAME: docker-build-test
+      GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
   # This is a PR required job.
   node-api-compatibility-tests:
-    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator] # runs with the default release docker build variant "rust-images"
+    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
     if: |
-      (
+      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && needs.rust-images.result == 'success' && (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null) ||
-        contains(github.event.pull_request.body, '#e2e'
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
       )
     uses: ./.github/workflows/node-api-compatibility-tests.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SELECTION_RESULT: ${{ needs.e2e-test-determinator.result }}
+      SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'node-api-compatibility') }}
 
   # This is a PR required job.
   cli-e2e-tests:
-    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator] # runs with the default release docker build variant "rust-images"
+    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
     if: |
-      (
+      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && needs.rust-images.result == 'success' && (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null) ||
-        contains(github.event.pull_request.body, '#e2e'
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
       )
     uses: aptos-labs/aptos-core/.github/workflows/cli-e2e-tests.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SELECTION_RESULT: ${{ needs.e2e-test-determinator.result }}
+      SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'cli-e2e') }}
 
   faucet-tests-main:
-    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator] # runs with the default release docker build variant "rust-images"
+    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
     if: |
-      (
+      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && needs.rust-images.result == 'success' && (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null) ||
-        contains(github.event.pull_request.body, '#e2e'
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
       )
     uses: ./.github/workflows/faucet-tests-main.yaml
     secrets: inherit
     with:
+      SELECTION_RESULT: ${{ needs.e2e-test-determinator.result }}
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'faucet-integration') }}
 
   # This is a PR required job.
   forge-e2e-test:
     needs:
+      - e2e-test-determinator
       - permission-check
       - determine-docker-build-metadata
       - rust-images
@@ -263,17 +289,26 @@ jobs:
       - rust-images-consensus-only-perf-test
       - file_change_determinator
     if: |
-      !failure() && !cancelled() && needs.permission-check.result == 'success' && (
+      !cancelled() &&
+      needs.permission-check.result == 'success' &&
+      needs.determine-docker-build-metadata.result == 'success' &&
+      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
+      (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      SELECTION_RESULT: ${{ needs.e2e-test-determinator.result }}
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: realistic_env_max_load
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
@@ -283,9 +318,9 @@ jobs:
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'forge-e2e') }}
       SEND_RESULTS_TO_TRUNK: true
-  
+
   # This job determines the last released docker image tag, which is used by forge compat test.
   fetch-last-released-docker-image-tag:
     needs:
@@ -307,7 +342,7 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.ref }}
-      
+
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
@@ -326,7 +361,7 @@ jobs:
         with:
           base-branch: ${{ github.base_ref }}
           variants: "failpoints performance"
-      
+
       - name: Add Image Tag to Step Summary
         run: |
           echo "## Image Tag for compat tests" >> $GITHUB_STEP_SUMMARY
@@ -334,10 +369,11 @@ jobs:
           echo "TARGET_BRANCH: ${{ steps.get-docker-image-tag.outputs.TARGET_BRANCH }}" >> $GITHUB_STEP_SUMMARY
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
-  
+
   # Run e2e compat test against testnet branch. This is a PR required job.
   forge-compat-test:
-    needs: 
+    needs:
+      - e2e-test-determinator
       - permission-check
       - fetch-last-released-docker-image-tag
       - determine-docker-build-metadata
@@ -347,25 +383,35 @@ jobs:
       - rust-images-consensus-only-perf-test
       - file_change_determinator
     if: |
-      !failure() && !cancelled() && needs.permission-check.result == 'success' && (
+      !cancelled() &&
+      needs.permission-check.result == 'success' &&
+      needs.determine-docker-build-metadata.result == 'success' &&
+      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
+      needs.fetch-last-released-docker-image-tag.result == 'success' &&
+      (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
+      SELECTION_RESULT: ${{ needs.e2e-test-determinator.result }}
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: ${{ needs.fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'forge-compatibility') }}
       SEND_RESULTS_TO_TRUNK: true
-  
+
   # Run forge framework upgradability test. Forge only runs when the
   # CICD:run-framework-upgrade-test label is present; otherwise SKIP_JOB short-circuits it.
   # The `if:` below deliberately stays broad so the job still materializes and reports a
@@ -383,7 +429,15 @@ jobs:
       - rust-images-performance
       - rust-images-consensus-only-perf-test
     if: |
-      !failure() && !cancelled() && needs.permission-check.result == 'success' && (
+      !cancelled() &&
+      needs.permission-check.result == 'success' &&
+      needs.determine-docker-build-metadata.result == 'success' &&
+      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
+      needs.fetch-last-released-docker-image-tag.result == 'success' &&
+      (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null
@@ -409,7 +463,13 @@ jobs:
       - rust-images-performance
       - rust-images-consensus-only-perf-test
     if: |
-      !failure() && !cancelled() && needs.permission-check.result == 'success' &&
+      !cancelled() &&
+      needs.permission-check.result == 'success' &&
+      needs.determine-docker-build-metadata.result == 'success' &&
+      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test')
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
@@ -431,7 +491,13 @@ jobs:
       - rust-images-performance
       - rust-images-consensus-only-perf-test
     if: |
-      !failure() && !cancelled() && needs.permission-check.result == 'success' &&
+      !cancelled() &&
+      needs.permission-check.result == 'success' &&
+      needs.determine-docker-build-metadata.result == 'success' &&
+      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
       contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test')
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
