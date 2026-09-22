@@ -53,7 +53,7 @@ jobs:
           nohup bash -c 'while true; do awk '\''/MemTotal:/ {total=$2} /MemAvailable:/ {print total-$2}'\'' /proc/meminfo; sleep 1; done' \
             > "$RUNNER_TEMP/cli-memory-kib.txt" 2>/dev/null < /dev/null &
 
-      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@6de07db2c04bdd975e13f2e33003458c15dc32f6
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@7dcf3cf36b471ea8ba1115546aadb73f0de6348d
         with:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}

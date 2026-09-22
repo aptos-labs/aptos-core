@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 6de07db2c04bdd975e13f2e33003458c15dc32f6
+          ref: 7dcf3cf36b471ea8ba1115546aadb73f0de6348d
       - name: Download exact candidate node binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
