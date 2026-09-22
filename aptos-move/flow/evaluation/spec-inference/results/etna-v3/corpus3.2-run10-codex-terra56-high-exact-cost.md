@@ -134,6 +134,10 @@ The clean controller results span 07:35:05–10:23:15 UTC, including clean repla
 - Controller harness SHA-256: `3327f404208e3ef3bdde57f1db0d78c88b40132838d79b349fda81b3559f51a8`.
 - Controller prompts SHA-256: `673cae42ce32a29cc1af1b894437eea40b5adce5e26f6071074be2fd961136e5`.
 
-The companion archive `corpus3.2-run10-codex-terra56-high-exact-cost.tar.gz` contains this report, machine-readable analysis and pricing, per-cell and per-request CSVs, all 240 compact run records, schedules, gate and scoring verdicts, audit and launch reports, and compact evidence from excluded infrastructure attempts. `SHA256SUMS` authenticates the files inside the archive.
+The companion archive `corpus3.2-run10-codex-terra56-high-exact-cost.tar.gz`
+contains only source-free aggregate reports, configuration, pricing, audit
+results, and per-cell and per-request cost tables. Per-run diffs, diagnostics,
+transcripts, event streams, source trees, and excluded-attempt evidence are not
+published. `SHA256SUMS` authenticates the files inside the archive.
 
-The archive SHA-256 is `51f42ab5c7438a7edecb360c23ae7177b01f0b2ddf3c995591eaa9a01b6a7c23`.
+The archive SHA-256 is `3874d346acb7645b4cebb637186988035086c21a26350ecf18c979240ad70460`.

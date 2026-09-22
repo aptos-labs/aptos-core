@@ -200,9 +200,9 @@ The apparatus and coordination provenance was pushed at
 
 The companion archive is
 [`corpus3.2-run9-opus5-foundry.tar.gz`](corpus3.2-run9-opus5-foundry.tar.gz).
-It contains the detailed report, per-cell and per-query tables, final mutation
-summary and per-mutant verdicts, infrastructure-recovery evidence, schedules,
-pricing, audit data, apparatus identities, and an internal `SHA256SUMS`. Raw
-transcripts, workspaces, binaries, credentials, and solver scratch files are
-excluded. The archive SHA-256 is
-`2b99f068c26c592b7b9c66221a71d17941f6f650c0f122a1748a10b20375c4a4`.
+It contains an aggregate publication notice, per-cell and per-query tables,
+the final mutation summary, pricing, audit data, and apparatus identities.
+Per-run verdicts, diagnostics, transcripts, event streams, source trees, and
+recovery evidence with source-bearing fields are excluded. The archive
+includes an internal `SHA256SUMS`; its SHA-256 is
+`e0f545f7a92f33cde0f7cde4d3f9a3cb607be70386747cb43308f6aee9290d04`.
