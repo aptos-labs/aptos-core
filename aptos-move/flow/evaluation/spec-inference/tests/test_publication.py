@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import io
@@ -7,6 +8,7 @@ import tarfile
 import tempfile
 import tracemalloc
 import unittest
+import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -64,6 +66,7 @@ UNSUPPORTED_ARCHIVE_MAGICS = (
     b"\xfd7zXZ\x00",
     b"\x28\xb5\x2f\xfd",
 )
+MAX_ZIP_TRAILER_BYTES = 65_557
 
 
 @contextmanager
@@ -92,8 +95,10 @@ def _result_archives(results: Path) -> list[Path]:
             archives.append(archive)
             if len(archives) > MAX_TRACKED_ARCHIVES:
                 raise PublicationError(f"{results}: too many result archives")
-        elif name.endswith(UNSUPPORTED_ARCHIVE_SUFFIXES) or _is_archive_header(
-            header
+        elif (
+            name.endswith(UNSUPPORTED_ARCHIVE_SUFFIXES)
+            or _is_archive_header(header)
+            or _has_zip_end_record(archive)
         ):
             raise PublicationError(f"{archive}: unsupported result archive")
     return sorted(archives)
@@ -108,6 +113,14 @@ def _is_archive_header(header: bytes) -> bool:
     return _has_tar_checksum(header) or any(
         header.startswith(magic) for magic in UNSUPPORTED_ARCHIVE_MAGICS
     )
+
+
+def _has_zip_end_record(path: Path) -> bool:
+    size = path.stat().st_size
+    with path.open("rb") as stream:
+        stream.seek(max(0, size - MAX_ZIP_TRAILER_BYTES))
+        trailer = stream.read(MAX_ZIP_TRAILER_BYTES)
+    return b"PK\x05\x06" in trailer or b"PK\x06\x06" in trailer
 
 
 def _has_tar_checksum(header: bytes) -> bool:
@@ -197,6 +210,18 @@ class PublicationTest(unittest.TestCase):
             checksum = sum(header)
             header[148:156] = f"{checksum:06o}\0 ".encode()
             (results / "opaque.data").write_bytes(header + bytes(1024))
+            with self.assertRaisesRegex(
+                PublicationError, "unsupported result archive"
+            ):
+                _result_archives(results)
+
+    def test_rejects_prepended_zip_with_opaque_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            payload = io.BytesIO()
+            with zipfile.ZipFile(payload, "w") as archive:
+                archive.writestr("source.move", "module 0x1::sample {}")
+            (results / "opaque.data").write_bytes(bytes(512) + payload.getvalue())
             with self.assertRaisesRegex(
                 PublicationError, "unsupported result archive"
             ):
@@ -382,6 +407,28 @@ class PublicationTest(unittest.TestCase):
             nested = encoded.replace("\\", "\\\\")
             (root / "analysis.json").write_text(
                 f'{{"payload": "{nested}"}}\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_base64_encoded_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            (root / "analysis.json").write_text(
+                f'{{"payload": "{encoded}"}}\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_nested_base64_and_json_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"\\u006dodule 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(base64.b64encode(source)).decode("ascii")
+            (root / "analysis.json").write_text(
+                f'{{"payload": "{encoded}"}}\n', encoding="utf-8"
             )
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")

@@ -8,6 +8,8 @@ when tracked bundles are tested.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import codecs
 import gzip
 import hashlib
@@ -90,6 +92,9 @@ JSON_SIMPLE_ESCAPES = {
     ord("t"): ord("\t"),
 }
 MAX_HTML_ENTITY_NAME_BYTES = max(len(name) for name in HTML_ENTITIES)
+BASE64_TOKEN = re.compile(
+    br"(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]{16,}={0,2})(?![A-Za-z0-9+/_=-])"
+)
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -280,9 +285,7 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
         raise PublicationError(f"{name}: declared size does not match content")
     _validate_utf8(data, name)
     _check_content(data, name)
-    decoded = _decode_structured_content(data)
-    if decoded is not data:
-        _check_content(decoded, name)
+    _check_encoded_content(data, name)
     return data, hashlib.sha256(data).hexdigest()
 
 
@@ -304,6 +307,29 @@ def _check_content(data: bytes, name: str) -> None:
         raise PublicationError(f"{name}: contains unified-diff source content")
     if _contains_move_source(data):
         raise PublicationError(f"{name}: contains Move source content")
+
+
+def _check_encoded_content(data: bytes, name: str) -> None:
+    pending = [_decode_structured_content(data)]
+    while pending:
+        normalized = pending.pop()
+        if normalized is not data:
+            _check_content(normalized, name)
+        for match in BASE64_TOKEN.finditer(normalized):
+            decoded = _decode_base64(match.group(1))
+            if decoded is None:
+                continue
+            _check_content(decoded, name)
+            pending.append(_decode_structured_content(decoded))
+
+
+def _decode_base64(data: bytes) -> bytes | None:
+    standard = data.translate(bytes.maketrans(b"-_", b"+/"))
+    standard += b"=" * (-len(standard) % 4)
+    try:
+        return base64.b64decode(standard, validate=True)
+    except (binascii.Error, ValueError):
+        return None
 
 
 def _decode_json_escapes(data: bytes) -> bytes:
