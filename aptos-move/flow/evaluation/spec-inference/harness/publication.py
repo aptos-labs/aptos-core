@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 import zlib
 from pathlib import Path, PurePosixPath
-from typing import BinaryIO, Iterable
+from typing import BinaryIO, Iterable, Iterator
 
 
 PUBLIC_AGGREGATE_FILES = frozenset(
@@ -64,8 +64,16 @@ SOURCE_PATH = re.compile(
     br"(?i)(?<![A-Za-z0-9_.-])sources[/\\][A-Za-z0-9_.-]+"
 )
 DIFF_LINE = re.compile(br"(?m)^(?:diff --git |--- a/|\+\+\+ b/|@@ )")
-MOVE_TOKEN = re.compile(br"0x[0-9a-fA-F]+|[A-Za-z_][A-Za-z0-9_]*|::|[{}()<>,]")
-MOVE_IDENTIFIER = re.compile(br"[A-Za-z_][A-Za-z0-9_]*")
+MOVE_PUNCTUATION = {
+    ord("{"): b"{",
+    ord("}"): b"}",
+    ord("("): b"(",
+    ord(")"): b")",
+    ord("<"): b"<",
+    ord(">"): b">",
+    ord(","): b",",
+    ord(";"): b";",
+}
 _ZERO_BLOCK = b"\0" * 512
 _EXTENDED_TAR_TYPES = {b"g", b"x", b"L", b"K", b"S"}
 
@@ -255,68 +263,133 @@ def _scan_file(stream: BinaryIO, size: int, name: str) -> tuple[bytes, str]:
 
 
 def _contains_move_source(data: bytes) -> bool:
-    token_sets = (MOVE_TOKEN.findall(data), MOVE_TOKEN.findall(_strip_move_comments(data)))
-    return any(_move_tokens_contain_declaration(tokens) for tokens in token_sets)
+    return _move_tokens_contain_declaration(
+        _iter_move_tokens(data, skip_comments=False)
+    ) or _move_tokens_contain_declaration(_iter_move_tokens(data, skip_comments=True))
 
 
-def _move_tokens_contain_declaration(tokens: list[bytes]) -> bool:
-    lowered = [token.lower() for token in tokens]
-    for index, token in enumerate(lowered):
-        if token == b"module" and index + 4 < len(lowered):
-            address, separator, module, opening = lowered[index + 1 : index + 5]
-            if (
-                _is_move_name(address)
-                and separator == b"::"
-                and MOVE_IDENTIFIER.fullmatch(module)
-                and opening == b"{"
-            ):
+def _move_tokens_contain_declaration(tokens: Iterable[bytes]) -> bool:
+    module_state = 0
+    address_state = 0
+    script_state = 0
+    function_state = 0
+    function_type_depth = 0
+    data_type_state = 0
+    data_type_depth = 0
+    data_type_tokens_left = 0
+
+    for token in tokens:
+        if module_state == 1:
+            module_state = 2 if _is_move_name(token) else 0
+        elif module_state == 2:
+            if token == b"{":
                 return True
-        if token == b"fun" and index + 2 < len(lowered):
-            if MOVE_IDENTIFIER.fullmatch(lowered[index + 1]):
-                next_index = _after_type_parameters(lowered, index + 2)
-                if next_index < len(lowered) and lowered[next_index] == b"(":
-                    return True
-        if token in (b"struct", b"enum") and index + 2 < len(lowered):
-            if MOVE_IDENTIFIER.fullmatch(lowered[index + 1]):
-                next_index = _after_type_parameters(lowered, index + 2)
-                if next_index < len(lowered) and lowered[next_index] == b"{":
-                    return True
-                if b"{" in lowered[next_index : next_index + 16]:
-                    return True
+            module_state = 3 if token == b"::" else 0
+        elif module_state == 3:
+            module_state = 4 if _is_move_identifier(token) else 0
+        elif module_state == 4:
+            if token == b"{":
+                return True
+            module_state = 0
+        if token == b"module":
+            module_state = 1
+
+        if address_state == 1:
+            address_state = 2 if _is_move_name(token) else 0
+        elif address_state == 2:
+            if token == b"{":
+                return True
+            address_state = 0
+        if token == b"address":
+            address_state = 1
+
+        if script_state == 1:
+            if token == b"{":
+                return True
+            script_state = 0
+        if token == b"script":
+            script_state = 1
+
+        if function_state == 1:
+            function_state = 2 if _is_move_identifier(token) else 0
+        elif function_state == 2:
+            if token == b"(":
+                return True
+            if token == b"<":
+                function_state = 3
+                function_type_depth = 1
+            else:
+                function_state = 0
+        elif function_state == 3:
+            if token == b"<":
+                function_type_depth += 1
+            elif token == b">":
+                function_type_depth -= 1
+                if function_type_depth == 0:
+                    function_state = 4
+        elif function_state == 4:
+            if token == b"(":
+                return True
+            function_state = 0
+        if token == b"fun":
+            function_state = 1
+
+        if data_type_state == 1:
+            data_type_state = 2 if _is_move_identifier(token) else 0
+        elif data_type_state == 2:
+            if token == b"{":
+                return True
+            if token == b"<":
+                data_type_state = 3
+                data_type_depth = 1
+            elif token == b"has":
+                data_type_state = 4
+                data_type_tokens_left = 16
+            else:
+                data_type_state = 0
+        elif data_type_state == 3:
+            if token == b"<":
+                data_type_depth += 1
+            elif token == b">":
+                data_type_depth -= 1
+                if data_type_depth == 0:
+                    data_type_state = 2
+        elif data_type_state == 4:
+            if token == b"{":
+                return True
+            data_type_tokens_left -= 1
+            if token == b";" or data_type_tokens_left == 0:
+                data_type_state = 0
+        if token in (b"struct", b"enum"):
+            data_type_state = 1
+
     return False
 
 
 def _is_move_name(token: bytes) -> bool:
-    return bool(MOVE_IDENTIFIER.fullmatch(token) or re.fullmatch(br"0x[0-9a-f]+", token))
+    return _is_move_identifier(token) or (
+        len(token) > 2
+        and token.startswith(b"0x")
+        and all(_is_ascii_hex(byte) for byte in token[2:])
+    )
 
 
-def _after_type_parameters(tokens: list[bytes], index: int) -> int:
-    if index >= len(tokens) or tokens[index] != b"<":
-        return index
-    depth = 0
-    while index < len(tokens):
-        if tokens[index] == b"<":
-            depth += 1
-        elif tokens[index] == b">":
-            depth -= 1
-            if depth == 0:
-                return index + 1
-        index += 1
-    return index
+def _is_move_identifier(token: bytes) -> bool:
+    if not token or not _is_identifier_start(token[0]):
+        return False
+    return all(_is_identifier_continue(byte) for byte in token[1:])
 
 
-def _strip_move_comments(data: bytes) -> bytes:
-    output = bytearray()
+def _iter_move_tokens(data: bytes, *, skip_comments: bool) -> Iterator[bytes]:
     index = 0
     while index < len(data):
-        if data[index : index + 2] == b"//":
+        if skip_comments and data[index : index + 2] == b"//":
             newline = data.find(b"\n", index + 2)
             if newline < 0:
-                break
-            output.append(ord("\n"))
+                return
             index = newline + 1
             continue
-        if data[index : index + 2] == b"/*":
+        if skip_comments and data[index : index + 2] == b"/*":
             index += 2
             depth = 1
             while index < len(data) and depth:
@@ -328,11 +401,56 @@ def _strip_move_comments(data: bytes) -> bytes:
                     index += 2
                 else:
                     index += 1
-            output.append(ord(" "))
             continue
-        output.append(data[index])
+
+        byte = data[index]
+        if (
+            byte == ord("0")
+            and data[index + 1 : index + 2].lower() == b"x"
+            and index + 2 < len(data)
+            and _is_ascii_hex(data[index + 2])
+        ):
+            end = index + 3
+            while end < len(data) and _is_ascii_hex(data[end]):
+                end += 1
+            yield data[index:end].lower()
+            index = end
+            continue
+        if _is_identifier_start(byte):
+            end = index + 1
+            while end < len(data) and _is_identifier_continue(data[end]):
+                end += 1
+            yield data[index:end].lower()
+            index = end
+            continue
+        if data[index : index + 2] == b"::":
+            yield b"::"
+            index += 2
+            continue
+        punctuation = MOVE_PUNCTUATION.get(byte)
+        if punctuation is not None:
+            yield punctuation
         index += 1
-    return bytes(output)
+
+
+def _is_identifier_start(byte: int) -> bool:
+    return (
+        byte == ord("_")
+        or ord("A") <= byte <= ord("Z")
+        or ord("a") <= byte <= ord("z")
+    )
+
+
+def _is_identifier_continue(byte: int) -> bool:
+    return _is_identifier_start(byte) or ord("0") <= byte <= ord("9")
+
+
+def _is_ascii_hex(byte: int) -> bool:
+    return (
+        ord("0") <= byte <= ord("9")
+        or ord("A") <= byte <= ord("F")
+        or ord("a") <= byte <= ord("f")
+    )
 
 
 def _preflight_tar(path: Path) -> None:

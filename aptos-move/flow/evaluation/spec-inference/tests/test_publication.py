@@ -5,6 +5,7 @@ import hashlib
 import io
 import tarfile
 import tempfile
+import tracemalloc
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,6 +13,7 @@ from typing import Iterator
 
 from harness.publication import (
     PublicationError,
+    _contains_move_source,
     build_public_archive,
     scan_public_archive,
 )
@@ -176,6 +178,30 @@ class PublicationTest(unittest.TestCase):
             )
             with self.assertRaisesRegex(PublicationError, "Move source content"):
                 build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_rejects_address_block_move_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text(
+                "address 0x42 {\n"
+                "    module sample {\n"
+                "        const VALUE: u64 = 1;\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_move_source_scan_has_bounded_token_memory(self) -> None:
+        payload = b"aa " * (1024 * 1024 // 3)
+        tracemalloc.start()
+        try:
+            self.assertFalse(_contains_move_source(payload))
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, 8 * 1024 * 1024)
 
     def test_scanner_rejects_nested_or_linked_members(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
