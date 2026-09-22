@@ -38,6 +38,10 @@ on:
         type: boolean
         description: Collect framework function usage instead of only replay-verifying.
         default: false
+      FRAMEWORK_USAGE_BUCKET:
+        required: false
+        type: string
+        description: Private GCS bucket name, without gs://, used to transport framework usage shards.
     secrets:
       APTOS_BOT_PAT:
         required: false
@@ -95,6 +99,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FRAMEWORK_USAGE_BUCKET: ${{ inputs.FRAMEWORK_USAGE_BUCKET || vars.FRAMEWORK_USAGE_BUCKET }}
+
 jobs:
   validate-inputs:
     runs-on: ubuntu-latest
@@ -116,6 +123,14 @@ jobs:
             exit 1
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
+            if [ -z "$FRAMEWORK_USAGE_BUCKET" ]; then
+              echo "::error::FRAMEWORK_USAGE_BUCKET is required for framework usage collection. Configure the repository variable or reusable-workflow input."
+              exit 1
+            fi
+            if [[ "$FRAMEWORK_USAGE_BUCKET" == gs://* ]]; then
+              echo "::error::FRAMEWORK_USAGE_BUCKET must be a bare bucket name without the gs:// prefix."
+              exit 1
+            fi
             if [ -z "$START_VERSION" ] && [ -z "$START_TIME" ]; then
               echo "::error::A START_VERSION or START_TIME is required for framework usage collection."
               exit 1
@@ -151,7 +166,6 @@ jobs:
     timeout-minutes: 420 # 7 hours
     needs: build-images
     env:
-      FRAMEWORK_USAGE_BUCKET: aptos-framework-usage-reports
       REPORT_BRANCH: gh-pages
       REPORT_REPOSITORY: aptos-labs/aptos-core-private
     permissions:
@@ -212,12 +226,13 @@ jobs:
             echo "::error::Framework usage shard bucket must enforce public access prevention."
             exit 1
           fi
-          if [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
+          if [ "$UNIFORM_BUCKET_ACCESS" != "True" ] && [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
             echo "::error::Framework usage shard bucket must use uniform bucket-level access."
             exit 1
           fi
 
       - uses: ./.github/actions/python-setup
+        id: replay-verify-python
         with:
           pyproject_directory: testsuite/replay-verify
 
@@ -363,7 +378,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
           NETWORK: ${{ inputs.NETWORK }}
           IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
-        if: ${{ always() && inputs.DRY_RUN == false }}
+        if: ${{ always() && inputs.DRY_RUN == false && steps.replay-verify-python.outcome == 'success' }}
         run: |
           cd testsuite/replay-verify
           ARGS=(--network "$NETWORK" --cleanup)
