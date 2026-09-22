@@ -140,10 +140,18 @@ def build_public_archive(source: Path, output: Path, archive_name: str) -> None:
         raise
 
 
-def scan_public_archive(path: Path) -> None:
+def scan_public_archive(
+    path: Path, *, max_total_bytes: int = MAX_TOTAL_BYTES
+) -> int:
     """Reject archives that do not satisfy the publication contract."""
-    _validate_gzip_container(path)
-    _preflight_tar(path)
+    max_total_bytes = min(max_total_bytes, MAX_TOTAL_BYTES)
+    if max_total_bytes < 0:
+        raise PublicationError("archive byte budget cannot be negative")
+    max_tar_bytes = min(
+        max_total_bytes + (MAX_MEMBERS + 20) * 1024, MAX_TAR_BYTES
+    )
+    _validate_gzip_container(path, max_tar_bytes)
+    _preflight_tar(path, max_total_bytes, max_tar_bytes)
     seen: set[str] = set()
     roots: set[str] = set()
     digests: dict[str, str] = {}
@@ -189,9 +197,9 @@ def scan_public_archive(path: Path) -> None:
             if name not in PUBLIC_AGGREGATE_FILES and name != CHECKSUM_FILE:
                 raise PublicationError(f"{path}: forbidden publication artifact: {member.name}")
             total_bytes += member.size
-            if total_bytes > MAX_TOTAL_BYTES:
+            if total_bytes > max_total_bytes:
                 raise PublicationError(
-                    f"{path}: expanded archive exceeds {MAX_TOTAL_BYTES} bytes"
+                    f"{path}: expanded archive exceeds {max_total_bytes} bytes"
                 )
             stream = archive.extractfile(member)
             if stream is None:
@@ -209,6 +217,7 @@ def scan_public_archive(path: Path) -> None:
     if not digests:
         raise PublicationError(f"{path}: archive contains no public aggregate files")
     _check_checksums(path, checksum_data, digests)
+    return total_bytes
 
 
 def _publication_files(source: Path) -> list[Path]:
@@ -542,7 +551,9 @@ def _is_ascii_hex(byte: int) -> bool:
     )
 
 
-def _preflight_tar(path: Path) -> None:
+def _preflight_tar(
+    path: Path, max_total_bytes: int, max_tar_bytes: int
+) -> None:
     """Bound raw tar parsing and reject extension records before ``tarfile``."""
     raw_bytes = 0
     payload_bytes = 0
@@ -555,15 +566,15 @@ def _preflight_tar(path: Path) -> None:
                 if not block:
                     break
                 raw_bytes += len(block)
-                if raw_bytes > MAX_TAR_BYTES:
+                if raw_bytes > max_tar_bytes:
                     raise PublicationError(
-                        f"{path}: expanded tar stream exceeds {MAX_TAR_BYTES} bytes"
+                        f"{path}: expanded tar stream exceeds {max_tar_bytes} bytes"
                     )
                 if len(block) != 512:
                     raise PublicationError(f"{path}: truncated tar header")
                 if block == _ZERO_BLOCK:
                     saw_end = True
-                    _check_zero_padding(path, stream, raw_bytes)
+                    _check_zero_padding(path, stream, raw_bytes, max_tar_bytes)
                     break
 
                 members += 1
@@ -587,15 +598,15 @@ def _preflight_tar(path: Path) -> None:
                         f"{path}: tar member exceeds {MAX_MEMBER_BYTES} bytes"
                     )
                 payload_bytes += size
-                if payload_bytes > MAX_TOTAL_BYTES:
+                if payload_bytes > max_total_bytes:
                     raise PublicationError(
-                        f"{path}: expanded archive exceeds {MAX_TOTAL_BYTES} bytes"
+                        f"{path}: expanded archive exceeds {max_total_bytes} bytes"
                     )
                 padded_size = ((size + 511) // 512) * 512
                 raw_bytes += padded_size
-                if raw_bytes > MAX_TAR_BYTES:
+                if raw_bytes > max_tar_bytes:
                     raise PublicationError(
-                        f"{path}: expanded tar stream exceeds {MAX_TAR_BYTES} bytes"
+                        f"{path}: expanded tar stream exceeds {max_tar_bytes} bytes"
                     )
                 _discard_exact(path, stream, size)
                 _check_member_padding(path, stream, padded_size - size)
@@ -607,7 +618,7 @@ def _preflight_tar(path: Path) -> None:
         raise PublicationError(f"{path}: tar stream is missing its end marker")
 
 
-def _validate_gzip_container(path: Path) -> None:
+def _validate_gzip_container(path: Path, max_tar_bytes: int) -> None:
     """Require one metadata-free gzip member and bound decompression."""
     try:
         with path.open("rb") as stream:
@@ -624,9 +635,9 @@ def _validate_gzip_container(path: Path) -> None:
                 while pending:
                     output = decoder.decompress(pending, 1024 * 1024)
                     expanded += len(output)
-                    if expanded > MAX_TAR_BYTES:
+                    if expanded > max_tar_bytes:
                         raise PublicationError(
-                            f"{path}: expanded tar stream exceeds {MAX_TAR_BYTES} bytes"
+                            f"{path}: expanded tar stream exceeds {max_tar_bytes} bytes"
                         )
                     pending = decoder.unconsumed_tail
                     if decoder.eof:
@@ -701,15 +712,17 @@ def _check_member_padding(path: Path, stream: BinaryIO, size: int) -> None:
         raise PublicationError(f"{path}: nonzero tar padding")
 
 
-def _check_zero_padding(path: Path, stream: BinaryIO, raw_bytes: int) -> None:
+def _check_zero_padding(
+    path: Path, stream: BinaryIO, raw_bytes: int, max_tar_bytes: int
+) -> None:
     while True:
         chunk = stream.read(1024 * 1024)
         if not chunk:
             return
         raw_bytes += len(chunk)
-        if raw_bytes > MAX_TAR_BYTES:
+        if raw_bytes > max_tar_bytes:
             raise PublicationError(
-                f"{path}: expanded tar stream exceeds {MAX_TAR_BYTES} bytes"
+                f"{path}: expanded tar stream exceeds {max_tar_bytes} bytes"
             )
         if chunk.strip(b"\0"):
             raise PublicationError(f"{path}: data follows the tar end marker")

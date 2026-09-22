@@ -10,6 +10,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
+from unittest.mock import patch
 
 from harness.publication import (
     PublicationError,
@@ -36,6 +37,8 @@ LEGACY_ARCHIVES = {
         "93a462f43e6855824e87955fe54e2203f27f58feb2391bd3816dc55332bc4a46"
     ),
 }
+MAX_TRACKED_ARCHIVES = 16
+MAX_TRACKED_ARCHIVE_BYTES = 64 * 1024 * 1024
 
 
 @contextmanager
@@ -51,13 +54,34 @@ def _archive_writer(
 
 
 def _result_archives(results: Path) -> list[Path]:
-    return sorted(
-        archive
-        for archive in results.rglob("*")
-        if archive.is_file()
-        and archive.name.casefold().endswith(".tar.gz")
-        and archive.relative_to(results).as_posix() not in LEGACY_ARCHIVES
-    )
+    archives: list[Path] = []
+    for archive in results.rglob("*"):
+        if (
+            archive.is_file()
+            and archive.name.casefold().endswith(".tar.gz")
+            and archive.relative_to(results).as_posix() not in LEGACY_ARCHIVES
+        ):
+            archives.append(archive)
+            if len(archives) > MAX_TRACKED_ARCHIVES:
+                raise PublicationError(f"{results}: too many result archives")
+    return sorted(archives)
+
+
+def _scan_result_archives(results: Path) -> None:
+    archives = _result_archives(results)
+    if not archives:
+        raise PublicationError(f"{results}: no result archives")
+    remaining_bytes = MAX_TRACKED_ARCHIVE_BYTES
+    for archive in archives:
+        archive_bytes = scan_public_archive(
+            archive, max_total_bytes=remaining_bytes
+        )
+        remaining_bytes -= archive_bytes
+        if remaining_bytes < 0:
+            raise PublicationError(
+                f"{results}: aggregate result archives exceed "
+                f"{MAX_TRACKED_ARCHIVE_BYTES} bytes"
+            )
 
 
 class PublicationTest(unittest.TestCase):
@@ -69,11 +93,7 @@ class PublicationTest(unittest.TestCase):
             self.assertEqual(
                 expected_digest, hashlib.sha256(archive.read_bytes()).hexdigest()
             )
-        archives = _result_archives(results)
-        self.assertTrue(archives)
-        for archive in archives:
-            with self.subTest(archive=archive.name):
-                scan_public_archive(archive)
+        _scan_result_archives(results)
 
     def test_discovers_archives_case_insensitively(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -84,6 +104,37 @@ class PublicationTest(unittest.TestCase):
                 ["lower.tar.gz", "mixed.Tar.Gz", "upper.TAR.GZ"],
                 [archive.name for archive in _result_archives(results)],
             )
+
+    def test_rejects_excessive_archive_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            for index in range(MAX_TRACKED_ARCHIVES + 1):
+                (results / f"archive-{index}.tar.gz").touch()
+            with self.assertRaisesRegex(PublicationError, "too many result archives"):
+                _result_archives(results)
+
+    def test_rejects_excessive_aggregate_archive_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            (results / "first.tar.gz").touch()
+            (results / "second.tar.gz").touch()
+            with patch(
+                "tests.test_publication.scan_public_archive",
+                side_effect=[MAX_TRACKED_ARCHIVE_BYTES, 1],
+            ):
+                with self.assertRaisesRegex(
+                    PublicationError, "aggregate result archives exceed"
+                ):
+                    _scan_result_archives(results)
+
+    def test_scanner_enforces_custom_byte_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_text("aggregate report\n", encoding="utf-8")
+            archive = root / "archive.tar.gz"
+            build_public_archive(root, archive, "round")
+            with self.assertRaisesRegex(PublicationError, "expanded archive exceeds"):
+                scan_public_archive(archive, max_total_bytes=1)
 
     def test_builds_deterministic_source_free_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
