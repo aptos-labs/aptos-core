@@ -561,15 +561,21 @@ class PublicationTest(unittest.TestCase):
                         )
 
     def test_builder_rejects_variable_width_base16_fragments(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            encoded = (
-                "6d6f6475~6c65203078~313a3a657669~6c207b2066756e~"
-                "206c6561~6b2829207b~7d207d"
-            )
-            (root / "REPORT.md").write_text(encoded + "\n")
-            with self.assertRaisesRegex(PublicationError, "Move source content"):
-                build_public_archive(root, root / "archive.tar.gz", "round")
+        encoded = (
+            "6d6f6475~6c65203078~313a3a657669~6c207b2066756e~"
+            "206c6561~6b2829207b~7d207d"
+        )
+        for suffix in ("", "~f"):
+            with self.subTest(suffix=suffix):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    (root / "REPORT.md").write_text(encoded + suffix + "\n")
+                    with self.assertRaisesRegex(
+                        PublicationError, "Move source content"
+                    ):
+                        build_public_archive(
+                            root, root / "archive.tar.gz", "round"
+                        )
 
     def test_builder_rejects_ascii85_zero_shorthand(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -705,14 +711,15 @@ class PublicationTest(unittest.TestCase):
         source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
         compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
         streams = {
-            "zlib": zlib.compress(source),
-            "raw": compressor.compress(source) + compressor.flush(),
+            "zlib": b"X" + zlib.compress(source),
+            "zlib-after-long-prefix": b"X" * 65 + zlib.compress(source),
+            "raw": b"X" + compressor.compress(source) + compressor.flush(),
         }
-        for encoding, compressed in streams.items():
+        for encoding, payload in streams.items():
             with self.subTest(encoding=encoding):
                 with tempfile.TemporaryDirectory() as temporary:
                     root = Path(temporary)
-                    encoded = base64.b64encode(b"X" + compressed)
+                    encoded = base64.b64encode(payload)
                     (root / "REPORT.md").write_bytes(encoded + b"\n")
                     with self.assertRaisesRegex(
                         PublicationError, "Move source content"

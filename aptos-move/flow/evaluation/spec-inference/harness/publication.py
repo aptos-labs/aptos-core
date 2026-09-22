@@ -21,7 +21,7 @@ import tempfile
 import zlib
 from html.entities import html5 as HTML_ENTITIES
 from pathlib import Path, PurePosixPath
-from typing import BinaryIO, Iterable, Iterator
+from typing import BinaryIO, Callable, Iterable, Iterator
 
 
 PUBLIC_AGGREGATE_FILES = frozenset(
@@ -390,11 +390,9 @@ def _check_encoded_content(
             _check_content(
                 current, name, check_source_paths=check_source_paths
             )
-        expanded = _decode_deflate(
+        for decoded, remainder in _decode_deflate_candidates(
             current, MAX_ENCODED_DECODE_BYTES - decoded_bytes, name
-        )
-        if expanded is not None:
-            decoded, remainder = expanded
+        ):
             enqueue(decoded)
             if remainder:
                 enqueue(remainder)
@@ -538,37 +536,77 @@ def _decode_base64(data: bytes) -> bytes | None:
 
 def _decode_base_n_candidates(data: bytes) -> Iterator[bytes]:
     for token in _base_n_candidates(data, BASE16_CHUNK, 2):
-        try:
-            yield base64.b16decode(token, casefold=True)
-        except (binascii.Error, ValueError):
-            # Ordinary text overlaps this alphabet; invalid candidates are expected.
-            continue
+        decoded = _decode_base16(token)
+        if decoded is not None:
+            yield decoded
+    yield from _decode_same_delimiter_candidates(
+        data, BASE16_CHUNK, MIN_BASE_N_BYTES, _decode_base16
+    )
     for token in _base_n_candidates(data, BASE32_CHUNK, 4):
-        token += b"=" * (-len(token) % 8)
-        try:
-            yield base64.b32decode(token, casefold=True)
-        except (binascii.Error, ValueError):
-            # Ordinary text overlaps this alphabet; invalid candidates are expected.
-            continue
+        decoded = _decode_base32(token)
+        if decoded is not None:
+            yield decoded
+    yield from _decode_same_delimiter_candidates(
+        data, BASE32_CHUNK, MIN_BASE_N_BYTES, _decode_base32
+    )
     for token in _base_n_candidates(data, BASE32HEX_CHUNK, 4):
-        token += b"=" * (-len(token) % 8)
-        try:
-            yield base64.b32hexdecode(token, casefold=True)
-        except (binascii.Error, ValueError):
-            # Ordinary text overlaps this alphabet; invalid candidates are expected.
-            continue
+        decoded = _decode_base32hex(token)
+        if decoded is not None:
+            yield decoded
+    yield from _decode_same_delimiter_candidates(
+        data, BASE32HEX_CHUNK, MIN_BASE_N_BYTES, _decode_base32hex
+    )
     for token in _base_n_candidates(data, BASE85_CHUNK, 5):
-        try:
-            yield base64.b85decode(token)
-        except (binascii.Error, ValueError):
-            # Ordinary text overlaps this alphabet; invalid candidates are expected.
-            continue
+        decoded = _decode_base85(token)
+        if decoded is not None:
+            yield decoded
+    yield from _decode_same_delimiter_candidates(
+        data, BASE85_CHUNK, MIN_BASE_N_BYTES, _decode_base85
+    )
     for token in _base_n_candidates(data, ASCII85_CHUNK, 5):
-        try:
-            yield base64.a85decode(token, ignorechars=b"")
-        except (binascii.Error, ValueError):
-            # Ordinary text overlaps this alphabet; invalid candidates are expected.
-            continue
+        decoded = _decode_ascii85(token)
+        if decoded is not None:
+            yield decoded
+    yield from _decode_same_delimiter_candidates(
+        data, ASCII85_CHUNK, MIN_BASE_N_BYTES, _decode_ascii85
+    )
+
+
+def _decode_base16(token: bytes) -> bytes | None:
+    try:
+        return base64.b16decode(token, casefold=True)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _decode_base32(token: bytes) -> bytes | None:
+    token += b"=" * (-len(token) % 8)
+    try:
+        return base64.b32decode(token, casefold=True)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _decode_base32hex(token: bytes) -> bytes | None:
+    token += b"=" * (-len(token) % 8)
+    try:
+        return base64.b32hexdecode(token, casefold=True)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _decode_base85(token: bytes) -> bytes | None:
+    try:
+        return base64.b85decode(token)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _decode_ascii85(token: bytes) -> bytes | None:
+    try:
+        return base64.a85decode(token, ignorechars=b"")
+    except (binascii.Error, ValueError):
+        return None
 
 
 def _base_n_candidates(
@@ -578,34 +616,49 @@ def _base_n_candidates(
     yield from _equal_width_fragment_candidates(
         data, pattern, MIN_BASE_N_BYTES, {fragment_width}
     )
-    yield from _same_delimiter_fragment_candidates(
-        data, pattern, MIN_BASE_N_BYTES
-    )
 
 
-def _same_delimiter_fragment_candidates(
+def _same_delimiter_fragment_runs(
     data: bytes, pattern: re.Pattern[bytes], min_bytes: int
-) -> Iterator[bytes]:
+) -> Iterator[tuple[bytes, tuple[int, ...]]]:
     previous: re.Match[bytes] | None = None
     delimiter: bytes | None = None
     fragments = bytearray()
-    fragment_count = 0
+    fragment_ends: list[int] = []
     for match in pattern.finditer(data):
         if previous is None:
             previous = match
             continue
         separator = data[previous.end() : match.start()]
         if delimiter is None or separator != delimiter:
-            if fragment_count > 1 and len(fragments) >= min_bytes:
-                yield bytes(fragments)
+            if len(fragment_ends) > 1 and len(fragments) >= min_bytes:
+                yield bytes(fragments), tuple(fragment_ends)
             delimiter = separator
             fragments = bytearray(previous.group(1))
-            fragment_count = 1
+            fragment_ends = [len(fragments)]
         fragments.extend(match.group(1))
-        fragment_count += 1
+        fragment_ends.append(len(fragments))
         previous = match
-    if fragment_count > 1 and len(fragments) >= min_bytes:
-        yield bytes(fragments)
+    if len(fragment_ends) > 1 and len(fragments) >= min_bytes:
+        yield bytes(fragments), tuple(fragment_ends)
+
+
+def _decode_same_delimiter_candidates(
+    data: bytes,
+    pattern: re.Pattern[bytes],
+    min_bytes: int,
+    decode: Callable[[bytes], bytes | None],
+) -> Iterator[bytes]:
+    for run, fragment_ends in _same_delimiter_fragment_runs(
+        data, pattern, min_bytes
+    ):
+        for end in reversed(fragment_ends[1:]):
+            if end < min_bytes:
+                break
+            decoded = decode(run[:end])
+            if decoded is not None:
+                yield decoded
+                break
 
 
 def _equal_width_fragment_candidates(
@@ -636,26 +689,55 @@ def _equal_width_fragment_candidates(
             yield bytes(fragments)
 
 
-def _decode_deflate(
+def _decode_deflate_candidates(
     data: bytes, max_bytes: int, name: str
-) -> tuple[bytes, bytes] | None:
+) -> Iterator[tuple[bytes, bytes]]:
     max_prefix = min(len(data), MAX_DEFLATE_PREFIX_BYTES)
     for offset in range(max_prefix + 1):
         decoded = _decode_deflate_at_offset(data, offset, max_bytes, name)
         if decoded is not None:
-            return decoded
-    return None
+            yield decoded
+    probe_count = 0
+    for offset in range(max_prefix + 1, len(data) - 1):
+        if not _is_zlib_header(data, offset):
+            continue
+        probe_count += 1
+        if probe_count > MAX_CONTAINER_PROBES:
+            raise PublicationError(f"{name}: encoded content exceeds probe limit")
+        decoded = _decode_deflate_at_offset(
+            data, offset, max_bytes, name, window_bits=(zlib.MAX_WBITS,)
+        )
+        if decoded is not None:
+            yield decoded
+
+
+def _is_zlib_header(data: bytes, offset: int) -> bool:
+    cmf = data[offset]
+    flags = data[offset + 1]
+    return (
+        cmf & 0x0F == zlib.DEFLATED
+        and cmf >> 4 <= 7
+        and (cmf << 8 | flags) % 31 == 0
+    )
 
 
 def _decode_deflate_at_offset(
-    data: bytes, offset: int, max_bytes: int, name: str
+    data: bytes,
+    offset: int,
+    max_bytes: int,
+    name: str,
+    *,
+    window_bits: tuple[int, ...] = (zlib.MAX_WBITS, -zlib.MAX_WBITS),
 ) -> tuple[bytes, bytes] | None:
     remaining = data[offset:]
     combined = bytearray()
     stream_count = 0
     while remaining:
         decoded_stream = _decode_one_deflate(
-            remaining, max_bytes - len(combined), name
+            remaining,
+            max_bytes - len(combined),
+            name,
+            window_bits=window_bits,
         )
         if decoded_stream is None:
             break
@@ -672,10 +754,14 @@ def _decode_deflate_at_offset(
 
 
 def _decode_one_deflate(
-    data: bytes, max_bytes: int, name: str
+    data: bytes,
+    max_bytes: int,
+    name: str,
+    *,
+    window_bits: tuple[int, ...] = (zlib.MAX_WBITS, -zlib.MAX_WBITS),
 ) -> tuple[bytes, bytes] | None:
-    for window_bits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
-        decoder = zlib.decompressobj(window_bits)
+    for bits in window_bits:
+        decoder = zlib.decompressobj(bits)
         try:
             decoded = decoder.decompress(data, max_bytes + 1)
         except zlib.error:
