@@ -187,12 +187,11 @@ def _scan_result_archives(results: Path) -> None:
                 stream,
                 artifact.stat().st_size,
                 str(artifact),
-                check_source_paths=False,
             )
         sidecar_content.extend(data)
     combined = bytes(sidecar_content)
-    _check_content(combined, str(results), check_source_paths=False)
-    _check_encoded_content(combined, str(results), check_source_paths=False)
+    _check_content(combined, str(results))
+    _check_encoded_content(combined, str(results))
 
 
 class PublicationTest(unittest.TestCase):
@@ -205,6 +204,30 @@ class PublicationTest(unittest.TestCase):
                 expected_digest, hashlib.sha256(archive.read_bytes()).hexdigest()
             )
         _scan_result_archives(results)
+
+    def test_result_sidecars_reject_source_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            results = Path(temporary)
+            archive = results / "round.tar.gz"
+            archive.write_bytes(b"")
+            (results / "analysis.json").write_text(
+                '{"target": "sources/example/module.move"}\n',
+                encoding="utf-8",
+            )
+            with (
+                patch(
+                    "tests.test_publication._result_archives",
+                    return_value=[archive],
+                ),
+                patch(
+                    "tests.test_publication.scan_public_archive",
+                    return_value=0,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    PublicationError, "disallowed source path"
+                ):
+                    _scan_result_archives(results)
 
     def test_discovers_archives_case_insensitively(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -858,6 +881,28 @@ class PublicationTest(unittest.TestCase):
                             root, root / "archive.tar.gz", "round"
                         )
 
+    def test_builder_rejects_variable_delimited_base64_fragments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = b"module 0x1::sample { public fun value(): u64 { 1 } }"
+            encoded = base64.b64encode(source).decode("ascii")
+            widths = iter(range(4, 13))
+            fragments = []
+            offset = 0
+            while offset < len(encoded):
+                width = next(widths)
+                fragments.append(encoded[offset : offset + width])
+                offset += width
+            fragmented = "".join(
+                fragment + ("," if index % 2 == 0 else ";")
+                for index, fragment in enumerate(fragments[:-1])
+            ) + fragments[-1]
+            (root / "REPORT.md").write_text(
+                fragmented + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(PublicationError, "Move source content"):
+                build_public_archive(root, root / "archive.tar.gz", "round")
+
     def test_builder_rejects_delimited_base64_after_leading_fragment(
         self,
     ) -> None:
@@ -950,6 +995,14 @@ class PublicationTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     PublicationError, "fragmented decode limit"
                 ):
+                    build_public_archive(root, root / "archive.tar.gz", "round")
+
+    def test_builder_bounds_fragment_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "REPORT.md").write_bytes(b",".join([b"A"] * 17))
+            with patch("harness.publication.MAX_FRAGMENT_COUNT", 16):
+                with self.assertRaisesRegex(PublicationError, "fragment limit"):
                     build_public_archive(root, root / "archive.tar.gz", "round")
 
     def test_builder_rejects_nested_base64_and_json_move_source(self) -> None:

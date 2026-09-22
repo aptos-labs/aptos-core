@@ -127,6 +127,7 @@ RAW_DEFLATE_PROBE_CHUNK_BYTES = 8
 MIN_FRAGMENT_DECODE_WORK = 64 * 1024
 MAX_FRAGMENT_DECODE_WORK = 16 * 1024 * 1024
 FRAGMENT_DECODE_WORK_FACTOR = 4
+MAX_FRAGMENT_COUNT = 65_536
 MAX_GZIP_INPUT_OVERHEAD = 64 * 1024
 ENCODED_CONTAINER_MAGICS = (
     b"7z\xbc\xaf\x27\x1c",
@@ -516,6 +517,12 @@ def _base64_candidates(data: bytes) -> Iterator[bytes]:
         _decode_base64,
         scan_leading_fragments=True,
     )
+    for run, fragment_ends in _variable_delimiter_fragment_runs(
+        data, BASE64_CHUNK, MIN_BASE64_BYTES
+    ):
+        yield from _base64_fragment_run_tokens(
+            run, fragment_ends, MIN_BASE64_BYTES, _decode_base64
+        )
 
 
 def _coalesced_candidates(
@@ -683,11 +690,82 @@ def _same_delimiter_fragment_runs(
             delimiter = separator
             fragments = bytearray(previous.group(1))
             fragment_ends = [len(fragments)]
+        if len(fragment_ends) >= MAX_FRAGMENT_COUNT:
+            raise PublicationError("encoded content exceeds fragment limit")
         fragments.extend(match.group(1))
         fragment_ends.append(len(fragments))
         previous = match
     if len(fragment_ends) > 1 and len(fragments) >= min_bytes:
         yield bytes(fragments), tuple(fragment_ends)
+
+
+def _variable_delimiter_fragment_runs(
+    data: bytes, pattern: re.Pattern[bytes], min_bytes: int
+) -> Iterator[tuple[bytes, tuple[int, ...]]]:
+    previous: re.Match[bytes] | None = None
+    delimiter: bytes | None = None
+    varied = False
+    fragments = bytearray()
+    fragment_ends: list[int] = []
+    for match in pattern.finditer(data):
+        if previous is None:
+            previous = match
+            continue
+        separator = data[previous.end() : match.start()]
+        punctuation_delimited = (
+            separator
+            and b"\n" not in separator
+            and b"\r" not in separator
+            and BASE64_WHITESPACE.fullmatch(separator) is None
+        )
+        if not punctuation_delimited:
+            if (
+                varied
+                and len(fragments) >= min_bytes
+                and _fragment_widths_are_monotonic(fragment_ends)
+            ):
+                yield bytes(fragments), tuple(fragment_ends)
+            delimiter = None
+            varied = False
+            fragments.clear()
+            fragment_ends.clear()
+            previous = match
+            continue
+        if not fragments:
+            fragments.extend(previous.group(1))
+            fragment_ends.append(len(fragments))
+            delimiter = separator
+        elif separator != delimiter:
+            varied = True
+        if len(fragment_ends) >= MAX_FRAGMENT_COUNT:
+            raise PublicationError("encoded content exceeds fragment limit")
+        fragments.extend(match.group(1))
+        fragment_ends.append(len(fragments))
+        previous = match
+    if (
+        varied
+        and len(fragments) >= min_bytes
+        and _fragment_widths_are_monotonic(fragment_ends)
+    ):
+        yield bytes(fragments), tuple(fragment_ends)
+
+
+def _fragment_widths_are_monotonic(fragment_ends: list[int]) -> bool:
+    direction = 0
+    previous_end = 0
+    previous_width: int | None = None
+    for end in fragment_ends:
+        width = end - previous_end
+        previous_end = end
+        if previous_width is not None:
+            comparison = (width > previous_width) - (width < previous_width)
+            if comparison == 0:
+                return False
+            if direction and comparison != direction:
+                return False
+            direction = comparison
+        previous_width = width
+    return direction != 0
 
 
 def _decode_same_delimiter_candidates(
@@ -718,32 +796,42 @@ def _same_delimiter_tokens(
                 run, 0, fragment_ends, min_bytes, decode
             )
             continue
+        yield from _base64_fragment_run_tokens(
+            run, fragment_ends, min_bytes, decode
+        )
 
-        segment_start = 0
-        segment_first_fragment = 0
-        previous_end = 0
-        for fragment_index, end in enumerate(fragment_ends):
-            if b"=" in run[previous_end:end]:
-                yield from _decodable_fragment_suffixes(
-                    run,
-                    segment_start,
-                    fragment_ends[segment_first_fragment : fragment_index + 1],
-                    min_bytes,
-                    decode,
-                    scan_leading_fragments=True,
-                )
-                segment_start = end
-                segment_first_fragment = fragment_index + 1
-            previous_end = end
-        if segment_first_fragment < len(fragment_ends):
+
+def _base64_fragment_run_tokens(
+    run: bytes,
+    fragment_ends: tuple[int, ...],
+    min_bytes: int,
+    decode: Callable[[bytes], bytes | None],
+) -> Iterator[bytes]:
+    segment_start = 0
+    segment_first_fragment = 0
+    previous_end = 0
+    for fragment_index, end in enumerate(fragment_ends):
+        if b"=" in run[previous_end:end]:
             yield from _decodable_fragment_suffixes(
                 run,
                 segment_start,
-                fragment_ends[segment_first_fragment:],
+                fragment_ends[segment_first_fragment : fragment_index + 1],
                 min_bytes,
                 decode,
                 scan_leading_fragments=True,
             )
+            segment_start = end
+            segment_first_fragment = fragment_index + 1
+        previous_end = end
+    if segment_first_fragment < len(fragment_ends):
+        yield from _decodable_fragment_suffixes(
+            run,
+            segment_start,
+            fragment_ends[segment_first_fragment:],
+            min_bytes,
+            decode,
+            scan_leading_fragments=True,
+        )
 
 
 def _decodable_fragment_suffixes(

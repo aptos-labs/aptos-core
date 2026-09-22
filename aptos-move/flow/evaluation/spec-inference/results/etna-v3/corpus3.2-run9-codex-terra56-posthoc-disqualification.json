@@ -1470,7 +1470,7 @@
     },
     {
       "arm": "hybrid_guided",
-      "detail": "ValueError: cannot apply mutant SM-select-022-one-draw-too-many: the implementation it rewrites is not present unchanged in sources/etna/selection_machine.move",
+      "detail": "ValueError: cannot apply mutant SM-select-022-one-draw-too-many: the target implementation is not present unchanged",
       "outcome": "not_scorable",
       "replicate": 2,
       "run_id": "corpus3.2-run9-codex-terra56-high-no-retries-SM-select-022-r02-hybrid-guided-acceptance",
@@ -1900,7 +1900,7 @@
     },
     {
       "arm": "agent_only",
-      "detail": "ValueError: cannot apply mutant TR-discard-011-scan-past-end: the implementation it rewrites is not present unchanged in sources/trading/extracted_bulk_order_utils.move",
+      "detail": "ValueError: cannot apply mutant TR-discard-011-scan-past-end: the target implementation is not present unchanged",
       "outcome": "not_scorable",
       "replicate": 1,
       "run_id": "corpus3.2-run9-codex-terra56-high-no-retries-TR-discard-011-r01-agent-only-acceptance",
