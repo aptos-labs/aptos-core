@@ -3,6 +3,7 @@
 Measured on 2026-09-17 UTC. **Validation is not green:** normal workspace CI and
 one large baseline sample, including its bounded rerun, failed on a prover output
 mismatch. Measurement runs are finished; no further retries were launched.
+The later local tracing fix below has not been validated in these remote runs.
 
 ## Revisions and method
 
@@ -24,7 +25,7 @@ three baseline/candidate samples using the same source, packages and profiles.
 use candidate test sources on both sides, main's baseline orchestration and its
 prebuilt tools image, pinned to
 `sha256:e64d0e85cd83b1f6383631a9216ffb9b3a909baf6b632dc6c4ba6c80ad295226`.
-The branch does not change product Rust sources relative to that main revision.
+That measured candidate does not change product Rust sources relative to main.
 Devnet/testnet/mainnet image digests were resolved once for all samples.
 The [temporary comparison harness](https://github.com/aptos-labs/aptos-core/commit/7c742e7b5225f7364607752861be136de99cdfef)
 is outside shipping history; its adaptations select images and collect diagnostics,
@@ -142,14 +143,29 @@ former cache backend. Transfer percentages are not whole-smoke-check speedups.
   `ping_success_resets_fail_counter` timed out once and `folds_of_idx.move` hit
   prover resource/time limits once; each passed on its second attempt.
   The job took **60m 41s / 3,883.7 allocated vCPU-minutes** and was not rerun.
-  Prover sources, unit-test action and nextest configuration are unchanged from
-  main; the same `choice.move` discrepancy also occurred in the old-path benchmark.
-  This does not establish a clean regression-free result; triage the flake before
-  claiming full validation. No assertion, baseline or timeout was weakened.
+  At the measured revision, prover sources, the unit-test action and nextest
+  configuration were unchanged from main; the same `choice.move` discrepancy
+  also occurred in the old-path benchmark. The local fix below does not replace
+  a successful remote rerun. No assertion, baseline or timeout was weakened.
 - All eight smoke partitions passed: **143 executed tests, 48 ignored**.
   `test_swarm_with_bad_non_qs_node` twice timed out waiting for a ledger version,
   then passed on its third attempt. The slowest measured test phase was 714.5s;
   peak sampled host memory was 27.2 GB.
+
+### Local tracing fix (2026-09-22)
+
+Debug instrumentation now omits compiler-generated `return` / `return[n]` local
+traces while preserving actual result traces. The original `choice.move` test
+passes with its source and expected output unchanged. Three regression tests
+cover both return branches, multiple return slots, preservation of similarly
+named user locals, and unchanged executable instructions. The single- and
+multiple-return regressions failed before the fix and pass after it.
+
+On macOS with Z3 4.13.0 and Boogie 3.5.6, all **448 move-prover tests** (including
+55 inference tests and 387 prover fixtures) and **18 move-stackless-bytecode
+tests** passed without retries or baseline updates. Scoped Cargo check, Clippy
+with the repository's lint rules, formatting and diff checks also passed.
+These are local correctness results, not refreshed Linux performance measurements.
 
 A real PR is still needed to exercise affected-package selection in PR context,
 labels/skip conditions, required-check integration and PR-specific permissions.

@@ -26,6 +26,11 @@ impl DebugInstrumenter {
     pub fn new() -> Box<Self> {
         Box::new(Self {})
     }
+
+    fn is_return_local(fun_env: &FunctionEnv, idx: usize) -> bool {
+        let name = fun_env.symbol_pool().string(fun_env.get_local_name(idx));
+        name.as_str() == "return" || name.starts_with("return[")
+    }
 }
 
 impl FunctionTargetProcessor for DebugInstrumenter {
@@ -70,7 +75,8 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                     builder.emit(bc);
                 },
                 Call(_, _, Operation::WriteRef, srcs, _)
-                    if srcs[0] < fun_env.get_local_count().unwrap_or_default() =>
+                    if srcs[0] < fun_env.get_local_count().unwrap_or_default()
+                        && !Self::is_return_local(fun_env, srcs[0]) =>
                 {
                     builder.set_loc_from_attr(bc.get_attr_id());
                     builder.emit(bc.clone());
@@ -94,9 +100,11 @@ impl FunctionTargetProcessor for DebugInstrumenter {
                         .chain(mut_targets.into_iter().map(|(idx, _)| idx))
                         .collect();
                     for idx in affected_variables {
-                        // Only emit this for user declared locals, not for ones introduced
-                        // by stack elimination.
-                        if !fun_env.is_temporary(idx).unwrap_or_default() {
+                        // Trace user locals, not compiler temporaries or return slots.
+                        // Return values are traced separately by TraceReturn.
+                        if !fun_env.is_temporary(idx).unwrap_or_default()
+                            && !Self::is_return_local(fun_env, idx)
+                        {
                             builder.emit_with(|id| {
                                 Call(id, vec![], Operation::TraceLocal(idx), vec![idx], None)
                             });
