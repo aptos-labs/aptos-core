@@ -225,7 +225,7 @@ jobs:
             echo "::error::Framework usage shard bucket must enforce public access prevention."
             exit 1
           fi
-          if [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
+          if [ "$UNIFORM_BUCKET_ACCESS" != "True" ] && [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
             echo "::error::Framework usage shard bucket must use uniform bucket-level access."
             exit 1
           fi
