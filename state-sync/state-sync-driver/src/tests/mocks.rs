@@ -4,6 +4,7 @@
 use crate::{
     error::Error,
     metadata_storage::MetadataStorageInterface,
+    snapshot_chunk::SnapshotChunk,
     snapshot_kind::SnapshotKind,
     storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
     tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info},
@@ -30,6 +31,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -99,6 +101,11 @@ pub fn create_mock_reader_writer_with_version(
 /// Creates a mock state snapshot receiver
 pub fn create_mock_receiver() -> MockSnapshotReceiver {
     MockSnapshotReceiver::new()
+}
+
+/// Creates a mock hot state snapshot receiver
+pub fn create_mock_hot_receiver() -> MockHotSnapshotReceiver {
+    MockHotSnapshotReceiver::new()
 }
 
 /// Creates a mock data streaming client
@@ -292,6 +299,12 @@ mock! {
             kind: StateKind,
         ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>>;
 
+        fn get_hot_state_snapshot_receiver(
+            &self,
+            version: Version,
+            expected_root_hash: HashValue,
+        ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>>;
+
         fn finalize_state_snapshot(
             &self,
             version: Version,
@@ -348,6 +361,18 @@ mock! {
     pub SnapshotReceiver {}
     impl StateSnapshotReceiver<StateKey, StateValue> for SnapshotReceiver {
         fn add_chunk(&mut self, chunk: Vec<(StateKey, StateValue)>, proof: SparseMerkleRangeProof) -> Result<()>;
+
+        fn finish(self) -> Result<()>;
+
+        fn finish_box(self: Box<Self>) -> Result<()>;
+    }
+}
+
+// This automatically creates a MockHotSnapshotReceiver.
+mock! {
+    pub HotSnapshotReceiver {}
+    impl StateSnapshotReceiver<StateKey, HotStateValue> for HotSnapshotReceiver {
+        fn add_chunk(&mut self, chunk: Vec<(StateKey, HotStateValue)>, proof: SparseMerkleRangeProof) -> Result<()>;
 
         fn finish(self) -> Result<()>;
 
@@ -460,8 +485,14 @@ mock! {
             &mut self,
             target_ledger_info: LedgerInfoWithSignatures,
             expected_root: HashValue,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
+
+        async fn finish_empty_hot_snapshot(
+            &mut self,
+            target_ledger_info: LedgerInfoWithSignatures,
+            expected_root: HashValue,
+        ) -> AnyhowResult<(), crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;
 
@@ -469,10 +500,10 @@ mock! {
 
         fn acknowledge_storage_data_error(&self);
 
-        async fn save_state_values(
+        async fn save_snapshot_chunk(
             &mut self,
             notification_id: NotificationId,
-            state_value_chunk_with_proof: StateValueChunkWithProof,
+            snapshot_chunk: SnapshotChunk,
         ) -> AnyhowResult<(), crate::error::Error>;
 
         async fn finalize_fast_sync(
