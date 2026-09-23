@@ -164,19 +164,16 @@ impl StreamEngine {
     }
 }
 
+/// Index and count tracking shared by the snapshot stream engines (state values
+/// and hot state). Both stream a flat, index-addressed snapshot at a single
+/// version: the item count is fetched first, then chunks are requested in order.
 #[derive(Clone, Debug)]
-pub struct StateStreamEngine {
-    // The original states request made by the client
-    pub request: GetAllStatesRequest,
-
-    // Which snapshot store this engine streams
-    pub kind: StateKind,
-
-    // True iff a request has been created to fetch the number of states
-    pub state_num_requested: bool,
+pub struct SnapshotStreamCursor {
+    // True iff a request has been created to fetch the number of items
+    pub count_requested: bool,
 
     // The total number of states to fetch at this version
-    pub number_of_states: Option<u64>,
+    pub number_of_items: Option<u64>,
 
     // The next state index that we're waiting to send to the client along the
     // stream. All states before this index have already been sent.
@@ -190,40 +187,99 @@ pub struct StateStreamEngine {
     pub stream_is_complete: bool,
 }
 
+impl SnapshotStreamCursor {
+    fn new(start_index: u64) -> Self {
+        Self {
+            count_requested: false,
+            number_of_items: None,
+            next_stream_index: start_index,
+            next_request_index: start_index,
+            stream_is_complete: false,
+        }
+    }
+
+    /// The index of the last item in the snapshot.
+    fn last_snapshot_index(&self) -> Result<u64, Error> {
+        self.number_of_items
+            .ok_or_else(|| {
+                Error::UnexpectedErrorEncountered("Number of items is not initialized!".into())
+            })?
+            .checked_sub(1)
+            .ok_or_else(|| Error::IntegerOverflow("The last snapshot index has overflown!".into()))
+    }
+
+    /// Records the item count returned by a peer, rejecting a count that cannot
+    /// satisfy the indices we've already requested. An empty snapshot (a count
+    /// of zero) has no chunks, so the stream is already complete.
+    fn record_number_of_items(&mut self, number_of_items: u64) -> Result<(), Error> {
+        if number_of_items < self.next_request_index {
+            return Err(Error::NoDataToFetch(format!(
+                "The next index to fetch is higher than the total number of \
+                items. Next index: {:?}, total items: {:?}",
+                self.next_request_index, number_of_items
+            )));
+        }
+        if number_of_items == 0 {
+            self.stream_is_complete = true;
+        } else {
+            self.number_of_items = Some(number_of_items);
+        }
+        Ok(())
+    }
+
+    /// Advances the request cursor past a batch of chunk requests. The batch is
+    /// contiguous and ascending, so only the last request matters.
+    fn advance_request_index(
+        &mut self,
+        client_requests: &[DataClientRequest],
+    ) -> Result<(), Error> {
+        let end_index = match client_requests.last() {
+            Some(StateValuesWithProof(request)) => request.end_index,
+            Some(request) => {
+                return Err(Error::UnexpectedErrorEncountered(format!(
+                    "Invalid snapshot chunk request created: {:?}",
+                    request
+                )))
+            },
+            None => return Ok(()),
+        };
+        self.next_request_index = end_index
+            .checked_add(1)
+            .ok_or_else(|| Error::IntegerOverflow("Next request index has overflown!".into()))?;
+        Ok(())
+    }
+
+    /// Advances the stream cursor past a received chunk, marking the stream
+    /// complete once the last snapshot item has been sent.
+    fn advance_stream_index(&mut self, last_received_index: u64) -> Result<(), Error> {
+        self.next_stream_index = last_received_index
+            .checked_add(1)
+            .ok_or_else(|| Error::IntegerOverflow("Next stream index has overflown!".into()))?;
+        if last_received_index >= self.last_snapshot_index()? {
+            self.stream_is_complete = true;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StateStreamEngine {
+    // The original states request made by the client
+    pub request: GetAllStatesRequest,
+
+    // Which snapshot store this engine streams
+    pub kind: StateKind,
+
+    // Tracks the item count and the requested/streamed indices
+    pub cursor: SnapshotStreamCursor,
+}
+
 impl StateStreamEngine {
     fn new(request: &GetAllStatesRequest) -> Result<Self, Error> {
         Ok(StateStreamEngine {
             request: request.clone(),
             kind: request.state_kind,
-            state_num_requested: false,
-            number_of_states: None,
-            next_stream_index: request.start_index,
-            next_request_index: request.start_index,
-            stream_is_complete: false,
-        })
-    }
-
-    fn update_request_tracking(
-        &mut self,
-        client_requests: &[DataClientRequest],
-    ) -> Result<(), Error> {
-        for client_request in client_requests {
-            match client_request {
-                StateValuesWithProof(request) => {
-                    self.next_request_index =
-                        request.end_index.checked_add(1).ok_or_else(|| {
-                            Error::IntegerOverflow("Next request index has overflown!".into())
-                        })?;
-                },
-                request => invalid_client_request!(request, self),
-            }
-        }
-        Ok(())
-    }
-
-    fn get_number_of_states(&self) -> Result<u64, Error> {
-        self.number_of_states.ok_or_else(|| {
-            Error::UnexpectedErrorEncountered("Number of states is not initialized!".into())
+            cursor: SnapshotStreamCursor::new(request.start_index),
         })
     }
 }
@@ -237,56 +293,36 @@ impl DataStreamEngine for StateStreamEngine {
         global_data_summary: &GlobalDataSummary,
         _unique_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Vec<DataClientRequest>, Error> {
-        // Check if we should wait for the number of states to be returned
-        if self.number_of_states.is_none() && self.state_num_requested {
-            return Ok(vec![]);
-        }
-
-        // If we have the number of states, send the requests
-        if let Some(number_of_states) = self.number_of_states {
-            // Calculate the number of requests to send
-            let num_requests_to_send = calculate_num_requests_to_send(
-                max_number_of_requests,
-                max_in_flight_requests,
-                num_in_flight_requests,
+        // If we don't have the number of states, request it (or keep waiting)
+        if self.cursor.number_of_items.is_none() {
+            if self.cursor.count_requested {
+                return Ok(vec![]);
+            }
+            info!(
+                (LogSchema::new(LogEntry::AptosDataClient)
+                    .event(LogEvent::Pending)
+                    .message(&format!(
+                        "Requested the number of states at version: {:?}",
+                        self.request.version
+                    )))
             );
-
-            // Calculate the end index
-            let end_state_index = number_of_states
-                .checked_sub(1)
-                .ok_or_else(|| Error::IntegerOverflow("End state index has overflown!".into()))?;
-
-            // Create the client requests
-            let client_requests = create_data_client_request_batch(
-                self.next_request_index,
-                end_state_index,
-                num_requests_to_send,
-                global_data_summary.optimal_chunk_sizes.state_chunk_size,
-                self.clone().into(),
-            )?;
-
-            // Return the requests
-            self.update_request_tracking(&client_requests)?;
-            return Ok(client_requests);
+            self.cursor.count_requested = true;
+            return Ok(vec![NumberOfStates(NumberOfStatesRequest {
+                version: self.request.version,
+                state_kind: self.kind,
+            })]);
         }
 
-        // Otherwise, we need to request the number of states
-        info!(
-            (LogSchema::new(LogEntry::AptosDataClient)
-                .event(LogEvent::Pending)
-                .message(&format!(
-                    "Requested the number of states at version: {:?}",
-                    self.request.version
-                )))
-        );
-
-        // Return the request
-        self.state_num_requested = true;
-        let number_request = DataClientRequest::NumberOfStates(NumberOfStatesRequest {
-            version: self.request.version,
-            state_kind: self.kind,
-        });
-        Ok(vec![number_request])
+        // Otherwise, request the next batch of state value chunks
+        let stream_engine = self.clone().into();
+        create_snapshot_chunk_requests(
+            &mut self.cursor,
+            max_number_of_requests,
+            max_in_flight_requests,
+            num_in_flight_requests,
+            global_data_summary.optimal_chunk_sizes.state_chunk_size,
+            stream_engine,
+        )
     }
 
     fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
@@ -298,7 +334,7 @@ impl DataStreamEngine for StateStreamEngine {
     }
 
     fn is_stream_complete(&self) -> bool {
-        self.stream_is_complete
+        self.cursor.stream_is_complete
     }
 
     fn transform_client_response_into_notification(
@@ -315,7 +351,7 @@ impl DataStreamEngine for StateStreamEngine {
             StateValuesWithProof(request) => {
                 // Verify the client request indices
                 verify_client_request_indices(
-                    self.next_stream_index,
+                    self.cursor.next_stream_index,
                     request.start_index,
                     request.end_index,
                 )?;
@@ -339,19 +375,8 @@ impl DataStreamEngine for StateStreamEngine {
                 let last_received_index =
                     bound_by_range(last_received_index, request.start_index, request.end_index);
 
-                // Update the next stream index
-                self.next_stream_index = last_received_index.checked_add(1).ok_or_else(|| {
-                    Error::IntegerOverflow("Next stream index has overflown!".into())
-                })?;
-
-                // Check if the stream is complete
-                let last_stream_index = self
-                    .get_number_of_states()?
-                    .checked_sub(1)
-                    .ok_or_else(|| Error::IntegerOverflow("End index has overflown!".into()))?;
-                if last_received_index >= last_stream_index {
-                    self.stream_is_complete = true;
-                }
+                // Update the stream cursor and check if the stream is complete
+                self.cursor.advance_stream_index(last_received_index)?;
 
                 // Create a new data notification
                 let data_notification = create_data_notification(
@@ -372,32 +397,23 @@ impl DataStreamEngine for StateStreamEngine {
                                 request.version, number_of_states
                             )))
                     );
-                    self.state_num_requested = false;
 
-                    // Sanity check the response before saving it.
-                    if number_of_states < self.next_request_index {
-                        return Err(Error::NoDataToFetch(format!(
-                            "The next state index to fetch is higher than the \
-                            total number of states. Next index: {:?}, total states: {:?}",
-                            self.next_request_index, number_of_states
-                        )));
-                    }
+                    // The count request has been answered, so a count rejected
+                    // below can be re-requested from another peer
+                    self.cursor.count_requested = false;
+
                     // The number of states is an internal planning value, not
                     // consumer data. An empty tree (count 0) has no chunks: just
                     // end the stream (no notification). The bootstrapper detects
                     // the zero-chunk end and verifies emptiness against the
                     // committed snapshot root. Main state at a real snapshot is
                     // never empty, so a 0 there is an invalid response.
-                    if number_of_states == 0 {
-                        if self.kind == StateKind::MainState {
-                            return Err(Error::AptosDataClientResponseIsInvalid(
-                                "Received a state count of 0 for the main state snapshot!".into(),
-                            ));
-                        }
-                        self.stream_is_complete = true;
-                        return Ok(None);
+                    if number_of_states == 0 && self.kind == StateKind::MainState {
+                        return Err(Error::AptosDataClientResponseIsInvalid(
+                            "Received a state count of 0 for the main state snapshot!".into(),
+                        ));
                     }
-                    self.number_of_states = Some(number_of_states);
+                    self.cursor.record_number_of_items(number_of_states)?;
                 }
             },
             request => invalid_client_request!(request, self),
@@ -2062,6 +2078,37 @@ fn calculate_num_requests_to_send(
 
     // Bound the number of requests to send by the maximum
     min(remaining_in_flight_slots, max_number_of_requests)
+}
+
+/// Creates the next batch of chunk requests for a snapshot stream (state values
+/// or hot state) and advances the cursor past the requested indices. Assumes the
+/// item count has already been received.
+fn create_snapshot_chunk_requests(
+    cursor: &mut SnapshotStreamCursor,
+    max_number_of_requests: u64,
+    max_in_flight_requests: u64,
+    num_in_flight_requests: u64,
+    optimal_chunk_size: u64,
+    stream_engine: StreamEngine,
+) -> Result<Vec<DataClientRequest>, Error> {
+    // Create the client requests
+    let num_requests_to_send = calculate_num_requests_to_send(
+        max_number_of_requests,
+        max_in_flight_requests,
+        num_in_flight_requests,
+    );
+    let client_requests = create_data_client_request_batch(
+        cursor.next_request_index,
+        cursor.last_snapshot_index()?,
+        num_requests_to_send,
+        optimal_chunk_size,
+        stream_engine,
+    )?;
+
+    // Advance the request cursor past everything we just requested
+    cursor.advance_request_index(&client_requests)?;
+
+    Ok(client_requests)
 }
 
 /// Creates a batch of data client requests for the given stream engine
