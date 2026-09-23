@@ -3821,12 +3821,12 @@ impl Value {
 }
 
 /***************************************************************************************
-*
-* Vector
-*
-*   Implemented as a built-in data type.
-*
-**************************************************************************************/
+ *
+ * Vector
+ *
+ *   Implemented as a built-in data type.
+ *
+ **************************************************************************************/
 
 pub const INDEX_OUT_OF_BOUNDS: u64 = NFE_VECTOR_ERROR_BASE + 1;
 pub const POP_EMPTY_VEC: u64 = NFE_VECTOR_ERROR_BASE + 2;
@@ -4670,12 +4670,12 @@ impl GlobalValue {
 }
 
 /***************************************************************************************
-*
-* Debug
-*
-*   Implementation of the Debug trait for VM Values.
-*
-**************************************************************************************/
+ *
+ * Debug
+ *
+ *   Implementation of the Debug trait for VM Values.
+ *
+ **************************************************************************************/
 
 impl Debug for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -4712,13 +4712,13 @@ impl Debug for Value {
 }
 
 /***************************************************************************************
-*
-* Display
-*
-*   Implementation of the Display trait for VM Values. These are supposed to be more
-*   friendly & readable than the generated Debug dump.
-*
-**************************************************************************************/
+ *
+ * Display
+ *
+ *   Implementation of the Display trait for VM Values. These are supposed to be more
+ *   friendly & readable than the generated Debug dump.
+ *
+ **************************************************************************************/
 
 /// Cap recursive `Display` of a `Value` so deeply nested values cannot blow the
 /// formatting thread's stack. Every recursive path (Value↔Container, Locals→Value,
@@ -5849,12 +5849,12 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for StructVariantVisitor<'c, 'l> {
 }
 
 /***************************************************************************************
-*
-* Constants
-*
-*   Implementation of deserialization of constant data into a runtime value
-*
-**************************************************************************************/
+ *
+ * Constants
+ *
+ *   Implementation of deserialization of constant data into a runtime value
+ *
+ **************************************************************************************/
 
 impl Value {
     fn constant_sig_token_to_layout(constant_signature: &SignatureToken) -> Option<MoveTypeLayout> {
@@ -5897,10 +5897,10 @@ impl Value {
 }
 
 /***************************************************************************************
-*
-* Destructors
-*
-**************************************************************************************/
+ *
+ * Destructors
+ *
+ **************************************************************************************/
 // Locals may contain reference values that points to the same cotnainer through Rc, hencing forming
 // a cycle. Therefore values need to be manually taken out of the Locals in order to not leak memory.
 impl Drop for Locals {
@@ -5919,10 +5919,10 @@ impl Drop for Locals {
 }
 
 /***************************************************************************************
-*
-* Views
-*
-**************************************************************************************/
+ *
+ * Views
+ *
+ **************************************************************************************/
 impl Container {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         use Container::*;
