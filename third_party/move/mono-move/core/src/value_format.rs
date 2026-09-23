@@ -3,11 +3,6 @@
 
 //! Options controlling how a VM value renders as text.
 //!
-//! The walk lives in `mono-move-runtime`'s `value_display`; this module only
-//! describes what it should print. Each knob is an independent decision, so
-//! callers compose by field assignment and the presets below are just named
-//! combinations.
-//!
 //! # Divergence from the V1 formatter
 //!
 //! V1 builds no named layout for an enum, so it prints an enum as `#0{ 7 }`:
@@ -42,7 +37,26 @@ pub struct FormatOptions {
 }
 
 impl FormatOptions {
+    /// `0x1::string_utils::to_string_with_canonical_addresses`.
+    pub const CANONICAL_ADDRESSES: Self = Self {
+        canonical_addresses: true,
+        ..Self::TO_STRING
+    };
+    /// `0x1::string_utils::debug_string`, also the rendering behind
+    /// `0x1::debug::print`.
+    pub const DEBUG_STRING: Self = Self {
+        fully_qualified_nominals: true,
+        ..Self::MONO_MOVE
+    };
+    /// One `{}` substitution of `0x1::string_utils::format1`..`format4`.
+    pub const LIST_ELEMENT: Self = Self {
+        single_line: true,
+        fully_qualified_nominals: true,
+        ..Self::MONO_MOVE
+    };
     /// Multi-line, unqualified, unabridged.
+    // TODO(metering): replace the two limits with finite bounds, large enough
+    // that nothing in practice hits them, so every walk terminates.
     pub const MONO_MOVE: Self = Self {
         single_line: false,
         fully_qualified_nominals: false,
@@ -53,30 +67,9 @@ impl FormatOptions {
         max_depth: usize::MAX,
         max_len: usize::MAX,
     };
-
     /// `0x1::string_utils::to_string`.
     pub const TO_STRING: Self = Self {
         single_line: true,
-        ..Self::MONO_MOVE
-    };
-
-    /// `0x1::string_utils::to_string_with_canonical_addresses`.
-    pub const CANONICAL_ADDRESSES: Self = Self {
-        canonical_addresses: true,
-        ..Self::TO_STRING
-    };
-
-    /// `0x1::string_utils::debug_string`, also the rendering behind
-    /// `0x1::debug::print`.
-    pub const DEBUG_STRING: Self = Self {
-        fully_qualified_nominals: true,
-        ..Self::MONO_MOVE
-    };
-
-    /// One `{}` substitution of `0x1::string_utils::format1`..`format4`.
-    pub const LIST_ELEMENT: Self = Self {
-        single_line: true,
-        fully_qualified_nominals: true,
         ..Self::MONO_MOVE
     };
 }

@@ -37,7 +37,8 @@ pub fn native_format<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: `arg` references a live value of type `ty` for the rest of the call.
     let formatted = unsafe { ctx.format_value(arg.ptr(), ty, &options)? };
     let out = ctx.new_byte_vector(formatted.as_bytes())?;
-    // SAFETY: return 0 is `String`, which has a bare `vector<u8>` representation.
+    // SAFETY: return 0 is `String`, which has the same representation as
+    // `vector<u8>`.
     unsafe { ctx.set_return(0, out)? };
     Ok(NativeStatus::Success)
 }
@@ -113,7 +114,8 @@ pub fn native_format_list<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     }
 
     let bytes = ctx.new_byte_vector(out.as_bytes())?;
-    // SAFETY: return 0 is `String`, which has a bare `vector<u8>` representation.
+    // SAFETY: return 0 is `String`, which has the same representation as
+    // `vector<u8>`.
     unsafe { ctx.set_return(0, bytes)? };
     Ok(NativeStatus::Success)
 }
@@ -191,9 +193,6 @@ fn abort(code: u64, message: Option<&str>) -> NativeStatus {
 pub fn make_all_string_utils_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
     polymorphic_natives![
         ("0x1::string_utils::native_format", native_format),
-        (
-            "0x1::string_utils::native_format_list",
-            native_format_list
-        ),
+        ("0x1::string_utils::native_format_list", native_format_list),
     ]
 }

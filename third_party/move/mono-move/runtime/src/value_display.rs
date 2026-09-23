@@ -18,8 +18,8 @@ use mono_move_core::{
     interner::InternedIdentifier,
     types::{is_nominal, type_to_string, view_name, view_type, InternedType, Type},
     value_layout::U8_LAYOUT_ID,
-    FormatOptions, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout,
-    ENUM_DATA_OFFSET,
+    FieldValueLayout, FormatOptions, LayoutId, LayoutKind, LayoutProvider, VMInternalError,
+    VMResult, ValueLayout, ENUM_DATA_OFFSET,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -74,19 +74,25 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
     match &layout.kind {
         LayoutKind::Bool => {
             // SAFETY: a bool occupies one readable byte at `base`.
-            out.push_str(if unsafe { *base } != 0 { "true" } else { "false" });
+            out.push_str(
+                if unsafe { *base } != 0 {
+                    "true"
+                } else {
+                    "false"
+                },
+            );
             Ok(())
         },
         LayoutKind::UnsignedInt => {
             // SAFETY: `base` is readable for the layout's size.
             let suffix = unsafe {
                 match layout.size {
-                    1 => write_int(out, *base, "u8"),
-                    2 => write_int(out, u16::from_le_bytes(read_array(base)), "u16"),
-                    4 => write_int(out, u32::from_le_bytes(read_array(base)), "u32"),
-                    8 => write_int(out, u64::from_le_bytes(read_array(base)), "u64"),
-                    16 => write_int(out, u128::from_le_bytes(read_array(base)), "u128"),
-                    32 => write_int(out, U256::from_le_bytes(read_array(base)), "u256"),
+                    1 => write_int(out, *base, "u8")?,
+                    2 => write_int(out, u16::from_le_bytes(read_array(base)), "u16")?,
+                    4 => write_int(out, u32::from_le_bytes(read_array(base)), "u32")?,
+                    8 => write_int(out, u64::from_le_bytes(read_array(base)), "u64")?,
+                    16 => write_int(out, u128::from_le_bytes(read_array(base)), "u128")?,
+                    32 => write_int(out, U256::from_le_bytes(read_array(base)), "u256")?,
                     _ => return Err(bad_int_width("unsigned")),
                 }
             };
@@ -99,12 +105,12 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
             // SAFETY: `base` is readable for the layout's size.
             let suffix = unsafe {
                 match layout.size {
-                    1 => write_int(out, *(base as *const i8), "i8"),
-                    2 => write_int(out, i16::from_le_bytes(read_array(base)), "i16"),
-                    4 => write_int(out, i32::from_le_bytes(read_array(base)), "i32"),
-                    8 => write_int(out, i64::from_le_bytes(read_array(base)), "i64"),
-                    16 => write_int(out, i128::from_le_bytes(read_array(base)), "i128"),
-                    32 => write_int(out, I256::from_le_bytes(read_array(base)), "i256"),
+                    1 => write_int(out, *(base as *const i8), "i8")?,
+                    2 => write_int(out, i16::from_le_bytes(read_array(base)), "i16")?,
+                    4 => write_int(out, i32::from_le_bytes(read_array(base)), "i32")?,
+                    8 => write_int(out, i64::from_le_bytes(read_array(base)), "i64")?,
+                    16 => write_int(out, i128::from_le_bytes(read_array(base)), "i128")?,
+                    32 => write_int(out, I256::from_le_bytes(read_array(base)), "i256")?,
                     _ => return Err(bad_int_width("signed")),
                 }
             };
@@ -142,7 +148,7 @@ unsafe fn display_impl<L: LayoutProvider + ?Sized>(
                 for i in 0..len {
                     // SAFETY: the `i`th byte lies within the data region.
                     let byte = unsafe { *vec.add(VEC_DATA_OFFSET + i) };
-                    write!(out, "{:02x}", byte).expect("writing to a string cannot fail");
+                    write!(out, "{:02x}", byte).map_err(write_failed)?;
                 }
                 return Ok(());
             }
@@ -253,7 +259,7 @@ struct Child {
 unsafe fn display_fields<L: LayoutProvider + ?Sized>(
     layouts: &L,
     base: *const u8,
-    fields: &[mono_move_core::FieldValueLayout],
+    fields: &[FieldValueLayout],
     options: &FormatOptions,
     depth: usize,
     out: &mut String,
@@ -265,16 +271,7 @@ unsafe fn display_fields<L: LayoutProvider + ?Sized>(
         name: Some(field.name),
     });
     // SAFETY: every child pointer is a valid value of its field layout.
-    unsafe {
-        display_body(
-            layouts,
-            children,
-            options,
-            depth,
-            !options.single_line,
-            out,
-        )
-    }
+    unsafe { display_body(layouts, children, options, depth, !options.single_line, out) }
 }
 
 /// Renders the children of an aggregate between the brackets the caller writes.
@@ -327,13 +324,16 @@ where
 /// variant body, whose `fields` are empty for `None` and hold the payload for
 /// `Some`.
 ///
+/// The payload nests one level deeper, like any other field. V1 keeps it at the
+/// caller's level, so a multi-line `Some(S { .. })` indents differently there.
+///
 /// # Safety
 ///
 /// `body` must point to a fully initialized variant body holding `fields`.
 unsafe fn display_option<L: LayoutProvider + ?Sized>(
     layouts: &L,
     body: *const u8,
-    fields: &[mono_move_core::FieldValueLayout],
+    fields: &[FieldValueLayout],
     options: &FormatOptions,
     depth: usize,
     out: &mut String,
@@ -343,15 +343,14 @@ unsafe fn display_option<L: LayoutProvider + ?Sized>(
         return Ok(());
     };
     out.push_str("Some(");
-    // SAFETY: the payload lies at its offset within the variant body. The
-    // nesting level is unchanged, matching V1.
+    // SAFETY: the payload lies at its offset within the variant body.
     unsafe {
         display_impl(
             layouts,
             body.add(payload.offset as usize),
             payload.id,
             options,
-            depth,
+            depth + 1,
             out,
         )?
     };
@@ -366,7 +365,7 @@ unsafe fn display_option<L: LayoutProvider + ?Sized>(
 /// `base` must point to a fully initialized `String` holding `fields`.
 unsafe fn display_string(
     base: *const u8,
-    fields: &[mono_move_core::FieldValueLayout],
+    fields: &[FieldValueLayout],
     out: &mut String,
 ) -> VMResult<()> {
     let [bytes] = fields else {
@@ -400,7 +399,7 @@ unsafe fn display_string(
 }
 
 /// Writes the name of a struct or enum: qualified as `0x1::m::S<u64>`, or bare
-/// as `S`.
+/// as `S`. The bare form drops the type arguments, as V1 does.
 fn write_nominal(out: &mut String, nominal: InternedType, options: &FormatOptions) {
     if !options.fully_qualified_nominals {
         if let Type::Nominal { name, .. } = view_type(nominal) {
@@ -452,9 +451,19 @@ fn is_aggregate(layout: &ValueLayout) -> bool {
 }
 
 /// Writes `v` in decimal and returns the width suffix for it.
-fn write_int(out: &mut String, v: impl std::fmt::Display, suffix: &'static str) -> &'static str {
-    write!(out, "{}", v).expect("writing to a string cannot fail");
-    suffix
+fn write_int(
+    out: &mut String,
+    v: impl std::fmt::Display,
+    suffix: &'static str,
+) -> VMResult<&'static str> {
+    write!(out, "{}", v).map_err(write_failed)?;
+    Ok(suffix)
+}
+
+fn write_failed(err: std::fmt::Error) -> VMInternalError {
+    VMInternalError::new(RuntimeError::InvariantViolation(
+        RuntimeInvariantViolation::Unreachable(format!("Writing to a string failed: {err}")),
+    ))
 }
 
 fn bad_int_width(signedness: &str) -> VMInternalError {
@@ -554,7 +563,7 @@ mod tests {
         }
     }
 
-    fn variants(names: &[&'static str], ids: Box<[LayoutId]>) -> Box<[VariantValueLayout]> {
+    fn variants(names: &[&'static str], ids: &[LayoutId]) -> Box<[VariantValueLayout]> {
         assert_eq!(names.len(), ids.len());
         names
             .iter()
@@ -592,14 +601,16 @@ mod tests {
         let ty = intern_type_tag(&tag("option", "Option", vec![elem_tag.clone()]), guard).unwrap();
         let variant_ids = guard.publish_variant_layouts(ty, vec![
             struct_layout(ty, 0, 1, vec![]),
-            struct_layout(ty, elem_size, elem_size.max(1), vec![field(0, elem_id, "e")]),
+            struct_layout(ty, elem_size, elem_size.max(1), vec![field(
+                0, elem_id, "e",
+            )]),
         ]);
         guard.publish_layout(
             ty,
             ptr_layout(LayoutKind::FrozenEnum {
                 nominal: ty,
                 descriptor_id: DescriptorId(0),
-                variants: variants(&["None", "Some"], variant_ids),
+                variants: variants(&["None", "Some"], &variant_ids),
                 max_size_across_variants: 8 + elem_size,
             }),
         );
@@ -608,9 +619,10 @@ mod tests {
 
     fn publish_string(guard: &ExecutionGuard<'_>, vec_u8_id: LayoutId) -> InternedType {
         let ty = intern_type_tag(&tag("string", "String", vec![]), guard).unwrap();
-        guard.publish_layout(ty, struct_layout(ty, 8, 8, vec![
-            field(0, vec_u8_id, "bytes"),
-        ]));
+        guard.publish_layout(
+            ty,
+            struct_layout(ty, 8, 8, vec![field(0, vec_u8_id, "bytes")]),
+        );
         ty
     }
 
@@ -622,10 +634,13 @@ mod tests {
 
     fn publish_point(guard: &ExecutionGuard<'_>) -> InternedType {
         let ty = intern_type_tag(&tag("m", "Point", vec![]), guard).unwrap();
-        guard.publish_layout(ty, struct_layout(ty, 16, 8, vec![
-            field(0, reserved(&Type::U64), "x"),
-            field(8, reserved(&Type::Bool), "y"),
-        ]));
+        guard.publish_layout(
+            ty,
+            struct_layout(ty, 16, 8, vec![
+                field(0, reserved(&Type::U64), "x"),
+                field(8, reserved(&Type::Bool), "y"),
+            ]),
+        );
         ty
     }
 
@@ -640,11 +655,7 @@ mod tests {
     enum Shape {
         Circle { r: u64 },
         Dot,
-        Wrap {
-            p: Point,
-            s: String,
-            o: Option<u64>,
-        },
+        Wrap { p: Point, s: String, o: Option<u64> },
     }
 
     /// The fixtures every test shares: the types are published once per guard,
@@ -672,11 +683,14 @@ mod tests {
         let option_u64 = publish_option(guard, &TypeTag::U64, reserved(&Type::U64), 8);
 
         let nested = intern_type_tag(&tag("m", "Nested", vec![]), guard).unwrap();
-        guard.publish_layout(nested, struct_layout(nested, 32, 8, vec![
-            field(0, guard.layout_id(point).unwrap(), "p"),
-            field(16, guard.layout_id(vec_u64).unwrap(), "v"),
-            field(24, guard.layout_id(string).unwrap(), "s"),
-        ]));
+        guard.publish_layout(
+            nested,
+            struct_layout(nested, 32, 8, vec![
+                field(0, guard.layout_id(point).unwrap(), "p"),
+                field(16, guard.layout_id(vec_u64).unwrap(), "v"),
+                field(24, guard.layout_id(string).unwrap(), "s"),
+            ]),
+        );
 
         let shape = intern_type_tag(&tag("m", "Shape", vec![]), guard).unwrap();
         let variant_ids = guard.publish_variant_layouts(shape, vec![
@@ -693,7 +707,7 @@ mod tests {
             ptr_layout(LayoutKind::FrozenEnum {
                 nominal: shape,
                 descriptor_id: DescriptorId(0),
-                variants: variants(&["Circle", "Dot", "Wrap"], variant_ids),
+                variants: variants(&["Circle", "Dot", "Wrap"], &variant_ids),
                 max_size_across_variants: 40,
             }),
         );
@@ -753,10 +767,7 @@ mod tests {
         let guard = ctx.try_execution_context(0).unwrap();
         let f = publish(&guard);
         assert_eq!(render(&guard, f.u8_ty, &7u8, &COMPACT), "7");
-        assert_eq!(
-            render(&guard, f.u256_ty, &U256::from(9u64), &COMPACT),
-            "9"
-        );
+        assert_eq!(render(&guard, f.u256_ty, &U256::from(9u64), &COMPACT), "9");
         assert_eq!(render(&guard, f.bool_ty, &false, &COMPACT), "false");
         assert_eq!(
             render(&guard, f.address_ty, &AccountAddress::ONE, &COMPACT),
@@ -888,7 +899,12 @@ mod tests {
         let guard = ctx.try_execution_context(0).unwrap();
         let f = publish(&guard);
         assert_eq!(
-            render(&guard, f.vec_u64, &Vec::<u64>::new(), &FormatOptions::MONO_MOVE),
+            render(
+                &guard,
+                f.vec_u64,
+                &Vec::<u64>::new(),
+                &FormatOptions::MONO_MOVE
+            ),
             "[]"
         );
         assert_eq!(

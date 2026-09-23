@@ -20,7 +20,7 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
     types::{InternedType, EMPTY_TYPE_LIST},
-    DescriptorId, NominalFields, FrameOffset, LayoutId, LayoutProvider, VMResult, ValueLayout,
+    DescriptorId, FrameOffset, LayoutId, LayoutProvider, NominalFields, VMResult, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};

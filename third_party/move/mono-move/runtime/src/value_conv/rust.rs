@@ -528,7 +528,7 @@ mod tests {
     }
 
     /// Names the published variant bodies. These tests never read the names.
-    fn variants(ids: Box<[LayoutId]>) -> Box<[VariantValueLayout]> {
+    fn variants(ids: &[LayoutId]) -> Box<[VariantValueLayout]> {
         ids.iter()
             .map(|&id| VariantValueLayout {
                 name: InternedIdentifier::from_static("V"),
@@ -583,7 +583,7 @@ mod tests {
             ptr_layout(LayoutKind::FrozenEnum {
                 nominal: ty,
                 descriptor_id: DescriptorId(0),
-                variants: variants(variant_ids),
+                variants: variants(&variant_ids),
                 max_size_across_variants: 8 + elem_size,
             }),
         );
@@ -705,7 +705,10 @@ mod tests {
         let vec_u8 = publish_vector(&guard, &TypeTag::U8, reserved(&Type::U8));
         let vec_u8_id = guard.layout_id(vec_u8).unwrap();
         let string_ty = intern_type_tag(&tag("string", "String", vec![]), &guard).unwrap();
-        guard.publish_layout(string_ty, struct_layout(string_ty, 8, 8, vec![field(0, vec_u8_id)]));
+        guard.publish_layout(
+            string_ty,
+            struct_layout(string_ty, 8, 8, vec![field(0, vec_u8_id)]),
+        );
         check(&guard, string_ty, &"hello Move".to_string());
         check(&guard, string_ty, &String::new());
     }
@@ -734,7 +737,10 @@ mod tests {
         let vec_u8 = publish_vector(&guard, &TypeTag::U8, reserved(&Type::U8));
         let vec_u8_id = guard.layout_id(vec_u8).unwrap();
         let string_ty = intern_type_tag(&tag("string", "String", vec![]), &guard).unwrap();
-        guard.publish_layout(string_ty, struct_layout(string_ty, 8, 8, vec![field(0, vec_u8_id)]));
+        guard.publish_layout(
+            string_ty,
+            struct_layout(string_ty, 8, 8, vec![field(0, vec_u8_id)]),
+        );
         let string_id = guard.layout_id(string_ty).unwrap();
 
         let ty = intern_type_tag(&tag("m", "Metadata", vec![]), &guard).unwrap();
@@ -797,7 +803,7 @@ mod tests {
             ptr_layout(LayoutKind::FrozenEnum {
                 nominal: ty,
                 descriptor_id: DescriptorId(0),
-                variants: variants(variant_ids),
+                variants: variants(&variant_ids),
                 max_size_across_variants: 24,
             }),
         );
@@ -872,7 +878,7 @@ mod tests {
             ptr_layout(LayoutKind::FrozenEnum {
                 nominal: ty,
                 descriptor_id: DescriptorId(0),
-                variants: variants(variant_ids),
+                variants: variants(&variant_ids),
                 max_size_across_variants: 24,
             }),
         );

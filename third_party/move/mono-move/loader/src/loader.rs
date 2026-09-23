@@ -28,8 +28,8 @@ use mono_move_core::{
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, NominalFields, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
-    LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
+    DescriptorId, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider,
+    ModuleId, ModuleProvider, NominalFields, VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -888,11 +888,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             self.discovered.push(slot);
         }
 
-        Ok(module
-            .ir()
-            .module
-            .interned_fields(*nominal_name)
-            .cloned())
+        Ok(module.ir().module.interned_fields(*nominal_name).cloned())
     }
 
     fn publish_vec_descriptor(

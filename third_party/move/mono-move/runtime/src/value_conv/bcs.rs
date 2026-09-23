@@ -1402,12 +1402,8 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        let layout = ValueLayout::frozen_enum(
-            U64_TY,
-            DescriptorId(3),
-            variants,
-            max_size_across_variants,
-        );
+        let layout =
+            ValueLayout::frozen_enum(U64_TY, DescriptorId(3), variants, max_size_across_variants);
         table.push(U64_TY, layout)
     }
 
