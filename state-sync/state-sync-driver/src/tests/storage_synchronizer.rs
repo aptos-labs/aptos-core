@@ -3,30 +3,33 @@
 
 use crate::{
     error::Error,
-    metadata_storage::PersistentMetadataStorage,
+    metadata_storage::{MetadataStorageInterface, PersistentMetadataStorage},
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedTransactions,
         ErrorNotificationListener, MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
+    snapshot_chunk::SnapshotChunk,
+    snapshot_kind::SnapshotKind,
     storage_synchronizer::{
         NotificationMetadata, StorageSynchronizer, StorageSynchronizerHandles,
         StorageSynchronizerInterface,
     },
     tests::{
         mocks::{
-            create_mock_db_writer, create_mock_executor, create_mock_reader_writer,
-            create_mock_reader_writer_with_version, create_mock_receiver, MockChunkExecutor,
+            create_mock_db_writer, create_mock_executor, create_mock_hot_receiver,
+            create_mock_reader_writer, create_mock_reader_writer_with_version,
+            create_mock_receiver, MockChunkExecutor,
         },
         utils::{
-            create_epoch_ending_ledger_info, create_event, create_output_list_with_proof,
-            create_state_value_chunk_with_proof, create_transaction,
+            create_epoch_ending_ledger_info, create_event, create_hot_state_value_chunk_with_proof,
+            create_output_list_with_proof, create_state_value_chunk_with_proof, create_transaction,
             create_transaction_list_with_proof, verify_commit_notification,
         },
     },
 };
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor_types::ChunkCommitNotification;
@@ -38,7 +41,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionOutputListWithProofV2, Version},
 };
-use claims::assert_matches;
+use claims::{assert_err, assert_matches};
 use futures::StreamExt;
 use mockall::predicate::always;
 use std::{sync::Arc, time::Duration};
@@ -650,7 +653,7 @@ async fn test_save_states_receiver_error() {
         .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MainState,
         )
         .unwrap();
 
@@ -658,7 +661,13 @@ async fn test_save_states_receiver_error() {
     // notification and that there's no pending data.
     let notification_id = 0;
     storage_synchronizer
-        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .save_snapshot_chunk(
+            notification_id,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
@@ -730,17 +739,29 @@ async fn test_save_states_completion() {
         .initialize_snapshot_synchronizer(
             target_ledger_info.clone(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MainState,
         )
         .unwrap();
 
     // Save multiple state chunks (including the last chunk)
     storage_synchronizer
-        .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .save_snapshot_chunk(
+            0,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
     storage_synchronizer
-        .save_state_values(1, create_state_value_chunk_with_proof(true))
+        .save_snapshot_chunk(
+            1,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(true),
+            ),
+        )
         .await
         .unwrap();
 
@@ -816,11 +837,17 @@ async fn test_finalize_fast_sync_dropped_commit_listener() {
         .initialize_snapshot_synchronizer(
             target_ledger_info.clone(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MainState,
         )
         .unwrap();
     storage_synchronizer
-        .save_state_values(0, create_state_value_chunk_with_proof(true))
+        .save_snapshot_chunk(
+            0,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(true),
+            ),
+        )
         .await
         .unwrap();
     state_synchronizer_handle.await.unwrap();
@@ -863,17 +890,335 @@ async fn test_save_states_invalid_chunk() {
         .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MainState,
         )
         .unwrap();
 
     // Save a state chunk and verify we get an error notification
     let notification_id = 0;
     storage_synchronizer
-        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .save_snapshot_chunk(
+            notification_id,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_hot_states_completion() {
+    // Hot chunks must reach the hot receiver with their `HotStateValue` leaves
+    // intact (vacancies and hot-since versions included), and the final chunk
+    // must complete the hot stage without issuing the global commit notification.
+    let target_ledger_info = create_epoch_ending_ledger_info();
+    let first_chunk = create_hot_state_value_chunk_with_proof(0, 4, false);
+    let last_chunk = create_hot_state_value_chunk_with_proof(5, 9, true);
+
+    // Setup the mock hot snapshot receiver, capturing what it was handed
+    let received_values = Arc::new(Mutex::new(vec![]));
+    let received_values_clone = Arc::clone(&received_values);
+    let mut hot_snapshot_receiver = create_mock_hot_receiver();
+    hot_snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(move |chunk, _| {
+            received_values_clone.lock().extend(chunk);
+            Ok(())
+        });
+    hot_snapshot_receiver
+        .expect_finish_box()
+        .returning(|| Ok(()));
+
+    // The main state receiver must not be used for the hot stage
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_hot_state_snapshot_receiver()
+        .with(always(), always())
+        .return_once(move |_, _| Ok(Box::new(hot_snapshot_receiver)));
+
+    // Create the storage synchronizer with an inspectable metadata storage
+    let db_path = aptos_temppath::TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+    let (mut commit_listener, _, _, _, _, mut storage_synchronizer, _) =
+        create_storage_synchronizer_with_metadata(
+            create_mock_executor(),
+            create_mock_reader_writer(None, Some(db_writer)),
+            metadata_storage.clone(),
+        );
+
+    // Write the hot snapshot to completion
+    let handle = storage_synchronizer
+        .initialize_snapshot_synchronizer(
+            target_ledger_info.clone(),
+            HashValue::random(),
+            SnapshotKind::HotState,
+        )
+        .unwrap();
+    storage_synchronizer
+        .save_snapshot_chunk(0, SnapshotChunk::HotStates(first_chunk.clone()))
+        .await
+        .unwrap();
+    storage_synchronizer
+        .save_snapshot_chunk(1, SnapshotChunk::HotStates(last_chunk.clone()))
+        .await
+        .unwrap();
+    handle.await.unwrap();
+
+    // The receiver saw every leaf, in order, with its hot state metadata intact
+    let received_values = received_values.lock().clone();
+    let expected_values = first_chunk
+        .raw_values
+        .iter()
+        .chain(last_chunk.raw_values.iter())
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(received_values, expected_values);
+    assert!(received_values
+        .iter()
+        .any(|(_, value)| value.value_opt().is_none())); // A vacant leaf survived
+    for (index, (_, value)) in received_values.iter().enumerate() {
+        assert_eq!(value.hot_since_version(), index as u64);
+    }
+
+    // The hot stage is complete, but no other stage is, and no global commit
+    // notification was sent (that belongs to `finalize_fast_sync`).
+    assert!(metadata_storage
+        .is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::HotState)
+        .unwrap());
+    assert_err!(
+        metadata_storage.is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::MainState)
+    );
+    assert!(
+        timeout(Duration::from_secs(1), commit_listener.select_next_some())
+            .await
+            .is_err()
+    );
+
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_hot_states_invalid_chunk() {
+    // A failing hot chunk must surface an error notification and must not mark
+    // the stage complete.
+    let target_ledger_info = create_epoch_ending_ledger_info();
+
+    // Setup the mock hot snapshot receiver to always return errors
+    let mut hot_snapshot_receiver = create_mock_hot_receiver();
+    hot_snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(|_, _| Err(AptosDbError::Other("Invalid hot chunk!".to_string())));
+
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_hot_state_snapshot_receiver()
+        .with(always(), always())
+        .return_once(move |_, _| Ok(Box::new(hot_snapshot_receiver)));
+
+    // Create the storage synchronizer with an inspectable metadata storage
+    let db_path = aptos_temppath::TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _) =
+        create_storage_synchronizer_with_metadata(
+            create_mock_executor(),
+            create_mock_reader_writer(None, Some(db_writer)),
+            metadata_storage.clone(),
+        );
+
+    // Save the last hot chunk and verify we get an error notification
+    let _join_handle = storage_synchronizer
+        .initialize_snapshot_synchronizer(
+            target_ledger_info.clone(),
+            HashValue::random(),
+            SnapshotKind::HotState,
+        )
+        .unwrap();
+    let notification_id = 0;
+    storage_synchronizer
+        .save_snapshot_chunk(
+            notification_id,
+            SnapshotChunk::HotStates(create_hot_state_value_chunk_with_proof(0, 4, true)),
+        )
+        .await
+        .unwrap();
+    verify_error_notification(&mut error_listener, notification_id).await;
+
+    // A failed chunk leaves no progress behind, let alone a completion marker
+    assert_err!(
+        metadata_storage.is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::HotState)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_hot_states_finish_error() {
+    // If `finish_box()` fails, the stage must not be recorded as complete.
+    let target_ledger_info = create_epoch_ending_ledger_info();
+
+    let mut hot_snapshot_receiver = create_mock_hot_receiver();
+    hot_snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(|_, _| Ok(()));
+    hot_snapshot_receiver
+        .expect_finish_box()
+        .returning(|| Err(AptosDbError::Other("Failed to finish!".to_string())));
+
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_hot_state_snapshot_receiver()
+        .with(always(), always())
+        .return_once(move |_, _| Ok(Box::new(hot_snapshot_receiver)));
+
+    let db_path = aptos_temppath::TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _) =
+        create_storage_synchronizer_with_metadata(
+            create_mock_executor(),
+            create_mock_reader_writer(None, Some(db_writer)),
+            metadata_storage.clone(),
+        );
+
+    let handle = storage_synchronizer
+        .initialize_snapshot_synchronizer(
+            target_ledger_info.clone(),
+            HashValue::random(),
+            SnapshotKind::HotState,
+        )
+        .unwrap();
+    let notification_id = 0;
+    storage_synchronizer
+        .save_snapshot_chunk(
+            notification_id,
+            SnapshotChunk::HotStates(create_hot_state_value_chunk_with_proof(0, 4, true)),
+        )
+        .await
+        .unwrap();
+    handle.await.unwrap();
+
+    verify_error_notification(&mut error_listener, notification_id).await;
+    assert_err!(
+        metadata_storage.is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::HotState)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_hot_states_receiver_error() {
+    // Creating the hot receiver should fail recoverably, not panic the task
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_hot_state_snapshot_receiver()
+        .returning(|_, _| {
+            Err(AptosDbError::Other(
+                "Failed to get hot snapshot receiver!".to_string(),
+            ))
+        });
+
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    let _join_handle = storage_synchronizer
+        .initialize_snapshot_synchronizer(
+            create_epoch_ending_ledger_info(),
+            HashValue::random(),
+            SnapshotKind::HotState,
+        )
+        .unwrap();
+    let notification_id = 0;
+    storage_synchronizer
+        .save_snapshot_chunk(
+            notification_id,
+            SnapshotChunk::HotStates(create_hot_state_value_chunk_with_proof(0, 4, false)),
+        )
+        .await
+        .unwrap();
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_finish_empty_hot_snapshot() {
+    // An authenticated empty hot snapshot still creates the receiver and
+    // finishes it, so the restore writes an (empty) tree at the version rather
+    // than only a metadata marker.
+    let target_ledger_info = create_epoch_ending_ledger_info();
+    let target_version = target_ledger_info.ledger_info().version();
+    let expected_root = *SPARSE_MERKLE_PLACEHOLDER_HASH;
+
+    let mut hot_snapshot_receiver = create_mock_hot_receiver();
+    hot_snapshot_receiver.expect_add_chunk().never();
+    hot_snapshot_receiver
+        .expect_finish_box()
+        .returning(|| Ok(()));
+
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_hot_state_snapshot_receiver()
+        .withf(move |version: &Version, root: &HashValue| {
+            *version == target_version && *root == expected_root
+        })
+        .return_once(move |_, _| Ok(Box::new(hot_snapshot_receiver)));
+
+    let db_path = aptos_temppath::TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+    let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer_with_metadata(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+        metadata_storage.clone(),
+    );
+
+    storage_synchronizer
+        .finish_empty_hot_snapshot(target_ledger_info.clone(), expected_root)
+        .await
+        .unwrap();
+
+    // The stage is complete at index 0 (a single-item snapshot also reports 0)
+    assert!(metadata_storage
+        .is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::HotState)
+        .unwrap());
+    assert_eq!(
+        0,
+        metadata_storage
+            .get_last_persisted_index(&target_ledger_info, SnapshotKind::HotState)
+            .unwrap()
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_finish_empty_hot_snapshot_receiver_error() {
+    // If the empty restore can't be written, the stage must not be completed
+    let target_ledger_info = create_epoch_ending_ledger_info();
+
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_hot_state_snapshot_receiver()
+        .returning(|_, _| {
+            Err(AptosDbError::Other(
+                "Failed to get hot snapshot receiver!".to_string(),
+            ))
+        });
+
+    let db_path = aptos_temppath::TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+    let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer_with_metadata(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+        metadata_storage.clone(),
+    );
+
+    let result = storage_synchronizer
+        .finish_empty_hot_snapshot(target_ledger_info.clone(), *SPARSE_MERKLE_PLACEHOLDER_HASH)
+        .await;
+    assert_matches!(result, Err(Error::UnexpectedError(_)));
+    assert_err!(
+        metadata_storage.is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::HotState)
+    );
 }
 
 #[tokio::test]
@@ -888,7 +1233,13 @@ async fn test_save_states_without_initialize() {
     // Attempting to save the states should panic as the state
     // synchronizer was not initialized!
     storage_synchronizer
-        .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .save_snapshot_chunk(
+            0,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
 }
@@ -897,6 +1248,30 @@ async fn test_save_states_without_initialize() {
 fn create_storage_synchronizer(
     mock_chunk_executor: MockChunkExecutor,
     mock_reader_writer: DbReaderWriter,
+) -> (
+    CommitNotificationListener,
+    ErrorNotificationListener,
+    Arc<Mutex<EventSubscriptionService>>,
+    MempoolNotificationListener,
+    StorageServiceNotificationListener,
+    StorageSynchronizer<MockChunkExecutor, PersistentMetadataStorage>,
+    StorageSynchronizerHandles,
+) {
+    let db_path = aptos_temppath::TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+    create_storage_synchronizer_with_metadata(
+        mock_chunk_executor,
+        mock_reader_writer,
+        metadata_storage,
+    )
+}
+
+/// Creates a storage synchronizer backed by the given metadata storage, so a
+/// test can inspect the recorded stage progress.
+fn create_storage_synchronizer_with_metadata(
+    mock_chunk_executor: MockChunkExecutor,
+    mock_reader_writer: DbReaderWriter,
+    metadata_storage: PersistentMetadataStorage,
 ) -> (
     CommitNotificationListener,
     ErrorNotificationListener,
@@ -928,10 +1303,6 @@ fn create_storage_synchronizer(
         aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
     let storage_service_notification_handler =
         StorageServiceNotificationHandler::new(storage_service_notifier);
-
-    // Create the metadata storage
-    let db_path = aptos_temppath::TempPath::new();
-    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
 
     // Create the storage synchronizer
     let (storage_synchronizer, storage_synchronizer_handles) = StorageSynchronizer::new(
