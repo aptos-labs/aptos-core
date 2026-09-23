@@ -5,15 +5,16 @@ use crate::{
     data_notification::{
         DataClientRequest,
         DataClientRequest::{
-            EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
-            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfStates,
-            StateValuesWithProof, SubscribeTransactionOutputsWithProof,
+            EpochEndingLedgerInfos, HotStateValuesWithProof, NewTransactionOutputsWithProof,
+            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfHotStates,
+            NumberOfStates, StateValuesWithProof, SubscribeTransactionOutputsWithProof,
             SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
             TransactionOutputsWithProof, TransactionsOrOutputsWithProof, TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
+        HotStateValuesWithProofRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        NumberOfHotStatesRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
         SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
@@ -23,7 +24,8 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
     streaming_client::{
-        Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
+        Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllHotStatesRequest, GetAllStatesRequest,
+        StreamRequest,
     },
 };
 use aptos_config::config::DataStreamingServiceConfig;
@@ -123,6 +125,7 @@ pub trait DataStreamEngine {
 pub enum StreamEngine {
     ContinuousTransactionStreamEngine,
     EpochEndingStreamEngine,
+    HotStateStreamEngine,
     StateStreamEngine,
     TransactionStreamEngine,
 }
@@ -143,6 +146,9 @@ impl StreamEngine {
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => Ok(
                 ContinuousTransactionStreamEngine::new(data_stream_config, stream_request)?.into(),
             ),
+            StreamRequest::GetAllHotStates(request) => {
+                Ok(HotStateStreamEngine::new(request)?.into())
+            },
             StreamRequest::GetAllStates(request) => Ok(StateStreamEngine::new(request)?.into()),
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
                 Ok(EpochEndingStreamEngine::new(request, advertised_data)?.into())
@@ -347,6 +353,7 @@ impl SnapshotStreamCursor {
         for client_request in client_requests {
             let end_index = match client_request {
                 StateValuesWithProof(request) => request.end_index,
+                HotStateValuesWithProof(request) => request.end_index,
                 request => {
                     return Err(Error::UnexpectedErrorEncountered(format!(
                         "Invalid snapshot chunk request created: {:?}",
@@ -469,6 +476,117 @@ impl DataStreamEngine for StateStreamEngine {
                     };
                     self.cursor
                         .record_number_of_items(number_of_states, can_be_empty)?;
+                }
+            },
+            request => invalid_client_request!(request, self),
+        }
+        Ok(None)
+    }
+}
+
+/// Streams the hot state snapshot at a version. Hot state leaves are
+/// `HotStateValue`s, so this is a separate engine rather than another
+/// `StateKind`; the snapshot bookkeeping is shared via the cursor.
+#[derive(Clone, Debug)]
+pub struct HotStateStreamEngine {
+    // The original hot states request made by the client
+    pub request: GetAllHotStatesRequest,
+
+    // Tracks the item count and the requested/streamed indices
+    pub cursor: SnapshotStreamCursor,
+}
+
+impl HotStateStreamEngine {
+    fn new(request: &GetAllHotStatesRequest) -> Result<Self, Error> {
+        Ok(HotStateStreamEngine {
+            request: request.clone(),
+            cursor: SnapshotStreamCursor::new("hot state", request.version, request.start_index),
+        })
+    }
+}
+
+impl DataStreamEngine for HotStateStreamEngine {
+    fn create_data_client_requests(
+        &mut self,
+        max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
+        global_data_summary: &GlobalDataSummary,
+        _unique_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<Vec<DataClientRequest>, Error> {
+        let count_request = NumberOfHotStates(NumberOfHotStatesRequest {
+            version: self.request.version,
+        });
+        let stream_engine = self.clone().into();
+        self.cursor.create_data_client_requests(
+            count_request,
+            max_number_of_requests,
+            max_in_flight_requests,
+            num_in_flight_requests,
+            global_data_summary.optimal_chunk_sizes.state_chunk_size,
+            stream_engine,
+        )
+    }
+
+    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
+        // TODO(HotState): hot snapshots share the main `states` advertisement, so a
+        // peer advertising this version may still have pruned its hot snapshot.
+        // Advertise hot retention separately to support mixed-version peers.
+        Ok(AdvertisedData::contains_range(
+            self.request.version,
+            self.request.version,
+            &advertised_data.states,
+        ))
+    }
+
+    fn is_stream_complete(&self) -> bool {
+        self.cursor.stream_is_complete
+    }
+
+    fn transform_client_response_into_notification(
+        &mut self,
+        client_request: &DataClientRequest,
+        client_response_payload: ResponsePayload,
+        notification_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
+        // Handle and transform the response
+        match client_request {
+            HotStateValuesWithProof(request) => {
+                // Update the stream cursor with the received chunk
+                let (num_values, last_index) = match &client_response_payload {
+                    ResponsePayload::HotStateValuesWithProof(hot_state_values_with_proof) => (
+                        hot_state_values_with_proof.raw_values.len(),
+                        hot_state_values_with_proof.last_index,
+                    ),
+                    _ => invalid_response_type!(client_response_payload),
+                };
+                self.cursor.accept_chunk(
+                    request.start_index,
+                    request.end_index,
+                    num_values,
+                    last_index,
+                )?;
+
+                // Create a new data notification
+                let data_notification = create_data_notification(
+                    notification_id_generator,
+                    client_response_payload,
+                    None,
+                    self.clone().into(),
+                )?;
+                return Ok(Some(data_notification));
+            },
+            NumberOfHotStates(_) => {
+                if let ResponsePayload::NumberOfStates(number_of_hot_states) =
+                    client_response_payload
+                {
+                    // The bootstrapper decides whether an empty hot snapshot is
+                    // legitimate from the committed hot root
+                    self.cursor
+                        .record_number_of_items(number_of_hot_states, true)?;
                 }
             },
             request => invalid_client_request!(request, self),
@@ -2242,6 +2360,13 @@ fn create_data_client_request(
                 end_epoch: end_index,
             })
         },
+        StreamEngine::HotStateStreamEngine(stream_engine) => {
+            HotStateValuesWithProof(HotStateValuesWithProofRequest {
+                version: stream_engine.request.version,
+                start_index,
+                end_index,
+            })
+        },
         StreamEngine::TransactionStreamEngine(stream_engine) => match &stream_engine.request {
             StreamRequest::GetAllTransactions(request) => {
                 TransactionsWithProof(TransactionsWithProofRequest {
@@ -2292,11 +2417,14 @@ fn create_data_notification(
             _ => invalid_response_type!(client_response_type),
         },
         // The number of states is consumed internally by the engine for chunk
-        // planning; it is never surfaced to the consumer as a notification.
+        // planning; it is never surfaced to the consumer as a notification. This
+        // covers hot state too: its count shares this payload variant.
         ResponsePayload::NumberOfStates(_) => invalid_response_type!(client_response_type),
-        // TODO(HotState): hot state values are not streamed yet.
-        ResponsePayload::HotStateValuesWithProof(_) => {
-            invalid_response_type!(client_response_type)
+        ResponsePayload::HotStateValuesWithProof(hot_states_chunk) => match &stream_engine {
+            StreamEngine::HotStateStreamEngine(_) => {
+                DataPayload::HotStateValuesWithProof(hot_states_chunk)
+            },
+            _ => invalid_response_type!(client_response_type),
         },
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
