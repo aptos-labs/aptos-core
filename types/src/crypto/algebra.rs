@@ -2,12 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Curve constants for the `aptos_std::crypto_algebra` natives.
-//!
-//! Both VMs implement those natives, and a constant that differs between them
-//! is a consensus split. They live here so there is a single copy.
-//!
-//! A constant that fails to decode is [`None`] rather than a panic: the natives
-//! turn that into an abort, matching what the legacy VM has always done.
 
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::CanonicalDeserialize;
