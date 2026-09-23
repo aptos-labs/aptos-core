@@ -1826,12 +1826,8 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        let layout = ValueLayout::frozen_enum(
-            ty,
-            DescriptorId(3),
-            variants,
-            max_size_across_variants,
-        );
+        let layout =
+            ValueLayout::frozen_enum(ty, DescriptorId(3), variants, max_size_across_variants);
         table.push(layout)
     }
 
