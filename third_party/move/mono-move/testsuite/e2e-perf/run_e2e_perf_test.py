@@ -208,10 +208,10 @@ class RunStats:
     output_bytes_per_txn: float
     mono_move_enabled: bool
     # One entry per block, from BLOCK_MEASUREMENTS_JSON.
-    blocks: list = field(default_factory=list)
+    blocks: list
     # From STAGE_COUNTERS_JSON: {"executor": {...}, "storage": {...}}, each
     # mapping a timer label to its total seconds and call count over the run.
-    timers: dict = field(default_factory=dict)
+    timers: dict
 
     def metric(self, name):
         if name == "total":
@@ -1011,17 +1011,16 @@ def glossary(selected, results):
         "`execution` carries.",
         "- `execution range`, `total range` — `(max - min) / median` across one "
         "VM's repeats of that metric, reported for whichever VM came out worse. "
-        "It says how repeatable each side was, not how uncertain the ratio is: "
-        "the two VMs run alternating, so drift hits both and largely cancels in "
+        "It says how repeatable each side was, not how uncertain the ratio is. "
+        "The two VMs run alternating, so drift hits both and largely cancels in "
         "the ratio. Only `execution range` bears on the verdict, which becomes "
         f"`noisy` past {MAX_DEVIATION * 100:.0f}%.",
         "- `total speedup` — wall clock over the whole pipeline.",
         f"- `steady speedup` — the same, with the first {WARMUP_BLOCKS} blocks "
-        "dropped, measured at the commit stage from the per-block timings. Both "
-        f"it and `total speedup` divide by {BLOCK_SIZE} user transactions plus "
-        "the block metadata, leaving the block epilogue out of the count "
-        "though not out of the time, so the two throughputs are directly "
-        "comparable.",
+        "dropped, measured at the commit stage from the per-block timings. It "
+        f"and `total speedup` both divide by {BLOCK_SIZE} user transactions "
+        "plus the block metadata. The block epilogue is left out of that count "
+        "but not out of the time, so the two throughputs compare directly.",
         "- `sigver` — signature verification. Does identical work in both "
         "replays, so it sits near 1.00x and whatever it deviates by is noise and "
         "core contention with the concurrent execution stage.",
@@ -1044,12 +1043,13 @@ def glossary(selected, results):
         "so the children can add up past their parent's wall clock.",
         "- `speedup` — V1 over MonoMove, inverted from the raw times so that "
         "above 1.00x still means MonoMove is faster.",
-        "- `calls/block` — how often the timer fired per block, from the "
-        "MonoMove runs. Both VMs commit the same number of blocks, so V1's "
-        "count is the same except where the two write different amounts.",
-        "- A stage no run entered is left out rather than printed as a zero. "
-        "Timers with no row are left out of the report; the benchmark's stdout "
-        "carries all of them.",
+        "- `calls/block` — how often the timer fired per block, counted on the "
+        "MonoMove runs. Both VMs commit the same blocks, so V1 fires the same "
+        "number of times unless a stage is driven by how much was written.",
+        "",
+        "A stage no run entered is left out rather than printed as a zero. A "
+        "timer with no row is left out of the report; the benchmark's stdout "
+        "carries every label.",
         "",
         "#### Verdicts",
         "",
@@ -1192,19 +1192,18 @@ def build_report(selected, results, failures, charts):
         output_size_table(results),
     ]
 
-    artifacts = chart_section(charts)
-
     warnings = [(r.workload.name, w) for r in results for w in r.warnings]
     if warnings:
-        artifacts += ["", "Warnings:", ""]
-        artifacts += [f"- `{name}`: {message}" for name, message in warnings]
+        parts += ["", "#### Warnings", ""]
+        parts += [f"- `{name}`: {message}" for name, message in warnings]
 
     if failures:
-        artifacts += ["", "Failed workloads:", ""]
-        artifacts += [f"- `{name}`: {message}" for name, message in failures]
+        parts += ["", "#### Failed workloads", ""]
+        parts += [f"- `{name}`: {message}" for name, message in failures]
 
-    if artifacts:
-        parts += ["", "#### Artifacts"] + artifacts
+    charts_section = chart_section(charts)
+    if charts_section:
+        parts += ["", "#### Artifacts"] + charts_section
 
     parts += ["", glossary(selected, results)]
 

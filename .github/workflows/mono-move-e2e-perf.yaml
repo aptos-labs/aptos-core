@@ -101,7 +101,6 @@ jobs:
         if: always()
         run: cat "${{ runner.temp }}/mono-move-e2e-perf.md" >> "$GITHUB_STEP_SUMMARY"
 
-      # The report links here by name; keep the two in sync.
       - name: Upload per-block stage charts
         if: always()
         continue-on-error: true

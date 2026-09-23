@@ -106,8 +106,8 @@ pub struct SingleRunResults {
     pub per_block_measurements: BlockMeasurements,
 }
 
-/// Prints the per-block stages and the labeled timers, each as a table and as
-/// the single JSON line the e2e-perf harness reads.
+/// Prints the per-block stages and the labeled timers, each for a human to
+/// read and each as one JSON line for the e2e-perf harness.
 fn report_run_details(overall: &OverallMeasurement, per_block: &BlockMeasurements) {
     per_block.print_end_table();
     per_block.print_json_line();

@@ -517,12 +517,9 @@ impl OverallMeasurement {
         print_one("Storage timers", &self.delta_execution.storage_timers);
     }
 
-    /// One line the e2e-perf harness greps for. Keep the marker in sync with
-    /// `STAGE_COUNTERS_MARKER` in `run_e2e_perf_test.py`.
+    /// One line the e2e-perf harness greps for, keyed by metric family.
     pub fn print_counters_json_line(&self) {
         let payload = serde_json::json!({
-            "elapsed_s": self.elapsed,
-            "num_txns": self.num_txns,
             "executor": self.delta_execution.executor_timers,
             "storage": self.delta_execution.storage_timers,
         });
@@ -530,21 +527,6 @@ impl OverallMeasurement {
             "STAGE_COUNTERS_JSON: {}",
             serde_json::to_string(&payload).expect("stage counters serialize")
         );
-    }
-
-    pub fn json_end_table(&self) -> serde_json::Value {
-        serde_json::json!({
-            "stage": self.prefix.replace("Staged execution: ", ""),
-            "metadata": self.metadata,
-            "txns/s": format!("{:.2}", self.get_tps()),
-            "gas/s": format!("{:.2}", self.get_gps()),
-            "eff_gas/s": format!("{:.2}", self.get_effective_gps()),
-            "conf_mul": format!("{:.2}", self.get_effective_conflict_multiplier()),
-            "gas/txn": format!("{:.2}", self.get_gpt()),
-            "io gas/txn": format!("{:.2}", self.get_io_gpt()),
-            "exe gas/txn": format!("{:.2}", self.get_execution_gpt()),
-            "output/txn": format!("{:.2}", self.get_output_per_txn()),
-        })
     }
 }
 
@@ -607,8 +589,7 @@ impl BlockMeasurements {
         }
     }
 
-    /// One line the e2e-perf harness greps for. Keep the marker in sync with
-    /// `BLOCK_MEASUREMENTS_MARKER` in `run_e2e_perf_test.py`.
+    /// One line the e2e-perf harness greps for.
     pub fn print_json_line(&self) {
         println!(
             "BLOCK_MEASUREMENTS_JSON: {}",
