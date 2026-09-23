@@ -7,7 +7,9 @@ use super::{
     extension::NativeExtension,
     value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector},
 };
-use crate::{interner::InternedModuleId, types::InternedType, DescriptorId, VMResult};
+use crate::{
+    interner::InternedModuleId, types::InternedType, DescriptorId, FormatOptions, VMResult,
+};
 use core::{cell::RefMut, cmp::Ordering};
 use move_core_types::account_address::AccountAddress;
 
@@ -226,6 +228,23 @@ pub trait NativeContext {
     /// `a` and `b` must point to valid values of type `ty` that stay
     /// live for the duration of the call.
     unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering>;
+
+    /// Renders the value of type `ty` at `base` as text.
+    ///
+    /// # Safety
+    ///
+    /// `base` must point to a fully initialized value of type `ty` that stays
+    /// live for the duration of the call.
+    unsafe fn format_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+        options: &FormatOptions,
+    ) -> VMResult<String>;
+
+    /// Byte offset of field `i` of the struct `ty`, or `None` when `ty` is not
+    /// a struct with that many fields.
+    fn field_offset(&self, ty: InternedType, i: usize) -> VMResult<Option<u32>>;
 
     /// Builds an enum value with variant `tag` and payload `value`, tagged with
     /// `descriptor` for GC tracing, and returns an owned handle. Pass `()` for a

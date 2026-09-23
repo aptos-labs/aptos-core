@@ -24,7 +24,9 @@ use crate::{
 };
 use mono_move_core::{
     align_up_u32, checked_align_up_u32,
-    interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId},
+    interner::{
+        InternedFunctionRef, InternedIdentifier, InternedModuleId, TypeSubstitutionError,
+    },
     native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
     types::{
@@ -32,9 +34,10 @@ use mono_move_core::{
         EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
-    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
-    Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule, SizedSlot,
-    SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    Code, DescriptorId, FieldDecl, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
+    Interner, LayoutFlags, LayoutId, LayoutProvider, NominalFields, PreparedModule, SizedSlot,
+    SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, VariantValueLayout,
+    FRAME_METADATA_SIZE, MAX_ALIGN,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -232,6 +235,7 @@ pub struct VariantFieldLayout {
     pub offset: u32,
     pub size: u32,
     pub ty: InternedType,
+    pub name: InternedIdentifier,
 }
 
 /// Lowering layout for one concrete enum type: its published descriptor and,
@@ -884,7 +888,7 @@ pub trait SpecializerContext: LayoutProvider {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> VMResult<Option<FieldTypes>>;
+    ) -> VMResult<Option<NominalFields>>;
 
     /// Publishes a vector descriptor for `elem_ty` (with byte width
     /// `elem_size` and intra-element heap-pointer offsets
@@ -1295,23 +1299,46 @@ fn discover_captured_data_descriptor(
     }))
 }
 
-/// Accumulate the inline byte layout of `field_types` (in declaration order):
-/// (each field's variant field layout, the region's total size, and its max
+/// Substitutes each declared field's type by the owning nominal's type
+/// arguments, keeping the declared names.
+fn subst_field_decls(
+    interner: &impl Interner,
+    decls: &[FieldDecl],
+    ty_args: InternedTypeList,
+) -> Result<Vec<FieldDecl>, TypeSubstitutionError> {
+    decls
+        .iter()
+        .map(|decl| {
+            Ok(FieldDecl {
+                name: decl.name,
+                ty: interner.subst_type(decl.ty, ty_args)?,
+            })
+        })
+        .collect()
+}
+
+/// Accumulate the inline byte layout of `decls` (in declaration order): (each
+/// field's variant field layout, the region's total size, and its max
 /// alignment).
 /// Returns `None` if any field type lacks a concrete size or the running
 /// offset/total overflows `u32`.
 fn layout_inline_fields(
     layouts: &dyn LayoutProvider,
-    field_types: &[InternedType],
+    decls: &[FieldDecl],
 ) -> Option<(Vec<VariantFieldLayout>, u32, u32)> {
     let mut offset = 0u32;
     let mut max_align = 1u32;
-    let mut fields = Vec::with_capacity(field_types.len());
-    for &ty in field_types {
-        let (size, align) = layouts.size_and_align(ty)?;
+    let mut fields = Vec::with_capacity(decls.len());
+    for decl in decls {
+        let (size, align) = layouts.size_and_align(decl.ty)?;
         offset = checked_align_up_u32(offset, align)?;
         max_align = max_align.max(align);
-        fields.push(VariantFieldLayout { offset, size, ty });
+        fields.push(VariantFieldLayout {
+            offset,
+            size,
+            ty: decl.ty,
+            name: decl.name,
+        });
         offset = offset.checked_add(size)?;
     }
     let total = checked_align_up_u32(offset, max_align)?;
@@ -1327,6 +1354,7 @@ fn layout_inline_fields(
 /// internal inconsistency (a published id that does not resolve to a layout).
 fn try_build_inline_value_layout(
     ctx: &impl SpecializerContext,
+    nominal: InternedType,
     field_layouts: &[VariantFieldLayout],
     field_ids: &[Option<LayoutId>],
     total: u32,
@@ -1350,6 +1378,7 @@ fn try_build_inline_value_layout(
         layout_fields.push(FieldValueLayout {
             offset: field.offset,
             id,
+            name: field.name,
         });
         match child.fixed_bcs_size {
             Some(bcs_sz) => fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64),
@@ -1378,6 +1407,7 @@ fn try_build_inline_value_layout(
         }
     }
     Ok(Some(ValueLayout::struct_layout(
+        nominal,
         total,
         align,
         fixed_bcs_size,
@@ -1518,21 +1548,18 @@ fn discover_type_metadata(
                     // like a generic type parameter: defer.
                     Ok(None)
                 },
-                Some(FieldTypes::Struct(fields)) => {
-                    let fields = fields
-                        .iter()
-                        .map(|f| interner.subst_type(*f, *nominal_ty_args))
-                        .collect::<Result<Vec<_>, _>>()?;
+                Some(NominalFields::Struct(fields)) => {
+                    let fields = subst_field_decls(interner, &fields, *nominal_ty_args)?;
 
                     // Recurse on every field unconditionally (a deferred or
                     // unsized field must not stop discovery of later fields'
                     // descriptors), collecting each field's layout id.
                     let mut field_ids = Vec::with_capacity(fields.len());
-                    for &ft in &fields {
+                    for f in &fields {
                         field_ids.push(discover_type_metadata(
                             ctx,
                             interner,
-                            ft,
+                            f.ty,
                             EMPTY_TYPE_LIST,
                             visited,
                             descriptors,
@@ -1552,6 +1579,7 @@ fn discover_type_metadata(
                     // deferred), before recording any nominal layout.
                     let Some(value_layout) = try_build_inline_value_layout(
                         &*ctx,
+                        ty,
                         &field_layouts,
                         &field_ids,
                         total,
@@ -1562,7 +1590,7 @@ fn discover_type_metadata(
                     };
                     Ok(Some(ctx.publish_layout(ty, value_layout)))
                 },
-                Some(FieldTypes::Enum(variants)) => {
+                Some(NominalFields::Enum(variants)) => {
                     // An enum is an 8-byte heap pointer at the type level.
                     //
                     // TODO(correctness): the enum value layout carries no fixed
@@ -1581,21 +1609,19 @@ fn discover_type_metadata(
                     let mut all_sized = true;
                     let mut all_value_layouts = true;
 
-                    'variants: for variant_fields in &variants {
+                    'variants: for variant in &variants {
                         // Substitute each field type by the enum's own type
                         // args (mirrors the Struct arm), then recurse so nested
                         // vec/struct/enum descriptors and layouts get published,
                         // capturing each field's layout id.
-                        let fields = variant_fields
-                            .iter()
-                            .map(|field_ty| interner.subst_type(*field_ty, *nominal_ty_args))
-                            .collect::<Result<Vec<_>, _>>()?;
+                        let fields =
+                            subst_field_decls(interner, &variant.fields, *nominal_ty_args)?;
                         let mut field_ids = Vec::with_capacity(fields.len());
-                        for &field_ty in &fields {
+                        for f in &fields {
                             field_ids.push(discover_type_metadata(
                                 ctx,
                                 interner,
-                                field_ty,
+                                f.ty,
                                 EMPTY_TYPE_LIST,
                                 visited,
                                 descriptors,
@@ -1628,6 +1654,7 @@ fn discover_type_metadata(
                         if all_value_layouts {
                             match try_build_inline_value_layout(
                                 &*ctx,
+                                ty,
                                 &variant_layout,
                                 &field_ids,
                                 variant_size,
@@ -1670,8 +1697,16 @@ fn discover_type_metadata(
                             debug_assert_eq!(variant_value_layouts.len(), variants.len());
                             let variant_ids =
                                 ctx.publish_variant_layouts(ty, variant_value_layouts);
+                            let variant_layouts = variants
+                                .iter()
+                                .zip(variant_ids.iter())
+                                .map(|(variant, &id)| VariantValueLayout {
+                                    name: variant.name,
+                                    id,
+                                })
+                                .collect::<Box<[_]>>();
                             let value_layout =
-                                ValueLayout::frozen_enum(descriptor_id, variant_ids, size);
+                                ValueLayout::frozen_enum(ty, descriptor_id, variant_layouts, size);
                             return Ok(Some(ctx.publish_layout(ty, value_layout)));
                         }
                     }

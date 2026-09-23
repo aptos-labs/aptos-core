@@ -41,6 +41,7 @@ pub mod secp256k1;
 pub mod signer;
 pub mod state_storage;
 pub mod string;
+pub mod string_utils;
 pub mod table;
 #[cfg(feature = "testing")]
 pub mod test_natives;
@@ -88,6 +89,7 @@ pub use secp256k1::make_all_secp256k1_natives;
 pub use signer::make_all_signer_natives;
 pub use state_storage::{make_all_state_storage_natives, StorageUsageAtEpochBoundary};
 pub use string::make_all_string_natives;
+pub use string_utils::make_all_string_utils_natives;
 pub use table::make_all_table_natives;
 #[cfg(feature = "testing")]
 pub use test_natives::{
@@ -119,6 +121,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_aptos_hash_natives::<F>());
     natives.extend(make_all_init_natives::<F>());
     natives.extend(make_all_string_natives::<F>());
+    natives.extend(make_all_string_utils_natives::<F>());
     natives.extend(make_all_bcs_natives::<F>());
     natives.extend(make_all_cmp_natives::<F>());
     natives.extend(make_all_consensus_config_natives::<F>());

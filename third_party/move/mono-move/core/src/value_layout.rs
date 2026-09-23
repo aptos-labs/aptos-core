@@ -17,6 +17,7 @@
 //! header.
 
 use crate::{
+    interner::InternedIdentifier,
     types::{intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type},
     DescriptorId, MAX_ALIGN,
 };
@@ -89,7 +90,7 @@ impl fmt::Display for ValueLayout {
             LayoutKind::SignedInt => write!(f, "{}-byte signed integer", self.size),
             LayoutKind::Address => write!(f, "address"),
             LayoutKind::Signer => write!(f, "signer"),
-            LayoutKind::Struct { fields } => write!(f, "struct with {} fields", fields.len()),
+            LayoutKind::Struct { fields, .. } => write!(f, "struct with {} fields", fields.len()),
             LayoutKind::Vector { .. } => write!(f, "vector"),
             LayoutKind::FrozenEnum { variants, .. } => {
                 write!(f, "enum with {} variants", variants.len())
@@ -103,6 +104,16 @@ impl fmt::Display for ValueLayout {
 /// Layout information for a struct field.
 pub struct FieldValueLayout {
     pub offset: u32,
+    pub id: LayoutId,
+    /// Declared field name.
+    pub name: InternedIdentifier,
+}
+
+/// Layout information for one variant of an enum.
+pub struct VariantValueLayout {
+    /// Declared variant name.
+    pub name: InternedIdentifier,
+    /// Layout of the variant's body, a [`LayoutKind::Struct`] over its fields.
     pub id: LayoutId,
 }
 
@@ -122,7 +133,10 @@ pub enum LayoutKind {
     /// An inline struct: fields laid out flat in the parent's payload.
     /// TODO(completeness): for non-inline structs (resources), we need a descriptor ID.
     Struct {
-        /// Byte offsets and IDs of each field within the struct payload.
+        /// The struct this body belongs to. For an enum variant body, the enum
+        /// itself.
+        nominal: InternedType,
+        /// Byte offsets, names and IDs of each field within the struct payload.
         fields: Box<[FieldValueLayout]>,
     },
     /// A vector: an 8-byte heap-pointer slot. `elem_id` is the element layout
@@ -138,9 +152,11 @@ pub enum LayoutKind {
     ///
     /// TODO(completeness): revisit with upgrade story, might not need to be frozen.
     FrozenEnum {
+        /// The enum this value belongs to.
+        nominal: InternedType,
         descriptor_id: DescriptorId,
-        /// One layout per variant body, indexed by variant tag.
-        variants: Box<[LayoutId]>,
+        /// One entry per variant body, indexed by variant tag.
+        variants: Box<[VariantValueLayout]>,
         /// Size of the enum object's data region: the 8-byte tag plus the
         /// widest variant body, rounded up to 8-byte alignment. Sized to the
         /// largest variant so any variant fits.
@@ -333,6 +349,7 @@ impl ValueLayout {
 
     /// Layout for a struct.
     pub fn struct_layout(
+        nominal: InternedType,
         size: u32,
         align: u32,
         fixed_bcs_size: Option<u32>,
@@ -348,14 +365,15 @@ impl ValueLayout {
             align,
             fixed_bcs_size,
             flags,
-            kind: LayoutKind::Struct { fields },
+            kind: LayoutKind::Struct { nominal, fields },
         }
     }
 
     /// Layout for a frozen enum.
     pub fn frozen_enum(
+        nominal: InternedType,
         descriptor_id: DescriptorId,
-        variants: Box<[LayoutId]>,
+        variants: Box<[VariantValueLayout]>,
         max_size_across_variants: u32,
     ) -> ValueLayout {
         Self {
@@ -364,6 +382,7 @@ impl ValueLayout {
             fixed_bcs_size: None,
             flags: LayoutFlags::empty(),
             kind: LayoutKind::FrozenEnum {
+                nominal,
                 descriptor_id,
                 variants,
                 max_size_across_variants,

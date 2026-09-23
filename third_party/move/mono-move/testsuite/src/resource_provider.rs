@@ -162,7 +162,7 @@ fn collect_pointer_offsets(
         | LayoutKind::Function
         | LayoutKind::Ref
         | LayoutKind::FrozenEnum { .. } => out.push(base),
-        LayoutKind::Struct { fields } => {
+        LayoutKind::Struct { fields, .. } => {
             for field in fields.iter() {
                 if let Some(sub) = guard.layout(field.id) {
                     collect_pointer_offsets(guard, sub, base + field.offset, out);

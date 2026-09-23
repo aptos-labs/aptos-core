@@ -7,7 +7,7 @@
 //! [`NativeContext`] trait, never on these types directly.
 
 use crate::{
-    error::RuntimeError,
+    error::{RuntimeError, RuntimeInvariantViolation},
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
         alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
@@ -28,7 +28,8 @@ use mono_move_core::{
     },
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
-    DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
+    DescriptorId, DescriptorProvider, ExecutionErrorKind, FormatOptions, Function, GasMeter,
+    LayoutKind, LayoutProvider,
     ObjectDescriptorInner, ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE,
     OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
@@ -829,6 +830,28 @@ impl NativeContext for ProductionNativeContext<'_> {
     unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering> {
         // SAFETY: forwarded from this method's contract.
         unsafe { crate::value_cmp::compare(self.layouts, a, b, ty) }
+    }
+
+    unsafe fn format_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+        options: &FormatOptions,
+    ) -> VMResult<String> {
+        let mut out = String::new();
+        // SAFETY: forwarded from this method's contract.
+        unsafe { crate::value_display::display(self.layouts, base, ty, options, &mut out)? };
+        Ok(out)
+    }
+
+    fn field_offset(&self, ty: InternedType, i: usize) -> VMResult<Option<u32>> {
+        let layout = self.layouts.layout_by_ty(ty).ok_or({
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+        })?;
+        let LayoutKind::Struct { fields, .. } = &layout.kind else {
+            return Ok(None);
+        };
+        Ok(fields.get(i).map(|field| field.offset))
     }
 
     unsafe fn new_enum<'a, V: VMValue<'a>>(
