@@ -28,6 +28,10 @@ module bench::oracle_batch_tests {
         x"d989973690b5d1ed044888df19f1b0328b91b8d1135ed640490169715f73bafd980e7a0de37e81405eac9fb6985978b2443d319cf5438d1da13eac6401863c0d";
     const BATCH_SECP_SIG: vector<u8> =
         x"3df6d879f880f459c398b46cfbd04908391bde086f92cf29b7e3280343038eea5f8a5b52a5913915f74cc9d37e23e270969a9236d22951c01f1f780d8c2ee3f8";
+    /// Recovery id the signature above was produced under. The generator sends
+    /// one per signature, and `test_secp256k1_recovers_the_signing_key` pins it
+    /// to the only id that recovers `SECP_PUBKEY`.
+    const BATCH_SECP_ID: u8 = 0;
 
     /// The same, for a single record: offset 0, price 100000000, confidence 10,
     /// timestamp 1700000000. Its BCS length is one byte, so the records start
@@ -38,6 +42,7 @@ module bench::oracle_batch_tests {
         x"974fff92788d8ab61d4c79350fea8c174135925c61dcf511c7e93c94bde4466966d9cad4065b7ad8c43b306ab9782f5e43d318f1b1f67e31ac896edea69e0d06";
     const ONE_SECP_SIG: vector<u8> =
         x"ad4a09aefdc313573c93e311f42085ed31a690fa0f82c37297bc3c5b4f1ed43c71a14dd2e09e1a20b2a7e1cde2012e677d76ec31f0fba97bbbef63cd527793fa";
+    const ONE_SECP_ID: u8 = 0;
 
     const RECORDS_IN_BATCH: u64 = 4;
     const DEPTH: u64 = 2;
@@ -116,9 +121,9 @@ module bench::oracle_batch_tests {
 
     #[test]
     fun test_secp256k1_recovers_the_signing_key() {
-        // The signer drops the recovery id, so the key comes back under one of
-        // the four. Finding it at all proves the digest and the signature
-        // encoding agree with what was signed.
+        // Exactly one of the four ids recovers the signer, and it is the one
+        // the generator sends. Any other recovers a key the authority set does
+        // not hold, which is what the quorum has to reject.
         let digest = hash::sha3_256(BATCH);
         let matches = 0;
         let rid = 0;
@@ -126,6 +131,7 @@ module bench::oracle_batch_tests {
             let raw = orc_verifier::recover_raw(digest, rid, BATCH_SECP_SIG);
             if (raw == SECP_PUBKEY) {
                 matches = matches + 1;
+                assert!(rid == BATCH_SECP_ID, 0);
                 assert!(
                     orc_verifier::recover_secp256k1(digest, rid, BATCH_SECP_SIG)
                         == hash::sha3_256(SECP_PUBKEY),
@@ -143,6 +149,7 @@ module bench::oracle_batch_tests {
             if (orc_verifier::recover_raw(digest, rid, ONE_SECP_SIG)
                 == SECP_PUBKEY) {
                 matches = matches + 1;
+                assert!(rid == ONE_SECP_ID, 0);
             };
             rid = rid + 1;
         };
@@ -169,7 +176,7 @@ module bench::oracle_batch_tests {
         orc_aggregator::bench_update_ed25519(
             alice, 0, BATCH, vector[BATCH_ED_SIG], vector[0], DEPTH);
         orc_aggregator::bench_update_secp256k1(
-            alice, 0, BATCH, vector[BATCH_SECP_SIG], DEPTH);
+            alice, 0, BATCH, vector[BATCH_SECP_SIG], vector[BATCH_SECP_ID], DEPTH);
         orc_aggregator::bench_verify_only(
             alice, BATCH, vector[BATCH_ED_SIG], vector[0]);
         orc_aggregator::bench_write_only(alice, 0, BATCH, DEPTH);
@@ -180,6 +187,7 @@ module bench::oracle_batch_tests {
             vector[BATCH_ED_SIG],
             vector[0],
             vector[BATCH_SECP_SIG],
+            vector[BATCH_SECP_ID],
             DEPTH,
         );
         orc_aggregator::bench_read_aggregate(alice, 0, RECORDS_IN_BATCH);
@@ -340,6 +348,7 @@ module bench::oracle_batch_tests {
             vector[BATCH_ED_SIG],
             vector[0],
             vector::empty<vector<u8>>(),
+            vector::empty<u8>(),
             DEPTH,
         );
         let (batches, verified, rejected, _authorized) =
@@ -350,6 +359,71 @@ module bench::oracle_batch_tests {
         assert!(batches == 0, 0);
         let (_price, _aggregate, _conf, _ts, updates) = orc_registry::read(0);
         assert!(updates == 0, 0);
+    }
+
+    #[test(admin = @bench, alice = @0xa11ce)]
+    fun test_quorum_counts_only_authorized_signatures(
+        admin: &signer, alice: &signer
+    ) {
+        setup(admin, CHUNK, 2);
+        orc_aggregator::bench_onboard(alice, 0);
+        // The right signature under the wrong recovery id recovers a key the
+        // authority set does not hold, so it cannot make up a quorum.
+        orc_aggregator::bench_quorum(
+            alice,
+            0,
+            BATCH,
+            vector[BATCH_ED_SIG],
+            vector[0],
+            vector[BATCH_SECP_SIG],
+            vector[BATCH_SECP_ID + 1],
+            DEPTH,
+        );
+        let (batches, verified, rejected, authorized) =
+            orc_aggregator::subscriber_state(signer::address_of(alice));
+        assert!(verified == 1, 0);
+        assert!(rejected == 1, 0);
+        assert!(authorized == 0, 0);
+        assert!(batches == 0, 0);
+        let (_price, _aggregate, _conf, _ts, updates) = orc_registry::read(0);
+        assert!(updates == 0, 0);
+
+        // Under the id it was signed with, the same pair meets the quorum.
+        orc_aggregator::bench_quorum(
+            alice,
+            0,
+            BATCH,
+            vector[BATCH_ED_SIG],
+            vector[0],
+            vector[BATCH_SECP_SIG],
+            vector[BATCH_SECP_ID],
+            DEPTH,
+        );
+        let (batches, _verified, _rejected, authorized) =
+            orc_aggregator::subscriber_state(signer::address_of(alice));
+        assert!(batches == 1, 0);
+        assert!(authorized == 1, 0);
+        let (_price, _aggregate, _conf, _ts, updates) = orc_registry::read(0);
+        assert!(updates == 1, 0);
+    }
+
+    #[test(admin = @bench, alice = @0xa11ce)]
+    fun test_update_secp256k1_counts_an_unauthorized_recovery(
+        admin: &signer, alice: &signer
+    ) {
+        setup(admin, CHUNK, 1);
+        orc_aggregator::bench_onboard(alice, 0);
+        orc_aggregator::bench_update_secp256k1(
+            alice, 0, BATCH, vector[BATCH_SECP_SIG], vector[BATCH_SECP_ID + 1], DEPTH);
+        let (batches, verified, rejected, authorized) =
+            orc_aggregator::subscriber_state(signer::address_of(alice));
+        assert!(batches == 1, 0);
+        assert!(verified == 0, 0);
+        assert!(rejected == 1, 0);
+        assert!(authorized == 0, 0);
+        // The batch still lands: only the count changes, never the write path.
+        let (_price, _aggregate, _conf, _ts, updates) = orc_registry::read(0);
+        assert!(updates == 1, 0);
     }
 
     #[test(admin = @bench, alice = @0xa11ce)]

@@ -3,6 +3,11 @@
 /// Every route is a chain of `dexr_backend` hops whose venues and legs come in
 /// as type arguments. A hop returns what it managed to trade and the next hop
 /// takes that, so a route that fills short keeps going instead of unwinding.
+///
+/// A pool trades only the pair it holds, and pool `id` holds assets `id` and
+/// `id + 1`. The hop offsets below therefore walk the legs forward one asset
+/// at a time, and a caller has to pick `pool_id` and the leg markers together
+/// or the route trades nothing.
 module bench::dexr_router {
     use std::signer;
     use std::vector;
@@ -134,6 +139,10 @@ module bench::dexr_router {
 
     /// Split the first leg across two venues, then merge the two halves back
     /// through two more. `split_bps` is the share the first venue takes.
+    ///
+    /// The two venues of a leg have to hold the same pair, and pools hold the
+    /// same pair only a whole asset cycle apart, so the second one of each
+    /// pair of hops sits `N_ASSETS` further along.
     public entry fun bench_split<
         B0, B1, B2, B3,
         X0, X1, X2,
@@ -148,9 +157,9 @@ module bench::dexr_router {
         );
         let second = amount_in - first;
         let a = dexr_backend::swap<B0, X0, X1>(user, base, first);
-        let b = dexr_backend::swap<B1, X0, X1>(user, base + 1, second);
-        let c = dexr_backend::swap<B2, X1, X2>(user, base + 2, a);
-        let d = dexr_backend::swap<B3, X1, X2>(user, base + 3, b);
+        let b = dexr_backend::swap<B1, X0, X1>(user, base + N_ASSETS, second);
+        let c = dexr_backend::swap<B2, X1, X2>(user, base + 1, a);
+        let d = dexr_backend::swap<B3, X1, X2>(user, base + 1 + N_ASSETS, b);
         let _ = c + d;
     }
 

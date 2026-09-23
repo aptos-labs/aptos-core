@@ -4973,6 +4973,7 @@ dependencies = [
  "aptos-transaction-generator-lib",
  "async-trait",
  "clap 4.5.60",
+ "libsecp256k1",
  "move-binary-format",
  "once_cell",
  "rand 0.7.3",

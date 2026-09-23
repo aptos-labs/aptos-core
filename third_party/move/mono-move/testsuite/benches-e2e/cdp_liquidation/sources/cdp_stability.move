@@ -2,9 +2,12 @@
 /// Liquity's offset mechanism.
 ///
 /// Depositors put stable into the pool and are paid in the collateral of the
-/// vaults the pool absorbs. A deposit tracks its share with a snapshot of the
-/// pool's running gain per unit staked, so absorbing a vault costs one write
-/// rather than one per depositor.
+/// vaults the pool absorbs. A deposit tracks its share with a snapshot of two
+/// running quantities: the gain per unit staked, which pays it, and the
+/// product, which shrinks it by whatever share of the pool the last
+/// cancellation spent. Absorbing a vault therefore costs one write rather than
+/// one per depositor, and what the depositors hold still adds up to what the
+/// pool holds.
 ///
 /// A liquidated vault is reopened at a ratio measured against the oracle's
 /// reference price instead of being deleted. The list therefore keeps a
@@ -26,8 +29,14 @@ module bench::cdp_stability {
 
     const STABLE_SYMBOL: vector<u8> = b"CDPS";
 
-    /// Fixed point scale of the running collateral gain per unit staked.
+    /// Fixed point scale of the two running quantities a deposit snapshots.
     const SCALE: u128 = 1000000000000;
+
+    /// Product floor. A long run of absorbs drives the product towards zero,
+    /// and below this the ratio against a snapshot has lost too much precision
+    /// to pay anyone accurately. The pool then starts a new epoch, which is
+    /// what Liquity does when a cancellation empties it.
+    const PRODUCT_FLOOR: u128 = 1000000;
 
     /// Ratios a liquidated vault reopens at, in basis points against the
     /// oracle's reference price. Measuring against the reference rather than
@@ -52,14 +61,25 @@ module bench::cdp_stability {
         total: u64,
         /// Collateral seized from liquidated vaults, cumulative.
         coll_absorbed: u64,
-        /// Running collateral gain per unit staked, scaled by `SCALE`.
+        /// Running collateral gain per unit staked, scaled by `product`.
         gain_per_unit: u128,
+        /// Running product every stake is compounded by, scaled by `SCALE`.
+        /// Cancelling `c` of `s` staked multiplies it by `(s - c) / s`, which
+        /// is how one write takes the spent stake off every deposit at once.
+        product: u128,
+        /// Bumped whenever the product is reset.
+        epoch: u64,
     }
 
     struct Deposit has key {
+        /// Stake as of the snapshots below, before any later absorb.
         amount: u64,
         /// Value of `gain_per_unit` when this deposit was last resized.
         snapshot: u128,
+        /// Value of `product` when this deposit was last resized.
+        snapshot_product: u128,
+        /// Value of the pool's epoch when this deposit was last resized.
+        epoch: u64,
         coll_gain: u64,
     }
 
@@ -69,7 +89,15 @@ module bench::cdp_stability {
         assert!(signer::address_of(admin) == @bench, E_NOT_BENCH);
         if (!exists<Pool>(@bench)) {
             move_to(
-                admin, Pool { total: 0, coll_absorbed: 0, gain_per_unit: 0 });
+                admin,
+                Pool {
+                    total: 0,
+                    coll_absorbed: 0,
+                    gain_per_unit: 0,
+                    product: SCALE,
+                    epoch: 0,
+                },
+            );
         };
         cdp_assets::faucet(stable_asset(), @bench, amount);
         let pool = borrow_global_mut<Pool>(@bench);
@@ -86,20 +114,50 @@ module bench::cdp_stability {
         let stable = stable_asset();
         cdp_assets::faucet(stable, owner, amount);
         primary_fungible_store::transfer(user, stable, @bench, amount);
+        let pool = borrow_global<Pool>(@bench);
+        let gain_per_unit = pool.gain_per_unit;
+        let product = pool.product;
+        let epoch = pool.epoch;
         if (!exists<Deposit>(owner)) {
-            move_to(user, Deposit { amount: 0, snapshot: 0, coll_gain: 0 });
+            move_to(
+                user,
+                Deposit {
+                    amount: 0,
+                    snapshot: gain_per_unit,
+                    snapshot_product: product,
+                    epoch,
+                    coll_gain: 0,
+                },
+            );
         };
-        let gain_per_unit = borrow_global<Pool>(@bench).gain_per_unit;
         let deposit = borrow_global_mut<Deposit>(owner);
-        // Settle what the deposit earned at its old size before the new stake
-        // changes the weighting.
-        deposit.coll_gain = deposit.coll_gain
-            + ((((gain_per_unit - deposit.snapshot)
-                * (deposit.amount as u128)) / SCALE) as u64);
+        // Take the absorbs since the last resize off the old stake, and settle
+        // what that stake earned, before the new one changes the weighting.
+        let (staked, gain) = compounded(deposit, gain_per_unit, product, epoch);
+        deposit.coll_gain = deposit.coll_gain + gain;
+        deposit.amount = staked + amount;
         deposit.snapshot = gain_per_unit;
-        deposit.amount = deposit.amount + amount;
+        deposit.snapshot_product = product;
+        deposit.epoch = epoch;
         let pool = borrow_global_mut<Pool>(@bench);
         pool.total = pool.total + amount;
+    }
+
+    /// `(stake, gain)` a deposit holds against the pool's current running
+    /// quantities: what is left of its stake after every absorb since it was
+    /// last resized, and the collateral those absorbs owe it. An absorb that
+    /// closed the epoch spent the stake, so both come back zero.
+    fun compounded(
+        deposit: &Deposit, gain_per_unit: u128, product: u128, epoch: u64
+    ): (u64, u64) {
+        if (deposit.epoch != epoch || deposit.snapshot_product == 0) {
+            return (0, 0)
+        };
+        let amount = (deposit.amount as u128);
+        let stake = amount * product / deposit.snapshot_product;
+        let gain = amount * (gain_per_unit - deposit.snapshot)
+            / deposit.snapshot_product;
+        ((stake as u64), (gain as u64))
     }
 
     /// Sweep the riskiest end of the list. Walks at most `walk_limit` nodes,
@@ -155,8 +213,21 @@ module bench::cdp_stability {
         let cancelled = if (debt > staked) staked else debt;
         let cancelled = if (cancelled > held) held else cancelled;
         if (staked > 0) {
+            let product = pool.product;
             pool.gain_per_unit = pool.gain_per_unit
-                + ((coll as u128) * SCALE / (staked as u128));
+                + ((coll as u128) * product / (staked as u128));
+            // The cancellation spent the same share of every stake, so decay
+            // the product they are all measured against. Spending the pool
+            // outright, or wearing the product down to its floor, closes the
+            // epoch instead: the stakes recorded under it are gone.
+            let left = product * ((staked - cancelled) as u128)
+                / (staked as u128);
+            if (left < PRODUCT_FLOOR) {
+                pool.product = SCALE;
+                pool.epoch = pool.epoch + 1;
+            } else {
+                pool.product = left;
+            };
         };
         pool.total = staked - cancelled;
         pool.coll_absorbed = pool.coll_absorbed + coll;
@@ -184,10 +255,14 @@ module bench::cdp_stability {
     }
 
     #[view]
-    /// Staked stable and settled collateral gain of one depositor.
-    public fun deposit_state(owner: address): (u64, u64) acquires Deposit {
-        if (!exists<Deposit>(owner)) return (0, 0);
+    /// Staked stable and collateral gain of one depositor, both taken up to
+    /// the absorbs that have happened since its last deposit.
+    public fun deposit_state(owner: address): (u64, u64) acquires Deposit, Pool {
+        if (!exists<Deposit>(owner) || !exists<Pool>(@bench)) return (0, 0);
+        let pool = borrow_global<Pool>(@bench);
         let deposit = borrow_global<Deposit>(owner);
-        (deposit.amount, deposit.coll_gain)
+        let (staked, gain) = compounded(
+            deposit, pool.gain_per_unit, pool.product, pool.epoch);
+        (staked, deposit.coll_gain + gain)
     }
 }

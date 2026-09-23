@@ -18,9 +18,10 @@ module bench::orc_aggregator {
     use bench::orc_registry;
     use bench::orc_verifier;
 
-    /// `aptos-crypto` drops the recovery id when it signs, so there is nothing
-    /// better to guess than the first one.
-    const RECOVERY_ID: u8 = 0;
+    /// Recovery id a signature with none of its own falls back to. Every
+    /// signature the generator sends carries one, so this only covers a
+    /// hand-built call.
+    const DEFAULT_RECOVERY_ID: u8 = 0;
 
     /// Ceiling on a read-only scan, so a caller cannot ask for an unbounded
     /// one.
@@ -83,23 +84,25 @@ module bench::orc_aggregator {
     }
 
     /// Same, over secp256k1 recovery: the digest is `sha3_256` of the batch,
-    /// which is what the signer's message hashes to.
+    /// which is what the signer's message hashes to. Each signature carries the
+    /// recovery id it was produced under, so a recovery lands on the key that
+    /// signed rather than on whichever one the id happens to select.
     public entry fun bench_update_secp256k1(
         user: &signer,
         feed_base: u64,
         records: vector<u8>,
         signatures: vector<vector<u8>>,
+        recovery_ids: vector<u8>,
         decode_depth: u64,
     ) acquires Subscriber {
-        let (verified, authorized) =
-            recover_secp256k1_batch(&records, &signatures);
-        let rejected = vector::length(&signatures) - verified;
+        let (authorized, rejected) =
+            recover_secp256k1_batch(&records, &signatures, &recovery_ids);
         publish(
             user,
             feed_base,
             &records,
             decode_depth,
-            verified,
+            authorized,
             rejected,
             authorized,
         );
@@ -125,7 +128,8 @@ module bench::orc_aggregator {
         publish(user, feed_base, &records, decode_depth, 0, 0, 0);
     }
 
-    /// k-of-n acceptance across both schemes. A batch that misses the quorum
+    /// k-of-n acceptance across both schemes. Only a signature that belongs to
+    /// the authority set counts towards the quorum, and a batch that misses it
     /// is counted and dropped, which is how a real feed treats one.
     public entry fun bench_quorum(
         user: &signer,
@@ -134,15 +138,15 @@ module bench::orc_aggregator {
         ed_signatures: vector<vector<u8>>,
         signer_idxs: vector<u64>,
         secp_signatures: vector<vector<u8>>,
+        recovery_ids: vector<u8>,
         decode_depth: u64,
     ) acquires Subscriber {
         let (ed_ok, ed_failed) =
             verify_ed25519_batch(&records, &ed_signatures, &signer_idxs);
-        let (secp_ok, authorized) =
-            recover_secp256k1_batch(&records, &secp_signatures);
-        let verified = ed_ok + secp_ok;
-        let rejected =
-            ed_failed + (vector::length(&secp_signatures) - secp_ok);
+        let (authorized, secp_failed) =
+            recover_secp256k1_batch(&records, &secp_signatures, &recovery_ids);
+        let verified = ed_ok + authorized;
+        let rejected = ed_failed + secp_failed;
         if (verified >= orc_queue::quorum()) {
             publish(
                 user,
@@ -267,30 +271,36 @@ module bench::orc_aggregator {
         (verified, rejected)
     }
 
-    /// `(recovered, authorized)` over the batch. A recovery that lands on a key
-    /// outside the authority set still counts as recovered: the signer drops
-    /// the recovery id, so the guess is right about half the time, and gating
-    /// on it would make the branch write nothing.
+    /// `(authorized, rejected)` over the batch. A signature that fails to
+    /// recover, or that recovers a key the authority set does not hold, is
+    /// rejected: what a feed accepts is a signature from one of its
+    /// authorities, not any signature at all. An id list shorter than the
+    /// signature list falls back to `DEFAULT_RECOVERY_ID`.
     fun recover_secp256k1_batch(
-        records: &vector<u8>, signatures: &vector<vector<u8>>
+        records: &vector<u8>,
+        signatures: &vector<vector<u8>>,
+        recovery_ids: &vector<u8>,
     ): (u64, u64) {
         let digest = hash::sha3_256(*records);
         let n = vector::length(signatures);
-        let recovered = 0;
+        let ids = vector::length(recovery_ids);
         let authorized = 0;
+        let rejected = 0;
         let i = 0;
         while (i < n) {
+            let id =
+                if (i < ids) *vector::borrow(recovery_ids, i)
+                else DEFAULT_RECOVERY_ID;
             let addr = orc_verifier::recover_secp256k1(
-                digest, RECOVERY_ID, *vector::borrow(signatures, i));
-            if (vector::length(&addr) > 0) {
-                recovered = recovered + 1;
-                if (orc_queue::has_secp_addr(&addr)) {
-                    authorized = authorized + 1;
-                };
+                digest, id, *vector::borrow(signatures, i));
+            if (vector::length(&addr) > 0 && orc_queue::has_secp_addr(&addr)) {
+                authorized = authorized + 1;
+            } else {
+                rejected = rejected + 1;
             };
             i = i + 1;
         };
-        (recovered, authorized)
+        (authorized, rejected)
     }
 
     /// Median by insertion sort. The window is one longer than

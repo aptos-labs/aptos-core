@@ -57,7 +57,8 @@ module bench::ad_distributor {
     ) {
         assert!(signer::address_of(admin) == @bench, E_NOT_BENCH);
         let memo = vector::empty<u8>();
-        credit_all(shard_id, &recipients, min(amount, MAX_UNIT_AMOUNT), &memo);
+        credit_all(
+            shard_id, &recipients, min(amount, MAX_UNIT_AMOUNT), &memo, false);
     }
 
     /// Bring a fresh account to the state the mix assumes: funded with the
@@ -73,6 +74,7 @@ module bench::ad_distributor {
             user_addr,
             min(seed_amount, MAX_UNIT_AMOUNT),
             vector::empty<u8>(),
+            false,
         );
     }
 
@@ -80,16 +82,24 @@ module bench::ad_distributor {
     /// modifies existing ones is decided entirely by the addresses the caller
     /// passes, so one entry point serves both distribution branches of the
     /// mix.
+    ///
+    /// The slots it creates are evictable, and the trim that follows takes the
+    /// shard back down to `ring_cap` of them. A batch of addresses nothing has
+    /// paid before therefore costs its creations plus the same number of
+    /// deletions, which is what stops the run from growing the claims table
+    /// under itself.
     public entry fun bench_distribute(
         _user: &signer,
         shard_id: u64,
         recipients: vector<address>,
         amount: u64,
         memo: vector<u8>,
+        ring_cap: u64,
     ) {
         let amount = min(amount, MAX_UNIT_AMOUNT);
         let n = batch_len(&recipients);
-        let fresh = credit_all(shard_id, &recipients, amount, &memo);
+        let fresh = credit_all(shard_id, &recipients, amount, &memo, true);
+        ad_registry::trim(shard_id, ring_cap);
         ad_ledger::record_batch(
             shard_id,
             ad_ledger::kind_distribute(),
@@ -175,16 +185,21 @@ module bench::ad_distributor {
         sweep(shard_id, &recipients);
     }
 
-    /// Credit the batch and report how many slots it created.
+    /// Credit the batch and report how many slots it created. `track` decides
+    /// whether those slots can later be evicted.
     fun credit_all(
-        shard_id: u64, recipients: &vector<address>, amount: u64, memo: &vector<u8>
+        shard_id: u64,
+        recipients: &vector<address>,
+        amount: u64,
+        memo: &vector<u8>,
+        track: bool,
     ): u64 {
         let n = batch_len(recipients);
         let fresh = 0;
         let i = 0;
         while (i < n) {
             if (ad_registry::credit(
-                shard_id, *vector::borrow(recipients, i), amount, *memo)) {
+                shard_id, *vector::borrow(recipients, i), amount, *memo, track)) {
                 fresh = fresh + 1;
             };
             i = i + 1;

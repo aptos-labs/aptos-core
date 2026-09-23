@@ -603,6 +603,9 @@ impl TransactionTypeArg {
                 num_modules: 1,
                 progress_type: workflow_progress_type,
             },
+            // A ring of 4096 per shard holds the claims table at 32768
+            // evictable slots across the eight shards, which the fresh branch
+            // fills inside the first percent of the run and then stays on.
             TransactionTypeArg::AirdropFanout => TransactionType::Workflow {
                 workflow_kind: Box::new(BenchWorkflowKind::AirdropFanout {
                     num_accounts: BENCH_NUM_ACCOUNTS,
@@ -612,6 +615,7 @@ impl TransactionTypeArg {
                     payload_len: 32,
                     write_every: 4,
                     fresh_ratio: 75,
+                    ring_cap: 4096,
                     num_txns: BENCH_NUM_TXNS,
                 }),
                 num_modules: 1,

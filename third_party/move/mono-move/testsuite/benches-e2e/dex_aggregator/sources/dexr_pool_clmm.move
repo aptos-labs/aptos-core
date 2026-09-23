@@ -126,8 +126,12 @@ module bench::dexr_pool_clmm {
         let i = 0;
         while (i < count) {
             state = lcg_next(state);
-            let x = *vector::borrow(&assets, state % n_assets);
-            let y = *vector::borrow(&assets, (state + 3) % n_assets);
+            // Pool `id` holds assets `id` and `id + 1`. A route picks the pool
+            // each of its hops lands on before it knows what that pool holds,
+            // so which pair a pool holds has to follow from its id.
+            let id = n_pools();
+            let x = *vector::borrow(&assets, id % n_assets);
+            let y = *vector::borrow(&assets, (id + 1) % n_assets);
             create_pool(
                 admin,
                 x,
@@ -223,13 +227,18 @@ module bench::dexr_pool_clmm {
         (tick.liquidity, tick.price_num, tick.price_den)
     }
 
-    /// Direction of a hop through `pool`. Whichever side the requested input
-    /// sits on wins; a marker the pool holds on neither side takes the `x`
-    /// side, unless the requested output is `x`.
-    fun forward(pool: &Pool, asset_in: address, asset_out: address): bool {
-        if (pool.y == asset_in) { false } else { pool.x != asset_out }
+    /// `(holds, forward)` for a hop from `asset_in` to `asset_out`: whether
+    /// the pool trades that pair at all, and which way round it holds it. A
+    /// pool that holds something else is not a venue for this hop, and saying
+    /// so is what keeps a route to the legs it named.
+    fun direction(pool: &Pool, asset_in: address, asset_out: address): (bool, bool) {
+        if (pool.x == asset_in && pool.y == asset_out) { (true, true) }
+        else if (pool.y == asset_in && pool.x == asset_out) { (true, false) }
+        else { (false, false) }
     }
 
+    /// Trade `amount_in` of `asset_in` through pool `pool_id`, crossing ticks
+    /// until it fills. A pool that does not hold the pair trades nothing.
     public fun swap(
         user: &signer,
         pool_id: u64,
@@ -245,7 +254,10 @@ module bench::dexr_pool_clmm {
             return 0
         };
         let pool = table::borrow_mut(&mut pools.pools, pool_id % pools.n_pools);
-        let forward = forward(pool, asset_in, asset_out);
+        let (holds, forward) = direction(pool, asset_in, asset_out);
+        if (!holds) {
+            return 0
+        };
         let (reserve_in, reserve_out) =
             if (forward) { (pool.reserve_x, pool.reserve_y) }
             else { (pool.reserve_y, pool.reserve_x) };
@@ -316,8 +328,12 @@ module bench::dexr_pool_clmm {
             return 0
         };
         let pool = table::borrow(&pools.pools, pool_id % pools.n_pools);
+        let (holds, forward) = direction(pool, asset_in, asset_out);
+        if (!holds) {
+            return 0
+        };
         let (reserve_in, reserve_out) =
-            if (forward(pool, asset_in, asset_out)) { (pool.reserve_x, pool.reserve_y) }
+            if (forward) { (pool.reserve_x, pool.reserve_y) }
             else { (pool.reserve_y, pool.reserve_x) };
         let remaining = dexr_math::clamp_in(amount_in, reserve_in);
         let n_ticks = vector::length(&pool.ticks);

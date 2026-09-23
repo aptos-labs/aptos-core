@@ -20,6 +20,7 @@ aptos-sdk = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
+libsecp256k1 = { workspace = true }
 move-binary-format = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }

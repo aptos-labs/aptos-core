@@ -27,6 +27,16 @@ module bench::cdp_liquidation_tests {
     const ONBOARD_ICR_BPS: u64 = 25000;
     const POOL_FUNDING: u64 = 1000000000000;
     const DEPOSIT_AMOUNT: u64 = 1000000;
+
+    /// Stake per depositor in the pool accounting test, which starts the pool
+    /// empty so that two equal deposits are the whole of it. Enough that one
+    /// cancellation takes a visible share without emptying it.
+    const SMALL_STAKE: u64 = 200000;
+
+    /// Units the depositors' share of the pool may fall under the pool's own
+    /// count, from the truncation each resize does.
+    const ROUNDING_SLACK: u64 = 4;
+
     const ADJUST_COLL: u64 = 4;
     const ADJUST_DEBT: u64 = 20000;
 
@@ -46,12 +56,18 @@ module bench::cdp_liquidation_tests {
 
     /// Every publisher-signed call the Rust generator issues, in order.
     fun init_package(admin: &signer) {
+        init_package_funded(admin, POOL_FUNDING);
+    }
+
+    /// The same, with the stability pool funded at `funding` rather than at
+    /// what the generator funds it at.
+    fun init_package_funded(admin: &signer, funding: u64) {
         cdp_assets::create_asset_entry(admin, b"CDPC", COLL_DECIMALS);
         cdp_assets::create_asset_entry(admin, b"CDPS", STABLE_DECIMALS);
         cdp_vault::initialize(admin, MCR_BPS);
         cdp_oracle::set_price(admin, START_PRICE);
         cdp_sorted::seed_vaults(admin, 0, LIST_LENGTH);
-        cdp_stability::fund(admin, POOL_FUNDING);
+        cdp_stability::fund(admin, funding);
         cdp_auction::initialize(admin, AUCTION_LOTS);
     }
 
@@ -142,9 +158,13 @@ module bench::cdp_liquidation_tests {
         assert!(absorbed > 0, 0);
         let (lots_after, proceeds) = cdp_auction::auction_state();
         assert!(lots_after == lots && proceeds > 0, 0);
+        // The sweeps spent part of the pool, so alice holds a little less
+        // than she staked. A little, because what she staked is a small share
+        // of a pool the seeding funded.
         let (staked, _) = cdp_stability::deposit_state(
             signer::address_of(alice));
-        assert!(staked == DEPOSIT_AMOUNT * BAND_STOPS, 0);
+        let deposited = DEPOSIT_AMOUNT * BAND_STOPS;
+        assert!(staked < deposited && staked * 1000 > deposited * 999, 0);
         assert!(cdp_vault::exists_vault(vault_of(alice)), 0);
         assert!(cdp_sorted::in_list(vault_of(bob)), 0);
     }
@@ -172,6 +192,59 @@ module bench::cdp_liquidation_tests {
         let (staked_swept, absorbed_swept) = cdp_stability::pool_state();
         assert!(cdp_sorted::len() == len, 0);
         assert!(absorbed_swept > absorbed && staked_swept < staked, 0);
+    }
+
+    #[test(admin = @bench, alice = @0xa11ce, bob = @0xb0b)]
+    /// What the depositors hold adds up to what the pool holds, before and
+    /// after a cancellation spends part of it. The stake a cancellation spent
+    /// is gone from the deposits that funded it, and the collateral it paid
+    /// out is bounded by the collateral it seized.
+    fun test_absorb_spends_every_deposit_in_proportion(
+        admin: &signer, alice: &signer, bob: &signer
+    ) {
+        init_package_funded(admin, 0);
+        let alice_addr = signer::address_of(alice);
+        let bob_addr = signer::address_of(bob);
+        cdp_sorted::bench_onboard(
+            alice, ONBOARD_COLL, ONBOARD_ICR_BPS, hint(0));
+        cdp_stability::bench_deposit(alice, SMALL_STAKE);
+        cdp_stability::bench_deposit(bob, SMALL_STAKE);
+        let (staked, _) = cdp_stability::pool_state();
+        assert!(staked == SMALL_STAKE * 2, 0);
+        assert_pool_adds_up(alice_addr, bob_addr);
+
+        // One vault, cancelled against a pool that two equal deposits funded
+        // between them.
+        cdp_oracle::set_price(admin, START_PRICE / 2);
+        cdp_stability::bench_liquidate(alice, 1, WALK_LIMIT);
+        let (staked_after, absorbed) = cdp_stability::pool_state();
+        assert!(absorbed > 0 && staked_after > 0 && staked_after < staked, 0);
+        assert_pool_adds_up(alice_addr, bob_addr);
+        let (alice_staked, alice_gain) = cdp_stability::deposit_state(alice_addr);
+        let (bob_staked, bob_gain) = cdp_stability::deposit_state(bob_addr);
+        assert!(alice_staked == bob_staked && alice_gain == bob_gain, 0);
+        assert!(alice_staked < SMALL_STAKE && alice_gain > 0, 0);
+
+        // A second cancellation is paid for by what is left, not by what was
+        // first staked.
+        cdp_stability::bench_liquidate(alice, 1, WALK_LIMIT);
+        let (staked_twice, _) = cdp_stability::pool_state();
+        assert!(staked_twice < staked_after, 0);
+        assert_pool_adds_up(alice_addr, bob_addr);
+    }
+
+    /// Both stability pool invariants: the two deposits add up to the staked
+    /// total, and their gains add up to no more than the collateral the pool
+    /// seized. Each deposit truncates when it is resized, so the sums come in
+    /// just under rather than exactly on.
+    fun assert_pool_adds_up(alice: address, bob: address) {
+        let (staked, absorbed) = cdp_stability::pool_state();
+        let (alice_staked, alice_gain) = cdp_stability::deposit_state(alice);
+        let (bob_staked, bob_gain) = cdp_stability::deposit_state(bob);
+        let held = alice_staked + bob_staked;
+        assert!(held <= staked && held + ROUNDING_SLACK >= staked, 0);
+        let paid = alice_gain + bob_gain;
+        assert!(paid <= absorbed && paid + ROUNDING_SLACK >= absorbed, 0);
     }
 
     #[test(admin = @bench, alice = @0xa11ce, bob = @0xb0b)]

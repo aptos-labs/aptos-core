@@ -8,6 +8,13 @@
 /// Shards sit in a vector rather than a table: a batch then reaches its claims
 /// table through a vector index instead of a second table item lookup per
 /// recipient, which would otherwise show up in the measurement.
+///
+/// A campaign pays each cohort once, so the recipients a run generates are
+/// never seen twice and the claims table would grow for as long as the run
+/// lasts. Each shard therefore records the slots a distribution created in
+/// creation order and `trim` drops the oldest of them back to a cap, which
+/// holds the table at a fixed size. Slots the setup creates stay out of that
+/// order, so the warm recipients a batch is drawn from are never dropped.
 module bench::ad_registry {
     use std::signer;
     use std::vector;
@@ -17,6 +24,12 @@ module bench::ad_registry {
     const E_NOT_BENCH: u64 = 1;
     /// A registry with no shards has nowhere to put a recipient.
     const E_NO_SHARDS: u64 = 2;
+
+    /// Slots one `trim` may drop. A batch creates at most `MAX_RECIPIENTS` of
+    /// them, so a trim per batch keeps up, and a caller that lowers the cap
+    /// mid-run walks the backlog down over several batches instead of doing
+    /// it all in one transaction.
+    const MAX_EVICTIONS: u64 = 256;
 
     struct Claim has store, drop {
         /// Distributed but not yet claimed.
@@ -36,6 +49,11 @@ module bench::ad_registry {
         claims: Table<address, Claim>,
         /// Slots ever created in this shard.
         n_slots: u64,
+        /// Tracked slots in creation order, the oldest at `head` and the next
+        /// one in at `tail`.
+        order: Table<u64, address>,
+        head: u64,
+        tail: u64,
     }
 
     struct Registry has key {
@@ -53,7 +71,13 @@ module bench::ad_registry {
         while (i < n_shards) {
             vector::push_back(
                 &mut shards,
-                Shard { claims: table::new<address, Claim>(), n_slots: 0 },
+                Shard {
+                    claims: table::new<address, Claim>(),
+                    n_slots: 0,
+                    order: table::new<u64, address>(),
+                    head: 0,
+                    tail: 0,
+                },
             );
             i = i + 1;
         };
@@ -74,9 +98,16 @@ module bench::ad_registry {
 
     /// Credit `recipient`, creating the slot when nothing has paid it before.
     /// Returns whether the slot was created, which is what separates a batch
-    /// of creation writes from a batch of modification writes.
+    /// of creation writes from a batch of modification writes. A created slot
+    /// joins the shard's eviction order when `track` is set, which is how the
+    /// one-shot recipients of the mix are held to a fixed population and the
+    /// warm ones the setup creates are kept out of it.
     public fun credit(
-        shard_id: u64, recipient: address, amount: u64, memo: vector<u8>
+        shard_id: u64,
+        recipient: address,
+        amount: u64,
+        memo: vector<u8>,
+        track: bool,
     ): bool acquires Registry {
         let shard = shard_mut(borrow_global_mut<Registry>(@bench), shard_id);
         if (table::contains(&shard.claims, recipient)) {
@@ -92,8 +123,29 @@ module bench::ad_registry {
                 Claim { amount, credits: 1, claims: 0, touches: 0, memo },
             );
             shard.n_slots = shard.n_slots + 1;
+            if (track) {
+                table::add(&mut shard.order, shard.tail, recipient);
+                shard.tail = shard.tail + 1;
+            };
             true
         }
+    }
+
+    /// Drop tracked slots, oldest first, until at most `cap` of them are left,
+    /// and report how many went. A slot that is already gone costs a lookup
+    /// and nothing else.
+    public fun trim(shard_id: u64, cap: u64): u64 acquires Registry {
+        let shard = shard_mut(borrow_global_mut<Registry>(@bench), shard_id);
+        let dropped = 0;
+        while (shard.tail - shard.head > cap && dropped < MAX_EVICTIONS) {
+            let recipient = table::remove(&mut shard.order, shard.head);
+            shard.head = shard.head + 1;
+            if (table::contains(&shard.claims, recipient)) {
+                table::remove(&mut shard.claims, recipient);
+            };
+            dropped = dropped + 1;
+        };
+        dropped
     }
 
     /// Borrow the slot for writing and change it only when `write` is set. The
@@ -159,6 +211,14 @@ module bench::ad_registry {
     #[view]
     public fun shard_slots(shard_id: u64): u64 acquires Registry {
         shard_ref(borrow_global<Registry>(@bench), shard_id).n_slots
+    }
+
+    #[view]
+    /// Slots of this shard that a trim can still drop, which is the part of
+    /// the claims table that a run grows.
+    public fun shard_tracked(shard_id: u64): u64 acquires Registry {
+        let shard = shard_ref(borrow_global<Registry>(@bench), shard_id);
+        shard.tail - shard.head
     }
 
     #[view]

@@ -132,6 +132,7 @@ pub enum BenchWorkflowKind {
         payload_len: usize,
         write_every: u64,
         fresh_ratio: u32,
+        ring_cap: u64,
         num_txns: usize,
     },
     /// Oracle feed updates. The publisher installs an authority set and the
@@ -321,6 +322,7 @@ impl WorkflowKind for BenchWorkflowKind {
                 payload_len,
                 write_every,
                 fresh_ratio,
+                ring_cap,
                 num_txns,
             } => {
                 let config = airdrop_fanout::Config::new(
@@ -330,6 +332,7 @@ impl WorkflowKind for BenchWorkflowKind {
                     *payload_len,
                     *write_every,
                     *fresh_ratio,
+                    *ring_cap,
                 );
                 let workers: Vec<Box<dyn UserModuleTransactionGenerator>> = vec![
                     Box::new(airdrop_fanout::Onboard(config)),
@@ -2310,6 +2313,9 @@ mod airdrop_fanout {
         pub payload_len: usize,
         pub write_every: u64,
         pub fresh_ratio: u32,
+        /// Evictable slots a shard keeps, which is where the claims table
+        /// settles once the fresh branch has filled it.
+        pub ring_cap: u64,
     }
 
     impl Config {
@@ -2320,6 +2326,7 @@ mod airdrop_fanout {
             payload_len: usize,
             write_every: u64,
             fresh_ratio: u32,
+            ring_cap: u64,
         ) -> Self {
             assert!(n_shards > 0, "the registry needs at least one shard");
             assert!(
@@ -2336,6 +2343,10 @@ mod airdrop_fanout {
                 "a zero stride writes every slot, which the distribute branch already measures"
             );
             assert!(fresh_ratio <= 100, "fresh_ratio is a percentage");
+            assert!(
+                ring_cap >= recipients_per_txn as u64,
+                "the ring has to hold a whole batch, or a distribute evicts what it just created"
+            );
             Self {
                 n_shards,
                 recipients_per_txn,
@@ -2343,6 +2354,7 @@ mod airdrop_fanout {
                 payload_len,
                 write_every,
                 fresh_ratio,
+                ring_cap,
             }
         }
 
@@ -2550,12 +2562,14 @@ mod airdrop_fanout {
                         bcs::to_bytes(&batch).unwrap(),
                         bcs::to_bytes(&DISTRIBUTE_AMOUNT).unwrap(),
                         bcs::to_bytes(&config.memo()).unwrap(),
+                        bcs::to_bytes(&config.ring_cap).unwrap(),
                     ])
                 },
                 MixKind::DistributeFresh => {
                     // Drawing the counter from the worker's own rng is what
                     // keeps the addresses unseen without any state shared
-                    // between transactions.
+                    // between transactions. Nothing credits them again, so the
+                    // slots they open are the ones the package's ring evicts.
                     let counter = rng.gen_range(0u64, u64::MAX);
                     let batch = config
                         .with_own_slot(account, config.fresh_batch(account, shard, start, counter));
@@ -2564,6 +2578,7 @@ mod airdrop_fanout {
                         bcs::to_bytes(&batch).unwrap(),
                         bcs::to_bytes(&DISTRIBUTE_AMOUNT).unwrap(),
                         bcs::to_bytes(&config.memo()).unwrap(),
+                        bcs::to_bytes(&config.ring_cap).unwrap(),
                     ])
                 },
                 MixKind::FaFanout => (ident_str!("bench_fa_fanout"), vec![
@@ -2600,6 +2615,7 @@ mod oracle_batch {
         traits::{signing_message, PrivateKey, Signature, SigningKey, Uniform},
     };
     use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+    use aptos_sdk::crypto::hash::HashValue;
     use rand::SeedableRng;
     use serde::{Deserialize, Serialize};
 
@@ -2642,6 +2658,8 @@ mod oracle_batch {
         message: Vec<u8>,
         ed: Vec<Vec<u8>>,
         secp: Vec<Vec<u8>>,
+        /// Recovery id of each secp256k1 signature, in the same order.
+        secp_ids: Vec<u8>,
     }
 
     #[derive(Clone)]
@@ -2713,19 +2731,22 @@ mod oracle_batch {
                             signature.to_bytes().to_vec()
                         })
                         .collect::<Vec<Vec<u8>>>();
-                    // Signing sha3-256s the message and drops the recovery id.
-                    // The Move side hashes the same bytes and guesses id zero,
-                    // so what it recovers is counted rather than matched.
-                    let secp = secp_keys
+                    let (secp, secp_ids) = secp_keys
                         .iter()
                         .map(|key| {
                             let signature = key.sign(&batch).expect("secp256k1 signing failed");
                             let bytes = signature.to_bytes().to_vec();
                             assert_eq!(bytes.len(), 64, "secp256k1 signature is not 64 bytes");
-                            bytes
+                            let id = recovery_id(&message, &bytes, &key.public_key().to_bytes());
+                            (bytes, id)
                         })
-                        .collect::<Vec<Vec<u8>>>();
-                    SignedBatch { message, ed, secp }
+                        .unzip();
+                    SignedBatch {
+                        message,
+                        ed,
+                        secp,
+                        secp_ids,
+                    }
                 })
                 .collect::<Vec<SignedBatch>>();
 
@@ -2756,6 +2777,29 @@ mod oracle_batch {
 
     const DEFAULT_SIG_POOL_SIZE: usize = 64;
     const DEFAULT_SCHEME_RATIO: f64 = 0.6;
+
+    /// Recovery ids a secp256k1 signature can carry.
+    const RECOVERY_IDS: u8 = 4;
+
+    /// The recovery id `signature` was produced under. `PrivateKey::sign`
+    /// throws it away, so it is found again by recovering under each id and
+    /// keeping the one that lands back on the signer's key. Without it the
+    /// Move side recovers a key the authority set does not hold, and a quorum
+    /// that counts authorized signatures would accept none of them.
+    fn recovery_id(message: &[u8], signature: &[u8], public_key: &[u8]) -> u8 {
+        let digest = HashValue::sha3_256_of(message);
+        let message = libsecp256k1::Message::parse_slice(digest.as_ref())
+            .expect("a sha3-256 digest is not a valid secp256k1 message");
+        let signature = libsecp256k1::Signature::parse_standard_slice(signature)
+            .expect("precomputed secp256k1 signature does not parse");
+        (0..RECOVERY_IDS)
+            .find(|id| {
+                libsecp256k1::RecoveryId::parse(*id)
+                    .and_then(|id| libsecp256k1::recover(&message, &signature, &id))
+                    .is_ok_and(|recovered| recovered.serialize().as_slice() == public_key)
+            })
+            .expect("no recovery id recovers the signing key")
+    }
 
     fn record(feed: u64, price: u128, conf: u64, ts: u64) -> Vec<u8> {
         let mut out = Vec::with_capacity(RECORD_LEN);
@@ -2901,6 +2945,7 @@ mod oracle_batch {
                     bcs::to_bytes(&feed_base).unwrap(),
                     bcs::to_bytes(&batch.message).unwrap(),
                     bcs::to_bytes(&vec![batch.secp[primary].clone()]).unwrap(),
+                    bcs::to_bytes(&vec![batch.secp_ids[primary]]).unwrap(),
                     bcs::to_bytes(&config.decode_depth).unwrap(),
                 ]),
                 MixKind::VerifyOnly => (ident_str!("bench_verify_only"), vec![
@@ -2924,15 +2969,24 @@ mod oracle_batch {
                         .iter()
                         .map(|i| batch.ed[*i as usize].clone())
                         .collect::<Vec<Vec<u8>>>();
-                    let secp = (0..secp_quorum)
-                        .map(|i| batch.secp[(primary + i) % config.num_signers as usize].clone())
+                    let secp_idxs = (0..secp_quorum)
+                        .map(|i| (primary + i) % config.num_signers as usize)
+                        .collect::<Vec<usize>>();
+                    let secp = secp_idxs
+                        .iter()
+                        .map(|i| batch.secp[*i].clone())
                         .collect::<Vec<Vec<u8>>>();
+                    let secp_ids = secp_idxs
+                        .iter()
+                        .map(|i| batch.secp_ids[*i])
+                        .collect::<Vec<u8>>();
                     (ident_str!("bench_quorum"), vec![
                         bcs::to_bytes(&feed_base).unwrap(),
                         bcs::to_bytes(&batch.message).unwrap(),
                         bcs::to_bytes(&ed).unwrap(),
                         bcs::to_bytes(&idxs).unwrap(),
                         bcs::to_bytes(&secp).unwrap(),
+                        bcs::to_bytes(&secp_ids).unwrap(),
                         bcs::to_bytes(&config.decode_depth).unwrap(),
                     ])
                 },
@@ -2977,11 +3031,19 @@ mod oracle_batch {
                 signature
                     .verify_arbitrary_msg(&batch.message, &pubkey)
                     .expect("pool entry does not verify against its authority");
-                assert_eq!(
-                    config.pubkeys[config.num_signers as usize + signer].len(),
-                    64
-                );
+                let secp_pubkey = &config.pubkeys[config.num_signers as usize + signer];
+                assert_eq!(secp_pubkey.len(), 64);
                 assert_eq!(batch.secp[signer].len(), 64);
+                // The recovery id the pool carries is the one that lands back
+                // on the authority's key. Any other recovers a key the queue
+                // does not hold, which the quorum has to reject.
+                let digest = HashValue::sha3_256_of(&batch.message);
+                let message = libsecp256k1::Message::parse_slice(digest.as_ref()).unwrap();
+                let signature =
+                    libsecp256k1::Signature::parse_standard_slice(&batch.secp[signer]).unwrap();
+                let id = libsecp256k1::RecoveryId::parse(batch.secp_ids[signer]).unwrap();
+                let recovered = libsecp256k1::recover(&message, &signature, &id).unwrap();
+                assert_eq!(&recovered.serialize()[1..], secp_pubkey.as_slice());
             }
 
             // A pool entry is bound to its own bytes, so it cannot be replayed
@@ -3419,6 +3481,15 @@ mod dex_aggregator {
                 pools_per_backend as usize > MAX_POOL_SPAN,
                 "every route would wrap onto the same pools"
             );
+            // A route reads its legs off the pool its first hop lands on and
+            // then walks one asset per hop. The wrap at the end of the pool
+            // table keeps that alignment only if the table holds a whole
+            // number of asset cycles.
+            assert!(
+                pools_per_backend.is_multiple_of(ASSETS.len() as u64),
+                "a pool table that is not a whole number of asset cycles \
+                 misaligns the routes that wrap"
+            );
             // Past a twentieth of the reserve a hop clamps, and the mix would
             // measure the clamp instead of the trade.
             assert!(
@@ -3514,11 +3585,10 @@ mod dex_aggregator {
 
     /// Address byte each axis takes its slot from. `slot_for` reduces the same
     /// eight-byte tail for every modulus, which ties a smaller slot to a larger
-    /// one: a backend slot taken that way is always the asset slot mod four.
-    /// Reading a byte per axis leaves the three independent, so the mix reaches
-    /// the whole four-by-eight-by-twenty-four space of instantiations.
+    /// one: a backend slot taken that way is always the mode slot mod four.
+    /// Reading a byte per axis leaves the two independent, so the mix reaches
+    /// every venue rotation against every mode rotation.
     const BACKEND_BYTE: usize = 30;
-    const ASSET_BYTE: usize = 31;
     const MODE_BYTE: usize = 29;
 
     fn byte_slot(account: &LocalAccount, byte: usize, modulus: usize) -> usize {
@@ -3543,6 +3613,23 @@ mod dex_aggregator {
         (0..count)
             .map(|i| marker(package, MODES[(start + i) % MODES.len()]))
             .collect::<Vec<TypeTag>>()
+    }
+
+    /// Pool offsets one mode marker can add, mirroring `dexr_backend::
+    /// mode_bits`.
+    const MODE_SPAN: u64 = 4;
+
+    /// Pool offset that `count` mode markers from `start` add. `mode_bits`
+    /// reduces the last byte of a marker's name, so the same names have to
+    /// reduce the same way here or a route's legs miss the pools its hops
+    /// land on.
+    fn mode_offset(start: usize, count: usize) -> u64 {
+        (0..count)
+            .map(|i| {
+                let name = MODES[(start + i) % MODES.len()].as_bytes();
+                *name.last().unwrap() as u64 % MODE_SPAN
+            })
+            .sum()
     }
 
     /// Stage 1: create the assets, stand up the four backends and seed them
@@ -3755,78 +3842,48 @@ mod dex_aggregator {
             // Recomputed from the address rather than stored, so the mix needs
             // no state shared across workers.
             let backend_slot = byte_slot(account, BACKEND_BYTE, BACKENDS.len());
-            let asset_slot = byte_slot(account, ASSET_BYTE, ASSETS.len());
             let mode_slot = byte_slot(account, MODE_BYTE, MODES.len());
             let pool_id = rng.gen_range(0u64, config.pools_per_backend);
 
             let pool_arg = bcs::to_bytes(&pool_id).unwrap();
             let amount_arg = bcs::to_bytes(&config.amount_in).unwrap();
 
+            // Venues, legs and modes of one route. A hop trades only if the
+            // pool it lands on holds the pair its two leg markers name, and
+            // pool `id` holds assets `id` and `id + 1`, so the legs follow
+            // from where the route starts. The modes move that start too.
+            let route_tys = |n_backends: usize, n_legs: usize, n_modes: usize| {
+                let base = pool_id + mode_offset(mode_slot, n_modes);
+                let asset_slot = (base % ASSETS.len() as u64) as usize;
+                [
+                    backend_tys(package, backend_slot, n_backends),
+                    asset_tys(package, asset_slot, n_legs),
+                    mode_tys(package, mode_slot, n_modes),
+                ]
+                .concat()
+            };
+
             let (func, ty_args, args) = match MIX[dist.sample(rng)].0 {
-                MixKind::Route1 => (
-                    ident_str!("bench_route1"),
-                    [
-                        backend_tys(package, backend_slot, 1),
-                        asset_tys(package, asset_slot, 2),
-                        mode_tys(package, mode_slot, 1),
-                    ]
-                    .concat(),
-                    vec![pool_arg, amount_arg],
-                ),
-                MixKind::Route2 => (
-                    ident_str!("bench_route2"),
-                    [
-                        backend_tys(package, backend_slot, 2),
-                        asset_tys(package, asset_slot, 3),
-                        mode_tys(package, mode_slot, 3),
-                    ]
-                    .concat(),
-                    vec![pool_arg, amount_arg],
-                ),
-                MixKind::Route3 => (
-                    ident_str!("bench_route3"),
-                    [
-                        backend_tys(package, backend_slot, 3),
-                        asset_tys(package, asset_slot, 4),
-                        mode_tys(package, mode_slot, 9),
-                    ]
-                    .concat(),
-                    vec![pool_arg, amount_arg],
-                ),
-                MixKind::Route5 => (
-                    ident_str!("bench_route5"),
-                    [
-                        backend_tys(package, backend_slot, 5),
-                        asset_tys(package, asset_slot, 6),
-                        mode_tys(package, mode_slot, 21),
-                    ]
-                    .concat(),
-                    vec![pool_arg, amount_arg],
-                ),
-                MixKind::Split => (
-                    ident_str!("bench_split"),
-                    [
-                        backend_tys(package, backend_slot, 4),
-                        asset_tys(package, asset_slot, 3),
-                        mode_tys(package, mode_slot, 9),
-                    ]
-                    .concat(),
-                    vec![
-                        pool_arg,
-                        amount_arg,
-                        bcs::to_bytes(&config.split_bps).unwrap(),
-                    ],
-                ),
-                MixKind::Quote => (
-                    ident_str!("bench_quote"),
-                    [
-                        backend_tys(package, backend_slot, 3),
-                        asset_tys(package, asset_slot, 4),
-                        mode_tys(package, mode_slot, 9),
-                    ]
-                    .concat(),
-                    vec![pool_arg, amount_arg],
-                ),
+                MixKind::Route1 => (ident_str!("bench_route1"), route_tys(1, 2, 1), vec![
+                    pool_arg, amount_arg,
+                ]),
+                MixKind::Route2 => (ident_str!("bench_route2"), route_tys(2, 3, 3), vec![
+                    pool_arg, amount_arg,
+                ]),
+                MixKind::Route3 => (ident_str!("bench_route3"), route_tys(3, 4, 9), vec![
+                    pool_arg, amount_arg,
+                ]),
+                MixKind::Route5 => (ident_str!("bench_route5"), route_tys(5, 6, 21), vec![
+                    pool_arg, amount_arg,
+                ]),
+                MixKind::Split => (ident_str!("bench_split"), route_tys(4, 3, 9), vec![
+                    pool_arg,
+                    amount_arg,
+                    bcs::to_bytes(&config.split_bps).unwrap(),
+                ]),
+                MixKind::Quote => (ident_str!("bench_quote"), route_tys(3, 4, 9), vec![
+                    pool_arg, amount_arg,
+                ]),
                 MixKind::Rebalance => (ident_str!("bench_rebalance"), vec![], vec![
                     bcs::to_bytes(&(backend_slot as u8)).unwrap(),
                     pool_arg,

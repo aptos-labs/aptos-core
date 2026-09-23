@@ -27,6 +27,11 @@ module bench::airdrop_fanout_tests {
     const WRITE_EVERY: u64 = 4;
     const FRESH_RATIO: u64 = 75;
 
+    /// Evictable slots a shard keeps. A whole multiple of what one batch
+    /// creates, so the equilibrium sits exactly on it, and wide enough that
+    /// the tests which are not about eviction never reach it.
+    const TEST_RING_CAP: u64 = 24;
+
     const SEED_AMOUNT: u64 = 1000000;
     const DISTRIBUTE_AMOUNT: u64 = 1000;
     const ONBOARD_FUNDING: u64 = 1000000000000;
@@ -186,7 +191,7 @@ module bench::airdrop_fanout_tests {
         let slots = ad_registry::shard_slots(shard);
 
         ad_distributor::bench_distribute(
-            alice, shard, warm_dist, DISTRIBUTE_AMOUNT, memo);
+            alice, shard, warm_dist, DISTRIBUTE_AMOUNT, memo, TEST_RING_CAP);
         // A warm batch modifies seeded slots rather than creating any.
         assert!(ad_registry::shard_slots(shard) == slots, 0);
         assert!(
@@ -196,7 +201,7 @@ module bench::airdrop_fanout_tests {
         );
 
         ad_distributor::bench_distribute(
-            alice, shard, fresh, DISTRIBUTE_AMOUNT, memo);
+            alice, shard, fresh, DISTRIBUTE_AMOUNT, memo, TEST_RING_CAP);
         let created = TEST_BATCH * FRESH_RATIO / 100;
         assert!(ad_registry::shard_slots(shard) == slots + created, 0);
 
@@ -230,11 +235,55 @@ module bench::airdrop_fanout_tests {
         // second account's batch modifies rather than creates.
         let slots = ad_registry::shard_slots(shard);
         ad_distributor::bench_distribute(
-            bob, shard, distribute_batch(bob_addr, warm), DISTRIBUTE_AMOUNT, memo);
+            bob,
+            shard,
+            distribute_batch(bob_addr, warm),
+            DISTRIBUTE_AMOUNT,
+            memo,
+            TEST_RING_CAP,
+        );
         assert!(ad_registry::shard_slots(shard) == slots, 0);
         let (_, credits, _, _) =
             ad_registry::slot_state(shard, warm_recipient(shard, 0));
         assert!(credits == 3, 0);
+    }
+
+    // Constraint 5. A campaign never pays the same cohort twice, so the fresh
+    // branch creates slots that nothing will ever credit again, and the run
+    // would deepen the tree under itself for as long as it lasts. The trim
+    // behind each distribute takes back what that branch creates, so the
+    // claims table settles at the ring cap and stays there.
+    #[test(admin = @bench, alice = @0xa11ce)]
+    fun test_fresh_distribution_settles_at_the_ring_cap(
+        admin: &signer, alice: &signer
+    ) {
+        configure(admin);
+        seed_all(admin);
+        let alice_addr = signer::address_of(alice);
+        let shard = slot_for(alice_addr, TEST_SHARDS);
+        let per_batch = TEST_BATCH * FRESH_RATIO / 100;
+        let rounds = 8;
+        assert!(rounds * per_batch > TEST_RING_CAP, 0);
+
+        let i = 0;
+        while (i < rounds) {
+            ad_distributor::bench_distribute(
+                alice,
+                shard,
+                fresh_batch(alice_addr, shard, 0, i * TEST_BATCH, TEST_BATCH),
+                DISTRIBUTE_AMOUNT,
+                memo_bytes(),
+                TEST_RING_CAP,
+            );
+            assert!(ad_registry::shard_tracked(shard) <= TEST_RING_CAP, 0);
+            i = i + 1;
+        };
+        // Filled and held, however many more rounds run.
+        assert!(ad_registry::shard_tracked(shard) == TEST_RING_CAP, 0);
+        // The oldest cohort is gone from the table, and the warm recipients
+        // the other branches draw from are untouched by the eviction.
+        assert!(!ad_registry::has_slot(shard, fresh_recipient(alice_addr, 0)), 0);
+        assert!(ad_registry::has_slot(shard, warm_recipient(shard, 0)), 0);
     }
 
     #[test(admin = @bench, alice = @0xa11ce)]
@@ -246,7 +295,7 @@ module bench::airdrop_fanout_tests {
         vector::push_back(&mut batch, @0xdead);
         assert!(!ad_registry::has_slot(0, @0xdead), 0);
         ad_distributor::bench_distribute(
-            alice, 0, batch, DISTRIBUTE_AMOUNT, memo_bytes());
+            alice, 0, batch, DISTRIBUTE_AMOUNT, memo_bytes(), TEST_RING_CAP);
         let (amount, credits, _, _) = ad_registry::slot_state(0, @0xdead);
         assert!(amount == DISTRIBUTE_AMOUNT && credits == 1, 0);
         assert!(ad_ledger::fresh_slots() == 1, 0);
@@ -295,7 +344,7 @@ module bench::airdrop_fanout_tests {
         let batches = ad_ledger::batches();
         let empty = vector::empty<address>();
         ad_distributor::bench_distribute(
-            alice, 0, empty, DISTRIBUTE_AMOUNT, memo_bytes());
+            alice, 0, empty, DISTRIBUTE_AMOUNT, memo_bytes(), TEST_RING_CAP);
         ad_distributor::bench_fa_fanout(alice, 0, empty, DISTRIBUTE_AMOUNT);
         ad_distributor::bench_touch(alice, 0, empty, WRITE_EVERY);
         ad_distributor::bench_sweep(alice, 0, empty);
@@ -392,6 +441,7 @@ module bench::airdrop_fanout_tests {
             distribute_batch(alice_addr, warm_batch(shard, 0, TEST_BATCH)),
             DISTRIBUTE_AMOUNT,
             memo_bytes(),
+            TEST_RING_CAP,
         );
         let (amount, _, _, _) = ad_registry::slot_state(shard, alice_addr);
         assert!(amount == DISTRIBUTE_AMOUNT, 0);
@@ -424,7 +474,13 @@ module bench::airdrop_fanout_tests {
         let batch = vector::empty<address>();
         vector::push_back(&mut batch, @0xbeef);
         ad_distributor::bench_distribute(
-            alice, TEST_SHARDS + 1, batch, DISTRIBUTE_AMOUNT, memo_bytes());
+            alice,
+            TEST_SHARDS + 1,
+            batch,
+            DISTRIBUTE_AMOUNT,
+            memo_bytes(),
+            TEST_RING_CAP,
+        );
         assert!(ad_registry::has_slot(1, @0xbeef), 0);
     }
 }
