@@ -44,11 +44,11 @@ use mono_move_core::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
     },
-    BytecodeOffset, CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex,
-    ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
-    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
-    PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
-    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    BytecodeOffset, CallClosureOp, CallFrame, ClosureFuncRef, CmpKind, CodeOffset,
+    ConstantPoolIndex, ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef,
+    GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
+    PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult,
+    VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -357,6 +357,12 @@ impl<'guard> CompletedCall<'_, 'guard> {
         self.interp
     }
 
+    /// Returns caller frames above the frame where execution stopped,
+    /// most recent caller first. Empty after success or an abort in the root frame.
+    pub fn stack_trace(&self) -> VMResult<Vec<CallFrame>> {
+        self.interp.stack_trace()
+    }
+
     /// BCS-serializes a successful call's return values in declaration order,
     /// pairing each value with its type. Fails if the call did not succeed or
     /// if any return type is a reference.
@@ -390,12 +396,14 @@ impl<'guard> CompletedCall<'_, 'guard> {
     }
 }
 
+/// The [`ModuleId`] naming a frame's module, or [`None`] for a script frame.
+fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
+    (!is_script_module_id(module_id)).then(|| module_id_of(module_id))
+}
+
 /// Materializes the [`AbortLocation`] naming the module that raised an abort.
 fn abort_location(module_id: InternedModuleId) -> AbortLocation {
-    if is_script_module_id(module_id) {
-        return AbortLocation::Script;
-    }
-    AbortLocation::Module(module_id_of(module_id))
+    frame_module(module_id).map_or(AbortLocation::Script, AbortLocation::Module)
 }
 
 /// The bytecode instruction the micro-op at `pc` originates from, or `None`
@@ -431,23 +439,78 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
     // execution guard keeps alive.
     let func = unsafe { regs.func.as_ref() };
     let offset = func.code.origins().get(regs.pc).copied();
-    let location = if is_script_module_id(func.module_id) {
-        match offset {
-            Some(offset) => ErrorLocation::ScriptInstruction { offset },
-            None => ErrorLocation::Script,
-        }
-    } else {
-        let module = module_id_of(func.module_id);
-        match offset {
-            Some(offset) => ErrorLocation::Instruction {
-                module,
-                function: func.def_idx,
-                offset,
-            },
-            None => ErrorLocation::Module(module),
-        }
+    let location = match (frame_module(func.module_id), offset) {
+        (None, Some(offset)) => ErrorLocation::ScriptInstruction { offset },
+        (None, None) => ErrorLocation::Script,
+        (Some(module), Some(offset)) => ErrorLocation::Instruction {
+            module,
+            function: func.def_idx,
+            offset,
+        },
+        (Some(module), None) => ErrorLocation::Module(module),
     };
     err.at(location)
+}
+
+/// Returns the callers of the frame identified by `regs`, most recent caller
+/// first, each at its call instruction. Excludes the current frame, so the
+/// root frame has an empty trace.
+///
+/// Each callee frame starts at a higher address than its caller. Bounds and
+/// ordering checks require each caller's frame pointer to be lower than its
+/// callee's and within the stack, preventing an unbounded walk through a
+/// corrupted chain.
+///
+/// # Safety
+///
+/// `regs.fp` must point to the root frame of `stack`, or to a frame from its
+/// last run with the stack unchanged since. The metadata chain must be the one
+/// written by the call protocol, and every function it references must still
+/// be alive.
+#[cold]
+unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<Vec<CallFrame>> {
+    let lowest = root_frame_base(stack);
+    let highest = stack.as_ptr().wrapping_add(stack.len());
+    let mut frames = Vec::new();
+    let mut fp = regs.fp;
+    loop {
+        if !(lowest..highest).contains(&fp) {
+            invariant_violation!(Unreachable(
+                "stack trace: a frame pointer is outside the stack".to_string()
+            ));
+        }
+        // SAFETY: `fp` is at or above the root frame, so the metadata below
+        // it is inside the stack; per the contract, a non-null saved function
+        // pointer there names a live function.
+        let caller = unsafe { saved_caller_ptr(fp).as_ref() };
+        let Some(caller) = caller else {
+            return Ok(frames);
+        };
+        let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
+        // The saved pc is the return address, one past the call micro-op.
+        let return_pc = unsafe { read_u64(meta, META_SAVED_PC_OFFSET) } as usize;
+        let Some((function, offset)) = return_pc
+            .checked_sub(1)
+            .and_then(|call_pc| bytecode_origin(caller, call_pc))
+        else {
+            invariant_violation!(Unreachable(format!(
+                "stack trace: no bytecode origin for the call returning to micro-op {return_pc} of `{}`",
+                caller.name()
+            )));
+        };
+        frames.push(CallFrame {
+            module: frame_module(caller.module_id),
+            function,
+            offset,
+        });
+        let caller_fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
+        if caller_fp >= fp {
+            invariant_violation!(Unreachable(
+                "stack trace: a caller's frame pointer is not below its callee's".to_string()
+            ));
+        }
+        fp = caller_fp;
+    }
 }
 
 /// Per-transaction interpreter context with a unified call stack and a
@@ -844,11 +907,18 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Starts a call to `func`. Fails if the function's frame does not fit on
-    /// the stack.
-    pub fn build_call<'a>(&'a mut self, func: &'a Function) -> VMResult<CallBuilder<'a, 'guard>> {
+    /// the stack. `func` must live as long as the execution guard because
+    /// callee frames keep its address for later stack traces.
+    pub fn build_call<'a>(
+        &'a mut self,
+        func: &'guard Function,
+    ) -> VMResult<CallBuilder<'a, 'guard>> {
         if FRAME_METADATA_SIZE + func.extended_frame_size > self.stack.len() {
             return Err(VMInternalError::new(RuntimeError::StackOverflow));
         }
+        // Reset the trace before argument placement can overwrite frame
+        // metadata from the previous run.
+        self.registers = VMRegisters::idle(&self.stack);
         Ok(CallBuilder {
             interp: self,
             func,
@@ -1453,6 +1523,18 @@ impl InterpreterContext<'_> {
         Ok(())
     }
 
+    /// Returns the last run's caller frames, most recent first, excluding the
+    /// frame where execution stopped. Empty after success, a root-frame
+    /// failure, or a successful [`Self::build_call`].
+    pub fn stack_trace(&self) -> VMResult<Vec<CallFrame>> {
+        // SAFETY: `self.registers` are idle (the root frame) or name the frame
+        // the last run ended in, and nothing writes the stack between the end
+        // of a run and the next `build_call`, which resets them. Every function
+        // the chain names lives as long as the execution guard: the root by
+        // `build_call`'s signature, callees because the loader owns them.
+        unsafe { walk_stack_trace(&self.stack, self.registers) }
+    }
+
     fn run(&mut self) -> VMResult<RuntimeStatus> {
         if self.registers.is_idle() {
             invariant_violation!(Unreachable(
@@ -1462,20 +1544,17 @@ impl InterpreterContext<'_> {
 
         // Hoist the VM registers into a local so the dispatch loop keeps
         // them in CPU registers rather than reloading from `self.registers`
-        // each iteration. Only sync back to `self` on success.
+        // each iteration.
         let mut regs = self.registers;
-
-        match self.dispatch_loop(&mut regs) {
-            Ok(outcome) => {
-                self.registers = regs;
-                Ok(outcome)
-            },
-            // A failing micro-op leaves `regs.pc` on itself, so `regs` names
-            // the instruction that failed. An error keeps the first location
-            // attached to it, so this fills in only the errors that were not
-            // already located.
-            Err(err) => Err(locate_bytecode_failure(err, regs)),
-        }
+        let result = self.dispatch_loop(&mut regs);
+        // Save the final registers on every outcome so `stack_trace` can
+        // traverse the caller frames after execution stops.
+        self.registers = regs;
+        // A failing micro-op leaves `regs.pc` on itself, so `regs` names the
+        // instruction that failed. An error keeps the first location attached
+        // to it, so this fills in only the errors that were not already
+        // located.
+        result.map_err(|err| locate_bytecode_failure(err, regs))
     }
 
     /// The instruction dispatch loop.
@@ -3072,8 +3151,10 @@ impl InterpreterContext<'_> {
                     }
                     let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
                     if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
-                        // TODO(completeness): only the Materialized captured-data tag is supported.
-                        todo!("CallClosure: unsupported captured-data tag {} (only Materialized supported now)", cap_tag);
+                        // TODO(completeness): handle `CAPTURED_DATA_TAG_RAW` here once
+                        // that tag has a writer. Until then only `Materialized` is ever
+                        // written, so any other tag is corruption.
+                        invariant_violation!(InvalidCapturedDataTag { tag: cap_tag });
                     }
                     // The resolved callee's captured `values_size` must equal the
                     // one the object was packed with (persisted exactly, not the
@@ -3277,6 +3358,9 @@ impl InterpreterContext<'_> {
             // switching `regs` to the callee.
             self.write_frame_metadata(caller, regs);
         }
+        // TODO(correctness): track calls and returns for V1's resource-lock
+        // and `#[module_lock]` reentrancy checks. Without these checks, MonoMove
+        // can commit reentrant writes that V1 rejects with `RUNTIME_DISPATCH_ERROR`.
         regs.fp = new_fp;
         regs.pc = 0;
         regs.func = NonNull::from(callee);

@@ -123,6 +123,12 @@ impl MonoMoveDivergence {
             ..self
         }
     }
+
+    /// Returns whether this divergence applies to `config`, excluding configs
+    /// listed in `except`.
+    pub fn applies_under(&self, config: &str) -> bool {
+        !self.except.contains(&config)
+    }
 }
 
 /// One column of a corpus's matrix.
@@ -179,7 +185,7 @@ impl<P> Corpus<P> {
         self.mono_move_divergences
             .iter()
             .find(|divergence| divergence.source == source)
-            .filter(|divergence| !divergence.except.contains(&config.name))
+            .filter(|divergence| divergence.applies_under(config.name))
     }
 
     /// Resolves one (source, config, VM backend) cell, or [`None`] when the

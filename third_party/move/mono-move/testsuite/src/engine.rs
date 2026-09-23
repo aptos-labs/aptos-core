@@ -123,7 +123,7 @@ impl<'guard> MonoRunner<'guard> {
 /// `signers` and passing each remaining argument index to `place_arg`.
 fn place_and_run<'a, 'guard>(
     interp: &'a mut InterpreterContext<'guard>,
-    function: &'a Function,
+    function: &'guard Function,
     signers: &'a [AccountAddress],
     mut place_arg: impl FnMut(&mut CallBuilder<'_, '_>, usize) -> VMResult<()>,
 ) -> VMResult<CompletedCall<'a, 'guard>> {

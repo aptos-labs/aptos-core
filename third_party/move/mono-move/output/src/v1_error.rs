@@ -28,12 +28,13 @@
 //! equality and would report the divergence as a mismatch.
 
 use mono_move_core::{
-    BytecodeOffset, ErrorLocation, ExecutionErrorKind, GasExhaustedError, IntTy, VMInternalError,
+    BytecodeOffset, CallFrame, ErrorLocation, ExecutionErrorKind, GasExhaustedError, IntTy,
+    VMInternalError,
 };
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError};
 use move_binary_format::{
-    errors::{Location, VMError},
+    errors::{ExecutionState, Location, VMError},
     file_format::FunctionDefinitionIndex,
 };
 use move_core_types::vm_status::StatusCode;
@@ -195,6 +196,31 @@ pub fn v1_location(
         Some(ErrorLocation::Script) => (Location::Script, None),
         None => (Location::Undefined, None),
     }
+}
+
+/// Converts caller frames to V1's execution state, preserving their order.
+/// Both formats represent a script frame with no module and definition index 0.
+pub fn v1_execution_state(stack_trace: &[CallFrame]) -> ExecutionState {
+    ExecutionState::new(
+        stack_trace
+            .iter()
+            .map(|frame| (frame.module.clone(), frame.function, frame.offset))
+            .collect(),
+    )
+}
+
+/// Whether to attach a stack trace when mapping `err` to V1.
+/// Returns false for stack overflow and loader errors, and true otherwise.
+///
+/// V1 also omits traces for other call setup failures, such as closure argument
+/// mismatches and gas exhaustion. This check cannot identify those cases.
+pub fn v1_records_execution_state(err: &VMInternalError) -> bool {
+    let stack_overflow = matches!(
+        err.downcast_ref::<RuntimeError>(),
+        Some(RuntimeError::StackOverflow)
+    );
+    let code_loading = err.downcast_ref::<LoaderError>().is_some();
+    !(stack_overflow || code_loading)
 }
 
 /// Maps `err` to its V1 equivalent.
@@ -703,6 +729,24 @@ mod tests {
         };
         assert_eq!(info.status, StatusCode::OUT_OF_GAS);
         assert_eq!(info.message, V1Message::Absent);
+    }
+
+    /// Stack overflow and loader errors omit execution state; heap exhaustion
+    /// includes it.
+    #[test]
+    fn call_setup_failures_have_no_execution_state() {
+        assert!(!v1_records_execution_state(&VMInternalError::new(
+            RuntimeError::StackOverflow
+        )));
+        assert!(!v1_records_execution_state(&VMInternalError::new(
+            LoaderError::ModuleNotFound {
+                address: AccountAddress::ONE,
+                name: "gone".to_string(),
+            }
+        )));
+        assert!(v1_records_execution_state(&VMInternalError::new(
+            RuntimeError::OutOfHeapMemory { requested: 64 }
+        )));
     }
 
     #[test]
