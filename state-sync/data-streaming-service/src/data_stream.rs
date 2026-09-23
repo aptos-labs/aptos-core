@@ -5,9 +5,10 @@ use crate::{
     data_notification,
     data_notification::{
         DataClientRequest, DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, NotificationId, NumberOfStatesRequest,
-        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
+        HotStateValuesWithProofRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest, NotificationId,
+        NumberOfHotStatesRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
+        SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
         TransactionsWithProofRequest,
@@ -1045,6 +1046,9 @@ pub(crate) fn create_missing_data_request(
         DataClientRequest::EpochEndingLedgerInfos(request) => {
             create_missing_epoch_ending_ledger_infos_request(request, response_payload)
         },
+        DataClientRequest::HotStateValuesWithProof(request) => {
+            create_missing_hot_state_values_request(request, response_payload)
+        },
         DataClientRequest::StateValuesWithProof(request) => {
             create_missing_state_values_request(request, response_payload)
         },
@@ -1144,6 +1148,61 @@ fn create_missing_state_values_request(
         },
         payload => Err(Error::AptosDataClientResponseIsInvalid(format!(
             "Invalid response payload found for state values request: {:?}",
+            payload
+        ))),
+    }
+}
+
+/// Creates and returns a missing hot state values request if the given client
+/// response doesn't satisfy the original request. If the request is satisfied,
+/// None is returned.
+///
+/// Note: the server may return fewer hot state values than requested (e.g., to
+/// respect the network byte limit), so the suffix is re-requested at the same
+/// version and end index.
+fn create_missing_hot_state_values_request(
+    request: &HotStateValuesWithProofRequest,
+    response_payload: &ResponsePayload,
+) -> Result<Option<DataClientRequest>, Error> {
+    // Determine the number of requested hot state values
+    let num_requested_values = request
+        .end_index
+        .checked_sub(request.start_index)
+        .and_then(|v| v.checked_add(1))
+        .ok_or_else(|| {
+            Error::IntegerOverflow("Number of requested hot state values has overflown!".into())
+        })?;
+
+    // Identify the missing data if the request was not satisfied
+    match response_payload {
+        ResponsePayload::HotStateValuesWithProof(hot_state_values_with_proof) => {
+            // Check if the request was satisfied
+            let num_received_values = hot_state_values_with_proof.raw_values.len() as u64;
+            if num_received_values == 0 {
+                // The suffix request would repeat the same range forever
+                return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                    "Received an empty hot state values response! Request: {:?}",
+                    request
+                )));
+            }
+            if num_received_values < num_requested_values {
+                let start_index = request
+                    .start_index
+                    .checked_add(num_received_values)
+                    .ok_or_else(|| Error::IntegerOverflow("Start index has overflown!".into()))?;
+                Ok(Some(DataClientRequest::HotStateValuesWithProof(
+                    HotStateValuesWithProofRequest {
+                        version: request.version,
+                        start_index,
+                        end_index: request.end_index,
+                    },
+                )))
+            } else {
+                Ok(None) // The request was satisfied!
+            }
+        },
+        payload => Err(Error::AptosDataClientResponseIsInvalid(format!(
+            "Invalid response payload found for hot state values request: {:?}",
             payload
         ))),
     }
@@ -1304,6 +1363,12 @@ fn sanity_check_client_response_type(
                 ResponsePayload::EpochEndingLedgerInfos(_)
             )
         },
+        DataClientRequest::HotStateValuesWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::HotStateValuesWithProof(_)
+            )
+        },
         DataClientRequest::NewTransactionOutputsWithProof(_) => {
             matches!(
                 data_client_response.payload,
@@ -1325,7 +1390,9 @@ fn sanity_check_client_response_type(
                 ResponsePayload::NewTransactionOutputsWithProof(_)
             )
         },
-        DataClientRequest::NumberOfStates(_) => {
+        // The hot state count shares the `NumberOfStates` payload; the request
+        // identifies which snapshot it counts.
+        DataClientRequest::NumberOfHotStates(_) | DataClientRequest::NumberOfStates(_) => {
             matches!(
                 data_client_response.payload,
                 ResponsePayload::NumberOfStates(_)
@@ -1445,8 +1512,15 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
                 )
                 .await
             },
+            DataClientRequest::NumberOfHotStates(request) => {
+                get_number_of_hot_states(aptos_data_client, request, request_timeout_ms).await
+            },
             DataClientRequest::NumberOfStates(request) => {
                 get_number_of_states(aptos_data_client, request, request_timeout_ms).await
+            },
+            DataClientRequest::HotStateValuesWithProof(request) => {
+                get_hot_state_values_with_proof(aptos_data_client, request, request_timeout_ms)
+                    .await
             },
             DataClientRequest::StateValuesWithProof(request) => {
                 get_states_values_with_proof(aptos_data_client, request, request_timeout_ms).await
@@ -1527,6 +1601,22 @@ async fn get_states_values_with_proof<T: AptosDataClientInterface + Send + Clone
     Ok(client_response.map(ResponsePayload::StateValuesWithProof))
 }
 
+async fn get_hot_state_values_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: HotStateValuesWithProofRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
+    let client_response = aptos_data_client
+        .get_hot_state_values_with_proof(
+            request.version,
+            request.start_index,
+            request.end_index,
+            request_timeout_ms,
+        )
+        .await?;
+    Ok(client_response.map(ResponsePayload::HotStateValuesWithProof))
+}
+
 async fn get_epoch_ending_ledger_infos<T: AptosDataClientInterface + Send + Clone + 'static>(
     aptos_data_client: T,
     request: EpochEndingLedgerInfosRequest,
@@ -1599,6 +1689,17 @@ async fn get_number_of_states<T: AptosDataClientInterface + Send + Clone + 'stat
 ) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client
         .get_number_of_states(request.version, request_timeout_ms, request.state_kind)
+        .await?;
+    Ok(client_response.map(ResponsePayload::NumberOfStates))
+}
+
+async fn get_number_of_hot_states<T: AptosDataClientInterface + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: NumberOfHotStatesRequest,
+    request_timeout_ms: u64,
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
+    let client_response = aptos_data_client
+        .get_number_of_hot_states(request.version, request_timeout_ms)
         .await?;
     Ok(client_response.map(ResponsePayload::NumberOfStates))
 }
