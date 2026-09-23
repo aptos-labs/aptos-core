@@ -56,7 +56,7 @@ pub(crate) fn run_script<'a>(
     )?;
     call.run()
         .map(CompletedCall::into_status)
-        .map_err(MoveExecutionFailure::RuntimeError)
+        .map_err(|err| MoveExecutionFailure::RuntimeError(err.into_error()))
 }
 
 /// Checks that AptosVM would run `script`, loaded as a module: mainnet refuses

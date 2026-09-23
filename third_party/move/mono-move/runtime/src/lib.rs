@@ -18,7 +18,7 @@ pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, Runtim
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
 pub use heap::{FrozenHeap, Heap, SharedArena};
 pub use interpreter::{
-    CallBuilder, CompletedCall, InterpreterContext, InterpreterOptions, SessionEffects,
+    CallBuilder, CallError, CompletedCall, InterpreterContext, InterpreterOptions, SessionEffects,
 };
 pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,

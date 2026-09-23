@@ -123,7 +123,7 @@ impl<'guard> MonoRunner<'guard> {
 /// `signers` and passing each remaining argument index to `place_arg`.
 fn place_and_run<'a, 'guard>(
     interp: &'a mut InterpreterContext<'guard>,
-    function: &'a Function,
+    function: &'guard Function,
     signers: &'a [AccountAddress],
     mut place_arg: impl FnMut(&mut CallBuilder<'_, '_>, usize) -> VMResult<()>,
 ) -> VMResult<CompletedCall<'a, 'guard>> {
@@ -145,7 +145,7 @@ fn place_and_run<'a, 'guard>(
         signers.len(),
         "more signers than signer parameters"
     );
-    call.run()
+    Ok(call.run()?)
 }
 
 /// Build the native registry mono-move executes against: the synthetic test

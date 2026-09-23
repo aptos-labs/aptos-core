@@ -10,7 +10,7 @@ use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes
 use move_asm::assembler::{self, Options as AsmOptions};
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{CompiledScript, FunctionDefinitionIndex},
+    file_format::{Bytecode, CodeOffset, CompiledScript, FunctionDefinitionIndex},
     CompiledModule,
 };
 use move_compiler_v2::Options;
@@ -163,6 +163,36 @@ pub fn function_def_index(module: &CompiledModule, name: &str) -> Option<Functio
             == name
     })?;
     Some(FunctionDefinitionIndex(position as u16))
+}
+
+/// The module named `name` in `modules`. Panics if it is absent.
+pub fn find_module<'a>(modules: &'a [CompiledModule], name: &str) -> &'a CompiledModule {
+    modules
+        .iter()
+        .find(|module| module.self_name().as_str() == name)
+        .unwrap_or_else(|| panic!("module `{name}` is not in the compiled output"))
+}
+
+/// Returns the offset of the only instruction in `code` satisfying `predicate`.
+/// Panics unless exactly one instruction matches and its offset fits in
+/// [`CodeOffset`].
+pub fn sole_bytecode_offset(
+    code: &[Bytecode],
+    predicate: impl Fn(&Bytecode) -> bool,
+) -> CodeOffset {
+    let first = code
+        .iter()
+        .position(&predicate)
+        .expect("an instruction matches the predicate");
+    let last = code
+        .iter()
+        .rposition(&predicate)
+        .expect("an instruction matches the predicate");
+    assert_eq!(
+        first, last,
+        "more than one instruction matches the predicate"
+    );
+    CodeOffset::try_from(first).expect("the offset fits a code offset")
 }
 
 /// Assemble `.masm` source text into a single module.

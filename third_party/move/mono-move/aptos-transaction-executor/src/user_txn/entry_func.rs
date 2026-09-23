@@ -180,5 +180,5 @@ pub(crate) fn call_entry_function<'a>(
     )?;
     call.run()
         .map(CompletedCall::into_status)
-        .map_err(MoveExecutionFailure::RuntimeError)
+        .map_err(|err| MoveExecutionFailure::RuntimeError(err.into_error()))
 }

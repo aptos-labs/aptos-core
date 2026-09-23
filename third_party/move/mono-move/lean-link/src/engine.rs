@@ -266,7 +266,7 @@ fn place_and_run<'a, 'guard>(
     for arg in args {
         call.arg_bcs(arg)?;
     }
-    call.run()
+    Ok(call.run()?)
 }
 
 /// Classifies a failed MonoVM run by whether its error is a program outcome.

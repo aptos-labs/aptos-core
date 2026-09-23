@@ -63,7 +63,7 @@ fn checkpoint_rollback_drives_extensions_in_lockstep() {
     let func = trivial_program();
     let mut extensions = NativeExtensions::new();
     extensions.add(CheckpointProbe::default());
-    common::with_test_interpreter(&func, u64::MAX, extensions, |ctx| {
+    common::with_test_interpreter(&func, u64::MAX, extensions, |ctx, _entry| {
         ctx.checkpoint().unwrap();
         ctx.checkpoint().unwrap();
         assert_eq!(ctx.checkpoint_depth(), 2);
