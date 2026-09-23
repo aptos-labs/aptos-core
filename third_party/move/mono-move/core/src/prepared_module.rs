@@ -11,10 +11,10 @@ use crate::{
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex,
-        IdentifierIndex, ModuleHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
-        StructFieldInformation, StructHandle, StructHandleIndex, VariantFieldHandleIndex,
-        VariantIndex,
+        ConstantPoolIndex, FieldDefinition, FieldHandleIndex, FunctionHandleIndex,
+        FunctionInstantiationIndex, IdentifierIndex, ModuleHandleIndex, SignatureIndex,
+        SignatureToken, StructDefinitionIndex, StructFieldInformation, StructHandle,
+        StructHandleIndex, VariantFieldHandleIndex, VariantIndex,
     },
     CompiledModule,
 };
@@ -73,11 +73,11 @@ pub struct PreparedModule {
     nominal_handles: UnorderedMap<(InternedModuleId, InternedIdentifier), StructHandleIndex>,
     /// Maps struct or enum name to its local [`StructDefinitionIndex`].
     nominal_definitions: UnorderedMap<InternedIdentifier, StructDefinitionIndex>,
-    /// Interned struct or enum field types from compiled module. Only for
-    /// declared structs or enums.
+    /// Interned struct or enum fields from compiled module. Only for declared
+    /// structs or enums.
     ///
     /// Indexed by [`StructDefinitionIndex`].
-    field_types: Vec<FieldTypes>,
+    fields: Vec<NominalFields>,
     /// Interned constant types from compiled module.
     ///
     /// Indexed by [`ConstantPoolIndex`].
@@ -130,11 +130,25 @@ pub struct FunctionInstantiationSignature {
     pub ty_args: InternedTypeList,
 }
 
-/// Field types of any struct or enum definition in this module.
+/// One declared field of a struct or of an enum variant.
+#[derive(Clone, Copy)]
+pub struct FieldDecl {
+    pub name: InternedIdentifier,
+    pub ty: InternedType,
+}
+
+/// One declared variant of an enum, with its fields in declaration order.
 #[derive(Clone)]
-pub enum FieldTypes {
-    Struct(Vec<InternedType>),
-    Enum(Vec<Vec<InternedType>>),
+pub struct VariantDecl {
+    pub name: InternedIdentifier,
+    pub fields: Vec<FieldDecl>,
+}
+
+/// Declared fields of any struct or enum definition in this module.
+#[derive(Clone)]
+pub enum NominalFields {
+    Struct(Vec<FieldDecl>),
+    Enum(Vec<VariantDecl>),
 }
 
 // All compiled module pools are still accessible.
@@ -200,28 +214,28 @@ impl PreparedModule {
         Some(idx)
     }
 
-    /// Returns interned types corresponding to the compiled module's struct
+    /// Returns interned fields corresponding to the compiled module's struct
     /// definition. Returns [`None`] if not a struct.
-    pub fn interned_struct_field_types_at(
+    pub fn interned_struct_fields_at(
         &self,
         def_idx: StructDefinitionIndex,
-    ) -> Option<&[InternedType]> {
-        match &self.field_types[def_idx.0 as usize] {
-            FieldTypes::Struct(field_types) => Some(field_types.as_slice()),
-            FieldTypes::Enum(..) => None,
+    ) -> Option<&[FieldDecl]> {
+        match &self.fields[def_idx.0 as usize] {
+            NominalFields::Struct(fields) => Some(fields.as_slice()),
+            NominalFields::Enum(..) => None,
         }
     }
 
-    /// Returns interned types corresponding to the compiled module's enum
+    /// Returns interned fields corresponding to the compiled module's enum
     /// variant definition. Returns [`None`] if not an enum.
-    pub fn interned_variant_field_types_at(
+    pub fn interned_variant_fields_at(
         &self,
         def_idx: StructDefinitionIndex,
         variant_idx: VariantIndex,
-    ) -> Option<&[InternedType]> {
-        match &self.field_types[def_idx.0 as usize] {
-            FieldTypes::Enum(variants) => Some(variants[variant_idx as usize].as_slice()),
-            FieldTypes::Struct(..) => None,
+    ) -> Option<&[FieldDecl]> {
+        match &self.fields[def_idx.0 as usize] {
+            NominalFields::Enum(variants) => Some(variants[variant_idx as usize].fields.as_slice()),
+            NominalFields::Struct(..) => None,
         }
     }
 
@@ -240,9 +254,9 @@ impl PreparedModule {
 
     /// Looks up a struct or enum definition by its interned name, and returns
     /// its fields (or variants with fields).
-    pub fn interned_field_types(&self, name: InternedIdentifier) -> Option<&FieldTypes> {
+    pub fn interned_fields(&self, name: InternedIdentifier) -> Option<&NominalFields> {
         let idx = self.interned_nominal_type_def_idx(name)?;
-        Some(&self.field_types[idx.0 as usize])
+        Some(&self.fields[idx.0 as usize])
     }
 
     /// Whether a byte copy of `ty`'s frame bytes is by itself a complete,
@@ -326,7 +340,7 @@ impl PreparedModule {
                     // [`Self::is_bitwise_copy_type`].
                     return false;
                 }
-                let Some(FieldTypes::Struct(fields)) = self.interned_field_types(*name) else {
+                let Some(NominalFields::Struct(fields)) = self.interned_fields(*name) else {
                     // Enums are heap-boxed regardless of payload.
                     return false;
                 };
@@ -347,7 +361,7 @@ impl PreparedModule {
                     .collect();
                 fields
                     .iter()
-                    .all(|field| self.is_bitwise_copy_type_in_ty_env(*field, &args))
+                    .all(|field| self.is_bitwise_copy_type_in_ty_env(field.ty, &args))
             },
         }
     }
@@ -356,8 +370,9 @@ impl PreparedModule {
     /// field.
     pub fn interned_field_type_at(&self, idx: FieldHandleIndex) -> InternedType {
         let h = self.module.field_handle_at(idx);
-        self.interned_struct_field_types_at(h.owner)
+        self.interned_struct_fields_at(h.owner)
             .expect("Must be a struct")[h.field as usize]
+            .ty
     }
 
     /// Returns the field's position within its owning struct.
@@ -370,9 +385,9 @@ impl PreparedModule {
     pub fn interned_variant_field_type_at(&self, idx: VariantFieldHandleIndex) -> InternedType {
         let h = self.module.variant_field_handle_at(idx);
         let fields = self
-            .interned_variant_field_types_at(h.struct_index, h.variants[0])
+            .interned_variant_fields_at(h.struct_index, h.variants[0])
             .expect("Must be an enum");
-        fields[h.field as usize]
+        fields[h.field as usize].ty
     }
 
     /// Returns interned type corresponding to the compiled module's constant.
@@ -468,34 +483,33 @@ impl PreparedModule {
             );
         }
 
+        let intern_field = |f: &FieldDefinition| FieldDecl {
+            name: interned_identifiers[f.name.0 as usize],
+            ty: intern_sig_token(&f.signature.0, &module, interner),
+        };
+
         let mut nominal_definitions = UnorderedMap::with_capacity(module.struct_defs().len());
-        let field_types = module
+        let fields = module
             .struct_defs()
             .iter()
             .enumerate()
             .map(|(idx, def)| {
-                let field_types = match &def.field_information {
+                let fields = match &def.field_information {
                     StructFieldInformation::Native => {
                         return Err(PreparedModuleError::NativeFieldsDeprecated);
                     },
                     StructFieldInformation::Declared(fields) => {
-                        let fields = fields
-                            .iter()
-                            .map(|f| intern_sig_token(&f.signature.0, &module, interner))
-                            .collect::<Vec<_>>();
-                        FieldTypes::Struct(fields)
+                        NominalFields::Struct(fields.iter().map(intern_field).collect())
                     },
                     StructFieldInformation::DeclaredVariants(variants) => {
                         let variants = variants
                             .iter()
-                            .map(|v| {
-                                v.fields
-                                    .iter()
-                                    .map(|f| intern_sig_token(&f.signature.0, &module, interner))
-                                    .collect::<Vec<_>>()
+                            .map(|v| VariantDecl {
+                                name: interned_identifiers[v.name.0 as usize],
+                                fields: v.fields.iter().map(intern_field).collect(),
                             })
                             .collect::<Vec<_>>();
-                        FieldTypes::Enum(variants)
+                        NominalFields::Enum(variants)
                     },
                 };
 
@@ -503,7 +517,7 @@ impl PreparedModule {
                 let name = interned_identifiers[handle.name.0 as usize];
                 nominal_definitions.insert(name, StructDefinitionIndex(idx as u16));
 
-                Ok(field_types)
+                Ok(fields)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -545,7 +559,7 @@ impl PreparedModule {
             nominal_types,
             nominal_handles,
             nominal_definitions,
-            field_types,
+            fields,
             constant_types,
             interned_identifiers,
             module_ids,

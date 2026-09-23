@@ -80,7 +80,7 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
                 "Primitive layouts must be handled by fast-path".to_string(),
             ),
         ))),
-        LayoutKind::Struct { fields } => {
+        LayoutKind::Struct { fields, .. } => {
             for field in fields.iter() {
                 // SAFETY: value is a valid struct, so all fields lie at `offset`
                 // and are within bounds.
@@ -153,7 +153,7 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
 
             // Validate both tags before the equality check. An out-of-range tag
             // is heap corruption and must fail closed even when the tags differ.
-            let variant_id = *variants.get(tag_a as usize).ok_or({
+            let variant_id = variants.get(tag_a as usize).map(|v| v.id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
                     tag: tag_a,
                     variant_count: variants.len(),
@@ -315,7 +315,7 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // the layout, as guaranteed by the precondition of this function.
             Ok(unsafe { bytes_cmp(a, b, layout.size as usize) })
         },
-        LayoutKind::Struct { fields } => {
+        LayoutKind::Struct { fields, .. } => {
             for field in fields.iter() {
                 // SAFETY: value is a valid struct, so all fields lie at `offset`
                 // and are within bounds.
@@ -371,7 +371,7 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
 
             // Validate both tags before ordering them. An out-of-range tag is
             // heap corruption and must fail closed even when the tags differ.
-            let variant_id = *variants.get(tag_a as usize).ok_or({
+            let variant_id = variants.get(tag_a as usize).map(|v| v.id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
                     tag: tag_a,
                     variant_count: variants.len(),

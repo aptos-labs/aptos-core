@@ -121,7 +121,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
                     .to_string(),
             ),
         ))),
-        LayoutKind::Struct { fields } => {
+        LayoutKind::Struct { fields, .. } => {
             for field in fields.iter() {
                 let field_layout = layouts.layout(field.id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
                 // SAFETY: the field lies within `base`'s region at `offset`
@@ -185,6 +185,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             let tag = unsafe { read_enum_tag(obj_ptr) };
             let variant_id = variants
                 .get(tag as usize)
+                .map(|v| v.id)
                 .ok_or({
                     RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
                         tag,
@@ -193,7 +194,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
                 })?;
             write_uleb128_len(out, tag);
 
-            let variant_layout = layouts.layout(*variant_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
+            let variant_layout = layouts.layout(variant_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
             // SAFETY: the variant body lives at the specified offset within
             // the object.
             unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
@@ -324,7 +325,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
         ),
         // A signer is never deserialized.
         LayoutKind::Signer => Err(RuntimeError::BCSSignerNotDeserializable.into()),
-        LayoutKind::Struct { fields } => {
+        LayoutKind::Struct { fields, .. } => {
             for field in fields.iter() {
                 let field_layout = layouts.layout(field.id).ok_or({
                     RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
@@ -414,6 +415,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             descriptor_id,
             variants,
             max_size_across_variants,
+            ..
         } => {
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
@@ -427,7 +429,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 .into());
             }
 
-            let variant_layout = layouts.layout(variants[tag as usize]).ok_or({
+            let variant_layout = layouts.layout(variants[tag as usize].id).ok_or({
                 RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
             })?;
 
@@ -580,11 +582,13 @@ mod tests {
     };
     use mono_move_core::{
         align_up_u32,
+        interner::InternedIdentifier,
         types::U64_TY,
         value_layout::{
             BOOL_LAYOUT_ID, SIGNER_LAYOUT_ID, U16_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID,
         },
         DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ValueLayoutTable,
+        VariantValueLayout,
     };
     use serde::Serialize;
     use std::mem::{offset_of, size_of};
@@ -946,10 +950,14 @@ mod tests {
         }
         let field_layouts = fields
             .into_iter()
-            .map(|(offset, id)| FieldValueLayout { offset, id })
+            .map(|(offset, id)| FieldValueLayout {
+                offset,
+                id,
+                name: InternedIdentifier::from_static("f"),
+            })
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        ValueLayout::struct_layout(size, 8, const_bcs, flags, field_layouts)
+        ValueLayout::struct_layout(U64_TY, size, 8, const_bcs, flags, field_layouts)
     }
 
     /// Checks the walks for a fixed-size struct against the Rust oracle:
@@ -1386,11 +1394,16 @@ mod tests {
             variant_ids.push(table.push(U64_TY, layout));
         }
         let max_size_across_variants = align_up_u32(8 + max_data, 8);
-        let layout = ValueLayout::frozen_enum(
-            DescriptorId(3),
-            variant_ids.into_boxed_slice(),
-            max_size_across_variants,
-        );
+        let variants = variant_ids
+            .into_iter()
+            .map(|id| VariantValueLayout {
+                name: InternedIdentifier::from_static("V"),
+                id,
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        let layout =
+            ValueLayout::frozen_enum(U64_TY, DescriptorId(3), variants, max_size_across_variants);
         table.push(U64_TY, layout)
     }
 
