@@ -132,7 +132,7 @@ pub fn read_root_results(
         0 => Ok(vec![]),
         1 => {
             let bytes = interp
-                .serialize_root_result(returns[0])
+                .serialize_root_result_for_test(returns[0])
                 .map_err(|error| format!("{error}"))?;
             Ok(vec![decode_bcs(&bytes, view_type(returns[0]))?])
         },

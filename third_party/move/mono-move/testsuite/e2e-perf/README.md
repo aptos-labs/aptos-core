@@ -192,9 +192,28 @@ A self-compare warns when a ratio lands more than `SELF_COMPARE_MAX_DEVIATION`
 - `median_speedup` — the calibrated number. MonoMove throughput over V1
   throughput, not a TPS.
 
-A verdict is read from the `execution` row. `speedup_band` widens the observed
-range of speedups by a factor that shrinks as samples accumulate, so a thinly
-sampled workload gets a forgiving band.
+A verdict is read from the `execution` row. `speedup_band` estimates the
+run-to-run deviation and allows `BAND_DEVIATIONS` (3) of it either side of
+`median_speedup`, plus a `BAND_FLOOR` (3%) floor. The estimate divides the
+observed range by the range a normal distribution is expected to cover in that
+many samples, so the two spread columns are used only through their difference
+and the band comes out symmetric.
+
+Estimating the deviation, rather than scaling the range directly, is what makes
+the band independent of the sample count. A wider run set covers a wider range
+but is drawn from the same distribution, so the band converges on the real noise
+instead of tightening as samples accumulate. More samples make it accurate, not
+narrow. Today that lands at roughly ±6% for most workloads.
+
+The floor covers what repeats inside one run cannot see, and gives a band to a
+row whose runs came out identical — every `output_bytes_per_txn` row has a zero
+range, since both VMs write deterministically. It has to sit above the
+self-compare deviation measured on the runner.
+
+The remaining weakness is the range itself: one bad run widens a row's band
+until it is re-seeded, which is why `account-generation` sits at ±12.7% while
+everything else is near ±6%. Quartiles would be robust to that, but they need
+more samples than the five these rows were seeded from to mean anything.
 
 Recalibration rewrites the file as a merge: a row the query did not return keeps
 its stored value, so a workload that failed for the whole window does not come
