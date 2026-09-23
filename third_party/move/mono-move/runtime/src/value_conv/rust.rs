@@ -329,11 +329,12 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
             descriptor_id,
             variants,
             max_size_across_variants,
+            ..
         } = &self.layout.kind
         else {
             return Err(self.mismatch(format!("a {num_fields}-field enum variant")));
         };
-        let variant_id = *variants.get(tag as usize).ok_or({
+        let variant_id = variants.get(tag as usize).map(|v| v.id).ok_or({
             RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
                 tag: tag as u64,
                 variant_count: variants.len(),
@@ -483,7 +484,8 @@ mod tests {
     use super::*;
     use crate::value_conv::bcs::AlignedBuf;
     use mono_move_core::{
-        intern_type_tag, reserved_layout_id, types::Type, DescriptorId, LayoutFlags, LayoutId,
+        intern_type_tag, interner::InternedIdentifier, reserved_layout_id, types::Type,
+        DescriptorId, LayoutFlags, LayoutId, VariantValueLayout,
     };
     use mono_move_global_context::{ExecutionGuard, GlobalContext};
     use move_core_types::{
@@ -518,7 +520,21 @@ mod tests {
     }
 
     fn field(offset: u32, id: LayoutId) -> FieldValueLayout {
-        FieldValueLayout { offset, id }
+        FieldValueLayout {
+            offset,
+            id,
+            name: InternedIdentifier::from_static("f"),
+        }
+    }
+
+    /// Names the published variant bodies. These tests never read the names.
+    fn variants(ids: Box<[LayoutId]>) -> Box<[VariantValueLayout]> {
+        ids.iter()
+            .map(|&id| VariantValueLayout {
+                name: InternedIdentifier::from_static("V"),
+                id,
+            })
+            .collect()
     }
 
     fn tag(module: &str, name: &str, type_args: Vec<TypeTag>) -> TypeTag {
@@ -555,13 +571,13 @@ mod tests {
         elem_size: u32,
     ) -> InternedType {
         let ty = intern_type_tag(&tag("option", "Option", vec![elem_tag.clone()]), guard).unwrap();
-        let variants = guard.publish_variant_layouts(ty, vec![
+        let variant_ids = guard.publish_variant_layouts(ty, vec![
             struct_layout(None, 0, 1, vec![]),
             struct_layout(None, elem_size, elem_size.max(1), vec![field(0, elem_id)]),
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
-            variants,
+            variants: variants(variant_ids),
             max_size_across_variants: 8 + elem_size,
         }));
         ty
@@ -758,7 +774,7 @@ mod tests {
         let ctx = GlobalContext::with_num_execution_workers(1);
         let guard = ctx.try_execution_context(0).unwrap();
         let ty = intern_type_tag(&tag("m", "Protector", vec![]), &guard).unwrap();
-        let variants = guard.publish_variant_layouts(ty, vec![
+        let variant_ids = guard.publish_variant_layouts(ty, vec![
             struct_layout(None, 8, 8, vec![field(0, reserved(&Type::U64))]),
             struct_layout(None, 16, 8, vec![
                 field(0, reserved(&Type::U64)),
@@ -768,7 +784,7 @@ mod tests {
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
-            variants,
+            variants: variants(variant_ids),
             max_size_across_variants: 24,
         }));
         check(&guard, ty, &Protector::Nonce(7));
@@ -830,7 +846,7 @@ mod tests {
         let guard = ctx.try_execution_context(0).unwrap();
         // `Some` carries one field, but this enum's second variant has two.
         let ty = intern_type_tag(&tag("m", "Wrong", vec![]), &guard).unwrap();
-        let variants = guard.publish_variant_layouts(ty, vec![
+        let variant_ids = guard.publish_variant_layouts(ty, vec![
             struct_layout(None, 0, 1, vec![]),
             struct_layout(None, 16, 8, vec![
                 field(0, reserved(&Type::U64)),
@@ -839,7 +855,7 @@ mod tests {
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
-            variants,
+            variants: variants(variant_ids),
             max_size_across_variants: 24,
         }));
         let mut heap = Heap::new(1 << 20);
