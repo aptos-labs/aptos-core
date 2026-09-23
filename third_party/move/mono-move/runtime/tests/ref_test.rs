@@ -10,8 +10,8 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    native::NativeExtensions, Code, FrameLayoutInfo, FrameOffset as FO, Function,
-    FunctionDefinitionIndex, MicroOp, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, FrameLayoutInfo, FrameOffset as FO,
+    Function, FunctionDefinitionIndex, MicroOp, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 
 /// `ReadRef`/`WriteRef` whose runtime target aliases the dst/src slot.
@@ -45,6 +45,8 @@ fn ref_self_copy() {
         entry_gas: 0,
         param_slots: vec![],
         param_tys: vec![],
+        return_slots: vec![],
+        return_tys: EMPTY_TYPE_LIST,
         param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 32 + FRAME_METADATA_SIZE,

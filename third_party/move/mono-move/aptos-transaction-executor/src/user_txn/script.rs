@@ -8,7 +8,7 @@ use crate::errors::{MoveExecutionFailure, ScriptRejection};
 use aptos_types::{chain_id::ChainId, vm::module_metadata::get_compilation_metadata};
 use mono_move_core::types::InternedTypeList;
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{InterpreterContext, RuntimeStatus};
+use mono_move_runtime::{CompletedCall, InterpreterContext, RuntimeStatus};
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -54,7 +54,9 @@ pub(crate) fn run_script<'a>(
         secondary_signers,
         &convert_txn_args(args),
     )?;
-    call.run().map_err(MoveExecutionFailure::RuntimeError)
+    call.run()
+        .map(CompletedCall::into_status)
+        .map_err(MoveExecutionFailure::RuntimeError)
 }
 
 /// Checks that AptosVM would run `script`, loaded as a module: mainnet refuses
