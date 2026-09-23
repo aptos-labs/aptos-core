@@ -5,15 +5,16 @@ use crate::{
     data_notification::{
         DataClientRequest,
         DataClientRequest::{
-            EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
-            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfStates,
-            StateValuesWithProof, SubscribeTransactionOutputsWithProof,
+            EpochEndingLedgerInfos, HotStateValuesWithProof, NewTransactionOutputsWithProof,
+            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfHotStates,
+            NumberOfStates, StateValuesWithProof, SubscribeTransactionOutputsWithProof,
             SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
             TransactionOutputsWithProof, TransactionsOrOutputsWithProof, TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
+        HotStateValuesWithProofRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        NumberOfHotStatesRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
         SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
@@ -23,7 +24,8 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
     streaming_client::{
-        Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
+        Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllHotStatesRequest, GetAllStatesRequest,
+        StreamRequest,
     },
 };
 use aptos_config::config::DataStreamingServiceConfig;
@@ -123,6 +125,7 @@ pub trait DataStreamEngine {
 pub enum StreamEngine {
     ContinuousTransactionStreamEngine,
     EpochEndingStreamEngine,
+    HotStateStreamEngine,
     StateStreamEngine,
     TransactionStreamEngine,
 }
@@ -143,6 +146,9 @@ impl StreamEngine {
             StreamRequest::ContinuouslyStreamTransactionsOrOutputs(_) => Ok(
                 ContinuousTransactionStreamEngine::new(data_stream_config, stream_request)?.into(),
             ),
+            StreamRequest::GetAllHotStates(request) => {
+                Ok(HotStateStreamEngine::new(request)?.into())
+            },
             StreamRequest::GetAllStates(request) => Ok(StateStreamEngine::new(request)?.into()),
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
                 Ok(EpochEndingStreamEngine::new(request, advertised_data)?.into())
@@ -235,6 +241,7 @@ impl SnapshotStreamCursor {
     ) -> Result<(), Error> {
         let end_index = match client_requests.last() {
             Some(StateValuesWithProof(request)) => request.end_index,
+            Some(HotStateValuesWithProof(request)) => request.end_index,
             Some(request) => {
                 return Err(Error::UnexpectedErrorEncountered(format!(
                     "Invalid snapshot chunk request created: {:?}",
@@ -414,6 +421,164 @@ impl DataStreamEngine for StateStreamEngine {
                         ));
                     }
                     self.cursor.record_number_of_items(number_of_states)?;
+                }
+            },
+            request => invalid_client_request!(request, self),
+        }
+        Ok(None)
+    }
+}
+
+/// Streams the hot state snapshot at a version. Hot state leaves are
+/// `HotStateValue`s, so this is a separate engine rather than another
+/// `StateKind`; only the index/count bookkeeping is shared.
+#[derive(Clone, Debug)]
+pub struct HotStateStreamEngine {
+    // The original hot states request made by the client
+    pub request: GetAllHotStatesRequest,
+
+    // Tracks the item count and the requested/streamed indices
+    pub cursor: SnapshotStreamCursor,
+}
+
+impl HotStateStreamEngine {
+    fn new(request: &GetAllHotStatesRequest) -> Result<Self, Error> {
+        Ok(HotStateStreamEngine {
+            request: request.clone(),
+            cursor: SnapshotStreamCursor::new(request.start_index),
+        })
+    }
+}
+
+impl DataStreamEngine for HotStateStreamEngine {
+    fn create_data_client_requests(
+        &mut self,
+        max_number_of_requests: u64,
+        max_in_flight_requests: u64,
+        num_in_flight_requests: u64,
+        global_data_summary: &GlobalDataSummary,
+        _unique_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<Vec<DataClientRequest>, Error> {
+        // If we don't have the number of hot states, request it (or keep waiting)
+        if self.cursor.number_of_items.is_none() {
+            if self.cursor.count_requested {
+                return Ok(vec![]);
+            }
+            info!(
+                (LogSchema::new(LogEntry::AptosDataClient)
+                    .event(LogEvent::Pending)
+                    .message(&format!(
+                        "Requested the number of hot states at version: {:?}",
+                        self.request.version
+                    )))
+            );
+            self.cursor.count_requested = true;
+            return Ok(vec![NumberOfHotStates(NumberOfHotStatesRequest {
+                version: self.request.version,
+            })]);
+        }
+
+        // Otherwise, request the next batch of hot state value chunks
+        let stream_engine = self.clone().into();
+        create_snapshot_chunk_requests(
+            &mut self.cursor,
+            max_number_of_requests,
+            max_in_flight_requests,
+            num_in_flight_requests,
+            global_data_summary.optimal_chunk_sizes.state_chunk_size,
+            stream_engine,
+        )
+    }
+
+    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
+        // TODO(HotState): hot snapshots share the main `states` advertisement, so a
+        // peer advertising this version may still have pruned its hot snapshot.
+        // Advertise hot retention separately to support mixed-version peers.
+        Ok(AdvertisedData::contains_range(
+            self.request.version,
+            self.request.version,
+            &advertised_data.states,
+        ))
+    }
+
+    fn is_stream_complete(&self) -> bool {
+        self.cursor.stream_is_complete
+    }
+
+    fn transform_client_response_into_notification(
+        &mut self,
+        client_request: &DataClientRequest,
+        client_response_payload: ResponsePayload,
+        notification_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<Option<DataNotification>, Error> {
+        // Update the metrics for the number of received items
+        update_response_chunk_size_metrics(client_request, &client_response_payload);
+
+        // Handle and transform the response
+        match client_request {
+            HotStateValuesWithProof(request) => {
+                // Verify the client request indices
+                verify_client_request_indices(
+                    self.cursor.next_stream_index,
+                    request.start_index,
+                    request.end_index,
+                )?;
+
+                // Identify the last received hot state index and bound it appropriately
+                let last_received_index = match &client_response_payload {
+                    ResponsePayload::HotStateValuesWithProof(hot_state_values_with_proof) => {
+                        // An empty chunk makes no progress. Rejecting it prevents a
+                        // missing-suffix request that repeats the same range forever.
+                        if hot_state_values_with_proof.raw_values.is_empty() {
+                            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                                "Received an empty hot state values response! Request: {:?}",
+                                client_request
+                            )));
+                        }
+
+                        // Get the last received hot state index
+                        hot_state_values_with_proof.last_index
+                    },
+                    _ => invalid_response_type!(client_response_payload),
+                };
+                let last_received_index =
+                    bound_by_range(last_received_index, request.start_index, request.end_index);
+
+                // Update the stream cursor and check if the stream is complete
+                self.cursor.advance_stream_index(last_received_index)?;
+
+                // Create a new data notification
+                let data_notification = create_data_notification(
+                    notification_id_generator,
+                    client_response_payload,
+                    None,
+                    self.clone().into(),
+                )?;
+                return Ok(Some(data_notification));
+            },
+            NumberOfHotStates(request) => {
+                if let ResponsePayload::NumberOfStates(number_of_hot_states) =
+                    client_response_payload
+                {
+                    info!(
+                        (LogSchema::new(LogEntry::ReceivedDataResponse)
+                            .event(LogEvent::Success)
+                            .message(&format!(
+                                "Received number of hot states at version: {:?}. Total hot states: {:?}",
+                                request.version, number_of_hot_states
+                            )))
+                    );
+
+                    // The count request has been answered, so a count rejected
+                    // below can be re-requested from another peer
+                    self.cursor.count_requested = false;
+
+                    // The count is an internal planning value, never surfaced to the
+                    // consumer. An empty hot snapshot has no chunks, so the cursor
+                    // ends the stream without a notification: the bootstrapper
+                    // decides whether emptiness is legitimate from the committed
+                    // hot root.
+                    self.cursor.record_number_of_items(number_of_hot_states)?;
                 }
             },
             request => invalid_client_request!(request, self),
@@ -2218,6 +2383,13 @@ fn create_data_client_request(
                 end_epoch: end_index,
             })
         },
+        StreamEngine::HotStateStreamEngine(stream_engine) => {
+            HotStateValuesWithProof(HotStateValuesWithProofRequest {
+                version: stream_engine.request.version,
+                start_index,
+                end_index,
+            })
+        },
         StreamEngine::TransactionStreamEngine(stream_engine) => match &stream_engine.request {
             StreamRequest::GetAllTransactions(request) => {
                 TransactionsWithProof(TransactionsWithProofRequest {
@@ -2268,11 +2440,14 @@ fn create_data_notification(
             _ => invalid_response_type!(client_response_type),
         },
         // The number of states is consumed internally by the engine for chunk
-        // planning; it is never surfaced to the consumer as a notification.
+        // planning; it is never surfaced to the consumer as a notification. This
+        // covers hot state too: its count shares this payload variant.
         ResponsePayload::NumberOfStates(_) => invalid_response_type!(client_response_type),
-        // TODO(HotState): hot state values are not streamed yet.
-        ResponsePayload::HotStateValuesWithProof(_) => {
-            invalid_response_type!(client_response_type)
+        ResponsePayload::HotStateValuesWithProof(hot_states_chunk) => match &stream_engine {
+            StreamEngine::HotStateStreamEngine(_) => {
+                DataPayload::HotStateValuesWithProof(hot_states_chunk)
+            },
+            _ => invalid_response_type!(client_response_type),
         },
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
