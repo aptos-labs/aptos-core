@@ -101,7 +101,8 @@ where
             self.executor.pre_commit_block(block_id).unwrap();
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
 
-            let commit_time = Instant::now().duration_since(commit_start);
+            let committed_at = Instant::now();
+            let commit_time = committed_at.duration_since(commit_start);
             report_block(
                 self.start_version,
                 version,
@@ -120,8 +121,14 @@ where
                 execution_ms: execution_time.as_secs_f64() * 1000.0,
                 ledger_update_ms: ledger_update_time.as_secs_f64() * 1000.0,
                 commit_ms: commit_time.as_secs_f64() * 1000.0,
-                latency_ms: current_block_start_time.elapsed().as_secs_f64() * 1000.0,
-                committed_at_ms: first_block_start_time.elapsed().as_secs_f64() * 1000.0,
+                latency_ms: committed_at
+                    .duration_since(current_block_start_time)
+                    .as_secs_f64()
+                    * 1000.0,
+                committed_at_ms: committed_at
+                    .duration_since(first_block_start_time)
+                    .as_secs_f64()
+                    * 1000.0,
             });
         }
         last_version

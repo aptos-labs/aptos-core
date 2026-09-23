@@ -5,18 +5,8 @@
 
 """Per-block pipeline stage timings, one SVG per workload.
 
-Grouped bars, never stacked. The stages run concurrently in the benchmark
-pipeline, so their times overlap in wall clock and do not sum to block latency;
-stacking them would claim a part-to-whole relationship that does not hold.
-
-Each panel is scaled to its own peak. A shared scale would flatten MonoMove into
-the baseline, since V1 execution runs several times longer than anything
-MonoMove does, and the within-VM shape is what the chart is for: which stage
-dominates, and whether the tail is a fixed warmup cost or a recurring stall.
-Read the axis, not the bar height, when comparing the two panels.
-
-No dependencies beyond the standard library. The job installs exactly one
-Python package today and this adds none.
+Grouped bars on a per-panel scale, drawn with the standard library alone. The
+README's "Per-block charts" section covers why.
 """
 
 import math
@@ -204,7 +194,7 @@ def _panel(blocks, title, top, plot_w, tick_every):
 
     labels = [
         {
-            "text": f"{name} {peaks[name][0]:.0f} ms",
+            "text": f"{name} {_fmt_ms(peaks[name][0], step)} ms",
             "x": peaks[name][1],
             "y": baseline - PLOT_H * peaks[name][0] / ceiling - 6.0,
         }
@@ -259,9 +249,9 @@ def render(workload, v1_blocks, mono_blocks):
         )
         out.append(
             f'<text class="ink2" x="{legend_x + 15:.0f}" y="73" '
-            f'font-size="11.5">{_esc(name)}</text>'
+            f'font-size="{SUBTITLE_FONT}">{_esc(name)}</text>'
         )
-        legend_x += 15 + LABEL_FONT * 0.56 * len(name) + 22
+        legend_x += 15 + SUBTITLE_FONT * 0.56 * len(name) + 22
 
     out += _panel(v1_blocks, "V1 MoveVM", PAD_TOP, plot_w, tick_every)
     out += _panel(
@@ -291,7 +281,7 @@ def write_charts(chart_dir, charts):
         if not v1_blocks or not mono_blocks:
             continue
         name = f"{workload}.svg"
-        with open(os.path.join(chart_dir, name), "w") as f:
+        with open(os.path.join(chart_dir, name), "w", encoding="utf-8") as f:
             f.write(render(workload, v1_blocks, mono_blocks))
         written.append(name)
     return written

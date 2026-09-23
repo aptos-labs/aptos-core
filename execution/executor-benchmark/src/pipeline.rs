@@ -298,9 +298,6 @@ where
         let target_version = Arc::new(Mutex::new(None));
         let target_version_clone = target_version.clone();
 
-        // Declared outside the branch below because `join` unwraps this Arc
-        // whether or not a committer was spawned, and the unwrap needs the
-        // refcount back at one.
         let staged_blocks = Arc::new(Mutex::new(Vec::new()));
         let staged_blocks_clone = staged_blocks.clone();
 

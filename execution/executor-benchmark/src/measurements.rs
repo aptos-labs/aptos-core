@@ -502,7 +502,7 @@ impl OverallMeasurement {
     }
 
     /// The executor and AptosDB timers, each sorted by how much time they took.
-    pub fn print_counters_end_table(&self) {
+    pub fn print_timers_end_table(&self) {
         fn print_one(title: &str, timers: &TimerCounters) {
             println!("{}:", title);
             println!("{: >12}{: >10}  {}", "total s", "calls", "timer");
@@ -518,14 +518,14 @@ impl OverallMeasurement {
     }
 
     /// One line the e2e-perf harness greps for, keyed by metric family.
-    pub fn print_counters_json_line(&self) {
+    pub fn print_timers_json_line(&self) {
         let payload = serde_json::json!({
             "executor": self.delta_execution.executor_timers,
             "storage": self.delta_execution.storage_timers,
         });
         println!(
-            "STAGE_COUNTERS_JSON: {}",
-            serde_json::to_string(&payload).expect("stage counters serialize")
+            "STAGE_TIMERS_JSON: {}",
+            serde_json::to_string(&payload).expect("stage timers serialize")
         );
     }
 }
@@ -573,18 +573,18 @@ impl BlockMeasurements {
             "latency",
             "committed at",
         );
-        for (index, b) in self.blocks.iter().enumerate() {
+        for (index, block) in self.blocks.iter().enumerate() {
             println!(
                 "{: >6}{: >12}{: >9}{: >12.1}{: >12.1}{: >14.1}{: >10.1}{: >10.1}{: >14.1}",
                 index,
-                b.version,
-                b.num_txns,
-                b.partition_ms,
-                b.execution_ms,
-                b.ledger_update_ms,
-                b.commit_ms,
-                b.latency_ms,
-                b.committed_at_ms,
+                block.version,
+                block.num_txns,
+                block.partition_ms,
+                block.execution_ms,
+                block.ledger_update_ms,
+                block.commit_ms,
+                block.latency_ms,
+                block.committed_at_ms,
             );
         }
     }

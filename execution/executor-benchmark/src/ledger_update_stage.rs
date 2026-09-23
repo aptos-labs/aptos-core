@@ -67,9 +67,8 @@ where
             stage,
         } = ledger_update_message;
 
-        // Times the executor call alone. The event summary below takes a
-        // process-wide lock and walks every output, so including it would make
-        // this track event volume instead.
+        // Times the executor call alone; the event tally that follows is the
+        // benchmark's own bookkeeping.
         let ledger_update_start_time = Instant::now();
         let output = self
             .executor

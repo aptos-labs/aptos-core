@@ -209,7 +209,7 @@ class RunStats:
     mono_move_enabled: bool
     # One entry per block, from BLOCK_MEASUREMENTS_JSON.
     blocks: list
-    # From STAGE_COUNTERS_JSON: {"executor": {...}, "storage": {...}}, each
+    # From STAGE_TIMERS_JSON: {"executor": {...}, "storage": {...}}, each
     # mapping a timer label to its total seconds and call count over the run.
     timers: dict
 
@@ -233,10 +233,10 @@ class RunStats:
         if len(self.blocks) <= WARMUP_BLOCKS:
             return self.tps
         window = self.blocks[WARMUP_BLOCKS:]
-        elapsed = (
-            window[-1]["committed_at_ms"]
-            - self.blocks[WARMUP_BLOCKS - 1]["committed_at_ms"]
-        ) / 1000.0
+        start_ms = (
+            self.blocks[WARMUP_BLOCKS - 1]["committed_at_ms"] if WARMUP_BLOCKS else 0.0
+        )
+        elapsed = (window[-1]["committed_at_ms"] - start_ms) / 1000.0
         if elapsed <= 0:
             return self.tps
         return sum(b["num_txns"] for b in window) / elapsed
@@ -393,9 +393,9 @@ NUMBER = r"(\d+\.?\d*)"
 # execution/executor-benchmark/src/measurements.rs.
 BLOCK_MEASUREMENTS_MARKER = "BLOCK_MEASUREMENTS_JSON: "
 
-# Printed once per run by OverallMeasurement::print_counters_json_line, in the
+# Printed once per run by OverallMeasurement::print_timers_json_line, in the
 # same file.
-STAGE_COUNTERS_MARKER = "STAGE_COUNTERS_JSON: "
+STAGE_TIMERS_MARKER = "STAGE_TIMERS_JSON: "
 
 
 def extract_marked_json(output, marker, what):
@@ -438,7 +438,7 @@ def extract_run_stats(output):
         "commit": component_tps(r"Overall fraction of total: \d+\.?\d* in commit"),
     }
 
-    counters = extract_marked_json(output, STAGE_COUNTERS_MARKER, "stage counters line")
+    timers = extract_marked_json(output, STAGE_TIMERS_MARKER, "stage timers line")
     return RunStats(
         tps=tps,
         stage_tps=stage_tps,
@@ -447,7 +447,7 @@ def extract_run_stats(output):
         blocks=extract_marked_json(
             output, BLOCK_MEASUREMENTS_MARKER, "block measurements line"
         )["blocks"],
-        timers={family: counters[family] for family in ("executor", "storage")},
+        timers={family: timers[family] for family in ("executor", "storage")},
     )
 
 
@@ -720,7 +720,7 @@ def execution_table(results, failures):
         "MonoMove exec txn/s",
         "execution speedup",
         "calibrated",
-        "Block-STM",
+        "Block-STM speedup",
         "execution range",
         "verdict",
     ]
@@ -803,13 +803,8 @@ def output_size_table(results):
     )
 
 
-# The rows of the two measurement tables: how deep to indent, what to call the
-# stage, and which timer label it reads. A stage the run never entered is
-# dropped rather than printed as a zero. Labels the benchmark reports but no row
-# names are left out of the report entirely; the stdout tables carry all of them.
-#
-# Indent means containment: an indented stage runs inside the one above it, so
-# its time is already counted there.
+# The rows of the two measurement tables: indent depth, the stage's name, and
+# the timer label it reads. Indent means containment.
 EXECUTION_ROWS = [
     (0, "build the state view", "get_state_view"),
     (0, "run the block through the VM", "vm_execute_block"),
@@ -847,8 +842,7 @@ STORAGE_ROWS = [
     (0, "merkle tree commit, off thread", "batch_committer_work"),
 ]
 
-# What pre-commit splits into, for the per-workload table. Only MonoMove's
-# side is broken out; the V1 total beside it is what there is room for.
+# What pre-commit splits into, for the per-workload table. V1 gets a total only.
 STORAGE_SUMMARY_ROWS = [
     ("state kv", "commit_state_kv_and_ledger_metadata"),
     ("write sets", "commit_write_sets"),
@@ -955,7 +949,7 @@ def storage_per_workload_table(results):
         )
     return tabulate(
         rows,
-        headers=["workload", "V1 total", "MonoMove total", "speedup"]
+        headers=["workload", "V1 pre-commit", "MonoMove pre-commit", "speedup"]
         + [name for name, _ in STORAGE_SUMMARY_ROWS],
         tablefmt="github",
         disable_numparse=True,
@@ -1000,8 +994,8 @@ def glossary(selected, results):
         "",
         "- `V1 exec txn/s`, `MonoMove exec txn/s` — throughput of the execute "
         "stage alone.",
-        "- `execution speedup` — the executor's execute stage alone. The only "
-        "calibrated metric, and the only one that decides a verdict.",
+        "- `execution speedup` — the ratio of those two. The only calibrated "
+        "metric, and the only one that decides a verdict.",
         "- `calibrated` — `execution` as recorded in `e2e_perf_speedup.tsv`: the "
         "median over the runs that row was last seeded from, and in parentheses "
         "how far this run moved from it. `-` when the workload has no row yet.",
@@ -1015,7 +1009,7 @@ def glossary(selected, results):
         "The two VMs run alternating, so drift hits both and largely cancels in "
         "the ratio. Only `execution range` bears on the verdict, which becomes "
         f"`noisy` past {MAX_DEVIATION * 100:.0f}%.",
-        "- `total speedup` — wall clock over the whole pipeline.",
+        "- `total speedup` — the ratio of those two throughputs.",
         f"- `steady speedup` — the same, with the first {WARMUP_BLOCKS} blocks "
         "dropped, measured at the commit stage from the per-block timings. It "
         f"and `total speedup` both divide by {BLOCK_SIZE} user transactions "
@@ -1143,6 +1137,8 @@ def build_report(selected, results, failures, charts):
         ]
 
     parts += [
+        "#### End to end",
+        "",
         "Wall clock over the whole pipeline. Not calibrated: the four stages run "
         "concurrently, so this tracks whichever is slowest, and MonoMove is fast "
         "enough that the slowest one is commit. That makes it several times "

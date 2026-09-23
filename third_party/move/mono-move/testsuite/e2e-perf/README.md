@@ -242,10 +242,10 @@ runner type before trusting any band, and record the result here:
 | Apple M-series laptop | 2026-09-03 | 5 blocks, 3 repeats, 20k accounts | 0.7% | 3.6% |
 | `benchmark-c3d-60` | 2026-09-17 | 30 blocks, 3 repeats, 2M accounts | 1.2% | 2.6% |
 
-Both numbers cover `execution` and `inner_block_executor`. The verdict rests on
-`execution` alone. Every other metric is disk bound or takes single-digit
-milliseconds per block, so its range across two identical runs reaches tens of
-percent. Those are reported but neither calibrated nor able to decide a verdict.
+Both numbers cover `execution`, which is the only metric a verdict rests on.
+Every other metric is disk bound or takes single-digit milliseconds per block,
+so its range across two identical runs reaches tens of percent. Those are
+reported but neither calibrated nor able to decide a verdict.
 
 A self-compare warns when a ratio lands more than `SELF_COMPARE_MAX_DEVIATION`
 (3%) away from 1.00x. Tighten it if a runner turns out to be quieter than that.
@@ -269,12 +269,11 @@ wider without catching anything `execution` would miss.
 - `median_speedup` — the calibrated number. MonoMove throughput over V1
   throughput, not a TPS.
 
-`speedup_band` estimates the
-run-to-run deviation and allows `BAND_DEVIATIONS` (3) of it either side of
-`median_speedup`, plus a `BAND_FLOOR` (3%) floor. The estimate divides the
-observed range by the range a normal distribution is expected to cover in that
-many samples, so the two spread columns are used only through their difference
-and the band comes out symmetric.
+`speedup_band` estimates the run-to-run deviation and allows `BAND_DEVIATIONS`
+(3) of it either side of `median_speedup`, plus a `BAND_FLOOR` (3%) floor. The
+estimate divides the observed range by the range a normal distribution is
+expected to cover in that many samples, so the two spread columns are used only
+through their difference and the band comes out symmetric.
 
 Estimating the deviation, rather than scaling the range directly, is what makes
 the band independent of the sample count. A wider run set covers a wider range
