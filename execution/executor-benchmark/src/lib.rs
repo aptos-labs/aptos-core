@@ -106,11 +106,13 @@ pub struct SingleRunResults {
     pub per_block_measurements: BlockMeasurements,
 }
 
-/// Prints what the pipeline collected per block, both as a table and as the
-/// single JSON line the e2e-perf harness reads.
-fn report_per_block(per_block: &BlockMeasurements) {
+/// Prints the per-block stages and the labeled timers, each as a table and as
+/// the single JSON line the e2e-perf harness reads.
+fn report_run_details(overall: &OverallMeasurement, per_block: &BlockMeasurements) {
     per_block.print_end_table();
     per_block.print_json_line();
+    overall.print_counters_end_table();
+    overall.print_counters_json_line();
 }
 
 pub fn default_benchmark_features() -> Features {
@@ -727,7 +729,7 @@ where
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
-    report_per_block(&per_block_results);
+    report_run_details(&overall_results, &per_block_results);
     Some(SingleRunResults {
         measurements: overall_results,
         per_stage_measurements: staged_results,
@@ -829,7 +831,7 @@ where
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
-    report_per_block(&per_block_results);
+    report_run_details(&overall_results, &per_block_results);
     SingleRunResults {
         measurements: overall_results,
         per_stage_measurements: staged_results,

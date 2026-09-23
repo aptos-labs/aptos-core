@@ -95,6 +95,30 @@ transaction per block from its own DB.
 - **Parallel execution.** MonoMove is sequential only today.
 - **Publish, script, and multisig workloads.** MonoMove discards those payloads.
 
+## Execution and storage measurements
+
+Two tables break the pipeline down further than the stage timers do. The
+execution one reads `aptos_executor_other_timers_seconds`, the storage one reads
+`aptos_storage_other_timers_seconds`. Each row names a stage in words and prints
+the Prometheus label beside it.
+
+The benchmark walks the Prometheus registry rather than a fixed list of labels,
+so a timer added anywhere under those two families reaches the report without a
+change on the Rust side. What gets a row, a name, and a place in the tree is
+decided by `EXECUTION_ROWS` and `STORAGE_ROWS` in `run_e2e_perf_test.py`. A
+label with no row still lands in the benchmark's stdout tables and in the JSON
+line the harness reads.
+
+Values are milliseconds per block, summed over the median run of every workload
+and divided by the blocks those runs covered. It is time summed across threads,
+not a share of block latency: several storage stages run concurrently in one
+rayon scope, so the children add up past their parent's wall clock. Speedup is
+V1 over MonoMove, inverted from the raw times so that above 1.00x still means
+MonoMove is faster.
+
+Neither table is calibrated and neither decides a verdict. They say where the
+time went once `execution` has already said whether something moved.
+
 ## Output size
 
 The report also records bytes written per transaction on each VM. The two need

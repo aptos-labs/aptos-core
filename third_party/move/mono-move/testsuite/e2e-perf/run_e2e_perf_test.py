@@ -209,6 +209,9 @@ class RunStats:
     mono_move_enabled: bool
     # One entry per block, from BLOCK_MEASUREMENTS_JSON.
     blocks: list = field(default_factory=list)
+    # From STAGE_COUNTERS_JSON: {"executor": {...}, "storage": {...}}, each
+    # mapping a timer label to its total seconds and call count over the run.
+    timers: dict = field(default_factory=dict)
 
     def metric(self, name):
         if name == "total":
@@ -390,15 +393,15 @@ NUMBER = r"(\d+\.?\d*)"
 # execution/executor-benchmark/src/measurements.rs.
 BLOCK_MEASUREMENTS_MARKER = "BLOCK_MEASUREMENTS_JSON: "
 
+# Printed once per run by OverallMeasurement::print_counters_json_line, in the
+# same file.
+STAGE_COUNTERS_MARKER = "STAGE_COUNTERS_JSON: "
 
-def extract_block_measurements(output):
-    lines = [
-        line
-        for line in output.splitlines()
-        if line.startswith(BLOCK_MEASUREMENTS_MARKER)
-    ]
-    payload = get_only(lines, "block measurements line")
-    return json.loads(payload[len(BLOCK_MEASUREMENTS_MARKER) :])["blocks"]
+
+def extract_marked_json(output, marker, what):
+    lines = [line for line in output.splitlines() if line.startswith(marker)]
+    payload = get_only(lines, what)
+    return json.loads(payload[len(marker) :])
 
 
 def extract_run_stats(output):
@@ -435,12 +438,16 @@ def extract_run_stats(output):
         "commit": component_tps(r"Overall fraction of total: \d+\.?\d* in commit"),
     }
 
+    counters = extract_marked_json(output, STAGE_COUNTERS_MARKER, "stage counters line")
     return RunStats(
         tps=tps,
         stage_tps=stage_tps,
         output_bytes_per_txn=output_bpt,
         mono_move_enabled=mono_move_was_enabled(output),
-        blocks=extract_block_measurements(output),
+        blocks=extract_marked_json(
+            output, BLOCK_MEASUREMENTS_MARKER, "block measurements line"
+        )["blocks"],
+        timers={family: counters[family] for family in ("executor", "storage")},
     )
 
 
@@ -796,6 +803,165 @@ def output_size_table(results):
     )
 
 
+# The rows of the two measurement tables: how deep to indent, what to call the
+# stage, and which timer label it reads. A stage the run never entered is
+# dropped rather than printed as a zero. Labels the benchmark reports but no row
+# names are left out of the report entirely; the stdout tables carry all of them.
+#
+# Indent means containment: an indented stage runs inside the one above it, so
+# its time is already counted there.
+EXECUTION_ROWS = [
+    (0, "build the state view", "get_state_view"),
+    (0, "run the block through the VM", "vm_execute_block"),
+    (0, "parse the VM output", "parse_raw_output"),
+    (1, "collect statuses", "parse_raw_output__all_statuses"),
+    (1, "split off retries and discards", "parse_raw_output__retries_and_discards"),
+    (1, "index what will be committed", "parse_raw_output__to_commit"),
+    (1, "read the next epoch state", "parse_raw_output__next_epoch_state"),
+    (0, "state checkpoint", "do_state_checkpoint"),
+    (1, "hash the state tree", "get_state_checkpoint_hashes"),
+    (1, "hash the hot state tree", "get_hot_state_checkpoint_hashes"),
+    (1, "hash the position tree", "get_position_checkpoint_hashes"),
+    (0, "ledger update", "do_ledger_update"),
+    (1, "assemble transaction infos", "assemble_transaction_infos"),
+    (0, "commit the ledger", "commit_ledger"),
+    (0, "count executed txns, off thread", "async_update_counters__by_execution"),
+    (0, "count committed txns, off thread", "async_update_counters__by_output"),
+]
+
+STORAGE_ROWS = [
+    (0, "pre-commit the block", "pre_commit_ledger"),
+    (1, "write the ledger and the state", "save_transactions__work"),
+    (2, "state values and ledger metadata", "commit_state_kv_and_ledger_metadata"),
+    (3, "RocksDB write", "commit_state_kv_and_ledger_metadata___commit"),
+    (2, "write sets", "commit_write_sets"),
+    (3, "RocksDB write", "commit_write_sets___commit"),
+    (2, "transactions", "commit_transactions"),
+    (3, "RocksDB write", "commit_transactions___commit"),
+    (2, "events", "commit_events"),
+    (3, "RocksDB write", "commit_events___commit"),
+    (2, "transaction accumulator", "commit_transaction_accumulator"),
+    (3, "RocksDB write", "commit_transaction_accumulator___commit"),
+    (1, "hand the state to the merkle pipeline", "save_transactions__others"),
+    (0, "commit the ledger metadata", "commit_ledger"),
+    (0, "merkle tree commit, off thread", "batch_committer_work"),
+]
+
+# What pre-commit splits into, for the per-workload table. Only MonoMove's
+# side is broken out; the V1 total beside it is what there is room for.
+STORAGE_SUMMARY_ROWS = [
+    ("state kv", "commit_state_kv_and_ledger_metadata"),
+    ("write sets", "commit_write_sets"),
+    ("txns", "commit_transactions"),
+    ("events", "commit_events"),
+    ("accumulator", "commit_transaction_accumulator"),
+]
+
+
+def aggregate_timers(results, runs_of, family):
+    """One VM's timer totals summed over the median run of every workload.
+
+    Returns the totals keyed by label and the number of blocks they cover, so
+    a caller can put everything on a per-block footing.
+    """
+    totals = {}
+    num_blocks = 0
+    for r in results:
+        run = median_run(runs_of(r))
+        num_blocks += len(run.blocks)
+        for label, counter in run.timers[family].items():
+            entry = totals.setdefault(label, {"total_s": 0.0, "calls": 0})
+            entry["total_s"] += counter["total_s"]
+            entry["calls"] += counter["calls"]
+    return totals, num_blocks
+
+
+def ms_per_block(totals, label, num_blocks):
+    counter = totals.get(label)
+    if counter is None or not num_blocks:
+        return None
+    return counter["total_s"] * 1000.0 / num_blocks
+
+
+def indent(depth, name):
+    """Markdown eats leading spaces in a table cell, so indent with entities."""
+    if depth == 0:
+        return name
+    return "&nbsp;" * 2 * depth + "└ " + name
+
+
+def timer_table(results, rows, family):
+    """One row per timer, in the order the stages nest."""
+    v1_totals, v1_blocks = aggregate_timers(results, lambda r: r.v1_runs, family)
+    mono_totals, mono_blocks = aggregate_timers(results, lambda r: r.mono_runs, family)
+
+    table = []
+    for depth, name, label in rows:
+        v1_ms = ms_per_block(v1_totals, label, v1_blocks)
+        mono_ms = ms_per_block(mono_totals, label, mono_blocks)
+        if v1_ms is None and mono_ms is None:
+            continue
+        calls = mono_totals.get(label, {}).get("calls", 0)
+        table.append(
+            [
+                indent(depth, name),
+                f"`{label}`",
+                "-" if v1_ms is None else f"{v1_ms:.1f}",
+                "-" if mono_ms is None else f"{mono_ms:.1f}",
+                ratio(v1_ms / mono_ms) if v1_ms and mono_ms else "-",
+                f"{calls / mono_blocks:.1f}" if mono_blocks else "-",
+            ]
+        )
+    return tabulate(
+        table,
+        headers=[
+            "stage",
+            "timer",
+            "V1 ms/block",
+            "MonoMove ms/block",
+            "speedup",
+            "calls/block",
+        ],
+        tablefmt="github",
+        disable_numparse=True,
+    )
+
+
+def storage_per_workload_table(results):
+    """Pre-commit and what it splits into, one row per workload."""
+
+    def cell(value):
+        return "-" if value is None else f"{value:.1f}"
+
+    rows = []
+    for r in results:
+        v1 = median_run(r.v1_runs)
+        mono = median_run(r.mono_runs)
+        v1_total = ms_per_block(v1.timers["storage"], "pre_commit_ledger", len(v1.blocks))
+        mono_total = ms_per_block(
+            mono.timers["storage"], "pre_commit_ledger", len(mono.blocks)
+        )
+        rows.append(
+            [
+                r.workload.name,
+                cell(v1_total),
+                cell(mono_total),
+                ratio(v1_total / mono_total) if v1_total and mono_total else "-",
+            ]
+            + [
+                cell(ms_per_block(mono.timers["storage"], label, len(mono.blocks)))
+                for _, label in STORAGE_SUMMARY_ROWS
+            ]
+        )
+    return tabulate(
+        rows,
+        headers=["workload", "V1 total", "MonoMove total", "speedup"]
+        + [name for name, _ in STORAGE_SUMMARY_ROWS],
+        tablefmt="github",
+        disable_numparse=True,
+    )
+
+
 def per_repeat_table(results):
     rows = []
     for r in results:
@@ -866,6 +1032,25 @@ def glossary(selected, results):
         "",
         "The stages nest: `total` ⊃ `execution` ⊃ `Block-STM`.",
         "",
+        "#### Measurement columns",
+        "",
+        "- `stage`, `timer` — the stage in words and the Prometheus label it "
+        "reads. Indentation means containment: an indented stage runs inside "
+        "the one above it, so its time is already counted there.",
+        "- `V1 ms/block`, `MonoMove ms/block` — the timer's total over the "
+        "median run of every workload, divided by the blocks those runs "
+        "covered. It is time summed across threads, not a share of block "
+        "latency: several of these stages run concurrently in one rayon scope, "
+        "so the children can add up past their parent's wall clock.",
+        "- `speedup` — V1 over MonoMove, inverted from the raw times so that "
+        "above 1.00x still means MonoMove is faster.",
+        "- `calls/block` — how often the timer fired per block, from the "
+        "MonoMove runs. Both VMs commit the same number of blocks, so V1's "
+        "count is the same except where the two write different amounts.",
+        "- A stage no run entered is left out rather than printed as a zero. "
+        "Timers with no row are left out of the report; the benchmark's stdout "
+        "carries all of them.",
+        "",
         "#### Verdicts",
         "",
         "Only `execution` decides a verdict, by where its speedup fell relative "
@@ -914,8 +1099,6 @@ def chart_section(charts):
     )
     return [
         "",
-        "#### Per-block stages",
-        "",
         f"One SVG per workload in {where}: every block's execution, ledger "
         "update, and commit time, one panel per VM. The bars are grouped "
         "rather than stacked because the stages run concurrently, so they do "
@@ -941,6 +1124,8 @@ def build_report(selected, results, failures, charts):
         "",
         "Gas is not compared. MonoMove runs unmetered, so its gas metrics are zero.",
         "",
+        "#### Overall",
+        "",
         execution_table(results, failures),
         "",
     ]
@@ -958,8 +1143,6 @@ def build_report(selected, results, failures, charts):
         ]
 
     parts += [
-        "#### End to end",
-        "",
         "Wall clock over the whole pipeline. Not calibrated: the four stages run "
         "concurrently, so this tracks whichever is slowest, and MonoMove is fast "
         "enough that the slowest one is commit. That makes it several times "
@@ -967,6 +1150,38 @@ def build_report(selected, results, failures, charts):
         "",
         end_to_end_table(results, failures),
         "",
+    ]
+
+    if results:
+        parts += [
+            "#### Execution measurements",
+            "",
+            "Where the executor spent its time, from "
+            "`aptos_executor_other_timers_seconds`.",
+            "",
+            timer_table(results, EXECUTION_ROWS, "executor"),
+            "",
+            "#### Storage measurements",
+            "",
+            "Where AptosDB spent its time, from "
+            "`aptos_storage_other_timers_seconds`. This is what the commit stage "
+            "is made of.",
+            "",
+            timer_table(results, STORAGE_ROWS, "storage"),
+            "",
+            "<details>",
+            "<summary>Storage per workload</summary>",
+            "",
+            "Pre-commit per workload rather than summed, and what MonoMove's "
+            "share of it went into. Same units as above.",
+            "",
+            storage_per_workload_table(results),
+            "",
+            "</details>",
+            "",
+        ]
+
+    parts += [
         "#### Output size",
         "",
         "Bytes per transaction records what each VM wrote. The two need not "
@@ -977,16 +1192,19 @@ def build_report(selected, results, failures, charts):
         output_size_table(results),
     ]
 
-    parts += chart_section(charts)
+    artifacts = chart_section(charts)
 
     warnings = [(r.workload.name, w) for r in results for w in r.warnings]
     if warnings:
-        parts += ["", "#### Warnings", ""]
-        parts += [f"- `{name}`: {message}" for name, message in warnings]
+        artifacts += ["", "Warnings:", ""]
+        artifacts += [f"- `{name}`: {message}" for name, message in warnings]
 
     if failures:
-        parts += ["", "#### Failed workloads", ""]
-        parts += [f"- `{name}`: {message}" for name, message in failures]
+        artifacts += ["", "Failed workloads:", ""]
+        artifacts += [f"- `{name}`: {message}" for name, message in failures]
+
+    if artifacts:
+        parts += ["", "#### Artifacts"] + artifacts
 
     parts += ["", glossary(selected, results)]
 

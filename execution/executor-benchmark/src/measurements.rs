@@ -6,19 +6,15 @@ use aptos_block_executor::counters::{
     self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
 };
 use aptos_executor::metrics::{
-    COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS,
-    PROCESSED_TXNS_OUTPUT_SIZE, UPDATE_LEDGER,
+    COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, PROCESSED_TXNS_OUTPUT_SIZE,
+    UPDATE_LEDGER,
 };
 use aptos_logger::info;
 use aptos_metrics_core::Histogram;
 use aptos_types::transaction::Version;
 use move_core_types::language_storage::StructTag;
 use serde::Serialize;
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt::Write,
-    time::Instant,
-};
+use std::{collections::BTreeMap, fmt::Write, time::Instant};
 
 #[derive(Debug, Clone)]
 struct GasMeasurement {
@@ -109,16 +105,66 @@ impl GasMeasurement {
     }
 }
 
-static OTHER_LABELS: &[(&str, bool, &str)] = &[
-    ("1.", true, "verified_state_view"),
-    ("2.", true, "state_checkpoint"),
-    ("2.1.", false, "sort_transactions"),
-    ("2.2.", false, "calculate_for_transaction_block"),
-    ("2.2.1.", false, "get_sharded_state_updates"),
-    ("2.2.2.", false, "calculate_block_state_updates"),
-    ("2.2.3.", false, "calculate_usage"),
-    ("2.2.4.", false, "make_checkpoint"),
-];
+/// Total time and number of calls of one labeled timer.
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+pub struct TimerCounter {
+    pub total_s: f64,
+    pub calls: u64,
+}
+
+/// Every label of one histogram family, keyed by the label's value.
+type TimerCounters = BTreeMap<String, TimerCounter>;
+
+/// The timers inside the executor pipeline.
+const EXECUTOR_TIMERS_METRIC: &str = "aptos_executor_other_timers_seconds";
+
+/// The timers inside AptosDB, which is where the commit stage spends its time.
+const STORAGE_TIMERS_METRIC: &str = "aptos_storage_other_timers_seconds";
+
+/// Reads both timer families out of the default registry.
+///
+/// Walking the registry rather than a fixed list of labels means a timer added
+/// anywhere under those two families is picked up without a change here.
+fn scrape_timers() -> (TimerCounters, TimerCounters) {
+    let families = aptos_metrics_core::gather();
+    let family = |metric_name: &str| {
+        families
+            .iter()
+            .filter(|family| family.get_name() == metric_name)
+            .flat_map(|family| family.get_metric())
+            .filter_map(|metric| {
+                let label = metric
+                    .get_label()
+                    .iter()
+                    .find(|pair| pair.get_name() == "name")?;
+                let histogram = metric.get_histogram();
+                Some((label.get_value().to_string(), TimerCounter {
+                    total_s: histogram.get_sample_sum(),
+                    calls: histogram.get_sample_count(),
+                }))
+            })
+            .collect::<TimerCounters>()
+    };
+    (
+        family(EXECUTOR_TIMERS_METRIC),
+        family(STORAGE_TIMERS_METRIC),
+    )
+}
+
+/// Subtracts the starting snapshot, dropping labels that were never called
+/// inside the window. A label first observed inside it has no starting entry.
+fn delta_timers(start: &TimerCounters, end: TimerCounters) -> TimerCounters {
+    end.into_iter()
+        .filter_map(|(label, end)| {
+            let start = start.get(&label).copied().unwrap_or_default();
+            let delta = TimerCounter {
+                total_s: end.total_s - start.total_s,
+                calls: end.calls - start.calls,
+            };
+            (delta.calls > 0).then_some((label, delta))
+        })
+        .collect()
+}
 
 #[derive(Debug, Clone)]
 struct ExecutionTimeMeasurement {
@@ -130,7 +176,8 @@ struct ExecutionTimeMeasurement {
     execution_total_time: f64,
     block_executor_total_time: f64,
     block_executor_inner_total_time: f64,
-    by_other: HashMap<&'static str, f64>,
+    executor_timers: TimerCounters,
+    storage_timers: TimerCounters,
     ledger_update_total: f64,
     commit_total_time: f64,
 }
@@ -150,17 +197,7 @@ impl ExecutionTimeMeasurement {
         let block_executor_total = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum();
         let block_executor_inner_total = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.get_sample_sum();
 
-        let by_other = OTHER_LABELS
-            .iter()
-            .map(|(_prefix, _top_level, other_label)| {
-                (
-                    *other_label,
-                    OTHER_TIMERS
-                        .with_label_values(&[other_label])
-                        .get_sample_sum(),
-                )
-            })
-            .collect::<HashMap<_, _>>();
+        let (executor_timers, storage_timers) = scrape_timers();
         let ledger_update_total = UPDATE_LEDGER.get_sample_sum();
         let commit_total = COMMIT_BLOCKS.get_sample_sum();
 
@@ -172,7 +209,8 @@ impl ExecutionTimeMeasurement {
             execution_total_time: execution_total,
             block_executor_total_time: block_executor_total,
             block_executor_inner_total_time: block_executor_inner_total,
-            by_other,
+            executor_timers,
+            storage_timers,
             ledger_update_total,
             commit_total_time: commit_total,
         }
@@ -191,11 +229,8 @@ impl ExecutionTimeMeasurement {
                 - self.block_executor_total_time,
             block_executor_inner_total_time: end.block_executor_inner_total_time
                 - self.block_executor_inner_total_time,
-            by_other: end
-                .by_other
-                .into_iter()
-                .map(|(k, v)| (k, v - self.by_other.get(&k).unwrap()))
-                .collect::<HashMap<_, _>>(),
+            executor_timers: delta_timers(&self.executor_timers, end.executor_timers),
+            storage_timers: delta_timers(&self.storage_timers, end.storage_timers),
             ledger_update_total: end.ledger_update_total - self.ledger_update_total,
             commit_total_time: end.commit_total_time - self.commit_total_time,
         }
@@ -392,20 +427,6 @@ impl OverallMeasurement {
                 / self.delta_execution.execution_total_time,
             num_txns / self.delta_execution.block_executor_inner_total_time
         );
-        for (label_prefix, top_level, other_label) in OTHER_LABELS {
-            let time_in_label = self.delta_execution.by_other.get(other_label).unwrap();
-            if *top_level || time_in_label / self.delta_execution.execution_total_time > 0.01 {
-                info!(
-                    "{} fraction of execution {:.4} in {} {} (component TPS: {:.1})",
-                    self.prefix,
-                    time_in_label / self.delta_execution.execution_total_time,
-                    label_prefix,
-                    other_label,
-                    num_txns / time_in_label
-                );
-            }
-        }
-
         info!(
             "{} fraction of total: {:.4} in ledger update (component TPS: {:.1})",
             self.prefix,
@@ -478,6 +499,37 @@ impl OverallMeasurement {
             println!("{}  {}", v.prefix, v.metadata);
         }
         println!("{}", Self::format_end_table(stages, overall));
+    }
+
+    /// The executor and AptosDB timers, each sorted by how much time they took.
+    pub fn print_counters_end_table(&self) {
+        fn print_one(title: &str, timers: &TimerCounters) {
+            println!("{}:", title);
+            println!("{: >12}{: >10}  {}", "total s", "calls", "timer");
+            let mut rows = timers.iter().collect::<Vec<_>>();
+            rows.sort_by(|(_, a), (_, b)| b.total_s.total_cmp(&a.total_s));
+            for (label, counter) in rows {
+                println!("{: >12.3}{: >10}  {}", counter.total_s, counter.calls, label);
+            }
+        }
+
+        print_one("Executor timers", &self.delta_execution.executor_timers);
+        print_one("Storage timers", &self.delta_execution.storage_timers);
+    }
+
+    /// One line the e2e-perf harness greps for. Keep the marker in sync with
+    /// `STAGE_COUNTERS_MARKER` in `run_e2e_perf_test.py`.
+    pub fn print_counters_json_line(&self) {
+        let payload = serde_json::json!({
+            "elapsed_s": self.elapsed,
+            "num_txns": self.num_txns,
+            "executor": self.delta_execution.executor_timers,
+            "storage": self.delta_execution.storage_timers,
+        });
+        println!(
+            "STAGE_COUNTERS_JSON: {}",
+            serde_json::to_string(&payload).expect("stage counters serialize")
+        );
     }
 
     pub fn json_end_table(&self) -> serde_json::Value {
