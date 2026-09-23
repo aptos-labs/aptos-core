@@ -6,7 +6,7 @@
 
 use mono_move_core::{types::InternedTypeList, Function, Interner, VMInternalError};
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{CallBuilder, InterpreterContext, RuntimeStatus};
+use mono_move_runtime::{CallBuilder, CompletedCall, InterpreterContext, RuntimeStatus};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 /// Resolves `module::function<ty_args>` by name, metered against the gas
@@ -45,6 +45,6 @@ pub(crate) fn call_system_function_unmetered<'a>(
             call.signer(signer)?;
         }
         place(&mut call)?;
-        call.run()
+        call.run().map(CompletedCall::into_status)
     })
 }

@@ -22,7 +22,7 @@ use mono_move_natives::{
     make_all_ristretto255_scalar_test_natives, make_all_test_natives, make_all_unit_test_natives,
 };
 use mono_move_runtime::{
-    CallBuilder, InterpreterContext, InterpreterOptions, ProductionContextFamily,
+    CallBuilder, CompletedCall, InterpreterContext, InterpreterOptions, ProductionContextFamily,
     ProductionNativeRegistry, RuntimeStatus,
 };
 use move_core_types::{
@@ -71,46 +71,29 @@ impl<'guard> MonoRunner<'guard> {
     pub fn run<R>(
         &mut self,
         signers: &[AccountAddress],
-        mut place_arg: impl FnMut(&mut CallBuilder<'_, '_>, usize) -> VMResult<()>,
-        extract_returns: impl FnOnce(&InterpreterContext<'guard>) -> R,
+        place_arg: impl FnMut(&mut CallBuilder<'_, '_>, usize) -> VMResult<()>,
+        extract_returns: impl FnOnce(&CompletedCall<'_, 'guard>) -> VMResult<R>,
     ) -> RunResult<R> {
         // Each run is its own transaction: a clean state with a full budget,
         // reusing the already-allocated stack and heap buffers.
         self.interp.reset_for_test(GAS_BUDGET);
-        let function = self.function;
-        let outcome = (|| {
-            let mut call = self.interp.build_call(function)?;
-            let mut placed_signers = 0;
-            for (index, &ty) in function.param_tys.iter().enumerate() {
-                if is_signer_or_signer_immut_ref(ty) {
-                    let buf = signers
-                        .get(placed_signers)
-                        .expect("a signer per signer parameter");
-                    call.signer(buf)?;
-                    placed_signers += 1;
-                } else {
-                    place_arg(&mut call, index - placed_signers)?;
-                }
-            }
-            assert_eq!(
-                placed_signers,
-                signers.len(),
-                "more signers than signer parameters"
-            );
-            call.run()
-        })();
-        let result = match outcome {
+        let result = match place_and_run(&mut self.interp, self.function, signers, place_arg) {
             Err(err) => RunResult::Error(err),
-            Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&self.interp)),
-            Ok(RuntimeStatus::Aborted {
-                code,
-                message,
-                location,
-                ..
-            }) => RunResult::Aborted {
-                code,
-                message,
-                location,
+            Ok(call) => match call.status().clone() {
+                RuntimeStatus::Success => match extract_returns(&call) {
+                    Ok(value) => RunResult::Success(value),
+                    Err(err) => RunResult::Error(err),
+                },
+                RuntimeStatus::Aborted {
+                    code,
+                    message,
+                    location,
+                    ..
+                } => RunResult::Aborted {
+                    code,
+                    message,
+                    location,
+                },
             },
         };
         self.gc_count = self.interp.gc_count();
@@ -124,7 +107,7 @@ impl<'guard> MonoRunner<'guard> {
         match self.run(
             &[],
             |call, index| call.arg(&args[index]),
-            |interp| interp.root_result_u64_for_test(),
+            |call| Ok(call.interpreter().root_result_u64_for_test()),
         ) {
             RunResult::Success(value) => Ok(value),
             RunResult::Aborted { code, message, .. } => match message {
@@ -134,6 +117,35 @@ impl<'guard> MonoRunner<'guard> {
             RunResult::Error(err) => bail!("vm error: {}", err),
         }
     }
+}
+
+/// Builds and runs a call to `function`, filling signer parameters from
+/// `signers` and passing each remaining argument index to `place_arg`.
+fn place_and_run<'a, 'guard>(
+    interp: &'a mut InterpreterContext<'guard>,
+    function: &'a Function,
+    signers: &'a [AccountAddress],
+    mut place_arg: impl FnMut(&mut CallBuilder<'_, '_>, usize) -> VMResult<()>,
+) -> VMResult<CompletedCall<'a, 'guard>> {
+    let mut call = interp.build_call(function)?;
+    let mut placed_signers = 0;
+    for (index, &ty) in function.param_tys.iter().enumerate() {
+        if is_signer_or_signer_immut_ref(ty) {
+            let buf = signers
+                .get(placed_signers)
+                .expect("a signer per signer parameter");
+            call.signer(buf)?;
+            placed_signers += 1;
+        } else {
+            place_arg(&mut call, index - placed_signers)?;
+        }
+    }
+    assert_eq!(
+        placed_signers,
+        signers.len(),
+        "more signers than signer parameters"
+    );
+    call.run()
 }
 
 /// Build the native registry mono-move executes against: the synthetic test

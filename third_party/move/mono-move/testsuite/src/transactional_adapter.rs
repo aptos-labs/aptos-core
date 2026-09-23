@@ -192,14 +192,10 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
         let result = self
             .session
             .run(module, function, &type_args, &signers, &args);
-        let error = match self.run_result(result, function_execution_error, extra_args.verbose) {
-            Ok(return_values) => match self.serialized_return_values(return_values) {
-                Ok(values) => return self.display_return_values(values),
-                Err(err) => format!("{err:#}"),
-            },
-            Err(error) => error,
-        };
-        Some(format!("Error: {error}"))
+        match self.run_result(result, function_execution_error, extra_args.verbose) {
+            Ok(values) => self.display_return_values(values),
+            Err(error) => Some(format!("Error: {error}")),
+        }
     }
 
     fn view_data(
@@ -222,17 +218,21 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
 }
 
 impl MonoVMTestAdapter<'_> {
-    /// Returns successful results or formats failures, using `execution_error`
-    /// for the task kind's VM diagnostics.
+    /// Pairs successful outputs with their V1 layouts, or formats the failure
+    /// with the task-specific `execution_error` function.
     fn run_result(
         &self,
         result: Result<RunOutcome, RunError>,
         execution_error: fn(&VMError, bool) -> anyhow::Error,
         verbose: bool,
-    ) -> Result<Vec<(TypeTag, Vec<u8>)>, String> {
+    ) -> Result<SerializedReturnValues, String> {
         let debugging = self.run_config.vm_config.enable_debugging;
         let vm_error = match result {
-            Ok(RunOutcome::Success { return_values }) => return Ok(return_values),
+            Ok(RunOutcome::Success { return_values }) => {
+                return self
+                    .serialized_return_values(return_values)
+                    .map_err(|err| format!("{err:#}"))
+            },
             Ok(RunOutcome::Aborted {
                 code,
                 message,
@@ -248,8 +248,8 @@ impl MonoVMTestAdapter<'_> {
         Err(execution_error(&vm_error, verbose).to_string())
     }
 
-    /// Pairs each BCS return value with its V1 layout. Rejects decoding failures
-    /// to prevent a panic in the renderer.
+    /// Pairs each BCS return value with its V1 layout. Rejects decoding
+    /// failures to prevent a panic in the renderer.
     fn serialized_return_values(
         &self,
         return_values: Vec<(TypeTag, Vec<u8>)>,

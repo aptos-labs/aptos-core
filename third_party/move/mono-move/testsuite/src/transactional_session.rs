@@ -13,13 +13,14 @@ use mono_move_core::{
     intern_type_tag, nominal_tag,
     storage::resource_provider::InMemoryStorageKey,
     type_tag_of,
-    types::{is_signer_or_signer_immut_ref, InternedType, InternedTypeList},
+    types::{is_signer_or_signer_immut_ref, InternedType},
     BytecodeOffset, Function, FunctionDefinitionIndex, GasMeter, Interner, VMInternalError,
 };
-use mono_move_global_context::{view_type_list, ExecutionGuard, GlobalContext};
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_runtime::{
-    serialize, InterpreterContext, RuntimeError, RuntimeStatus, SessionEffects, WriteClass,
+    serialize, CompletedCall, InterpreterContext, RuntimeError, RuntimeStatus, SessionEffects,
+    WriteClass,
 };
 use move_binary_format::{compatibility::Compatibility, errors::VMError};
 use move_core_types::{
@@ -106,9 +107,7 @@ pub enum RunError {
     /// lowering skips, a missing native, or a runtime operation it rejects.
     #[error("unsupported by MonoVM: {0}")]
     VmUnsupported(String),
-    /// The session lacks something the run needs: entry type-argument
-    /// handling, multiple return values, return values of natives or of types
-    /// without a type tag, writes outside plain resources.
+    /// A transactional-session limitation prevents the run from completing.
     #[error("the MonoVM transactional session cannot {0}")]
     Unsupported(String),
     /// V1's storage rejected the effects.
@@ -334,7 +333,7 @@ enum Callee<'a> {
     Script(&'a [u8]),
 }
 
-/// Loads and calls `callee` on `interp`, then serializes its return value.
+/// Loads and calls `callee` on `interp`, then serializes its return values.
 fn execute(
     guard: &ExecutionGuard<'_>,
     interp: &mut InterpreterContext<'_>,
@@ -362,7 +361,16 @@ fn execute(
         )?,
         Callee::Script(script) => interp.load_script(script, ty_args)?,
     };
-    match call(interp, func, signers, args)? {
+    let placements = placements(func, signers, args)?;
+    let call = run_call(interp, func, &placements)?;
+    match call.status().clone() {
+        RuntimeStatus::Success => Ok(RunOutcome::Success {
+            return_values: call
+                .serialize_return_values()?
+                .into_iter()
+                .map(|(ty, bytes)| to_v1_bcs(ty, bytes))
+                .collect::<Result<_, _>>()?,
+        }),
         RuntimeStatus::Aborted {
             code,
             message,
@@ -374,29 +382,25 @@ fn execute(
             location,
             offset,
         }),
-        RuntimeStatus::Success => Ok(RunOutcome::Success {
-            return_values: return_values(guard, interp, func, ty_args)?,
-        }),
     }
 }
 
 /// One parameter's value: a signer address, or BCS bytes.
-enum Placement<'a> {
+enum Placement {
     Signer(AccountAddress),
-    Bcs(&'a [u8]),
+    Bcs(Vec<u8>),
 }
 
-/// Calls the function with `signers` followed by `args`, decoded by parameter
-/// type. Signers use V1's single-variant enum encoding containing an address,
-/// preserving V1's decoding behavior for misplaced arguments.
+/// Pairs signers and arguments with parameters in order. A value in a signer
+/// position must use V1's serialized signer representation; otherwise the run
+/// fails with [`ArgumentError::Undecodable`].
 // TODO(cleanup): place arguments with the executor's `place_user_txn_args` so
 // the corpus exercises the production path.
-fn call(
-    interp: &mut InterpreterContext<'_>,
+fn placements(
     func: &Function,
     signers: &[AccountAddress],
     args: &[Vec<u8>],
-) -> Result<RuntimeStatus, RunError> {
+) -> Result<Vec<Placement>, RunError> {
     let expected = func.param_tys.len();
     let actual = signers.len() + args.len();
     if expected != actual {
@@ -405,28 +409,34 @@ fn call(
             actual,
         }));
     }
-    let encoded_signers = signers
+    let blobs = signers
         .iter()
         .map(|signer| encode_signer(*signer))
-        .collect::<Vec<_>>();
-    let blobs = encoded_signers.iter().chain(args).map(Vec::as_slice);
-    let placements = func
-        .param_tys
+        .chain(args.iter().cloned());
+    func.param_tys
         .iter()
         .zip(blobs)
         .map(|(&ty, blob)| {
             if is_signer_or_signer_immut_ref(ty) {
-                decode_signer(blob)
+                decode_signer(&blob)
                     .map(Placement::Signer)
                     .ok_or(RunError::Arguments(ArgumentError::Undecodable))
             } else {
                 Ok(Placement::Bcs(blob))
             }
         })
-        .collect::<Result<Vec<_>, RunError>>()?;
+        .collect()
+}
 
+/// Places the arguments and runs the call. A `&signer` parameter borrows its
+/// address from `placements`, so they must outlive the completed call.
+fn run_call<'a, 'guard>(
+    interp: &'a mut InterpreterContext<'guard>,
+    func: &'a Function,
+    placements: &'a [Placement],
+) -> Result<CompletedCall<'a, 'guard>, RunError> {
     let mut call = interp.build_call(func)?;
-    for placement in &placements {
+    for placement in placements {
         match placement {
             Placement::Signer(address) => call.signer(address)?,
             Placement::Bcs(bytes) => call.arg_bcs(bytes).map_err(|err| {
@@ -470,57 +480,24 @@ fn decode_signer(blob: &[u8]) -> Option<AccountAddress> {
     }
 }
 
-/// Serializes the value a completed call returned, with its type tag. The
-/// runtime exposes the root frame's single return slot; more return values
-/// are not representable yet.
-fn return_values(
-    guard: &ExecutionGuard<'_>,
-    interp: &InterpreterContext<'_>,
-    func: &Function,
-    ty_args: InternedTypeList,
-) -> Result<Vec<(TypeTag, Vec<u8>)>, RunError> {
-    let loaded = interp
-        .read_set()
-        .get_loaded(guard.arena_ref_for_module_id(func.module_id))?;
-    let returns = match loaded.function_return_types(guard, func.name, ty_args) {
-        Some(Ok(returns)) => view_type_list(returns),
-        Some(Err(err)) => {
-            return Err(RunError::Unsupported(format!(
-                "instantiate the return types: {err}"
-            )))
-        },
-        None => {
-            return Err(RunError::Unsupported(
-                "return the values of a native function".to_string(),
-            ))
-        },
+/// The value's BCS as V1 serializes it, with its type tag.
+fn to_v1_bcs(ty: InternedType, bytes: Vec<u8>) -> Result<(TypeTag, Vec<u8>), RunError> {
+    let tag = type_tag_of(ty).ok_or_else(|| {
+        RunError::Unsupported("report a value whose type has no type tag".to_string())
+    })?;
+    // Convert a top-level signer from MonoVM's bare address to V1's variant.
+    // TODO(completeness): a signer nested in a returned vector or struct keeps
+    // the bare encoding, so the adapter rejects the value as undecodable under
+    // V1's layout (or renders it wrongly if the bytes happen to decode).
+    // Re-encode through the value's layout instead of by top-level tag.
+    let bytes = if tag == TypeTag::Signer {
+        let address =
+            AccountAddress::from_bytes(&bytes).expect("MonoVM serializes a signer as its address");
+        encode_signer(address)
+    } else {
+        bytes
     };
-    match returns {
-        [] => Ok(vec![]),
-        [ty] => {
-            let tag = type_tag_of(*ty).ok_or_else(|| {
-                RunError::Unsupported("return a value whose type has no type tag".to_string())
-            })?;
-            let bytes = interp.serialize_root_result_for_test(*ty)?;
-            // Convert a top-level signer from MonoVM's bare address to V1's variant.
-            // TODO(completeness): a signer nested in a returned vector or struct keeps
-            // the bare encoding, so the adapter rejects the value as undecodable under
-            // V1's layout (or renders it wrongly if the bytes happen to decode).
-            // Re-encode through the value's layout instead of by top-level tag.
-            let bytes = if tag == TypeTag::Signer {
-                let address = AccountAddress::from_bytes(&bytes)
-                    .expect("MonoVM serializes a signer as its address");
-                encode_signer(address)
-            } else {
-                bytes
-            };
-            Ok(vec![(tag, bytes)])
-        },
-        returns => Err(RunError::Unsupported(format!(
-            "return {} values from one call",
-            returns.len()
-        ))),
-    }
+    Ok((tag, bytes))
 }
 
 /// Converts a successful run's resource writes to a V1 change set, using the

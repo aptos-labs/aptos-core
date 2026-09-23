@@ -617,18 +617,7 @@ fn execute_function_v1(
                 .return_values
                 .iter()
                 .zip(return_kinds.iter())
-                .map(|((bytes, _layout), kind)| match kind {
-                    PrimitiveKind::Utf8String => {
-                        render_utf8(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
-                    },
-                    PrimitiveKind::ByteVector => {
-                        render_bytes(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
-                    },
-                    PrimitiveKind::U64Vector => render_u64_list(
-                        &bcs::from_bytes::<Vec<u64>>(bytes).expect("BCS vector<u64>"),
-                    ),
-                    _ => kind.format_bytes(bytes),
-                })
+                .map(|((bytes, _layout), kind)| kind.render_bcs(bytes))
                 .collect::<Vec<_>>();
             let events = finalize_events_v1(&extensions);
             Output::success(render_execution_output(&vals, &events))
@@ -707,36 +696,18 @@ fn execute_function_v2(
             let result = runner.run(
                 &signers,
                 |call, index| call.arg(&values[index]),
-                |interpreter| {
-                    let mut ret_off: u32 = 0;
-                    let mut vals = Vec::with_capacity(return_kinds.len());
-                    for kind in return_kinds {
-                        ret_off = mono_move_core::align_up_u32(ret_off, kind.align());
-                        match kind {
-                            PrimitiveKind::Utf8String => {
-                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
-                                vals.push(render_utf8(&content));
-                            },
-                            PrimitiveKind::ByteVector => {
-                                let content = interpreter.root_result_byte_vector_for_test(ret_off);
-                                vals.push(render_bytes(&content));
-                            },
-                            PrimitiveKind::U64Vector => {
-                                let content = interpreter.root_result_u64_vector_for_test(ret_off);
-                                vals.push(render_u64_list(&content));
-                            },
-                            _ => {
-                                let bytes =
-                                    interpreter.root_result_bytes_for_test(ret_off, kind.size());
-                                vals.push(kind.format_bytes(bytes));
-                            },
-                        }
-                        ret_off += kind.size();
-                    }
+                |call| {
+                    let vals = call
+                        .serialize_return_values()?
+                        .iter()
+                        .zip(return_kinds)
+                        .map(|((_, bytes), kind)| kind.render_bcs(bytes))
+                        .collect::<Vec<_>>();
                     // SAFETY: the heap (and every pointer the events embed) is
                     // live while the interpreter is.
-                    let events = unsafe { finalize_events_v2(interpreter.extensions(), guard) };
-                    (vals, events)
+                    let events =
+                        unsafe { finalize_events_v2(call.interpreter().extensions(), guard) };
+                    Ok((vals, events))
                 },
             );
             gc_count = runner.gc_count();
@@ -793,10 +764,9 @@ pub(crate) fn render_module_location(module_id: &ModuleId) -> String {
     )
 }
 
-/// Kind supported as an argument or return value in differential tests
-/// (the integer types plus `bool` and `address`). Mirrors mono-move's frame
-/// slot layout so the same byte buffer can be used for both BCS (V1) and raw
-/// frame storage (V2).
+/// Value kinds supported by differential tests. Strings and vectors are
+/// return-only. Both VMs report return values as BCS, so one renderer serves
+/// both.
 #[derive(Copy, Clone, Debug)]
 enum PrimitiveKind {
     Bool,
@@ -814,14 +784,13 @@ enum PrimitiveKind {
     I256,
     Address,
     Signer,
-    /// A `String` return value (return-only). Rendered as a UTF-8 string by
-    /// reading the heap `vector<u8>` (V2) or decoding the BCS bytes (V1).
+    /// A `String` return value (return-only). Rendered as a UTF-8 string.
     Utf8String,
     /// A `vector<u8>` return value (return-only). Rendered as a `0x…` hex dump
-    /// of its bytes, read from the heap (V2) or the BCS return (V1).
+    /// of its bytes.
     ByteVector,
     /// A `vector<u64>` return value (return-only). Rendered as a decimal list
-    /// `[a, b, …]`, read from the heap (V2) or decoded from the BCS return (V1).
+    /// `[a, b, …]`.
     U64Vector,
 }
 
@@ -873,45 +842,6 @@ impl PrimitiveKind {
         panic!("Only primitive, vector<u8>, vector<u64>, and String return types are supported");
     }
 
-    fn size(self) -> u32 {
-        match self {
-            PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
-            PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
-            PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64
-            | PrimitiveKind::I64
-            | PrimitiveKind::Utf8String
-            | PrimitiveKind::ByteVector
-            | PrimitiveKind::U64Vector => 8,
-            PrimitiveKind::U128 | PrimitiveKind::I128 => 16,
-            PrimitiveKind::U256
-            | PrimitiveKind::I256
-            | PrimitiveKind::Address
-            | PrimitiveKind::Signer => 32,
-        }
-    }
-
-    fn align(self) -> u32 {
-        match self {
-            PrimitiveKind::Bool | PrimitiveKind::U8 | PrimitiveKind::I8 => 1,
-            PrimitiveKind::U16 | PrimitiveKind::I16 => 2,
-            PrimitiveKind::U32 | PrimitiveKind::I32 => 4,
-            PrimitiveKind::U64
-            | PrimitiveKind::I64
-            | PrimitiveKind::Utf8String
-            | PrimitiveKind::ByteVector
-            | PrimitiveKind::U64Vector => 8,
-            // Wide integers and addresses are 8-byte aligned in the
-            // frame even though their size is larger.
-            PrimitiveKind::U128
-            | PrimitiveKind::I128
-            | PrimitiveKind::U256
-            | PrimitiveKind::I256
-            | PrimitiveKind::Address
-            | PrimitiveKind::Signer => 8,
-        }
-    }
-
     fn to_move_value(self, s: &str) -> MoveValue {
         match self {
             PrimitiveKind::Bool => MoveValue::Bool(parse_bool_arg(s)),
@@ -941,9 +871,9 @@ impl PrimitiveKind {
         }
     }
 
-    /// Format the raw little-endian frame bytes of a returned scalar as a
-    /// decimal string (or hex for addresses).
-    fn format_bytes(self, bytes: &[u8]) -> String {
+    /// Renders the BCS bytes of a returned value for cross-VM comparison:
+    /// scalars in decimal, addresses in hex, vectors as lists or hex dumps.
+    fn render_bcs(self, bytes: &[u8]) -> String {
         match self {
             PrimitiveKind::Bool => (bytes[0] != 0).to_string(),
             PrimitiveKind::U8 => bytes[0].to_string(),
@@ -958,12 +888,23 @@ impl PrimitiveKind {
             PrimitiveKind::I64 => i64::from_le_bytes(bytes[..8].try_into().unwrap()).to_string(),
             PrimitiveKind::I128 => i128::from_le_bytes(bytes[..16].try_into().unwrap()).to_string(),
             PrimitiveKind::I256 => I256::from_le_bytes(bytes[..32].try_into().unwrap()).to_string(),
+            // V1 prefixes the signer address with a variant tag; MonoVM emits
+            // the bare address, so the final 32 bytes match in both encodings.
             PrimitiveKind::Address | PrimitiveKind::Signer => {
-                let arr: [u8; AccountAddress::LENGTH] = bytes[..32].try_into().unwrap();
+                let arr: [u8; AccountAddress::LENGTH] = bytes
+                    [bytes.len() - AccountAddress::LENGTH..]
+                    .try_into()
+                    .unwrap();
                 AccountAddress::new(arr).to_hex_literal()
             },
-            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector | PrimitiveKind::U64Vector => {
-                unreachable!("String / vector returns are rendered from the heap, not format_bytes")
+            PrimitiveKind::Utf8String => {
+                render_utf8(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+            },
+            PrimitiveKind::ByteVector => {
+                render_bytes(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
+            },
+            PrimitiveKind::U64Vector => {
+                render_u64_list(&bcs::from_bytes::<Vec<u64>>(bytes).expect("BCS vector<u64>"))
             },
         }
     }

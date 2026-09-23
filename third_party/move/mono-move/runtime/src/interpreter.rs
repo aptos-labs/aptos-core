@@ -39,6 +39,7 @@ use mono_move_core::{
     },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
+    strip_ref,
     types::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
@@ -209,15 +210,28 @@ impl SessionEffects {
     }
 }
 
-/// Places one call's arguments, in parameter order. Every value is checked
-/// against its parameter's declared type.
+/// Places one call's arguments in parameter order, checking each value against
+/// its declared type. `signer` writes the address into a by-value `signer`
+/// slot, or points a `&signer` slot at the caller's address, which must then
+/// outlive the call. Other reference parameters are refused.
 pub struct CallBuilder<'a, 'guard> {
     interp: &'a mut InterpreterContext<'guard>,
     func: &'a Function,
+    /// Index of the parameter the next placement fills; `run` requires it to
+    /// have reached the parameter count.
     next_param: usize,
 }
 
-impl<'a> CallBuilder<'a, '_> {
+/// A call that has run. Holds the interpreter until dropped, so the return
+/// values in the root frame stay readable and no other call can be built over
+/// them.
+pub struct CompletedCall<'a, 'guard> {
+    interp: &'a InterpreterContext<'guard>,
+    func: &'a Function,
+    status: RuntimeStatus,
+}
+
+impl<'a, 'guard> CallBuilder<'a, 'guard> {
     /// The parameter types of the called function.
     pub fn param_tys(&self) -> &[InternedType] {
         &self.func.param_tys
@@ -249,6 +263,16 @@ impl<'a> CallBuilder<'a, '_> {
         Ok((dst, *ty))
     }
 
+    /// Advances to the next non-reference parameter. Only [`Self::signer`]
+    /// accepts a reference parameter, and only `&signer`.
+    fn next_value_slot(&mut self) -> VMResult<(*mut u8, InternedType)> {
+        let (dst, ty) = self.next_slot()?;
+        if strip_ref(ty).is_some() {
+            return Err(RuntimeError::Unsupported("reference parameters").into());
+        }
+        Ok((dst, ty))
+    }
+
     /// Fills the next parameter with `signer`, by value or by reference as
     /// the parameter declares. The address must outlive the call and sit
     /// outside the VM heap, out of the GC's reach.
@@ -278,7 +302,7 @@ impl<'a> CallBuilder<'a, '_> {
     /// On error, the parameter slot is left partially written and the call
     /// must be abandoned.
     pub fn arg<T: MoveValueView + ?Sized>(&mut self, value: &T) -> VMResult<()> {
-        let (dst, ty) = self.next_slot()?;
+        let (dst, ty) = self.next_value_slot()?;
         let guard = self.interp.loader.guard();
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
@@ -291,15 +315,8 @@ impl<'a> CallBuilder<'a, '_> {
     ///
     /// On error, the parameter slot is left partially written and the call
     /// must be abandoned.
-    // TODO(completeness): place reference arguments as V1 does, decoding the
-    // target into the heap and passing a pointer; until then they are rejected.
-    // Only direct callers such as the test harnesses need this: transactions
-    // reject reference parameters at entry validation.
     pub fn arg_bcs(&mut self, bytes: &[u8]) -> VMResult<()> {
-        let (dst, ty) = self.next_slot()?;
-        if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
-            return Err(RuntimeError::Unsupported("reference parameters").into());
-        }
+        let (dst, ty) = self.next_value_slot()?;
         let guard = self.interp.loader.guard();
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
@@ -307,14 +324,69 @@ impl<'a> CallBuilder<'a, '_> {
     }
 
     /// Runs the call once all parameters have been filled.
-    pub fn run(self) -> VMResult<RuntimeStatus> {
+    pub fn run(self) -> VMResult<CompletedCall<'a, 'guard>> {
         if self.next_param != self.func.param_slots.len() {
             invariant_violation!(Unreachable(
                 "not enough arguments for the function".to_string()
             ));
         }
-        self.interp.prepare_call(self.func);
-        self.interp.run()
+        let CallBuilder { interp, func, .. } = self;
+        interp.prepare_call(func);
+        let status = interp.run()?;
+        Ok(CompletedCall {
+            interp,
+            func,
+            status,
+        })
+    }
+}
+
+impl<'guard> CompletedCall<'_, 'guard> {
+    /// How the call ended.
+    pub fn status(&self) -> &RuntimeStatus {
+        &self.status
+    }
+
+    /// Consumes the call and returns its status.
+    pub fn into_status(self) -> RuntimeStatus {
+        self.status
+    }
+
+    /// The interpreter the call ran on.
+    pub fn interpreter(&self) -> &InterpreterContext<'guard> {
+        self.interp
+    }
+
+    /// BCS-serializes a successful call's return values in declaration order,
+    /// pairing each value with its type. Fails if the call did not succeed or
+    /// if any return type is a reference.
+    pub fn serialize_return_values(&self) -> VMResult<Vec<(InternedType, Vec<u8>)>> {
+        let RuntimeStatus::Success = self.status else {
+            invariant_violation!(Unreachable(
+                "return values of a call that did not succeed".to_string()
+            ));
+        };
+        let return_tys = view_type_list(self.func.return_tys);
+        if return_tys.iter().any(|&ty| strip_ref(ty).is_some()) {
+            return Err(RuntimeError::Unsupported("reference return values").into());
+        }
+        let guard = self.interp.loader.guard();
+        // SAFETY: after a successful run, the root frame's return slots hold
+        // values of their declared types, none of them a reference (checked
+        // above); the interpreter's heap still owns every reachable object,
+        // and the guard outlives the interpreter.
+        unsafe {
+            let base = root_frame_base(&self.interp.stack);
+            self.func
+                .return_slots
+                .iter()
+                .zip(return_tys)
+                .map(|(slot, &ty)| {
+                    value_conv::bcs::serialize(guard, base.add(usize::from(slot.offset)), ty)
+                        .map(|bytes| (ty, bytes))
+                })
+                .collect()
+        }
     }
 }
 
@@ -757,20 +829,6 @@ impl<'guard> InterpreterContext<'guard> {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
     }
 
-    /// BCS-serializes the value a successfully completed root call returned.
-    /// Call only after a successful run, with `ty` that call's return type;
-    /// the result lives at the start of the root frame's shared
-    /// parameter/return region. For tests.
-    pub fn serialize_root_result_for_test(&self, ty: InternedType) -> VMResult<Vec<u8>> {
-        // SAFETY: the caller guarantees a completed call whose return value
-        // of type `ty` sits at the region start; the context's heap still
-        // owns every reachable object, and the guard outlives the context.
-        unsafe {
-            let base = self.stack.as_ptr().add(FRAME_METADATA_SIZE);
-            value_conv::bcs::serialize(self.loader.guard(), base, ty)
-        }
-    }
-
     /// Read `size` raw bytes from the root frame at the given byte offset. For
     /// tests inspecting an entry/native function's raw return slots.
     pub fn root_result_bytes_for_test(&self, offset: u32, size: u32) -> &[u8] {
@@ -782,38 +840,6 @@ impl<'guard> InterpreterContext<'guard> {
                 .as_ptr()
                 .add(FRAME_METADATA_SIZE + offset as usize);
             std::slice::from_raw_parts(base, size as usize)
-        }
-    }
-
-    /// Reads a heap `vector<u8>` (or a `String`, same slot layout) from the root
-    /// result slot at `offset`; empty if the pointer is null. For tests.
-    pub fn root_result_byte_vector_for_test(&self, offset: u32) -> Vec<u8> {
-        // SAFETY: the slot holds a live pointer to a heap vector<u8>; the heap
-        // is still owned by this context, so the read stays in bounds.
-        unsafe {
-            let ptr = read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize);
-            if ptr.is_null() {
-                return vec![];
-            }
-            let len = read_u64(ptr, VEC_LENGTH_OFFSET) as usize;
-            std::slice::from_raw_parts(ptr.add(VEC_DATA_OFFSET), len).to_vec()
-        }
-    }
-
-    /// Reads a heap `vector<u64>` from the root result slot at `offset`; empty if
-    /// the pointer is null. For tests.
-    pub fn root_result_u64_vector_for_test(&self, offset: u32) -> Vec<u64> {
-        // SAFETY: the slot holds a live pointer to a heap vector<u64>; the heap is
-        // still owned by this context, so the reads stay in bounds.
-        unsafe {
-            let ptr = read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize);
-            if ptr.is_null() {
-                return vec![];
-            }
-            let len = read_u64(ptr, VEC_LENGTH_OFFSET) as usize;
-            (0..len)
-                .map(|i| read_u64(ptr, VEC_DATA_OFFSET + i * 8))
-                .collect()
         }
     }
 

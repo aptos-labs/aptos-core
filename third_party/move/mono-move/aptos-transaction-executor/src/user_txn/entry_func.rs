@@ -12,7 +12,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::{ExecutionGuard, LoadedModule};
 use mono_move_natives::RandomnessContext;
-use mono_move_runtime::{InterpreterContext, RuntimeStatus};
+use mono_move_runtime::{CompletedCall, InterpreterContext, RuntimeStatus};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionDefinitionIndex, Visibility},
@@ -178,5 +178,7 @@ pub(crate) fn call_entry_function<'a>(
         secondary_signers,
         args,
     )?;
-    call.run().map_err(MoveExecutionFailure::RuntimeError)
+    call.run()
+        .map(CompletedCall::into_status)
+        .map_err(MoveExecutionFailure::RuntimeError)
 }

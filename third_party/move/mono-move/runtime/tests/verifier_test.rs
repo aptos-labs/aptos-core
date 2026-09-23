@@ -5,9 +5,10 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    types::InternedType, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
-    FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
-    SortedSafePointEntries, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    types::{InternedType, EMPTY_TYPE_LIST},
+    Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo, FrameOffset as FO,
+    Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp, SortedSafePointEntries,
+    ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 mod common;
 
@@ -49,6 +50,8 @@ fn minimal_func() -> Function {
         entry_gas: 0,
         param_slots: vec![],
         param_tys: vec![],
+        return_slots: vec![],
+        return_tys: EMPTY_TYPE_LIST,
         param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
