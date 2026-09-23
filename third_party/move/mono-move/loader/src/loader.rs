@@ -916,11 +916,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             self.discovered.push(slot);
         }
 
-        Ok(module
-            .ir()
-            .module
-            .interned_fields(*nominal_name)
-            .cloned())
+        Ok(module.ir().module.interned_fields(*nominal_name).cloned())
     }
 
     fn publish_vec_descriptor(

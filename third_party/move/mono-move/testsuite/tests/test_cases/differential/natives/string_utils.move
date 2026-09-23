@@ -342,11 +342,6 @@ module 0x1::main {
 // RUN: execute 0x1::main::option_nested
 // CHECK: results: "Some(Some(1))"
 
-// V1 builds no named layout for an enum, so the tag stands in for the variant
-// name and the whole subtree below loses its names too. Mono names the variant
-// and keeps the subtree decorated. The divergence is deliberate; see the module
-// docs of `mono_move_core::value_format`.
-
 // RUN: execute 0x1::main::enum_fields
 // CHECK-V1: results: "#0{ 7 }"
 // CHECK-V2: results: "Shape::Circle { r: 7 }"
