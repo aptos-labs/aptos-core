@@ -437,22 +437,22 @@ impl<'ctx> MaintenanceGuard<'ctx> {
 }
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    /// Takes the scratch region parked on this guard's arena, or [`None`] if
-    /// there is none parked.
+    /// Takes the interpreter stack parked on this guard's arena, or [`None`]
+    /// if there is none parked.
     ///
     /// The region is not zeroed: it holds whatever the previous owner left
     /// behind, so the caller must write every byte before reading it. Return
-    /// it with [`Self::return_scratch_region`] when done.
-    pub fn take_scratch_region(&self) -> Option<MemoryRegion> {
-        self.global_arena.take_scratch_region()
+    /// it with [`Self::return_stack_region`] when done.
+    pub fn take_stack_region(&self) -> Option<MemoryRegion> {
+        self.global_arena.take_stack_region()
     }
 
-    /// Parks a region on this guard's arena for its next user.
+    /// Parks an interpreter stack on this guard's arena for its next user.
     ///
-    /// INVARIANT: every user of a guard's scratch region agrees on its size.
+    /// INVARIANT: every user of a guard's stack region agrees on its size.
     /// The region is parked and handed out as is, with no size check.
-    pub fn return_scratch_region(&self, region: MemoryRegion) {
-        self.global_arena.return_scratch_region(region)
+    pub fn return_stack_region(&self, region: MemoryRegion) {
+        self.global_arena.return_stack_region(region)
     }
 
     /// Inserts a loaded module into the cache, keyed by its interned ID.

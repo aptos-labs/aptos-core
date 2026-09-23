@@ -118,7 +118,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // TODO(correctness): every path out of here must call `interp.finish()`.
         // Block-STM validates a parallel transaction against the read set
         // `finish` returns, so a discard that skips it drops the transaction's
-        // dependencies. It also parks the scratch region for reuse.
+        // dependencies. It also parks the interpreter stack for reuse.
 
         let signers = ValidationSigners::new(&txn_data);
 

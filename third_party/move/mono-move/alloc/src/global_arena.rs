@@ -108,18 +108,26 @@ impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
     }
 }
 
-/// The memory one worker holds exclusively: its bump arena, plus a scratch
-/// region parked between executions.
+/// The memory one worker holds exclusively: its bump arena, plus the
+/// interpreter stack parked between executions.
+///
+/// Each kind of parked buffer gets its own field rather than sharing one pool
+/// of interchangeable regions. A region is handed out as is, with no size
+/// check, so a shared pool could give a caller one too small for it. A field
+/// holds at most one region: the slot is locked by one worker at a time, and
+/// that worker has at most one region of each kind live.
 struct ArenaSlot {
     bump: Bump,
-    scratch: Cell<Option<MemoryRegion>>,
+    /// The interpreter's call stack, left behind by the last execution on this
+    /// worker. Empty until the first execution returns one.
+    stack: Cell<Option<MemoryRegion>>,
 }
 
 impl ArenaSlot {
     fn with_capacity(arena_capacity: usize) -> Self {
         Self {
             bump: Bump::with_capacity(arena_capacity),
-            scratch: Cell::new(None),
+            stack: Cell::new(None),
         }
     }
 }
@@ -247,12 +255,12 @@ impl<'pool> GlobalArenaShard<'pool> {
         GlobalArenaPtr(NonNull::from(self.guard.bump.alloc_slice_copy(src)))
     }
 
-    /// Takes this arena's parked scratch region, or [`None`] if there is none
-    /// parked.
+    /// Takes this arena's parked interpreter stack, or [`None`] if there is
+    /// none parked.
     ///
     /// The region is not zeroed: it holds whatever the previous owner left
     /// behind, so the caller must write every byte before reading it.
-    pub fn take_scratch_region(&self) -> Option<MemoryRegion> {
+    pub fn take_stack_region(&self) -> Option<MemoryRegion> {
         // Reuse hides read-before-write bugs from Miri, since a recycled
         // region is ordinary initialized memory rather than uninitialized.
         // Hand out a fresh allocation instead so Miri still catches them.
@@ -260,21 +268,21 @@ impl<'pool> GlobalArenaShard<'pool> {
             return None;
         }
 
-        let mut region = self.guard.scratch.take()?;
+        let mut region = self.guard.stack.take()?;
         region.recycle();
         Some(region)
     }
 
-    /// Parks a region on this arena for its next user. Keeps one region; a
-    /// surplus region (the caller allocated its own because none was parked)
-    /// is dropped here.
+    /// Parks an interpreter stack on this arena for its next user. Keeps one
+    /// region; a surplus region (the caller allocated its own because none was
+    /// parked) is dropped here.
     ///
-    /// INVARIANT: every user of an arena's scratch region agrees on its size.
+    /// INVARIANT: every user of an arena's stack region agrees on its size.
     /// The region is parked and handed out as is, with no size check.
-    pub fn return_scratch_region(&self, region: MemoryRegion) {
+    pub fn return_stack_region(&self, region: MemoryRegion) {
         if cfg!(miri) {
             return;
         }
-        self.guard.scratch.set(Some(region));
+        self.guard.stack.set(Some(region));
     }
 }

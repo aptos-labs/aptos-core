@@ -463,7 +463,7 @@ impl<'guard> InterpreterContext<'guard> {
         // call writes it. It is written explicitly below.
         let stack = loader
             .guard()
-            .take_scratch_region()
+            .take_stack_region()
             .unwrap_or_else(new_stack_region);
         debug_assert_eq!(stack.len(), DEFAULT_STACK_SIZE);
 
@@ -646,7 +646,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// types are not: the effects do not borrow the guard, so the caller must
     /// keep the global arena alive until the effects are dropped.
     pub fn finish(self) -> SessionEffects {
-        self.loader.guard().return_scratch_region(self.stack);
+        self.loader.guard().return_stack_region(self.stack);
 
         SessionEffects {
             read_write_set: self.read_write_set,
