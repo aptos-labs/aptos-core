@@ -9,16 +9,16 @@ module bench::relay_msglib {
     const FIELD_MASK: u64 = 0xffffffff;
     const FIELD_MASK_128: u128 = 0xffffffff;
 
-    /// Low 63 bits of a GUID, which is what a payload slot is keyed on.
+    /// Low 63 bits of a GUID, which is what a slot key is built from.
     const SLOT_MASK: u128 = 0x7fffffffffffffff;
 
-    /// Payload slots a channel cycles through in each direction. Nonces never
-    /// repeat, so keying a slot on the nonce itself would make every store a
-    /// creation and grow the tree for the length of a run. Folding the nonce
-    /// into a ring settles the store at a fixed size instead, and a ring this
-    /// wide holds every message a single transaction can name, so no
-    /// transaction wraps its own window.
-    const PAYLOAD_RING: u64 = 64;
+    /// Slots a channel cycles through per nonce stream. Nonces never repeat,
+    /// so keying on the nonce itself would make every write a creation and
+    /// grow the tree for the length of a run. Folding the nonce into a ring
+    /// settles the payload store and the DVN attestations at a fixed size
+    /// instead, and a ring this wide holds every message a single transaction
+    /// can name, so no transaction wraps its own window.
+    const GUID_RING: u64 = 64;
 
     /// GUID layout, high bits first: source eid, destination eid, channel id,
     /// nonce, each 32 bits wide.
@@ -31,11 +31,11 @@ module bench::relay_msglib {
             | ((nonce & FIELD_MASK) as u128)
     }
 
-    /// The bits of a GUID that fit alongside a direction bit in a payload slot
-    /// key: the channel id, and the nonce folded into the channel's ring.
+    /// The bits of a GUID a slot key is built from: the channel id, and the
+    /// nonce folded into the channel's ring.
     public fun guid_slot_bits(guid: u128): u64 {
         let bits = ((guid & SLOT_MASK) as u64);
-        (bits & (FIELD_MASK << 32)) | (bits & (PAYLOAD_RING - 1))
+        (bits & (FIELD_MASK << 32)) | (bits & (GUID_RING - 1))
     }
 
     public fun guid_nonce(guid: u128): u64 {
@@ -47,5 +47,5 @@ module bench::relay_msglib {
     }
 
     #[view]
-    public fun payload_ring(): u64 { PAYLOAD_RING }
+    public fun guid_ring(): u64 { GUID_RING }
 }

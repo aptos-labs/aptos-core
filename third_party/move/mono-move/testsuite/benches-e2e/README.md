@@ -31,7 +31,7 @@ Application-shaped Move packages for the MonoMove end-to-end performance harness
 
 5. **The mix must balance.** Whatever state the workload measures — book depth, listing count, liquidation candidates, pool imbalance, queue length — the branches that produce it and the branches that consume it have to balance, or the state runs to a boundary and the measured branch stops doing work. A mix stage runs a million transactions; a drift of one unit per transaction against a seeded few thousand is gone inside the first 1% of the run, and what the remaining 99% measures is an empty tree, an unfilled buy, or a read-only walk. Seeding more does not fix it, it only moves the cliff.
 
-   Drift the other way is just as bad, and easier to miss because nothing stops working. State that only grows deepens the JMT for the length of the run, so throughput falls inside the run and the median depends on how many blocks were recorded. `bridge_relay` keys payload slots by nonce and nonces never repeat, so it grew without bound until the slots were put on a ring.
+   Drift the other way is just as bad, and easier to miss because nothing stops working. State that only grows deepens the JMT for the length of the run, so throughput falls inside the run and the median depends on how many blocks were recorded. `bridge_relay` keys both payload slots and DVN attestations by nonce and nonces never repeat, so both grew without bound until they were folded onto a ring. Check every table a nonce stream touches, not just the obvious one.
 
    Work out the equilibrium arithmetically before running anything: production rate per transaction, consumption rate per transaction, and the level where they meet. Then write the test that pins it, because the next person to retune a weight will not redo the arithmetic.
 
@@ -53,7 +53,7 @@ In order.
    ```bash
    ./testsuite/benchmark-workloads/generate.py
    ```
-   Commit `crates/transaction-workloads-lib/prebuilt.mpb`. Nothing rebuilds it at `cargo build` time and no CI check verifies it against the sources, so a stale bundle silently serves old bytecode.
+   Commit `crates/transaction-workloads-lib/prebuilt.mpb`. Nothing rebuilds it at `cargo build` time, so a stale bundle serves old bytecode. The `prebuilt-workloads-check` workflow rebuilds it on every PR that touches a source it is built from and fails if the committed copy differs.
 
 6. Add a `Workload(...)` entry to `../e2e-perf/run_e2e_perf_test.py` at `block_size=500`, `blocking=False`.
 

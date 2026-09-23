@@ -205,6 +205,38 @@ module bench::bridge_relay_tests {
         assert!(relay_endpoint::attestations_for(0, 1) == VERIFIERS_PER_MSG, 0);
     }
 
+    #[test(admin = @bench)]
+    fun test_attestations_fold_onto_the_ring(admin: &signer) {
+        relay_endpoint::initialize(admin, 2, SRC_EID, DST_EID);
+        let ring = relay_msglib::guid_ring();
+
+        relay_dvn::attest(relay_msglib::guid(SRC_EID, DST_EID, 0, 1), 3);
+        assert!(
+            relay_dvn::attestations(
+                relay_msglib::guid(SRC_EID, DST_EID, 0, 1)) == 3,
+            0,
+        );
+
+        // Verify attests ahead of a cursor that only moves forward, so keying
+        // on the raw nonce would add an item per message and never reclaim
+        // one. A nonce a ring on has to land in the same slot and take it
+        // over, which is what holds the table flat for the length of a run.
+        relay_dvn::attest(
+            relay_msglib::guid(SRC_EID, DST_EID, 0, 1 + ring), 7);
+        assert!(
+            relay_dvn::attestations(
+                relay_msglib::guid(SRC_EID, DST_EID, 0, 1)) == 7,
+            0,
+        );
+
+        // Channels keep their own rings.
+        assert!(
+            relay_dvn::attestations(
+                relay_msglib::guid(SRC_EID, DST_EID, 1, 1)) == 0,
+            0,
+        );
+    }
+
     #[test(admin = @bench, alice = @0xa11ce)]
     fun test_send_tolerates_an_empty_payload(admin: &signer, alice: &signer) {
         setup(admin);
@@ -258,7 +290,7 @@ module bench::bridge_relay_tests {
         // store at a fixed size instead of growing for the length of a run,
         // and it has to be wide enough for every message one transaction can
         // name.
-        let ring = relay_msglib::payload_ring();
+        let ring = relay_msglib::guid_ring();
         assert!(ring >= relay_endpoint::max_msgs(), 0);
         assert!(
             relay_msglib::guid_slot_bits(relay_msglib::guid(7, 9, 3, 5 + ring))

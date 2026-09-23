@@ -1,15 +1,17 @@
 /// Decentralised verifier network: the per-channel verifier set and the
 /// attestations it has produced, shaped after a LayerZero V2 DVN.
 ///
-/// An attestation is a count keyed by GUID, so re-attesting overwrites instead
-/// of failing. Delivery reads the count but never requires it, which is what
-/// lets the mix run verify and deliver in any order.
+/// An attestation is a count keyed by the GUID's ring slot, so re-attesting
+/// overwrites instead of failing and the table settles at a fixed size however
+/// long the mix runs. Delivery reads the count but never requires it, which is
+/// what lets the mix run verify and deliver in any order.
 module bench::relay_dvn {
     use std::bcs;
     use std::signer;
     use std::vector;
     use aptos_std::from_bcs;
     use aptos_std::table::{Self, Table};
+    use bench::relay_msglib;
 
     /// Only the package address may configure a verifier set.
     const E_NOT_BENCH: u64 = 1;
@@ -21,7 +23,7 @@ module bench::relay_dvn {
 
     struct Dvn has key {
         verifiers: Table<u64, vector<address>>,
-        attested: Table<u128, u64>,
+        attested: Table<u64, u64>,
     }
 
     public fun initialize(admin: &signer) {
@@ -64,11 +66,12 @@ module bench::relay_dvn {
     /// there.
     public fun attest(guid: u128, count: u64) acquires Dvn {
         if (!exists<Dvn>(@bench)) return;
+        let slot = relay_msglib::guid_slot_bits(guid);
         let dvn = borrow_global_mut<Dvn>(@bench);
-        if (table::contains(&dvn.attested, guid)) {
-            *table::borrow_mut(&mut dvn.attested, guid) = count;
+        if (table::contains(&dvn.attested, slot)) {
+            *table::borrow_mut(&mut dvn.attested, slot) = count;
         } else {
-            table::add(&mut dvn.attested, guid, count);
+            table::add(&mut dvn.attested, slot, count);
         }
     }
 
@@ -83,9 +86,10 @@ module bench::relay_dvn {
     #[view]
     public fun attestations(guid: u128): u64 acquires Dvn {
         if (!exists<Dvn>(@bench)) return 0;
+        let slot = relay_msglib::guid_slot_bits(guid);
         let dvn = borrow_global<Dvn>(@bench);
-        if (!table::contains(&dvn.attested, guid)) return 0;
-        *table::borrow(&dvn.attested, guid)
+        if (!table::contains(&dvn.attested, slot)) return 0;
+        *table::borrow(&dvn.attested, slot)
     }
 
     #[view]
