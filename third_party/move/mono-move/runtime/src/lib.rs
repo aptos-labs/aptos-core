@@ -12,6 +12,7 @@ mod native_context;
 mod types;
 mod value_cmp;
 mod value_conv;
+mod value_display;
 mod verifier;
 
 pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, RuntimeStatus, VecOp};

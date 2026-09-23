@@ -62,7 +62,7 @@ module 0x1::a {
     let layout = guard.layout_by_ty(ty).unwrap();
     assert_eq!(layout.size, 72);
     assert_eq!(layout.align, 8);
-    let LayoutKind::Struct { fields } = &layout.kind else {
+    let LayoutKind::Struct { fields, .. } = &layout.kind else {
         panic!("B: expected a struct layout");
     };
     let offsets = fields.iter().map(|f| f.offset).collect::<Vec<_>>();
@@ -76,7 +76,7 @@ module 0x1::a {
     let layout = guard.layout_by_ty(ty).unwrap();
     assert_eq!(layout.size, 128);
     assert_eq!(layout.align, 8);
-    let LayoutKind::Struct { fields } = &layout.kind else {
+    let LayoutKind::Struct { fields, .. } = &layout.kind else {
         panic!("D: expected a struct layout");
     };
     let offsets = fields.iter().map(|f| f.offset).collect::<Vec<_>>();

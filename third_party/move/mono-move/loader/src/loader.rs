@@ -28,9 +28,8 @@ use mono_move_core::{
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, ErrorLocation, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter,
-    Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult,
-    ValueLayout,
+    DescriptorId, ErrorLocation, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
+    LayoutProvider, ModuleId, ModuleProvider, NominalFields, VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -889,7 +888,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> VMResult<Option<FieldTypes>> {
+    ) -> VMResult<Option<NominalFields>> {
         let id = self.loader.guard.arena_ref_for_module_id(*module_id);
 
         // Every module needs to be in the read-set.
@@ -920,7 +919,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         Ok(module
             .ir()
             .module
-            .interned_field_types(*nominal_name)
+            .interned_fields(*nominal_name)
             .cloned())
     }
 
