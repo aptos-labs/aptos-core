@@ -139,6 +139,19 @@ module 0x1::main {
         to_string(&string::utf8(b"a\"b\\c"))
     }
 
+    // An empty string is backed by a null vector.
+    public fun string_empty(): String {
+        to_string(&string::utf8(b""))
+    }
+
+    public fun string_empty_field(): String {
+        to_string(&Wrap { t: string::utf8(b"") })
+    }
+
+    public fun string_empty_in_vec(): String {
+        to_string(&vector[string::utf8(b""), string::utf8(b"hi")])
+    }
+
     // --- structs ---
 
     public fun struct_flat(): String {
@@ -309,6 +322,15 @@ module 0x1::main {
 // RUN: execute 0x1::main::string_escaped
 // CHECK: results: "\"a\\\"b\\\\c\""
 
+// RUN: execute 0x1::main::string_empty
+// CHECK: results: "\"\""
+
+// RUN: execute 0x1::main::string_empty_field
+// CHECK: results: "Wrap { t: \"\" }"
+
+// RUN: execute 0x1::main::string_empty_in_vec
+// CHECK: results: "[ \"\", \"hi\" ]"
+
 // RUN: execute 0x1::main::struct_flat
 // CHECK: results: "Foo { x: 1, y: true }"
 
@@ -341,11 +363,6 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::option_nested
 // CHECK: results: "Some(Some(1))"
-
-// V1 builds no named layout for an enum, so the tag stands in for the variant
-// name and the whole subtree below loses its names too. Mono names the variant
-// and keeps the subtree decorated. The divergence is deliberate; see the module
-// docs of `mono_move_core::value_format`.
 
 // RUN: execute 0x1::main::enum_fields
 // CHECK-V1: results: "#0{ 7 }"

@@ -177,12 +177,7 @@ pub fn strip_ref(ref_ty: InternedType) -> Option<InternedType> {
 /// type arguments.
 ///
 /// Inherits safety contract of [`view_type`].
-pub fn is_nominal(
-    ty: InternedType,
-    address: &AccountAddress,
-    module: &str,
-    name: &str,
-) -> bool {
+pub fn is_nominal(ty: InternedType, address: &AccountAddress, module: &str, name: &str) -> bool {
     let Type::Nominal {
         module_id,
         name: ty_name,

@@ -24,9 +24,7 @@ use crate::{
 };
 use mono_move_core::{
     align_up_u32, checked_align_up_u32,
-    interner::{
-        InternedFunctionRef, InternedIdentifier, InternedModuleId, TypeSubstitutionError,
-    },
+    interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId, TypeSubstitutionError},
     native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
     types::{

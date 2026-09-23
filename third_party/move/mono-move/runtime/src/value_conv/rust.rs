@@ -528,7 +528,7 @@ mod tests {
     }
 
     /// Names the published variant bodies. These tests never read the names.
-    fn variants(ids: Box<[LayoutId]>) -> Box<[VariantValueLayout]> {
+    fn variants(ids: &[LayoutId]) -> Box<[VariantValueLayout]> {
         ids.iter()
             .map(|&id| VariantValueLayout {
                 name: InternedIdentifier::from_static("V"),
@@ -577,7 +577,7 @@ mod tests {
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
-            variants: variants(variant_ids),
+            variants: variants(&variant_ids),
             max_size_across_variants: 8 + elem_size,
         }));
         ty
@@ -784,7 +784,7 @@ mod tests {
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
-            variants: variants(variant_ids),
+            variants: variants(&variant_ids),
             max_size_across_variants: 24,
         }));
         check(&guard, ty, &Protector::Nonce(7));
@@ -855,7 +855,7 @@ mod tests {
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
-            variants: variants(variant_ids),
+            variants: variants(&variant_ids),
             max_size_across_variants: 24,
         }));
         let mut heap = Heap::new(1 << 20);
