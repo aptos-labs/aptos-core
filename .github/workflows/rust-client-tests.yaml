@@ -27,7 +27,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
         run: |
-          perm=$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR}/permission" --jq .permission)
+          if ! perm=$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR}/permission" --jq .permission); then
+            echo "::error::Could not look up repository permission for $ACTOR."; exit 1
+          fi
           case "$perm" in
             admin|write) echo "$ACTOR has $perm permission" ;;
             *) echo "::error::Sorry, you don't have permission to trigger this workflow ($ACTOR has '$perm', write required)."; exit 1 ;;
