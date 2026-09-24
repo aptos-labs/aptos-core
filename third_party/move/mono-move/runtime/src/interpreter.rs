@@ -1423,6 +1423,31 @@ impl InterpreterContext<'_> {
     /// program counter afterwards.
     #[inline(always)]
     fn dispatch_loop(&mut self, regs: &mut VMRegisters) -> VMResult<RuntimeStatus> {
+        // SCRATCH-BRANCH EXPERIMENT, DO NOT MERGE: shifts all following code in
+        // this function by LAYOUT_NOPS nops (build-time env var, default 0).
+        const LAYOUT_NOPS: usize = match option_env!("LAYOUT_NOPS") {
+            Some(text) => {
+                let bytes = text.as_bytes();
+                let mut value = 0;
+                let mut index = 0;
+                while index < bytes.len() {
+                    value = value * 10 + (bytes[index] - b'0') as usize;
+                    index += 1;
+                }
+                value
+            },
+            None => 0,
+        };
+        // SAFETY: executes only nops.
+        unsafe {
+            core::arch::asm!(
+                ".rept {count}",
+                "nop",
+                ".endr",
+                count = const LAYOUT_NOPS,
+                options(nomem, nostack, preserves_flags)
+            );
+        }
         // Charge the entry function's entry block before any of its instructions run.
         let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
         self.gas_meter.charge(entry_gas)?;
