@@ -51,7 +51,7 @@ jobs:
             echo "::error::Could not look up repository permission for $ACTOR."; exit 1
           fi
           case "$perm" in
-            admin|write) echo "$ACTOR has $perm permission" ;;
+            admin|maintain|write) echo "$ACTOR has $perm permission" ;;
             *) echo "::error::Sorry, you don't have permission to trigger this workflow ($ACTOR has '$perm', write required)."; exit 1 ;;
           esac
 
