@@ -114,8 +114,10 @@ class E2eSelectionTest(unittest.TestCase):
 
         caller = (root / ".github/workflows/docker-build-test.yaml").read_text()
         faucet_call = self.workflow_job(caller, "faucet-tests-main")
-        self.assertIn("needs.e2e-test-determinator.outputs.mode == 'legacy'", faucet_call)
-        self.assertIn("CICD:non-required-tests", faucet_call)
+        skip = next(line for line in faucet_call.splitlines() if "SKIP_JOB:" in line)
+        self.assertIn("needs.e2e-test-determinator.outputs.mode != 'subsystem'", skip)
+        self.assertIn("CICD:non-required-tests", skip)
+        self.assertIn("CICD:run-all-e2e-tests", skip)
 
         performance = (
             root / ".github/workflows/workflow-run-execution-performance.yaml"
