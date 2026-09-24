@@ -7,6 +7,12 @@
     { "id": "bst/mono" },
     { "id": "match_sum/mono" },
     { "id": "int_arith_loop/mono_u64" },
-    { "id": "int_arith_loop/mono_i64" }
+    { "id": "int_arith_loop/mono_i64" },
+    { "id": "towers/mono" },
+    { "id": "sieve/mono" },
+    { "id": "queens/mono" },
+    { "id": "bounce/mono" },
+    { "id": "exchange2/mono" },
+    { "id": "pathtracer/mono" }
   ]
 }

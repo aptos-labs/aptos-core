@@ -130,6 +130,27 @@ WORKLOADS = [
         description="Places orders on a single market whose buy and sell prices "
         "never overlap, so every order rests in the book.",
     ),
+    Workload(
+        "bench-aave",
+        block_size=500,
+        description="Aave-style lending market over eight reserves: supply, "
+        "withdraw, borrow, repay and flash loan. Wide u256 fixed-point math, "
+        "and a read set that grows with how many reserves the caller is in.",
+    ),
+    Workload(
+        "bench-clob",
+        block_size=500,
+        description="Central limit order book whose price levels live in a "
+        "bit-packed AVL queue. Places, cancels, matches and walks orders on a "
+        "single market.",
+    ),
+    Workload(
+        "bench-clmm",
+        block_size=500,
+        description="Concentrated-liquidity AMM: swaps that cross ticks, plus "
+        "position rebalancing and fee collection. Wide u256 math and sparse "
+        "table lookups keyed by signed and struct keys.",
+    ),
 ]
 
 
@@ -379,6 +400,11 @@ def common_flags(workload, db_dir, checkpoint_dir):
         f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
         f"--execution-threads 1 --generate-then-execute "
+        # Several generator threads assign sequence numbers in whatever order
+        # they run, but the block keeps the order the slots were laid out in.
+        # A workload that draws the same account twice in a block then lands
+        # its transactions reversed, and the second one is discarded.
+        f"--num-generator-workers 1 "
         f"--block-size {workload.block_size} "
         f"run-executor "
         f"--data-dir {db_dir} --checkpoint-dir {checkpoint_dir}"
