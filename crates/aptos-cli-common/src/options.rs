@@ -1036,6 +1036,23 @@ pub struct TransactionOptions {
     #[clap(long)]
     pub session: Option<PathBuf>,
 
+    /// Execute inside a `--session` without authenticating the sender.
+    ///
+    /// Builds a transaction with `NoAccountAuthenticator` and runs it through the
+    /// simulation VM (`is_simulation = true`), so an arbitrary `--sender-account`
+    /// can be used without a private key. Successful writes update the session.
+    /// This transaction cannot be submitted to a network.
+    ///
+    /// Requires `--session` and `--sender-account`.
+    #[clap(long, requires_all = ["session", "sender_account"])]
+    pub unauthenticated: bool,
+
+    /// When combined with `--session` and `--unauthenticated`, skip gas payment
+    /// by using fee payer `@0x0` (same rule as fullnode simulate). Default off:
+    /// gas is still charged from the sender when they are the gas payer.
+    #[clap(long, requires_all = ["session", "unauthenticated"])]
+    pub sponsor_gas: bool,
+
     /// Replay protection mechanism to use when generating the transaction.
     ///
     /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.

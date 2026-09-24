@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_gas_profiling::GasProfiler;
+use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_transaction_simulation::{
@@ -30,7 +30,7 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use aptos_validator_interface::{DebuggerStateView, RestDebuggerInterface};
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
@@ -636,8 +636,63 @@ impl Session {
             (vm_status, txn_output, None)
         };
 
+        // Authenticated session execution historically applies the write set
+        // unconditionally (discard outputs are typically empty).
         self.state_store.apply_write_set(txn_output.write_set())?;
+        self.persist_execute_artifacts(&txn, &txn_output, gas_log, true)?;
 
+        Ok((vm_status, txn_output))
+    }
+
+    /// Executes a transaction without authenticating the sender, using the same
+    /// simulation-VM path as fullnode `POST /transactions/simulate`.
+    ///
+    /// The transaction must use [`AccountAuthenticator::NoAccountAuthenticator`]
+    /// (optionally as a fee-payer transaction with fee payer `@0x0` to skip gas).
+    /// On a kept status the write set is applied so subsequent session commands
+    /// observe it; discarded outputs leave session state unchanged.
+    pub fn execute_unauthenticated_transaction(
+        &mut self,
+        txn: SignedTransaction,
+    ) -> Result<(VMStatus, TransactionOutput)> {
+        let (vm_status, txn_output) =
+            AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &self.state_store);
+
+        // Match simulation-VM / FakeExecutor keep-vs-discard rules: only apply
+        // kept outputs. Move aborts are kept and may still charge gas.
+        let kept = !txn_output.status().is_discarded();
+        if kept {
+            self.state_store.apply_write_set(txn_output.write_set())?;
+        }
+        self.persist_execute_artifacts(&txn, &txn_output, None, kept)?;
+
+        Ok((vm_status, txn_output))
+    }
+
+    /// Dry-runs a transaction against the current session state without applying
+    /// any write set — the same keep/discard semantics as fullnode
+    /// `POST /transactions/simulate`, but evaluated on this session's view.
+    ///
+    /// Unlike [`execute_unauthenticated_transaction`], this never mutates session
+    /// state or advances the op counter.
+    pub fn simulate_transaction(
+        &self,
+        txn: SignedTransaction,
+    ) -> Result<(VMStatus, TransactionOutput)> {
+        Ok(AptosSimulationVM::create_vm_and_simulate_signed_transaction(
+            &txn,
+            &self.state_store,
+        ))
+    }
+
+    /// Persists execution artifacts and advances the session op counter.
+    fn persist_execute_artifacts(
+        &mut self,
+        txn: &SignedTransaction,
+        txn_output: &TransactionOutput,
+        gas_log: Option<TransactionGasLog>,
+        save_state: bool,
+    ) -> Result<()> {
         fn name_from_executable(executable: &TransactionExecutable) -> String {
             match executable {
                 TransactionExecutable::Script(_script) => "script".to_string(),
@@ -694,14 +749,12 @@ impl Session {
         let write_set_path = output_path.join("write_set.json");
         save_write_set(&self.state_store, &write_set_path, txn_output.write_set())?;
 
-        // Generate gas profiling report if enabled.
         if let Some(gas_log) = gas_log {
             gas_log.generate_html_report(output_path.join("gas-report"), name)?;
         }
 
-        self.finish_op(true)?;
-
-        Ok((vm_status, txn_output))
+        self.finish_op(save_state)?;
+        Ok(())
     }
 
     /// Executes a view function and returns the output values.
