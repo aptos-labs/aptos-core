@@ -27,6 +27,14 @@ def plan(mode, tests):
 
 
 class E2eSelectionTest(unittest.TestCase):
+    @staticmethod
+    def workflow_job(workflow, job):
+        return re.search(
+            r"^  " + re.escape(job) + r":\n(.*?)(?=^  [a-z][a-z0-9-]*:|\Z)",
+            workflow,
+            re.M | re.S,
+        ).group(1)
+
     def test_registry_has_real_workflow_jobs_and_required_nightly_coverage(self):
         root = Path(__file__).resolve().parents[3]
         nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
@@ -81,6 +89,39 @@ class E2eSelectionTest(unittest.TestCase):
         self.assertTrue({"mono-move-parity", "mono-move-performance",
                          "forge-framework-upgrade", "forge-consensus-only-performance",
                          "forge-multiregion"}.isdisjoint(REGISTRY))
+
+    def test_full_run_label_reaches_compat_prerequisite(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        fetch = self.workflow_job(workflow, "fetch-last-released-docker-image-tag")
+        self.assertIn("CICD:run-all-e2e-tests", fetch)
+
+    def test_pr_generated_directories_are_archived_before_artifact_upload(self):
+        root = Path(__file__).resolve().parents[3]
+        for filename, step, archive, raw_path in (
+            (
+                "cli-e2e-tests.yaml",
+                "Preserve CLI test output",
+                "cli-e2e-output.tar.gz",
+                "aptos-e2e-tests-*/out/",
+            ),
+            (
+                "node-api-compatibility-tests.yaml",
+                "Preserve generated API specs",
+                "api-compatibility-specs.tar.gz",
+                "specs/",
+            ),
+        ):
+            workflow = (root / ".github/workflows" / filename).read_text()
+            with self.subTest(workflow=filename):
+                self.assertIn("tar --create --gzip", workflow)
+                upload = re.search(
+                    r"- name: " + re.escape(step) + r"\n(.*?)(?=\n      - |\Z)",
+                    workflow,
+                    re.S,
+                ).group(1)
+                self.assertIn(f"path: ${{{{ runner.temp }}}}/{archive}", upload)
+                self.assertNotIn(raw_path, upload)
 
     def test_checked_in_config_uses_only_registered_names(self):
         root = Path(__file__).resolve().parents[3]

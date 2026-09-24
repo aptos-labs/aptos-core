@@ -331,6 +331,7 @@ jobs:
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')

@@ -121,12 +121,24 @@ jobs:
           git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
         if: ${{ !inputs.SKIP_JOB }}
 
+      # Archive first so upload-artifact never traverses PR-created symlinks.
+      - name: Archive generated API specs
+        if: ${{ always() && !inputs.SKIP_JOB }}
+        shell: bash
+        run: |
+          if [[ -d "$RUNNER_TEMP/specs" ]]; then
+            tar --create --gzip \
+              --file "$RUNNER_TEMP/api-compatibility-specs.tar.gz" \
+              --directory "$RUNNER_TEMP" \
+              -- specs
+          fi
+
       - name: Preserve generated API specs
         if: ${{ always() && !inputs.SKIP_JOB }}
         uses: actions/upload-artifact@v4
         with:
           name: api-compatibility-specs-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/specs/
+          path: ${{ runner.temp }}/api-compatibility-specs.tar.gz
           if-no-files-found: warn
           retention-days: 14
 
