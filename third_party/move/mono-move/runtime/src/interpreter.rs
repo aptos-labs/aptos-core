@@ -716,12 +716,9 @@ impl<'guard> InterpreterContext<'guard> {
 
     /// Read a u64 from the root frame's slot 0 (where the result lands).
     pub fn root_result_u64_for_test(&self) -> u64 {
+        // SAFETY: the caller guarantees a completed call that wrote an 8-byte
+        // result to slot 0, so every byte read is initialized.
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
-    }
-
-    /// Read a u64 from the root frame at the given byte offset.
-    pub fn root_result_u64_at_for_test(&self, offset: u32) -> u64 {
-        unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
     }
 
     /// BCS-serializes the value a successfully completed root call returned.
@@ -741,6 +738,8 @@ impl<'guard> InterpreterContext<'guard> {
     /// Read `size` raw bytes from the root frame at the given byte offset. For
     /// tests inspecting an entry/native function's raw return slots.
     pub fn root_result_bytes_for_test(&self, offset: u32, size: u32) -> &[u8] {
+        // SAFETY: the caller guarantees a completed call that wrote all `size`
+        // bytes at `offset`, so the slice lies in the stack and is initialized.
         unsafe {
             let base = self
                 .stack
