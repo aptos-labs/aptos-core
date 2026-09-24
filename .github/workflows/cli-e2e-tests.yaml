@@ -99,7 +99,7 @@ jobs:
 
       # Archive first so upload-artifact never traverses PR-created symlinks.
       - name: Archive CLI test output
-        if: ${{ always() && !inputs.SKIP_JOB }}
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
         shell: bash
         run: |
           shopt -s nullglob
@@ -117,7 +117,7 @@ jobs:
             -- "${relative_dirs[@]}"
 
       - name: Preserve CLI test output
-        if: ${{ always() && !inputs.SKIP_JOB }}
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
         uses: actions/upload-artifact@v4
         with:
           name: cli-e2e-output-${{ github.run_attempt }}

@@ -98,6 +98,10 @@ class E2eSelectionTest(unittest.TestCase):
 
     def test_pr_generated_directories_are_archived_before_artifact_upload(self):
         root = Path(__file__).resolve().parents[3]
+        trusted_event_guard = (
+            "github.event_name != 'pull_request' && "
+            "github.event_name != 'pull_request_target'"
+        )
         for filename, step, archive, raw_path in (
             (
                 "cli-e2e-tests.yaml",
@@ -115,6 +119,7 @@ class E2eSelectionTest(unittest.TestCase):
             workflow = (root / ".github/workflows" / filename).read_text()
             with self.subTest(workflow=filename):
                 self.assertIn("tar --create --gzip", workflow)
+                self.assertGreaterEqual(workflow.count(trusted_event_guard), 2)
                 upload = re.search(
                     r"- name: " + re.escape(step) + r"\n(.*?)(?=\n      - |\Z)",
                     workflow,

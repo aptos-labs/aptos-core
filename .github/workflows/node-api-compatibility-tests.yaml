@@ -123,7 +123,7 @@ jobs:
 
       # Archive first so upload-artifact never traverses PR-created symlinks.
       - name: Archive generated API specs
-        if: ${{ always() && !inputs.SKIP_JOB }}
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
         shell: bash
         run: |
           if [[ -d "$RUNNER_TEMP/specs" ]]; then
@@ -134,7 +134,7 @@ jobs:
           fi
 
       - name: Preserve generated API specs
-        if: ${{ always() && !inputs.SKIP_JOB }}
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
         uses: actions/upload-artifact@v4
         with:
           name: api-compatibility-specs-${{ github.run_attempt }}
