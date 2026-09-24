@@ -256,16 +256,9 @@ fn run_wide(
         }
         call.run().map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        let mut out = vec![0u8; dst_size];
-        let mut i = 0usize;
-        while i < dst_size {
-            let word = ctx.root_result_u64_at_for_test(SLOT_DST + i as u32);
-            let bytes = word.to_ne_bytes();
-            let copy_n = (dst_size - i).min(8);
-            out[i..i + copy_n].copy_from_slice(&bytes[..copy_n]);
-            i += 8;
-        }
-        Ok(out)
+        Ok(ctx
+            .root_result_bytes_for_test(SLOT_DST, dst_size as u32)
+            .to_vec())
     })
 }
 
