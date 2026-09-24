@@ -36,9 +36,11 @@ def _case(fragment: str, edit: dict, source: str = SOURCE) -> dict:
 
 
 class ApplyMutantTest(unittest.TestCase):
-    def _packages(self, root: Path, candidate: str = SOURCE) -> tuple[Path, Path]:
+    def _packages(
+        self, root: Path, candidate: str = SOURCE, baseline_source: str = SOURCE
+    ) -> tuple[Path, Path]:
         baseline, package = root / "baseline", root / "package"
-        for tree, text in ((baseline, SOURCE), (package, candidate)):
+        for tree, text in ((baseline, baseline_source), (package, candidate)):
             (tree / "sources").mkdir(parents=True)
             (tree / "sources" / "m.move").write_text(text, encoding="utf-8")
         return package, baseline
@@ -81,6 +83,142 @@ class ApplyMutantTest(unittest.TestCase):
             text = (package / "sources/m.move").read_text()
             self.assertIn("i <= n", text)
             self.assertIn("aborts_if false;", text, "the candidate's spec survives")
+
+    def test_a_loop_invariant_may_wrap_the_anchored_guard(self) -> None:
+        candidate = SOURCE.replace(
+            "while (i < n) {",
+            """while ({
+            spec {
+                invariant [inferred] i <= n;
+            };
+            i < n
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate)
+            anchor = "while (i < n) {"
+            case = _case(
+                anchor,
+                {
+                    "kind": "substitute",
+                    "at": anchor.index("<"),
+                    "length": 1,
+                    "to": "<=",
+                },
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("invariant [inferred] i <= n;", text)
+            self.assertIn("\n            i <= n\n", text)
+
+    def test_a_mutant_does_not_rewrite_a_restated_specification(self) -> None:
+        candidate = SOURCE.replace(
+            "while (i < n) {",
+            """while ({
+            spec {
+                invariant [inferred] i < n;
+            };
+            i < n
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate)
+            anchor = "while (i < n) {"
+            case = _case(
+                anchor,
+                {
+                    "kind": "substitute",
+                    "at": anchor.index("<"),
+                    "length": 1,
+                    "to": "<=",
+                },
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("invariant [inferred] i < n;", text)
+            self.assertIn("\n            i <= n\n", text)
+
+    def test_a_full_anchor_does_not_rewrite_a_restated_specification(self) -> None:
+        candidate = SOURCE.replace(
+            "while (i < n) {",
+            """while ({
+            spec {
+                invariant [inferred] i < n;
+            };
+            i < n
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate)
+            case = _case(
+                "i < n",
+                {"kind": "substitute", "at": 2, "length": 1, "to": "<="},
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("invariant [inferred] i < n;", text)
+            self.assertIn("\n            i <= n\n", text)
+
+    def test_a_fallback_mutates_the_aligned_occurrence_when_context_repeats(self) -> None:
+        source = SOURCE.replace("        i\n", "        assert!(i < n);\n        i\n")
+        candidate = source.replace(
+            "while (i < n) {",
+            """while ({
+            spec {
+                invariant [inferred] i <= n;
+            };
+            i < n
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate, source)
+            anchor = "while (i < n) {"
+            case = _case(
+                anchor,
+                {
+                    "kind": "substitute",
+                    "at": anchor.index("<"),
+                    "length": 1,
+                    "to": "<=",
+                },
+                source,
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("\n            i <= n\n", text)
+            self.assertIn("assert!(i < n);", text)
+
+    def test_a_fallback_does_not_mutate_a_different_occurrence(self) -> None:
+        source = SOURCE.replace("        i\n", "        assert!(i < n);\n        i\n")
+        candidate = source.replace("while (i < n) {", "while (i < 7) {")
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate, source)
+            anchor = "while (i < n) {"
+            case = _case(
+                anchor,
+                {
+                    "kind": "substitute",
+                    "at": anchor.index("<"),
+                    "length": 1,
+                    "to": "<=",
+                },
+                source,
+            )
+
+            with self.assertRaisesRegex(ValueError, "not present unchanged"):
+                apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("while (i < 7) {", text)
+            self.assertIn("assert!(i < n);", text)
 
     def test_a_stale_anchor_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

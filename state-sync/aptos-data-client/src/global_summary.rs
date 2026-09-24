@@ -106,7 +106,7 @@ impl fmt::Debug for AdvertisedData {
         write!(
             f,
             "epoch_ending_ledger_infos: {:?}, states: {:?}, synced_ledger_infos: [{}], transactions: {:?}, transaction_outputs: {:?}",
-            &self.epoch_ending_ledger_infos, &self.states, synced_ledger_infos, &self.transactions, &self.transaction_outputs
+            self.epoch_ending_ledger_infos, self.states, synced_ledger_infos, self.transactions, self.transaction_outputs
         )
     }
 }

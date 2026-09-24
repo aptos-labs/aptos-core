@@ -338,8 +338,8 @@ pub fn update_counters_for_processed_chunk<T>(
                         sample!(
                             SampleRate::Duration(Duration::from_secs(15)),
                             warn!(
-                                "[sampled] Txn being discarded is {:?} with status code {:?}",
-                                txn, discard_status_code
+                                "[sampled] Txn discarded with status code {:?}: {:?}",
+                                discard_status_code, txn
                             );
                         );
                         "discard"

@@ -113,6 +113,14 @@ pub trait NativeContext {
         Ok(unsafe { vec.transmute_unchecked() })
     }
 
+    /// Allocates a `vector<vector<u8>>` on the VM heap holding one inner byte
+    /// vector per entry of `items`, and returns a handle to it. The vector and
+    /// its elements stay live for the rest of the native call.
+    fn new_byte_vector_vector<'a>(
+        &'a self,
+        items: &[&[u8]],
+    ) -> VMResult<Vector<'a, Vector<'a, u8>>>;
+
     /// Allocates a vector of the specified number of pointer-free elements on
     /// the heap, initialized from already packed in-frame element bytes. These
     /// bytes must be exactly `count * elem_size` bytes long.
@@ -125,6 +133,41 @@ pub trait NativeContext {
         count: u64,
         data: &[u8],
     ) -> VMResult<Vector<'a, Opaque>>;
+
+    /// Allocates a zeroed vector of `count` elements on the heap, where
+    /// `descriptor` is the vector descriptor for the element type and
+    /// `elem_size` its byte stride.
+    ///
+    /// The length is set to `count`, so the result is a well-formed value whose
+    /// elements are all-zero bit patterns. Fill them with
+    /// [`Self::vector_write_elements_raw_test_only`] before handing it back to Move.
+    fn new_vector<'a>(
+        &'a self,
+        descriptor: DescriptorId,
+        elem_size: u32,
+        count: u64,
+    ) -> VMResult<Vector<'a, Opaque>>;
+
+    /// Overwrites a vector's elements with `data`, the concatenated flat
+    /// encodings of all of them at a stride of `elem_size`, then replaces every
+    /// heap pointer inside them with a deep copy, so the vector shares nothing
+    /// with wherever `data` came from. Null slots (an empty vector, say) stay
+    /// null.
+    ///
+    /// Reserved for test-only natives: `data` bypasses the type system, so a
+    /// production native should build its result through the typed APIs.
+    ///
+    /// # Safety
+    ///
+    /// `data` must be a valid representation of the vector's full length in
+    /// elements of its element type, must not overlap the VM heap, and every
+    /// heap pointer it holds must point at a live object.
+    unsafe fn vector_write_elements_raw_test_only(
+        &self,
+        vector: &Vector<'_, Opaque>,
+        elem_size: u32,
+        data: &[u8],
+    ) -> VMResult<()>;
 
     /// Moves the elements of `from` at `[removal_position, removal_position + length)`
     /// into `to` at `insert_position`.
@@ -172,7 +215,8 @@ pub trait NativeContext {
     fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>>;
 
     /// The constant BCS-serialized size of any value of type `ty`.
-    /// Returns `None` if the size is data-dependent (e.g. vectors).
+    /// Returns `None` if the size is data-dependent (e.g. vectors) or `ty`
+    /// reaches `signer`.
     fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>>;
 
     /// Compares the values of type `ty` at `a` and `b` (the natural ordering).

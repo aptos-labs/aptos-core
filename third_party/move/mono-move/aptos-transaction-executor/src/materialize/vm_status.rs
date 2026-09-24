@@ -120,10 +120,15 @@ fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
 /// with.
 pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
     match reason {
+        DiscardReason::InvalidSignature => VMStatus::error(StatusCode::INVALID_SIGNATURE, None),
         DiscardReason::Unsupported(msg) => unsupported_status(msg),
         DiscardReason::Deprecated(what) => VMStatus::error(
             StatusCode::FEATURE_UNDER_GATING,
             Some(format!("{what} is no longer supported")),
+        ),
+        DiscardReason::EmptyPayload => VMStatus::error(
+            StatusCode::EMPTY_PAYLOAD_PROVIDED,
+            Some("no executable in a non-multisig transaction".to_string()),
         ),
         DiscardReason::PreExecutionCheck(failure) => pre_execution_check_status(failure),
         DiscardReason::InvalidTypeArgument(detail) => {
@@ -150,6 +155,9 @@ fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
             StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
         },
         F::GasPriceBelowMinimum { .. } => StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+        F::EncryptedGasPriceBelowMinimum { .. } => {
+            StatusCode::ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND
+        },
         F::GasPriceAboveMaximum { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
     };
     VMStatus::error(code, Some(failure.to_string()))
@@ -183,7 +191,15 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
         {
             VMStatus::error(
                 match reason {
-                    InvalidArguments::SignerAfterArgument => {
+                    InvalidArguments::NativeEntryFunction => {
+                        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+                    },
+                    InvalidArguments::NotEntryFunction => {
+                        StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION
+                    },
+                    InvalidArguments::ReturnsValues
+                    | InvalidArguments::SignerAfterArgument
+                    | InvalidArguments::DisallowedParameterType => {
                         StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
                     },
                     InvalidArguments::ArgumentCountMismatch => {
@@ -211,6 +227,14 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
                     VMStatus::error(StatusCode::INVALID_OPERATION_IN_SCRIPT, None)
                 },
             }
+        },
+        // V1 reports a payload it could not decrypt as an argument it could
+        // not deserialize.
+        MoveExecutionFailure::UndecryptedPayload if matches!(stage, ExecutionStage::Payload) => {
+            VMStatus::error(
+                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                Some("the encrypted payload was not decrypted".to_string()),
+            )
         },
         MoveExecutionFailure::RuntimeError(err) if matches!(stage, ExecutionStage::Payload) => {
             internal_error_to_status(err)
@@ -252,9 +276,10 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
         MoveExecutionFailure::RuntimeError(err) => {
             return unexpected_validation_error("prologue", err.to_string())
         },
-        // The prologue takes no payload arguments and runs no script.
+        // The prologue never touches the payload.
         failure @ (MoveExecutionFailure::InvalidArguments(_)
-        | MoveExecutionFailure::RejectedScript(_)) => {
+        | MoveExecutionFailure::RejectedScript(_)
+        | MoveExecutionFailure::UndecryptedPayload) => {
             return unexpected_validation_error("prologue", format!("{failure:?}"))
         },
     };

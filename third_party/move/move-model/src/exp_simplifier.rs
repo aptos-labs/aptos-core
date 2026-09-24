@@ -4973,12 +4973,9 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
         if let Operation::Select(mid, sid, fid) = oper {
             let mut base = &args[0];
             let mut skipped = false;
-            loop {
-                let ExpData::Call(_, Operation::UpdateField(mid2, sid2, fid2), inner_args) =
-                    base.as_ref()
-                else {
-                    break;
-                };
+            while let ExpData::Call(_, Operation::UpdateField(mid2, sid2, fid2), inner_args) =
+                base.as_ref()
+            {
                 if mid != mid2 || sid != sid2 {
                     break;
                 }

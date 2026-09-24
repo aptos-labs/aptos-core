@@ -5,7 +5,7 @@
 //! session hosting the prologue, the payload, and the epilogue.
 
 use super::{
-    args::call_entry_function,
+    entry_func::call_entry_function,
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
     script::run_script,
@@ -42,7 +42,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         &self,
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome<'guard> {
+    ) -> TxnOutcome {
         match self.execute_user_transaction_impl(txn, aux_info) {
             Ok(outcome) => outcome,
             Err(reason) => TxnOutcome::Discarded(reason),
@@ -54,7 +54,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         &self,
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
-    ) -> Result<TxnOutcome<'guard>, DiscardReason> {
+    ) -> Result<TxnOutcome, DiscardReason> {
         let guard = self.guard;
 
         // ======================== Pre-execution checks ========================
@@ -67,15 +67,17 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             .run_checks()
             .map_err(DiscardReason::PreExecutionCheck)?;
 
+        // TODO(completeness): multisig payloads. Refused for now, since the
+        // inner executable must run as the multisig account, not the sender.
+        if txn.multisig_address().is_some() {
+            return Err(DiscardReason::Unsupported("multisig payloads"));
+        }
         let executable = match txn.payload().executable_ref() {
             Ok(TransactionExecutableRef::EntryFunction(entry)) => Executable::EntryFunction(entry),
             Ok(TransactionExecutableRef::Script(script)) => Executable::Script(script),
-            // TODO(completeness): multisig payloads and encrypted transactions.
-            Ok(TransactionExecutableRef::Encrypted) | Ok(TransactionExecutableRef::Empty) => {
-                return Err(DiscardReason::Unsupported(
-                    "anything but entry-function and script payloads",
-                ))
-            },
+            Ok(TransactionExecutableRef::Encrypted) => Executable::Encrypted,
+            // Only a multisig transaction may leave the executable out.
+            Ok(TransactionExecutableRef::Empty) => return Err(DiscardReason::EmptyPayload),
             Err(_) => return Err(DiscardReason::Deprecated("module-bundle payload")),
         };
         // TODO(security): these type arguments are user supplied, so interning
@@ -101,6 +103,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let extensions = transaction_extensions(&txn_data, self.usage);
 
         let max_gas = txn_data.max_gas_amount;
+        // TODO(metering): charge the transaction's base cost: intrinsic gas
+        // plus the keyless, SLH-DSA, and decryption surcharges.
         let mut interp = InterpreterContext::new(
             loader,
             // TODO(metering): MonoMove gas units are uncalibrated; budgeting
@@ -110,6 +114,11 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             self.natives,
         )
         .with_extensions(extensions);
+
+        // TODO(correctness): every path out of here must call `interp.finish()`.
+        // Block-STM validates a parallel transaction against the read set
+        // `finish` returns, so a discard that skips it drops the transaction's
+        // dependencies. It also parks the interpreter stack for reuse.
 
         let signers = ValidationSigners::new(&txn_data);
 
@@ -214,11 +223,6 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         executable: &Executable<'_>,
         ty_args: InternedTypeList,
     ) -> Result<(), MoveExecutionFailure> {
-        // TODO(security, completeness): entry-function validation -- `entry`
-        // visibility, no return values, allowed argument types, and constructed
-        // arguments (`String`, `Object<T>`, `Option<..>`) from
-        // `transaction_arg_validation`.
-
         // TODO(completeness): multi-agent transactions are untested.
         let status = match executable {
             Executable::EntryFunction(entry) => call_entry_function(
@@ -242,6 +246,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 &txn_data.secondary_signers,
                 script.args(),
             )?,
+            // Decryption failed upstream: nothing runs, the fee is still charged.
+            Executable::Encrypted => return Err(MoveExecutionFailure::UndecryptedPayload),
         };
 
         call_result(status)
@@ -252,6 +258,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 enum Executable<'a> {
     EntryFunction(&'a EntryFunction),
     Script(&'a Script),
+    /// An encrypted payload that was not decrypted, so there is nothing to run.
+    Encrypted,
 }
 
 impl Executable<'_> {
@@ -259,6 +267,7 @@ impl Executable<'_> {
         match self {
             Executable::EntryFunction(entry) => entry.ty_args(),
             Executable::Script(script) => script.ty_args(),
+            Executable::Encrypted => &[],
         }
     }
 }

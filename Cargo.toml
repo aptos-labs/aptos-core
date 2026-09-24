@@ -16,6 +16,7 @@ members = [
     "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
+    "aptos-move/aptos-governance-bundle",
     "aptos-move/aptos-memory-usage-tracker",
     "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
@@ -261,6 +262,7 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/shared-dsa",
+    "third_party/move/testing-infra/transactional-test-matrix",
     "third_party/move/testing-infra/transactional-test-runner",
     "third_party/move/tools/move-abigen",
     "third_party/move/tools/move-asm",
@@ -382,6 +384,7 @@ aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
+aptos-governance-bundle = { path = "aptos-move/aptos-governance-bundle" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
@@ -954,6 +957,7 @@ move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
 move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
+move-transactional-test-matrix = { path = "third_party/move/testing-infra/transactional-test-matrix" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
 move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
     "table-extension",

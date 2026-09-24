@@ -52,11 +52,11 @@
 use crate::maintenance_config::MaintenanceConfig;
 use anyhow::Result;
 use dashmap::DashMap;
-use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
+use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard, MemoryRegion};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
     FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeSubstitutionError, ValueLayout, TRIVIAL_DESCRIPTOR_ID,
+    TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
@@ -214,11 +214,12 @@ impl Descriptors {
     }
 }
 
-/// Initial descriptor table: the two reserved entries.
+/// Returns the initial descriptor table with the reserved entries.
 fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
     let table = boxcar::Vec::new();
     table.push(ObjectDescriptor::trivial());
     table.push(ObjectDescriptor::closure());
+    table.push(ObjectDescriptor::pointer_vec());
     table
 }
 
@@ -436,6 +437,24 @@ impl<'ctx> MaintenanceGuard<'ctx> {
 }
 
 impl<'ctx> ExecutionGuard<'ctx> {
+    /// Takes the interpreter stack parked on this guard's arena, or [`None`]
+    /// if there is none parked.
+    ///
+    /// The region is not zeroed: it holds whatever the previous owner left
+    /// behind, so the caller must write every byte before reading it. Return
+    /// it with [`Self::return_stack_region`] when done.
+    pub fn take_stack_region(&self) -> Option<MemoryRegion> {
+        self.global_arena.take_stack_region()
+    }
+
+    /// Parks an interpreter stack on this guard's arena for its next user.
+    ///
+    /// INVARIANT: every user of a guard's stack region agrees on its size.
+    /// The region is parked and handed out as is, with no size check.
+    pub fn return_stack_region(&self, region: MemoryRegion) {
+        self.global_arena.return_stack_region(region)
+    }
+
     /// Inserts a loaded module into the cache, keyed by its interned ID.
     ///
     /// Returns an error only if the cache detects an invariant violation
@@ -563,6 +582,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
     ) -> DescriptorId {
         if elem_ptr_offsets.is_empty() {
             return TRIVIAL_DESCRIPTOR_ID;
+        }
+        if elem_size == 8 && elem_ptr_offsets == [FrameOffset(0)] {
+            return POINTER_VEC_DESCRIPTOR_ID;
         }
         // Fast path: existing entry returns without touching the shard
         // write-lock.

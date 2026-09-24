@@ -36,10 +36,28 @@ This file is the runbook. It says how to run things, not how they work.
 - `tests/` — dependency-free fixtures; `analysis/` — round analysis.
 - `evaluation-artifacts/` — generated round material, gitignored.
 
+## Publishing result archives
+
+Stage aggregate reports and tables in a new directory, then build and scan the
+archive through the publication helper:
+
+```text
+python3 -m harness.publication build \
+  --source PUBLIC-AGGREGATES --output results/ROUND.tar.gz --name ROUND
+python3 -m harness.publication scan results/ROUND.tar.gz
+```
+
+The helper accepts only the documented top-level aggregate files, creates and
+checks `SHA256SUMS`, and validates member names, types, sizes, and archive
+structure. Workspace diffs and other raw per-run artifacts are not part of the
+format. Construct result archives through this helper so they remain
+deterministic and compact.
+
 ## Environment
 
-The base package has no third-party dependencies; install the optional SDK only
-for real model runs. It is pinned to `0.2.139`.
+The base package has no third-party dependencies. Claude runs use the optional
+SDK pinned to `0.2.139`; Codex runs use the separately installed, pinned Codex
+CLI and its digest-pinned, version-paired code-mode host, and need no Python SDK.
 
 ```text
 python3 -m venv .venv
@@ -75,13 +93,23 @@ SDK metrics remain available for cost accounting; missing terminal usage is
 not zero usage. The launch report distinguishes queued aborts (`started: false`)
 from in-flight aborts (`started: true`). Neither is a completed evaluation.
 
-## Select GLM or Opus
+## Select GLM, Opus, Sonnet, Sol 5.6, or Terra 5.6
 
 Select the model before screening and scheduling. `--model glm` selects
 GLM 5.3 through Z.ai; `--model opus` selects `claude-opus-5` through Anthropic
-with Claude subscription authentication and `xhigh` effort. GLM uses `max`
-effort. The selector writes a new config, preserves budgets and source
-provenance, and refuses to overwrite a config:
+with Claude subscription authentication and `xhigh` effort; `--model sonnet`
+selects `claude-sonnet-5` through the same subscription-only path and also uses
+`xhigh`. GLM uses `max` effort. The selector writes a new config, preserves
+budgets and source provenance, and refuses to overwrite a config:
+
+`--model sol56` selects `gpt-5.6-sol` through Codex with `high` reasoning
+effort. It uses `codex exec --json`, retains the thread across controller
+follow-ups, inlines the immutable rendered `move-inf` skill, and requires the
+generated Move Flow MCP tool allowlist.
+
+`--model terra56` selects `gpt-5.6-terra` through the same Codex path with
+`high` reasoning effort. Pass `--infrastructure-retries 0` when preparing a
+round that must not retry genuine infrastructure failures.
 
 ```text
 .venv/bin/python -m harness.model_profile select --model opus \
@@ -89,11 +117,15 @@ provenance, and refuses to overwrite a config:
   --output evaluation-artifacts/corpus3.2-run1-opus/config.json
 ```
 
-For Opus, run `claude setup-token` locally and set `CLAUDE_CODE_OAUTH_TOKEN`
+For Opus or Sonnet, run `claude setup-token` locally and set `CLAUDE_CODE_OAUTH_TOKEN`
 to its token, or save just the token in a private file outside the repository
 and set `MOVE_INFERENCE_CLAUDE_TOKEN_FILE` to that path. The sandbox passes
 subscription OAuth through and redacts it from artifacts. An API key is not
 used as a fallback for the subscription profile.
+
+For Sol 5.6 or Terra 5.6, run `codex login`. The launcher copies the saved `auth.json` into
+the private per-cell sandbox home and removes it with that staging directory;
+set `MOVE_INFERENCE_CODEX_AUTH_FILE` only when the login is stored elsewhere.
 
 This launcher chooses credentials from the config for either model:
 
@@ -267,8 +299,8 @@ move-inference-audit-pilot --config ROUND/config.json \
   --output ROUND/audit.json
 ```
 
-Preflight writes no credential values. It requires the exact SDK and Claude
-Code versions, the pinned endpoint, one credential, every hash-valid run cell,
+Preflight writes no credential values. It requires the configured runtime's
+exact SDK/CLI version, the pinned endpoint, one credential, every hash-valid run cell,
 a rehearsal in which a simulated outage withholds queued cells, and a sandbox
 probe. The audit fails on a missing artifact, malformed event, unexplained
 model, token reconciliation error, reused session ID, changed baseline or
@@ -285,9 +317,11 @@ mounted beside it.
 
 ## Analyse a finished round
 
-Each real session records telemetry before the SDK parser in
-`claude-events.jsonl` (`sdk_message` events), in addition to the typed messages
-used by the controller. Partial-message streaming is enabled. This retains
+Claude sessions record telemetry before the SDK parser in
+`claude-events.jsonl` (`sdk_message` events), in addition to the typed messages.
+Codex sessions retain the native `codex exec --json` stream in
+`codex-events.jsonl` and summarize it in `codex-metrics.json`. For Claude,
+partial-message streaming is enabled. This retains
 native usage fields, per-message IDs and usage, nested cache-write durations,
 per-model usage/cost/provider/context limits, stop reasons, permission denials,
 API errors, rate-limit/reset/overage events, compaction events, and future

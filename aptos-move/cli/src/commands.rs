@@ -1344,7 +1344,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         if self.chunked_publish_option.chunked_publish {
             let chunked_package_payloads: ChunkedPublishPayloads = (&self).async_try_into().await?;
 
-            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &chunked_package_payloads.payloads.len());
+            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", chunked_package_payloads.payloads.len());
             println!("{}", message.bold());
             submit_chunked_publish_transactions(
                 chunked_package_payloads.payloads,
@@ -1524,7 +1524,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 .map(bcs::serialized_size)
                 .sum::<Result<usize, _>>()?;
             println!("package size {} bytes", size);
-            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &payloads.len());
+            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", payloads.len());
             println!("{}", message.bold());
 
             submit_chunked_publish_transactions(
@@ -1643,7 +1643,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 .map(bcs::serialized_size)
                 .sum::<Result<usize, _>>()?;
             println!("package size {} bytes", size);
-            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", &payloads.len());
+            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", payloads.len());
             println!("{}", message.bold());
             submit_chunked_publish_transactions(
                 payloads,
@@ -1783,7 +1783,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 .map(bcs::serialized_size)
                 .sum::<Result<usize, _>>()?;
             println!("package size {} bytes", size);
-            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", &payloads.len());
+            let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", payloads.len());
             println!("{}", message.bold());
 
             submit_chunked_publish_transactions(
@@ -1947,7 +1947,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                 .map(bcs::serialized_size)
                 .sum::<Result<usize, _>>()?;
             println!("package size {} bytes", size);
-            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", &payloads.len());
+            let message = format!("Upgrading package in chunked mode will submit {} transactions for staging and upgrading code.\n", payloads.len());
             println!("{}", message.bold());
             submit_chunked_publish_transactions(
                 payloads,
@@ -2040,7 +2040,7 @@ async fn submit_chunked_publish_transactions(
                         "Failed".to_string()
                     }
                 });
-                println!("Transaction executed: {} ({})\n", status, &tx_hash);
+                println!("Transaction executed: {} ({})\n", status, tx_hash);
                 tx_hashes.push(tx_hash);
                 publishing_result = Ok(tx_summary);
             },
@@ -2155,7 +2155,7 @@ impl CliCommand<TransactionSummary> for ClearStagingArea {
             .await?;
         println!(
             "Cleaning up resource {}::large_packages::StagingArea under account {}.",
-            &large_packages_module_address, account_address,
+            large_packages_module_address, account_address,
         );
         let payload = large_packages_cleanup_staging_area(large_packages_module_address);
         dispatch_transaction(payload, &self.txn_options, &self.env).await

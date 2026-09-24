@@ -3,36 +3,23 @@
 \label{sec:intro}
 
 A roadblock in program verification adoption is the \emph{cost of specification}.
-The properties developers want to establish are often high-level: that a call chain aborts only under stated preconditions, that an API entrypoint satisfies postconditions, that data is well-formed with respect to an invariant, or that a resource cannot be accessed without required permissions.
-But to verify those properties developers have to write specifications for every single function in the system.
+The properties developers care about are high-level --- a call chain aborts only under stated preconditions, an entrypoint satisfies its postconditions, stored data respects an invariant --- but to prove any of them, the supporting functions need contracts of their own, and those are boilerplate: they restate what the code does.
+\emph{Specification inference} derives such contracts from the program, so that effort can go to the properties worth stating by hand.
+Verifiers abstract from imperative code with Dijkstra's weakest-precondition transformation (\WP)~\cite{dijkstra1975wp}, and \WP is the natural inference engine, but it stops at loops: a loop needs an invariant as induction hypothesis~\cite{BL05}, invariant synthesis has no complete technique despite a long history~\cite{CousotHalbwachs78}, and in practice invariants are written by hand.
 
-Modern verifiers automatically abstract from imperative code using Dijkstra's weakest-precondition transformation (\WP)~\cite{dijkstra1975wp}.
-The problem is that \WP stops at loops.
-Most loops require \emph{loop invariants}, which eliminate the cycle: the invariant serves as the induction hypothesis, and the loop is replaced by an acyclic fragment \WP can propagate through~\cite{BL05}.
-There is no complete technique to synthesize such invariants, even though there has been a lot of work in this area, going back to Cousot and Halbwachs~\cite{CousotHalbwachs78}.
-Loop invariants have to be provided manually in realistic applications of program verification. The invariants are not only needed for the code which is the target of verification, they are also needed for all dependencies, unless those themselves have fully specified function interfaces.
+LLMs have been applied to inference since 2023~\cite{PeiEtAl23, KamathEtAl23}, and with today's frontier models a well-instructed agent that receives the verifier's diagnosis can realistically infer specifications, loop invariants included.
+This paper is a study of such inference for Move, a smart contract language with a specification language built in and strong verification support in the Move Prover (\MVP)~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
+We run inference with a coding agent, and equip it with a mechanical \WP tool that derives precise, simplified contracts once the loop invariants are in place: the agent asks for specs, the tool either succeeds or reports the loops that lack an invariant, the agent proposes invariants, and the cycle repeats.
 
-Where the human is in the loop to solve tedious problems, LLMs are there to help. Specification inference via LLMs has been investigated as early as 2023
-\cite{PeiEtAl23, KamathEtAl23}. While the success rate in these early years wasn't high, LLMs have drastically improved since then. In the 2026 era of frontier models, it appears quite realistic to use a well-instructed agent to infer specifications, including loop invariants, specifically since the agent receives feedback from the verifier: the program must, by definition, conform to the inferred specification, and if not, a decent verifier will produce a meaningful diagnosis.
+The setup is measured on a corpus of 20 inference problems drawn from a private codebase (\Anon{that of the perpetual trading system Decibel~\cite{Decibel}}{that of a production perpetual trading system}) --- private so that contracts must be inferred rather than recalled --- with three tactics, one without the \WP tool and two with, under three models, Opus~5, Sol~5.6, and Terra~5.6, and with completeness checked by held-out mutants.
+The study shows several things at once.
+Pure agent-based inference works surprisingly well: at its first attempt it produced a complete specification in 95\% of its cells under the two frontier models, including on targets that require inventing lemmas and recursive helper functions.
+Different models make different use of the \WP tool: relative to the unaided agent it costs about 1.3$\times$ under Opus~5, 0.95$\times$ under Sol~5.6, and 0.X$\times$ under Terra~5.6 --- a trade of exact contracts for context, and which side pays depends on how the model spends its tokens.
+In every case the success rate with \WP is higher: the tool removes the incomplete contracts the unaided agent leaves behind, all of them on the targets whose contract has to pin down a whole data structure.
 
-In this work we are going one step further: we supply the agent with a \WP tool which can infer precise, simplified specifications, provided loop invariants are given.
-The intended workflow is that the agent requests specs for a program, the tool comes back either with success, then the task is done, or with information about the missing loop invariants. The agent then asks the model to infer those invariants, and we loop back to the start.
+\MVP was developed for the Diem project and is \Anon{maintained at Aptos Labs since 2022}{since maintained by the blockchain company behind it}; it has verified Diem's payment system and critical components of \Anon{the Aptos blockchain}{a public blockchain}~\cite{ParkZGXGCLC24, AptosFrameworkBook}.
+Move shares Rust's safe references, linear types, algebraic data types, and higher-order functions~\cite{MoveOnAptosBook}; the mechanical half of our approach relies on exactly these traits --- above all reference elimination (Sec.~\ref{sec:wp}) --- so we expect it to carry over to verifiers for Rust-like languages.
 
-The most interesting question with such a setup is whether the capability to run \WP actually improves specification inference, and whether the overhead introduced by model/tool interaction is worth it.
-We investigate this question empirically by comparing pure agent and combined agent/\WP on a corpus of examples drawn out of a private codebase (\Anon{the one for the perpetual trading system Decibel~\cite{Decibel}}{that of a production perpetual trading system}).
-The fact that we choose a private codebase is methodologically important, as discussed later. The currency of comparison is US dollars under the stated token prices; we use GLM-5.3~\cite{GLM53} as the model and the Claude Code SDK as the harness.
-The results show that \WP-based inference, at least with today's models, beats the agent-only approach on average by 31\% lower cost.
-
-The combination of agentic and mechanical inference as discussed here has been implemented in the Move Prover (\MVP).
-\MVP has been developed as part of the Libra/Diem project at Meta, targeting the Move smart contract language, \Anon{and transitioned into Aptos Labs in 2022}{and later transitioned to the blockchain company that maintains it}.
-The Move language has many similarities to Rust: safe reference semantics, linear types, algebraic data types, higher-order functions.
-Those traits are what the mechanical half of our approach relies on --- specifically the ability to eliminate references (Sec.~\ref{sec:wp}) --- so while we implement and evaluate it for Move, we expect it to carry over to verifiers for Rust and similar languages.
-Move has been used to specify and verify Diem's international payment system and also for critical components of \Anon{the Aptos Blockchain}{a public blockchain}
-\cite{ParkZGXGCLC24, AptosFrameworkBook}.
-The Prover supports pre/post conditions, abort conditions, state/data/loop invariants, and higher-order functions, in first-order predicate logic. It has an efficient encoding in SMT/z3 via Boogie, which has been described in \cite{DillGPQXZ22,GrieskampEtAl26HO}.
-For more details, see the Move book \cite{MoveOnAptosBook}.
-
-
-
+Sec.~\ref{sec:hybrid} presents hybrid inference, Sec.~\ref{sec:evaluation} the evaluation, and Sec.~\ref{sec:conclusion} discusses the results and concludes.
 
 \endinput

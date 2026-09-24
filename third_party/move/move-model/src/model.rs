@@ -3165,42 +3165,6 @@ impl GlobalEnv {
         }
         self.call_graph_cache.invalidate();
     }
-
-    /// Update the friend declarations in all target modules, when the
-    /// callees could have changed due to AST-level optimizations.
-    pub fn update_friend_decls_in_targets(&mut self) {
-        let mut friend_decls_to_add = BTreeMap::new();
-        for module in self.get_target_modules() {
-            let module_name = module.get_name();
-            let needed = module.need_to_be_friended_by();
-            for need_to_be_friended_by in needed {
-                let need_to_be_friend_with = self.get_module(need_to_be_friended_by);
-                let already_friended = need_to_be_friend_with
-                    .get_friend_decls()
-                    .iter()
-                    .any(|friend_decl| &friend_decl.module_name == module_name);
-                if !already_friended {
-                    let loc = need_to_be_friend_with.get_loc();
-                    let friend_decl = FriendDecl {
-                        loc,
-                        module_name: module_name.clone(),
-                        module_id: Some(module.get_id()),
-                    };
-                    friend_decls_to_add
-                        .entry(need_to_be_friended_by)
-                        .or_insert_with(Vec::new)
-                        .push(friend_decl);
-                }
-            }
-        }
-        for (module_id, friend_decls) in friend_decls_to_add {
-            let module_data = self.get_module_data_mut(module_id);
-            module_data
-                .friend_modules
-                .extend(friend_decls.iter().flat_map(|d| d.module_id));
-            module_data.friend_decls.extend(friend_decls);
-        }
-    }
 }
 
 impl Default for GlobalEnv {
@@ -5594,6 +5558,21 @@ impl<'env> FunctionEnv<'env> {
     /// Checks whether the function has an attribute.
     pub fn has_attribute(&self, pred: impl Fn(&Attribute) -> bool) -> bool {
         Attribute::has(&self.data.attributes, pred)
+    }
+
+    /// Checks whether this function has the `#[module_lock]` attribute.
+    pub fn has_module_lock(&self) -> bool {
+        self.has_attribute(|attr| {
+            self.symbol_pool().string(attr.name()).as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+        })
+    }
+
+    /// Checks whether this function has an explicit `#[persistent]` attribute.
+    /// Public functions are implicitly persistent but are not reported here.
+    pub fn has_persistent(&self) -> bool {
+        self.has_attribute(|attr| {
+            self.symbol_pool().string(attr.name()).as_str() == well_known::PERSISTENT_ATTRIBUTE
+        })
     }
 
     /// Checks whether this item is only used in tests.

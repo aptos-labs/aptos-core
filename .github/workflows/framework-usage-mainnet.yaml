@@ -1,8 +1,15 @@
 name: "Framework function usage: Mainnet"
 
 on:
+  # The fortnightly schedule is managed by PIES, which dispatches this workflow
+  # with PREVIOUS_THREE_WEEKS=true every 336 hours.
   workflow_dispatch:
     inputs:
+      PREVIOUS_THREE_WEEKS:
+        required: false
+        type: boolean
+        description: Analyze the previous three completed UTC weeks; leave range inputs empty.
+        default: false
       IMAGE_TAG:
         required: false
         type: string
@@ -34,11 +41,67 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Every run publishes the same stable "latest" path, including manual runs
+  # started from non-default branches.
+  group: framework-usage-mainnet-publisher
   cancel-in-progress: false
 
 jobs:
+  prepare-range:
+    runs-on: ubuntu-latest
+    outputs:
+      start_version: ${{ steps.range.outputs.start_version }}
+      end_version: ${{ steps.range.outputs.end_version }}
+      start_time: ${{ steps.range.outputs.start_time }}
+      end_time: ${{ steps.range.outputs.end_time }}
+    steps:
+      - name: Select analysis range
+        id: range
+        env:
+          INPUT_PREVIOUS_THREE_WEEKS: ${{ inputs.PREVIOUS_THREE_WEEKS }}
+          INPUT_START_VERSION: ${{ inputs.START_VERSION }}
+          INPUT_END_VERSION: ${{ inputs.END_VERSION }}
+          INPUT_START_TIME: ${{ inputs.START_TIME }}
+          INPUT_END_TIME: ${{ inputs.END_TIME }}
+        run: |
+          START_VERSION="$INPUT_START_VERSION"
+          END_VERSION="$INPUT_END_VERSION"
+          START_TIME="$INPUT_START_TIME"
+          END_TIME="$INPUT_END_TIME"
+
+          if [ "$INPUT_PREVIOUS_THREE_WEEKS" = "true" ]; then
+            if [ -n "$START_VERSION" ] || [ -n "$END_VERSION" ] || [ -n "$START_TIME" ] || [ -n "$END_TIME" ]; then
+              echo "::error::PREVIOUS_THREE_WEEKS cannot be combined with explicit version or time inputs."
+              exit 1
+            fi
+            NOW_EPOCH="$(date --utc +%s)"
+            DAY_START_EPOCH="$((NOW_EPOCH - NOW_EPOCH % 86400))"
+            DAYS_SINCE_MONDAY="$(($(date --utc +%u) - 1))"
+            END_EPOCH="$((DAY_START_EPOCH - DAYS_SINCE_MONDAY * 86400))"
+            START_EPOCH="$((END_EPOCH - 21 * 86400))"
+            START_TIME="$(date --utc --date="@${START_EPOCH}" '+%Y-%m-%d %H:%M:%S UTC')"
+            END_TIME="$(date --utc --date="@${END_EPOCH}" '+%Y-%m-%d %H:%M:%S UTC')"
+          fi
+
+          {
+            echo "start_version=$START_VERSION"
+            echo "end_version=$END_VERSION"
+            echo "start_time=$START_TIME"
+            echo "end_time=$END_TIME"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Framework usage analysis range"
+            echo
+            if [ -n "$START_VERSION" ] || [ -n "$END_VERSION" ]; then
+              echo "Ledger versions: ${START_VERSION:-archive start} through ${END_VERSION:-archive end}"
+            else
+              echo "UTC: $START_TIME through $END_TIME"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   collect:
+    needs: prepare-range
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
     secrets:
       APTOS_BOT_PAT: ${{ secrets.APTOS_BOT_PAT }}
@@ -52,9 +115,25 @@ jobs:
     with:
       NETWORK: mainnet
       IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
-      START_VERSION: ${{ inputs.START_VERSION }}
-      END_VERSION: ${{ inputs.END_VERSION }}
-      START_TIME: ${{ inputs.START_TIME }}
-      END_TIME: ${{ inputs.END_TIME }}
+      START_VERSION: ${{ needs.prepare-range.outputs.start_version }}
+      END_VERSION: ${{ needs.prepare-range.outputs.end_version }}
+      START_TIME: ${{ needs.prepare-range.outputs.start_time }}
+      END_TIME: ${{ needs.prepare-range.outputs.end_time }}
       FRAMEWORK_USAGE: true
+      FRAMEWORK_USAGE_BUCKET: ${{ vars.FRAMEWORK_USAGE_BUCKET }}
       DRY_RUN: ${{ inputs.DRY_RUN || false }}
+
+  notify-slack:
+    needs: [prepare-range, collect]
+    if: ${{ !cancelled() && needs.collect.result == 'success' && inputs.DRY_RUN == false }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Post published report to #feed-move-alerts
+        continue-on-error: true
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
+        with:
+          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: ":bar_chart: Mainnet framework usage report published for `${{ needs.prepare-range.outputs.start_time }}` through `${{ needs.prepare-range.outputs.end_time }}`: <${{ needs.collect.outputs.latest_html_report_url }}|open the latest report>"

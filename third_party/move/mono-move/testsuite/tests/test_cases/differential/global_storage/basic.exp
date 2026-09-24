@@ -348,7 +348,7 @@ fun double_publish() {
     7: Move(16) [112] <- [80] @6
     8: Move8 [104] <- [56] @6
     9: Move8 [96] <- [48] @6
-    10: HeapNew [128] desc=2 @7
+    10: HeapNew [128] desc=3 @7
     11: HeapMoveTo [128]+0 <- [96] (size=32) @7
     12: MoveTo<0x42::globals::R> signer=[32], src=[128] @7
     13: SlotBorrow [32] <- &[0] @8
@@ -361,7 +361,7 @@ fun double_publish() {
     20: Move(16) [112] <- [80] @14
     21: Move8 [104] <- [48] @14
     22: Move8 [96] <- [56] @14
-    23: HeapNew [128] desc=2 @15
+    23: HeapNew [128] desc=3 @15
     24: HeapMoveTo [128]+0 <- [96] (size=32) @15
     25: MoveTo<0x42::globals::R> signer=[32], src=[128] @15
     26: Return @16
@@ -383,7 +383,7 @@ fun publish_and_read() {
     6: Move(16) [160] <- [128] @12
     7: Move8 [152] <- [104] @12
     8: Move8 [144] <- [64] @12
-    9: HeapNew [176] desc=2 @13
+    9: HeapNew [176] desc=3 @13
     10: HeapMoveTo [176]+0 <- [144] (size=32) @13
     11: MoveTo<0x42::globals::R> signer=[88], src=[176] @13
     12: BorrowGlobal<0x42::globals::R> [72] <- addr=[32], ty= @15
@@ -413,7 +413,7 @@ fun publish_and_take() {
     6: Move(16) [160] <- [128] @12
     7: Move8 [152] <- [104] @12
     8: Move8 [144] <- [64] @12
-    9: HeapNew [176] desc=2 @13
+    9: HeapNew [176] desc=3 @13
     10: HeapMoveTo [176]+0 <- [144] (size=32) @13
     11: MoveTo<0x42::globals::R> signer=[88], src=[176] @13
     12: MoveFrom<0x42::globals::R> [176] <- addr=[32], ty= @15
@@ -446,7 +446,7 @@ fun publish_mutate_read() {
     6: Move(16) [160] <- [128] @6
     7: Move8 [152] <- [104] @6
     8: Move8 [144] <- [64] @6
-    9: HeapNew [192] desc=2 @7
+    9: HeapNew [192] desc=3 @7
     10: HeapMoveTo [192]+0 <- [144] (size=32) @7
     11: MoveTo<0x42::globals::R> signer=[88], src=[192] @7
     12: BorrowGlobalMut<0x42::globals::R> [72] <- addr=[32], ty= @9

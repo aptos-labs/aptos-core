@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    bench_workflows::BenchWorkflowKind,
     move_workloads::{FibonacciFunctionType, LoopType, PreBuiltPackagesImpl},
     token_workflow::TokenWorkflowKind,
     EntryPoints, MonotonicCounterType, OrderBookState,
@@ -9,6 +10,14 @@ use crate::{
 use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
+
+/// Accounts a `benches-e2e` workload onboards. Matches the block size the perf
+/// harness runs these at, so a block touches each account about once.
+const BENCH_NUM_ACCOUNTS: usize = 500;
+
+/// Effectively unbounded, so the mix stage never terminates inside a run and
+/// every block after onboarding measures the mix.
+const BENCH_NUM_TXNS: usize = 1_000_000;
 
 /// Utility class for specifying transaction type with predefined configurations through CLI
 #[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
@@ -113,6 +122,20 @@ pub enum TransactionTypeArg {
     // Encrypted variants
     EncryptedCoinTransfer,
     EncryptedAptFaTransfer,
+
+    // Application workloads from `third_party/move/mono-move/testsuite/benches-e2e`.
+    // Each runs a three-stage workflow: account creation, onboarding, then a
+    // weighted mix of entry points that loops for the rest of the run.
+    ClobAvl,
+    LendingMarket,
+    ClmmSwap,
+    Stableswap,
+    BridgeRelay,
+    AirdropFanout,
+    OracleBatch,
+    CdpLiquidation,
+    DexAggregator,
+    NftMintMarket,
 }
 
 impl TransactionTypeArg {
@@ -519,6 +542,143 @@ impl TransactionTypeArg {
                     sender_use_account_pool,
                     workflow_progress_type,
                 )),
+            },
+
+            TransactionTypeArg::ClobAvl => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::ClobAvl {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    seed_orders_per_side: 512,
+                    index_limit: 64,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::LendingMarket => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::LendingMarket {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    num_reserves: 8,
+                    collaterals_per_account: 3,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::ClmmSwap => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::ClmmSwap {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    seed_positions: 64,
+                    swap_size: 60000000000000,
+                    tick_density: 20,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::Stableswap => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::Stableswap {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    amp_2coin: 200,
+                    amp_3coin: 600,
+                    fee_bps: 4,
+                    imbalance_bp: 2000,
+                    swap_size: 1000,
+                    math_only_pools: 8,
+                    ramp_duration_secs: 86400,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::BridgeRelay => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::BridgeRelay {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    num_channels: 512,
+                    msgs_per_txn: 8,
+                    payload_len: 256,
+                    verifiers_per_msg: 2,
+                    read_depth: 8,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            // A ring of 4096 per shard holds the claims table at 32768
+            // evictable slots across the eight shards, which the fresh branch
+            // fills inside the first percent of the run and then stays on.
+            TransactionTypeArg::AirdropFanout => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::AirdropFanout {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    n_shards: 8,
+                    recipients_per_txn: 100,
+                    warm_recipients: 256,
+                    payload_len: 32,
+                    write_every: 4,
+                    fresh_ratio: 75,
+                    ring_cap: 4096,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            // 8192 feeds over 16 per window gives 512 windows, one per
+            // benchmark account, so no two accounts write the same feed.
+            TransactionTypeArg::OracleBatch => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::OracleBatch {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    num_feeds: 8192,
+                    feeds_per_txn: 16,
+                    num_signers: 8,
+                    quorum_k: 3,
+                    decode_depth: 4,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::CdpLiquidation => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::CdpLiquidation {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    list_length: 2000,
+                    walk_limit: 64,
+                    liquidations_per_txn: 4,
+                    hint_stride: 8,
+                    mcr_bps: 11000,
+                    price_step: 37,
+                    auction_lots: 8,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::DexAggregator => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::DexAggregator {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    pools_per_backend: 64,
+                    amount_in: 100000000,
+                    split_bps: 5000,
+                    tick_crossings: 8,
+                    book_depth: 8,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::NftMintMarket => TransactionType::Workflow {
+                workflow_kind: Box::new(BenchWorkflowKind::NftMintMarket {
+                    num_accounts: BENCH_NUM_ACCOUNTS,
+                    num_collections: 4,
+                    tokens_per_collection: 512,
+                    tokens_per_account: 4,
+                    tokens_read_per_txn: 4,
+                    price: 1_000_000,
+                    commission_bps: 250,
+                    royalty_bps: 500,
+                    mint_batch: 2,
+                    num_txns: BENCH_NUM_TXNS,
+                }),
+                num_modules: 1,
+                progress_type: workflow_progress_type,
             },
         }
     }

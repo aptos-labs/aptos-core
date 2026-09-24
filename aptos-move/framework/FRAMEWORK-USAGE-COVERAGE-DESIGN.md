@@ -402,8 +402,8 @@ The usage workflow therefore follows these rules:
 
 ## Distributed Execution and CI
 
-The workflow is manually triggered and is separate from replay verify, for
-example:
+The workflow is scheduled every two weeks and can also be triggered manually. It is
+separate from replay verify, for example:
 
 ```text
 .github/workflows/framework-usage-mainnet.yaml
@@ -412,23 +412,34 @@ example:
 
 Inputs mirror replay verify:
 
+- `PREVIOUS_THREE_WEEKS`
 - `IMAGE_TAG`
 - `START_VERSION` and `END_VERSION`
 - `START_TIME` and `END_TIME`
 - `DRY_RUN`
 
-Version and time inputs remain mutually exclusive. UTC times are resolved to
-versions before tasks are created, and the resolved range is included in the
-manifest.
+Version and time inputs remain mutually exclusive. `PREVIOUS_THREE_WEEKS`
+cannot be combined with an explicit range. UTC times are resolved to versions
+before tasks are created, and the resolved range is included in the manifest.
+Aptos's PIES scheduler dispatches the workflow with
+`PREVIOUS_THREE_WEEKS=true` every 336 hours. Scheduled runs analyze the
+previous three completed UTC weeks, from 00:00 UTC Monday three weeks earlier
+through 00:00 UTC on the dispatch week's Monday. The two-week cadence leaves
+one week of overlap between successive reports. Using fixed week boundaries
+makes reports comparable and prevents scheduler delays from shifting the
+intended observation window.
 
 The replay scheduler is extended with a framework-usage worker mode while
-retaining the same archive snapshot provisioning and cleanup behavior. The CI
-workflow writes result shards to a run-specific prefix in the fixed
-`aptos-framework-usage-reports` bucket. Before scheduling workers, it requires
-that the bucket enforce public access prevention and uniform bucket-level
-access. Object names use the requested range and workflow run identity. The
-worker must successfully upload the shard before its Kubernetes job is
-considered successful.
+retaining the same archive snapshot provisioning and cleanup behavior. In CI,
+workers upload deterministic result shards to a run-specific prefix in the
+private GCS bucket configured by the `FRAMEWORK_USAGE_BUCKET` Actions variable.
+The workflow requires public access prevention and uniform bucket-level access
+before scheduling workers. The variable contains the bare bucket name. The
+replay worker's Kubernetes service account needs object-create and object-read
+access. The GitHub Actions identity needs bucket metadata plus object-list,
+object-read, and object-delete access. A bounded Kubernetes pod-log transport
+remains available for direct development runs of at most 10,000 transactions,
+but it is not used by the scheduled workflow.
 
 After every task succeeds, the GitHub runner downloads and merges the shards.
 The merge step rejects:
@@ -438,6 +449,11 @@ The merge step rejects:
 - overlapping ranges
 - unexplained gaps
 - failed replay verification
+
+After the report is published and its temporary GCS shards are deleted, the
+workflow posts a best-effort FYI with the stable HTML report link to
+`#feed-move-alerts`. Notification failures do not fail an otherwise successful
+analysis run.
 
 The final private report contains:
 
@@ -453,13 +469,18 @@ job summary links directly to both reports and shows its resolved UTC time
 range, ledger-version range, and processed transaction count. Access to the
 rendered report follows the private repository's GitHub access controls. The
 repository and branch are fixed in the workflow rather than dispatch inputs.
-Each publication also updates stable `framework-usage/<network>/index.html` and
-`framework-usage/<network>/framework-usage.json` URLs. The merged JSON records
-its UTC generation timestamp, which the HTML displays in its header.
+Only a successfully validated run is published. Each publication also updates
+stable `framework-usage/<network>/index.html` and
+`framework-usage/<network>/framework-usage.json` URLs, so readers can bookmark
+the rendered HTML from the latest successful run. Failed scheduled runs leave
+the previous successful report in place. The merged JSON records its UTC
+generation timestamp, which the HTML displays in its header.
 
-The result bucket should have a lifecycle policy. CI cleanup always removes
-pods and temporary PVCs, and final reports remain available through the private
-Pages site.
+After the merged report is committed and pushed to private Pages, CI deletes
+that run's temporary GCS shards. A publication failure leaves its shards in GCS
+for diagnosis. CI cleanup always removes pods and temporary PVCs. Final merged
+JSON and HTML reports, including historical run-specific reports, remain
+available through the private Pages site.
 
 ## Report Interpretation
 
@@ -533,8 +554,8 @@ The implementation is split into four layers:
 1. A generic Move VM function-call callback.
 2. An opt-in Aptos VM transaction recorder and framework target filter.
 3. The archive `framework-usage` command, inventory, and deterministic shard.
-4. GCS shard upload, scheduler merge, and the manually triggered mainnet
-   workflow.
+4. GCS shard upload, scheduler merge, and the scheduled or manually triggered
+   mainnet workflow.
 
 Parallel Block-STM support is a follow-up. It should be implemented only by
 associating usage with the committed incarnation, not by deduplicating an
@@ -574,14 +595,12 @@ parallelism.
 
 ## Open Questions
 
-1. Which object-storage bucket and Kubernetes service account should own result
-   shard uploads?
-2. What retention period is appropriate for raw shards and merged artifacts?
-3. Should a future workflow expose package selection instead of always
+1. What retention period is appropriate for raw shards and merged artifacts?
+2. Should a future workflow expose package selection instead of always
    analyzing the complete built-in framework bundle?
-4. Is an exact module-revision split required, or is stable function identity
+3. Is an exact module-revision split required, or is stable function identity
    across compatible revisions sufficient?
-5. What maximum acceptable replay slowdown should gate enabling the workflow on
+4. What maximum acceptable replay slowdown should gate enabling the workflow on
    very large ranges?
 
 The implemented defaults are a complete framework target set, stable function

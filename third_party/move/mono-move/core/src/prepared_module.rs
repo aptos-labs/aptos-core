@@ -659,8 +659,12 @@ pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Resul
         TypeTag::Vector(elem) => interner.vector_of(intern_type_tag(elem, interner)?),
         TypeTag::Struct(struct_tag) => intern_struct_tag(struct_tag, interner)?,
         TypeTag::Function(function_tag) => {
-            // TODO: reject abilities for which `is_valid_for_function_type()` is false, as the
-            // MoveVM does when converting tags to runtime types.
+            // Abilities are interned as-is: resource group decoding interns every stored member
+            // tag, and stored tags may predate the v1 VM's validation.
+            // TODO(correctness): reject abilities outside copy+drop+store in transaction type
+            // arguments after the prologue, as the v1 VM does (CONSTRAINT_NOT_SATISFIED).
+            // TODO(cleanup): look up group members by `StructTag` (via `struct_tag_of`) instead of
+            // interning stored tags; the rejection can then move here.
             let args = intern_function_param_tags(&function_tag.args, interner)?;
             let results = intern_function_param_tags(&function_tag.results, interner)?;
             interner.function_of(

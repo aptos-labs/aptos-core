@@ -40,15 +40,13 @@ impl ManagedNode {
         let node_dir = get_derived_test_dir(&node_data_dir)?.join(INDEXER_TESTING_FOLDER);
         // By default, we don't reuse the testnet folder.
         if node_dir.exists() {
-            remove_dir_all(node_dir.as_path()).await.context(format!(
-                "Failed to remove testnet folder at {:?}",
-                &node_dir
-            ))?;
+            remove_dir_all(node_dir.as_path())
+                .await
+                .context(format!("Failed to remove testnet folder at {:?}", node_dir))?;
         }
-        create_dir_all(node_dir.as_path()).await.context(format!(
-            "Failed to create testnet folder at {:?}",
-            &node_dir
-        ))?;
+        create_dir_all(node_dir.as_path())
+            .await
+            .context(format!("Failed to create testnet folder at {:?}", node_dir))?;
         let rng = StdRng::from_seed(DEFAULT_SEED);
         let node = build_node_config(rng, &node_config_path, &None, false, node_dir.clone())
             .context("Failed to build node config")?;

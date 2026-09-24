@@ -7,6 +7,6 @@ Error: Function execution failed with VMError: {
     sub_status: Some(14566554180833181696),
     location: 0x42::test,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(1), 72)],
+    offsets: [(FunctionDefinitionIndex(1), 21)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }

@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "9.5.1"
+version = "9.6.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -312,6 +312,7 @@ dependencies = [
  "aptos-genesis",
  "aptos-github-client",
  "aptos-global-constants",
+ "aptos-governance-bundle",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-processor-sdk",
  "aptos-keygen",
@@ -744,7 +745,11 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
  "mono-move-global-context",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -2245,6 +2250,19 @@ name = "aptos-global-constants"
 version = "0.1.0"
 
 [[package]]
+name = "aptos-governance-bundle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "serde",
+ "sha2 0.9.9",
+ "sha3 0.9.1",
+ "tempfile",
+ "toml 0.7.8",
+]
+
+[[package]]
 name = "aptos-id-generator"
 version = "0.1.0"
 
@@ -3327,6 +3345,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "clap 4.5.60",
+ "mono-move-testsuite",
  "move-model",
  "move-package",
  "move-prover",
@@ -3337,7 +3356,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-move-flow"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "aptos-cli-common",
@@ -3436,6 +3455,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -4007,6 +4027,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-cli-common",
  "aptos-crypto",
+ "aptos-governance-bundle",
  "aptos-infallible",
  "aptos-move-cli",
  "aptos-release-builder",
@@ -4016,17 +4037,14 @@ dependencies = [
  "chrono",
  "clap 4.5.60",
  "git2 0.16.1",
- "hex",
  "move-command-line-common",
  "move-core-types",
  "move-model",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "sha2 0.9.9",
  "tempfile",
  "tokio",
- "toml 0.7.8",
  "url",
 ]
 
@@ -4948,11 +4966,14 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-crypto-derive",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
  "async-trait",
  "clap 4.5.60",
+ "libsecp256k1",
  "move-binary-format",
  "once_cell",
  "rand 0.7.3",
@@ -12929,7 +12950,6 @@ dependencies = [
  "move-bytecode-verifier",
  "move-core-types",
  "thiserror 1.0.69",
- "triomphe",
 ]
 
 [[package]]
@@ -12958,7 +12978,6 @@ dependencies = [
  "move-model",
  "move-value-view",
  "thiserror 1.0.69",
- "triomphe",
 ]
 
 [[package]]
@@ -13045,10 +13064,14 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "blake2-rfc",
+ "bulletproofs",
+ "byteorder",
  "curve25519-dalek-ng",
  "libsecp256k1",
+ "merlin",
  "mono-move-core",
  "move-core-types",
+ "once_cell",
  "rand_core 0.5.1",
  "ripemd",
  "sha2 0.9.9",
@@ -13125,7 +13148,7 @@ dependencies = [
  "move-core-types",
  "move-value-view",
  "move-value-view-derive",
- "num-bigint 0.3.3",
+ "num 0.4.1",
  "paste",
  "proptest",
  "rand 0.7.3",
@@ -13139,7 +13162,7 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-crypto",
+ "aptos-framework",
  "aptos-framework-natives",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
@@ -13170,7 +13193,6 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
- "rand_core 0.5.1",
  "smallvec",
  "specializer",
  "tempfile",
@@ -13382,7 +13404,7 @@ dependencies = [
  "itertools 0.13.0",
  "libtest-mimic",
  "move-compiler-v2",
- "move-model",
+ "move-transactional-test-matrix",
  "move-transactional-test-runner",
  "walkdir",
 ]
@@ -13864,6 +13886,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-transactional-test-matrix"
+version = "0.1.0"
+dependencies = [
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-compiler-v2",
+ "move-model",
+ "move-vm-runtime",
+ "walkdir",
+]
+
+[[package]]
 name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
@@ -14049,12 +14083,8 @@ dependencies = [
  "datatest-stable",
  "fail",
  "libtest-mimic",
- "move-bytecode-verifier",
- "move-model",
+ "move-transactional-test-matrix",
  "move-transactional-test-runner",
- "move-vm-runtime",
- "once_cell",
- "walkdir",
 ]
 
 [[package]]
@@ -18611,6 +18641,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-global-constants",
+ "aptos-governance-bundle",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",

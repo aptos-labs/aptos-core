@@ -646,7 +646,7 @@ impl ResolvingPackage {
                 if other.value != addr_value.value {
                     bail!(
                         "Named address '{}' in dependency '{}' is already set to '{}' but was then reassigned to '{}'",
-                        &addr_name,
+                        addr_name,
                         dep_name,
                         match other.value.take() {
                             None => "unassigned".to_string(),

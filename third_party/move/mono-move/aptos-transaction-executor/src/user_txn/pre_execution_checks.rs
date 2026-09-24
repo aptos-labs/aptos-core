@@ -8,10 +8,14 @@
 
 use super::metadata::TxnMetadata;
 use crate::errors::PreExecutionCheckFailure;
-use aptos_gas_algebra::{FeePerGasUnit, Gas, GasExpression, InternalGas, NumBytes};
+use aptos_gas_algebra::{
+    FeePerGasUnit, Gas, GasExpression, InternalGas, InternalGasUnit, NumBytes,
+};
 use aptos_gas_schedule::{
-    gas_params::txn::{KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST},
-    AptosGasParameters, TransactionGasParameters,
+    gas_params::txn::{
+        ENCRYPTED_TXN_DECRYPTION_BASE_COST, KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST,
+    },
+    AptosGasParameters, TransactionGasParameters, VMGasParameters,
 };
 
 pub(crate) struct PreExecutionChecker<'a> {
@@ -37,9 +41,12 @@ impl<'a> PreExecutionChecker<'a> {
         self.check_transaction_size()?;
         self.check_gas_price_bounds()?;
         self.check_gas_budget_upper_bound()?;
-        self.check_gas_budget_covers_base_costs()?;
+        self.check_gas_budget_covers_base_cost()?;
         // TODO(completeness, metering): the account-creation affordability
         // check, once lazy account creation is supported.
+        // TODO(security, completeness): the authenticator feature gates
+        // (`SingleSender`, WebAuthn, SLH-DSA) are not enforced, so an
+        // authenticator governance has disabled still executes.
         Ok(())
     }
 
@@ -59,6 +66,19 @@ impl<'a> PreExecutionChecker<'a> {
         self.txn_data.gas_unit_price.into()
     }
 
+    /// `cost` if the surcharge applies, otherwise zero.
+    fn surcharge(
+        &self,
+        applies: bool,
+        cost: impl GasExpression<VMGasParameters, Unit = InternalGasUnit>,
+    ) -> InternalGas {
+        if applies {
+            cost.evaluate(self.gas_feature_version, &self.gas_params.vm)
+        } else {
+            InternalGas::zero()
+        }
+    }
+
     /// Checks if the transaction size is within the allowed maximum.
     // TODO(completeness): approved governance scripts get a larger size
     // allowance (`max_transaction_size_in_bytes_gov`); revisit with scripts.
@@ -74,6 +94,7 @@ impl<'a> PreExecutionChecker<'a> {
     }
 
     /// Checks if the gas unit price is within the allowed global minimum and maximum.
+    /// An encrypted transaction has its own, higher minimum.
     fn check_gas_price_bounds(&self) -> Result<(), PreExecutionCheckFailure> {
         let min = self.txn_gas_params().min_price_per_gas_unit;
         if self.gas_price() < min {
@@ -81,6 +102,15 @@ impl<'a> PreExecutionChecker<'a> {
                 price: self.gas_price().into(),
                 min: min.into(),
             });
+        }
+        if self.txn_data.is_encrypted_txn {
+            let encrypted_min = min.max(self.txn_gas_params().encrypted_txn_min_price_per_gas_unit);
+            if self.gas_price() < encrypted_min {
+                return Err(PreExecutionCheckFailure::EncryptedGasPriceBelowMinimum {
+                    price: self.gas_price().into(),
+                    min: encrypted_min.into(),
+                });
+            }
         }
         // TODO(completeness): the staking high-limit minimum price, once
         // transaction-limits requests are supported.
@@ -106,31 +136,27 @@ impl<'a> PreExecutionChecker<'a> {
         Ok(())
     }
 
-    /// The budget must at least cover the transaction's intrinsic cost plus
-    /// any authentication surcharges.
-    fn check_gas_budget_covers_base_costs(&self) -> Result<(), PreExecutionCheckFailure> {
-        let keyless = if self.txn_data.is_keyless {
-            KEYLESS_BASE_COST.evaluate(self.gas_feature_version, &self.gas_params.vm)
-        } else {
-            InternalGas::zero()
-        };
-        let slh_dsa = if self.txn_data.is_slh_dsa {
-            SLH_DSA_SHA2_128S_BASE_COST.evaluate(self.gas_feature_version, &self.gas_params.vm)
-        } else {
-            InternalGas::zero()
-        };
-        // TODO(completeness): the encrypted-transaction decryption surcharge
-        // and minimum price, once encrypted payloads are supported.
+    /// The budget must at least cover the transaction's base cost: its
+    /// intrinsic cost plus any authentication and decryption surcharges.
+    // TODO(metering): deriving the base cost from the existing gas parameters
+    // is temporary; revisit with the gas schedule and VM config design.
+    fn check_gas_budget_covers_base_cost(&self) -> Result<(), PreExecutionCheckFailure> {
+        let keyless = self.surcharge(self.txn_data.is_keyless, KEYLESS_BASE_COST);
+        let slh_dsa = self.surcharge(self.txn_data.is_slh_dsa, SLH_DSA_SHA2_128S_BASE_COST);
+        let decryption = self.surcharge(
+            self.txn_data.is_encrypted_txn,
+            ENCRYPTED_TXN_DECRYPTION_BASE_COST,
+        );
         let intrinsic = self
             .txn_gas_params()
             .calculate_intrinsic_gas(self.txn_size())
             .evaluate(self.gas_feature_version, &self.gas_params.vm);
-        let min_gas: Gas =
-            (intrinsic + keyless + slh_dsa).to_unit_round_up_with_params(self.txn_gas_params());
-        if self.max_gas() < min_gas {
+        let base_cost: Gas = (intrinsic + keyless + slh_dsa + decryption)
+            .to_unit_round_up_with_params(self.txn_gas_params());
+        if self.max_gas() < base_cost {
             return Err(PreExecutionCheckFailure::GasBudgetBelowIntrinsicCost {
                 max_gas: self.max_gas().into(),
-                min: min_gas.into(),
+                min: base_cost.into(),
             });
         }
         Ok(())

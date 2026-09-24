@@ -50,12 +50,12 @@ impl SpanData {
 
 impl tracing::field::Visit for SpanData {
     fn record_str(&mut self, field: &Field, value: &str) {
-        let name = format!("{}.{}", self.prefix, &field.name());
+        let name = format!("{}.{}", self.prefix, field.name());
         self.data.insert(name, value.to_string());
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
-        let name = format!("{}.{}", self.prefix, &field.name());
+        let name = format!("{}.{}", self.prefix, field.name());
         self.data.insert(name, format!("{:?}", value));
     }
 }

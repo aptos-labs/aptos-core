@@ -67,6 +67,10 @@ pub enum TimedFeatureFlag {
     /// Charge execution gas for value deserialization proportional to the
     /// produced value size.
     MeterValueNodesOnDeserialize,
+
+    /// Include the cost of a closure's type arguments in its abstract value
+    /// size, instead of charging a flat amount for any closure.
+    MeterClosureTypeArguments,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -117,7 +121,8 @@ impl TimedFeatureOverride {
                 | RejectV5ModulePublishing
                 | RevalidateResolvedClosures
                 | MeterBcsByValueSize
-                | MeterValueNodesOnDeserialize,
+                | MeterValueNodesOnDeserialize
+                | MeterClosureTypeArguments,
             ) => None,
         }
     }
@@ -298,6 +303,22 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (MeterValueNodesOnDeserialize, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 8, 21, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Note: Set to a future date so forge's framework-upgrade compat test runs
+            // with this feature off, matching the pre-feature old image and avoiding a
+            // fork (see UseFullTransactionSizeForGasCheck).
+            (MeterClosureTypeArguments, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 9, 21, 23, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterClosureTypeArguments, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 9, 16, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterClosureTypeArguments, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 9, 18, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

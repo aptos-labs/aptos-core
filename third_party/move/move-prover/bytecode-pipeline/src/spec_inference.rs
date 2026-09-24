@@ -96,7 +96,7 @@
 use crate::{
     data_invariant_instrumentation::INVARIANT_FAILS_MESSAGE as DATA_INVARIANT_FAILS_MESSAGE,
     global_invariant_instrumentation::GLOBAL_INVARIANT_FAILS_MESSAGE,
-    loop_analysis::{LoopInvariantEvidence, LoopsWithInvariants, LoopsWithoutInvariants},
+    loop_analysis::{LoopInvariantEvidence, LoopsWithoutInvariants},
     options::ProverOptions,
     spec_instrumentation::{ABORTS_CODE_NOT_COVERED, ABORTS_IF_FAILS_MESSAGE, ABORT_NOT_COVERED},
     verification_analysis,
@@ -148,6 +148,16 @@ use std::{
 
 /// Prefix for inferred intermediate state labels in displayed specs.
 const INFERRED_LABEL_PREFIX: &str = "S";
+
+/// Source-size budgets keep an explosive WP expression from becoming an
+/// equally explosive generated file. The expression is still diagnosed, but
+/// is not rendered into that diagnostic.
+const MAX_INFERRED_CONDITION_SOURCE_BYTES: usize = 8 * 1024;
+const MAX_INFERRED_FUNCTION_SOURCE_BYTES: usize = 32 * 1024;
+
+/// Bounded loop evidence is an agent hint, not a source dump.
+const MAX_LOOP_HEAD_FACT_SOURCE_BYTES: usize = 512;
+const MAX_LOOP_EVIDENCE_DIAGNOSTIC_BYTES: usize = 4 * 1024;
 
 #[derive(Clone, Debug)]
 struct LoopEvidenceSeed {
@@ -437,6 +447,12 @@ pub struct InferredFrameTargets(pub BTreeSet<QualifiedId<FunId>>);
 /// merely loaded from a previous inference run.
 #[derive(Clone, Debug, Default)]
 pub struct InferredConditionTargets(pub BTreeSet<QualifiedId<FunId>>);
+
+/// Functions skipped because source already contained generated conditions.
+/// Collected so a package-wide retry produces one bounded warning, not one
+/// warning per function.
+#[derive(Clone, Debug, Default)]
+struct ExistingInferredConditionTargets(BTreeSet<QualifiedId<FunId>>);
 
 impl WPAnnotation {
     /// Get the WP state at a specific code offset.
@@ -853,6 +869,13 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
             .iter()
             .any(|condition| condition.properties.contains_key(&inferred_sym))
         {
+            let env = fun_env.module_env.env;
+            let mut skipped = env
+                .get_extension::<ExistingInferredConditionTargets>()
+                .map(|targets| (*targets).clone())
+                .unwrap_or_default();
+            skipped.0.insert(fun_env.get_qualified_id());
+            env.set_extension(skipped);
             return data;
         }
 
@@ -862,6 +885,7 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
         }
         report_uninvariant_loops(fun_env, &data);
         drop_vacuous_conditions(fun_env);
+        report_oversized_inferred_conditions(fun_env);
         data
     }
 
@@ -912,6 +936,8 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
     }
 
     fn finalize(&self, env: &GlobalEnv, _targets: &mut FunctionTargetsHolder) {
+        report_existing_inferred_condition_noop(env);
+
         // A direct call to a transparent function executes that function's
         // body; it does not obtain its return value from the behavioral
         // `result_of` Skolem used for opaque/function-value calls.  When WP
@@ -940,6 +966,43 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
     }
 }
 
+fn report_existing_inferred_condition_noop(env: &GlobalEnv) {
+    const MAX_DISPLAYED_FUNCTIONS: usize = 5;
+
+    let Some(skipped) = env.clear_extension::<ExistingInferredConditionTargets>() else {
+        return;
+    };
+    let Some(first) = skipped.0.first().copied() else {
+        return;
+    };
+    let mut names: Vec<_> = skipped
+        .0
+        .iter()
+        .take(MAX_DISPLAYED_FUNCTIONS)
+        .map(|id| env.get_function(*id).get_full_name_with_address())
+        .collect();
+    if skipped.0.len() > MAX_DISPLAYED_FUNCTIONS {
+        names.push(format!(
+            "+{} more",
+            skipped.0.len() - MAX_DISPLAYED_FUNCTIONS
+        ));
+    }
+    env.diag(
+        Severity::Warning,
+        &env.get_function(first).get_loc(),
+        &format!(
+            "WP made no changes for {} function(s) ({}) because they already contain \
+             `[inferred]` function conditions. WP regenerates each function contract as a \
+             unit and does not merge with generated clauses. To refresh stale or partial \
+             results, remove all `[inferred]` function conditions plus their WP-generated \
+             `modifies` and `aborts_if_is_partial` clauses, then rerun; keep loop invariants \
+             and user-written conditions.",
+            skipped.0.len(),
+            names.join(", ")
+        ),
+    );
+}
+
 /// Explain loop abstraction behind an imprecise inferred contract.
 ///
 /// Loop analysis has already turned loops into a DAG before WP runs.  When a
@@ -963,6 +1026,65 @@ fn drop_vacuous_conditions(fun_env: &FunctionEnv) {
             Some(PropertyValue::Symbol(value)) if *value == vacuous_sym
         )
     });
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum InferredOutputBudgetViolation {
+    Condition { largest: usize },
+    Function { total: usize },
+}
+
+fn inferred_output_budget_violation(sizes: &[usize]) -> Option<InferredOutputBudgetViolation> {
+    let largest = sizes.iter().copied().max().unwrap_or_default();
+    if largest > MAX_INFERRED_CONDITION_SOURCE_BYTES {
+        return Some(InferredOutputBudgetViolation::Condition { largest });
+    }
+    let total = sizes.iter().copied().fold(0usize, usize::saturating_add);
+    (total > MAX_INFERRED_FUNCTION_SOURCE_BYTES)
+        .then_some(InferredOutputBudgetViolation::Function { total })
+}
+
+/// Refuse to write an inferred contract whose source form has exploded.
+///
+/// The error is raised during the bytecode pipeline, before any inference
+/// output file is created. Keeping the expression out of the diagnostic is
+/// intentional: the diagnostic must remain useful even when the expression is
+/// the source of the blow-up.
+fn report_oversized_inferred_conditions(fun_env: &FunctionEnv) {
+    let env = fun_env.module_env.env;
+    let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
+    let sizes: Vec<_> = fun_env
+        .get_spec()
+        .conditions
+        .iter()
+        .filter(|condition| condition.properties.contains_key(&inferred_sym))
+        .map(|condition| {
+            let sourcifier = Sourcifier::new(env, true);
+            sourcifier.print_exp_for_fun_spec(fun_env, &condition.exp);
+            sourcifier.result().len()
+        })
+        .collect();
+    let Some(violation) = inferred_output_budget_violation(&sizes) else {
+        return;
+    };
+    let detail = match violation {
+        InferredOutputBudgetViolation::Condition { largest } => format!(
+            "largest condition: {largest} bytes; per-condition limit: \
+             {MAX_INFERRED_CONDITION_SOURCE_BYTES} bytes"
+        ),
+        InferredOutputBudgetViolation::Function { total } => format!(
+            "all conditions: {total} bytes; per-function limit: \
+             {MAX_INFERRED_FUNCTION_SOURCE_BYTES} bytes"
+        ),
+    };
+    env.diag_with_notes(
+        Severity::Error,
+        &fun_env.get_loc(),
+        "WP did not emit this inferred contract because its generated source exceeds the \
+         bounded output budget. Add an abstraction such as a loop invariant, helper \
+         specification, or equivalent compact condition, then rerun WP.",
+        vec![detail],
+    );
 }
 
 fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
@@ -995,31 +1117,11 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
         .get::<LoopsWithoutInvariants>()
         .map(|loops| loops.0.as_slice())
         .unwrap_or_default();
-    // An invariant may exist without determining enough of the loop's
-    // carried state to eliminate the quantified WP summary. The presence of
-    // *some* invariant must not silently turn that summary into a trusted
-    // contract. Only report residual quantified clauses, not every loop or
-    // every sathard callee dependency.
-    if has_sathard
-        && fun_env.get_spec().conditions.iter().any(|condition| {
-            matches!(condition.properties.get(&inferred_sym),
-            Some(PropertyValue::Symbol(value)) if *value == sathard_sym)
-                && has_top_level_quantifier(&condition.exp)
-        })
-    {
-        if let Some(loops) = data.annotations.get::<LoopsWithInvariants>() {
-            for loc in &loops.0 {
-                fun_env.module_env.env.diag(
-                    loop_severity,
-                    loc,
-                    "WP retained a quantified loop summary despite the supplied invariant. \
-                     Inference has not established a trusted complete contract. Strengthen \
-                     the invariant to characterize the loop-carried values and mutated state \
-                     relative to entry; a bounds-only invariant may not suffice.",
-                );
-            }
-        }
-    }
+    // A supplied invariant can legitimately produce quantified path summaries
+    // (for example, a witness for the iteration which returns from a search).
+    // `sathard` describes solver cost and does not establish that the loop
+    // invariant is incomplete, so only loops actually recorded as missing an
+    // invariant are diagnosed here.
     if uninvariant.is_empty() {
         // Without loops, a `vacuous` condition has one other source: an
         // opaque callee that returns `&mut` into state it does not model. The
@@ -1102,24 +1204,41 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
                 notes.push(format!("bounded WP status: {}", status));
                 let mut observations =
                     String::from("bounded loop-head facts (for paths reaching each head):");
+                let mut facts_omitted_from_diagnostic = 0usize;
                 for head in &evidence.heads {
                     if head.facts.is_empty() {
-                        observations.push_str(&format!(
-                            "\n  head[{}]: no source-level fact retained",
-                            head.index
-                        ));
+                        let line =
+                            format!("\n  head[{}]: no source-level fact retained", head.index);
+                        if observations.len().saturating_add(line.len())
+                            <= MAX_LOOP_EVIDENCE_DIAGNOSTIC_BYTES
+                        {
+                            observations.push_str(&line);
+                        }
                     } else {
                         for (fact_index, fact) in head.facts.iter().enumerate() {
-                            if fact_index == 0 {
-                                observations
-                                    .push_str(&format!("\n  head[{}]: {}", head.index, fact));
+                            let line = if fact_index == 0 {
+                                format!("\n  head[{}]: {}", head.index, fact)
                             } else {
-                                observations.push_str(&format!("\n           {}", fact));
+                                format!("\n           {}", fact)
+                            };
+                            if observations.len().saturating_add(line.len())
+                                <= MAX_LOOP_EVIDENCE_DIAGNOSTIC_BYTES
+                            {
+                                observations.push_str(&line);
+                            } else {
+                                facts_omitted_from_diagnostic += 1;
                             }
                         }
                     }
                 }
                 notes.push(observations);
+                if facts_omitted_from_diagnostic > 0 {
+                    notes.push(format!(
+                        "partial evidence: {} additional fact(s) exceeded the {}-byte \
+                         diagnostic budget and were omitted",
+                        facts_omitted_from_diagnostic, MAX_LOOP_EVIDENCE_DIAGNOSTIC_BYTES
+                    ));
+                }
                 notes.extend(
                     evidence
                         .partial_notes
@@ -1499,6 +1618,10 @@ pub(crate) fn infer_loop_head_evidence(
         // `$` denotes a compiler/WP temporary. Such a condition may be useful
         // internally but is not actionable source-level evidence.
         if rendered.contains('$') || rendered.contains(&marker_prefix) {
+            omitted_facts += 1;
+            continue;
+        }
+        if rendered.len() > MAX_LOOP_HEAD_FACT_SOURCE_BYTES {
             omitted_facts += 1;
             continue;
         }
@@ -8087,11 +8210,8 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             let mut conditions: Vec<Exp> = vec![];
             let mut block = def_block;
 
-            loop {
-                let Some(idom) = dom.immediate_dominator(block) else {
-                    break; // reached entry
-                };
-
+            // Terminates at the entry block, which has no dominator.
+            while let Some(idom) = dom.immediate_dominator(block) {
                 // Check if the dominator block ends with a Branch
                 let idom_range = fwd_cfg.code_range(idom);
                 if !idom_range.is_empty() {
@@ -8570,6 +8690,29 @@ mod tests {
         let value = ExpData::Value(id, Value::Bool(true)).into_exp();
 
         assert!(!contains_can_modify(&value));
+    }
+
+    #[test]
+    fn inferred_source_budget_bounds_individual_and_total_output() {
+        assert_eq!(
+            inferred_output_budget_violation(&[MAX_INFERRED_CONDITION_SOURCE_BYTES + 1]),
+            Some(InferredOutputBudgetViolation::Condition {
+                largest: MAX_INFERRED_CONDITION_SOURCE_BYTES + 1,
+            })
+        );
+        assert_eq!(
+            inferred_output_budget_violation(
+                &[MAX_INFERRED_CONDITION_SOURCE_BYTES;
+                    MAX_INFERRED_FUNCTION_SOURCE_BYTES / MAX_INFERRED_CONDITION_SOURCE_BYTES + 1]
+            ),
+            Some(InferredOutputBudgetViolation::Function {
+                total: MAX_INFERRED_FUNCTION_SOURCE_BYTES + MAX_INFERRED_CONDITION_SOURCE_BYTES,
+            })
+        );
+        assert_eq!(
+            inferred_output_budget_violation(&[MAX_INFERRED_CONDITION_SOURCE_BYTES]),
+            None
+        );
     }
 
     #[test]

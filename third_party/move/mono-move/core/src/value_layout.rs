@@ -72,7 +72,8 @@ pub struct ValueLayout {
     pub align: u32,
     /// Fixed BCS size in bytes, or [`None`] when data-dependent (e.g., for
     /// vectors, enums, function values and anything that transitively owns
-    /// them).
+    /// them). Also [`None`] for `signer`: the V1 VM returns `None` there, and
+    /// `constant_serialized_size` must agree.
     pub fixed_bcs_size: Option<u32>,
     /// Flags with extra information about this layout / type.
     pub flags: LayoutFlags,
@@ -189,7 +190,7 @@ impl ValueLayout {
     }
 
     /// The fixed BCS size of a value of this type, or [`None`] when
-    /// data-dependent.
+    /// data-dependent or when the type reaches `signer`.
     pub fn fixed_serialized_size(&self) -> Option<u32> {
         self.fixed_bcs_size
     }
@@ -281,7 +282,9 @@ impl ValueLayout {
         Self {
             size: 32,
             align: MAX_ALIGN as u32,
-            fixed_bcs_size: Some(32),
+            // TODO(correctness): `None` for V1 parity; V1's signer had two encodings.
+            // Mono's is a fixed 32 bytes, so revisit once V1 does the same.
+            fixed_bcs_size: None,
             // No `ALL_BYTE_PATTERNS_VALID`: without it deserialization takes the
             // per-byte path, which rejects `signer` instead of copying the bytes.
             flags: LayoutFlags::NO_POINTERS_NO_PADDING,
@@ -622,7 +625,7 @@ mod tests {
 
         let s = &layouts[SIGNER_LAYOUT_ID.as_usize()];
         assert_eq!(s.size, 32);
-        assert_eq!(s.fixed_bcs_size, Some(32));
+        assert_eq!(s.fixed_bcs_size, None);
         assert!(s.has_no_pointers_no_padding());
         assert!(!s.all_byte_patterns_valid());
         assert!(matches!(s.kind, LayoutKind::Signer));

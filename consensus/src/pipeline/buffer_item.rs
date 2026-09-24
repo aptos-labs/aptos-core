@@ -543,7 +543,7 @@ mod test {
     use aptos_executor_types::state_compute_result::StateComputeResult;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
-        ledger_info::LedgerInfo,
+        ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     };
@@ -905,6 +905,73 @@ mod test {
                     .expect("aggregated certificate must verify against its own ledger info");
             },
             _ => panic!("Expected aggregated item."),
+        }
+    }
+
+    // A commit decision alone — without any local commit vote — aggregates an item that has
+    // already executed. This is the state machine half of the epoch manager fast path that
+    // hands an epoch change certificate to the buffer manager before tearing down the
+    // pipeline (`try_commit_epoch_ending_block_locally`).
+    #[test]
+    fn test_decision_aggregates_executed_item_without_local_votes() {
+        let (validator_signers, validator_verifier) = create_validators();
+        let pipelined_block = create_pipelined_block();
+        let block_info = pipelined_block.block_info();
+        let ledger_info = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        let ordered_proof =
+            LedgerInfoWithSignatures::new(ledger_info.clone(), AggregateSignature::empty());
+
+        // A quorum-signed decision for the same block (5 of 7, no local vote required).
+        let commit_proof = generate_ledger_info_with_sig(&validator_signers[0..5], ledger_info);
+        commit_proof
+            .verify_signatures(&validator_verifier)
+            .expect("decision must carry a valid quorum certificate");
+
+        // No votes at all, so execution leaves the item in the Executed state.
+        let ordered_item =
+            BufferItem::new_ordered(vec![pipelined_block.clone()], ordered_proof, HashMap::new());
+        let executed_item = ordered_item.advance_to_executed_or_aggregated(
+            vec![pipelined_block.clone()],
+            &validator_verifier,
+            None,
+            true,
+        );
+        assert!(executed_item.is_executed());
+
+        let aggregated_item =
+            executed_item.try_advance_to_aggregated_with_ledger_info(commit_proof.clone());
+        match aggregated_item {
+            BufferItem::Aggregated(item) => {
+                assert_eq!(item.commit_proof, commit_proof);
+                assert_eq!(item.executed_blocks, vec![pipelined_block]);
+            },
+            _ => panic!("Expected aggregated item."),
+        }
+    }
+
+    // A decision for a block that has not executed yet must not aggregate it: the proof is
+    // cached on the ordered item and applied when execution completes. This is the
+    // safe-degradation path of the same fast path — the block is committed with the cached
+    // proof if execution finishes in time, and aborted otherwise.
+    #[test]
+    fn test_decision_for_not_yet_executed_block_is_cached() {
+        let (validator_signers, _validator_verifier) = create_validators();
+        let pipelined_block = create_pipelined_block();
+        let block_info = pipelined_block.block_info();
+        let ledger_info = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        let ordered_proof =
+            LedgerInfoWithSignatures::new(ledger_info.clone(), AggregateSignature::empty());
+        let commit_proof = generate_ledger_info_with_sig(&validator_signers[0..5], ledger_info);
+
+        let ordered_item =
+            BufferItem::new_ordered(vec![pipelined_block.clone()], ordered_proof, HashMap::new());
+        let result = ordered_item.try_advance_to_aggregated_with_ledger_info(commit_proof.clone());
+        match result {
+            BufferItem::Ordered(item) => {
+                assert_eq!(item.commit_proof, Some(commit_proof));
+                assert_eq!(item.ordered_blocks, vec![pipelined_block]);
+            },
+            _ => panic!("Expected ordered item with a cached commit proof."),
         }
     }
 }

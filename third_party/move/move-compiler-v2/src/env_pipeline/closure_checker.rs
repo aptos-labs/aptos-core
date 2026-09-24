@@ -17,7 +17,6 @@ use move_core_types::ability::Ability;
 use move_model::{
     ast::{ExpData, Operation},
     model::GlobalEnv,
-    well_known,
 };
 
 /// Checks various properties of lambda expressions in all target module functions.
@@ -43,10 +42,7 @@ pub fn check_closures(env: &GlobalEnv) {
                         // from the function type of the closure, it cannot have `key` ability.
                         if required_abilities.has_ability(Ability::Store)
                             && fun_env.visibility() != Visibility::Public
-                            && !fun_env.has_attribute(|attr| {
-                                env.symbol_pool().string(attr.name()).as_str()
-                                    == well_known::PERSISTENT_ATTRIBUTE
-                            })
+                            && !fun_env.has_persistent()
                         {
                             env.error_with_notes(
                                 &env.get_node_loc(*id),

@@ -6,7 +6,7 @@
 
 use crate::context::ExecutionGuard;
 use anyhow::Result;
-use aptos_types::vm::module_metadata::get_metadata;
+use aptos_types::vm::module_metadata::{get_metadata, get_randomness_annotation};
 use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     intern_struct_tag,
@@ -17,7 +17,7 @@ use mono_move_core::{
 use move_binary_format::access::ModuleAccess;
 use move_core_types::identifier::IdentStr;
 use parking_lot::Mutex;
-use shared_dsa::{Entry, UnorderedMap};
+use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
 use std::sync::{Arc, OnceLock};
 
@@ -186,6 +186,9 @@ pub struct LoadedModule {
     /// module is loaded. If struct's or enum's name is not in the map, then it
     /// is not a resource group member.
     resource_group_members: UnorderedMap<InternedIdentifier, InternedType>,
+    /// Names of the functions carrying the `#[randomness]` annotation. Built
+    /// once when the module is loaded.
+    randomness_annotated: UnorderedSet<InternedIdentifier>,
 }
 
 impl LoadedModule {
@@ -197,6 +200,7 @@ impl LoadedModule {
     ) -> Result<Box<Self>> {
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
+        let mut randomness_annotated = UnorderedSet::new();
 
         debug_assert_eq!(
             ir.functions.len(),
@@ -219,6 +223,10 @@ impl LoadedModule {
             if func_ir.is_some() {
                 functions.insert(name, OnceLock::new());
             }
+            let name_str = ir.module.identifier_at(name_idx).as_str();
+            if get_randomness_annotation(name_str, &ir.module.metadata).is_some() {
+                randomness_annotated.insert(name);
+            }
         }
         let resource_group_members = Self::build_resource_group_members(&ir, interner)?;
         Ok(Box::new(Self {
@@ -229,6 +237,7 @@ impl LoadedModule {
             function_indices,
             instantiated_functions: Mutex::new(UnorderedMap::new()),
             resource_group_members,
+            randomness_annotated,
         }))
     }
 
@@ -338,6 +347,11 @@ impl LoadedModule {
     /// own storage slot).
     pub fn resource_group_of(&self, name: &InternedIdentifier) -> Option<InternedType> {
         self.resource_group_members.get(name).copied()
+    }
+
+    /// Whether the function `name` carries the `#[randomness]` annotation.
+    pub fn has_randomness_annotation(&self, name: &InternedIdentifier) -> bool {
+        self.randomness_annotated.contains(name)
     }
 }
 

@@ -19,8 +19,8 @@ use crate::{
 use anyhow::{anyhow, bail};
 use aptos_framework_natives::{
     cryptography::ristretto255_point::NativeRistrettoPointContext, event::NativeEventContext,
-    object::NativeObjectContext, state_storage::NativeStateStorageContext,
-    transaction_context::NativeTransactionContext,
+    object::NativeObjectContext, randomness::RandomnessContext,
+    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
@@ -437,9 +437,8 @@ fn v1_native_table() -> NativeFunctionTable {
         TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     );
-    // The mirrors take precedence over same-name production natives (cargo
-    // feature unification can put `unit_test` natives into the production
-    // table), so both VMs run the same implementation in the comparison.
+    // The toy natives take precedence over any same-name production native, so
+    // both VMs run the same implementation in the comparison.
     let overrides = crate::v1_test_natives::make_all_v1_test_natives();
     table.retain(|(addr, module, fun, _)| {
         !overrides.iter().any(|(o_addr, o_module, o_fun, _)| {
@@ -595,6 +594,9 @@ fn execute_function_v1(
     extensions.add(NativeStateStorageContext::new(&state_storage_view));
     extensions.add(NativeEventContext::default());
     extensions.add(NativeRistrettoPointContext::new());
+    let mut randomness = RandomnessContext::new();
+    randomness.mark_unbiasable();
+    extensions.add(randomness);
 
     let mut data_cache = TransactionDataCache::empty();
     let output = match MoveVM::execute_loaded_function(

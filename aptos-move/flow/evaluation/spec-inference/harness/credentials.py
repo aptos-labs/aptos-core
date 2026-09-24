@@ -14,6 +14,7 @@ README.md` records that limit and the design that would close it.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -21,7 +22,13 @@ from typing import Any
 from .artifacts import _walk
 
 
-CREDENTIAL_VARIABLES = ("ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
+CREDENTIAL_VARIABLES = (
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_API_KEY",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "OPENAI_API_KEY",
+    "CODEX_API_KEY",
+)
 REPLACEMENT = "[REDACTED]"
 
 
@@ -42,7 +49,26 @@ def require_provider_auth(model: str, endpoint: str) -> None:
 
 def configured_credentials() -> list[str]:
     """Return the credential values present in this process's environment."""
-    return [value for value in (os.environ.get(name) for name in CREDENTIAL_VARIABLES) if value]
+    values = [
+        value for value in (os.environ.get(name) for name in CREDENTIAL_VARIABLES) if value
+    ]
+    if auth_path := os.environ.get("MOVE_INFERENCE_CODEX_AUTH_FILE"):
+        try:
+            auth = json.loads(Path(auth_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            auth = None
+
+        def strings(value: Any) -> list[str]:
+            if isinstance(value, str):
+                return [value] if len(value) >= 20 else []
+            if isinstance(value, dict):
+                return [item for inner in value.values() for item in strings(inner)]
+            if isinstance(value, list):
+                return [item for inner in value for item in strings(inner)]
+            return []
+
+        values.extend(strings(auth))
+    return list(dict.fromkeys(values))
 
 
 def redact(value: Any) -> Any:

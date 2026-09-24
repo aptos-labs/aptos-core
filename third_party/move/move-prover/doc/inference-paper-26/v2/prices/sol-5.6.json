@@ -1,0 +1,15 @@
+{
+  "model": "gpt-5.6-sol",
+  "label": "Sol~5.6",
+  "runtime": "codex",
+  "currency": "USD",
+  "per_million": {
+    "input_tokens": 4,
+    "cached_input_tokens": 0.4,
+    "cache_write_input_tokens": 5,
+    "output_tokens": 20
+  },
+  "source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+  "retrieved": "2026-09-11",
+  "note": "cached_input_tokens is a subset of input_tokens and reasoning a subset of output; cache writes are 1.25x input. The >272K-token long-context surcharge is not applied: per-request prompt sizes are not in the archived totals. API-equivalent estimate; the round ran on a subscription."
+}

@@ -149,7 +149,7 @@ impl<'a> VMValue<'a> for AccountAddress {
 
 /// A table's storage handle.
 #[repr(transparent)]
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct TableHandle(AccountAddress);
 
 impl TableHandle {
@@ -292,11 +292,8 @@ impl<'a, V> Vector<'a, V> {
     ///
     /// Stale if GC runs -- it is the caller's responsibility to only use it in a transient
     /// manner.
-    ///
-    /// Note: currently private, but could be made public if needed. In that case, external
-    /// callers need to follow the same rule above.
     #[inline]
-    fn ptr(&self) -> *mut u8 {
+    pub fn ptr(&self) -> *mut u8 {
         self.handle.ptr()
     }
 
@@ -452,8 +449,7 @@ mod tests {
     // backing to get `MAX_ALIGN`.
     //
     // TODO(cleanup, testing): allocate through `MemoryRegion`, which is
-    // `MAX_ALIGN`-aligned by construction; it lives in `mono-move-runtime`,
-    // which this crate cannot depend on.
+    // `MAX_ALIGN`-aligned by construction.
     const _: () = assert!(
         core::mem::align_of::<u64>() >= MAX_ALIGN,
         "u64 no longer covers MAX_ALIGN"

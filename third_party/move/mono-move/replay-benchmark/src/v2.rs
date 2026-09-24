@@ -52,10 +52,12 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         executor
             .execute_transaction(&txn, &aux_info)
             .materialize(
+                &guard,
                 &data_provider,
                 env.features(),
                 TransactionAuxiliaryData::default(),
             )
+            .map(|(output, _groups)| output)
             .map_err(|e| anyhow!("failed to materialize V2 output: {}", e))
     };
 

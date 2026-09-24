@@ -197,7 +197,7 @@ impl Factory for K8sFactory {
             let new_era = generate_new_era();
             info!(
                 "Creating new era {} in namespace {}",
-                &new_era, &self.kube_namespace
+                new_era, self.kube_namespace
             );
 
             // Testnet install phase
