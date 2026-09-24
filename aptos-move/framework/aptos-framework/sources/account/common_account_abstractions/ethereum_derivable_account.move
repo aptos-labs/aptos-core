@@ -44,6 +44,20 @@ module aptos_framework::ethereum_derivable_account {
     const EADDR_MISMATCH: u64 = 4;
     /// Unexpected v value.
     const EUNEXPECTED_V: u64 = 5;
+    /// Invalid URI scheme.
+    const EINVALID_SCHEME: u64 = 6;
+    /// Invalid issued at timestamp.
+    const EINVALID_ISSUED_AT: u64 = 7;
+    /// Invalid domain.
+    const EINVALID_DOMAIN: u64 = 8;
+    /// Invalid Ethereum address.
+    const EINVALID_ETHEREUM_ADDRESS: u64 = 9;
+
+    const MAX_SCHEME_LEN: u64 = 16;
+    const MIN_ISSUED_AT_LEN: u64 = 20;
+    const MAX_ISSUED_AT_LEN: u64 = 29;
+    const MAX_DOMAIN_LEN: u64 = 259;
+    const ETHEREUM_ADDRESS_LEN: u64 = 42;
 
     enum SIWEAbstractSignature has drop {
         /// Deprecated, use MessageV2 instead
@@ -70,12 +84,72 @@ module aptos_framework::ethereum_derivable_account {
         domain: vector<u8>,
     }
 
+    fun is_alpha(c: u8): bool {
+        (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)
+    }
+
+    fun validate_scheme(scheme: &vector<u8>) {
+        let len = scheme.length();
+        assert!(len > 0 && len <= MAX_SCHEME_LEN, EINVALID_SCHEME);
+        assert!(is_alpha(scheme[0]), EINVALID_SCHEME);
+        let i = 1;
+        while (i < len) {
+            let c = scheme[i];
+            assert!(
+                is_alpha(c) || (c >= 0x30 && c <= 0x39) || c == 0x2b || c == 0x2d || c == 0x2e,
+                EINVALID_SCHEME
+            );
+            i += 1;
+        };
+    }
+
+    fun validate_issued_at(issued_at: &vector<u8>) {
+        let len = issued_at.length();
+        assert!(len >= MIN_ISSUED_AT_LEN && len <= MAX_ISSUED_AT_LEN, EINVALID_ISSUED_AT);
+        let i = 0;
+        while (i < len) {
+            let c = issued_at[i];
+            assert!(
+                (c >= 0x30 && c <= 0x39) // 0-9
+                    || c == 0x2d // -
+                    || c == 0x3a // :
+                    || c == 0x2e // .
+                    || c == 0x2b // +
+                    || c == 0x54 // T
+                    || c == 0x5a, // Z
+                EINVALID_ISSUED_AT
+            );
+            i += 1;
+        };
+    }
+
+    fun validate_domain(domain: &vector<u8>) {
+        let len = domain.length();
+        assert!(len > 0 && len <= MAX_DOMAIN_LEN, EINVALID_DOMAIN);
+        let i = 0;
+        while (i < len) {
+            let c = domain[i];
+            assert!(c > 0x20 && c < 0x7f && c != 0x2f, EINVALID_DOMAIN);
+            i += 1;
+        };
+    }
+
+    fun validate_ethereum_address(ethereum_address: &vector<u8>) {
+        assert!(ethereum_address.length() == ETHEREUM_ADDRESS_LEN, EINVALID_ETHEREUM_ADDRESS);
+        assert!(
+            ethereum_address[0] == 0x30 && ethereum_address[1] == 0x78,
+            EINVALID_ETHEREUM_ADDRESS
+        );
+    }
+
     /// Deserializes the abstract public key which is supposed to be a bcs
     /// serialized `SIWEAbstractPublicKey`.
     fun deserialize_abstract_public_key(abstract_public_key: &vector<u8>): SIWEAbstractPublicKey {
         let stream = bcs_stream::new(*abstract_public_key);
         let ethereum_address = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
         let domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+        validate_ethereum_address(&ethereum_address);
+        validate_domain(&domain);
         SIWEAbstractPublicKey { ethereum_address, domain }
     }
 
@@ -84,14 +158,12 @@ module aptos_framework::ethereum_derivable_account {
     fun deserialize_abstract_signature(abstract_signature: &vector<u8>): SIWEAbstractSignature {
         let stream = bcs_stream::new(*abstract_signature);
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
-        if (signature_type == 0x00) {
-            let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
-            SIWEAbstractSignature::MessageV1 { issued_at: string::utf8(issued_at), signature }
-        } else if (signature_type == 0x01) {
+        if (signature_type == 0x01) {
             let scheme = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let issued_at = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            validate_scheme(&scheme);
+            validate_issued_at(&issued_at);
             SIWEAbstractSignature::MessageV2 { scheme: string::utf8(scheme), issued_at: string::utf8(issued_at), signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
@@ -229,6 +301,22 @@ module aptos_framework::ethereum_derivable_account {
     fun create_raw_signature(scheme: String, issued_at: String, signature: vector<u8>): vector<u8> {
         let abstract_signature = SIWEAbstractSignature::MessageV2 { scheme, issued_at, signature };
         bcs::to_bytes(&abstract_signature)
+    }
+
+    #[test_only]
+    fun create_raw_signature_v1(issued_at: String, signature: vector<u8>): vector<u8> {
+        let abstract_signature = SIWEAbstractSignature::MessageV1 { issued_at, signature };
+        bcs::to_bytes(&abstract_signature)
+    }
+
+    #[test_only]
+    fun collision_scheme(): vector<u8> {
+        b"https://localhost:3001\nVersion: 1\nChain ID: 4\nNonce: 0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd\nIssued At: 2025-01-01T00:00:00.000Z"
+    }
+
+    #[test_only]
+    fun collision_issued_at(): vector<u8> {
+        b"2025-01-01T00:00:00.000Z://localhost:3001\nVersion: 1\nChain ID: 4\nNonce: 0x705f1f57dd8399bf134e649981af43b5c42e59f985c4e4335ab70ce3f96bcd27\nIssued At: 2025-01-01T00:00:00.000Z"
     }
 
     #[test]
@@ -373,5 +461,129 @@ module aptos_framework::ethereum_derivable_account {
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
+    }
+
+    #[test(framework = @0x1)]
+    fun test_construct_message_collision_witness(framework: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+
+        let ethereum_address = b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a";
+        let domain = b"localhost:3001";
+        let entry_function_name = b"0x1::aptos_account::transfer";
+        let first_digest = b"0x2a2f07c32382a94aa90ddfdb97076b77d779656bb9730c4f3e4d22a30df298dd";
+        let second_digest = b"0x705f1f57dd8399bf134e649981af43b5c42e59f985c4e4335ab70ce3f96bcd27";
+        let issued_at = b"2025-01-01T00:00:00.000Z";
+
+        let via_scheme = construct_message(
+            &ethereum_address, &domain, &entry_function_name,
+            &second_digest, &issued_at, &collision_scheme()
+        );
+        let via_issued_at = construct_message(
+            &ethereum_address, &domain, &entry_function_name,
+            &first_digest, &collision_issued_at(), &b"https"
+        );
+        assert!(via_scheme == via_issued_at);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_SCHEME)]
+    fun test_deserialize_abstract_signature_rejects_collision_scheme() {
+        let abstract_signature = create_raw_signature(
+            utf8(collision_scheme()), utf8(b"2025-01-01T00:00:00.000Z"), vector[]
+        );
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_ISSUED_AT)]
+    fun test_deserialize_abstract_signature_rejects_collision_issued_at() {
+        let abstract_signature = create_raw_signature(
+            utf8(b"https"), utf8(collision_issued_at()), vector[]
+        );
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_SCHEME)]
+    fun test_deserialize_abstract_signature_rejects_empty_scheme() {
+        let abstract_signature = create_raw_signature(
+            utf8(b""), utf8(b"2025-01-01T00:00:00.000Z"), vector[]
+        );
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_SCHEME)]
+    fun test_deserialize_abstract_signature_rejects_scheme_with_newline() {
+        let abstract_signature = create_raw_signature(
+            utf8(b"https\n"), utf8(b"2025-01-01T00:00:00.000Z"), vector[]
+        );
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_ISSUED_AT)]
+    fun test_deserialize_abstract_signature_rejects_issued_at_with_newline() {
+        let abstract_signature = create_raw_signature(
+            utf8(b"https"), utf8(b"2025-01-01T00:00:00.00\n"), vector[]
+        );
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_ISSUED_AT)]
+    fun test_deserialize_abstract_signature_rejects_short_issued_at() {
+        let abstract_signature = create_raw_signature(
+            utf8(b"https"), utf8(b"2025-01-01T00:00:0"), vector[]
+        );
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    fun test_deserialize_abstract_signature_accepts_utc_offset() {
+        let abstract_signature = create_raw_signature(
+            utf8(b"https"), utf8(b"2025-01-01T00:00:00.000+01:00"), vector[]
+        );
+        let siwe_abstract_signature = deserialize_abstract_signature(&abstract_signature);
+        assert!(siwe_abstract_signature is SIWEAbstractSignature::MessageV2);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_SIGNATURE_TYPE)]
+    fun test_deserialize_abstract_signature_rejects_message_v1() {
+        let abstract_signature = create_raw_signature_v1(
+            utf8(b"2025-01-01T00:00:00.000Z"), vector[]
+        );
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_DOMAIN)]
+    fun test_deserialize_abstract_public_key_rejects_domain_with_newline() {
+        let abstract_public_key = create_abstract_public_key(
+            b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98a",
+            b"localhost:3001\nVersion: 1"
+        );
+        deserialize_abstract_public_key(&abstract_public_key);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_ETHEREUM_ADDRESS)]
+    fun test_deserialize_abstract_public_key_rejects_short_ethereum_address() {
+        let abstract_public_key = create_abstract_public_key(
+            b"0xC7B576Ead6aFb962E2DEcB35814FB29723AEC98",
+            b"localhost:3001"
+        );
+        deserialize_abstract_public_key(&abstract_public_key);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EINVALID_ETHEREUM_ADDRESS)]
+    fun test_deserialize_abstract_public_key_rejects_missing_hex_prefix() {
+        let abstract_public_key = create_abstract_public_key(
+            b"\nxC7B576Ead6aFb962E2DEcB35814FB29723AEC98a",
+            b"localhost:3001"
+        );
+        deserialize_abstract_public_key(&abstract_public_key);
     }
 }
