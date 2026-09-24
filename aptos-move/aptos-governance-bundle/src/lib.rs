@@ -170,21 +170,32 @@ fn visit_files(dir: &Path, root: &Path, out: &mut BTreeMap<String, String>) -> R
         if path.is_dir() {
             visit_files(&path, root, out)?;
         } else {
-            let rel = path
-                .strip_prefix(root)
-                .map_err(|e| anyhow!("path outside bundle root: {}", e))?
-                .to_string_lossy()
-                .replace('\\', "/");
+            let rel = relative_key(&path, root)?;
             if rel == BUNDLE_TOML {
                 continue;
             }
             let bytes =
                 fs::read(&path).with_context(|| format!("failed to read {}", path.display()))?;
             let to_hash = normalize_for_checksum(&rel, &bytes);
-            out.insert(rel, hex::encode(Sha256::digest(to_hash.as_ref())));
+            let hash = hex::encode(Sha256::digest(to_hash.as_ref()));
+            if out.insert(rel.clone(), hash).is_some() {
+                bail!("two files resolve to the same bundle path: {}", rel);
+            }
         }
     }
     Ok(())
+}
+
+/// A file's bundle-relative path as the manifest's key for it, with the OS path
+/// separator normalized to `/`. Errors on a non-UTF-8 path, which the manifest
+/// cannot name as a string.
+fn relative_key(path: &Path, root: &Path) -> Result<String> {
+    let rel = path
+        .strip_prefix(root)
+        .map_err(|e| anyhow!("path outside bundle root: {}", e))?
+        .to_str()
+        .ok_or_else(|| anyhow!("non-UTF-8 file name in bundle: {}", path.display()))?;
+    Ok(rel.replace(std::path::MAIN_SEPARATOR, "/"))
 }
 
 /// Summary files are hashed with sign-off checkboxes and incidental whitespace
@@ -300,8 +311,9 @@ pub fn load_compiled_scripts(bundle_dir: &Path) -> Result<Vec<(String, Vec<u8>)>
             let name = path
                 .file_stem()
                 .with_context(|| format!("no file stem: {}", path.display()))?
-                .to_string_lossy()
-                .into_owned();
+                .to_str()
+                .with_context(|| format!("non-UTF-8 file name in bundle: {}", path.display()))?
+                .to_owned();
             let blob =
                 fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
             Ok((name, blob))
@@ -432,5 +444,51 @@ mod tests {
         assert!(err
             .to_string()
             .contains("unsupported bundle format version"));
+    }
+
+    /// A non-UTF-8 path has no manifest key, so `relative_key` must reject it
+    /// rather than lossily coerce it. In-memory, so it runs on macOS too, which
+    /// forbids such names on disk.
+    #[cfg(unix)]
+    #[test]
+    fn relative_key_rejects_non_utf8() {
+        use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+
+        let root = Path::new("/bundle");
+        let path = root.join(OsStr::from_bytes(b"0-step-\xff.mv"));
+        let err = relative_key(&path, root).unwrap_err().to_string();
+        assert!(err.contains("non-UTF-8 file name in bundle"), "{}", err);
+    }
+
+    /// Two bytecode names that differ only in an invalid UTF-8 byte collapse to
+    /// one key under `to_string_lossy`; checksumming and loading must both
+    /// refuse them. Linux-only: macOS rejects such names as the files are
+    /// created, before the code under test runs.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn colliding_non_utf8_file_names_are_rejected() {
+        use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+
+        let dir = tempfile::tempdir().unwrap();
+        let bytecode = dir.path().join(BYTECODE_DIR);
+        fs::create_dir_all(&bytecode).unwrap();
+        fs::write(
+            bytecode.join(OsStr::from_bytes(b"0-step-\xfe.mv")),
+            b"benign",
+        )
+        .unwrap();
+        fs::write(
+            bytecode.join(OsStr::from_bytes(b"0-step-\xff.mv")),
+            b"malicious",
+        )
+        .unwrap();
+
+        let checksum_err = compute_checksums(dir.path()).unwrap_err().to_string();
+        assert!(
+            checksum_err.contains("non-UTF-8 file name in bundle"),
+            "{}",
+            checksum_err
+        );
+        assert!(load_compiled_scripts(dir.path()).is_err());
     }
 }
