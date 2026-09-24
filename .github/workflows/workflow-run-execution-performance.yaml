@@ -139,7 +139,12 @@ jobs:
   # Run single node execution performance tests
   single-node-performance:
     needs: test-target-determinator
-    if: ${{ !cancelled() }}
+    if: |
+      !cancelled() && (
+        needs.test-target-determinator.result != 'success' ||
+        inputs.IGNORE_TARGET_DETERMINATION ||
+        needs.test-target-determinator.outputs.run_execution_performance_test == 'true'
+      )
     concurrency:
       group: execution-benchmark-${{ inputs.RUNNER_NAME }}
       cancel-in-progress: false

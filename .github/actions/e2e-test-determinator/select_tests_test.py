@@ -96,6 +96,25 @@ class E2eSelectionTest(unittest.TestCase):
         fetch = self.workflow_job(workflow, "fetch-last-released-docker-image-tag")
         self.assertIn("CICD:run-all-e2e-tests", fetch)
 
+    def test_selected_reusable_jobs_reach_their_work(self):
+        root = Path(__file__).resolve().parents[3]
+        faucet = (
+            root / ".github/workflows/faucet-tests-main.yaml"
+        ).read_text()
+        faucet_job = self.workflow_job(faucet, "run-tests-main")
+        self.assertNotRegex(faucet_job.split("    runs-on:", 1)[0], r"(?m)^    if:")
+
+        performance = (
+            root / ".github/workflows/workflow-run-execution-performance.yaml"
+        ).read_text()
+        performance_job = self.workflow_job(performance, "single-node-performance")
+        gate = performance_job.split("    concurrency:", 1)[0]
+        self.assertIn("needs.test-target-determinator.result != 'success'", gate)
+        self.assertIn(
+            "needs.test-target-determinator.outputs.run_execution_performance_test == 'true'",
+            gate,
+        )
+
     def test_pr_generated_directories_are_archived_before_artifact_upload(self):
         root = Path(__file__).resolve().parents[3]
         trusted_event_guard = (
