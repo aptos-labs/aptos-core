@@ -9,7 +9,9 @@
 #       (LAYOUT_PAD, shifts all downstream code) and from nops injected at the
 #       top of the interpreter dispatch loop (LAYOUT_NOPS, shifts its internals).
 #       v0 = default flags, v1 = -align-all-functions=6, v2 = v1 plus
-#       -align-all-nofallthru-blocks=5. 3 interleaved processes per layout.
+#       -align-all-nofallthru-blocks=5, v3 = v1 plus -align-all-nofallthru-blocks=6,
+#       v4 = v1 plus -align-all-blocks=6, v5 = v2 plus x86 branch-boundary alignment.
+#       3 interleaved processes per layout.
 #
 #   layout_experiment.sh noise
 #       R2 + R4: one v1 binary run as many separate processes under four process
@@ -39,6 +41,9 @@ else
 fi
 ALIGN_FUNCTIONS="-C llvm-args=-align-all-functions=6"
 ALIGN_BLOCKS="-C llvm-args=-align-all-nofallthru-blocks=5"
+ALIGN_BLOCKS_64="-C llvm-args=-align-all-nofallthru-blocks=6"
+ALIGN_ALL_BLOCKS_64="-C llvm-args=-align-all-blocks=6"
+ALIGN_BRANCHES="-C llvm-args=-x86-align-branch-boundary=32 -C llvm-args=-x86-align-branch=fused+jcc+jmp+indirect+call+ret"
 
 if [[ -n "${SMOKE:-}" ]]; then
     PADS="0 16"
@@ -107,6 +112,9 @@ cmd_layout() {
         v0) flags="$BASE_FLAGS" ;;
         v1) flags="$BASE_FLAGS $ALIGN_FUNCTIONS" ;;
         v2) flags="$BASE_FLAGS $ALIGN_FUNCTIONS $ALIGN_BLOCKS" ;;
+        v3) flags="$BASE_FLAGS $ALIGN_FUNCTIONS $ALIGN_BLOCKS_64" ;;
+        v4) flags="$BASE_FLAGS $ALIGN_FUNCTIONS $ALIGN_ALL_BLOCKS_64" ;;
+        v5) flags="$BASE_FLAGS $ALIGN_FUNCTIONS $ALIGN_BLOCKS $ALIGN_BRANCHES" ;;
         *) echo "unknown variant $variant" >&2; exit 2 ;;
     esac
     echo "RUSTFLAGS: $flags" | tee -a "$OUT_DIR/env.txt"

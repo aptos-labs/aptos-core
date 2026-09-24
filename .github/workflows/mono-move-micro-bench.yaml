@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [layout-v0, layout-v1, layout-v2, noise]
+        mode: [layout-v3, layout-v4, layout-v5]
     steps:
       - uses: actions/checkout@v4
         with:
