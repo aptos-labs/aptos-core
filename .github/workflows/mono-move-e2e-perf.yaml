@@ -58,7 +58,7 @@ jobs:
     # Bands are machine-specific, so this and the RUNNER_NAME the run is tagged
     # with have to be the same value. A pull request always gets the default.
     runs-on: ${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
         with:

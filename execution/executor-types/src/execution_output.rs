@@ -217,24 +217,27 @@ impl Inner {
                     if execution_status.is_success() {
                         None
                     } else {
-                        Some(format!("{txn:?}: {:?} {aux_info:?}", output.status()))
+                        Some(format!("{:?}: {txn:?} {aux_info:?}", output.status()))
                     }
                 },
                 Err(_) => None,
             })
             .collect::<Vec<_>>();
 
+        // Status first: a transaction renders to several kilobytes, and both
+        // the log line and the assert message get truncated well before the
+        // end, which is the only part worth reading.
         let discards_3 = self
             .to_discard
             .iter()
             .take(3)
-            .map(|(txn, output, aux_info)| format!("{txn:?}: {:?} {aux_info:?}", output.status()))
+            .map(|(txn, output, aux_info)| format!("{:?}: {txn:?} {aux_info:?}", output.status()))
             .collect::<Vec<_>>();
         let retries_3 = self
             .to_retry
             .iter()
             .take(3)
-            .map(|(txn, output, aux_info)| format!("{txn:?}: {:?} {aux_info:?}", output.status()))
+            .map(|(txn, output, aux_info)| format!("{:?}: {txn:?} {aux_info:?}", output.status()))
             .collect::<Vec<_>>();
 
         if !aborts.is_empty() || !discards_3.is_empty() || !retries_3.is_empty() {
