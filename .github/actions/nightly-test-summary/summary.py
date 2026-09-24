@@ -30,7 +30,6 @@ def build_summary(needs, branch, sha, run_url, jobs=None, previous_sha=None):
                 "failure",
                 "timed_out",
                 "cancelled",
-                "skipped",
             ):
                 continue
             failed_steps = [

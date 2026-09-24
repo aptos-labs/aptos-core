@@ -24,7 +24,7 @@ jobs:
   select:
     runs-on: 2cpu-gh-ubuntu24-x64
     env:
-      E2E_MODE: ${{ (inputs.FORCE_FULL || (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) && 'legacy' || vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
+      E2E_MODE: ${{ (inputs.FORCE_FULL || (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') || contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf')) && 'legacy' || vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
     outputs:
       selected_e2e_tests: ${{ steps.selection.outputs.selected_e2e_tests }}
       mode: ${{ env.E2E_MODE }}

@@ -275,7 +275,7 @@ jobs:
     with:
       SELECTION_RESULT: ${{ needs.e2e-test-determinator.result }}
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'faucet-integration') }}
+      SKIP_JOB: ${{ (needs.e2e-test-determinator.outputs.mode == 'legacy' && !contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')) || (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'faucet-integration') }}
 
   # This is a PR required job.
   forge-e2e-test:

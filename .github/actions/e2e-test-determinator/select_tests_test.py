@@ -6,6 +6,7 @@ import io
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 
-from select_tests import main, REGISTRY, selections
+from select_tests import main, planner_inputs_changed, REGISTRY, selections
 
 
 def plan(mode, tests):
@@ -96,13 +97,25 @@ class E2eSelectionTest(unittest.TestCase):
         fetch = self.workflow_job(workflow, "fetch-last-released-docker-image-tag")
         self.assertIn("CICD:run-all-e2e-tests", fetch)
 
+    def test_explicit_forge_label_forces_legacy_e2e_selection(self):
+        root = Path(__file__).resolve().parents[3]
+        selection = (root / ".github/workflows/e2e-test-selection.yaml").read_text()
+        self.assertIn("CICD:run-forge-e2e-perf", selection)
+
     def test_selected_reusable_jobs_reach_their_work(self):
         root = Path(__file__).resolve().parents[3]
         faucet = (
             root / ".github/workflows/faucet-tests-main.yaml"
         ).read_text()
         faucet_job = self.workflow_job(faucet, "run-tests-main")
-        self.assertNotRegex(faucet_job.split("    runs-on:", 1)[0], r"(?m)^    if:")
+        faucet_gate = faucet_job.split("    runs-on:", 1)[0]
+        self.assertIn("inputs.SELECTION_RESULT != 'success'", faucet_gate)
+        self.assertIn("!inputs.SKIP_JOB", faucet_gate)
+
+        caller = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        faucet_call = self.workflow_job(caller, "faucet-tests-main")
+        self.assertIn("needs.e2e-test-determinator.outputs.mode == 'legacy'", faucet_call)
+        self.assertIn("CICD:non-required-tests", faucet_call)
 
         performance = (
             root / ".github/workflows/workflow-run-execution-performance.yaml"
@@ -114,6 +127,9 @@ class E2eSelectionTest(unittest.TestCase):
             "needs.test-target-determinator.outputs.run_execution_performance_test == 'true'",
             gate,
         )
+        determinator = self.workflow_job(performance, "test-target-determinator")
+        self.assertNotIn("mode != 'subsystem'", determinator)
+        self.assertNotIn("mode == 'subsystem'", determinator)
 
     def test_pr_generated_directories_are_archived_before_artifact_upload(self):
         root = Path(__file__).resolve().parents[3]
@@ -180,7 +196,7 @@ class E2eSelectionTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 selections({**plan("subsystem", []), **change}, "subsystem")
 
-    def run_action(self, mode, cargo_result=None, error=None):
+    def run_action(self, mode, cargo_result=None, error=None, changed_paths=""):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             outputs, summary, artifact = (
@@ -204,7 +220,10 @@ class E2eSelectionTest(unittest.TestCase):
                 "select_tests.subprocess.run",
                 return_value=cargo_result,
                 side_effect=error,
-            ) as cargo, contextlib.redirect_stdout(
+            ) as cargo, patch(
+                "select_tests.subprocess.check_output",
+                return_value=changed_paths,
+            ) as diff, contextlib.redirect_stdout(
                 io.StringIO()
             ):
                 if error:
@@ -223,8 +242,13 @@ class E2eSelectionTest(unittest.TestCase):
                         + "\n",
                     )
                 if mode == "legacy":
+                    diff.assert_not_called()
+                    cargo.assert_not_called()
+                elif changed_paths:
+                    diff.assert_called_once()
                     cargo.assert_not_called()
                 else:
+                    diff.assert_called_once()
                     self.assertEqual(
                         cargo.call_args.args[0],
                         [
@@ -277,6 +301,22 @@ class E2eSelectionTest(unittest.TestCase):
             ),
         )
 
+    def test_planner_input_changes_select_all_before_parsing(self):
+        for path in (
+            ".config/test-subsystems.toml",
+            ".github/actions/e2e-test-determinator/registry.json",
+            "devtools/aptos-cargo-cli/src/test_selection.rs",
+        ):
+            with self.subTest(path=path):
+                self.run_action("subsystem", changed_paths=path + "\n")
+
+    def test_planner_input_matching_is_exact(self):
+        with patch(
+            "select_tests.subprocess.check_output",
+            return_value="docs/devtools/aptos-cargo-cli/readme.md\n",
+        ):
+            self.assertFalse(planner_inputs_changed("origin/main"))
+
     def test_prebuilt_planner_bypasses_pr_cargo_alias(self):
         consumer = Path(__file__).with_name("select_tests.py").resolve()
         with tempfile.TemporaryDirectory() as directory:
@@ -286,15 +326,22 @@ class E2eSelectionTest(unittest.TestCase):
                 f"#!{sys.executable}\nimport json\nprint(json.dumps({plan('subsystem', ['cli-e2e'])!r}))\n"
             )
             planner.chmod(0o755)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                 "commit", "--allow-empty", "-qm", "baseline"],
+                cwd=root, check=True,
+            )
             # A PR-controlled Cargo alias must never execute during selection.
             (root / ".cargo").mkdir()
             (root / ".cargo/config.toml").write_text('[alias]\nx = "!exit 99"\n')
             subprocess.run(
                 [sys.executable, str(consumer), "--mode", "subsystem",
-                 "--base", "origin/main", "--plan-file", str(root / "plan.json"),
+                "--base", "HEAD", "--plan-file", str(root / "plan.json"),
                  "--planner-bin", str(planner)],
                 cwd=root,
-                env={**os.environ, "PATH": "", "GITHUB_OUTPUT": str(root / "outputs"),
+                env={**os.environ, "PATH": str(Path(shutil.which("git")).parent),
+                     "GITHUB_OUTPUT": str(root / "outputs"),
                      "GITHUB_STEP_SUMMARY": str(root / "summary")},
                 check=True, stdout=subprocess.PIPE, text=True,
             )

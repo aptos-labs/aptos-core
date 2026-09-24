@@ -123,16 +123,16 @@ jobs:
     if: ${{ !cancelled() && needs.e2e-selection.result != 'failure' }}
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
-      run_execution_performance_test: ${{ inputs.IGNORE_TARGET_DETERMINATION || github.event_name == 'workflow_dispatch' || (contains(fromJSON(needs.e2e-selection.outputs.selected_e2e_tests || '[]'), 'execution-performance') && (needs.e2e-selection.outputs.mode == 'subsystem' || steps.determine_test_targets.outputs.run_execution_performance_test == 'true')) }}
+      run_execution_performance_test: ${{ inputs.IGNORE_TARGET_DETERMINATION || github.event_name == 'workflow_dispatch' || (contains(fromJSON(needs.e2e-selection.outputs.selected_e2e_tests || '[]'), 'execution-performance') && steps.determine_test_targets.outputs.run_execution_performance_test == 'true') }}
     steps:
       # The legacy dependency selector still needs the actual tested revision.
       - uses: actions/checkout@v4
-        if: needs.e2e-selection.outputs.mode != 'subsystem' && !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch'
+        if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
         with:
           ref: ${{ inputs.GIT_SHA }}
           fetch-depth: 0
       - name: Run the test target determinator
-        if: needs.e2e-selection.outputs.mode != 'subsystem' && !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch'
+        if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
 

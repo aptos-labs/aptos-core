@@ -34,6 +34,7 @@ class NightlySummaryTest(unittest.TestCase):
                 for command in re.findall(r"(?:run|command): (cargo test .*?)\n", text)
             }
         self.assertEqual(cargo_test_args(nightly), cargo_test_args(legacy))
+        self.assertIn("FORGE_NAMESPACE: forge-nightly-", nightly)
 
     def test_green_run_does_not_alert(self):
         failed, _ = self.summary({"workspace": {"result": "success"}})
@@ -55,6 +56,17 @@ class NightlySummaryTest(unittest.TestCase):
         self.assertIn("storage: failure", payload["text"])
         self.assertIn("cargo (workspace): Run tests", payload["text"])
         self.assertIn("base123...abc123", payload["text"])
+
+    def test_skipped_jobs_are_omitted_from_failure_details(self):
+        _, payload = self.summary(
+            {"storage": {"result": "failure"}},
+            jobs=[
+                {"name": "failed", "conclusion": "failure", "steps": []},
+                {"name": "expected skip", "conclusion": "skipped", "steps": []},
+            ],
+        )
+        self.assertIn("failed:", payload["text"])
+        self.assertNotIn("expected skip", payload["text"])
 
     def test_skips_timeouts_cancellations_and_missing_results_are_not_green(self):
         for result in ("skipped", "cancelled", "failure", "timed_out"):

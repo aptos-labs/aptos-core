@@ -11,6 +11,33 @@ from pathlib import Path
 import subprocess
 
 REGISTRY = json.loads(Path(__file__).with_name("registry.json").read_text())
+PLANNER_INPUTS = (
+    ".config/test-subsystems.toml",
+    ".github/actions/e2e-test-determinator/registry.json",
+    "devtools/aptos-cargo-cli/",
+)
+
+
+def planner_inputs_changed(base):
+    changed = subprocess.check_output(
+        ["git", "diff", "--name-only", "--diff-filter=ACDMRTUXB", f"{base}...HEAD"],
+        text=True,
+    ).splitlines()
+    return any(
+        path == PLANNER_INPUTS[0]
+        or path == PLANNER_INPUTS[1]
+        or path.startswith(PLANNER_INPUTS[2])
+        for path in changed
+    )
+
+
+def full_plan(mode, reason):
+    return {
+        "schema_version": 1,
+        "mode": mode,
+        "explicit_packages": False,
+        "e2e_tests": {name: [reason] for name in REGISTRY},
+    }
 
 
 def selections(plan, mode):
@@ -37,12 +64,10 @@ def main():
     args = parser.parse_args()
     if args.mode == "legacy":
         # Preserve today's gates without requiring Cargo or subsystem config.
-        plan = {
-            "schema_version": 1,
-            "mode": "legacy",
-            "explicit_packages": False,
-            "e2e_tests": {name: ["Legacy workflow selection"] for name in REGISTRY},
-        }
+        plan = full_plan("legacy", "Legacy workflow selection")
+    elif planner_inputs_changed(args.base):
+        # The trusted base planner may not understand the proposed schema or registry.
+        plan = full_plan(args.mode, "Planner input changed")
     else:
         result = subprocess.run(
             [

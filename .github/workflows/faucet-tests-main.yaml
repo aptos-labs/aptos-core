@@ -55,6 +55,7 @@ jobs:
   # the image for the faucet private fullnode, the faucet and fullnode should always
   # be compatible in production.
   run-tests-main:
+    if: ${{ inputs.SELECTION_RESULT != 'success' || !inputs.SKIP_JOB }}
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       id-token: write

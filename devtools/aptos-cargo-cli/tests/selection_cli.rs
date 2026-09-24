@@ -145,9 +145,10 @@ fn execution_matches_plan_and_propagates_failure() {
         .unwrap();
     assert!(!result.status.success());
     let args = fs::read_to_string(repo.root().join("runner-args")).unwrap();
+    let root = repo.root().canonicalize().unwrap();
     assert_eq!(
         args,
-        format!("nextest\nrun\n--no-tests=warn\n--profile\nci\n--locked\n-p\npath+file://{}/move/core#move-core@0.1.0\n-p\npath+file://{}/api#test-api@0.1.0\n", repo.root().display(), repo.root().display())
+        format!("nextest\nrun\n--no-tests=warn\n--profile\nci\n--locked\n-p\npath+file://{}/move/core#move-core@0.1.0\n-p\npath+file://{}/api#test-api@0.1.0\n", root.display(), root.display())
     );
 }
 

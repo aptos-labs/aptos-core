@@ -258,7 +258,7 @@ jobs:
       FORGE_TEST_SUITE: ${{ matrix.suite }}
       FORGE_RUNNER_DURATION_SECS: ${{ matrix.duration }}
       IMAGE_TAG: ${{ (matrix.name == 'forge-compatibility' || matrix.name == 'forge-framework-upgrade') && needs.forge-baseline.outputs.image_tag || matrix.name == 'forge-consensus-only-performance' && format('consensus_only_perf_test_{0}', github.sha) || github.sha }}
-      FORGE_NAMESPACE: nightly-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+      FORGE_NAMESPACE: forge-nightly-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
       FORGE_CLUSTER_NAME: ${{ matrix.name == 'forge-multiregion' && 'forge-multiregion' || '' }}
       COMMENT_HEADER: nightly-${{ matrix.name }}
       SKIP_JOB: false
