@@ -1323,24 +1323,27 @@ private def bindsCheckedIndex (context : Context) (slot : LocalId) (body : ExprI
 /-- The children an expression evaluates first and unconditionally: its
 leading operands, a binding's value, a condition, a scrutinee, a block's
 first statement. A branch, a loop body, an operand behind one that acts, and
-what follows a binding are not among them, except past the index checks and
-index temporaries that precede an element access. -/
+what follows a binding are not among them, except past an inert index
+temporary that precedes an element access. -/
 private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
   | .operation _ _ arguments _ => actingPrefix context arguments
   | .letDecl pattern (some value) body =>
       let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
-      let valueKind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
-      let precedesAccess : Bool := match patternKind, valueKind with
-        | some .wildcard, some (.operation (.primitive (.checkVectorIndex _)) _ _ _) => true
-        -- The traversal runs for whichever check the caller tracks, which may
-        -- be an earlier one of another vector; the lowering orders a computed
-        -- index only against the check that tests it. So the binding is passed
-        -- only when its value cannot act before that earlier check's implied
-        -- position either.
-        | some (.variable slot), _ =>
+      -- A `checkVectorIndex` binding is passed by no arm here. Crossing one is
+      -- never sound for an earlier check: both can abort, so whichever runs
+      -- first decides the error, and eliding the earlier one moves it after
+      -- this one. A nested `v[i][j]` is still reached, through this check's
+      -- own operands rather than past it.
+      --
+      -- An index temporary is passed, but only when its value cannot act: the
+      -- traversal runs for whichever check the caller tracks, which may be an
+      -- earlier one of another vector, and the lowering orders a computed
+      -- index against the check that tests it alone.
+      let precedesAccess : Bool := match patternKind with
+        | some (.variable slot) =>
             (context.locals[slot.index]?).any (·.name.startsWith "$t") &&
               bindsCheckedIndex context slot body && inertOperand context value
-        | _, _ => false
+        | _ => false
       if precedesAccess then #[value, body] else #[value]
   | .letDecl _ none body => #[body]
   | .assign _ value => #[value]
