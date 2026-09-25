@@ -21,8 +21,8 @@ use crate::{
         write_u64, MemoryRegion,
     },
     types::{
-        DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
-        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -35,7 +35,7 @@ use mono_move_core::{
     FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use std::{cell::RefCell, ptr::NonNull};
+use std::{cell::RefCell, ptr::NonNull, sync::Arc};
 
 // ---------------------------------------------------------------------------
 // Macros
@@ -200,11 +200,10 @@ pub(crate) mod macros {
 /// allocation sizes (e.g. a corrupted descriptor or attacker-controlled
 /// capacity in `alloc_vec`) before we compute a bump-pointer offset.
 ///
-/// Tied to [`DEFAULT_HEAP_SIZE`] — anything larger could never succeed
-/// regardless. The constant exists so the bound can be detached from
-/// `DEFAULT_HEAP_SIZE` once heaps become per-context configurable
-/// (likely driven by gas limits).
-const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
+/// Set to the largest buffer the runtime ever creates, so it rejects only
+/// sizes no heap could ever serve. Each allocation is still bounded by its own
+/// heap's buffer, which for a session heap is `DEFAULT_HEAP_SIZE`.
+const MAX_SINGLE_ALLOCATION_SIZE: usize = MAX_SEGMENT_BYTES;
 
 /// True if `bump_ptr + size` still lies within the heap buffer (or one
 /// byte past the end). Compares integer addresses to avoid forming an
@@ -339,6 +338,98 @@ impl SharedArena {
 }
 
 impl ReadPin for SharedArena {}
+
+/// Size of one [`SegmentedArena`] segment. Small enough that an owner touching
+/// few values does not reserve much, large enough that most blocks fit in one
+/// or two segments.
+const SEGMENT_BYTES: usize = 4 * 1024 * 1024;
+
+/// Ceiling on a single segment. A value that needs more than this could not be
+/// used by the interpreter either, whose per-transaction heap is far smaller.
+const MAX_SEGMENT_BYTES: usize = 64 * 1024 * 1024;
+
+/// An append-only arena that grows by adding [`SharedArena`] segments.
+///
+/// Values materialized from storage stay reachable long after the transaction
+/// that read them finished, so nothing here is ever reset or collected while
+/// the block runs. Each allocation hands back the segment it landed in, and the
+/// value pins that segment.
+///
+/// [`SharedArena`] is interior-mutable and `!Sync`, yet a pin on a segment may
+/// be held by another thread. That is sound only because [`ReadPin`] exposes no
+/// methods: a pin holder cannot reach the heap, and the arena's owner is the
+/// only one that ever allocates in it.
+pub struct SegmentedArena {
+    segments: RefCell<Vec<Arc<SharedArena>>>,
+}
+
+impl SegmentedArena {
+    /// Creates an arena with no segments. The first is allocated on the first
+    /// allocation, so an owner that never allocates reserves nothing.
+    pub fn new() -> Self {
+        Self {
+            segments: RefCell::new(vec![]),
+        }
+    }
+
+    /// Runs `alloc` against a segment until it succeeds, growing the arena when
+    /// the current segment has too little room left. Returns what `alloc`
+    /// produced together with the segment to pin it by.
+    ///
+    /// `alloc` returns [`None`] only when it ran out of room; anything it must
+    /// not be retried for belongs in `T`. It may run several times, and
+    /// whatever it allocated in a segment it then failed in is left behind as
+    /// unreachable slack.
+    ///
+    /// Whether this succeeds must not depend on how much the owner allocated
+    /// before, or two Block-STM schedules could disagree on whether the same
+    /// value can be read. Hence every retry starts from an empty segment whose
+    /// size depends only on the attempt number.
+    pub fn alloc_in<T>(
+        &self,
+        alloc: impl Fn(&Arc<SharedArena>) -> Option<T>,
+    ) -> Option<(T, Arc<SharedArena>)> {
+        let mut segments = self.segments.borrow_mut();
+
+        if let Some(current) = segments.last().cloned() {
+            if let Some(value) = alloc(&current) {
+                return Some((value, current));
+            }
+        }
+
+        // Too little room left, or no segment yet: retire the current one and
+        // grow.
+        let fresh = new_segment(SEGMENT_BYTES);
+        if let Some(value) = alloc(&fresh) {
+            segments.push(fresh.clone());
+            return Some((value, fresh));
+        }
+
+        // The value outgrows a whole segment, so give it one of its own. Such a
+        // segment never becomes the allocation target; only the pin returned
+        // here keeps it alive.
+        let mut size = SEGMENT_BYTES;
+        while size < MAX_SEGMENT_BYTES {
+            size = size.saturating_mul(2).min(MAX_SEGMENT_BYTES);
+            let private = new_segment(size);
+            if let Some(value) = alloc(&private) {
+                return Some((value, private));
+            }
+        }
+        None
+    }
+}
+
+impl Default for SegmentedArena {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn new_segment(size: usize) -> Arc<SharedArena> {
+    #[allow(clippy::arc_with_non_send_sync)]
+    Arc::new(SharedArena::new(size))
+}
 
 /// Outcome of a bump-allocation attempt.
 #[derive(Debug)]
@@ -1413,7 +1504,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::global_storage::WriteClass;
+    use crate::{global_storage::WriteClass, types::DEFAULT_HEAP_SIZE};
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
         storage::resource_provider::{InMemoryStorageKey, NoResourceProvider},
@@ -1519,5 +1610,74 @@ mod tests {
         assert_ne!(moved, live);
         // SAFETY: the write now points at the copy in the evacuated heap.
         assert_eq!(unsafe { read_u64(moved.as_ptr(), 0usize) }, SENTINEL);
+    }
+}
+
+#[cfg(test)]
+mod segmented_arena_tests {
+    use super::*;
+
+    const PAYLOAD: usize = SEGMENT_BYTES / 2;
+
+    fn alloc_in_segment(segment: &SharedArena, payload: usize) -> Option<NonNull<u8>> {
+        segment.with_heap_mut(|heap: &mut Heap| {
+            heap.alloc_object(OBJECT_HEADER_SIZE + payload, DescriptorId(0))
+        })
+    }
+
+    fn alloc(arena: &SegmentedArena, payload: usize) -> Option<NonNull<u8>> {
+        arena
+            .alloc_in(|segment| alloc_in_segment(segment, payload))
+            .map(|(ptr, _)| ptr)
+    }
+
+    /// Leaves the arena's newest segment without room for another `PAYLOAD`.
+    fn fill_newest_segment(arena: &SegmentedArena) {
+        // The arena starts empty, so allocate once to bring a segment into
+        // existence before filling it.
+        alloc(arena, PAYLOAD).expect("A fresh arena serves the first allocation");
+        let segment = arena.segments.borrow().last().unwrap().clone();
+        while alloc_in_segment(&segment, PAYLOAD).is_some() {}
+    }
+
+    #[test]
+    fn a_fresh_arena_reserves_nothing() {
+        assert!(SegmentedArena::new().segments.borrow().is_empty());
+    }
+
+    #[test]
+    fn grows_past_a_full_segment() {
+        let arena = SegmentedArena::new();
+        fill_newest_segment(&arena);
+        assert!(alloc(&arena, PAYLOAD).is_some());
+        assert_eq!(arena.segments.borrow().len(), 2);
+    }
+
+    #[test]
+    fn success_does_not_depend_on_prior_allocations() {
+        // The point of growing: the same value must be admissible no matter how
+        // full the arena was, or two Block-STM schedules could disagree on
+        // whether it can be read.
+        let fresh = SegmentedArena::new();
+        assert!(alloc(&fresh, PAYLOAD).is_some());
+
+        let used = SegmentedArena::new();
+        fill_newest_segment(&used);
+        assert!(alloc(&used, PAYLOAD).is_some());
+    }
+
+    #[test]
+    fn oversized_value_gets_a_private_segment() {
+        let arena = SegmentedArena::new();
+        alloc(&arena, PAYLOAD).expect("A fresh arena serves the first allocation");
+        // Bigger than a whole segment, so only the doubling ladder can serve it.
+        let (_, segment) = arena
+            .alloc_in(|segment| alloc_in_segment(segment, SEGMENT_BYTES + 1))
+            .expect("A value just over a segment still fits under the cap");
+        assert!(!Arc::ptr_eq(
+            &segment,
+            arena.segments.borrow().last().unwrap()
+        ));
+        assert_eq!(arena.segments.borrow().len(), 1);
     }
 }
