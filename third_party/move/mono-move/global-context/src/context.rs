@@ -456,6 +456,10 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
     /// Inserts a loaded module into the cache, keyed by its interned ID.
     ///
+    /// TODO(correctness): include deserializer and verifier configs in module
+    /// and script cache keys, or clear both caches when on-chain configs
+    /// change. Reusing cached code would bypass the updated rules.
+    ///
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
     /// `Ok`.

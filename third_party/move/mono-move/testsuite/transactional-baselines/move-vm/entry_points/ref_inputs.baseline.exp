@@ -1,0 +1,18 @@
+processed 9 tasks
+task 0 lines 1-16:  publish [module 0x42::M]
+task 1 lines 20-23:  run --args 0 [script]
+Error: unsupported by MonoVM: reference parameters
+task 2 lines 27-30:  run --args false [script]
+Error: unsupported by MonoVM: reference parameters
+task 3 lines 34-38:  run --args 0 false 0 0 [script]
+Error: unsupported by MonoVM: reference parameters
+task 4 lines 42-45:  run --type-args u64 bool 0x42::M::S 0x42::M::S --args 0 false 0 0 [script]
+Error: unsupported by MonoVM: reference parameters
+task 5 lines 49-49:  run 0x42::M::t1 --args 0
+Error: unsupported by MonoVM: reference parameters
+task 6 lines 51-51:  run 0x42::M::t2 --args false
+Error: unsupported by MonoVM: reference parameters
+task 7 lines 53-53:  run 0x42::M::t3 --args 0 false 0 0
+Error: unsupported by MonoVM: reference parameters
+task 8 lines 55-55:  run 0x42::M::tgen --type-args u64 bool 0x42::M::S 0x42::M::S --args 0 false 0 0
+Error: unsupported by MonoVM: reference parameters
