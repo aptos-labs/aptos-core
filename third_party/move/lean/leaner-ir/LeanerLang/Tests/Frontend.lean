@@ -543,6 +543,17 @@ leaner module 0x42::mixed_index_check where
     core.assignPlace(checked[index], 0)
     core.assignPlace(other[index], 0)
 
+-- A bounds check whose matching access is a later operand is not the check
+-- index sugar implies: operands evaluate left to right, so an earlier one
+-- acts, or aborts, before the implied check would run.
+leaner module 0x42::operand_order_index_check where
+  pragma verify = false
+  fun counter() -> u64 := 0
+  fun observe_pair(value : u64, target : &mut u64) -> Unit := ()
+  fun borrow_second(values : &mut Vector<u64>, index : u64) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
+    observe_pair(counter(), core.borrowPlace(mut, values[index]))
+
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
     value : u64
@@ -1075,6 +1086,11 @@ elab "#guard_leaner_frontend" : command => do
       unless printed.contains "checked[index] := 0" &&
           printed.contains "core.assignPlace(other[index], 0)" do
         throwError "an unchecked access of another vector gained index sugar:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».operand_order_index_check) with
+  | .error error => throwError "the operand-order index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
+        throwError "a bounds check before a later operand's access was elided:\n{printed}"
   let some surfaceRegressions := LeanerLang.registeredUnit? env `«0x42».surface_regressions
     | throwError "the surface-regression fixture was not registered"
   match LeanerLang.Print.render env surfaceRegressions with

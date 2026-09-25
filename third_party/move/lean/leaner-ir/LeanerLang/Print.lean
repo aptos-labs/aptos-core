@@ -1262,13 +1262,30 @@ private partial def observesPlace (context : Context) (fuel : Nat) (value : Expr
         i == j && observesPlace context fuel inner base
     | _, _ => false
 
+/-- Whether an operand evaluates with no effect and no abort, so an operand
+after it still runs before anything observable. -/
+private def inertOperand (context : Context) (operand : ExprId) : Bool :=
+  let kind : Option ExprKind := (context.ns.expressions[operand.index]?).map (·.kind)
+  match kind with
+  | some (.value ..) | some (.localVar _) => true
+  | _ => false
+
+/-- The prefix of a left-to-right operand list that still evaluates before
+anything observable: the operands up to and including the first that is not
+inert. What follows it runs only after that operand's effects, or not at all
+if it aborts. -/
+private def actingPrefix (context : Context) (operands : Array ExprId) : Array ExprId :=
+  match operands.findIdx? (fun operand => !inertOperand context operand) with
+  | some index => operands.extract 0 (index + 1)
+  | none => operands
+
 /-- The children an expression evaluates first and unconditionally: its
-operands, a binding's value, a condition, a scrutinee, a block's first
-statement. A branch, a loop body, and what follows a binding are not among
-them, except past the index checks and index temporaries that precede an
-element access. -/
+leading operands, a binding's value, a condition, a scrutinee, a block's
+first statement. A branch, a loop body, an operand behind one that acts, and
+what follows a binding are not among them, except past the index checks and
+index temporaries that precede an element access. -/
 private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
-  | .operation _ _ arguments _ => arguments
+  | .operation _ _ arguments _ => actingPrefix context arguments
   | .letDecl pattern (some value) body =>
       let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
       let valueKind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
@@ -1286,8 +1303,8 @@ private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
       | some first, _ => #[first]
       | none, some result => #[result]
       | none, none => #[]
-  | .return_ values => values
-  | .throw_ _ arguments => arguments
+  | .return_ values => actingPrefix context values
+  | .throw_ _ arguments => actingPrefix context arguments
   | .break_ _ (some value) => #[value]
   | _ => #[]
 
