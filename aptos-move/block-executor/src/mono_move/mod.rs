@@ -467,6 +467,7 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             &self.environment,
             usage,
         )
+        .map_err(|e| code_invariant_error(format!("MonoMove: {e}")))?
         .without_metering()
         .execute_transaction(inner_txn, auxiliary_info);
 

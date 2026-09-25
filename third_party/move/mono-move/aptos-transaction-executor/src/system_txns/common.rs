@@ -9,6 +9,7 @@ use crate::{
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
+    symbols::FrameworkSymbols,
 };
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -16,14 +17,13 @@ use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{BlockEpiloguePayload, SessionId},
 };
-use mono_move_core::{GasMeter, Interner, VMInternalError};
-use mono_move_global_context::ExecutionGuard;
+use mono_move_core::{
+    interner::InternedIdentifier, types::EMPTY_TYPE_LIST, GasMeter, VMInternalError,
+};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
 use mono_move_runtime::{CallBuilder, InterpreterContext};
-use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
-
-const BLOCK: &IdentStr = ident_str!("block");
+use move_core_types::account_address::AccountAddress;
 
 /// The VM's signer (`0x0`), which every `0x1::block` call runs as.
 pub(super) const VM_SIGNER: AccountAddress = AccountAddress::ZERO;
@@ -123,17 +123,15 @@ pub(super) fn discard_system_session(
 /// args after the VM signer.
 pub(super) fn call_block_function<'a>(
     interp: &mut InterpreterContext<'a>,
-    guard: &ExecutionGuard<'a>,
-    function: &IdentStr,
+    symbols: &FrameworkSymbols,
+    function: InternedIdentifier,
     place: impl FnOnce(&mut CallBuilder<'_, '_>) -> Result<(), VMInternalError>,
 ) -> Result<(), MoveExecutionFailure> {
     let status = call_system_function_unmetered(
-        guard,
         interp,
-        &AccountAddress::ONE,
-        BLOCK,
+        symbols.block,
         function,
-        guard.type_list_of(&[]),
+        EMPTY_TYPE_LIST,
         &[VM_SIGNER],
         place,
     )

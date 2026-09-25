@@ -2,8 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    errors::{DiscardReason, NoEffectsReason},
+    errors::{DiscardReason, ExecutorCreationError, NoEffectsReason},
     outcome::TxnOutcome,
+    symbols::FrameworkSymbols,
 };
 use aptos_types::{
     state_store::state_storage_usage::StateStorageUsage,
@@ -11,7 +12,7 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_core::{storage::module_provider::ModuleProvider, ResourceProvider};
-use mono_move_global_context::ExecutionGuard;
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::ProductionNativeRegistry;
 
 /// The Aptos transaction executor on MonoMove (the legacy AptosVM's role).
@@ -22,6 +23,8 @@ use mono_move_runtime::ProductionNativeRegistry;
 /// `system_txns`.
 pub struct AptosTransactionExecutor<'a> {
     pub(crate) guard: &'a ExecutionGuard<'a>,
+    /// The framework symbols preinstalled into `guard`'s context.
+    pub(crate) symbols: &'a FrameworkSymbols,
     /// All native functions available for this executor.
     pub(crate) natives: &'a ProductionNativeRegistry,
     pub(crate) module_provider: &'a dyn ModuleProvider,
@@ -41,7 +44,8 @@ pub struct AptosTransactionExecutor<'a> {
 impl<'a> AptosTransactionExecutor<'a> {
     /// Constructs a new `AptosTransactionExecutor`. The borrowed contexts are
     /// built and owned by the block coordinator, which reuses them across the
-    /// executors it creates.
+    /// executors it creates; `guard`'s context must have been prepared with
+    /// `preinstall`.
     pub fn new(
         guard: &'a ExecutionGuard<'a>,
         natives: &'a ProductionNativeRegistry,
@@ -49,16 +53,20 @@ impl<'a> AptosTransactionExecutor<'a> {
         data_provider: &'a dyn ResourceProvider,
         env: &'a AptosEnvironment,
         usage: StateStorageUsage,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, ExecutorCreationError> {
+        let symbols = guard
+            .preinstalled::<FrameworkSymbols>()
+            .ok_or(ExecutorCreationError::ContextNotPrepared)?;
+        Ok(Self {
             guard,
+            symbols,
             natives,
             module_provider,
             data_provider,
             env,
             usage,
             unmetered: false,
-        }
+        })
     }
 
     /// Runs the payload unmetered, making the epilogue charge a zero fee.
@@ -67,6 +75,17 @@ impl<'a> AptosTransactionExecutor<'a> {
     pub fn without_metering(mut self) -> Self {
         self.unmetered = true;
         self
+    }
+
+    /// Preinstalls into `ctx` what every executor running in it reads. Call
+    /// once per context before execution, and again after its arenas are
+    /// reset.
+    pub fn preinstall(ctx: &mut GlobalContext) {
+        let symbols = FrameworkSymbols::new(
+            &ctx.try_execution_context(0)
+                .expect("no execution is in progress"),
+        );
+        ctx.preinstall(symbols);
     }
 
     /// Executes any transaction, dispatching to its kind's entry point.

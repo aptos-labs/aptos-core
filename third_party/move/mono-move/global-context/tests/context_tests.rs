@@ -4,6 +4,7 @@
 //! Integration tests for acquiring execution or maintenance guards from global
 //! context.
 
+use mono_move_core::Interner;
 use mono_move_global_context::GlobalContext;
 use move_core_types::{account_address::AccountAddress, ident_str};
 use std::{
@@ -120,4 +121,35 @@ fn test_global_arena_reset() {
     guard.reset_arena_pool();
     assert_eq!(guard.interned_identifiers_count(), 0);
     assert_eq!(guard.interned_module_ids_count(), 0);
+}
+
+/// A preinstalled value is read by every guard until the arenas are reset.
+#[test]
+fn test_preinstalled_values() {
+    struct Symbols(mono_move_core::interner::InternedIdentifier);
+
+    let mut ctx = GlobalContext::with_num_execution_workers(1);
+    let foo = ctx
+        .try_execution_context(0)
+        .unwrap()
+        .identifier_of(ident_str!("foo"));
+    ctx.preinstall(Symbols(foo));
+    {
+        let guard = ctx.try_execution_context(0).unwrap();
+        assert_eq!(guard.preinstalled::<Symbols>().unwrap().0, foo);
+    }
+
+    let mut guard = ctx.maintenance_context();
+    assert_eq!(guard.preinstalled_count(), 1);
+    guard.reset_arena_pool();
+    assert_eq!(guard.preinstalled_count(), 0);
+}
+
+#[test]
+fn test_preinstalled_value_missing() {
+    struct Missing;
+
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
+    assert!(guard.preinstalled::<Missing>().is_none());
 }
