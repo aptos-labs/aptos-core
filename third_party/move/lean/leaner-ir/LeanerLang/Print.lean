@@ -1262,26 +1262,29 @@ private partial def observesPlace (context : Context) (fuel : Nat) (value : Expr
         i == j && observesPlace context fuel inner base
     | _, _ => false
 
-/-- Whether a place is reached without an index, so reading it neither
-aborts nor gains an implied bounds check when index sugar is re-imported. -/
-private def indexFreePlace (context : Context) (place : PlaceId) : Bool :=
+/-- Whether reading a place neither fails nor gains an implied bounds check
+when index sugar is re-imported. An index would gain one, and a field
+projection resolves against the value's active variant, so it fails when
+that variant does not carry the field; only a local and a dereference of
+one are unconditional. -/
+private def inertPlace (context : Context) (place : PlaceId) : Bool :=
   let rec along : Nat → PlaceId → Bool
     | 0, _ => false
     | fuel + 1, place => match context.ns.places[place.index]? with
       | some (.localVar _) => true
-      | some (.deref base) | some (.field base ..) => along fuel base
+      | some (.deref base) => along fuel base
       | _ => false
   along (context.ns.places.size + 1) place
 
 /-- Whether an operand evaluates with no effect and no abort, so an operand
 after it still runs before anything observable: a literal, a local, and a
-read of a place no index leads to. -/
+read of a place that resolves unconditionally. -/
 private def inertOperand (context : Context) (operand : ExprId) : Bool :=
   let kind : Option ExprKind := (context.ns.expressions[operand.index]?).map (·.kind)
   match kind with
   | some (.value ..) | some (.localVar _) => true
   | some (.operation (.move place) _ _ _) | some (.operation (.copy place) _ _ _)
-  | some (.operation (.read place) _ _ _) => indexFreePlace context place
+  | some (.operation (.read place) _ _ _) => inertPlace context place
   | _ => false
 
 /-- The prefix of a left-to-right operand list that still evaluates before

@@ -564,6 +564,18 @@ leaner module 0x42::assigned_value_index_check where
     let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
     core.assignPlace(values[index], counter())
 
+-- A field projection resolves against the value's active variant, so reading
+-- one can fail where the variant does not carry it. An assigned value that
+-- reads a field therefore does not keep the bounds check first.
+leaner module 0x42::variant_field_index_check where
+  pragma verify = false
+  enum Choice has Copy, Drop where
+    | Payload (value : u64)
+    | Nothing
+  fun assign_field(values : &mut Vector<u64>, index : u64, choice : &Choice) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
+    core.assignPlace(values[index], core.read(choice.value))
+
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
     value : u64
@@ -1106,6 +1118,11 @@ elab "#guard_leaner_frontend" : command => do
   | .ok printed =>
       unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
         throwError "a bounds check before an assignment of a computed value was elided:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».variant_field_index_check) with
+  | .error error => throwError "the variant-field index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
+        throwError "a bounds check before an assignment of a field read was elided:\n{printed}"
   let some surfaceRegressions := LeanerLang.registeredUnit? env `«0x42».surface_regressions
     | throwError "the surface-regression fixture was not registered"
   match LeanerLang.Print.render env surfaceRegressions with
