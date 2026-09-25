@@ -52,6 +52,10 @@ keep the integration reviewable; worth reconsidering once the integration lands.
 
 ## Measurements
 
+The numbers below are a one-off profiling run. Per-workload speedups against
+the V1 VM at 16 threads come from the `mono-move-e2e-perf-parallel` CI job; see
+`../testsuite/e2e-perf/README.md`.
+
 Apple M4 Max, 10 performance + 4 efficiency cores. `aptos-executor-benchmark`
 replaying 200 identical recorded blocks of 1000 `apt-fa-transfer`,
 `--split-stages`, one transaction per sender, MonoMove on Block-STM v2.
