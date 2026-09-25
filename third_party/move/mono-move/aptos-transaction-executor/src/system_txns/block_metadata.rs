@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::common::{
-    call_block_function, finish_system_session, system_txn_outcome, SystemTxnMetadata,
+    call_block_function, discard_system_session, system_txn_outcome, SystemTxnMetadata,
 };
 use crate::{
     errors::{invariant_violation, MoveExecutionFailure, SystemTxnFailure},
@@ -31,13 +31,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         match run_block_prologue(&mut interp, self.symbols, block_metadata) {
             Ok(()) => system_txn_outcome(interp),
             Err(failure) => {
-                // The prologue failure already aborts the block, so there is
-                // nothing left to validate and a failure while closing the
-                // session adds nothing.
+                // The prologue failure already aborts the block, so a failure
+                // while closing the session adds nothing.
                 //
                 // TODO(cleanup): refactor the returned results so that we have
                 // a single source of truth locally.
-                let _ = finish_system_session(interp);
+                let _ = discard_system_session(interp);
                 TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
                     call: "block_prologue",
                     failure,
@@ -62,13 +61,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         match run_block_prologue_ext(&mut interp, self.symbols, block_metadata_ext) {
             Ok(()) => system_txn_outcome(interp),
             Err(failure) => {
-                // The prologue failure already aborts the block, so there is
-                // nothing left to validate and a failure while closing the
-                // session adds nothing.
+                // The prologue failure already aborts the block, so a failure
+                // while closing the session adds nothing.
                 //
                 // TODO(cleanup): refactor the returned results so that we have
                 // a single source of truth locally.
-                let _ = finish_system_session(interp);
+                let _ = discard_system_session(interp);
                 TxnOutcome::UnexpectedSystemTransactionFailure(SystemTxnFailure {
                     call: "block_prologue_ext",
                     failure,
