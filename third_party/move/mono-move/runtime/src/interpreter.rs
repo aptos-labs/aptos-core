@@ -11,7 +11,7 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
+        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc, evacuate_session_roots,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         FrozenHeap, Heap, TopFrame,
     },
@@ -153,23 +153,6 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
     );
     // SAFETY: the offset is within `stack`, checked above.
     unsafe { stack.as_ptr().add(FRAME_METADATA_SIZE) }
-}
-
-/// A fresh interpreter stack. Its contents are unspecified and must be written
-/// before they are read.
-///
-/// Release builds zero the region, so a slot read before it is written holds a
-/// defined value instead of an undefined one. A worker allocates one stack and
-/// reuses it, so the zeroing costs nothing per transaction. Debug builds poison
-/// and Miri gets genuinely uninitialized memory, so both still catch a read
-/// before write.
-fn new_stack_region() -> MemoryRegion {
-    if cfg!(miri) {
-        return MemoryRegion::new_uninit(DEFAULT_STACK_SIZE);
-    }
-    let mut region = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
-    region.recycle();
-    region
 }
 
 /// The function pointer saved in the metadata below the frame at `fp`: that
@@ -461,11 +444,8 @@ impl<'guard> InterpreterContext<'guard> {
         //
         // INVARIANT: the root frame's metadata sits below every frame, so no
         // call writes it. It is written explicitly below.
-        let stack = loader
-            .guard()
-            .take_stack_region()
-            .unwrap_or_else(new_stack_region);
-        debug_assert_eq!(stack.len(), DEFAULT_STACK_SIZE);
+        let stack = loader.guard().take_region(DEFAULT_STACK_SIZE);
+        let heap = Heap::from_region(loader.guard().take_region(options.heap_size));
 
         // Built before the metadata writes below: it asserts the region is
         // large enough to hold them.
@@ -494,7 +474,7 @@ impl<'guard> InterpreterContext<'guard> {
             resource_provider,
             registers,
             stack,
-            heap: Heap::new(options.heap_size),
+            heap,
             root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
@@ -641,19 +621,55 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. The session heap is frozen into the effects, so every heap
-    /// pointer they hold stays valid for as long as they live. Their interned
-    /// types are not: the effects do not borrow the guard, so the caller must
-    /// keep the global arena alive until the effects are dropped.
-    pub fn finish(self) -> SessionEffects {
-        self.loader.guard().return_stack_region(self.stack);
+    /// publication. The effects are copied out of the session heap into a
+    /// buffer sized to what the session allocated, which is then frozen into
+    /// them, so every heap pointer they hold stays valid for as long as they
+    /// live. Their interned types are not: the effects do not borrow the guard,
+    /// so the caller must keep the global arena alive until the effects are
+    /// dropped.
+    ///
+    /// Fails only on a VM bug. The copy leaves the session heap half-forwarded,
+    /// so nothing is recoverable afterwards and the block has to be aborted.
+    pub fn finish(self) -> VMResult<SessionEffects> {
+        let Self {
+            loader,
+            read_set: _,
+            gas_meter: _,
+            natives: _,
+            extensions,
+            resource_provider: _,
+            registers: _,
+            stack,
+            heap,
+            root_pool,
+            mut read_write_set,
+            rng: _,
+        } = self;
 
-        SessionEffects {
-            read_write_set: self.read_write_set,
-            extensions: self.extensions,
-            #[allow(clippy::arc_with_non_send_sync)]
-            heap: std::sync::Arc::new(FrozenHeap::new(self.heap)),
+        // The call stack is gone and every handle is scoped to one allocation,
+        // so the read-write set and the extensions are the complete root set.
+        // A root left behind means evacuation would miss it and overwrite the
+        // original with a forwarding marker.
+        if root_pool.has_live_roots() {
+            invariant_violation!(LiveRootAtSessionEnd);
         }
+
+        let guard = loader.guard();
+        // TODO(perf): the evacuated region is never returned to the pool. It
+        // outlives the session inside an `Arc<FrozenHeap>`, so returning it
+        // needs a hook on the last drop.
+        let to_space = guard.take_region(heap.used().max(MAX_ALIGN));
+        let evacuated =
+            evacuate_session_roots(&heap, to_space, guard, &mut read_write_set, &extensions)?;
+        guard.return_region(heap.into_region());
+        guard.return_region(stack);
+
+        Ok(SessionEffects {
+            read_write_set,
+            extensions,
+            #[allow(clippy::arc_with_non_send_sync)]
+            heap: std::sync::Arc::new(FrozenHeap::new(evacuated)),
+        })
     }
 
     /// Runs `f` with gas metering suspended: the meter is swapped for an
@@ -2627,12 +2643,11 @@ impl InterpreterContext<'_> {
         unsafe {
             let dst = regs.fp.add(usize::from(dst));
             deserialize_or_gc(
-                self.loader.guard(),
                 &mut self.heap,
+                self.loader.guard(),
                 ty,
                 bytes,
                 dst,
-                self.loader.guard(),
                 &mut self.read_write_set,
                 &self.root_pool,
                 &self.extensions,
@@ -3310,7 +3325,6 @@ impl InterpreterContext<'_> {
                 abi,
                 view_type_list(ty_args),
                 &mut self.gas_meter,
-                guard,
                 guard,
                 self.resource_provider,
                 &resolve_resource_group,

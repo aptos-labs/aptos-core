@@ -16,7 +16,11 @@ pub use mono_move_core::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 /// results, and every node has to agree on the value.
 pub(crate) const DEFAULT_STACK_SIZE: usize = 1024 * 1024; // 1 MiB
 
-pub(crate) const DEFAULT_HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
+/// Size of a session's heap. This bounds how much a transaction can have live
+/// at once, so it decides which programs fail with an out-of-memory error.
+/// Changing it changes execution results, and every node has to agree on the
+/// value.
+pub(crate) const DEFAULT_HEAP_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 
 /// Initial capacity, in elements, of a vector allocated lazily on its first
 /// `push_back`.

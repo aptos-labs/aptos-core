@@ -437,22 +437,21 @@ impl<'ctx> MaintenanceGuard<'ctx> {
 }
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    /// Takes the interpreter stack parked on this guard's arena, or [`None`]
-    /// if there is none parked.
+    /// A region of exactly `size` bytes, reusing one parked on this guard's
+    /// arena when there is one.
     ///
-    /// The region is not zeroed: it holds whatever the previous owner left
-    /// behind, so the caller must write every byte before reading it. Return
-    /// it with [`Self::return_stack_region`] when done.
-    pub fn take_stack_region(&self) -> Option<MemoryRegion> {
-        self.global_arena.take_stack_region()
+    /// The region's contents are unspecified: it may hold whatever its
+    /// previous owner left behind. The caller must write every byte before
+    /// reading it, and zero the region itself if it needs zeroed memory.
+    /// Return it with [`Self::return_region`] when done.
+    pub fn take_region(&self, size: usize) -> MemoryRegion {
+        self.global_arena.take_region(size)
     }
 
-    /// Parks an interpreter stack on this guard's arena for its next user.
-    ///
-    /// INVARIANT: every user of a guard's stack region agrees on its size.
-    /// The region is parked and handed out as is, with no size check.
-    pub fn return_stack_region(&self, region: MemoryRegion) {
-        self.global_arena.return_stack_region(region)
+    /// Parks a region on this guard's arena for its next user. A region whose
+    /// size is not pooled is dropped.
+    pub fn return_region(&self, region: MemoryRegion) {
+        self.global_arena.return_region(region)
     }
 
     /// Inserts a loaded module into the cache, keyed by its interned ID.

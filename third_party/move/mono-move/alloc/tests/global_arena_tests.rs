@@ -3,7 +3,11 @@
 
 //! Integration tests for [`GlobalArenaPool`] and [`GlobalArenaPtr`].
 
-use mono_move_alloc::{GlobalArenaPool, MemoryRegion};
+use mono_move_alloc::GlobalArenaPool;
+
+/// Smallest and largest pooled sizes, 32 KiB and 4 MiB.
+const MIN_POOLED: usize = 1 << 15;
+const MAX_POOLED: usize = 1 << 22;
 
 #[test]
 fn test_alloc() {
@@ -44,30 +48,91 @@ fn test_default() {
     assert!(pool.num_arenas() >= 1);
 }
 
+/// Under Miri every take allocates, so no two of these tests' pointers ever
+/// match. Reuse is what the assertions below are about, so they do not run.
+fn reuse_is_observable() -> bool {
+    !cfg!(miri)
+}
+
 #[test]
-fn test_stack_region_parking() {
+fn test_returned_region_comes_back() {
+    if !reuse_is_observable() {
+        return;
+    }
+    for size in [MIN_POOLED, MAX_POOLED] {
+        let pool = GlobalArenaPool::default();
+        let arena = pool.lock_arena(0);
+
+        let region = arena.take_region(size);
+        assert_eq!(region.len(), size);
+        let ptr = region.as_ptr();
+        arena.return_region(region);
+
+        let taken = arena.take_region(size);
+        assert_eq!(taken.as_ptr(), ptr);
+        assert_eq!(taken.len(), size);
+    }
+}
+
+#[test]
+fn test_bucket_holds_more_than_one_region() {
+    if !reuse_is_observable() {
+        return;
+    }
     let pool = GlobalArenaPool::default();
     let arena = pool.lock_arena(0);
 
-    assert!(arena.take_stack_region().is_none());
+    let first = arena.take_region(MIN_POOLED);
+    let second = arena.take_region(MIN_POOLED);
+    let mut parked = vec![first.as_ptr(), second.as_ptr()];
+    assert_ne!(parked[0], parked[1]);
+    arena.return_region(first);
+    arena.return_region(second);
 
-    let region = MemoryRegion::new_uninit(1024);
-    let ptr = region.as_ptr();
-    arena.return_stack_region(region);
+    let mut taken = vec![
+        arena.take_region(MIN_POOLED).as_ptr(),
+        arena.take_region(MIN_POOLED).as_ptr(),
+    ];
+    parked.sort();
+    taken.sort();
+    assert_eq!(parked, taken);
+}
 
-    // Miri opts out of reuse so it can still catch reads of uninitialized
-    // memory, and always hands out a fresh region.
-    if cfg!(miri) {
-        assert!(arena.take_stack_region().is_none());
+#[test]
+fn test_buckets_do_not_mix_sizes() {
+    if !reuse_is_observable() {
         return;
     }
+    let pool = GlobalArenaPool::default();
+    let arena = pool.lock_arena(0);
 
-    let taken = arena.take_stack_region().expect("a region was parked");
-    assert_eq!(taken.as_ptr(), ptr);
-    assert_eq!(taken.len(), 1024);
+    let big = arena.take_region(MAX_POOLED);
+    let ptr = big.as_ptr();
+    arena.return_region(big);
 
-    // Only one region is parked, and it is out.
-    assert!(arena.take_stack_region().is_none());
+    let small = arena.take_region(MIN_POOLED);
+    assert_ne!(small.as_ptr(), ptr);
+    assert_eq!(small.len(), MIN_POOLED);
+
+    // The big region is still parked in its own bucket.
+    assert_eq!(arena.take_region(MAX_POOLED).as_ptr(), ptr);
+}
+
+#[test]
+fn test_unpooled_sizes_are_served_exactly() {
+    let pool = GlobalArenaPool::default();
+    let arena = pool.lock_arena(0);
+
+    // Not a power of two, below the floor, and above the ceiling. Returning
+    // one drops it, which must leave the pooled buckets alone.
+    for size in [MIN_POOLED + 8, MIN_POOLED / 2, MAX_POOLED * 2] {
+        let region = arena.take_region(size);
+        assert_eq!(region.len(), size);
+        arena.return_region(region);
+    }
+
+    let pooled = arena.take_region(MIN_POOLED);
+    assert_eq!(pooled.len(), MIN_POOLED);
 }
 
 #[test]
