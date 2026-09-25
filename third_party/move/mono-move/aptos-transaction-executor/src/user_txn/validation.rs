@@ -10,20 +10,16 @@ use super::metadata::TxnMetadata;
 use crate::{
     calls::call_system_function_unmetered,
     errors::{call_result, MoveExecutionFailure},
+    symbols::FrameworkSymbols,
 };
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{EpilogueArgs, PrologueArgs},
 };
-use mono_move_core::{Interner, VMInternalError};
-use mono_move_global_context::ExecutionGuard;
+use mono_move_core::{interner::InternedIdentifier, types::EMPTY_TYPE_LIST, VMInternalError};
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
-use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
+use move_core_types::account_address::AccountAddress;
 use move_value_view::MoveValueView;
-
-const TRANSACTION_VALIDATION: &IdentStr = ident_str!("transaction_validation");
-const VERSIONED_PROLOGUE: &IdentStr = ident_str!("versioned_prologue");
-const VERSIONED_EPILOGUE: &IdentStr = ident_str!("versioned_epilogue");
 
 /// The signers the prologue and epilogue take.
 pub(crate) struct ValidationSigners {
@@ -42,19 +38,17 @@ impl ValidationSigners {
 
 /// Calls `0x1::transaction_validation::<function>(sender, fee_payer, args)`.
 fn call_validation_function_unmetered<'a>(
-    guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
-    function: &IdentStr,
+    symbols: &FrameworkSymbols,
+    function: InternedIdentifier,
     signers: &ValidationSigners,
     args: &impl MoveValueView,
 ) -> Result<RuntimeStatus, VMInternalError> {
     call_system_function_unmetered(
-        guard,
         interp,
-        &AccountAddress::ONE,
-        TRANSACTION_VALIDATION,
+        symbols.transaction_validation,
         function,
-        guard.type_list_of(&[]),
+        EMPTY_TYPE_LIST,
         &[signers.sender, signers.fee_payer],
         |call| call.arg(args),
     )
@@ -62,7 +56,7 @@ fn call_validation_function_unmetered<'a>(
 
 pub(crate) fn run_prologue<'a>(
     interp: &mut InterpreterContext<'a>,
-    guard: &ExecutionGuard<'a>,
+    symbols: &FrameworkSymbols,
     signers: &ValidationSigners,
     txn_data: &TxnMetadata,
 ) -> Result<(), MoveExecutionFailure> {
@@ -81,15 +75,20 @@ pub(crate) fn run_prologue<'a>(
         // TODO(completeness): transaction limits requests (staking multipliers).
         txn_limits_request: None,
     };
-    let status =
-        call_validation_function_unmetered(guard, interp, VERSIONED_PROLOGUE, signers, &args)
-            .map_err(MoveExecutionFailure::RuntimeError)?;
+    let status = call_validation_function_unmetered(
+        interp,
+        symbols,
+        symbols.versioned_prologue,
+        signers,
+        &args,
+    )
+    .map_err(MoveExecutionFailure::RuntimeError)?;
     call_result(status)
 }
 
 pub(crate) fn run_epilogue<'a>(
     interp: &mut InterpreterContext<'a>,
-    guard: &ExecutionGuard<'a>,
+    symbols: &FrameworkSymbols,
     signers: &ValidationSigners,
     txn_data: &TxnMetadata,
     fee_statement: FeeStatement,
@@ -103,8 +102,13 @@ pub(crate) fn run_epilogue<'a>(
         is_simulation: false,
         is_orderless_txn: txn_data.is_orderless(),
     };
-    let status =
-        call_validation_function_unmetered(guard, interp, VERSIONED_EPILOGUE, signers, &args)
-            .map_err(MoveExecutionFailure::RuntimeError)?;
+    let status = call_validation_function_unmetered(
+        interp,
+        symbols,
+        symbols.versioned_epilogue,
+        signers,
+        &args,
+    )
+    .map_err(MoveExecutionFailure::RuntimeError)?;
     call_result(status)
 }
