@@ -28,7 +28,9 @@
 //! replay benchmark, which compares the two VMs by exact `TransactionStatus`
 //! equality and would report the divergence as a mismatch.
 
-use mono_move_core::{BytecodeOffset, ErrorLocation, GasExhaustedError, IntTy, VMInternalError};
+use mono_move_core::{
+    BytecodeOffset, ErrorLocation, ExecutionErrorKind, GasExhaustedError, IntTy, VMInternalError,
+};
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError};
 use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex};
@@ -203,6 +205,32 @@ pub fn describe(err: &VMInternalError) -> V1Equivalent {
     V1Equivalent::V1StatusUnknown
 }
 
+/// [`describe`] with a fallback when no V1 equivalent is available.
+/// Callers comparing with V1 must treat the fallback as a divergence.
+pub fn describe_or_fallback(err: &VMInternalError) -> V1ErrorInfo {
+    let status = match describe(err) {
+        V1Equivalent::Described(info) => return info,
+        // Execution-range codes throughout, so the executor keeps the
+        // transaction and the fee it already charged.
+        V1Equivalent::NoV1Failure => StatusCode::UNKNOWN_RUNTIME_STATUS,
+        // TODO(correctness): multiple error kinds share `UNKNOWN_RUNTIME_STATUS`;
+        // distinct codes would change committed transaction statuses.
+        V1Equivalent::V1StatusUnknown => match err.kind() {
+            ExecutionErrorKind::OutOfGas => StatusCode::OUT_OF_GAS,
+            ExecutionErrorKind::LinkingError => StatusCode::LINKER_ERROR,
+            ExecutionErrorKind::InvariantViolation
+            | ExecutionErrorKind::RuntimeLimitExceeded
+            | ExecutionErrorKind::InvalidOperation
+            | ExecutionErrorKind::Placeholder => StatusCode::UNKNOWN_RUNTIME_STATUS,
+        },
+    };
+    V1ErrorInfo {
+        status,
+        sub_status: V1SubStatus::Unmodelled,
+        message: V1Message::MonoText(err.to_string()),
+    }
+}
+
 /// Describes a runtime fault.
 pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
     use RuntimeError as E;
@@ -294,6 +322,7 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSSequenceTooLong { .. }
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
+        | E::BCSInvalidEnumTag { .. }
         | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.

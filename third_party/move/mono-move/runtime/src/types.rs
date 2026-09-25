@@ -20,7 +20,7 @@ pub(crate) const DEFAULT_STACK_SIZE: usize = 1024 * 1024; // 1 MiB
 /// at once, so it decides which programs fail with an out-of-memory error.
 /// Changing it changes execution results, and every node has to agree on the
 /// value.
-pub(crate) const DEFAULT_HEAP_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
+pub const DEFAULT_HEAP_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
 
 /// Initial capacity, in elements, of a vector allocated lazily on its first
 /// `push_back`.

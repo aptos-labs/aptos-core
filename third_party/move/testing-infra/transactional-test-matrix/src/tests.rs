@@ -103,6 +103,30 @@ fn every_non_applicable_config_records_a_reason() {
     }
 }
 
+fn assert_every_divergence_names_a_source<P>(corpus: &Corpus<P>) {
+    let sources = corpus.sources(&workspace_root().join(corpus.root));
+    for divergence in corpus.mono_move_divergences {
+        assert!(
+            sources.iter().any(|identity| identity == divergence.source),
+            "{}: divergence `{}` is not in the corpus",
+            corpus.name,
+            divergence.source
+        );
+        assert!(
+            !divergence.reason.trim().is_empty(),
+            "{}: divergence `{}` has an empty reason",
+            corpus.name,
+            divergence.source
+        );
+    }
+}
+
+#[test]
+fn every_divergence_names_a_source_and_records_a_reason() {
+    assert_every_divergence_names_a_source(&COMPILER_V2);
+    assert_every_divergence_names_a_source(&MOVE_VM);
+}
+
 fn assert_every_source_is_covered<P>(corpus: &Corpus<P>) {
     for identity in corpus.sources(&workspace_root().join(corpus.root)) {
         assert!(

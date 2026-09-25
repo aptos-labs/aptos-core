@@ -1300,6 +1300,9 @@ fn handle_expected_output(
     let exp_path = target.path(test_path);
 
     if update_requested && target.update_policy.may_write(exp_path.exists()) {
+        if let Some(parent) = exp_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         std::fs::write(&exp_path, output)?;
         return Ok(());
     }
