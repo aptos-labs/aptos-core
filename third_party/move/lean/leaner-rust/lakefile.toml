@@ -1,5 +1,5 @@
 name = "leaner-rust"
-defaultTargets = ["LeanerRust"]
+defaultTargets = ["LeanerRust", "leaner-rust"]
 testDriver = "LeanerRustTests"
 
 [[require]]
@@ -12,6 +12,9 @@ name = "LeanerRust"
 [[lean_exe]]
 name = "leaner-rust"
 root = "Main"
+# Elaborating the rendering runs imported elaborators, which may reach the
+# interpreter.
+supportInterpreter = true
 
 [[lean_lib]]
 name = "LeanerRustTests"

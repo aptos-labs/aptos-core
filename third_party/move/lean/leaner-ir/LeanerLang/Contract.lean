@@ -10,9 +10,11 @@ import LeanerLang.Registry
 import LeanerLang.SpecTypes
 import LeanerLang.Syntax
 import LeanerLang.ValueRep
+import LeanerIR.Proofs.Denote.Compile
 import LeanerIR.Proofs.Meaning
 import LeanerIR.Proofs.IntegerArithmetic
 import LeanerIR.Proofs.Denote.Types
+import LeanerIR.Proofs.Maps
 
 /-!
 # Generated contracts from LIR specifications
@@ -36,6 +38,7 @@ open Lean Meta Elab Command
 open LeanerIR (RuntimeValue ConstValue Operation PrimitiveOperation ExprId
   LocalId TypeId)
 open LeanerIR.Validation (ValidatedUnit ValidatedNamespace)
+open LeanerIR.Proofs (ObligationRange)
 open LeanerLang.Quote
 
 /-- The shared IR type node; `LeanerLang.Ty` is the surface type. -/
@@ -49,6 +52,48 @@ structure RecursiveDefinition where
   argument : Lean.Expr
   recurse : Lean.Expr
   measure : Lean.Expr
+  /-- The definition's result type, for the value of a guarded call. -/
+  resultType : Lean.Expr
+  /-- Whether a recursive call whose decrease the path conditions do not
+  prove is guarded by it, taking an arbitrary value where the measure does
+  not descend, rather than rejected. -/
+  guarded : Bool := false
+
+/-! ## Quotation of native types -/
+
+mutual
+/-- The literal of a native type.  An enum's distinctness witness is decided. -/
+partial def quoteNTy : LeanerIR.Proofs.Denote.NTy → MetaM Lean.Expr
+  | .unit => return mkConst ``LeanerIR.Proofs.Denote.NTy.unit
+  | .bool => return mkConst ``LeanerIR.Proofs.Denote.NTy.bool
+  | .int width signed => return mkAppN (mkConst ``LeanerIR.Proofs.Denote.NTy.int) #[toExpr width, toExpr signed]
+  | .address => return mkConst ``LeanerIR.Proofs.Denote.NTy.address
+  | .signer => return mkConst ``LeanerIR.Proofs.Denote.NTy.signer
+  | .string => return mkConst ``LeanerIR.Proofs.Denote.NTy.string
+  | .bytes => return mkConst ``LeanerIR.Proofs.Denote.NTy.bytes
+  | .tuple elements => return mkApp (mkConst ``LeanerIR.Proofs.Denote.NTy.tuple) (← quoteRow elements)
+  | .struct source fields =>
+      return mkAppN (mkConst ``LeanerIR.Proofs.Denote.NTy.struct) #[toExpr source, ← quoteRow fields]
+  | .enum source names rows _ => do
+      let namesExpr := toExpr names
+      let distinct ← mkDecideProof (← mkAppM ``List.Nodup #[namesExpr])
+      return mkAppN (mkConst ``LeanerIR.Proofs.Denote.NTy.enum) #[toExpr source, namesExpr, ← quoteRows rows, distinct]
+  | .vector element => return mkApp (mkConst ``LeanerIR.Proofs.Denote.NTy.vector) (← quoteNTy element)
+  | .ref referent => return mkApp (mkConst ``LeanerIR.Proofs.Denote.NTy.ref) (← quoteNTy referent)
+  | .param index => return mkApp (mkConst ``LeanerIR.Proofs.Denote.NTy.param) (toExpr index)
+
+partial def quoteRow : LeanerIR.Proofs.Denote.NRow → MetaM Lean.Expr
+  | .nil => return mkConst ``LeanerIR.Proofs.Denote.NRow.nil
+  | .cons τ rest => return mkAppN (mkConst ``LeanerIR.Proofs.Denote.NRow.cons) #[← quoteNTy τ, ← quoteRow rest]
+
+partial def quoteRows : LeanerIR.Proofs.Denote.NRows → MetaM Lean.Expr
+  | .nil => return mkConst ``LeanerIR.Proofs.Denote.NRows.nil
+  | .cons fields rest => return mkAppN (mkConst ``LeanerIR.Proofs.Denote.NRows.cons) #[← quoteRow fields, ← quoteRows rest]
+end
+
+def quoteShape : LeanerIR.Proofs.Denote.ResultShape → MetaM Lean.Expr
+  | .none => return mkConst ``LeanerIR.Proofs.Denote.ResultShape.none
+  | .one τ => return mkApp (mkConst ``LeanerIR.Proofs.Denote.ResultShape.one) (← quoteNTy τ)
 
 /-- Translation context for one function's specification clauses. -/
 structure Context where
@@ -81,6 +126,10 @@ structure Context where
   state : Option Lean.Expr := none
   /-- Runtime state `spec.old` reads storage from. -/
   oldState : Option Lean.Expr := none
+  /-- Lean binder each local denotes under `spec.old` inside a state anchor,
+  and the state the anchor saved: in a loop invariant, the loop's entry. -/
+  anchorLocals : Array (Option Lean.Expr) := #[]
+  anchorState : Option Lean.Expr := none
   /-- Typed twins of the unit's struct declarations. -/
   twins : Array SpecTypes.TwinInfo := #[]
   /-- Storable families with typed accessors a clause reads through. -/
@@ -88,6 +137,9 @@ structure Context where
   /-- Native representation environment of a generic contract. -/
   carrier : Option Lean.Expr := none
   codecs : Option Lean.Expr := none
+  /-- What the family's type parameters stand for (`Skolems.type`), which
+  names the type arguments of an opaque specification function. -/
+  types : Option Lean.Expr := none
   /-- Sparse declaration-type substitution selected for this invocation. -/
   typeInstantiation : Option Lean.Expr := none
   /-- Derived specification calls are expanded from their already-lowered
@@ -98,6 +150,9 @@ structure Context where
   resolved in the contract's frame: each parameter's type and native
   representation. -/
   typeArguments : Array (IrTy × Option Typed.ValueRep) := #[]
+  /-- The native types of the same arguments, for the type arguments of an
+  opaque specification function the expansion applies. -/
+  typeArgumentTypes : Array (Option LeanerIR.Proofs.Denote.NTy) := #[]
   /-- Inside the body of a recursive specification function's definition. -/
   definition : Option RecursiveDefinition := none
   /-- The conditions on the path to the current position, which prove a
@@ -111,6 +166,23 @@ private def Context.typeOf? (context : Context) (typeId : TypeId) : Option IrTy 
   match ty with
   | .typeParameter index => (context.typeArguments[index]?).map (·.1) <|> pure ty
   | _ => pure ty
+
+/-- The native type of a specification type, with the parameters replaced
+by the expansion's type arguments. -/
+private def Context.ntyOf? (context : Context) (typeId : TypeId) :
+    Option LeanerIR.Proofs.Denote.NTy := do
+  let ty ← context.unit.tables.types[typeId.index]?
+  match ty with
+  | .typeParameter index =>
+      -- The family's own parameter outside an expansion, the expansion's
+      -- type argument inside one.
+      if context.typeArgumentTypes.isEmpty then some (.param index)
+      else (context.typeArgumentTypes[index]?).join
+  | _ =>
+      let nty ← LeanerIR.Proofs.Denote.ntyOf context.unit context.namespaceId typeId
+      if context.typeArgumentTypes.isEmpty then some nty else
+        let row ← context.typeArgumentTypes.toList.mapM id
+        some (nty.subst (LeanerIR.Proofs.Denote.NRow.ofList row))
 
 /-- The native representation of a specification type, with the parameters
 of an expanded specification function replaced by their arguments'. -/
@@ -259,8 +331,8 @@ instance [LeanerIR.Proofs.Denote.Skolems] (τ : LeanerIR.Proofs.Denote.NTy) :
 /-- The meaning of a specification function without a body: a fixed
 function about which nothing is known, named by the declaration's qualified
 spelling and applied to its encoded arguments. -/
-opaque opaqueSpec (name : String) (result : Type) [Inhabited result]
-    (arguments : List RuntimeValue) : result
+opaque opaqueSpec (name : String) (typeArguments : List LeanerIR.Proofs.Denote.NTy)
+    (result : Type) [Inhabited result] (arguments : List RuntimeValue) : result
 
 /-- Logical membership corresponding to the value-level `containsVector`. -/
 def containsVector (value element : RuntimeValue) : Prop :=
@@ -282,6 +354,16 @@ def lengthVector (value : RuntimeValue) : Int :=
 
 @[simp] theorem lengthVector_vector (elements : Array RuntimeValue) :
     lengthVector (.vector elements) = (elements.size : Int) := rfl
+
+/-- The elements of a runtime vector, which a quantifier over the vector
+ranges over. -/
+def elementsVector (value : RuntimeValue) : List RuntimeValue :=
+  match value with
+  | .vector elements => elements.toList
+  | _ => []
+
+@[simp] theorem elementsVector_vector (elements : Array RuntimeValue) :
+    elementsVector (.vector elements) = elements.toList := rfl
 
 /-- Decoding determines the vector behind a precondition's runtime length.
 Expose just those hypotheses before reducing indexed operations; traversing
@@ -348,6 +430,71 @@ theorem testVariants_nominal_self (owner : LeanerIR.StructHandle)
       variantMember variant variants.toList := by
   simp [testVariants]
 
+/-- The value of a three-variant ordering enum at an order: its first,
+second, or third variant for less, equal, greater, as `std::cmp::compare`
+returns it. -/
+def orderingVariant (owner : LeanerIR.StructHandle) (less equal greater : String) :
+    Ordering → RuntimeValue
+  | .lt => .nominal owner (some less) #[]
+  | .eq => .nominal owner (some equal) #[]
+  | .gt => .nominal owner (some greater) #[]
+
+/- The variant at a decided order. An undecided order keeps the variant
+folded, so that the order's operands can still be read at their type. -/
+@[simp, lir_denote_norm] theorem orderingVariant_lt (owner : LeanerIR.StructHandle)
+    (less equal greater : String) :
+    orderingVariant owner less equal greater .lt = .nominal owner (some less) #[] := rfl
+@[simp, lir_denote_norm] theorem orderingVariant_eq (owner : LeanerIR.StructHandle)
+    (less equal greater : String) :
+    orderingVariant owner less equal greater .eq = .nominal owner (some equal) #[] := rfl
+@[simp, lir_denote_norm] theorem orderingVariant_gt (owner : LeanerIR.StructHandle)
+    (less equal greater : String) :
+    orderingVariant owner less equal greater .gt = .nominal owner (some greater) #[] := rfl
+
+/-- An ordering variant is a given variant exactly at the order naming it.
+Stated before the order is read, so that every comparison, of integers or
+of a map's keys read at their type, becomes the order's relation. -/
+@[lir_denote_norm ↓] theorem orderingVariant_eq_nominal (owner source : LeanerIR.StructHandle)
+    (less equal greater variant : String) (order : Ordering) :
+    orderingVariant owner less equal greater order = .nominal source (some variant) #[] ↔
+      owner = source ∧ ((order = .lt ∧ less = variant) ∨ (order = .eq ∧ equal = variant) ∨
+        (order = .gt ∧ greater = variant)) := by
+  cases order <;> simp [orderingVariant, eq_comm]
+
+@[lir_denote_norm ↓] theorem nominal_eq_orderingVariant (owner source : LeanerIR.StructHandle)
+    (less equal greater variant : String) (order : Ordering) :
+    .nominal source (some variant) #[] = orderingVariant owner less equal greater order ↔
+      owner = source ∧ ((order = .lt ∧ less = variant) ∨ (order = .eq ∧ equal = variant) ∨
+        (order = .gt ∧ greater = variant)) := by
+  rw [eq_comm, orderingVariant_eq_nominal]
+
+/-- A variant equated to a conditional variant holds in the branch naming it. -/
+@[lir_denote_norm] theorem nominal_eq_ite (source : LeanerIR.StructHandle) (variant : Option String)
+    (fields : Array RuntimeValue) (condition : Prop) [Decidable condition]
+    (yes no : RuntimeValue) :
+    (RuntimeValue.nominal source variant fields = if condition then yes else no) ↔
+      (condition ∧ RuntimeValue.nominal source variant fields = yes) ∨
+        (¬condition ∧ RuntimeValue.nominal source variant fields = no) := by
+  by_cases h : condition <;> simp [h]
+
+@[lir_denote_norm] theorem ite_eq_nominal (source : LeanerIR.StructHandle) (variant : Option String)
+    (fields : Array RuntimeValue) (condition : Prop) [Decidable condition]
+    (yes no : RuntimeValue) :
+    ((if condition then yes else no) = RuntimeValue.nominal source variant fields) ↔
+      (condition ∧ yes = RuntimeValue.nominal source variant fields) ∨
+        (¬condition ∧ no = RuntimeValue.nominal source variant fields) := by
+  by_cases h : condition <;> simp [h]
+
+/-- The ordering variant at the order of two integers, by their comparison. -/
+@[lir_denote_norm] theorem orderingVariant_compare_int (owner : LeanerIR.StructHandle)
+    (less equal greater : String) (a b : Int) :
+    orderingVariant owner less equal greater (compare a b) =
+      if a < b then .nominal owner (some less) #[]
+      else if a = b then .nominal owner (some equal) #[]
+      else .nominal owner (some greater) #[] := by
+  simp only [compare, compareOfLessAndEq]
+  split <;> (try split) <;> rfl
+
 private def typeOfExpr? (context : Context) (id : ExprId) : Option IrTy := do
   let expression ← context.ns.expressions[id.index]?
   context.typeOf? expression.typeId
@@ -412,6 +559,124 @@ private def twinOfReference? (context : Context)
   context.twins.find? fun info =>
     info.namespaceIndex == handle.namespaceId.index &&
       info.structIndex == handle.structId
+
+/-- The declaration of a nominal type, with its runtime identity and owning
+namespace. -/
+private def nominalDeclaration? (unit : ValidatedUnit) (ty : IrTy) :
+    Option (LeanerIR.StructHandle × ValidatedNamespace × LeanerIR.StructDecl) := do
+  let .nominal name _ := ty | none
+  let qualified ← unit.tables.names[name.index]?
+  let ns ← unit.namespaces[qualified.namespaceId.index]?
+  let structId ← ns.structs.findIdx? (·.name == name)
+  let declaration ← ns.structs[structId]?
+  some ({ namespaceId := qualified.namespaceId, structId }, ns, declaration)
+
+/-- The structural order of two runtime values, as `std::cmp::compare`
+and the `compare` primitive observe it. -/
+private def structuralOrderTerm (context : Context) (left right : Lean.Expr) :
+    MetaM Lean.Expr := do
+  let rank := mkApp (mkConst ``LeanerIR.SemanticOperations.variantRank)
+    (toExpr context.ns.variantOrders)
+  return mkAppN (mkConst ``LeanerIR.RuntimeValue.order) #[rank, left, right]
+
+/-- The value of the three-variant ordering enum `ty` at `order`. -/
+private def orderingValue (context : Context) (ty : IrTy) (order : Lean.Expr) :
+    MetaM Lean.Expr := do
+  let some (owner, _, declaration) := nominalDeclaration? context.unit ty
+    | throwError "a structural order returns an ordering enum"
+  let names := declaration.variants.map fun variant =>
+    ((context.unit.tables.names[variant.name.index]?).map (·.name)).getD ""
+  let #[less, equal, greater] := names
+    | throwError "the result of a structural order has three variants"
+  return mkAppN (mkConst ``LeanerLang.Contract.orderingVariant)
+    #[toExpr owner, toExpr less, toExpr equal, toExpr greater, order]
+
+/-! ## Intrinsic maps
+
+An owner of an intrinsic map is read through the map model
+(`designs/intrinsic-maps.md`): its layout, and its discipline, ordered when
+the owner binds a role that enumerates it in key order. -/
+
+/-- The roles of an intrinsic map that enumerate it in key order. -/
+private def orderingRoles : Array String := #["map_spec_key_at", "map_spec_rank",
+  "map_borrow_front", "map_borrow_back", "map_front_key", "map_back_key", "map_pop_front",
+  "map_pop_back", "map_prev_key", "map_next_key"]
+
+/-- A map owner's model, quoted: its layout and discipline. -/
+private structure MapModel where
+  layout : Lean.Expr
+  discipline : Lean.Expr
+
+/-- The model of an intrinsic map owner holding its entries in one vector of
+two-field entries, a plain struct or the single variant of an enum. -/
+private def mapModel? (unit : ValidatedUnit) (ty : IrTy) : Option MapModel := do
+  let (owner, ns, declaration) ← nominalDeclaration? unit ty
+  let intrinsic ← ns.intrinsics.find? fun intrinsic =>
+    intrinsic.model == "map" && intrinsic.owner == declaration.name
+  let (variant, fields) ← match declaration.variants.toList with
+    | [] => some (none, declaration.fields)
+    | [variant] => some (some (((unit.tables.names[variant.name.index]?).map (·.name)).getD ""),
+        variant.fields)
+    | _ => none
+  let [field] := fields.toList | none
+  let .vector element _ ← unit.tables.types[field.type.typeId.index]? | none
+  let entryType ← unit.tables.types[element.index]?
+  let (entry, _, entryDeclaration) ← nominalDeclaration? unit entryType
+  guard (entryDeclaration.variants.isEmpty && entryDeclaration.fields.size == 2)
+  let ordered := (intrinsic.executableBindings ++ intrinsic.specBindings).any
+    (orderingRoles.contains ·.role)
+  let rank := mkApp (mkConst ``LeanerIR.SemanticOperations.variantRank) (toExpr ns.variantOrders)
+  let discipline := if ordered then mkApp (mkConst ``LeanerIR.Maps.Discipline.ordered) rank
+    else mkConst ``LeanerIR.Maps.Discipline.sequence
+  let layout := mkApp3 (mkConst ``LeanerIR.Maps.Layout.mk) (toExpr owner) (toExpr variant)
+    (toExpr entry)
+  some { layout, discipline }
+
+/-- The specification role a specification function plays for an intrinsic
+map of its namespace, with the map's owner. -/
+private def mapSpecRole? (ns : ValidatedNamespace) (reference : LeanerIR.QualifiedRef) :
+    Option (String × LeanerIR.NameId) :=
+  ns.intrinsics.findSome? fun intrinsic =>
+    if intrinsic.model == "map" then
+      (intrinsic.specBindings.find? (·.target == reference)).map (·.role, intrinsic.owner)
+    else none
+
+/-- The rank a map model's ordered discipline compares keys by. -/
+private def MapModel.rank? (model : MapModel) : Option Lean.Expr :=
+  if model.discipline.isAppOfArity ``LeanerIR.Maps.Discipline.ordered 1 then
+    some (model.discipline.getArg! 0)
+  else none
+
+/-- The position variant of an iterator enum, with the enum's handle: the
+variant holding one field, the position. -/
+private def iteratorPosition? (unit : ValidatedUnit) (ty : IrTy) :
+    Option (LeanerIR.StructHandle × String) := do
+  let (owner, _, declaration) ← nominalDeclaration? unit ty
+  let variant ← declaration.variants.find? (·.fields.size == 1)
+  let name ← (unit.tables.names[variant.name.index]?).map (·.name)
+  pure (owner, name)
+
+/-- The position an iterator holds, as a specification reads its payload
+field. -/
+private def iteratorPosition (owner : LeanerIR.StructHandle) (variant : String)
+    (iterator : Lean.Expr) : MetaM Lean.Expr := do
+  let variants := #[(variant, (0 : Nat))]
+  mkAppM ``LeanerIR.RuntimeValue.asInt
+    #[← mkAppM ``LeanerLang.Contract.selectVariantField #[iterator, toExpr owner, toExpr variants]]
+
+/-- Whether an iterator is at a position of a map: its position variant,
+below the map's size. -/
+private def iteratorInRange (owner : LeanerIR.StructHandle) (variant : String)
+    (iterator map : Lean.Expr) : MetaM Lean.Expr := do
+  let test ← mkEq (← mkAppM ``LeanerLang.Contract.testVariants
+    #[iterator, toExpr owner, toExpr #[variant]]) (mkConst ``Bool.true)
+  let position ← iteratorPosition owner variant iterator
+  mkAppM ``And #[test, ← mkAppM ``LT.lt #[position, ← mkAppM ``LeanerIR.Maps.size #[map]]]
+
+/-- The key at an iterator's position. -/
+private def iteratorKey (owner : LeanerIR.StructHandle) (variant : String)
+    (iterator map : Lean.Expr) : MetaM Lean.Expr := do
+  mkAppM ``LeanerIR.Maps.keyAt #[map, ← iteratorPosition owner variant iterator]
 
 /-- Encode a native generic value when entering the total runtime vocabulary
 of aggregate clauses. Values already in that vocabulary are unchanged. -/
@@ -527,36 +792,67 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
             | throwError "generated contracts currently require a variable quantifier pattern"
           let some domainExpression := active.ns.expressions[binder.domain.index]?
             | throwError "quantifier domain {binder.domain.index} is out of range"
-          let .operation (.specification .typeDomain) #[.typeArg domainType] #[] _ :=
-              domainExpression.kind
-            | throwError "generated contracts currently require a type-domain quantifier"
           let some patternType := active.typeOf? pattern.typeId
             | throwError "quantifier pattern type {pattern.typeId.index} is out of range"
-          let some declaredDomain := active.typeOf? domainType.typeId
-            | throwError "quantifier domain type {domainType.typeId.index} is out of range"
-          -- A bounded integer domain ranges over its values, bound at the
-          -- widened logical type.
-          let range? : Option Lean.Expr ← if patternType == declaredDomain then pure none else
-            match patternType, declaredDomain with
-            | .integer .unbounded _, .integer (.bits width) signed =>
-                pure (some (mkApp2 (mkConst ``LeanerIR.IntegerValueFits)
-                  (mkApp (mkConst ``LeanerIR.IntWidth.bits) (toExpr width)) (toExpr signed)))
-            | _, _ => throwError "quantifier pattern and type domain differ"
+          let some domainType := active.typeOf? domainExpression.typeId
+            | throwError "quantifier domain type {domainExpression.typeId.index} is out of range"
+          let domain := domainOf patternType
           let binderName := match active.localNames[localId.index]? with
             | some name => if name.isEmpty then Name.mkSimple s!"quantified_{localId.index}"
                 else Name.mkSimple name
             | none => Name.mkSimple s!"quantified_{localId.index}"
-          withLocalDeclD binderName
-              (domainOf patternType).leanType fun value => do
+          let range (lower upper : Lean.Expr) (value : Lean.Expr) : MetaM Lean.Expr := do
+            mkAppM ``And #[← mkAppM ``LE.le #[lower, value], ← mkAppM ``LT.lt #[value, upper]]
+          -- What the quantifier binds, the condition a bound value satisfies
+          -- to be in the domain when not every value is, and the value the
+          -- pattern's local takes.
+          let (binderName, binderType, membership?, element) ← match domainType with
+            -- A type's domain; a bounded integer type ranges over its values,
+            -- bound at the widened logical type.
+            | .typeDomain declaredId =>
+                let some declared := active.typeOf? declaredId
+                  | throwError "quantifier domain type {declaredId.index} is out of range"
+                let membership? ← if patternType == declared then pure none else
+                  match patternType, declared with
+                  | .integer .unbounded _, .integer (.bits width) signed =>
+                      pure (some fun (value : Lean.Expr) => pure (mkApp3
+                        (mkConst ``LeanerIR.IntegerValueFits)
+                        (mkApp (mkConst ``LeanerIR.IntWidth.bits) (toExpr width)) (toExpr signed)
+                        value))
+                  | _, _ => throwError "quantifier pattern and type domain differ"
+                pure (binderName, domain.leanType, membership?,
+                  fun (value : Lean.Expr) => (pure value : MetaM Lean.Expr))
+            -- A range ranges over the integers from its lower bound, below
+            -- its upper bound.
+            | .range =>
+                let .operation (.primitive .range) _ #[lower, upper] _ := domainExpression.kind
+                  | throwError "a quantifier range must be written as a range"
+                let lower ← translate active lower
+                let upper ← translate active upper
+                pure (binderName, domain.leanType, some (range lower upper), fun value => pure value)
+            -- A vector ranges over its elements: the pattern binds an element
+            -- of the vector, the form the `contains` and `index_of`
+            -- primitives denote to.
+            | .vector _ _ =>
+                let vector ← runtimeAggregateValue active binder.domain
+                  (← translate active binder.domain)
+                let elements ← mkAppM ``LeanerLang.Contract.elementsVector #[vector]
+                pure (binderName, mkConst ``RuntimeValue,
+                  some fun element => mkAppM ``Membership.mem #[elements, element],
+                  fun element => domain.binderOfRuntime element)
+            | _ => throwError "a quantifier domain must be a type, a range, or a vector"
+          withLocalDeclD binderName binderType fun value => do
+            let element ← element value
             let inner ← bind (index + 1) { active with
-              locals := active.locals.set! localId.index (some value)
-              oldLocals := active.oldLocals.set! localId.index (some value) }
-            match kind, range? with
+              locals := active.locals.set! localId.index (some element)
+              oldLocals := active.oldLocals.set! localId.index (some element) }
+            let membership ← membership?.mapM (· value)
+            match kind, membership with
             | .forall, none => mkForallFVars #[value] inner
-            | .forall, some range => mkForallFVars #[value] (← mkArrow (mkApp range value) inner)
+            | .forall, some member => mkForallFVars #[value] (← mkArrow member inner)
             | .exists, none => mkAppM ``Exists #[← mkLambdaFVars #[value] inner]
-            | .exists, some range =>
-                mkAppM ``Exists #[← mkLambdaFVars #[value] (← mkAppM ``And #[mkApp range value, inner])]
+            | .exists, some member =>
+                mkAppM ``Exists #[← mkLambdaFVars #[value] (← mkAppM ``And #[member, inner])]
             | _, _ => throwError "choice quantifiers are not supported in generated contracts"
         else
           let proposition ← translate active body
@@ -721,6 +1017,38 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
             localTypes := if localId.index < context.localTypes.size
               then context.localTypes.set! localId.index patternType else context.localTypes
             oldLocals := context.oldLocals.setIfInBounds localId.index (some value) } body
+      | .tuple elements =>
+          -- A tuple bound from a tuple literal binds component-wise, every
+          -- component taken in the scope before the binding, as an inlined
+          -- function's parameters are bound from its arguments.
+          let some { kind := .operation (.primitive .tuple) _ components _, .. } :=
+              context.ns.expressions[initializer.index]?
+            | throwError "generated contracts bind a tuple pattern only from a tuple literal"
+          unless components.size == elements.size do
+            throwError "a tuple pattern binds a tuple of another arity"
+          let mut bound := context
+          for (element, component) in elements.zip components do
+            let some elementNode := context.ns.patterns[element.index]?
+              | throwError "specification binding pattern {element.index} is out of range"
+            match elementNode.kind with
+            | .wildcard => pure ()
+            | .variable localId =>
+                let some elementType := context.typeOf? elementNode.typeId
+                  | throwError "specification binding pattern has an unknown type"
+                unless localId.index < context.locals.size do
+                  throwError "specification local {localId.index} has no binder slot"
+                let value ← translate context component
+                let value ← match domainOf elementType with
+                  | .boolean => mkDecide value
+                  | _ => pure value
+                bound := { bound with
+                  locals := bound.locals.set! localId.index (some value)
+                  localTypes := if localId.index < bound.localTypes.size
+                    then bound.localTypes.set! localId.index elementType else bound.localTypes
+                  oldLocals := bound.oldLocals.setIfInBounds localId.index (some value) }
+            | _ => throwError "generated contracts require a variable or wildcard component \
+                in a tuple binding pattern"
+          translate bound body
       | _ =>
           throwError "generated contracts require a variable or wildcard binding pattern"
   | .block statements (some result) =>
@@ -882,6 +1210,79 @@ where
     | .aggregate, domain => domain.ofRuntime value
     | .boolean, .boolean => pure value
     | _, _ => pure value
+  /-- A specification role of an intrinsic map, as the map model reads it. -/
+  mapSpecCall (role : String) (owner : LeanerIR.NameId) (ty : IrTy) (arguments : Array ExprId) :
+      MetaM Lean.Expr := do
+    let some model := mapModel? context.unit (.nominal owner #[])
+      | throwError m!"the intrinsic map role `{role}` belongs to a map whose representation \
+          is not carried"
+    let operand (index : Nat) : MetaM ExprId := do
+      let some id := arguments[index]?
+        | throwError m!"the intrinsic map role `{role}` lacks operand {index}"
+      pure id
+    let aggregate (index : Nat) : MetaM Lean.Expr := do runtimeAggregate (← operand index)
+    let value (index : Nat) : MetaM Lean.Expr := do runtimeOperand (← operand index)
+    let map := aggregate 0
+    let key := value 1
+    let size : MetaM Lean.Expr := do mkAppM ``LeanerIR.Maps.size #[← map]
+    let hasKey : MetaM Lean.Expr := do mkAppM ``LeanerIR.Maps.hasKey #[← map, ← key]
+    match role with
+    | "map_spec_new" => mkAppM ``LeanerIR.Maps.empty #[model.layout]
+    | "map_spec_len" => size
+    | "map_spec_is_empty" | "map_spec_aborts_empty" => mkEq (← size) (mkIntLit 0)
+    | "map_spec_has_key" | "map_spec_aborts_add" => mkEq (← hasKey) (mkConst ``Bool.true)
+    | "map_spec_aborts_del" | "map_spec_aborts_borrow" => mkEq (← hasKey) (mkConst ``Bool.false)
+    | "map_spec_aborts_destroy_empty" => mkAppM ``Ne #[← size, mkIntLit 0]
+    | "map_spec_get" => (domainOf ty).ofRuntime (← mkAppM ``LeanerIR.Maps.valueAt #[← map, ← key])
+    | "map_spec_set" =>
+        mkAppM ``LeanerIR.Maps.update #[model.layout, model.discipline, ← map, ← key, ← value 2]
+    | "map_spec_del" => mkAppM ``LeanerIR.Maps.remove #[model.layout, model.discipline, ← map, ← key]
+    | "map_spec_key_at" =>
+        (domainOf ty).ofRuntime (← mkAppM ``LeanerIR.Maps.keyAt #[← map, ← translate context (← operand 1)])
+    | "map_spec_rank" => mkAppM ``LeanerIR.Maps.rank #[← map, ← key]
+    | "map_spec_aborts_add_all" => mkAppM ``LeanerIR.Maps.AbortsAddAll #[← map, ← aggregate 1, ← aggregate 2]
+    | "map_spec_aborts_new_from" => mkAppM ``LeanerIR.Maps.AbortsNewFrom #[← aggregate 0, ← aggregate 1]
+    | "map_spec_aborts_upsert_all" => mkAppM ``LeanerIR.Maps.AbortsUpsertAll #[← aggregate 1, ← aggregate 2]
+    | "map_spec_aborts_append_disjoint" =>
+        mkAppM ``LeanerIR.Maps.AbortsAppendDisjoint #[← map, ← aggregate 1]
+    | "map_spec_aborts_trim" => mkAppM ``LT.lt #[← size, ← translate context (← operand 1)]
+    | "map_spec_aborts_replace_key_inplace" =>
+        mkAppM ``LeanerIR.Maps.AbortsReplaceKey
+          #[model.layout, model.discipline, ← map, ← value 1, ← value 2]
+    | "map_spec_aborts_iter_borrow_mut" =>
+        let some iteratorType := arguments[0]?.bind (typeOfExpr? context)
+          | throwError "an iterator operand has an unknown type"
+        let some (iteratorOwner, variant) := iteratorPosition? context.unit iteratorType
+          | throwError "an iterator of an intrinsic map has no position variant"
+        mkAppM ``Not #[← iteratorInRange iteratorOwner variant (← aggregate 0) (← aggregate 1)]
+    | _ => throwError m!"the intrinsic map role `{role}` is not carried"
+  /-- The bounds the integer parameters of a bundle carry by their Move
+  types, in the form `SpecInt.unsigned_bounds`/`signed_bounds` state them;
+  `none` when no parameter is bounded. -/
+  parameterBounds (bundle : Lean.Expr) (domains : Array Domain) (localTypes : Array IrTy) :
+      MetaM (Option Lean.Expr) := do
+    let mut conjuncts : Array Lean.Expr := #[]
+    let mut rest := bundle
+    for index in [:domains.size] do
+      let value ← mkAppM ``Prod.fst #[rest]
+      rest ← mkAppM ``Prod.snd #[rest]
+      match domains[index]?, localTypes[index]? with
+      | some .integer, some (LeanerIR.Ty.integer (.bits width) signed) =>
+          if width == 0 then continue
+          let power (exponent : Nat) : MetaM Lean.Expr :=
+            mkAppM ``HPow.hPow #[mkIntLit 2, mkNatLit exponent]
+          let (low, high) ← if signed then
+              pure (← mkAppM ``Neg.neg #[← power (width - 1)],
+                ← mkAppM ``HSub.hSub #[← power (width - 1), mkIntLit 1])
+            else pure (mkIntLit 0, ← mkAppM ``HSub.hSub #[← power width, mkIntLit 1])
+          conjuncts := conjuncts.push (← mkAppM ``And
+            #[← mkAppM ``LE.le #[low, value], ← mkAppM ``LE.le #[value, high]])
+      | _, _ => pure ()
+    let some first := conjuncts[0]? | return none
+    let mut bounds := first
+    for conjunct in conjuncts[1:] do
+      bounds ← mkAppM ``And #[bounds, conjunct]
+    return some bounds
   /-- Define a recursive specification function once: over its bundled
   arguments by well-founded recursion on its `decreases` measure, with
   the unfolding theorem `f.unfold`. -/
@@ -892,9 +1293,6 @@ where
       | throwError "specification function `{repr reference}` does not resolve"
     let some root := declaration.body
       | throwError "a recursive specification function must have a body"
-    let some measureSource := declaration.contract.conditions.find? (·.kind == .decreases)
-      | throwError m!"the recursive specification function \
-          `{specFunctionSpelling context.unit reference}` needs a `decreases` measure"
     let (domains, resultDomain) ← definitionDomains reference
     let bundleType ← domains.foldrM (fun domain rest => mkAppM ``Prod #[definitionType domain, rest])
       (mkConst ``Unit)
@@ -918,20 +1316,90 @@ where
         results := #[], resultTypes := #[]
         specCallStack := #[], typeArguments := #[]
         definition, facts := #[] }
-    let measure ← withLocalDeclD `bundle bundleType fun bundle => do
-      let value ← translate (← bodyContext bundle none) measureSource.expression
-      mkLambdaFVars #[bundle] (← mkAppM ``Int.toNat #[value])
-    let step ← withLocalDeclD `bundle bundleType fun bundle => do
-      let recurseType ← withLocalDeclD `smaller bundleType fun smaller => do
-        let decreasing ← mkAppM ``LT.lt #[mkApp measure smaller, mkApp measure bundle]
-        mkForallFVars #[smaller] (← mkArrow decreasing resultType)
-      withLocalDeclD `recurse recurseType fun recurse => do
-        let body ← translate (← bodyContext bundle
-          (some { reference, argument := bundle, recurse, measure })) root
-        let body ← match resultDomain with
-          | .aggregate => runtimeAggregateValue (← bodyContext bundle none) root body
-          | _ => pure body
-        mkLambdaFVars #[bundle, recurse] body
+    -- The measure: the `decreases` clause, or, without one, each integer
+    -- parameter in turn, the first under which every recursive call
+    -- decreases on its path. A Move specification function states no
+    -- measure; the Move Prover takes its recursion as given.
+    let candidates : Array (Lean.Expr → MetaM Lean.Expr) ←
+      match declaration.contract.conditions.find? (·.kind == .decreases) with
+      | some measureSource => pure #[fun bundle => do
+          translate (← bodyContext bundle none) measureSource.expression]
+      | none => pure <| (domains.zipIdx).filterMap fun (domain, index) =>
+          if domain matches .integer then some (fun bundle => do
+            let mut rest := bundle
+            for _ in [:index] do rest ← mkAppM ``Prod.snd #[rest]
+            mkAppM ``Prod.fst #[rest])
+          else none
+    if candidates.isEmpty then
+      throwError m!"the recursive specification function \
+        `{specFunctionSpelling context.unit reference}` needs a `decreases` measure"
+    let mut attempts : Array MessageData := #[]
+    let mut found : Option (Lean.Expr × Lean.Expr) := none
+    -- The step function at a measure. Guarded, a recursive call the path
+    -- conditions do not prove descending is guarded by its descent.
+    -- Assuming non-negativity, the integer parameters are taken as
+    -- non-negative — the Move types the specification's `num` projection
+    -- widened — only to select a measure; the step built so is discarded.
+    let buildStep (measure : Lean.Expr) (guarded assumeNonNegative : Bool) : MetaM Lean.Expr :=
+      withLocalDeclD `bundle bundleType fun bundle => do
+        let recurseType ← withLocalDeclD `smaller bundleType fun smaller => do
+          let decreasing ← mkAppM ``LT.lt #[mkApp measure smaller, mkApp measure bundle]
+          mkForallFVars #[smaller] (← mkArrow decreasing resultType)
+        withLocalDeclD `recurse recurseType fun recurse => do
+          let translateBody : MetaM Lean.Expr := do
+            let body ← translate (← bodyContext bundle
+              (some { reference, argument := bundle, recurse, measure, resultType, guarded })) root
+            match resultDomain with
+            | .aggregate => runtimeAggregateValue (← bodyContext bundle none) root body
+            | _ => pure body
+          let translateBody : MetaM Lean.Expr := if !assumeNonNegative then translateBody else do
+            let mut nonNegative : Array Lean.Expr := #[]
+            let mut rest := bundle
+            for domain in domains do
+              let value ← mkAppM ``Prod.fst #[rest]
+              rest ← mkAppM ``Prod.snd #[rest]
+              if domain matches .integer then
+                nonNegative := nonNegative.push (← mkAppM ``LE.le #[mkIntLit 0, value])
+            let rec assume (index : Nat) : MetaM Lean.Expr := do
+              if h : index < nonNegative.size then
+                withLocalDeclD `nonNegative nonNegative[index] fun _ => assume (index + 1)
+              else translateBody
+            assume 0
+            -- The definition unfolds at well-typed arguments only, as the Move
+            -- Prover's axiom for the function does: the parameters' bounds
+            -- are what the recursion's descent may rely on, and the value
+            -- outside them is arbitrary.
+          let body ← match ← parameterBounds bundle domains localTypes with
+            | none => translateBody
+            | some bounds =>
+                let decision ← synthInstance (← mkAppM ``Decidable #[bounds])
+                let inside ← withLocalDeclD `bounds bounds fun boundsHypothesis => do
+                  mkLambdaFVars #[boundsHypothesis] (← translateBody)
+                let outside ← withLocalDeclD `outside (mkNot bounds) fun outsideHypothesis => do
+                  mkLambdaFVars #[outsideHypothesis]
+                    (← mkAppOptM ``Inhabited.default #[resultType, none])
+                pure (mkApp5 (mkConst ``dite [1]) resultType bounds decision inside outside)
+          mkLambdaFVars #[bundle, recurse] body
+    let measures ← candidates.mapM fun candidate =>
+      withLocalDeclD `bundle bundleType fun bundle => do
+        mkLambdaFVars #[bundle] (← mkAppM ``Int.toNat #[← candidate bundle])
+    -- A measure every recursive call provably descends on; failing that,
+    -- one they descend on for non-negative parameters, with the calls
+    -- guarded.
+    for measure in measures do
+      if found.isSome then break
+      try found := some (measure, ← buildStep measure false false)
+      catch failure => attempts := attempts.push failure.toMessageData
+    for measure in measures do
+      if found.isSome then break
+      try
+        discard <| buildStep measure false true
+        found := some (measure, ← buildStep measure true false)
+      catch _ => pure ()
+    let some (measure, step) := found
+      | throwError m!"no measure of the recursive specification function \
+          `{specFunctionSpelling context.unit reference}` decreases at every recursive call: \
+          {MessageData.joinSep attempts.toList "\n"}"
     let relation ← mkAppM ``measure #[measure]
     let wellFounded ← mkAppOptM ``WellFoundedRelation.wf #[bundleType, relation]
     let motive ← withLocalDeclD `bundle bundleType fun bundle => mkLambdaFVars #[bundle] resultType
@@ -971,18 +1439,32 @@ where
             -- reads the arithmetic, not the pairing.
             let (goal, _) ← dsimp goal (← Simp.mkContext)
             let proof ← mkFreshExprMVar goal
-            try
-              -- As the tactic does: refute the negated goal from the local
-              -- hypotheses, which include the path conditions.
-              if let some refutation ← proof.mvarId!.falseOrByContra then
-                let hypotheses ← refutation.withContext getLocalHyps
-                Lean.Elab.Tactic.Omega.omega hypotheses.toList refutation
-            catch failure =>
-              let facts ← context.facts.mapM fun fact => do pure m!"{← inferType fact}"
-              throwError m!"the recursive call of `{specFunctionSpelling context.unit reference}` \
-                does not decrease its measure under the conditions on its path: \
-                {failure.toMessageData}\ngoal: {goal}\nconditions: {facts.toList}"
-            let value := mkApp2 definition.recurse bundle (← instantiateMVars proof)
+            let decreases ← try
+                -- As the tactic does: refute the negated goal from the local
+                -- hypotheses, which include the path conditions.
+                if let some refutation ← proof.mvarId!.falseOrByContra then
+                  let hypotheses ← refutation.withContext getLocalHyps
+                  Lean.Elab.Tactic.Omega.omega hypotheses.toList refutation
+                pure true
+              catch failure =>
+                if definition.guarded then pure false else
+                  let facts ← context.facts.mapM fun fact => do pure m!"{← inferType fact}"
+                  throwError m!"the recursive call of \
+                    `{specFunctionSpelling context.unit reference}` does not decrease its \
+                    measure under the conditions on its path: \
+                    {failure.toMessageData}\ngoal: {goal}\nconditions: {facts.toList}"
+            let value ← if decreases then
+                pure (mkApp2 definition.recurse bundle (← instantiateMVars proof))
+              else
+                -- The Move Prover's axiom for the function holds unguarded; a
+                -- definition holds it wherever the measure descends and takes
+                -- an arbitrary value elsewhere.
+                let decision ← synthInstance (← mkAppM ``Decidable #[goal])
+                let inside ← withLocalDeclD `descends goal fun descends =>
+                  mkLambdaFVars #[descends] (mkApp2 definition.recurse bundle descends)
+                let outside ← withLocalDeclD `stuck (mkNot goal) fun stuck => do
+                  mkLambdaFVars #[stuck] (← mkAppOptM ``Inhabited.default #[definition.resultType, none])
+                pure (mkApp5 (mkConst ``dite [1]) definition.resultType goal decision inside outside)
             return ← callResult reference ty value
         if specRecursive context.unit reference then
           if let some definition := context.definition then
@@ -1006,37 +1488,65 @@ where
           let some argumentType := context.typeOf? argument.typeId
             | throwError "a specification function type argument has an unknown type"
           pure (argumentType, context.valueRep? argument.typeId)
+        let typeArgumentTypes := instantiations.map fun instantiation =>
+          match instantiation with
+          | .typeArg argument => context.ntyOf? argument.typeId
+          | _ => none
         let some qualified := context.unit.tables.names[reference.name.index]?
           | throwError "specification function call has an unknown name"
         unless qualified.namespaceId == reference.namespaceId do
           throwError "specification function call name belongs to a different namespace"
         let some targetNs := context.unit.namespaces[reference.namespaceId.index]?
           | throwError "specification function call namespace is out of range"
+        if let some (role, owner) := mapSpecRole? targetNs reference then
+          return ← mapSpecCall role owner ty arguments
+        -- An uninterpreted value of the call: an opaque specification
+        -- function's, or a native's, which has no body to derive a
+        -- specification version from, as the Move Prover reads it.
+        let opaqueCall : MetaM Lean.Expr := do
+          let some path := context.unit.tables.namespaces[reference.namespaceId.index]?
+            | throwError "specification function namespace has no path"
+          let own := "::".intercalate (path.segments.toList ++ [qualified.name])
+          -- A native read by its Prover model denotes the model's value.
+          let model : Option NativeModel := do
+            let functionId ← context.unit.resolution.function? reference.name
+            let declaration ← targetNs.functions[functionId.index]?
+            guard (declaration.body == LeanerIR.Validation.FunctionBody.absent &&
+              readsNativeModel declaration)
+            nativeModel? targetNs.profile own
+          if let some .structuralOrder := model then
+            let [left, right] := arguments.toList
+              | throwError "a structural order compares two operands"
+            return ← orderingValue context ty
+              (← structuralOrderTerm context (← runtimeOperand left) (← runtimeOperand right))
+          let name : String := match model with
+            | some (.uninterpreted _ (some function) _) => function
+            | _ => own
+          -- The type arguments as native types under the contract's family,
+          -- which an instantiation of the contract resolves to the caller's.
+          let some types := context.types
+            | throwError "the specification function `{name}` is applied outside a family"
+          let typeArgumentTerms ← (instantiations.zip typeArgumentTypes).mapM
+            fun (instantiation, nty?) => do
+              let some nty := nty?
+                | throwError m!"a type argument of the specification function `{name}` has no \
+                    native type ({repr instantiation})"
+              return mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types (← quoteNTy nty)
+          let encoded ← arguments.mapM runtimeOperand
+          let domain := domainOf ty
+          let value ← mkAppOptM ``LeanerLang.Contract.opaqueSpec
+            #[toExpr name, ← mkListLit (mkConst ``LeanerIR.Proofs.Denote.NTy) typeArgumentTerms.toList,
+              domain.leanType, none, ← mkListLit (mkConst ``RuntimeValue) encoded.toList]
+          domain.ofBinder value
         let some functionId := context.unit.resolution.specFunction? reference.name
-          | if (context.unit.resolution.function? reference.name).isSome then
-              throwError "`{qualified.name}` has no specification version: it has no \
-                body (a native); `spec fun {qualified.name}` can declare one"
+          | if (context.unit.resolution.function? reference.name).isSome then opaqueCall
             else throwError "specification function call target does not resolve"
         let some declaration := targetNs.specFunctions[functionId.index]?
           | throwError "specification function declaration is out of range"
         unless arguments.size == declaration.signature.parameters.size do
           throwError "specification function call argument count differs from its declaration"
         let some body := declaration.body
-          | do
-            let some path := context.unit.tables.namespaces[reference.namespaceId.index]?
-              | throwError "specification function namespace has no path"
-            let instantiation := typeArguments.map fun (argumentType, rep) =>
-              match rep with
-              | some rep => toString (repr rep)
-              | none => toString (repr argumentType)
-            let name := "::".intercalate (path.segments.toList ++ [qualified.name]) ++
-              (if instantiation.isEmpty then "" else s!"<{", ".intercalate instantiation.toList}>")
-            let encoded ← arguments.mapM runtimeOperand
-            let domain := domainOf ty
-            let value ← mkAppOptM ``LeanerLang.Contract.opaqueSpec
-              #[toExpr name, domain.leanType, none,
-                ← mkListLit (mkConst ``RuntimeValue) encoded.toList]
-            domain.ofBinder value
+          | opaqueCall
         unless declaration.signature.results.size == 1 do
           throwError "generated contracts currently expand specification functions with one result"
         let callee : Context := {
@@ -1046,7 +1556,7 @@ where
           results := #[]
           resultTypes := #[]
           specCallStack := context.specCallStack.push reference
-          typeArguments }
+          typeArguments, typeArgumentTypes }
         let mut targetLocals : Array (Option Lean.Expr) :=
           Array.replicate declaration.locals.size none
         let mut targetTypes : Array IrTy := #[]
@@ -1103,6 +1613,14 @@ where
           | throwError "spec.old expects one argument"
         translate { context with
           locals := context.oldLocals, state := context.oldState } argument
+    | .specification (.withStateAnchor _) =>
+        -- `old` inside the anchor reads the state the anchor saved.
+        let some argument := arguments[0]?
+          | throwError "spec.withStateAnchor expects one argument"
+        let some anchorState := context.anchorState
+          | throwError "a state anchor is read outside a loop invariant"
+        translate { context with
+          oldLocals := context.anchorLocals, oldState := some anchorState } argument
     | .specification .bitVectorToInt | .specification .intToBitVector =>
         -- The logical domain already represents every integer unbounded, so
         -- reading a fixed-width value at `Int` is the identity.
@@ -1129,6 +1647,11 @@ where
           | throwError "spec.containsVector expects an element operand"
         mkAppM ``LeanerLang.Contract.containsVector
           #[← runtimeAggregate vector, ← runtimeOperand element]
+    | .specification .singletonVector =>
+        let some element := arguments[0]?
+          | throwError "a singleton vector expects one element"
+        let literal ← mkArrayLit (mkConst ``LeanerIR.RuntimeValue) [← runtimeOperand element]
+        mkAppM ``LeanerIR.RuntimeValue.vector #[literal]
     | .specification .updateVector =>
         let some vector := arguments[0]?
           | throwError "spec.updateVector expects a vector operand"
@@ -1480,22 +2003,24 @@ partial def loopSpecifications (ns : ValidatedNamespace)
     if acc.any (fun previous => previous.1 == item.1) then acc else acc.push item) #[]
   return found
 
-/-- The conjunction of a loop annotation's `invariant` clauses over the
-given local binders: the clause translation the contracts use, with no
-runtime row, frame, or route-specific representation. -/
-def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
-    (ns : ValidatedNamespace) (block : LeanerIR.SpecBlock)
-    (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (codecs : Option Lean.Expr)
-    (localNames : Array String) (oldLocals : Array (Option Lean.Expr))
-    (oldState : Lean.Expr) (twins : Array SpecTypes.TwinInfo)
-    (families : Array SpecTypes.FamilyInfo) : MetaM Lean.Expr := do
-  let context : Context := {
-    unit, namespaceId, ns, locals, oldLocals, localTypes, localNames, results := #[],
-    codecs, oldState := some oldState, twins, families }
-  let clauses ← block.conditions.filterMapM fun condition => do
-    if condition.kind == .loopInvariant then some <$> translate context condition.expression
-    else pure none
-  conjunction clauses
+/-- The authored byte range of a location, when the unit records one. -/
+private def locRange (unit : ValidatedUnit) (loc : LeanerIR.LocId) : ObligationRange :=
+  match unit.tables.locations[loc.index]?.bind (·.primary) with
+  | some range => {
+      file := (unit.tables.files[range.file.index]?.map (·.name)).getD ""
+      startByte := range.startByte, endByte := range.endByte }
+  | none => {}
+
+/-- The authored byte range of a condition. -/
+private def conditionRange (unit : ValidatedUnit) (condition : LeanerIR.Condition) :
+    ObligationRange :=
+  locRange unit condition.loc
+
+/-- Wrap a translated clause with its source range so a residual obligation
+can be reported at the authored clause. -/
+private def markObligation (range : ObligationRange) (clause : Lean.Expr) : Lean.Expr :=
+  mkApp4 (mkConst ``LeanerIR.Proofs.Obligation) (mkStrLit range.file)
+    (mkRawNatLit range.startByte) (mkRawNatLit range.endByte) clause
 
 /-- Locals lexically available at a loop header. Body-local slots exist in
 the runtime row but are not initialized on the first visit. -/
@@ -1535,22 +2060,20 @@ private partial def checkLoopAnnotations (ns : ValidatedNamespace) (root : ExprI
 private structure AbortClause where
   condition : ExprId
   code : Option ExprId := none
-  range : Nat × Nat := (0, 0)
+  range : ObligationRange := {}
+
+/-- A contract's `let`: the local it binds, its value, and whether that is
+read in the post-state. -/
+private structure ContractLet where
+  name : String
+  value : ExprId
+  post : Bool
 
 private structure ClauseGroups where
   requires : Array ExprId := #[]
-  ensures : Array (ExprId × Nat × Nat) := #[]
+  ensures : Array (ExprId × ObligationRange) := #[]
   abortsIf : Array AbortClause := #[]
-
-/-- The authored byte range of a condition, when the unit records one. -/
-private def conditionRange (unit : ValidatedUnit) (condition : LeanerIR.Condition) :
-    Nat × Nat :=
-  match unit.tables.locations[condition.loc.index]? with
-  | some location =>
-      match location.primary with
-      | some range => (range.startByte, range.endByte)
-      | none => (0, 0)
-  | none => (0, 0)
+  lets : Array ContractLet := #[]
 
 /-- One total resource read in a module invariant.  `old` selects whether its
 implicit existence guard observes the entry or current state. -/
@@ -1629,17 +2152,19 @@ private inductive InvariantPhase where
 Invariant locals are declaration-owned, so their quantifier binders start
 unbound even when the surrounding function has locals with the same IDs.
 Update invariants are obligations only at exit; regular invariants are also
-assumptions at entry. -/
+assumptions at entry; axioms are assumptions at entry and never obligations. -/
 private def namespaceInvariantTerms (context : Context)
     (modifiedResources : Option (Array ModifiedResource)) (phase : InvariantPhase) :
-    MetaM (Array (Lean.Expr × Nat × Nat)) := do
+    MetaM (Array (Lean.Expr × ObligationRange)) := do
   let mut terms := #[]
   for declaration in context.ns.invariants do
-    let (typeParameters, isUpdate) ← match declaration.condition.kind with
-      | .globalInvariant typeParameters => pure (typeParameters, false)
-      | .globalInvariantUpdate typeParameters => pure (typeParameters, true)
+    let (typeParameters, isUpdate, isAxiom) ← match declaration.condition.kind with
+      | .globalInvariant typeParameters => pure (typeParameters, false, false)
+      | .globalInvariantUpdate typeParameters => pure (typeParameters, true, false)
+      | .axiom_ typeParameters => pure (typeParameters, false, true)
       | kind => throwError "namespace condition {repr kind} is not a global invariant"
     if phase == .entry && isUpdate then continue
+    if phase == .exit && isAxiom then continue
     unless typeParameters.isEmpty do
       throwError "generic namespace invariants are not supported in generated contracts"
     unless declaration.condition.auxiliary.isEmpty do
@@ -1658,7 +2183,9 @@ private def namespaceInvariantTerms (context : Context)
     let range := conditionRange context.unit declaration.condition
     let invariantFamilies := (invariantValueReads context.ns
       declaration.condition.expression).map (fun read => read.typeIndex)
-    let modifiedKeys := modifiedResources.map fun resources =>
+    -- An axiom is not re-established at the modified keys: it is assumed
+    -- as stated.
+    let modifiedKeys := if isAxiom then none else modifiedResources.map fun resources =>
       resources.filterMap fun resource =>
         if invariantFamilies.contains resource.typeIndex then some resource.key else none
     match modifiedKeys with
@@ -1683,11 +2210,11 @@ private def namespaceInvariantTerms (context : Context)
               let bodyProposition ← guardedInvariantBody active
                 declaration.condition.expression body condition
               mkForallFVars #[value] bodyProposition
-            terms := terms.push (proposition, range.1, range.2)
+            terms := terms.push (proposition, range)
         | _ =>
             let proposition ← guardedInvariantBody invariantContext
               declaration.condition.expression declaration.condition.expression none
-            terms := terms.push (proposition, range.1, range.2)
+            terms := terms.push (proposition, range)
     | some keys =>
         if keys.isEmpty then continue
         let some root := context.ns.expressions[declaration.condition.expression.index]?
@@ -1710,11 +2237,11 @@ private def namespaceInvariantTerms (context : Context)
                 oldLocals := invariantContext.oldLocals.set! localId.index (some key) }
               let proposition ← guardedInvariantBody active
                 declaration.condition.expression body condition
-              terms := terms.push (proposition, range.1, range.2)
+              terms := terms.push (proposition, range)
         | _ =>
             let proposition ← guardedInvariantBody invariantContext
               declaration.condition.expression declaration.condition.expression none
-            terms := terms.push (proposition, range.1, range.2)
+            terms := terms.push (proposition, range)
   pure terms
 
 /-- Source-key expressions named by the function's frame. Specializing a
@@ -1751,15 +2278,39 @@ private def groupConditions (unit : ValidatedUnit)
         groups := { groups with
           abortsIf := groups.abortsIf.push
             { condition := condition.expression, code, range } }
+    | .letPre name => groups := { groups with
+        lets := groups.lets.push { name, value := condition.expression, post := false } }
+    | .letPost name => groups := { groups with
+        lets := groups.lets.push { name, value := condition.expression, post := true } }
     | kind =>
         throwError "specification clause {repr kind} is not supported in           generated contracts"
   return groups
 
-/-- Wrap a translated clause with its source range so a residual obligation
-can be reported at the authored clause. -/
-private def markObligation (range : Nat × Nat) (clause : Lean.Expr) : Lean.Expr :=
-  mkApp3 (mkConst ``LeanerIR.Proofs.Obligation)
-    (mkRawNatLit range.1) (mkRawNatLit range.2) clause
+/-- A clause context with a contract's `let`s bound, in order: a
+pre-state `let` is read at entry, a post-state one, where `post` admits it,
+in the context itself. A contract's bindings are the function's last
+locals, one per `let`, after the ones its body declares. -/
+private def bindLets (context : Context) (lets : Array ContractLet) (post : Bool) :
+    MetaM Context := do
+  let mut context := context
+  let firstBinding := context.localNames.size - lets.size
+  for h : position in [:lets.size] do
+    let binding := lets[position]
+    if binding.post && !post then continue
+    let reading := if binding.post then context
+      else { context with locals := context.oldLocals, state := context.oldState }
+    let index := firstBinding + position
+    unless context.localNames[index]? == some binding.name do
+      throwError "the contract binding `{binding.name}` has no local"
+    let value ← translate reading binding.value
+    let value ← match context.localTypes[index]?.map domainOf with
+      | some .boolean => mkDecide value
+      | _ => pure value
+    context := { context with
+      locals := context.locals.set! index (some value)
+      oldLocals := context.oldLocals.set! index (some value) }
+  return context
+
 
 /-! ## Data invariants
 
@@ -1769,30 +2320,87 @@ those proofs, so the generated contract restores their verification meaning:
 incoming values provide invariant assumptions, while outgoing values and
 modified resources owe the invariant again. -/
 
-/-- The declaration and owning namespace of a nominal type. -/
-private def nominalDeclaration? (context : Context) (ty : IrTy) :
-    Option (LeanerIR.NamespaceId × ValidatedNamespace × LeanerIR.StructDecl) := do
-  let .nominal name _ := ty | none
-  let qualified ← context.unit.tables.names[name.index]?
-  let ns ← context.unit.namespaces[qualified.namespaceId.index]?
-  let declaration ← ns.structs.find? (·.name == name)
-  some (qualified.namespaceId, ns, declaration)
+/-- A type use under the type arguments of the declaration it occurs in:
+the use, with the arguments its type parameters stand for. -/
+private inductive Scoped where
+  | mk (typeId : LeanerIR.TypeId) (arguments : Array Scoped)
 
-/-- Whether a physical type actually contributes a data-invariant clause. -/
-private def hasDataInvariant (context : Context) (ty : IrTy) : Bool :=
-  match nominalDeclaration? context ty with
-  | some (_, _, declaration) => declaration.contract.conditions.any
-      (fun condition => condition.kind == .structInvariant)
-  | none => false
+/-- The type a use denotes, with the arguments its parameters stand for; none
+for a parameter of the function, whose type is not known. -/
+private def Scoped.resolve (unit : ValidatedUnit) (arguments : Array Scoped)
+    (typeId : LeanerIR.TypeId) : Option (IrTy × Array Scoped) :=
+  match unit.tables.types[typeId.index]? with
+  | some (.typeParameter index) => do
+      let .mk argument outer ← arguments[index]?
+      let resolved ← unit.tables.types[argument.index]?
+      if resolved matches .typeParameter _ then none else some (resolved, outer)
+  | some ty => some (ty, arguments)
+  | none => none
+
+/-- The arguments a nominal type use gives its declaration's parameters. -/
+private def Scoped.ofNominal (arguments : Array Scoped) (uses : Array LeanerIR.GenericArgument) :
+    Array Scoped :=
+  uses.filterMap fun
+    | .typeArg argument => some (.mk argument.typeId arguments)
+    | _ => none
+
+/-- The rows of fields a nominal declaration holds: its fields, or each
+variant's payload with the variant's name. -/
+private def fieldRows (unit : ValidatedUnit) (declaration : LeanerIR.StructDecl) :
+    Array (Option String × Array LeanerIR.FieldDecl) :=
+  if declaration.variants.isEmpty then #[(none, declaration.fields)]
+  else declaration.variants.map fun variant =>
+    (some (((unit.tables.names[variant.name.index]?).map (·.name)).getD ""), variant.fields)
+
+/-- The type of the values an intrinsic map in an entries layout holds, as a
+use under the owner's arguments. -/
+private def mapValueType? (unit : ValidatedUnit) (declaration : LeanerIR.StructDecl)
+    (arguments : Array Scoped) : Option (IrTy × Array Scoped) := do
+  let [(_, fields)] := (fieldRows unit declaration).toList | none
+  let [field] := fields.toList | none
+  let (.vector element _, scope) ← Scoped.resolve unit arguments field.type.typeId | none
+  let (entryType, scope) ← Scoped.resolve unit scope element
+  let .nominal _ uses := entryType | none
+  let (_, _, entry) ← nominalDeclaration? unit entryType
+  let valueField ← entry.fields[1]?
+  Scoped.resolve unit (Scoped.ofNominal scope uses) valueField.type.typeId
+
+/-- Whether values of a type carry a data invariant at any depth: one it
+declares, the representation invariant of an intrinsic map, or one of a
+field's, an element's, or a stored value's, as the Move Prover assumes them
+(`data_invariant_instrumentation.rs`). -/
+private partial def carriesInvariant (unit : ValidatedUnit) (ty : IrTy)
+    (arguments : Array Scoped) (depth : Nat) : Bool :=
+  if depth > 16 then false else
+  match ty with
+  | .vector element _ => match Scoped.resolve unit arguments element with
+      | some (elementType, scope) => carriesInvariant unit elementType scope (depth + 1)
+      | none => false
+  | .nominal _ uses => match nominalDeclaration? unit ty with
+      | some (_, _, declaration) =>
+          let scope := Scoped.ofNominal arguments uses
+          declaration.contract.conditions.any (·.kind == .structInvariant) ||
+            (mapModel? unit ty).isSome ||
+            (fieldRows unit declaration).any fun (_, fields) => fields.any fun field =>
+              match Scoped.resolve unit scope field.type.typeId with
+              | some (fieldType, fieldScope) => carriesInvariant unit fieldType fieldScope (depth + 1)
+              | none => false
+      | none => false
+  | _ => false
+
+/-- Whether a physical type contributes a data-invariant clause. -/
+def hasDataInvariant (unit : ValidatedUnit) (ty : IrTy) : Bool :=
+  carriesInvariant unit ty #[] 0
 
 /-- Specialize every invariant declared by `ty` to its erased runtime value.
 Struct invariant locals are the fields in declaration order; enum invariants
 receive the whole tagged value as local zero and bind payloads in their own
 logical match. -/
-private def dataInvariantTerms (context : Context) (ty : IrTy)
-    (value : Lean.Expr) : MetaM (Array (Lean.Expr × Nat × Nat)) := do
-  let some (namespaceId, ns, declaration) := nominalDeclaration? context ty
+private def declaredInvariantTerms (context : Context) (ty : IrTy)
+    (value : Lean.Expr) : MetaM (Array (Lean.Expr × ObligationRange)) := do
+  let some (owner, ns, declaration) := nominalDeclaration? context.unit ty
     | return #[]
+  let namespaceId := owner.namespaceId
   let conditions := declaration.contract.conditions.filter
     (fun condition => condition.kind == .structInvariant)
   if conditions.isEmpty then return #[]
@@ -1823,7 +2431,65 @@ private def dataInvariantTerms (context : Context) (ty : IrTy)
       throwError "a data invariant cannot carry auxiliary expressions"
     let proposition ← translate invariantContext condition.expression
     let range := conditionRange context.unit condition
-    pure (proposition, range.1, range.2)
+    pure (proposition, range)
+
+
+/-- The data invariants of a value of a type, at any depth, as the Move
+Prover assumes them: the type's declared invariants; for an intrinsic map,
+its representation invariant and the invariants of its values; the
+invariants of each field, under the test of its variant; and those of each
+element of a vector. -/
+private partial def deepInvariantTerms (context : Context) (ty : IrTy) (arguments : Array Scoped)
+    (value : Lean.Expr) (depth : Nat) : MetaM (Array (Lean.Expr × ObligationRange)) := do
+  unless carriesInvariant context.unit ty arguments depth do return #[]
+  match ty with
+  | .vector element _ =>
+      let some (elementType, scope) := Scoped.resolve context.unit arguments element | return #[]
+      withLocalDeclD `element (mkConst ``RuntimeValue) fun elementValue => do
+        let terms ← deepInvariantTerms context elementType scope elementValue (depth + 1)
+        let some (_, range) := terms[0]? | return #[]
+        let member ← mkAppM ``Membership.mem
+          #[← mkAppM ``LeanerLang.Contract.elementsVector #[value], elementValue]
+        let body ← mkArrow member (← conjunction (terms.map (·.1)))
+        return #[(← mkForallFVars #[elementValue] body, range)]
+  | .nominal _ uses =>
+      let some (owner, ns, declaration) := nominalDeclaration? context.unit ty | return #[]
+      let scope := Scoped.ofNominal arguments uses
+      let mut terms ← declaredInvariantTerms context ty value
+      if let some model := mapModel? context.unit ty then
+        let some intrinsic := ns.intrinsics.find? (·.owner == declaration.name) | return terms
+        let range := locRange context.unit intrinsic.loc
+        terms := terms.push (← mkAppM ``LeanerIR.Maps.Valid #[model.discipline, value], range)
+        if let some (valueType, valueScope) := mapValueType? context.unit declaration scope then
+          let stored ← withLocalDeclD `key (mkConst ``RuntimeValue) fun key => do
+            let held ← mkAppM ``LeanerIR.Maps.valueAt #[value, key]
+            let inner ← deepInvariantTerms context valueType valueScope held (depth + 1)
+            let some (_, range) := inner[0]? | return none
+            let present ← mkEq (← mkAppM ``LeanerIR.Maps.hasKey #[value, key]) (mkConst ``Bool.true)
+            let body ← mkArrow present (← conjunction (inner.map (·.1)))
+            return some (← mkForallFVars #[key] body, range)
+          if let some term := stored then terms := terms.push term
+        return terms
+      for (variant, fields) in fieldRows context.unit declaration do
+        for (field, index) in fields.zipIdx do
+          let some (fieldType, fieldScope) := Scoped.resolve context.unit scope field.type.typeId
+            | continue
+          let selected ← mkAppM ``LeanerIR.RuntimeValue.field #[value, toExpr index]
+          let inner ← deepInvariantTerms context fieldType fieldScope selected (depth + 1)
+          for (term, range) in inner do
+            match variant with
+            | none => terms := terms.push (term, range)
+            | some name =>
+                let test ← mkEq (← mkAppM ``LeanerLang.Contract.testVariants
+                  #[value, toExpr owner, toExpr #[name]]) (mkConst ``Bool.true)
+                terms := terms.push (← mkArrow test term, range)
+      return terms
+  | _ => return #[]
+
+/-- The data invariants of a value of a physical type, at any depth. -/
+private def dataInvariantTerms (context : Context) (ty : IrTy) (value : Lean.Expr) :
+    MetaM (Array (Lean.Expr × ObligationRange)) :=
+  deepInvariantTerms context ty #[] value 0
 
 /-- Encode the logical value of a slot without adding the outer borrow which
 appears in an argument row.  Data invariants constrain the referent. -/
@@ -1839,10 +2505,10 @@ private def slotValueRuntime (context : Context) (slot : Slot)
 private def slotDataInvariantTerms (context : Context) (slots : Array Slot)
     (bound : Array SlotBinders)
     (binderOf : SlotBinders → Option Lean.Expr) :
-    MetaM (Array (Lean.Expr × Nat × Nat)) := do
+    MetaM (Array (Lean.Expr × ObligationRange)) := do
   let mut terms := #[]
   for (slot, binders) in slots.zip bound do
-    unless hasDataInvariant context slot.physical do continue
+    unless hasDataInvariant context.unit slot.physical do continue
     let some binder := binderOf binders | continue
     let value ← slotValueRuntime context slot binder
     terms := terms ++ (← dataInvariantTerms context slot.physical value)
@@ -1860,7 +2526,7 @@ private def modifiedDataInvariantTerms (context : Context)
   lookups, which keeps their existing verification path cost-neutral. -/
   let resources := resources.filter fun resource =>
     match context.unit.tables.types[resource.typeIndex]? with
-    | some resourceType => hasDataInvariant context resourceType
+    | some resourceType => hasDataInvariant context.unit resourceType
     | none => false
   if resources.isEmpty then return #[]
   let some state := context.state
@@ -1880,10 +2546,44 @@ private def modifiedDataInvariantTerms (context : Context)
     let present ← mkEq (← mkAppM ``Option.isSome #[lookup]) (mkConst ``Bool.true)
     let value ← mkAppM ``Option.getD #[lookup, mkConst ``RuntimeValue.unit]
     let invariants ← dataInvariantTerms context resourceType value
-    for (invariant, start, stop) in invariants do
+    for (invariant, range) in invariants do
       obligations := obligations.push
-        (← mkArrow present (markObligation (start, stop) invariant))
+        (← mkArrow present (markObligation range invariant))
   pure obligations
+
+/-- The conjunction of a loop annotation's `invariant` clauses over the
+given local binders: the clause translation the contracts use, with no
+runtime row, frame, or route-specific representation. Each clause is marked
+with its source range, so an invariant not established is reported there.
+The data invariants of the `dataInvariantSlots` (locals of a type declaring
+them, which the body modifies) are conjoined: a value of the type satisfies
+them wherever it is not under construction, so the loop owes them as it
+owes an authored clause, and each iteration assumes them. A state anchor in
+a clause reads the loop's entry: `entryLocals` and `entryState`. -/
+def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (ns : ValidatedNamespace) (block : LeanerIR.SpecBlock)
+    (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (codecs : Option Lean.Expr)
+    (types : Option Lean.Expr)
+    (localNames : Array String) (oldLocals : Array (Option Lean.Expr))
+    (oldState : Lean.Expr) (twins : Array SpecTypes.TwinInfo)
+    (families : Array SpecTypes.FamilyInfo) (dataInvariantSlots : Array Nat := #[])
+    (entryLocals : Array (Option Lean.Expr) := #[]) (entryState : Option Lean.Expr := none) :
+    MetaM Lean.Expr := do
+  let context : Context := {
+    unit, namespaceId, ns, locals, oldLocals, localTypes, localNames, results := #[],
+    codecs, types, oldState := some oldState, twins, families,
+    anchorLocals := entryLocals, anchorState := entryState }
+  let mut clauses ← block.conditions.filterMapM fun condition => do
+    if condition.kind == .loopInvariant then
+      some <$> markObligation (conditionRange unit condition) <$>
+        translate context condition.expression
+    else pure none
+  for slot in dataInvariantSlots do
+    let some (some value) := locals[slot]? | throwError "a data invariant slot has no binder"
+    let some ty := localTypes[slot]? | throwError "a data invariant slot has no type"
+    for (invariant, range) in ← dataInvariantTerms context ty value do
+      clauses := clauses.push (markObligation range invariant)
+  conjunction clauses
 
 /-- The runtime key a `modifies global<T>(k)` clause names, as a
 `GlobalKey`-valued term over the contract's logical binders. -/
@@ -1995,6 +2695,18 @@ private def familiesUsed (unit : ValidatedUnit) (namespaceId : LeanerIR.Namespac
                   callee.body
                 if let some body := body? then
                   work := work ++ [(reference.namespaceId, body)]
+            | .call (.function reference) =>
+                -- A callee's resources are ones the call reaches, through
+                -- its body or its contract.
+                if let some calleeNs := unit.namespaces[reference.namespaceId.index]? then
+                  if let some functionId := unit.resolution.function? reference.name then
+                    if let some callee := calleeNs.functions[functionId.index]? then
+                      let calleeRoots := callee.contract.conditions.flatMap fun condition =>
+                        #[condition.expression] ++ condition.auxiliary.map (·.2)
+                      let calleeRoots := match callee.body with
+                        | .structured root => calleeRoots.push root
+                        | _ => calleeRoots
+                      work := work ++ (calleeRoots.toList.map (reference.namespaceId, ·))
             | _ => pure ()
         | _ => pure ()
         work := work ++ (LeanerIR.Validation.expressionChildren expression.kind).toList.map
@@ -2156,6 +2868,334 @@ def ensureSpecFunctionDefinitions (unit : ValidatedUnit) (twins : Array SpecType
       results := #[] }
     let _ ← translate.ensureDefinition context reference
 
+/-- The value of the uninterpreted function `name` at a native's type
+parameters and argument values. -/
+private def modelApplication (context : Context)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) (name : String)
+    (parameterSlots : Array Slot) (values : Array Lean.Expr) (domain : Domain) :
+    MetaM Lean.Expr := do
+  let some types := context.types
+    | throwError "the native model `{name}` is applied outside a family"
+  let typeParameters := declaration.signature.generics.filter (·.kind == .typeArg) |>.size
+  let typeArguments ← (List.range typeParameters).mapM fun index =>
+    return mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types
+      (mkApp (mkConst ``LeanerIR.Proofs.Denote.NTy.param) (toExpr index))
+  let encoded ← (parameterSlots.zip values).mapM fun (slot, value) =>
+    (domainOf slot.physical).encode value
+  mkAppOptM ``LeanerLang.Contract.opaqueSpec
+    #[toExpr name, ← mkListLit (mkConst ``LeanerIR.Proofs.Denote.NTy) typeArguments,
+      domain.leanType, none, ← mkListLit (mkConst ``RuntimeValue) encoded.toList]
+
+/-- A native's path-qualified name. -/
+private def nativeName (context : Context)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : MetaM String := do
+  let some path := context.unit.tables.namespaces[context.namespaceId.index]?
+    | throwError "a native's namespace has no path"
+  let some qualified := context.unit.tables.names[declaration.name.index]?
+    | throwError "a native has no name"
+  return "::".intercalate (path.segments.toList ++ [qualified.name])
+
+/-- The result clauses of an uninterpreted native model: the result is the
+model function's value at the native's type parameters and arguments, and a
+vector result has the length the model states. None for a native without
+exactly one result. -/
+private def uninterpretedResult (context : Context)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
+    (resultLength : Option Nat) (function : Option String)
+    (parameterSlots : Array Slot) (parameterBound : Array SlotBinders)
+    (resultSlots : Array Slot) (resultBound : Array SlotBinders) : MetaM (Array Lean.Expr) := do
+  let [resultSlot] := resultSlots.toList | return #[]
+  let [resultBinders] := resultBound.toList | return #[]
+  let name ← match function with
+    | some name => pure name
+    | none => nativeName context declaration
+  let domain := domainOf resultSlot.physical
+  let value ← modelApplication context declaration name parameterSlots
+    (parameterBound.map (·.current)) domain
+  -- The uninterpreted value on the left: a second call at the same arguments
+  -- rewrites to the first's result, and a clause naming the native closes.
+  let mut clauses := #[← mkEq value resultBinders.entry]
+  if let some length := resultLength then
+    if domain matches .aggregate then
+      clauses := clauses.push (← mkEq
+        (← mkAppM ``LeanerLang.Contract.lengthVector #[resultBinders.entry])
+        (toExpr (Int.ofNat length)))
+  return clauses
+
+/-- The result clause of the structural-order model: the result is the
+ordering variant at the order of the two operands. The result is on the
+left, as a defined model states what the result is. -/
+private def orderResult (context : Context)
+    (parameterSlots : Array Slot) (parameterBound : Array SlotBinders)
+    (resultSlots : Array Slot) (resultBound : Array SlotBinders) : MetaM Lean.Expr := do
+  let [(leftSlot, left), (rightSlot, right)] := (parameterSlots.zip parameterBound).toList
+    | throwError "a structural order compares two operands"
+  let [resultSlot] := resultSlots.toList | throwError "a structural order has one result"
+  let [resultBinders] := resultBound.toList | throwError "a structural order has one result"
+  let order ← structuralOrderTerm context
+    (← (domainOf leftSlot.physical).encode left.current)
+    (← (domainOf rightSlot.physical).encode right.current)
+  mkEq resultBinders.entry (← orderingValue context resultSlot.physical order)
+
+/-- The executable role a function plays for an intrinsic map of its
+namespace, with the map's model. -/
+def mapRoleOf? (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Option String := do
+  let target : LeanerIR.QualifiedRef := { namespaceId, name := declaration.name }
+  let intrinsic ← ns.intrinsics.find? fun intrinsic =>
+    intrinsic.model == "map" && intrinsic.executableBindings.any (·.target == target)
+  let _ ← mapModel? unit (.nominal intrinsic.owner #[])
+  let binding ← intrinsic.executableBindings.find? (·.target == target)
+  pure binding.role
+
+/-- The model of the map a role function's namespace owns. -/
+private def mapRoleModel (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : MetaM MapModel := do
+  let target : LeanerIR.QualifiedRef := { namespaceId, name := declaration.name }
+  let some intrinsic := ns.intrinsics.find? fun intrinsic =>
+      intrinsic.model == "map" && intrinsic.executableBindings.any (·.target == target)
+    | throwError "a map role function has no intrinsic declaration"
+  let some model := mapModel? unit (.nominal intrinsic.owner #[])
+    | throwError "a map role function's owner has no carried representation"
+  return model
+
+/-- The runtime value of a parameter's binder at entry, or at exit. -/
+private def slotRuntime (slot : Slot) (binder : Lean.Expr) : MetaM Lean.Expr := do
+  if (← whnfR (← inferType binder)).isConstOf ``RuntimeValue then return binder
+  (domainOf slot.physical).encode binder
+
+/-- The value of the `Option` result type at an optional runtime value: its
+one vector field holds the value or nothing. -/
+private def optionValue (context : Context) (ty : IrTy) (value : Option Lean.Expr) :
+    MetaM Lean.Expr := do
+  let some (owner, _, _) := nominalDeclaration? context.unit ty
+    | throwError "an optional map result is not an `Option`"
+  let elements ← mkArrayLit (mkConst ``RuntimeValue) value.toList
+  let vector ← mkAppM ``RuntimeValue.vector #[elements]
+  mkAppM ``RuntimeValue.nominal
+    #[toExpr owner, toExpr (none : Option String), ← mkArrayLit (mkConst ``RuntimeValue) [vector]]
+
+/-- The runtime values of a role's parameters at entry, and of its map at
+exit, with the model terms the roles share. -/
+private structure RoleOperands where
+  role : String
+  model : MapModel
+  slots : Array Slot
+  bound : Array SlotBinders
+
+namespace RoleOperands
+
+private def parameter (operands : RoleOperands) (index : Nat) : MetaM (Slot × SlotBinders) := do
+  let (some slot, some binders) := (operands.slots[index]?, operands.bound[index]?)
+    | throwError m!"the intrinsic map role `{operands.role}` lacks parameter {index}"
+  pure (slot, binders)
+
+/-- A parameter's runtime value at entry. -/
+private def entry (operands : RoleOperands) (index : Nat) : MetaM Lean.Expr := do
+  let (slot, binders) ← operands.parameter index
+  slotRuntime slot binders.entry
+
+/-- A parameter's clause value at entry, in its own domain. -/
+private def clause (operands : RoleOperands) (index : Nat) : MetaM Lean.Expr := do
+  pure (← operands.parameter index).2.entry
+
+/-- A mutated parameter's runtime value at exit. -/
+private def exit (operands : RoleOperands) (index : Nat) : MetaM Lean.Expr := do
+  let (slot, binders) ← operands.parameter index
+  let some exit := binders.exit
+    | throwError m!"the intrinsic map role `{operands.role}` does not mutate parameter {index}"
+  slotRuntime slot exit
+
+private def size (map : Lean.Expr) : MetaM Lean.Expr :=
+  mkAppM ``LeanerIR.Maps.size #[map]
+
+private def hasKey (map key : Lean.Expr) : MetaM Lean.Expr :=
+  mkAppM ``LeanerIR.Maps.hasKey #[map, key]
+
+private def empty (map : Lean.Expr) : MetaM Lean.Expr := do
+  mkEq (← size map) (mkIntLit 0)
+
+/-- The key an enumerating role reads: the first, or the last. -/
+private def endKey (operands : RoleOperands) (map : Lean.Expr) : MetaM Lean.Expr := do
+  let front := operands.role == "map_borrow_front" || operands.role == "map_front_key" ||
+    operands.role == "map_pop_front"
+  let position ← if front then pure (mkIntLit 0)
+    else mkAppM ``HSub.hSub #[← size map, mkIntLit 1]
+  mkAppM ``LeanerIR.Maps.keyAt #[map, position]
+
+end RoleOperands
+
+/-- The abort condition of an intrinsic map role over the entry binders
+(`designs/intrinsic-maps.md`, "Roles"), `none` when it never aborts. -/
+private def mapRoleAborts (context : Context) (operands : RoleOperands) :
+    MetaM (Option Lean.Expr) := do
+  let map := operands.entry 0
+  let absent : MetaM Lean.Expr := do
+    mkEq (← RoleOperands.hasKey (← map) (← operands.entry 1)) (mkConst ``Bool.false)
+  match operands.role with
+  | "map_borrow" | "map_borrow_mut" | "map_del_must_exist" | "map_del_return_key" =>
+      return some (← absent)
+  | "map_add_no_override" =>
+      return some (← mkEq (← RoleOperands.hasKey (← map) (← operands.entry 1)) (mkConst ``Bool.true))
+  | "map_destroy_empty" => return some (← mkAppM ``Ne #[← RoleOperands.size (← map), mkIntLit 0])
+  | "map_borrow_front" | "map_borrow_back" | "map_front_key" | "map_back_key" | "map_pop_front"
+  | "map_pop_back" => return some (← RoleOperands.empty (← map))
+  | "map_new_from" =>
+      return some (← mkAppM ``LeanerIR.Maps.AbortsNewFrom #[← operands.entry 0, ← operands.entry 1])
+  | "map_add_all" =>
+      return some (← mkAppM ``LeanerIR.Maps.AbortsAddAll
+        #[← map, ← operands.entry 1, ← operands.entry 2])
+  | "map_upsert_all" =>
+      return some (← mkAppM ``LeanerIR.Maps.AbortsUpsertAll #[← operands.entry 1, ← operands.entry 2])
+  | "map_append_disjoint" =>
+      return some (← mkAppM ``LeanerIR.Maps.AbortsAppendDisjoint #[← map, ← operands.entry 1])
+  | "map_trim" => return some (← mkAppM ``LT.lt #[← RoleOperands.size (← map), ← operands.clause 1])
+  | "map_replace_key_inplace" =>
+      return some (← mkAppM ``LeanerIR.Maps.AbortsReplaceKey
+        #[operands.model.layout, operands.model.discipline, ← map, ← operands.entry 1,
+          ← operands.entry 2])
+  | "map_iter_borrow_mut" =>
+      let (iteratorSlot, _) ← operands.parameter 0
+      let some (owner, variant) := iteratorPosition? context.unit iteratorSlot.physical
+        | throwError "an iterator of an intrinsic map has no position variant"
+      return some (← mkAppM ``Not
+        #[← iteratorInRange owner variant (← operands.entry 0) (← operands.entry 1)])
+  | _ => return none
+
+/-- The roles returning a mutable reference into the map, whose ensures state
+the map at the reference's final value. -/
+private def mapRoleReadsFinal (role : String) : Bool :=
+  role == "map_borrow_mut" || role == "map_borrow_mut_with_default" ||
+    role == "map_iter_borrow_mut"
+
+/-- The result and effect clauses of an intrinsic map role, over the entry
+binders, the exit binders of a mutated map, and the result binders. A value
+the role builds replaces its result; an observation of the map is on the
+left, so that a clause naming it speaks about the result. -/
+private def mapRoleEnsures (context : Context) (operands : RoleOperands)
+    (resultSlots : Array Slot) (resultBound : Array SlotBinders)
+    (finals : Array (Option Lean.Expr)) : MetaM (Array Lean.Expr) := do
+  let model := operands.model
+  let role := operands.role
+  let result : MetaM (Slot × Lean.Expr) := do
+    let (some slot, some binders) := (resultSlots[0]?, resultBound[0]?)
+      | throwError m!"the intrinsic map role `{role}` lacks its result"
+    pure (slot, binders.entry)
+  let observed (value : Lean.Expr) : MetaM Lean.Expr := do
+    let (slot, binder) ← result
+    mkEq (← (domainOf slot.physical).binderOfRuntime value) binder
+  let built (value : Lean.Expr) : MetaM Lean.Expr := do
+    let (_, binder) ← result
+    mkEq binder value
+  let tuple (values : List Lean.Expr) : MetaM Lean.Expr := do
+    mkAppM ``RuntimeValue.tuple #[← mkArrayLit (mkConst ``RuntimeValue) values]
+  let map := operands.entry 0
+  let key := operands.entry 1
+  let valueAt (map key : Lean.Expr) : MetaM Lean.Expr := mkAppM ``LeanerIR.Maps.valueAt #[map, key]
+  let present : MetaM Lean.Expr := do
+    mkEq (← RoleOperands.hasKey (← map) (← key)) (mkConst ``Bool.true)
+  let update (map key value : Lean.Expr) : MetaM Lean.Expr := do
+    mkAppM ``LeanerIR.Maps.update #[model.layout, model.discipline, map, key, value]
+  let remove (map key : Lean.Expr) : MetaM Lean.Expr := do
+    mkAppM ``LeanerIR.Maps.remove #[model.layout, model.discipline, map, key]
+  let exitIs (value : Lean.Expr) : MetaM Lean.Expr := do mkEq (← operands.exit 0) value
+  let optional (value : Option Lean.Expr) (condition : Option Lean.Expr) : MetaM Lean.Expr := do
+    let (slot, binder) ← result
+    let some_ ← optionValue context slot.physical value
+    let none_ ← optionValue context slot.physical none
+    match condition with
+    | some condition => mkEq (← mkAppOptM ``ite #[none, condition, none, some_, none_]) binder
+    | none => mkEq some_ binder
+  let final : MetaM Lean.Expr := do
+    let (slot, _) ← result
+    let some (some final) := finals[0]?
+      | throwError m!"the intrinsic map role `{role}` returns no mutable reference"
+    slotRuntime slot final
+  match role with
+  | "map_new" => return #[← built (← mkAppM ``LeanerIR.Maps.empty #[model.layout])]
+  | "map_new_from" =>
+      return #[← built (← mkAppM ``LeanerIR.Maps.updateAll #[model.layout, model.discipline,
+        ← mkAppM ``LeanerIR.Maps.empty #[model.layout], ← operands.entry 0, ← operands.entry 1])]
+  | "map_len" =>
+      let (_, binder) ← result
+      return #[← mkEq (← RoleOperands.size (← map)) binder]
+  | "map_is_empty" =>
+      let (_, binder) ← result
+      return #[← mkEq (← mkDecide (← RoleOperands.empty (← map))) binder]
+  | "map_has_key" =>
+      let (_, binder) ← result
+      return #[← mkEq (← RoleOperands.hasKey (← map) (← key)) binder]
+  | "map_borrow" => return #[← observed (← valueAt (← map) (← key))]
+  | "map_borrow_with_default" =>
+      return #[← observed (← mkAppOptM ``ite
+        #[none, ← present, none, ← valueAt (← map) (← key), ← operands.entry 2])]
+  | "map_get" => return #[← optional (some (← valueAt (← map) (← key))) (some (← present))]
+  | "map_borrow_mut" | "map_borrow_mut_with_default" =>
+      let current ← if role == "map_borrow_mut" then valueAt (← map) (← key)
+        else mkAppOptM ``ite #[none, ← present, none, ← valueAt (← map) (← key), ← operands.entry 2]
+      return #[← observed current, ← exitIs (← update (← map) (← key) (← final))]
+  | "map_iter_borrow_mut" =>
+      -- The iterator is parameter 0, the map parameter 1.
+      let (iteratorSlot, _) ← operands.parameter 0
+      let some (owner, variant) := iteratorPosition? context.unit iteratorSlot.physical
+        | throwError "an iterator of an intrinsic map has no position variant"
+      let iteratorKey ← iteratorKey owner variant (← operands.entry 0) (← operands.entry 1)
+      return #[← observed (← valueAt (← operands.entry 1) iteratorKey),
+        ← mkEq (← operands.exit 1) (← update (← operands.entry 1) iteratorKey (← final))]
+  | "map_add_no_override" | "map_add_override_if_exists" =>
+      return #[← exitIs (← update (← map) (← key) (← operands.entry 2))]
+  | "map_upsert" =>
+      return #[← optional (some (← valueAt (← map) (← key))) (some (← present)),
+        ← exitIs (← update (← map) (← key) (← operands.entry 2))]
+  | "map_del_must_exist" =>
+      return #[← observed (← valueAt (← map) (← key)), ← exitIs (← remove (← map) (← key))]
+  | "map_remove_or_none" =>
+      return #[← optional (some (← valueAt (← map) (← key))) (some (← present)),
+        ← exitIs (← remove (← map) (← key))]
+  | "map_del_return_key" =>
+      return #[← built (← tuple [← key, ← valueAt (← map) (← key)]),
+        ← exitIs (← remove (← map) (← key))]
+  | "map_destroy_empty" => return #[]
+  | "map_add_all" | "map_upsert_all" =>
+      return #[← exitIs (← mkAppM ``LeanerIR.Maps.updateAll #[model.layout, model.discipline, ← map,
+        ← operands.entry 1, ← operands.entry 2])]
+  | "map_append" | "map_append_disjoint" =>
+      let other ← operands.entry 1
+      return #[← exitIs (← mkAppM ``LeanerIR.Maps.updateAll #[model.layout, model.discipline, ← map,
+        ← mkAppM ``LeanerIR.Maps.keysOf #[other], ← mkAppM ``LeanerIR.Maps.valuesOf #[other]])]
+  | "map_trim" =>
+      let count ← operands.clause 1
+      return #[← built (← mkAppM ``LeanerIR.Maps.dropEntries #[model.layout, ← map, count]),
+        ← exitIs (← mkAppM ``LeanerIR.Maps.takeEntries #[model.layout, ← map, count])]
+  | "map_replace_key_inplace" =>
+      return #[← exitIs (← mkAppM ``LeanerIR.Maps.replaceKey
+        #[model.layout, ← map, ← operands.entry 1, ← operands.entry 2])]
+  | "map_borrow_front" | "map_borrow_back" =>
+      let key ← operands.endKey (← map)
+      return #[← built (← tuple [key, ← valueAt (← map) key])]
+  | "map_front_key" | "map_back_key" => return #[← observed (← operands.endKey (← map))]
+  | "map_pop_front" | "map_pop_back" =>
+      let key ← operands.endKey (← map)
+      return #[← built (← tuple [key, ← valueAt (← map) key]), ← exitIs (← remove (← map) key)]
+  | "map_prev_key" | "map_next_key" =>
+      let some rank := model.rank?
+        | throwError m!"the intrinsic map role `{role}` needs an ordered map"
+      let neighbour ← mkAppM (if role == "map_prev_key" then ``LeanerIR.Maps.prevKey?
+        else ``LeanerIR.Maps.nextKey?) #[rank, ← map, ← key]
+      let (slot, binder) ← result
+      let none_ ← optionValue context slot.physical none
+      let some_ ← withLocalDeclD `neighbour (mkConst ``RuntimeValue) fun neighbour => do
+        mkLambdaFVars #[neighbour] (← optionValue context slot.physical (some neighbour))
+      return #[← mkEq (← mkAppOptM ``Option.elim #[none, none, neighbour, none_, some_]) binder]
+  | "map_keys" => return #[← built (← mkAppM ``LeanerIR.Maps.keysOf #[← map])]
+  | "map_values" => return #[← built (← mkAppM ``LeanerIR.Maps.valuesOf #[← map])]
+  | "map_to_vec_pair" =>
+      return #[← built (← tuple [← mkAppM ``LeanerIR.Maps.keysOf #[← map],
+        ← mkAppM ``LeanerIR.Maps.valuesOf #[← map]])]
+  | _ => throwError m!"the intrinsic map role `{role}` is not carried"
+
 /-- The contract of a function over its native arguments and result. -/
 def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     (ns : ValidatedNamespace)
@@ -2165,24 +3205,37 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     (families : Array SpecTypes.FamilyInfo := #[])
     (carrier : Option Lean.Expr := none)
     (codecs : Option Lean.Expr := none)
-    (typeInstantiation : Option Lean.Expr := none) :
+    (types : Option Lean.Expr := none)
+    (typeInstantiation : Option Lean.Expr := none)
+    (nativeModel : Option NativeModel := none) :
     MetaM Lean.Expr := do
   let families := familiesUsed unit namespaceId ns declaration families
-  let groups ← groupConditions unit declaration.contract.conditions
+  -- An intrinsic map role is read by the map model, not by its source
+  -- specification (`designs/intrinsic-maps.md`, "Roles").
+  let mapRole ← (mapRoleOf? unit namespaceId ns declaration).mapM fun role =>
+    return (role, ← mapRoleModel unit namespaceId ns declaration)
+  let groups ← if mapRole.isSome then pure {}
+    else groupConditions unit declaration.contract.conditions
   let invariantResources ← invariantModifiedResources ns declaration.contract
   let isPartial := pragmaEnabled declaration.contract "aborts_if_is_partial"
-  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict"
+  -- A native without a specification is read by its Prover model
+  -- (`NativeModel`): it aborts only as the model says, and its result is the
+  -- value of the model's uninterpreted function at its arguments, so two
+  -- calls at equal arguments agree and a clause naming the function speaks
+  -- about the same value.
+  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict" || nativeModel.isSome ||
+    mapRole.isSome
   let parameterSlots ← declaration.signature.parameters.mapIdxM fun index parameter =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], twins := twins, families := families,
-             carrier := carrier, codecs := codecs,
+             carrier := carrier, codecs := codecs, types := types,
              typeInstantiation := typeInstantiation }
       (Name.mkSimple (if parameter.name.isEmpty then s!"argument{index}" else parameter.name))
       parameter.typeUse.typeId (allowReference := true)
   let resultSlots ← declaration.signature.results.mapIdxM fun index result =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
              locals := #[], results := #[], twins := twins, families := families,
-             carrier := carrier, codecs := codecs,
+             carrier := carrier, codecs := codecs, types := types,
              typeInstantiation := typeInstantiation }
       (Name.mkSimple (if declaration.signature.results.size == 1 then "result"
         else s!"result{index}"))
@@ -2209,7 +3262,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
   reference — and `spec.old` reaches the entry. -/
   let contextOf (state : Lean.Expr) (bound : Array SlotBinders) : Context :=
     { unit, namespaceId, ns, twins, families
-      carrier := carrier, codecs := codecs,
+      carrier := carrier, codecs := codecs, types := types,
       typeInstantiation := typeInstantiation
       locals := padLocals (bound.map fun binders => some binders.entry)
       localTypes := functionLocalTypes
@@ -2224,7 +3277,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     withLocalDeclD `state runtimeState fun state =>
       withFamilyContents families carrier fun familyBound => do
         let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
-        let context := contextOf state bound
+        let context ← bindLets (contextOf state bound) groups.lets false
         let represented ← familyConjuncts families familyBound state codecs typeInstantiation
         let dataInvariants ← slotDataInvariantTerms context parameterSlots bound
           (some ·.entry)
@@ -2243,7 +3296,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
           let (resultBound, prophecies, finals) ← resultBinders resultSlots signature result
           let context : Context :=
             { unit, namespaceId, ns, twins, families
-              carrier := carrier, codecs := codecs,
+              carrier := carrier, codecs := codecs, types := types,
               typeInstantiation := typeInstantiation
               locals := padLocals (parameterBound.map fun binders => some binders.current)
               localTypes := functionLocalTypes
@@ -2253,26 +3306,38 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
               resultFinals := finals
               resultTypes := resultSlots.map (·.physical)
               state := some final, oldState := some state }
-          let clauses ← groups.ensures.mapM fun (clause, range) =>
+          let context ← bindLets context groups.lets true
+          let mut clauses ← groups.ensures.mapM fun (clause, range) =>
             return markObligation range (← translate context clause)
+          if let some (.uninterpreted resultLength function _) := nativeModel then
+            clauses := clauses ++ (← uninterpretedResult context declaration resultLength
+              function parameterSlots parameterBound resultSlots resultBound)
+          if let some .structuralOrder := nativeModel then
+            clauses := clauses.push (← orderResult context parameterSlots parameterBound
+              resultSlots resultBound)
+          if let some (role, model) := mapRole then
+            let operands : RoleOperands := { role, slots := parameterSlots, bound := parameterBound
+                                             model }
+            clauses := clauses ++ (← mapRoleEnsures context operands resultSlots resultBound finals)
           let resultInvariants ← slotDataInvariantTerms context resultSlots resultBound
             (some ·.entry)
           let exitInvariants ← slotDataInvariantTerms context parameterSlots parameterBound
             (·.exit)
           let dataInvariantObligations :=
-            (resultInvariants ++ exitInvariants).map fun (clause, start, stop) =>
-              markObligation (start, stop) clause
+            (resultInvariants ++ exitInvariants).map fun (clause, range) =>
+              markObligation range clause
           let modifiedDataInvariants ←
             modifiedDataInvariantTerms context invariantResources
           let invariants ← namespaceInvariantTerms context invariantResources .exit
-          let invariantObligations := invariants.map fun (clause, start, stop) =>
-            markObligation (start, stop) clause
+          let invariantObligations := invariants.map fun (clause, range) =>
+            markObligation range clause
           let body ← conjunction
             (clauses ++ dataInvariantObligations ++ modifiedDataInvariants ++ invariantObligations)
           -- The value view: a returned reference is read at its current
           -- value, as if it died on return, unless the clauses read its
           -- final value.
-          let readsFinal := groups.ensures.any fun (clause, _) => mentionsFinal ns clause
+          let readsFinal := groups.ensures.any (fun (clause, _) => mentionsFinal ns clause) ||
+            mapRole.any (mapRoleReadsFinal ·.1)
           let body ← if prophecies.isEmpty || readsFinal then pure body
             else mkArrow (← conjunction prophecies) body
           mkLambdaFVars #[arguments, state, result, final] body
@@ -2284,21 +3349,34 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
   is declared — while `aborts_if_is_partial` additionally permits any outcome
   in states where no Pᵢ holds. -/
   let declaredAborts := !groups.abortsIf.isEmpty
+  -- A native model's abort: exactly when its predicate is false.
+  let modelAborts (context : Context) (bound : Array SlotBinders) : MetaM (Option Lean.Expr) := do
+    if let some (role, model) := mapRole then
+      return ← mapRoleAborts context { role, slots := parameterSlots, bound, model }
+    let some (.uninterpreted _ _ (some predicate)) := nativeModel | return none
+    let holds ← modelApplication context declaration predicate parameterSlots
+      (bound.map (·.entry)) .boolean
+    return some (mkNot (← Domain.boolean.ofBinder holds))
   let abortConditionTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `state runtimeState fun state => do
       let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
-      let clauses ← translateAll (contextOf state bound) (groups.abortsIf.map (·.condition))
-      let body ← if declaredAborts then disjunction clauses else pure (mkConst ``False)
+      let clauses ← translateAll (← bindLets (contextOf state bound) groups.lets false)
+        (groups.abortsIf.map (·.condition))
+      let body ← if declaredAborts then disjunction clauses
+        else pure ((← modelAborts (contextOf state bound) bound).getD (mkConst ``False))
       mkLambdaFVars #[arguments, state] body
   let abortsTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `state runtimeState fun state =>
       withLocalDeclD `failure failure fun failureBinder => do
         if !declaredAborts then
-          let permitted := if isStrict then mkConst ``False else mkConst ``True
+          let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes
+            arguments
+          let permitted := (← modelAborts (contextOf state bound) bound).getD
+            (if isStrict then mkConst ``False else mkConst ``True)
           mkLambdaFVars #[arguments, state, failureBinder] permitted
         else
           let bound ← parameterBinders signature.skolems parameterSlots signature.argumentTypes arguments
-          let context := contextOf state bound
+          let context ← bindLets (contextOf state bound) groups.lets false
           let mut matched : Array Lean.Expr := #[]
           let mut conditions : Array Lean.Expr := #[]
           for clause in groups.abortsIf do
@@ -2396,18 +3474,83 @@ private partial def pathSegments (stx : Syntax) : Array String :=
 private def pathName (segments : Array String) : Name :=
   segments.foldl (fun name segment => Name.str name segment) .anonymous
 
-/-- Locate one function of a registered unit by its final path segment. -/
-def findFunction? (unit : ValidatedUnit) (name : String) :
+/-- A function's own name, without its namespace path. -/
+private def functionName (unit : ValidatedUnit) (handle : LeanerIR.FunctionHandle) : String :=
+  let qualified? : Option LeanerIR.QualifiedName := do
+    let ns ← unit.namespaces[handle.namespaceId.index]?
+    let declaration ← ns.functions[handle.functionId.index]?
+    unit.tables.names[declaration.name.index]?
+  (qualified?.map (·.name)).getD ""
+
+/-- A function's path-qualified name, in every namespace. -/
+def qualifiedFunctionName (unit : ValidatedUnit) (handle : LeanerIR.FunctionHandle) : String :=
+  let path := (unit.tables.namespaces[handle.namespaceId.index]?.map (·.segments)).getD #[]
+  "::".intercalate (path.push (functionName unit handle)).toList
+
+/-- A function's name relative to a unit: its own name in the unit's module,
+namespace 0, and its path-qualified name in another namespace. -/
+def functionKey (unit : ValidatedUnit) (handle : LeanerIR.FunctionHandle) : String :=
+  if handle.namespaceId.index == 0 then functionName unit handle
+  else qualifiedFunctionName unit handle
+
+/-- The prelude model a function is read by: a native's without a
+specification (`readsNativeModel`). -/
+def nativeModelOf? (unit : ValidatedUnit) (handle : LeanerIR.FunctionHandle)
+    (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    Option NativeModel :=
+  if readsNativeModel declaration then nativeModel? ns.profile (qualifiedFunctionName unit handle)
+  else none
+
+/-- Locate one function of a registered unit by its key: its name in the
+unit's module, or its path-qualified name in another namespace. -/
+def findFunction? (unit : ValidatedUnit) (key : String) :
     Option (Nat × ValidatedNamespace × Nat ×
       LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) := do
+  let parts := (key.splitOn "::").toArray
+  let path := parts.pop
+  let name := parts.back?.getD key
   for h : namespaceIndex in [0:unit.namespaces.size] do
     let ns := unit.namespaces[namespaceIndex]
+    let owned := if path.isEmpty then namespaceIndex == 0 else
+      unit.tables.namespaces[ns.identity.index]?.map (·.segments) == some path
+    unless owned do continue
     for h : index in [0:ns.functions.size] do
       let declaration := ns.functions[index]
       if let some qualified := unit.tables.names[declaration.name.index]? then
         if qualified.name == name then
           return (namespaceIndex, ns, index, declaration)
   none
+
+/-- Which clauses of a contract hold where: a `[concrete]` clause is proved
+of the function's body, an `[abstract]` one is what its callers see of it,
+and an unmarked clause is both. -/
+inductive ContractView where
+  | implementation
+  | interface
+  deriving BEq
+
+private def markedAs (name : String) (condition : LeanerIR.Condition) : Bool :=
+  condition.properties.any fun
+    | .assign marker (.constant (.bool true)) _ => marker == name
+    | _ => false
+
+/-- Whether callers see a function differently than its body is proved:
+some clause is `[abstract]` or `[concrete]`. -/
+def hasInterfaceView (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    Bool :=
+  declaration.contract.conditions.any fun condition =>
+    markedAs "abstract" condition || markedAs "concrete" condition
+
+/-- A declaration with only the clauses a view admits. -/
+def ContractView.of (view : ContractView)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody :=
+  let excluded := match view with
+    | .implementation => "abstract"
+    | .interface => "concrete"
+  { declaration with contract := { declaration.contract with
+      conditions := declaration.contract.conditions.filter (!markedAs excluded ·) } }
 
 /-- Name of the generated contract definition. -/
 def contractName (namespaceSegments : Array String) (function : String) : Name :=
@@ -2416,6 +3559,11 @@ def contractName (namespaceSegments : Array String) (function : String) : Name :
 /-- Name of the contract over a function's native arguments and result. -/
 def typedContractName (namespaceSegments : Array String) (function : String) : Name :=
   Name.str (Name.str (pathName namespaceSegments) function) "typedContract"
+
+/-- Name of the contract a function's callers see of it, where that differs
+from its implementation's. -/
+def typedInterfaceContractName (namespaceSegments : Array String) (function : String) : Name :=
+  Name.str (Name.str (pathName namespaceSegments) function) "typedInterfaceContract"
 
 private def rootIdent (name : Name) : Ident :=
   mkIdent (rootNamespace ++ name)
@@ -2517,6 +3665,9 @@ def ensureSemanticsDefinitions (namespaceSegments : Array String)
   let widthEqName := pointerWidthEqName namespaceSegments
   if (← getEnv).contains eqName && (← getEnv).contains widthEqName then
     return (eqName, widthEqName)
+  -- An inductive declaration waits for every pending kernel check, and these
+  -- certificates are the longest: the twin structures come first.
+  discard <| SpecTypes.ensureSpecTypes namespaceSegments unit
   let marked := (LeanerIR.Validation.markLoanDeaths unit).1
   let indexes := LeanerIR.Validation.sharedReferenceErasureIndexes marked
   let chunks := LeanerIR.Validation.sharedReferenceErasureChunks marked

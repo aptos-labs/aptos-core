@@ -205,6 +205,12 @@ structure BorrowCertificate where
   lifetimeRelations : Array LifetimeRelationFact
   deriving Repr, BEq, Inhabited
 
+/-- A diagnostic of one namespace's function. -/
+structure OwnedDiagnostic where
+  namespaceId : NamespaceId
+  diagnostic : Diagnostic
+  deriving Repr, BEq, Inhabited
+
 /-- Only public backend input. Its constructor is private; the shared checker
 creates it after bounds, arena, declaration, profile, CFG, resolution, typing,
 and initialization/borrow validation, and records derived indexes and
@@ -221,11 +227,16 @@ structure ValidatedUnit where
   resolution : ResolutionIndex
   initializationCertificates : Array InitializationCertificate
   borrowCertificates : Array BorrowCertificate
-  /-- Diagnostics of functions the borrow analysis could not certify. The
-  analysis still lacks non-lexical loan death and region solving, so its
-  rejections stay preparation-stage errors instead of failing `validate`. -/
-  borrowDiagnostics : Array Diagnostic
+  /-- Diagnostics of functions the borrow analysis could not certify, with
+  their namespaces. The analysis still lacks non-lexical loan death and
+  region solving, so its rejections stay preparation-stage errors instead of
+  failing `validate`. -/
+  borrowRejections : Array OwnedDiagnostic
   deriving Repr, BEq, Inhabited
+
+/-- The borrow analysis's rejections. -/
+def ValidatedUnit.borrowDiagnostics (unit : ValidatedUnit) : Array Diagnostic :=
+  unit.borrowRejections.map (·.diagnostic)
 
 namespace Internal
 
@@ -240,9 +251,9 @@ def mkValidatedUnit (tables : Tables) (profiles : Array ProfileConfig)
     (resolution : ResolutionIndex)
     (initializationCertificates : Array InitializationCertificate := #[])
     (borrowCertificates : Array BorrowCertificate := #[])
-    (borrowDiagnostics : Array Diagnostic := #[]) : ValidatedUnit :=
+    (borrowRejections : Array OwnedDiagnostic := #[]) : ValidatedUnit :=
   .mk tables profiles namespaces dependencies evidence indexes structurizationWitnesses
-    resolution initializationCertificates borrowCertificates borrowDiagnostics
+    resolution initializationCertificates borrowCertificates borrowRejections
 
 end Internal
 

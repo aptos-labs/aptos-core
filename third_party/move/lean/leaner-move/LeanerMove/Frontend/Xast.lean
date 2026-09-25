@@ -447,6 +447,13 @@ structure Module where
   skipped : List Skipped := []
   sources : List String
   comments : List Comment
+  /-- Whether the module's functions are verification targets. A dependency
+  read with its bodies, so its calls inline, is not. -/
+  isTarget : Bool := true
+  /-- The proof file beside the module's source, whose `verify` items and
+  lemmas are spliced into the module; named on it as the `proof_file`
+  pragma whether or not the file exists. -/
+  proofFile : Option String := none
   deriving Inhabited
 
 /-- The module's own reference. -/

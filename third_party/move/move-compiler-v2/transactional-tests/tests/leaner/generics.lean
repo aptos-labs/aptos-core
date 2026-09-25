@@ -1,104 +1,75 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open scoped Move
-
-module LeanerGenerics where
-
-  @[move_struct]
-  structure Box (T : Type) where
+leaner module 0x0::LeanerGenerics where
+  struct Box {T has Copy, Drop, Store} has Copy, Drop, Store where
     value : T
-    deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure Pair (T U : Type) where
+  struct Pair {T has Copy, Drop, Store} {U has Copy, Drop, Store} has Copy, Drop, Store where
     first : T
     second : U
-    deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure Vault (T : Type) where
+  struct Vault {T has Store} has Key where
     value : T
-    deriving Key
 
-  @[move_enum]
-  inductive Choice (T : Type) where
-    | none
-    | some (value : T)
-    deriving Copy, Drop, Store
+  enum Choice {T has Copy, Drop, Store} has Copy, Drop, Store where
+    | None
+    | Some (value : T)
 
-  /-! ## Functions -/
+  fun identity {T}(value : T) -> T := value
 
-  fun identity {T : Type} (value : T) : T := value
+  fun box {T has Copy, Drop, Store}(value : T) -> Box<T> := new Box<T> { value }
 
-  fun box {T : Type} (value : T) : Box T := { value }
+  fun unbox {T has Copy, Drop, Store}(value : Box<T>) -> T := value.value
 
-  fun unbox {T : Type} (value : Box T) : T := value.value
+  fun swap {T has Copy, Drop, Store} {U has Copy, Drop, Store}(value : Pair<T, U>) -> Pair<U, T> :=
+    new Pair<U, T> { first := value.second, second := value.first }
 
-  fun swap {T U : Type} (value : Pair T U) : Pair U T :=
-    { first := value.second, second := value.first }
-
-  fun choose {T : Type} (fallback : T) (choice : Choice T) : T :=
+  fun choose {T has Copy, Drop, Store}(fallback : T, choice : Choice<T>) -> T :=
     match choice with
-    | .none => fallback
-    | .some inner => inner
+      | Choice<T>::None {} => fallback
+      | Choice<T>::Some { value := value } => value
 
-  fun singleton {T : Type} (value : T) : Move.Vector T := vector![value]
+  fun singleton {T}(value : T) -> Vector<T> := vector<T>[value]
 
-  fun publish {T : Type} (signer : &Signer) (value : T) : Action Unit :=
-    moveTo signer ({ value } : Vault T)
+  fun publish {T has Store}(account : &Signer, value : T) -> Unit :=
+    move_to<Vault<T> >(account, new Vault<T> { value })
 
-  fun contains {T : Type} (address : Address) : Action Bool :=
-    existsAt (Vault T) address
+  fun contains {T has Store}(address : Address) -> Bool := exists<Vault<T> >(address)
 
-  @[move_public]
-  fun round_trip (value : U64) : U64 :=
-    unbox (box (identity value))
+  public fun round_trip(value : u64) -> u64 :=
+    unbox::<u64>(box::<u64>(identity::<u64>(value)))
 
-  @[move_public]
-  fun enum_round_trip (value : U64) : U64 :=
-    let choice : Choice U64 := .some value
-    choose 0 choice
+  public fun enum_round_trip(value : u64) -> u64 := do
+    let choice := new Choice<u64>::Some { value }
+    choose::<u64>(0, choice)
 
-  @[move_public]
-  fun swap_first (first second : U64) : U64 :=
-    (swap ({ first, second } : Pair U64 U64)).first
+  public fun swap_first(first : u64, second : u64) -> u64 :=
+    swap::<u64, u64>(new Pair<u64, u64> { first, second }).first
 
-  @[move_public]
-  fun generic_vector_length (value : U64) : U64 :=
-    Move.Vector.length (singleton value)
+  public fun generic_vector_length(value : u64) -> u64 := singleton::<u64>(value).length
 
-  @[move_public]
-  fun equal_u64 (left right : U64) : Bool := left == right
+  public fun equal_u64(left : u64, right : u64) -> Bool := left == right
 
-  @[move_public]
-  fun publish_u64 (signer : &Signer) (value : U64) : Action Unit :=
-    publish signer value
+  public fun publish_u64(account : &Signer, value : u64) -> Unit := publish::<u64>(account, value)
 
-  @[move_public]
-  fun publish_bool (signer : &Signer) (value : Bool) : Action Unit :=
-    publish signer value
+  public fun publish_bool(account : &Signer, value : Bool) -> Unit :=
+    publish::<Bool>(account, value)
 
-  @[move_public]
-  fun take_u64 (address : Address) : Action U64 := do
-    let vault ← moveFrom (Vault U64) address
-    let Vault { value } := vault
-    pure value
+  public fun take_u64(address : Address) -> u64 := do
+    let Vault<u64> { value := value } := move_from<Vault<u64> >(address)
+    value
 
-  @[move_public]
-  fun take_bool (address : Address) : Action Bool := do
-    let vault ← moveFrom (Vault Bool) address
-    let Vault { value } := vault
-    pure value
+  public fun take_bool(address : Address) -> Bool := do
+    let Vault<Bool> { value := value } := move_from<Vault<Bool> >(address)
+    value
 
-  @[move_public]
-  fun has_u64 (address : Address) : Action Bool := contains (T := U64) address
+  public fun has_u64(address : Address) -> Bool := contains::<u64>(address)
 
-  @[move_public]
-  fun has_bool (address : Address) : Action Bool := contains (T := Bool) address
-
-/-! ## Tests -/
+  public fun has_bool(address : Address) -> Bool := contains::<Bool>(address)
 
 --# run 0x0::LeanerGenerics::round_trip --args 37u64
 

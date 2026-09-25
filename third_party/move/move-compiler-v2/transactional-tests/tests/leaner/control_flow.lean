@@ -1,37 +1,33 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-module LeanerControlFlow where
+leaner module 0x0::LeanerControlFlow where
+  fun classify(value : u64) -> u64 :=
+    if value < 10 then 1
+    else if value <= 20 then 2
+    else 3
 
-  /-! ## Functions -/
+  fun compare(left : u64, right : u64) -> u64 :=
+    if left == right then 10
+    else if left < right then 20
+    else 30
 
-  fun classify (value : U64) : U64 :=
-    if value < 10 then
-      1
-    else if UInt.lessEq value 20 then
-      2
-    else
-      3
+  fun choose(flag : Bool) -> u64 := if flag then 4 else 5
 
-  fun compare (left right : U64) : U64 :=
-    if UInt.equal left right then
-      10
-    else if left < right then
-      20
-    else
-      30
+  fun both(left : Bool, right : Bool) -> u64 := if left && right then 1 else 0
 
-  fun choose (flag : Bool) : U64 :=
-    if flag then 4 else 5
+  fun either(left : Bool, right : Bool) -> u64 := if left || !right then 1 else 0
 
-  partial fun countdown (value accumulator : U64) : U64 :=
-    if value < 1 then
-      accumulator
-    else
-      continue countdown (value - 1) (accumulator + 1)
-
-/-! ## Tests -/
+  fun countdown(value : u64, accumulator : u64) -> u64 := do
+    let mut remaining := value
+    let mut total := accumulator
+    while remaining > 0 do
+      remaining := remaining - 1
+      total := total + 1
+    total
 
 --# run 0x0::LeanerControlFlow::classify --args 9u64
 
@@ -48,5 +44,9 @@ module LeanerControlFlow where
 --# run 0x0::LeanerControlFlow::choose --args true
 
 --# run 0x0::LeanerControlFlow::choose --args false
+
+--# run 0x0::LeanerControlFlow::both --args true false
+
+--# run 0x0::LeanerControlFlow::either --args false false
 
 --# run 0x0::LeanerControlFlow::countdown --args 5u64 40u64

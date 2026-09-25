@@ -1,11 +1,11 @@
 processed 1 task
-task 0 lines 1-19:  publish [import Move]
+task 0 lines 3-17:  publish [import LeanerMove]
 Error: compilation errors:
- error: borrow safety error `vectorRef`: cannot activate a mutable reference while an immutable reference is live in the same tree (conflicts with `observation`)
-   ┌─ TEMPFILE:10:20
+ error: LIR-SEMANTIC-BORROW-CONFLICT: mutable reference use conflicts with an active shared loan
+   ┌─ TEMPFILE:13:6
    │
-10 │     let _removed ← vectorRef.popBack
-   │                    ^^^^^^^^^^^^^^^^^
+13 │     *vectorRef := rest
+   │      ^^^^^^^^^
 
 
 exiting with Leaner elaboration errors

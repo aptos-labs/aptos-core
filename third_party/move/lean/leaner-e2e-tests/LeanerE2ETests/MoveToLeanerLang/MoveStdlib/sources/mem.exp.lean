@@ -4,7 +4,7 @@
 import LeanerLang
 
 /-! Module with methods for safe memory manipulation. -/
-leaner module 0x1::mem where
+leaner module std::mem where
   /--
   Swap contents of two passed mutable references.
 

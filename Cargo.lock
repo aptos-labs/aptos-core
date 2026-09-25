@@ -2040,6 +2040,7 @@ dependencies = [
  "move-core-types",
  "move-docgen",
  "move-model",
+ "move-model-exchange",
  "move-package",
  "move-prover",
  "move-prover-boogie-backend",
@@ -13576,8 +13577,12 @@ dependencies = [
 name = "move-model-exchange"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-move-cli",
  "datatest-stable",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
  "move-prover-test-utils",
  "serde",
  "serde_json",

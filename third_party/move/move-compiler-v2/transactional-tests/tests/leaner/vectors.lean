@@ -1,33 +1,34 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open scoped Move
+leaner module 0x0::LeanerVectors where
+  fun length() -> u64 := vector<u64>[10, 20, 30].length
 
-module LeanerVectors where
+  fun middle() -> u64 := do
+    let values := vector<u64>[10, 20, 30]
+    let value := &values[1]
+    *value
 
-  /-! ## Functions -/
+  fun replaced() -> u64 := do
+    let mut values := vector<u64>[10, 20, 30]
+    let slot := &mut values[1]
+    *slot := 42
+    let value := &values[1]
+    *value
 
-  fun length : U64 :=
-    Move.Vector.length (vector![10, 20, 30] : Move.Vector U64)
+  fun borrowed_mut() -> u64 := do
+    let mut values := vector<u64>[10, 20, 30]
+    let value := &mut values[1]
+    *value := 42
+    *value
 
-  fun middle : U64 := Move.Vector.get vector![10, 20, 30] 1
-
-  fun replaced : U64 :=
-    Move.Vector.get (Move.Vector.set vector![10, 20, 30] 1 42) 1
-
-  fun borrowed : Action U64 := do
-    let values : Move.Vector U64 := vector![10, 20, 30]
-    let value ← &values[1]
-    (*value)
-
-  fun borrowed_mut : Action U64 := do
-    let values : Move.Vector U64 := vector![10, 20, 30]
-    let value ← &mut values[1]
-    value := 42
-    (*value)
-
-/-! ## Tests -/
+  fun out_of_range() -> u64 := do
+    let values := vector<u64>[10, 20, 30]
+    let value := &values[3]
+    *value
 
 --# run 0x0::LeanerVectors::length
 
@@ -35,6 +36,6 @@ module LeanerVectors where
 
 --# run 0x0::LeanerVectors::replaced
 
---# run 0x0::LeanerVectors::borrowed
-
 --# run 0x0::LeanerVectors::borrowed_mut
+
+--# run 0x0::LeanerVectors::out_of_range

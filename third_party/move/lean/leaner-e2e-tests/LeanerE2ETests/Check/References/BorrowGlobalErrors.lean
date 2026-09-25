@@ -71,7 +71,7 @@ run_cmd do
       throwError "unexpected global-borrow diagnostics: {repr diagnostics}"
     let diagnostic := diagnostics[0]!
     unless diagnostic.code == "LIR-SEMANTIC-BORROW-CONFLICT" &&
-        diagnostic.message == "global owner write conflicts with an active LeanerIR.ReferenceKind.shared loan" &&
+        diagnostic.message == "global owner write conflicts with an active shared loan" &&
         diagnostic.primary.isSome && diagnostic.related.size == 1 &&
         diagnostic.related[0]!.message == "active loan originates here" do
       throwError "wrong global-borrow rejection: {repr diagnostic}"

@@ -4,11 +4,11 @@
 import LeanerLang
 
 /-! Functionality for reflection in Move. -/
-leaner module 0x1::reflect where
-  use 0x1::std::error::invalid_state
-  use 0x1::std::features::is_function_reflection_enabled
-  use 0x1::std::result::Result
-  use 0x1::std::«string»::String
+leaner module std::reflect where
+  use std::error::invalid_state
+  use std::features::is_function_reflection_enabled
+  use std::result::Result
+  use std::«string»::String
 
   /--
   This error indicates that the reflection feature is not enabled.

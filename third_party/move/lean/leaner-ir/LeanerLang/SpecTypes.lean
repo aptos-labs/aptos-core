@@ -141,10 +141,16 @@ private partial def structSupported (unit : ValidatedUnit)
           (fieldRep? unit (fun _ => Name.anonymous) (structSupported unit)
             field.type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))).isSome
 
-/-- The generated Lean name of a struct's twin under the registered path. -/
-def twinName (segments : Array String) (qualified : QualifiedName) : Name :=
-  Name.str (segments.foldl (fun name segment => Name.str name segment)
-    .anonymous) qualified.name
+/-- The generated Lean name of a struct's twin under the registered path:
+its simple name, or, when the unit declares several structs of that name in
+different modules, its module's path and name. -/
+def twinName (segments : Array String) (unit : ValidatedUnit) (ambiguous : String → Bool)
+    (qualified : QualifiedName) : Name :=
+  let base := segments.foldl (fun name segment => Name.str name segment) .anonymous
+  let owner := if ambiguous qualified.name then
+      ((unit.tables.namespaces[qualified.namespaceId.index]?).map (·.segments)).getD #[]
+    else #[]
+  Name.str (owner.foldl (fun name segment => Name.str name segment) base) qualified.name
 
 /-- The twin row of every supported struct of the unit, in an order where
 nested twins precede their users. -/
@@ -158,6 +164,8 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
       if let some qualified := nameOf? unit declaration.name then
         if structSupported unit qualified then
           pending := pending.push qualified
+  let ambiguous := fun (name : String) => (pending.filter (·.name == name)).size > 1
+  let twinName := twinName segments unit ambiguous
   -- Declarations are acyclic, so at most `pending.size` rounds settle all.
   for _ in [0:pending.size] do
     for qualified in pending do
@@ -166,7 +174,7 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
           | continue
         let representFields := fun fields => fields.filterMap fun field => do
           let name ← nameOf? unit field.name
-          let rep ← fieldRep? unit (twinName segments)
+          let rep ← fieldRep? unit twinName
             (fun nested => emitted.contains nested ∨ nested == qualified)
             field.type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))
           some (name.name, rep)
@@ -189,7 +197,7 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
             variants.size == declaration.variants.size then
           ordered := ordered.push {
             name := qualified.name, qualified
-            twin := twinName segments qualified
+            twin := twinName qualified
             namespaceIndex, structIndex
             typeParameterCount := declaration.generics.size
             fields, variants }
@@ -228,6 +236,12 @@ def familyInfos (unit : ValidatedUnit) (twins : Array TwinInfo) :
   return families
 
 /-! ## Command generation -/
+
+/-- Elaborate a generated theorem with its proof checked before the command
+returns: a failure is an error at this site, never a `sorry` reported at the
+module's end. -/
+private def elabTheorem (command : TSyntax `command) : CommandElabM Unit := do
+  elabCommand (← `(command| set_option Elab.async false in $command))
 
 private def natLit (value : Nat) : Term :=
   Syntax.mkNatLit value
@@ -506,7 +520,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
     | _ => none))
 
   let roundtripName := rootIdent (info.twin ++ `decode?_erase)
-  elabCommand (← `(@[simp] theorem $roundtripName:ident
+  elabTheorem (← `(command| @[simp] theorem $roundtripName:ident
       $implicitTypeBinders* $codecBinders* ($value:ident : $twinType) :
       $decodeName $codecIds* ($eraseName $codecIds* $value) = some $value := by
     cases $value:ident
@@ -521,7 +535,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
     ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩ none
     #[$operands,*])
   let literalRoundtripName := rootIdent (info.twin ++ `decode?_literal)
-  elabCommand (← `(@[simp] theorem $literalRoundtripName:ident
+  elabTheorem (← `(command| @[simp] theorem $literalRoundtripName:ident
       $implicitTypeBinders* $codecBinders* $operandBinders* :
       $decodeName $codecIds* $literal = $chain := by
     simp [$decodeName:ident]))
@@ -534,7 +548,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let literalErasures ← info.fields.mapIdxM fun index (_, rep) =>
     rep.eraseSyntax fieldVars[index]! codecTerms
   let mapName := rootIdent (info.twin ++ `decode?_map_erase)
-  elabCommand (← `(@[simp] theorem $mapName:ident
+  elabTheorem (← `(command| @[simp] theorem $mapName:ident
       $implicitTypeBinders* $codecBinders* (contents : Option $twinType) :
       Option.bind (Option.map ($eraseName $codecIds*) contents)
         ($decodeName $codecIds*) = contents :=
@@ -548,13 +562,13 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
     decode_encode := $roundtripName $codecIds*))
 
   let eraseEqName := rootIdent (info.twin ++ `erase_eq_erase)
-  elabCommand (← `(@[simp] theorem $eraseEqName:ident
+  elabTheorem (← `(command| @[simp] theorem $eraseEqName:ident
       $implicitTypeBinders* $codecBinders* (left right : $twinType) :
       $eraseName $codecIds* left = $eraseName $codecIds* right ↔ left = right :=
     LeanerIR.Proofs.Codec.encode_eq_encode ($codecName $codecIds*) left right))
 
   let eraseLiteralName := rootIdent (info.twin ++ `erase_mk)
-  elabCommand (← `(theorem $eraseLiteralName:ident
+  elabTheorem (← `(command| theorem $eraseLiteralName:ident
       $implicitTypeBinders* $codecBinders* $fieldBinders* :
       $eraseName $codecIds* (⟨$fieldVars,*⟩ : $twinType) =
         LeanerIR.RuntimeValue.nominal
@@ -612,7 +626,7 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
     | _ => none))
   -- roundtrips
   let roundtripName := rootIdent (info.twin ++ `decode?_erase)
-  elabCommand (← `(@[simp] theorem $roundtripName:ident
+  elabTheorem (← `(command| @[simp] theorem $roundtripName:ident
       ($value:ident : $twin) :
       $decodeName ($eraseName $value) = some $value := by
     cases $value:ident
@@ -626,12 +640,12 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
     #[$erasures,*])
   let literalRoundtripName :=
     rootIdent (info.twin ++ `decode?_literal)
-  elabCommand (← `(@[simp] theorem $literalRoundtripName:ident
+  elabTheorem (← `(command| @[simp] theorem $literalRoundtripName:ident
       ($value:ident : $twin) :
       $decodeName $literal = some $value :=
     $roundtripName $value))
   let mapName := rootIdent (info.twin ++ `decode?_map_erase)
-  elabCommand (← `(@[simp] theorem $mapName:ident
+  elabTheorem (← `(command| @[simp] theorem $mapName:ident
       (contents : Option $twin) :
       Option.bind (Option.map $eraseName contents) $decodeName = contents :=
     LeanerIR.map_erase_bind_decode $roundtripName contents))
@@ -661,7 +675,7 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let literalErasures ← info.fields.mapIdxM fun index (_, rep) =>
     rep.eraseSyntax fieldVars[index]!
   let eraseLiteralName := rootIdent (info.twin ++ `erase_mk)
-  elabCommand (← `(theorem $eraseLiteralName:ident $fieldBinders* :
+  elabTheorem (← `(command| theorem $eraseLiteralName:ident $fieldBinders* :
       $eraseName (⟨$fieldVars,*⟩ : $twin) =
         LeanerIR.RuntimeValue.nominal
           ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩ none
@@ -737,7 +751,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
     let erasures ← variant.fields.mapIdxM fun index (_, rep) =>
       rep.eraseSyntax variables[index]! codecTerms
     let literalName := rootIdent (info.twin ++ Name.mkSimple s!"erase_{variant.name}")
-    elabCommand (← `(@[simp] theorem $literalName:ident $implicitTypeBinders* $codecBinders*
+    elabTheorem (← `(command| @[simp] theorem $literalName:ident $implicitTypeBinders* $codecBinders*
         $binders* :
         $eraseName $codecIds* $constructed = LeanerIR.RuntimeValue.nominal
           ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩
@@ -772,12 +786,12 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
     | _ => none))
 
   let roundtripName := rootIdent (info.twin ++ `decode?_erase)
-  elabCommand (← `(@[simp] theorem $roundtripName:ident
+  elabTheorem (← `(command| @[simp] theorem $roundtripName:ident
       $implicitTypeBinders* $codecBinders* ($value:ident : $twinType) :
       $decodeName $codecIds* ($eraseName $codecIds* $value) = some $value := by
     cases $value:ident <;> simp [$eraseName:ident, $decodeName:ident]))
   let mapName := rootIdent (info.twin ++ `decode?_map_erase)
-  elabCommand (← `(@[simp] theorem $mapName:ident
+  elabTheorem (← `(command| @[simp] theorem $mapName:ident
       $implicitTypeBinders* $codecBinders* (contents : Option $twinType) :
       Option.bind (Option.map ($eraseName $codecIds*) contents)
         ($decodeName $codecIds*) = contents :=
@@ -804,7 +818,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
         fun $(variables[index]!):ident => $chain)
     let rawLiteralName := rootIdent
       (info.twin ++ Name.mkSimple s!"decode?_{variant.name}_literal")
-    elabCommand (← `(@[simp] theorem $rawLiteralName:ident
+    elabTheorem (← `(command| @[simp] theorem $rawLiteralName:ident
         $implicitTypeBinders* $codecBinders* $operandBinders* :
         $decodeName $codecIds* (LeanerIR.RuntimeValue.nominal
           ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩
@@ -817,11 +831,11 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       (some $(quote variant.name)) #[$erasures,*])
     let eraseCtorName := rootIdent
       (info.twin ++ Name.mkSimple s!"erase_${variant.name}")
-    elabCommand (← `(theorem $eraseCtorName:ident $implicitTypeBinders* $codecBinders* $binders* :
+    elabTheorem (← `(command| theorem $eraseCtorName:ident $implicitTypeBinders* $codecBinders* $binders* :
       $eraseName $codecIds* $constructed = $runtime := rfl))
     let literalName := rootIdent
       (info.twin ++ Name.mkSimple s!"decode?_${variant.name}")
-    elabCommand (← `(@[simp] theorem $literalName:ident
+    elabTheorem (← `(command| @[simp] theorem $literalName:ident
       $implicitTypeBinders* $codecBinders* $binders* :
       $decodeName $codecIds* $runtime = some $constructed := by
         simp [$decodeName:ident]))
@@ -835,7 +849,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
     decode_encode := $roundtripName $codecIds*))
 
   let eraseEqName := rootIdent (info.twin ++ `erase_eq_erase)
-  elabCommand (← `(@[simp] theorem $eraseEqName:ident
+  elabTheorem (← `(command| @[simp] theorem $eraseEqName:ident
       $implicitTypeBinders* $codecBinders* (left right : $twinType) :
       $eraseName $codecIds* left = $eraseName $codecIds* right ↔ left = right :=
     LeanerIR.Proofs.Codec.encode_eq_encode ($codecName $codecIds*) left right))

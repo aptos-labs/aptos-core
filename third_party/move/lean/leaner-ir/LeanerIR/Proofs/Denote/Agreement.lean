@@ -36,46 +36,30 @@ axiom compileFunction_agrees (unit : ExecutableUnit) (handle : FunctionHandle)
     Spec.Equiv (f.denote unit typeInstantiation args)
       (propheticMeaning unit typeInstantiation handle f.params f.result args)
 
-/-- The prophetic meanings of the compiled members of a cycle of calls are
-the least fixed point of their bodies, with the calls to the members routed
-to the argument: every outcome is one of a finite unfolding, since a
-big-step derivation nests finitely many calls.  Assumed with the agreement
-above (`designs/denotation.md`, D6). -/
+/-- The prophetic meanings of the compiled members of a cycle of calls, at
+every slot (the runtime family, or a skolem family and type instantiation),
+are the least fixed point of their bodies over all slots, with every call to
+a member routed to the argument at the slot it reaches (at the runtime
+family, calls with type arguments stay closed): every outcome is one of a finite unfolding, since a big-step
+derivation nests finitely many calls. A function calling itself is a cycle
+of one. Assumed with the agreement above (`designs/denotation.md`, D6). -/
 axiom compileFunction_least_cycle (unit : ExecutableUnit)
     (members : List (FunctionHandle × Function))
     (compiled : ∀ index : CycleIndex members,
       compileFunction unit.unit index.member.1 = .ok index.member.2)
-    (typeInstantiation : Array (TypeId × TypeId)) (index : CycleIndex members)
-    (args : HList index.member.2.params) :
+    (typeInstantiation : Array (TypeId × TypeId)) (slot : CycleSlot members)
+    (args : @HList (familySkolems slot.family) slot.position.member.2.params) :
     Spec.Refines
-      (propheticMeaning unit typeInstantiation index.member.1 index.member.2.params
-        index.member.2.result args)
-      (Spec.fixFamily (Index := CycleIndex members)
-        (Args := fun index => HList index.member.2.params)
-        (Result := fun index => index.member.2.result.carrier)
-        (fun self index => index.member.2.denoteWith
-          ⟨cycleMeaning unit members self, closedGeneric unit typeInstantiation,
-            typeInstantiation⟩)
-        index args)
-
-/-- The prophetic meaning of a compiled generic function, at every skolem
-family and type instantiation, is the least fixed point of its body over
-all of them, with its own calls, with or without type arguments, routed
-to the argument at the family and instantiation the call induces.
-Assumed with the agreement above (`designs/denotation.md`, D6). -/
-axiom compileFunction_least_generic (unit : ExecutableUnit) (handle : FunctionHandle)
-    (f : Function) (compiled : compileFunction unit.unit handle = .ok f)
-    (typeInstantiation : Array (TypeId × TypeId)) (args : HList f.params) :
-    Spec.Refines (propheticMeaning unit typeInstantiation handle f.params f.result args)
-      (Spec.fixFamily (Index := Skolems × Array (TypeId × TypeId))
-        (Args := fun index => @HList index.1 f.params)
-        (Result := fun index => @ResultShape.carrier index.1 f.result)
-        (fun self index => @Function.denoteWith index.1
-          (@Meanings.mk index.1 (@recursiveMeaning index.1 unit handle f.params f.result (self index))
-            (@recursiveGeneric index.1 unit handle f.params f.result
-              (fun Θ instantiation => self (Θ, instantiation)) index.2)
-            index.2) f)
-        (‹Skolems›, typeInstantiation) args)
+      (@propheticMeaning (familySkolems slot.family) unit
+        (familyInstantiation typeInstantiation slot.family) slot.position.member.1
+        slot.position.member.2.params slot.position.member.2.result args)
+      (Spec.fixFamily (Index := CycleSlot members)
+        (Args := fun slot => @HList (familySkolems slot.family) slot.position.member.2.params)
+        (Result := fun slot =>
+          @ResultShape.carrier (familySkolems slot.family) slot.position.member.2.result)
+        (fun self slot => @Function.denoteWith (familySkolems slot.family)
+          (cycleMeanings unit members typeInstantiation self slot) slot.position.member.2)
+        slot args)
 
 omit [Skolems] in
 /-- Equivalent computations have the same weakest precondition. -/
@@ -117,54 +101,91 @@ theorem satisfies_propheticMeaning (unit : ExecutableUnit)
   (satisfies_congr (compileFunction_agrees unit handle f compiled typeInstantiation) contract).mp
     verified
 
-/-- Contracts established over the bodies of a cycle's members, each
-assuming every member's contract of the calls to the members, hold of their
-prophetic meanings. -/
+/-- Contracts established over the bodies of a cycle's members at every
+slot, each assuming every slot's contract of the calls to the members, hold
+of their prophetic meanings. -/
 theorem satisfies_cycle (unit : ExecutableUnit) (typeInstantiation : Array (TypeId × TypeId))
     (members : List (FunctionHandle × Function))
     (compiled : ∀ index : CycleIndex members,
       compileFunction unit.unit index.member.1 = .ok index.member.2)
+    (contracts : (slot : CycleSlot members) →
+      Contract RuntimeState Failure (@HList (familySkolems slot.family) slot.position.member.2.params)
+        (@ResultShape.carrier (familySkolems slot.family) slot.position.member.2.result))
+    (verified : ∀ self : CycleFamilySelves members,
+      (∀ slot, Satisfies (self slot) (contracts slot)) →
+      ∀ slot, Satisfies
+        (@Function.denoteWith (familySkolems slot.family)
+          (cycleMeanings unit members typeInstantiation self slot) slot.position.member.2)
+        (contracts slot))
+    (slot : CycleSlot members) :
+    Satisfies
+      (@propheticMeaning (familySkolems slot.family) unit
+        (familyInstantiation typeInstantiation slot.family) slot.position.member.1
+        slot.position.member.2.params slot.position.member.2.result)
+      (contracts slot) :=
+  satisfies_of_refines (compileFunction_least_cycle unit members compiled typeInstantiation slot)
+    (satisfies_fixFamily _ contracts verified slot)
+
+/-- `satisfies_cycle` at the runtime family: contracts established over the
+members' bodies at the runtime slots, assuming them of the calls to members
+there, hold of their prophetic meanings. The other slots stand vacuous. -/
+theorem satisfies_cycle_runtime (unit : ExecutableUnit)
+    (typeInstantiation : Array (TypeId × TypeId)) (members : List (FunctionHandle × Function))
+    (compiled : ∀ index : CycleIndex members,
+      compileFunction unit.unit index.member.1 = .ok index.member.2)
     (contracts : (index : CycleIndex members) →
       Contract RuntimeState Failure (HList index.member.2.params) index.member.2.result.carrier)
-    (verified : ∀ self : CycleSelves members, (∀ index, Satisfies (self index) (contracts index)) →
+    (verified : ∀ self : CycleFamilySelves members,
+      (∀ index, Satisfies (self ⟨index, none⟩) (contracts index)) →
       ∀ index, Satisfies
-        (index.member.2.denoteWith
-          ⟨cycleMeaning unit members self, closedGeneric unit typeInstantiation,
-            typeInstantiation⟩)
+        (index.member.2.denoteWith (cycleMeanings unit members typeInstantiation self ⟨index, none⟩))
         (contracts index))
     (index : CycleIndex members) :
     Satisfies
       (propheticMeaning unit typeInstantiation index.member.1 index.member.2.params
         index.member.2.result)
       (contracts index) :=
-  satisfies_of_refines (compileFunction_least_cycle unit members compiled typeInstantiation index)
-    (satisfies_fixFamily _ contracts verified index)
+  satisfies_cycle unit typeInstantiation members compiled
+    (fun | ⟨index, none⟩ => contracts index | ⟨_, some _⟩ => Contract.vacuous)
+    (fun self hypothesis => fun
+      | ⟨index, none⟩ => verified self (fun index => hypothesis ⟨index, none⟩) index
+      | ⟨_, some _⟩ => satisfies_vacuous _)
+    ⟨index, none⟩
 
-/-- A contract established over the body of a generic function calling
-itself, at every family and instantiation, assuming it of the calls to
-itself at the family and instantiation each induces, holds of its
-prophetic meaning. -/
-theorem satisfies_recursive_generic (unit : ExecutableUnit) (handle : FunctionHandle)
-    (f : Function) (compiled : compileFunction unit.unit handle = .ok f)
-    (contract : (Θ : Skolems) → (instantiation : Array (TypeId × TypeId)) →
-      Contract RuntimeState Failure (@HList Θ f.params) (@ResultShape.carrier Θ f.result))
-    (verified : ∀ self : SelfFamily f.params f.result,
-      (∀ Θ instantiation, Satisfies (self Θ instantiation) (contract Θ instantiation)) →
-      ∀ (Θ : Skolems) (instantiation : Array (TypeId × TypeId)),
-        Satisfies (@Function.denoteWith Θ
-          (@Meanings.mk Θ (@recursiveMeaning Θ unit handle f.params f.result (self Θ instantiation))
-            (@recursiveGeneric Θ unit handle f.params f.result self instantiation)
-            instantiation) f)
-          (contract Θ instantiation))
-    (typeInstantiation : Array (TypeId × TypeId)) :
-    Satisfies (propheticMeaning unit typeInstantiation handle f.params f.result)
-      (contract ‹Skolems› typeInstantiation) :=
-  satisfies_of_refines (compileFunction_least_generic unit handle f compiled typeInstantiation)
-    (satisfies_fixFamily _ (fun index => contract index.1 index.2)
-      (fun recursive hypothesis index =>
-        verified (fun Θ instantiation => recursive (Θ, instantiation))
-          (fun Θ instantiation => hypothesis (Θ, instantiation)) index.1 index.2)
-      (‹Skolems›, typeInstantiation))
+omit [Skolems] in
+/-- `satisfies_cycle` at every skolem family and type instantiation:
+contracts established over the members' bodies at every family, assuming
+them of the calls to members at every family, hold of their prophetic
+meanings. The runtime slots stand vacuous. -/
+theorem satisfies_cycle_family [root : Skolems] (unit : ExecutableUnit)
+    (typeInstantiation : Array (TypeId × TypeId)) (members : List (FunctionHandle × Function))
+    (compiled : ∀ index : CycleIndex members,
+      compileFunction unit.unit index.member.1 = .ok index.member.2)
+    (contracts : (index : CycleIndex members) → (Θ : Skolems) → Array (TypeId × TypeId) →
+      Contract RuntimeState Failure (@HList Θ index.member.2.params)
+        (@ResultShape.carrier Θ index.member.2.result))
+    (verified : ∀ self : @CycleFamilySelves root members,
+      (∀ index Θ instantiation,
+        Satisfies (self ⟨index, some (Θ, instantiation)⟩) (contracts index Θ instantiation)) →
+      ∀ index Θ instantiation, Satisfies
+        (@Function.denoteWith Θ
+          (@cycleMeanings root unit members typeInstantiation self ⟨index, some (Θ, instantiation)⟩)
+          index.member.2)
+        (contracts index Θ instantiation))
+    (index : CycleIndex members) (Θ : Skolems) (instantiation : Array (TypeId × TypeId)) :
+    Satisfies
+      (@propheticMeaning Θ unit instantiation index.member.1 index.member.2.params
+        index.member.2.result)
+      (contracts index Θ instantiation) :=
+  @satisfies_cycle root unit typeInstantiation members compiled
+    (fun | ⟨_, none⟩ => Contract.vacuous
+         | ⟨index, some (Θ, instantiation)⟩ => contracts index Θ instantiation)
+    (fun self hypothesis => fun
+      | ⟨_, none⟩ => satisfies_vacuous _
+      | ⟨index, some (Θ, instantiation)⟩ =>
+          verified self (fun index Θ instantiation => hypothesis ⟨index, some (Θ, instantiation)⟩)
+            index Θ instantiation)
+    ⟨index, some (Θ, instantiation)⟩
 
 /-- The runtime form of a contract over native arguments.  A runtime call
 lends the argument references under admissible loans, and the contract

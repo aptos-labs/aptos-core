@@ -11,7 +11,7 @@ It implements the Table type which supports individual table items to be represe
 separate global state items. The number of items and a unique handle are tracked on the table
 struct itself, while the operations are implemented as native functions. No traversal is provided.
 -/
-leaner module 0x1::table where
+leaner module aptos_std::table where
   friend aptos_std::storage_slots_allocator;
   friend aptos_std::table_with_length;
 

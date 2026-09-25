@@ -1,24 +1,19 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRejectSuspendedParent where
-
+leaner module 0x0::LeanerBorrowRejectSuspendedParent where
   struct Pair has Copy, Drop, Store where
-    left : U64
-    right : U64
+    left : u64
+    right : u64
 
-  fun run : Action U64 := do
-    let owner : Pair := { left := 1, right := 2 }
-    let parent ← &mut owner
-    let child ← &mut parent.left
-    child := 8
-    let parentValue ← *parent
-    let _childValue ← *child
-    pure parentValue.right
-
-  spec run where
-    ensures True
+  fun run() -> u64 := do
+    let mut owner := new Pair { left := 1, right := 2 }
+    let parent := &mut owner
+    let child := &mut parent.left
+    *child := 8
+    let parentValue := *parent
+    let _childValue := *child
+    parentValue.right

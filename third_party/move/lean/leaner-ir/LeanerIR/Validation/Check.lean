@@ -1556,7 +1556,7 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
           (initDs ++ functionInitDs,
             match initCert with | some c => inits.push c | none => inits,
             match borrowCert with | some c => borrows.push c | none => borrows,
-            borrowDs ++ functionBorrowDs)
+            borrowDs ++ functionBorrowDs.map ({ namespaceId := ns.identity, diagnostic := · }))
   if initializationErrors.any (·.severity == .error) then
     throw (dedupDiagnostics initializationErrors)
   return Internal.mkValidatedUnit unit.tables unit.profiles unit.namespaces

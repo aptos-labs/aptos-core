@@ -389,8 +389,10 @@ inductive Expr where
 following statement and the block result. -/
 inductive Statement where
   | expression (value : Expr)
+  /-- A declaration; without an initializer (`value := none`) it has a type
+  and its locals are assigned before they are read. -/
   | letDecl (mutable : Bool) (pattern : BindingPattern) (type : Option (Located Ty))
-      (value : Expr) (span : Span := {})
+      (value : Option Expr) (span : Span := {})
   deriving Repr, BEq, Inhabited
 end
 
@@ -505,6 +507,8 @@ structure FunctionDecl where
   result : Located Ty := { value := .unit }
   body : Option Expr := none
   contract : Array ContractClause := #[]
+  /-- The `spec` item the contract was declared in. -/
+  contractSpan : Option Span := none
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
   span : Span := {}
@@ -544,6 +548,8 @@ structure StructDecl where
   fields : Array FieldDecl := #[]
   abilities : Array Ability := #[]
   contract : Array ContractClause := #[]
+  /-- The `spec` item the contract was declared in. -/
+  contractSpan : Option Span := none
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
   span : Span := {}
@@ -562,6 +568,8 @@ structure EnumDecl where
   variants : Array VariantDecl := #[]
   abilities : Array Ability := #[]
   contract : Array ContractClause := #[]
+  /-- The `spec` item the contract was declared in. -/
+  contractSpan : Option Span := none
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
   span : Span := {}
@@ -571,6 +579,8 @@ structure EnumDecl where
 structure NamespaceInvariantDecl where
   expression : Expr
   properties : Array String := #[]
+  /-- An axiom: assumed, never an obligation. -/
+  isAxiom : Bool := false
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -607,6 +617,9 @@ structure Namespace where
   pragmas : Array Pragma := #[]
   comments : Array Comment := #[]
   items : Array Item := #[]
+  /-- The Move address alias each module was spelled with, by its canonical
+  path (address and name). -/
+  aliases : Array (Array String × String) := #[]
   span : Span := {}
   deriving Repr, BEq, Inhabited
 

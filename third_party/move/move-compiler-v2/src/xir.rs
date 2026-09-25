@@ -1727,15 +1727,22 @@ impl FunctionTranslator<'_> {
                     self.type_args(args)?,
                 )
             },
-            Oper::Function(id) => {
+            Oper::Function(id) | Oper::FunctionInst(id, _) => {
                 let target =
                     function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
-                StacklessOperation::Function(target.module_id, target.id, vec![])
-            },
-            Oper::FunctionInst(id, args) => {
-                let target =
-                    function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
-                StacklessOperation::Function(target.module_id, target.id, self.type_args(args)?)
+                let type_args = match oper {
+                    Oper::FunctionInst(_, args) => self.type_args(args)?,
+                    _ => vec![],
+                };
+                let callee = self.env.get_function(target);
+                ensure!(
+                    callee.get_type_parameter_count() == type_args.len(),
+                    "function `{}` takes {} type arguments, but the call supplies {}",
+                    callee.get_full_name_str(),
+                    callee.get_type_parameter_count(),
+                    type_args.len()
+                );
+                StacklessOperation::Function(target.module_id, target.id, type_args)
             },
             Oper::BorrowLoc => {
                 arity(dsts, srcs, 1, 1, oper)?;
@@ -2940,6 +2947,28 @@ mod tests {
         let mut targets = FunctionTargetsHolder::default();
         let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
         assert!(format!("{error:#}").contains("invalid address constant `not-an-address`"));
+    }
+
+    #[test]
+    fn rejects_call_with_wrong_type_argument_count() {
+        let mut module = account_module();
+        module.functions[1].type_parameters = vec![move_model_exchange::TypeParameter {
+            name: "T".to_string(),
+            abilities: vec![],
+            phantom: false,
+        }];
+        module.functions[0].blocks[0].instrs[0] =
+            Instr::Call(vec![], Oper::Function(1), vec![0, 1]);
+        let source = parse_source(
+            PathBuf::from("type-arguments.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("takes 1 type arguments, but the call supplies 0"));
     }
 
     #[test]

@@ -1,20 +1,8 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-namespace LeanerTxnRejectEmptyEnum
-
-open Move
-open scoped Move Move.Compiler
-
-/-! ## Functions -/
-
-@[move_enum]
-inductive Empty
-  deriving Copy, Drop, Store
-
-/-! ## Tests -/
-
-#export_leaner "LeanerRejectEmptyEnum" structs [Empty] functions []
-
-end LeanerTxnRejectEmptyEnum
+leaner module 0x0::LeanerRejectEmptyEnum where
+  enum Empty has Copy, Drop, Store where

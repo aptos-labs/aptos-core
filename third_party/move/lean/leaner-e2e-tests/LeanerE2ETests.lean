@@ -3,9 +3,11 @@
 
 import LeanerE2ETests.MoveToLeanerLang.Baseline
 import LeanerE2ETests.RustToLeanerLang.Baseline
+import LeanerE2ETests.SourceVerify.Baseline
 import LeanerE2ETests.MonoVM.Smoke
 import LeanerE2ETests.MonoDifferential.Baseline
 import LeanerE2ETests.Check
 
-/-! Source-to-LeanerLang end-to-end baseline tests, the LeanerLang checks,
-and the linked MonoVM smoke and differential suites. -/
+/-! Source-to-LeanerLang end-to-end baseline tests, verification of Move and
+Rust sources, the LeanerLang checks, and the linked MonoVM smoke and
+differential suites. -/

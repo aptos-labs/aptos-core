@@ -91,6 +91,96 @@ def measure [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
     (target : String) (theoremName : Name) (elaborate : m Unit) : m Unit :=
   measureArtifacts target #[theoremName] elaborate
 
+/-! ## Phases
+
+A verification run reports the wall time it spends in each phase, as the
+Move Prover reports its build, transformation, and solving times. Phases
+nest, and each moment is charged to the innermost phase running, so the
+phases add up to at most the run's total. -/
+
+/-- A phase of a verification run. -/
+inductive Phase where
+  /-- Importing the Lean environment the rendering elaborates in. -/
+  | load
+  /-- From the Move or Rust sources to their validated unit. -/
+  | frontend
+  /-- Rendering the unit as LeanerLang. -/
+  | render
+  /-- Lowering the rendered modules to validated, linked units. -/
+  | lowering
+  /-- The definitions and kernel-checked certificates the proofs use: the
+  unit, its semantics, compiled bodies, and contracts. -/
+  | certification
+  /-- The proofs, automatic and authored. -/
+  | verification
+  deriving BEq, Inhabited
+
+def Phase.all : Array Phase :=
+  #[.load, .frontend, .render, .lowering, .certification, .verification]
+
+def Phase.name : Phase → String
+  | .load => "load"
+  | .frontend => "frontend"
+  | .render => "render"
+  | .lowering => "lowering"
+  | .certification => "certification"
+  | .verification => "verification"
+
+private def Phase.index : Phase → Nat
+  | .load => 0
+  | .frontend => 1
+  | .render => 2
+  | .lowering => 3
+  | .certification => 4
+  | .verification => 5
+
+/-- The nanoseconds charged to each phase, the phases running, innermost
+first, and when the innermost was last charged. -/
+structure PhaseClock where
+  totals : Array Nat := Phase.all.map fun _ => 0
+  running : List Phase := []
+  since : Nat := 0
+  deriving Inhabited
+
+initialize phaseClock : IO.Ref PhaseClock ← IO.mkRef {}
+
+/-- Charge the time since the last charge to the innermost running phase. -/
+private def PhaseClock.charge (clock : PhaseClock) (now : Nat) : PhaseClock :=
+  match clock.running with
+  | phase :: _ =>
+      { clock with
+        totals := clock.totals.modify phase.index (· + (now - clock.since))
+        since := now }
+  | [] => { clock with since := now }
+
+/-- Run `action` in `phase`. -/
+def withPhase [Monad m] [MonadLiftT BaseIO m] [MonadFinally m] (phase : Phase)
+    (action : m α) : m α := do
+  let entered ← (IO.monoNanosNow : BaseIO Nat)
+  (phaseClock.modify fun clock =>
+    let clock := clock.charge entered
+    { clock with running := phase :: clock.running } : BaseIO Unit)
+  try action
+  finally
+    let left ← (IO.monoNanosNow : BaseIO Nat)
+    (phaseClock.modify fun clock =>
+      let clock := clock.charge left
+      { clock with running := clock.running.drop 1 } : BaseIO Unit)
+
+/-- Seconds, to two decimals. -/
+private def seconds (nanos : Nat) : String :=
+  let centis := (nanos + 5000000) / 10000000
+  let fraction := toString (centis % 100)
+  s!"{centis / 100}.{if fraction.length < 2 then "0" ++ fraction else fraction}s"
+
+/-- The time charged to each phase and a run's `total` nanoseconds, as the
+Move Prover reports its own: `0.81s load, …, 5.30s verification, total
+9.71s`. -/
+def phaseSummary (total : Nat) : BaseIO String := do
+  let clock ← phaseClock.get
+  let phases := Phase.all.map fun phase => s!"{seconds clock.totals[phase.index]!} {phase.name}"
+  return ", ".intercalate (phases.push s!"total {seconds total}").toList
+
 /-- Render the recorded samples as the baseline text: one target per line,
 sorted, carrying only the reproducible numbers. -/
 def baselineText (samples : Array Sample) : String :=

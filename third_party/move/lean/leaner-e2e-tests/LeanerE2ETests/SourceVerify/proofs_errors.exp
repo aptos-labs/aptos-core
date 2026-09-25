@@ -1,0 +1,16 @@
+LeanerE2ETests/SourceVerify/proofs_errors.move:11:9: error: the specification clause `ensures result == a * a + 2 * a * b + b * b` is not established
+LeanerE2ETests/SourceVerify/proofs_errors.move:8:5: error: leaner verification failed: the automatic verification of `square_of_sum` failed; provide a proof: `verify square_of_sum by …` in `LeanerE2ETests/SourceVerify/proofs_errors.proof.lean` (`verify square_of_sum by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/proofs_errors.move:26:5: error: leaner verification failed: `twice` sets `pragma verify = manual`; provide a proof: `verify twice by …` in `LeanerE2ETests/SourceVerify/proofs_errors.proof.lean` (`verify twice by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/proofs_errors.proof.lean:4:3: error: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  0 ≤ f ≤ 340282366920938463426481119284349108225
+  0 ≤ e ≤ 18446744073709551615
+  0 ≤ d ≤ 18446744073709551615
+  0 ≤ c ≤ 18446744073709551615
+  c - f ≤ -1
+where
+ c := a.val * b.val
+ d := a.val
+ e := b.val
+ f := b.val * a.val
+LeanerE2ETests/SourceVerify/proofs_errors.proof.lean:3:8: error: leaner verification failed: the proof of `product` does not establish its specification

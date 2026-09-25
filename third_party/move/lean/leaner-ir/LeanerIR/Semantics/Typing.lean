@@ -1038,7 +1038,6 @@ private theorem overflowingBinaryInteger_ok_typed {ns : ValidatedNamespace}
   dsimp only [List.toList_toArray] at ok_eq
   rw [value_eq, overflow_eq] at ok_eq
   simp [resolveTargetIntegerType?] at ok_eq
-  obtain ⟨-, ok_eq⟩ := ok_eq
   split at ok_eq
   · simp only [Option.bind_eq_some_iff, Option.some.injEq, Except.ok.injEq] at ok_eq
     obtain ⟨bounds, -, out, wrap_eq, out_def⟩ := ok_eq

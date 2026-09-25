@@ -102,12 +102,19 @@ pub fn run_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<
     // across runs — same mechanism as `move-prover/tests/testsuite.rs`.
     options.stable_test_output = true;
     assert_prover_tools_available(&options);
+    prove_against_baseline(test_file, &pkg_path, options, "Move prover");
+}
 
+/// Run `options` on `pkg_path` and compare the result against the `.exp`
+/// baseline next to `test_file`. Mirrors the format produced by
+/// `move-prover/tests/testsuite.rs`: error message (if any) first, then the
+/// captured diagnostic buffer. An empty baseline means clean verification.
+fn prove_against_baseline(test_file: &str, pkg_path: &Path, options: ProverOptions, tool: &str) {
     let (mut writer, buf) = DiagWriter::new_buffer();
     let result = options.prove_to(
         &mut writer,
         false,
-        pkg_path.as_path(),
+        pkg_path,
         BTreeMap::default(),
         Some(VERSION_DEFAULT),
         Some(CompilerVersion::latest_stable()),
@@ -116,16 +123,11 @@ pub fn run_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<
         extended_checks::get_all_attribute_names(),
         &[],
     );
-
-    // Mirror the format produced by `move-prover/tests/testsuite.rs`: error
-    // message (if any) first, then the captured diagnostic buffer. An empty
-    // baseline means clean verification.
     let mut diags = match &result {
         Ok(()) => String::new(),
-        Err(err) => format!("Move prover returns: {err}\n"),
+        Err(err) => format!("{tool} returns: {err}\n"),
     };
     diags += &String::from_utf8_lossy(buf.lock().unwrap().as_slice());
-
     check_baseline(test_file, &diags);
 }
 
@@ -182,4 +184,23 @@ fn move_aptos_stdlib_prover_tests() {
 #[test]
 fn move_stdlib_prover_tests() {
     run_prover_for_pkg("move-stdlib");
+}
+
+/// Verify `path_to_pkg` with the Leaner verifier (`prove --lean`) and compare
+/// its messages against the `.exp` baseline next to `test_file`. Skips where
+/// the verifier is not built (`third_party/move/lean/leaner-move`).
+pub fn run_lean_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<String>) {
+    if !aptos_framework::leaner::verifier_available() {
+        eprintln!("skipping Leaner prover test: the Leaner Move verifier is not built");
+        return;
+    }
+    let pkg_path = path_in_crate(path_to_pkg);
+    let mut options = ProverOptions::default_for_test();
+    options.lean = true;
+    prove_against_baseline(test_file, &pkg_path, options, "Leaner verifier");
+}
+
+#[test]
+fn move_stdlib_lean_prover_tests() {
+    run_lean_prover_for_pkg_with_baseline(file!(), "move-stdlib");
 }

@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerLang.Registry
+import LeanerLang.AddressAlias
 import LeanerLang.Operators
 import LeanerLang.Syntax
 import LeanerLang.Comments
@@ -164,6 +165,7 @@ private def isBlockEntrySyntax (stx : Syntax) : Bool :=
   stx.isOfKind ``leanerStatementSyntax ||
     stx.isOfKind ``leanerLetStatementSyntax ||
     stx.isOfKind ``leanerInferredLetStatementSyntax ||
+    stx.isOfKind ``leanerDeclareStatementSyntax ||
     stx.isOfKind ``leanerBareExpressionEntry ||
     stx.isOfKind ``leanerReturnBlockEntry
 
@@ -294,7 +296,7 @@ private def exprChildren (stx : Syntax) : Array Syntax :=
 private def placeChildren := childrenWhere isPlaceSyntax
 private def isPathSyntax (stx : Syntax) : Bool :=
   stx.isOfKind ``leanerPathSyntax
-private def pathChildren := childrenWhere isPathSyntax
+def pathChildren := childrenWhere isPathSyntax
 private partial def pathOutsideTypes? (stx : Syntax) : Option Syntax :=
   stx.getArgs.findSome? fun child =>
     if isPathSyntax child then some child
@@ -328,6 +330,66 @@ private partial def pathSegments (stx : Syntax) : Array String :=
   else if stx.isNatLit?.isSome then
     #[stx.reprint.getD stx.prettyPrint.pretty |>.trimAscii |>.toString]
   else stx.getArgs.flatMap pathSegments
+
+/-- Replace a path's first segment, an identifier or a numeric literal. -/
+private partial def replaceFirstSegment (stx : Syntax) (segment : Syntax) : Syntax × Bool :=
+  if stx.isIdent || stx.isNatLit?.isSome then (segment, true)
+  else
+    let (arguments, replaced) := stx.getArgs.foldl (init := (#[], false))
+      fun (arguments, replaced) child =>
+        if replaced then (arguments.push child, true)
+        else
+          let (child, replaced) := replaceFirstSegment child segment
+          (arguments.push child, replaced)
+    (stx.setArgs arguments, replaced)
+
+/-- A Move path spells its address as a literal or an alias, and a module is
+its address and name whatever the spelling. Rewrite every path of a Move
+command, and every `@alias` value, to lead with the canonical address,
+returning the alias each module was spelled with. -/
+partial def canonicalizeMoveAddresses (aliases : String → Option String) (stx : Syntax) :
+    Except (Syntax × String) (Syntax × Array (Array String × String)) :=
+  go stx #[]
+where
+  go (stx : Syntax) (found : Array (Array String × String)) :
+      Except (Syntax × String) (Syntax × Array (Array String × String)) := do
+    if stx.isOfKind ``leanerMoveAliasAddressExpr then
+      let name := stx[1].getId.toString (escape := false)
+      let some address := aliases name
+        | throw (stx[1], s!"unknown address alias `{name}`")
+      let literal := Syntax.mkNumLit address (SourceInfo.fromRef stx[1])
+      return (Syntax.node stx.getHeadInfo ``leanerMoveAddressExpr #[stx[0], literal], found)
+    if stx.isOfKind ``leanerPathSyntax then
+      let segments := pathSegments stx
+      let some first := segments[0]? | return (stx, found)
+      if segments.size < 2 then return (stx, found)
+      let (address, alias?) ← match addressValue? first with
+        | some value =>
+            if value < moveAddressBound then pure (canonicalAddress value, none)
+            else throw (stx, "a Move address is at most 256 bits")
+        | none => match aliases first with
+            | some address => pure (address, some first)
+            | none => return (stx, found)
+      let literal := Syntax.mkNumLit address (SourceInfo.fromRef stx)
+      let (rewritten, _) := replaceFirstSegment stx literal
+      let found ← match alias? with
+        | none => pure found
+        | some alias =>
+            let module := #[address, segments[1]!]
+            match found.find? (·.1 == module) with
+            | some (_, other) =>
+                if other == alias then pure found
+                else throw (stx, s!"module `{"::".intercalate module.toList}` is spelled both \
+                  `{other}` and `{alias}`")
+            | none => pure (found.push (module, alias))
+      return (rewritten, found)
+    let mut found := found
+    let mut arguments := #[]
+    for child in stx.getArgs do
+      let (child, next) ← go child found
+      arguments := arguments.push child
+      found := next
+    return (stx.setArgs arguments, found)
 
 private def unquoteIdentifier (value : String) : String :=
   if value.startsWith "«" && value.endsWith "»" then
@@ -731,20 +793,25 @@ private partial def blockExpressionOfEntries (entries : Array Syntax) (span : Sp
     pure (statement, Statement.expression (.return_ (← expressionOf expression) (spanOf statement)))
   let declarations ← (entries.filter fun entry =>
       entry.isOfKind ``leanerLetStatementSyntax ||
-        entry.isOfKind ``leanerInferredLetStatementSyntax).mapM fun statement => do
+        entry.isOfKind ``leanerInferredLetStatementSyntax ||
+        entry.isOfKind ``leanerDeclareStatementSyntax).mapM fun statement => do
     let patterns := childrenWhereOutsideExpressions isBindingPatternSyntax statement
     let some pattern := patterns[0]? | throw "a `let` statement must contain a pattern"
-    let type ← if statement.isOfKind ``leanerLetStatementSyntax then do
+    let type ← if statement.isOfKind ``leanerLetStatementSyntax ||
+        statement.isOfKind ``leanerDeclareStatementSyntax then do
         let types := signatureTypeChildren statement
         let some type := types.back? | throw "an annotated `let` statement must have a type"
         pure (some (← typeOf type))
       else pure none
-    let some value := (exprChildren statement)[0]?
-      | throw "a `let` statement must have an initializer"
+    let value ← if statement.isOfKind ``leanerDeclareStatementSyntax then pure none
+      else
+        let some value := (exprChildren statement)[0]?
+          | throw "a `let` statement must have an initializer"
+        pure (some value)
     -- Only the declaration's own `mut` marks every binding; a `mut` inside
     -- the pattern belongs to the binding it precedes.
     pure (statement, Statement.letDecl (containsDeclarationAtom "mut" statement)
-      (← bindingPatternOf pattern) type (← expressionOf value) (spanOf statement))
+      (← bindingPatternOf pattern) type (← value.mapM expressionOf) (spanOf statement))
   let explicitResults := entries.filter fun entry =>
     entry.isOfKind ``leanerReturnBlockEntry && !containsAtomOutsideExpressions ";" entry
   if explicitResults.size > 1 then throw "a `do` block has more than one final return"
@@ -1741,15 +1808,17 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
   else if stx.isOfKind ``leanerNamespaceInvariantItem then
-    let members := childrenWhere
-      (·.isOfKind ``LeanerLang.leanerNamespaceInvariantMemberSyntax) stx
-    if members.isEmpty then throw "a module specification must declare an invariant"
+    let members := childrenWhere (fun member =>
+      member.isOfKind ``LeanerLang.leanerNamespaceInvariantMemberSyntax ||
+        member.isOfKind ``LeanerLang.leanerNamespaceAxiomMemberSyntax) stx
+    if members.isEmpty then throw "a module specification must declare an invariant or an axiom"
     let declarations ← members.mapM fun member => do
       let some expression := (exprChildren member)[0]?
         | throw "a module invariant requires an expression"
       pure ({
         expression := ← expressionOf expression
         properties := (childrenOfKind ``leanerConditionPropertiesSyntax member).flatMap identifiers
+        isAxiom := member.isOfKind ``LeanerLang.leanerNamespaceAxiomMemberSyntax
         span := spanOf member } : NamespaceInvariantDecl)
     pure (.item (.namespaceInvariants declarations))
   else if stx.isOfKind ``leanerContractItem || stx.isOfKind ``leanerContractWhereItem then
@@ -1782,28 +1851,59 @@ private def attachContracts (parsed : Array ParsedItem) : Except String (Array I
         let contract := contracts.find? (·.1 == declaration.name)
         let clauses := contract.map (·.2.1) |>.getD #[]
         let pragmas := contract.map (·.2.2.1) |>.getD #[]
-        some (.function { declaration with contract := clauses, pragmas })
+        some (.function { declaration with
+          contract := clauses, contractSpan := contract.map (·.2.2.2), pragmas })
     | .item (.struct declaration) =>
         let contract := contracts.find? (·.1 == declaration.name)
         let clauses := contract.map (·.2.1) |>.getD #[]
         let pragmas := contract.map (·.2.2.1) |>.getD #[]
-        some (.struct { declaration with contract := clauses, pragmas })
+        some (.struct { declaration with
+          contract := clauses, contractSpan := contract.map (·.2.2.2), pragmas })
     | .item (.enum declaration) =>
         let contract := contracts.find? (·.1 == declaration.name)
         let clauses := contract.map (·.2.1) |>.getD #[]
         let pragmas := contract.map (·.2.2.1) |>.getD #[]
-        some (.enum { declaration with contract := clauses, pragmas })
+        some (.enum { declaration with
+          contract := clauses, contractSpan := contract.map (·.2.2.2), pragmas })
     | .item item => some item
 
 private def pathName (segments : Array String) : Name :=
   segments.foldl (fun name segment => Name.str name segment) .anonymous
 
-private def renderCompileError : CompileError → String
-  | .frontend diagnostics =>
-      String.intercalate "\n" (diagnostics.toList.map Diagnostic.render)
-  | .lir diagnostics =>
-      String.intercalate "\n" (diagnostics.toList.map fun diagnostic =>
-        s!"{diagnostic.code}: {diagnostic.message}")
+/-- Syntax spanning a byte range of the file, so a message lands on it. -/
+private def rangeSyntax (startByte endByte : Nat) : Syntax :=
+  Syntax.atom (SourceInfo.synthetic ⟨startByte⟩ ⟨endByte⟩) ""
+
+/-- Lower and validate a unit, reporting each diagnostic at its source range,
+or at the command when it has none. -/
+def compileAt (stx : Syntax) (unit : CompilationUnit) :
+    CommandElabM LeanerIR.Validation.ValidatedUnit := do
+  let raw ← match lower unit with
+    | Except.ok raw => pure raw
+    | Except.error diagnostics =>
+        for diagnostic in diagnostics do
+          let ref := match diagnostic.span with
+            | some span => rangeSyntax span.startByte span.endByte
+            | none => stx
+          let message := s!"{diagnostic.code}: {diagnostic.message}"
+          match diagnostic.severity with
+          | .error => logErrorAt ref message
+          | .warning => logWarningAt ref message
+        throwAbortCommand
+  match validate raw with
+  | Except.ok validated => pure validated
+  | Except.error diagnostics =>
+      for diagnostic in diagnostics do
+        let range := diagnostic.primary.bind (raw.tables.locations[·.index]?) |>.bind (·.primary)
+        let ref := match range with
+          | some range => rangeSyntax range.startByte range.endByte
+          | none => stx
+        let message := s!"{diagnostic.code}: {diagnostic.message}"
+        match diagnostic.severity with
+        | .error => logErrorAt ref message
+        | .warning => logWarningAt ref message
+        | .info => logInfoAt ref message
+      throwAbortCommand
 
 /-- Convert one parsed Leaner namespace/module command into the frontend AST used
 by lowering. The syntax node paired with an error lets command elaboration
@@ -1823,14 +1923,13 @@ def compilationUnitOfSyntax (stx : Syntax) (sourceName : String)
         | throw (stx, "a legacy Leaner namespace requires a profile")
       profileOf profileSyntax |>.mapError (profileSyntax, ·)
   if stx.isOfKind ``leanerMoveModuleCommand then
+    -- The address is a literal, or an alias the elaborator resolves.
     let address := path[0]?.getD ""
-    let digits := address.toList.drop 2
-    let hexDigit := fun character => character.isDigit ||
-      ('a' <= character && character <= 'f') || ('A' <= character && character <= 'F')
-    unless path.size == 2 && address.startsWith "0x" && !digits.isEmpty &&
-        digits.all hexDigit do
+    unless path.size == 2 && ((addressValue? address).isSome ||
+        address.front?.any fun c => c.isAlpha || c == '_') do
       throw (pathSyntax,
-        "a Move module path must be exactly `0xADDRESS::module_name`")
+        "a Move module path must be exactly `address::module_name`, its address a literal \
+          or an alias")
   else if profile == .rust && path[0]?.any (fun segment => segment.startsWith "0x") then
     throw (pathSyntax, "a hexadecimal address may lead a path only in the Move profile")
   let parsedItems ← (moduleItems stx).mapM itemOf |>.mapError (stx, ·)
@@ -1854,9 +1953,54 @@ def compilationUnitOfSyntax (stx : Syntax) (sourceName : String)
       path, profile, doc := namespaceDoc, uses, friends, pragmas, comments,
       items := parsed, span := spanOf stx }] }
 
-@[command_elab leanerNamespaceCommand, command_elab leanerMoveModuleCommand,
-  command_elab leanerRustNamespaceCommand]
-def elaborateNamespace : CommandElab := fun stx => do
+/-- Whether a command declares a Move-profile namespace. -/
+private def isMoveCommand (stx : Syntax) : Bool :=
+  stx.isOfKind ``leanerMoveModuleCommand ||
+    (stx.isOfKind ``leanerNamespaceCommand &&
+      (childrenWhere (·.isOfKind ``leanerMoveProfile) stx).size > 0)
+
+/-- A Move command with its addresses canonical, against the aliases
+`lookup` resolves; another command unchanged. -/
+def canonicalMoveCommandWith (lookup : String → Option String) (stx : Syntax) :
+    Except (Syntax × String) (Syntax × Array (Array String × String)) :=
+  if isMoveCommand stx then canonicalizeMoveAddresses lookup stx else pure (stx, #[])
+
+/-- A path with a Move address alias leading it made canonical, the address
+in its place; any other path unchanged. -/
+def canonicalMovePath (environment : Environment) (segments : Array String) : Array String :=
+  match segments[0]? with
+  | some first =>
+      if segments.size < 2 then segments else
+      match addressValue? first with
+      | some value => if value < moveAddressBound then
+          #[canonicalAddress value] ++ segments.drop 1 else segments
+      | none => match (addressAliases environment)[first]? with
+        | some address => #[address] ++ segments.drop 1
+        | none => segments
+  | none => segments
+
+/-- A Move command with its addresses canonical, against the aliases an
+environment declares. -/
+def canonicalMoveCommand (environment : Environment) (stx : Syntax) :
+    Except (Syntax × String) (Syntax × Array (Array String × String)) :=
+  canonicalMoveCommandWith (fun alias => (addressAliases environment)[alias]?) stx
+
+private partial def usedPaths (stx : Syntax) (found : Array (Array String)) :
+    Array (Array String) :=
+  if stx.isOfKind ``leanerFriendItem then found
+  else if isPathSyntax stx then found.push (pathSegments stx)
+  else stx.getArgs.foldl (fun found child => usedPaths child found) found
+
+/-- The paths a command names outside its header and its `friend`
+declarations: the namespaces it may use. -/
+def referencedPaths (stx : Syntax) : Array (Array String) :=
+  let header := (pathChildren stx)[0]?
+  stx.getArgs.foldl (fun found child =>
+    if some child == header then found else usedPaths child found) #[]
+
+/-- A namespace command as a compilation unit of its own, its Move addresses
+canonical; with the canonical command. -/
+def namespaceUnitOf (stx : Syntax) : CommandElabM (Syntax × CompilationUnit) := do
   let sourceName ← getFileName
   let source := (← getFileMap).source
   let span := spanOf stx
@@ -1866,18 +2010,19 @@ def elaborateNamespace : CommandElab := fun stx => do
     !leanSpans.any fun lean =>
       lean.startByte <= comment.span.startByte && comment.span.endByte <= lean.endByte
   let namespaceDoc := documentationBefore source span.startByte
-  let unit ← match compilationUnitOfSyntax stx sourceName comments namespaceDoc with
-    | .ok unit => pure unit
+  let (stx, aliases) ← match canonicalMoveCommand (← getEnv) stx with
+    | .ok canonical => pure canonical
     | .error (location, message) => throwErrorAt location message
-  let pathSyntax := (pathChildren stx)[0]!
-  let validated ← match compile unit with
-    | .ok value => pure value
-    | .error error => throwErrorAt stx (renderCompileError error)
-  let declarationName := pathName unit.namespaces[0]!.path
-  let environment ← match registerUnit (← getEnv) declarationName validated with
-    | .ok environment => pure environment
-    | .error message => throwErrorAt pathSyntax message
-  setEnv environment
+  let unit ← match compilationUnitOfSyntax stx sourceName comments namespaceDoc with
+    | .ok unit => pure { unit with namespaces := unit.namespaces.map fun ns => { ns with aliases } }
+    | .error (location, message) => throwErrorAt location message
+  -- A Move module's address is now canonical, unless its alias is unknown.
+  if let some ns := unit.namespaces[0]? then
+    if ns.profile == .move then
+      if let some first := ns.path[0]? then
+        unless (addressValue? first).isSome do
+          throwErrorAt ((pathChildren stx)[0]?.getD stx) s!"unknown address alias `{first}`"
+  return (stx, unit)
 
 @[command_elab checkLeanerCommand]
 def elaborateCheck : CommandElab := fun stx => do

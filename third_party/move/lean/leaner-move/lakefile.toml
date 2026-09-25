@@ -1,5 +1,5 @@
 name = "leaner-move"
-defaultTargets = ["LeanerMove"]
+defaultTargets = ["LeanerMove", "leaner-move"]
 testDriver = "Tests"
 
 [[require]]
@@ -9,6 +9,13 @@ path = "../leaner-ir"
 [[lean_lib]]
 name = "LeanerMove"
 
+[[lean_exe]]
+name = "leaner-move"
+root = "Main"
+# Elaborating the rendering runs imported elaborators, which may reach the
+# interpreter.
+supportInterpreter = true
+
 [[lean_lib]]
 name = "Tests"
-roots = ["Tests.Profile", "Tests.Intrinsics"]
+roots = ["Tests.Profile", "Tests.Intrinsics", "Tests.Xir"]

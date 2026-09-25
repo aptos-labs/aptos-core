@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerIR.Proofs.Denote.Types
+import LeanerIR.Semantics.Frames
 
 /-!
 # Typed terms and their denotation
@@ -141,6 +142,45 @@ theorem NTy.variantName_of_encode_enum {source owner : StructHandle} {names : Li
   rw [nominal] at encoded
   injection encoded with _ variant
   exact Option.some.inj variant
+
+/-- The variant a runtime value names; empty off a variant. -/
+def variantOf : RuntimeValue → String
+  | .nominal _ (some name) _ => name
+  | _ => ""
+
+omit [Skolems] in
+@[lir_denote_norm] theorem variantOf_nominal (source : StructHandle) (name : String)
+    (fields : Array RuntimeValue) : variantOf (.nominal source (some name) fields) = name := rfl
+
+omit [Skolems] in
+@[lir_denote_norm] theorem variantOf_ite (condition : Prop) [Decidable condition]
+    (left right : RuntimeValue) :
+    variantOf (if condition then left else right) =
+      if condition then variantOf left else variantOf right := by
+  split <;> rfl
+
+/-- An encoded enum value equated to a runtime value holds the variant that
+value names. -/
+theorem NTy.variantName_of_encode_eq {source : StructHandle} {names : List String}
+    {rows : NRows} {distinct : names.Nodup} {value : variantCarrier names rows}
+    {encoded : RuntimeValue}
+    (equation : NTy.encode (.enum source names rows distinct) value = encoded) :
+    variantName names rows value = variantOf encoded := by
+  obtain ⟨_, nominal⟩ := NTy.encode_enum_nominal source names rows distinct value
+  rw [← equation, nominal]
+  rfl
+
+omit [Skolems] in
+/-- A callee's value in the caller's view holds the variant it holds at the
+callee's family. -/
+theorem variantName_ofSkolem [Θ : Skolems] (θ : TypeArgs) : (names : List String) →
+    (rows : NRows) → (value : @variantCarrier (Skolems.instantiate θ Θ) names rows) →
+    variantName names (rows.subst θ.1) (variantCarrier.ofSkolem θ names rows value) =
+      @variantName (Skolems.instantiate θ Θ) names rows value
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons _ _, .inl _ => rfl
+  | _ :: names, .cons _ rest, .inr value => variantName_ofSkolem θ names rest value
 
 /-- The payload choices of a variant-field selection: for each variant that
 has the field, its position in that variant's row. -/
@@ -781,6 +821,73 @@ def frameInstantiation (unit : LeanerIR.Validation.ValidatedUnit) (handle : Func
     (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) : Array (TypeId × TypeId) :=
   LeanerIR.SemanticOperations.callTypeInstantiation unit handle outer (typeArgs.map .typeArg)
 
+omit [Skolems] in
+/-- Calls whose type arguments name the same types, wherever they occur,
+share a frame. -/
+theorem frameInstantiation_congr {unit : LeanerIR.Validation.ValidatedUnit}
+    {handle : FunctionHandle} {outer : Array (TypeId × TypeId)} {left right : Array TypeUse}
+    (same : left.toList.map (·.typeId) = right.toList.map (·.typeId)) :
+    frameInstantiation unit handle outer left = frameInstantiation unit handle outer right := by
+  have same : left.map (·.typeId) = right.map (·.typeId) := by
+    apply Array.ext'
+    simpa only [Array.toList_map] using same
+  have erase (typeArgs : Array TypeUse) :
+      (typeArgs.map GenericArgument.typeArg).map GenericArgument.eraseLoc =
+        (typeArgs.map (·.typeId)).map fun typeId => .typeArg ⟨typeId, ⟨0⟩⟩ := by
+    simp only [Array.map_map]
+    rfl
+  unfold frameInstantiation
+  rw [← LeanerIR.SemanticOperations.callTypeInstantiation_eraseLoc, erase, same, ← erase,
+    LeanerIR.SemanticOperations.callTypeInstantiation_eraseLoc]
+
+omit [Skolems] in
+/-- The instantiations a generic function runs in: the empty one, where it
+runs on its own, or a call's frame, from the caller's frame and one type
+argument per type parameter. -/
+def FrameOf (unit : LeanerIR.Validation.ValidatedUnit) (handle : FunctionHandle) (arity : Nat)
+    (typeInstantiation : Array (TypeId × TypeId)) : Prop :=
+  typeInstantiation = #[] ∨ ∃ outer typeArgs, typeArgs.size = arity ∧
+    typeInstantiation = frameInstantiation unit handle outer typeArgs
+
+omit [Skolems] in
+theorem FrameOf.empty {unit : LeanerIR.Validation.ValidatedUnit} {handle : FunctionHandle}
+    {arity : Nat} : FrameOf unit handle arity #[] := .inl rfl
+
+omit [Skolems] in
+theorem FrameOf.frame {unit : LeanerIR.Validation.ValidatedUnit} {handle : FunctionHandle}
+    {arity : Nat} {outer : Array (TypeId × TypeId)} {typeArgs : Array TypeUse}
+    (sizes : typeArgs.size = arity) :
+    FrameOf unit handle arity (frameInstantiation unit handle outer typeArgs) :=
+  .inr ⟨outer, typeArgs, sizes, rfl⟩
+
+omit [Skolems] in
+theorem FrameOf.rewrite {unit : LeanerIR.Validation.ValidatedUnit} {handle : FunctionHandle}
+    {arity : Nat} {left right : Array (TypeId × TypeId)} (frame : FrameOf unit handle arity left)
+    (same : left = right) : FrameOf unit handle arity right :=
+  same ▸ frame
+
+omit [Skolems] in
+/-- A call passing its caller's own type parameters, in order, from the
+caller's namespace, runs in the caller's frame; at the empty frame as the
+runtime computes it for the call (`empty`). -/
+theorem frameInstantiation_own {unit : LeanerIR.Validation.ValidatedUnit}
+    {caller callee : FunctionHandle} {arity : Nat}
+    {own : Array TypeUse} {typeInstantiation : Array (TypeId × TypeId)}
+    (same : callee.namespaceId = caller.namespaceId) (sizes : own.size = arity)
+    (parameters : LeanerIR.SemanticOperations.ownParametersIn unit caller own = true)
+    (empty : frameInstantiation unit callee #[] own = #[])
+    (frame : FrameOf unit caller arity typeInstantiation) :
+    frameInstantiation unit callee typeInstantiation own = typeInstantiation := by
+  rcases frame with rfl | ⟨outer, typeArgs, size, rfl⟩
+  · exact empty
+  · unfold LeanerIR.SemanticOperations.ownParametersIn at parameters
+    split at parameters
+    · rename_i ns namespaceOf
+      exact LeanerIR.SemanticOperations.callTypeInstantiation_own_parameters unit ns caller callee
+        outer typeArgs own namespaceOf same (by omega)
+        (LeanerIR.SemanticOperations.ownParameters_spec parameters)
+    · cases parameters
+
 /-- The closed meaning of calls with type arguments: the callee's
 prophetic meaning under its frame's instantiation, computed from the
 caller's as the runtime does. -/
@@ -1191,26 +1298,6 @@ theorem routeMeaning_other {handle callee : FunctionHandle} {π σs : NRow} {ρ 
     routeMeaning handle π ρ self rest callee σs shape args = rest callee σs shape args := by
   simp [routeMeaning, other]
 
-/-- The meaning of calls in the body of a generic function calling itself:
-its own handle at its own signature means `self`, every other call its
-callee's prophetic meaning. -/
-def recursiveMeaning (unit : LeanerIR.Validation.ExecutableUnit) (handle : FunctionHandle)
-    (π : NRow) (ρ : ResultShape) (self : HList π → Comp ρ.carrier) : CalleeMeaning :=
-  routeMeaning handle π ρ self (propheticMeaning unit #[])
-
-@[simp] theorem recursiveMeaning_self (unit : LeanerIR.Validation.ExecutableUnit)
-    (handle : FunctionHandle) (π : NRow) (ρ : ResultShape) (self : HList π → Comp ρ.carrier)
-    (args : HList π) :
-    recursiveMeaning unit handle π ρ self handle π ρ args = self args :=
-  routeMeaning_self handle π ρ self _ args
-
-theorem recursiveMeaning_other (unit : LeanerIR.Validation.ExecutableUnit)
-    {handle callee : FunctionHandle} {π σs : NRow} {ρ shape : ResultShape}
-    (self : HList π → Comp ρ.carrier) (args : HList σs) (other : callee ≠ handle) :
-    recursiveMeaning unit handle π ρ self callee σs shape args =
-      propheticMeaning unit #[] callee σs shape args :=
-  routeMeaning_other self _ args other
-
 /-- A position among the members of a cycle of calls, each a handle with
 its compiled function. -/
 inductive CycleIndex : List (FunctionHandle × Function) → Type where
@@ -1225,62 +1312,127 @@ def CycleIndex.member : {members : List (FunctionHandle × Function)} → CycleI
   | member :: _, .here => member
   | _ :: _, .there later => later.member
 
-/-- The meanings standing for a cycle's members, by position. -/
-abbrev CycleSelves (members : List (FunctionHandle × Function)) : Type :=
-  (index : CycleIndex members) → HList index.member.2.params → Comp index.member.2.result.carrier
-
-/-- Route each of a cycle's members to its meaning, every other call to `rest`. -/
-def cycleRoutes (rest : CalleeMeaning) :
-    (members : List (FunctionHandle × Function)) → CycleSelves members → CalleeMeaning
-  | [], _ => rest
-  | member :: others, self =>
-      routeMeaning member.1 member.2.params member.2.result (self .here)
-        (cycleRoutes rest others fun index => self (.there index))
-
-/-- The meaning of calls in the bodies of a cycle's members: each member's
-handle at its own signature means its `self`, every other call its callee's
-prophetic meaning. -/
-def cycleMeaning (unit : LeanerIR.Validation.ExecutableUnit)
-    (members : List (FunctionHandle × Function)) (self : CycleSelves members) : CalleeMeaning :=
-  cycleRoutes (propheticMeaning unit #[]) members self
-
-/-- The recursion hypothesis of a generic function: its meaning at every
-skolem family and type instantiation, so that a call to itself with type
-arguments is the hypothesis at the family and frame instantiation the call
-induces. -/
+/-- A function's meaning at every skolem family and type instantiation, so
+that a call to it with type arguments means it at the family and frame
+instantiation the call induces. -/
 abbrev SelfFamily (π : NRow) (ρ : ResultShape) : Type 1 :=
   (Θ : Skolems) → Array (TypeId × TypeId) → @HList Θ π → Comp (@ResultShape.carrier Θ ρ)
 
-/-- The meaning of calls with type arguments in the body of a generic
-function calling itself: its own handle at its own signature means `self`
-at the induced family and the callee's frame instantiation, every other
-call its closed meaning. -/
-def recursiveGeneric (unit : LeanerIR.Validation.ExecutableUnit) (handle : FunctionHandle)
-    (π : NRow) (ρ : ResultShape) (self : SelfFamily π ρ)
-    (typeInstantiation : Array (TypeId × TypeId)) : GenericMeaning :=
+omit [Skolems] in
+/-- A slot of a cycle's fixed point: a member at the runtime family
+(`none`), or at a skolem family and a type instantiation. -/
+structure CycleSlot (members : List (FunctionHandle × Function)) where
+  position : CycleIndex members
+  family : Option (Skolems × Array (TypeId × TypeId))
+
+omit [Skolems] in
+/-- The skolem family a slot's family names: the ambient one at the runtime
+family. -/
+@[reducible] def familySkolems [Θ : Skolems] : Option (Skolems × Array (TypeId × TypeId)) → Skolems
+  | none => Θ
+  | some (family, _) => family
+
+omit [Skolems] in
+/-- The type instantiation a slot's family names: the frame's own at the
+runtime family. -/
+def familyInstantiation (typeInstantiation : Array (TypeId × TypeId)) :
+    Option (Skolems × Array (TypeId × TypeId)) → Array (TypeId × TypeId)
+  | none => typeInstantiation
+  | some (_, instantiation) => instantiation
+
+omit [Skolems] in
+/-- The meanings standing for a cycle's members, one per slot. -/
+abbrev CycleFamilySelves [Θ : Skolems] (members : List (FunctionHandle × Function)) : Type 1 :=
+  (slot : CycleSlot members) → @HList (familySkolems slot.family) slot.position.member.2.params →
+    Comp (@ResultShape.carrier (familySkolems slot.family) slot.position.member.2.result)
+
+omit [Skolems] in
+/-- Route calls with type arguments to one function: its handle at its own
+signature means `self` at the family the call induces and the callee's frame
+instantiation, every other call `rest`. -/
+def routeGeneric [Θ : Skolems] (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
+    (self : SelfFamily π ρ) (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId))
+    (rest : GenericMeaning) : GenericMeaning :=
   fun callee typeArgs θ σs shape args =>
     if routed : callee = handle ∧ σs = π ∧ shape = ρ then
-      routed.2.2 ▸ self (Skolems.instantiate θ ‹Skolems›)
-        (frameInstantiation unit.unit callee typeInstantiation typeArgs) (routed.2.1 ▸ args)
-    else closedGeneric unit typeInstantiation callee typeArgs θ σs shape args
+      routed.2.2 ▸ self (Skolems.instantiate θ Θ) (frame callee typeArgs) (routed.2.1 ▸ args)
+    else rest callee typeArgs θ σs shape args
 
-@[simp] theorem recursiveGeneric_self (unit : LeanerIR.Validation.ExecutableUnit)
-    (handle : FunctionHandle) (π : NRow) (ρ : ResultShape) (self : SelfFamily π ρ)
-    (typeInstantiation : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) (θ : TypeArgs)
-    (args : @HList (Skolems.instantiate θ ‹Skolems›) π) :
-    recursiveGeneric unit handle π ρ self typeInstantiation handle typeArgs θ π ρ args =
-      self (Skolems.instantiate θ ‹Skolems›)
-        (frameInstantiation unit.unit handle typeInstantiation typeArgs) args := by
-  simp [recursiveGeneric]
+omit [Skolems] in
+@[simp] theorem routeGeneric_self [Θ : Skolems] (handle : FunctionHandle) (π : NRow)
+    (ρ : ResultShape) (self : SelfFamily π ρ)
+    (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId)) (rest : GenericMeaning)
+    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ) π) :
+    routeGeneric handle π ρ self frame rest handle typeArgs θ π ρ args =
+      self (Skolems.instantiate θ Θ) (frame handle typeArgs) args := by
+  simp [routeGeneric]
 
-theorem recursiveGeneric_other (unit : LeanerIR.Validation.ExecutableUnit)
-    {handle callee : FunctionHandle} {π σs : NRow} {ρ shape : ResultShape}
-    (self : SelfFamily π ρ) (typeInstantiation : Array (TypeId × TypeId))
-    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ ‹Skolems›) σs)
+omit [Skolems] in
+theorem routeGeneric_other [Θ : Skolems] {handle callee : FunctionHandle} {π σs : NRow}
+    {ρ shape : ResultShape} (self : SelfFamily π ρ)
+    (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId)) (rest : GenericMeaning)
+    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ) σs)
     (other : callee ≠ handle) :
-    recursiveGeneric unit handle π ρ self typeInstantiation callee typeArgs θ σs shape args =
-      closedGeneric unit typeInstantiation callee typeArgs θ σs shape args := by
-  simp [recursiveGeneric, other]
+    routeGeneric handle π ρ self frame rest callee typeArgs θ σs shape args =
+      rest callee typeArgs θ σs shape args := by
+  simp [routeGeneric, other]
+
+omit [Skolems] in
+/-- The meaning of calls without type arguments in a body at a slot's
+family: each member at its own signature means its meaning at that family,
+every other call `rest`. -/
+def cycleCalls [Θ : Skolems] (family : Option (Skolems × Array (TypeId × TypeId)))
+    (rest : @CalleeMeaning (familySkolems family)) :
+    (members : List (FunctionHandle × Function)) → CycleFamilySelves members →
+      @CalleeMeaning (familySkolems family)
+  | [], _ => rest
+  | member :: others, self =>
+      @routeMeaning (familySkolems family) member.1 member.2.params member.2.result
+        (self ⟨.here, family⟩)
+        (cycleCalls family rest others fun slot => self ⟨.there slot.position, slot.family⟩)
+
+omit [Skolems] in
+/-- The meaning of calls with type arguments in a body at a family: each
+member at its own signature means its meaning at the family and frame
+instantiation the call induces, every other call `rest`. -/
+def cycleGenerics [Θ : Skolems] (root : Skolems) (unit : LeanerIR.Validation.ExecutableUnit)
+    (instantiation : Array (TypeId × TypeId)) (rest : @GenericMeaning Θ) :
+    (members : List (FunctionHandle × Function)) → CycleFamilySelves (Θ := root) members →
+      @GenericMeaning Θ
+  | [], _ => rest
+  | member :: others, self =>
+      routeGeneric (Θ := Θ) member.1 member.2.params member.2.result
+        (fun family instantiation => self ⟨.here, some (family, instantiation)⟩)
+        (fun callee typeArgs => frameInstantiation unit.unit callee instantiation typeArgs)
+        (cycleGenerics (Θ := Θ) root unit instantiation rest others
+          fun slot => self ⟨.there slot.position, slot.family⟩)
+
+omit [Skolems] in
+/-- The meaning of calls with type arguments in a body at a family: at the
+runtime family every such call is closed, since a proof covers the runtime
+slots only when no member is generic; at a skolem family each member is
+routed as `cycleGenerics` does. -/
+def cycleGenericsAt [Θ : Skolems] (unit : LeanerIR.Validation.ExecutableUnit)
+    (members : List (FunctionHandle × Function)) (typeInstantiation : Array (TypeId × TypeId))
+    (self : CycleFamilySelves (Θ := Θ) members) :
+    (family : Option (Skolems × Array (TypeId × TypeId))) → @GenericMeaning (familySkolems family)
+  | none => closedGeneric unit typeInstantiation
+  | some (family, instantiation) =>
+      cycleGenerics (Θ := family) Θ unit instantiation (@closedGeneric family unit instantiation)
+        members self
+
+omit [Skolems] in
+/-- What calls denote in the body of a cycle's member at a slot: a call to a
+member its meaning at the slot the call reaches, every other call its
+callee's prophetic meaning. -/
+def cycleMeanings [Θ : Skolems] (unit : LeanerIR.Validation.ExecutableUnit)
+    (members : List (FunctionHandle × Function)) (typeInstantiation : Array (TypeId × TypeId))
+    (self : CycleFamilySelves (Θ := Θ) members) (slot : CycleSlot members) :
+    @Meanings (familySkolems slot.family) :=
+  @Meanings.mk (familySkolems slot.family)
+    (cycleCalls slot.family (@propheticMeaning (familySkolems slot.family) unit #[]) members self)
+    (cycleGenericsAt unit members typeInstantiation self slot.family)
+    (familyInstantiation typeInstantiation slot.family)
 
 omit [Skolems] in
 /-- The weakest precondition through a verified callee: its precondition,
@@ -1352,6 +1504,49 @@ theorem wp_flowBind {ρ : ResultShape} {Γ : NRow} {α β : Type}
     have := h.1 flow final execution
     cases flow <;> simpa [wp_pure] using this
 
+/-- Flows associate: an abrupt flow of the inner action passes both binds
+unchanged, a value reaches the outer continuation through the inner one. -/
+theorem Flow.bind_assoc {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (action : Comp (Flow ρ Γ α)) (middle : α → HEnv Γ → Comp (Flow ρ Γ β))
+    (next : β → HEnv Γ → Comp (Flow ρ Γ γ)) :
+    Flow.bind (Flow.bind action middle) next =
+      Flow.bind action fun value env => Flow.bind (middle value env) next := by
+  simp only [Flow.bind, Spec.bind_assoc]
+  congr 1
+  funext flow
+  cases flow <;> simp [Spec.pure_bind]
+
+/-- The rule for a flow bound after a flow: the binds associate to the right,
+so that the inner action heads the goal and the goal's continuation is not
+copied into the inner bind's arms. -/
+theorem wp_flowBind_flowBind {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (action : Comp (Flow ρ Γ α)) (middle : α → HEnv Γ → Comp (Flow ρ Γ β))
+    (next : β → HEnv Γ → Comp (Flow ρ Γ γ))
+    (ensures : Flow ρ Γ γ → RuntimeState → Prop) (aborts : Failure → Prop)
+    (state : RuntimeState) :
+    wp (Flow.bind (Flow.bind action middle) next) ensures aborts state ↔
+      wp (Flow.bind action fun value env => Flow.bind (middle value env) next) ensures aborts
+        state := by
+  rw [Flow.bind_assoc]
+
+/-- A flow bound after a bind is bound inside the bind's continuation. -/
+theorem Flow.bind_spec_bind {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (first : Comp γ) (middle : γ → Comp (Flow ρ Γ α)) (next : α → HEnv Γ → Comp (Flow ρ Γ β)) :
+    Flow.bind (Spec.bind first middle) next = Spec.bind first fun value => Flow.bind (middle value) next := by
+  simp only [Flow.bind, Spec.bind_assoc]
+
+/-- The rule for a flow bound after a bind, as a call's denotation is: the
+flow's continuation moves into the bind's, where it appears once — taken by
+`wp_flowBind` instead, it would be copied into every flow's arm. -/
+theorem wp_flowBind_specBind {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (first : Comp γ) (middle : γ → Comp (Flow ρ Γ α)) (next : α → HEnv Γ → Comp (Flow ρ Γ β))
+    (ensures : Flow ρ Γ β → RuntimeState → Prop) (aborts : Failure → Prop)
+    (state : RuntimeState) :
+    wp (Flow.bind (Spec.bind first middle) next) ensures aborts state ↔
+      wp first (fun value state => wp (Flow.bind (middle value) next) ensures aborts state)
+        aborts state := by
+  rw [Flow.bind_spec_bind, wp_bind]
+
 /-- Loop verification from an invariant over the locals and the state: it
 holds at entry, and one iteration under it is correct whenever the next
 iteration is assumed correct under it.  Partial correctness. -/
@@ -1384,12 +1579,16 @@ theorem wp_loopAt {ρ : ResultShape} {Γ : NRow} (site : Nat)
 attribute [lir_denote high] Choices.select?_single Choices.update?_single
 attribute [lir_denote] Which.project?_eq_some_iff
 
+-- The denotation rewrites by its equations; unfolding remains the fallback
+-- where an equation's type indices do not match the term's at reducible
+-- transparency, as a call's result type does.
+lir_denote_equations Term.denote Args.denote
 attribute [lir_denote] Term.denote Args.denote Function.denote ResultShape.ofBody NTy.ofGround
   closedGeneric
   HList.ofGround
   ResultShape.toBody
   ResultShape.finish Flow.iterate Flow.rebase Flow.bind_pure_value Flow.bind_pure_return
-  Flow.bind_pure_break Flow.bind_pure_continue Flow.bind_abort wp_flowBind finish_value finish_return finish_break
+  Flow.bind_pure_break Flow.bind_pure_continue Flow.bind_abort finish_value finish_return finish_break
   finish_continue Mutables.resolve_nil Mutables.resolve_cons Option.bind_some Option.bind_none
   Proj.get?_nil Proj.get?_deref Proj.get?_field Proj.get?_index Proj.get?_variant
   Proj.set?_nil Proj.set?_deref Proj.set?_field Proj.set?_index Proj.set?_variant

@@ -1,11 +1,11 @@
 processed 1 task
-task 0 lines 1-20:  publish [import Move]
+task 0 lines 3-15:  publish [import LeanerMove]
 Error: compilation errors:
- error: borrow safety error `poisoned`: reference was poisoned by an overlapping write (conflicts with `selected`)
-   ┌─ TEMPFILE:11:5
-   │
-11 │     let observation ← freeze poisoned
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ error: LIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan
+  ┌─ TEMPFILE:9:21
+  │
+9 │     let poisoned := &mut owner
+  │                     ^^^^^^^^^^
 
 
 exiting with Leaner elaboration errors

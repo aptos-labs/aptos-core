@@ -13,11 +13,11 @@ NOT the same as Keccak-256.
 Non-cryptograhic hashes:
 - SipHash: an add-rotate-xor (ARX) based family of pseudorandom functions created by Jean-Philippe Aumasson and Daniel J. Bernstein in 2012
 -/
-leaner module 0x1::aptos_hash where
-  use 0x1::std::bcs::to_bytes
-  use 0x1::std::error::invalid_state
-  use 0x1::std::features::blake2b_256_enabled
-  use 0x1::std::features::sha_512_and_ripemd_160_enabled
+leaner module aptos_std::aptos_hash where
+  use std::bcs::to_bytes
+  use std::error::invalid_state
+  use std::features::blake2b_256_enabled
+  use std::features::sha_512_and_ripemd_160_enabled
 
   --
   -- Constants

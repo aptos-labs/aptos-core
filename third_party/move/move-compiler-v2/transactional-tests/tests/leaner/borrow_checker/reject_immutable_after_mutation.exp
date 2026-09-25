@@ -1,11 +1,11 @@
 processed 1 task
-task 0 lines 1-20:  publish [import Move]
+task 0 lines 3-15:  publish [import LeanerMove]
 Error: compilation errors:
- error: borrow safety error `observation`: cannot create an immutable reference while a prophecy is active in the same tree (conflicts with `writer`)
-   ┌─ TEMPFILE:10:5
+ error: LIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan
+   ┌─ TEMPFILE:10:24
    │
-10 │     let observation ← &owner
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^
+10 │     let observation := &owner
+   │                        ^^^^^^
 
 
 exiting with Leaner elaboration errors

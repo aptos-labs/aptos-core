@@ -1,11 +1,17 @@
 processed 1 task
-task 0 lines 1-15:  publish [import Move]
+task 0 lines 3-11:  publish [import LeanerMove]
 Error: compilation errors:
- error: verification failed for `LeanerRejectVerification.wrong_increment`: the implementation does not prove its contract; use `verify LeanerRejectVerification.wrong_increment by` to inspect and prove the remaining obligation
-  ┌─ TEMPFILE:9:3
+ error: leaner verification failed
+  ┌─ TEMPFILE:7:8
   │
-9 │   verify wrong_increment
-  │   ^^^^^^^^^^^^^^^^^^^^^^
+7 │   spec wrong_increment where
+  │        ^^^^^^^^^^^^^^^
+
+error: the specification clause `ensures result == value` is not established
+  ┌─ TEMPFILE:8:5
+  │
+8 │     ensures result == value
+  │     ^^^^^^^^^^^^^^^^^^^^^^^
 
 
 exiting with Leaner elaboration errors

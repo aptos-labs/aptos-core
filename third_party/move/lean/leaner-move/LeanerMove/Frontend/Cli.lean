@@ -82,6 +82,44 @@ def readXastDir (dir : System.FilePath) : IO Package := do
   let modules ← files.toList.mapM fun e => decodeFile e.path
   pure { modules }
 
+/-- The modules of a package among an export's modules: the ones whose
+source lies under the package's `sources` directory; the others came in
+through a dependency. -/
+def splitOwned (package : Package) (dir : System.FilePath) : Package :=
+  -- The export records a source as the compiler was given it, relative to
+  -- the same directory as `dir`; a leading `./` is no part of either.
+  let plain (path : String) : String :=
+    if path.startsWith "./" then (path.drop 2).toString else path
+  let ownedPrefix := plain (dir / "sources").normalize.toString
+  let owns (candidate : Module) := candidate.sources.any fun source =>
+    (plain (System.FilePath.normalize source).toString).startsWith ownedPrefix
+  let owned := package.modules.filter owns
+  let dependencies := package.modules.filter fun candidate => !owns candidate
+  { modules := owned, dependencies }
+
+/-- Reads an existing export of a package, made by `move exchange --format
+ast`, for verification: with `packageDir`, the modules outside the package's
+sources are the dependencies it was exported with, kept whole so their calls
+inline, but not verification targets. -/
+def readExportDir (dir : System.FilePath) (packageDir : Option System.FilePath)
+    (filter : Option String := none) : IO Package := do
+  let package ← readXastDir dir
+  let selected (module : Module) : Bool := match filter with
+    | some part => module.sources.any fun source =>
+        (System.FilePath.fileName source).any fun name => (name.splitOn part).length > 1
+    | none => true
+  match packageDir with
+  | some packageDir =>
+      let split := splitOwned package packageDir
+      if split.modules.isEmpty then
+        throw <| IO.userError s!"the export {dir} holds no module of the package {packageDir}"
+      let (targets, linked) := split.modules.partition selected
+      if targets.isEmpty then
+        throw <| IO.userError s!"no module of the package {packageDir} matches the filter"
+      pure { modules := targets ++ (linked ++ split.dependencies).map ({ · with isTarget := false }) }
+  | none => pure { modules := package.modules.map fun module =>
+      { module with isTarget := selected module } }
+
 /-- Exports a Move package (`--package-dir`) and decodes its modules;
 `includeDeps` also exports the dependency modules with source. -/
 def exportPackage (dir : System.FilePath) (includeDeps : Bool := false) : IO Package := do
@@ -92,13 +130,6 @@ def exportPackage (dir : System.FilePath) (includeDeps : Bool := false) : IO Pac
     run exe args
     let package ← readXastDir tmp
     if !includeDeps then return package
-    -- A package's own modules are the ones under its `sources` directory;
-    -- every other exported module came in through a dependency.
-    let ownedPrefix := (dir / "sources").toString
-    let owned := package.modules.filter fun candidate =>
-      candidate.sources.any (·.startsWith ownedPrefix)
-    let dependencies := package.modules.filter fun candidate =>
-      !candidate.sources.any (·.startsWith ownedPrefix)
-    return { modules := owned, dependencies }
+    return splitOwned package dir
 
 end LeanerMove.Frontend.Cli
