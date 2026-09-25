@@ -58,4 +58,8 @@ repos:
           - devtools/assets/apache_license_header.txt
           - --license-filepath
           - devtools/assets/innovation_license_header.txt
-          - --comment-style=--
+          # NOTE: the value must not be a bare `--`: argparse in Python 3.10
+          # strips a standalone `--` from an option's values, which leaves the
+          # hook with an empty list for `--comment-style`. The `<start>|<prefix>|<end>`
+          # triplet with empty start/end yields the same `-- ` prefix safely.
+          - --comment-style=|--|
