@@ -1285,6 +1285,297 @@ fn randomness_api_matches_v1() {
     );
 }
 
+/// Runs a setup transaction on V1 and applies its output.
+fn execute_setup_txn(
+    fx: &mut FakeExecutor,
+    sender: &AccountData,
+    sequence_number: u64,
+    payload: aptos_types::transaction::TransactionPayload,
+) {
+    let txn = sender
+        .account()
+        .transaction()
+        .payload(payload)
+        .sequence_number(sequence_number)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign();
+    let output = fx.execute_and_apply(txn);
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "a setup transaction failed"
+    );
+}
+
+/// The entry function behind an SDK-built payload.
+fn entry_function_of(
+    payload: aptos_types::transaction::TransactionPayload,
+) -> aptos_types::transaction::EntryFunction {
+    let aptos_types::transaction::TransactionPayload::EntryFunction(entry) = payload else {
+        unreachable!("the SDK builds an entry function")
+    };
+    entry
+}
+
+/// A funded 2-of-2 multisig account owned by Alice and Bob. Alice's next
+/// sequence number is 12.
+fn setup_multisig() -> (
+    FakeExecutor,
+    AccountData,
+    AccountData,
+    move_core_types::account_address::AccountAddress,
+) {
+    use aptos_cached_packages::aptos_stdlib::{
+        aptos_account_transfer, multisig_account_create_with_owners,
+    };
+
+    let (mut fx, alice, bob) = setup();
+    // The address derives from Alice's sequence number at creation.
+    let multisig =
+        aptos_types::account_address::create_multisig_account_address(*alice.address(), 10);
+    execute_setup_txn(
+        &mut fx,
+        &alice,
+        10,
+        multisig_account_create_with_owners(vec![*bob.address()], 2, vec![], vec![]),
+    );
+    execute_setup_txn(
+        &mut fx,
+        &alice,
+        11,
+        aptos_account_transfer(multisig, 10_000_000),
+    );
+    (fx, alice, bob, multisig)
+}
+
+/// A transfer of `amount` to `to`, encoded as a multisig account stores it.
+fn transfer_payload(to: &AccountData, amount: u64) -> Vec<u8> {
+    use aptos_types::transaction::MultisigTransactionPayload;
+
+    let transfer =
+        aptos_cached_packages::aptos_stdlib::aptos_account_transfer(*to.address(), amount);
+    bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
+        entry_function_of(transfer),
+    ))
+    .expect("the payload serializes")
+}
+
+/// A multisig transaction from `sender` for `multisig`, carrying `payload`
+/// when the stored transaction holds only a hash.
+fn multisig_txn(
+    sender: &AccountData,
+    sequence_number: u64,
+    multisig: move_core_types::account_address::AccountAddress,
+    payload: Option<aptos_types::transaction::MultisigTransactionPayload>,
+) -> SignedTransaction {
+    use aptos_types::transaction::{Multisig, TransactionPayload};
+
+    sender
+        .account()
+        .transaction()
+        .payload(TransactionPayload::Multisig(Multisig {
+            multisig_address: multisig,
+            transaction_payload: payload,
+        }))
+        .sequence_number(sequence_number)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign()
+}
+
+/// Whether `output` emitted an event of type `type_name`.
+fn emitted(output: &TransactionOutput, type_name: &str) -> bool {
+    output
+        .events()
+        .iter()
+        .any(|event| event.type_tag().to_canonical_string() == type_name)
+}
+
+/// A stored payload every owner approved runs as the multisig account.
+#[test]
+fn multisig_stored_payload_executes_like_v1() {
+    use aptos_cached_packages::aptos_stdlib::{
+        multisig_account_approve_transaction, multisig_account_create_transaction,
+    };
+
+    let (mut fx, alice, bob, multisig) = setup_multisig();
+    execute_setup_txn(
+        &mut fx,
+        &alice,
+        12,
+        multisig_account_create_transaction(multisig, transfer_payload(&bob, 1_000)),
+    );
+    execute_setup_txn(
+        &mut fx,
+        &bob,
+        0,
+        multisig_account_approve_transaction(multisig, 1),
+    );
+
+    let txn = multisig_txn(&alice, 13, multisig, None);
+    let output = assert_output_matches_v1(&fx, &txn, *alice.address());
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
+    assert!(
+        emitted(
+            &output,
+            "0x1::multisig_account::TransactionExecutionSucceeded"
+        ),
+        "the account did not record the execution"
+    );
+}
+
+/// A transaction stored as a hash runs the payload the transaction provides,
+/// here in the newer payload format.
+#[test]
+fn multisig_provided_payload_executes_like_v1() {
+    use aptos_cached_packages::aptos_stdlib::{
+        aptos_account_transfer, multisig_account_approve_transaction,
+        multisig_account_create_transaction_with_hash,
+    };
+    use aptos_crypto::HashValue;
+    use aptos_types::transaction::{
+        TransactionExecutable, TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
+    };
+
+    let (mut fx, alice, bob, multisig) = setup_multisig();
+    let payload = transfer_payload(&bob, 1_000);
+    execute_setup_txn(
+        &mut fx,
+        &alice,
+        12,
+        multisig_account_create_transaction_with_hash(
+            multisig,
+            HashValue::sha3_256_of(&payload).to_vec(),
+        ),
+    );
+    execute_setup_txn(
+        &mut fx,
+        &bob,
+        0,
+        multisig_account_approve_transaction(multisig, 1),
+    );
+
+    let txn = alice
+        .account()
+        .transaction()
+        .payload(TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable: TransactionExecutable::EntryFunction(entry_function_of(
+                aptos_account_transfer(*bob.address(), 1_000),
+            )),
+            extra_config: TransactionExtraConfig::V2 {
+                multisig_address: Some(multisig),
+                replay_protection_nonce: None,
+                txn_limits_request: None,
+            },
+        }))
+        .sequence_number(13)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign();
+    let output = assert_output_matches_v1(&fx, &txn, *alice.address());
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
+    assert!(
+        emitted(
+            &output,
+            "0x1::multisig_account::TransactionExecutionSucceeded"
+        ),
+        "the account did not record the execution"
+    );
+}
+
+/// A payload that fails is rolled back and recorded by the account, and the
+/// transaction itself still succeeds. The recorded error must match V1's.
+#[test]
+fn multisig_failing_payload_recorded_like_v1() {
+    use aptos_cached_packages::aptos_stdlib::{
+        multisig_account_approve_transaction, multisig_account_create_transaction,
+    };
+
+    let (mut fx, alice, bob, multisig) = setup_multisig();
+    // More than the multisig account holds.
+    execute_setup_txn(
+        &mut fx,
+        &alice,
+        12,
+        multisig_account_create_transaction(multisig, transfer_payload(&bob, 1_000_000_000_000)),
+    );
+    execute_setup_txn(
+        &mut fx,
+        &bob,
+        0,
+        multisig_account_approve_transaction(multisig, 1),
+    );
+
+    let txn = multisig_txn(&alice, 13, multisig, None);
+    let output = assert_output_matches_v1(&fx, &txn, *alice.address());
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success)
+    );
+    assert!(
+        emitted(&output, "0x1::multisig_account::TransactionExecutionFailed"),
+        "the account did not record the failure"
+    );
+}
+
+/// The framework's reasons for refusing a multisig transaction each discard
+/// with the same status as V1.
+#[test]
+fn multisig_rejections_discard_like_v1() {
+    use aptos_cached_packages::aptos_stdlib::multisig_account_create_transaction;
+
+    let (mut fx, alice, bob, multisig) = setup_multisig();
+    let carol = fx.create_raw_account_data(100_000_000, 0);
+    fx.add_account_data(&carol);
+    execute_setup_txn(
+        &mut fx,
+        &alice,
+        12,
+        multisig_account_create_transaction(multisig, transfer_payload(&bob, 1_000)),
+    );
+
+    let cases = [
+        // Carol is not an owner.
+        (
+            "owner",
+            multisig_txn(&carol, 0, multisig, None),
+            StatusCode::NOT_MULTISIG_OWNER,
+        ),
+        // Only Alice has approved.
+        (
+            "approvals",
+            multisig_txn(&alice, 13, multisig, None),
+            StatusCode::MULTISIG_TRANSACTION_INSUFFICIENT_APPROVALS,
+        ),
+        // Bob's account is not a multisig account.
+        (
+            "account",
+            multisig_txn(&alice, 13, *bob.address(), None),
+            StatusCode::ACCOUNT_NOT_MULTISIG,
+        ),
+    ];
+    for (case, txn, code) in cases {
+        let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+        assert_eq!(
+            v1_status,
+            TransactionStatus::Discard(code),
+            "v1 did not discard the {case} case as expected"
+        );
+        assert_eq!(
+            execute_v2(fx.get_state_view(), &txn).status(),
+            &v1_status,
+            "v2 differs from v1 for the {case} case"
+        );
+    }
+}
+
 /// A block-metadata transaction produces byte-identical outputs on both VMs:
 /// the block prologue runs unmetered on both, so nothing is gas-masked.
 #[test]

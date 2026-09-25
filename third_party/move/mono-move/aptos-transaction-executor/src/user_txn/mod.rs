@@ -7,6 +7,7 @@ mod args;
 mod entry_func;
 mod execute;
 mod metadata;
+mod multisig;
 mod pre_execution_checks;
 mod script;
 mod validation;

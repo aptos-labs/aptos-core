@@ -7,6 +7,7 @@
 use super::{
     entry_func::call_entry_function,
     metadata::TxnMetadata,
+    multisig::{execute_multisig_payload, provided_payload_bytes, run_multisig_prologue},
     pre_execution_checks::PreExecutionChecker,
     script::run_script,
     validation::{run_epilogue, run_prologue, ValidationSigners},
@@ -30,7 +31,7 @@ use mono_move_core::{
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
 use mono_move_runtime::InterpreterContext;
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 
 impl<'guard> AptosTransactionExecutor<'guard> {
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
@@ -67,22 +68,26 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             .run_checks()
             .map_err(DiscardReason::PreExecutionCheck)?;
 
-        // TODO(completeness): multisig payloads. Refused for now, since the
-        // inner executable must run as the multisig account, not the sender.
-        if txn.multisig_address().is_some() {
-            return Err(DiscardReason::Unsupported("multisig payloads"));
-        }
-        let executable = match txn.payload().executable_ref() {
-            Ok(TransactionExecutableRef::EntryFunction(entry)) => Executable::EntryFunction(entry),
-            Ok(TransactionExecutableRef::Script(script)) => Executable::Script(script),
-            Ok(TransactionExecutableRef::Encrypted) => Executable::Encrypted,
-            // Only a multisig transaction may leave the executable out.
-            Ok(TransactionExecutableRef::Empty) => return Err(DiscardReason::EmptyPayload),
-            Err(_) => return Err(DiscardReason::Deprecated("module-bundle payload")),
+        let executable = txn
+            .payload()
+            .executable_ref()
+            .map_err(|_| DiscardReason::Deprecated("module-bundle payload"))?;
+        let payload = match txn.multisig_address() {
+            Some(multisig_address) => Payload::Multisig {
+                multisig_address,
+                provided_payload: provided_payload_bytes(executable)?,
+            },
+            None => Payload::Direct(match executable {
+                TransactionExecutableRef::EntryFunction(entry) => Executable::EntryFunction(entry),
+                TransactionExecutableRef::Script(script) => Executable::Script(script),
+                TransactionExecutableRef::Encrypted => Executable::Encrypted,
+                // Only a multisig transaction may leave the executable out.
+                TransactionExecutableRef::Empty => return Err(DiscardReason::EmptyPayload),
+            }),
         };
         // TODO(security): these type arguments are user supplied, so interning
         // them can pollute the global caches. Needs a bound.
-        let interned_ty_args = executable
+        let interned_ty_args = payload
             .ty_args()
             .iter()
             .map(|tag| intern_type_tag(tag, guard))
@@ -130,6 +135,23 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 failure,
             }
         })?;
+        if let Payload::Multisig {
+            multisig_address,
+            provided_payload,
+        } = &payload
+        {
+            run_multisig_prologue(
+                &mut interp,
+                guard,
+                &txn_data,
+                *multisig_address,
+                provided_payload,
+            )
+            .map_err(|failure| DiscardReason::Failure {
+                stage: ExecutionStage::Prologue,
+                failure,
+            })?;
+        }
         // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
         checkpoint(&mut interp)?;
 
@@ -137,9 +159,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
         let payload_result = if self.unmetered {
-            interp.unmetered(|interp| self.execute_payload(interp, &txn_data, &executable, ty_args))
+            interp.unmetered(|interp| self.execute_payload(interp, &txn_data, &payload, ty_args))
         } else {
-            self.execute_payload(&mut interp, &txn_data, &executable, ty_args)
+            self.execute_payload(&mut interp, &txn_data, &payload, ty_args)
         };
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
@@ -220,12 +242,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         &self,
         interp: &mut InterpreterContext<'guard>,
         txn_data: &TxnMetadata,
-        executable: &Executable<'_>,
+        payload: &Payload<'_>,
         ty_args: InternedTypeList,
     ) -> Result<(), MoveExecutionFailure> {
         // TODO(completeness): multi-agent transactions are untested.
-        let status = match executable {
-            Executable::EntryFunction(entry) => call_entry_function(
+        let status = match payload {
+            Payload::Direct(Executable::EntryFunction(entry)) => call_entry_function(
                 self.guard,
                 interp,
                 &entry.module().address,
@@ -236,7 +258,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 &txn_data.secondary_signers,
                 entry.args(),
             )?,
-            Executable::Script(script) => run_script(
+            Payload::Direct(Executable::Script(script)) => run_script(
                 self.guard,
                 interp,
                 self.env.chain_id(),
@@ -247,29 +269,59 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 script.args(),
             )?,
             // Decryption failed upstream: nothing runs, the fee is still charged.
-            Executable::Encrypted => return Err(MoveExecutionFailure::UndecryptedPayload),
+            Payload::Direct(Executable::Encrypted) => {
+                return Err(MoveExecutionFailure::UndecryptedPayload)
+            },
+            Payload::Multisig {
+                multisig_address,
+                provided_payload,
+            } => {
+                return execute_multisig_payload(
+                    self.guard,
+                    interp,
+                    self.env.chain_id(),
+                    txn_data,
+                    *multisig_address,
+                    provided_payload,
+                )
+            },
         };
 
         call_result(status)
     }
 }
 
-/// The payloads this executor runs.
+/// What a user transaction runs.
+enum Payload<'a> {
+    /// An executable run as the sender.
+    Direct(Executable<'a>),
+    /// The multisig account's next transaction, run as the account.
+    /// `provided_payload` is what the framework checks against the stored
+    /// transaction.
+    Multisig {
+        multisig_address: AccountAddress,
+        provided_payload: Vec<u8>,
+    },
+}
+
+impl Payload<'_> {
+    /// The type arguments known before the payload runs. A multisig payload's
+    /// are interned once the payload to run is known.
+    fn ty_args(&self) -> &[TypeTag] {
+        match self {
+            Payload::Direct(Executable::EntryFunction(entry)) => entry.ty_args(),
+            Payload::Direct(Executable::Script(script)) => script.ty_args(),
+            Payload::Direct(Executable::Encrypted) | Payload::Multisig { .. } => &[],
+        }
+    }
+}
+
+/// The payloads run directly as the sender.
 enum Executable<'a> {
     EntryFunction(&'a EntryFunction),
     Script(&'a Script),
     /// An encrypted payload that was not decrypted, so there is nothing to run.
     Encrypted,
-}
-
-impl Executable<'_> {
-    fn ty_args(&self) -> &[TypeTag] {
-        match self {
-            Executable::EntryFunction(entry) => entry.ty_args(),
-            Executable::Script(script) => script.ty_args(),
-            Executable::Encrypted => &[],
-        }
-    }
 }
 
 /// The native extensions a user transaction runs with.

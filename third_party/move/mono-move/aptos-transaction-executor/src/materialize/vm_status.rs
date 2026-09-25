@@ -8,7 +8,10 @@ use crate::errors::{
     MoveExecutionFailure, PreExecutionCheckFailure, ScriptRejection,
 };
 use aptos_types::{
-    error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
+    error::{
+        split_canonical, INVALID_ARGUMENT, INVALID_STATE, NOT_FOUND, OUT_OF_RANGE,
+        PERMISSION_DENIED,
+    },
     transaction::validation::{
         EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID,
         ECANT_PAY_GAS_DEPOSIT, EGAS_PAYER_ACCOUNT_MISSING,
@@ -36,6 +39,26 @@ static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
         ident_str!("transaction_validation").to_owned(),
     ))
 });
+
+/// Where a multisig transaction is checked against its account.
+static ABORT_LOC_MULTISIG_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
+    AbortLocation::Module(ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("multisig_account").to_owned(),
+    ))
+});
+
+// The reasons `0x1::multisig_account` aborts with in the prologue. Must match
+// the Move constants in that module.
+//
+// TODO(cleanup): share these with AptosVM through
+// `aptos_types::transaction::validation`.
+const EACCOUNT_NOT_MULTISIG: u64 = 2002;
+const ENOT_MULTISIG_OWNER: u64 = 2003;
+const EMULTISIG_TRANSACTION_NOT_FOUND: u64 = 2006;
+const EMULTISIG_PAYLOAD_DOES_NOT_MATCH_HASH: u64 = 2008;
+const EMULTISIG_NOT_ENOUGH_APPROVALS: u64 = 2009;
+const EPAYLOAD_DOES_NOT_MATCH: u64 = 2010;
 
 /// Converts a type-erased VM error into `VMStatus`.
 ///
@@ -236,6 +259,11 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
                 Some("the encrypted payload was not decrypted".to_string()),
             )
         },
+        MoveExecutionFailure::UndecodableMultisigPayload
+            if matches!(stage, ExecutionStage::Payload) =>
+        {
+            VMStatus::error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
+        },
         MoveExecutionFailure::RuntimeError(err) if matches!(stage, ExecutionStage::Payload) => {
             internal_error_to_status(err)
         },
@@ -263,9 +291,9 @@ fn unsupported_status(msg: &str) -> VMStatus {
 /// Mirrors V1's `convert_prologue_error`: recognized validation aborts map to
 /// their discard codes.
 //
-// TODO(completeness): V1 also recognizes aborts from `transaction_limits` and
-// the multisig account module. Neither is reachable here yet, so they land in
-// the unexpected-abort branch below.
+// TODO(completeness): V1 also recognizes aborts from `transaction_limits`,
+// which is not reachable here yet, so they land in the unexpected-abort branch
+// below.
 fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
     let (code, message, location) = match failure {
         MoveExecutionFailure::Abort {
@@ -279,10 +307,14 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
         // The prologue never touches the payload.
         failure @ (MoveExecutionFailure::InvalidArguments(_)
         | MoveExecutionFailure::RejectedScript(_)
-        | MoveExecutionFailure::UndecryptedPayload) => {
+        | MoveExecutionFailure::UndecryptedPayload
+        | MoveExecutionFailure::UndecodableMultisigPayload) => {
             return unexpected_validation_error("prologue", format!("{failure:?}"))
         },
     };
+    if location == *ABORT_LOC_MULTISIG_MODULE {
+        return multisig_abort_to_status(code, message, location);
+    }
     if location != *ABORT_LOC_VALIDATION_MODULE {
         return unexpected_prologue_abort(code, message, location);
     }
@@ -308,6 +340,30 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
             StatusCode::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE
         },
         (INVALID_ARGUMENT, ENONCE_ALREADY_USED) => StatusCode::NONCE_ALREADY_USED,
+        _ => return unexpected_prologue_abort(code, message, location),
+    };
+    VMStatus::error(new_major_status, None)
+}
+
+/// Converts a rejected multisig transaction into its discard code.
+fn multisig_abort_to_status(
+    code: u64,
+    message: Option<String>,
+    location: AbortLocation,
+) -> VMStatus {
+    let new_major_status = match split_canonical(code) {
+        (INVALID_STATE, EACCOUNT_NOT_MULTISIG) => StatusCode::ACCOUNT_NOT_MULTISIG,
+        (PERMISSION_DENIED, ENOT_MULTISIG_OWNER) => StatusCode::NOT_MULTISIG_OWNER,
+        (NOT_FOUND, EMULTISIG_TRANSACTION_NOT_FOUND) => StatusCode::MULTISIG_TRANSACTION_NOT_FOUND,
+        (INVALID_ARGUMENT, EMULTISIG_NOT_ENOUGH_APPROVALS) => {
+            StatusCode::MULTISIG_TRANSACTION_INSUFFICIENT_APPROVALS
+        },
+        (INVALID_ARGUMENT, EMULTISIG_PAYLOAD_DOES_NOT_MATCH_HASH) => {
+            StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH_HASH
+        },
+        (INVALID_ARGUMENT, EPAYLOAD_DOES_NOT_MATCH) => {
+            StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH
+        },
         _ => return unexpected_prologue_abort(code, message, location),
     };
     VMStatus::error(new_major_status, None)

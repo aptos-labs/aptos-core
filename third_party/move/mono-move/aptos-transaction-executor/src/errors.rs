@@ -169,6 +169,8 @@ pub enum MoveExecutionFailure {
     RejectedScript(ScriptRejection),
     /// The payload is still encrypted: decryption failed before execution.
     UndecryptedPayload,
+    /// The multisig transaction's payload could not be decoded.
+    UndecodableMultisigPayload,
     /// Execution failed with a VM error.
     RuntimeError(VMInternalError),
 }
