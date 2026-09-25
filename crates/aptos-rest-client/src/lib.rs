@@ -777,7 +777,8 @@ impl Client {
                     return Err(anyhow!(
                         "Transaction committed on chain, but failed execution: {}",
                         vm_status
-                    ))?;
+                    )
+                    .into());
                 },
                 Ok(WaitForTransactionResult::Pending(state)) => {
                     reached_mempool = true;

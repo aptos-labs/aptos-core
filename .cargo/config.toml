@@ -24,7 +24,6 @@ xclippy = [
   "-Aclippy::chunks_exact_to_as_chunks",
   "-Aclippy::explicit_counter_loop",
   "-Aclippy::manual_checked_ops",
-  "-Aclippy::needless_return_with_question_mark",
   "-Aclippy::question_mark",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
