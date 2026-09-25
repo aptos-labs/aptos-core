@@ -53,9 +53,11 @@ runs:
     - name: Setup git credentials
       if: inputs.GIT_CREDENTIALS != ''
       shell: bash
+      env:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
       run: |
         git config --global credential.helper store
-        echo "${{ inputs.GIT_CREDENTIALS }}" > ~/.git-credentials
+        echo "$GIT_CREDENTIALS" > ~/.git-credentials
 
     # Display the rust toolchain version being installed
     - name: Setup rust toolchain

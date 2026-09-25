@@ -40,7 +40,11 @@ runs:
     # pass the image tag.
     - name: Run integration tests
       if: ${{ inputs.NETWORK == 'custom' }}
-      run: poetry run python main.py --tag ${{ inputs.IMAGE_TAG }} --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      env:
+        IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+        NETWORK: ${{ inputs.NETWORK }}
+        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      run: poetry run python main.py --tag "$IMAGE_TAG" --base-network "$NETWORK" --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project "$GCP_DOCKER_ARTIFACT_REPO"
       working-directory: crates/aptos-faucet/integration-tests
       shell: bash
 
@@ -50,12 +54,17 @@ runs:
     # we don't pass the image tag.
     - name: Run integration tests
       if: ${{ inputs.NETWORK != 'custom' }}
-      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      env:
+        NETWORK: ${{ inputs.NETWORK }}
+        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      run: poetry run python main.py --base-network "$NETWORK" --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project "$GCP_DOCKER_ARTIFACT_REPO"
       working-directory: crates/aptos-faucet/integration-tests
       shell: bash
 
     # Print the logs from the local testnet if the tests failed.
     - name: Print local testnet logs if something failed
-      run: docker logs local-testnet-${{ inputs.NETWORK }}
+      env:
+        NETWORK: ${{ inputs.NETWORK }}
+      run: docker logs "local-testnet-$NETWORK"
       shell: bash
       if: ${{ failure() }}
