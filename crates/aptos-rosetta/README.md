@@ -45,7 +45,8 @@ Here are some exceptions:
 
 All transactions are parsed from the events provided by the AptosFramework.  There are a few exceptions to this that use the transaction payload, but only for errors.
 
-Block hash is `<chain_id>:<block_height>` and not actually a hash.
+Block hash is `<chain_id>-<block_height>` and not actually a hash. See
+`docs/SPEC_DEVIATIONS.md` §2.
 
 ### Constructing transactions
 

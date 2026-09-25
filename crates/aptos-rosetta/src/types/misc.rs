@@ -5,6 +5,7 @@ use crate::{
     account::view,
     common::native_coin,
     error::ApiError,
+    node_client::{self, NodeClient},
     types::{AccountIdentifier, Amount, STAKING_CONTRACT_MODULE},
     AccountAddress, ApiResult,
 };
@@ -160,6 +161,8 @@ impl OperationType {
             InitializeStakePool,
             ResetLockup,
             UnlockStake,
+            // BC-6: previously omitted, so update_commission was never advertised.
+            UpdateCommission,
             WithdrawUndelegatedFunds,
             DistributeStakingRewards,
             AddDelegatedStake,
@@ -286,7 +289,7 @@ impl Display for OperationStatusType {
 
 /// Retrieves stake balances for an owner with the associated pool
 pub async fn get_stake_balances(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &dyn NodeClient,
     owner_account: &AccountIdentifier,
     pool_address: AccountAddress,
     version: u64,
@@ -294,9 +297,13 @@ pub async fn get_stake_balances(
     const STAKE_POOL: &str = "0x1::stake::StakePool";
 
     // Retreive the pool resource
-    if let Ok(response) = rest_client
-        .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
-        .await
+    if let Ok(response) = node_client::get_account_resource_at_version_bcs::<StakePool>(
+        rest_client,
+        pool_address,
+        STAKE_POOL,
+        version,
+    )
+    .await
     {
         let stake_pool = response.into_inner();
 
@@ -322,7 +329,7 @@ pub async fn get_stake_balances(
         let owner_address = owner_account.account_address()?;
         let operator_address = stake_pool.operator_address;
 
-        let staking_contract_amounts_response = view::<Vec<u64>>(
+        let staking_contract_amounts_response = view(
             rest_client,
             version,
             AccountAddress::ONE,
@@ -353,7 +360,7 @@ pub async fn get_stake_balances(
             requested_balance = Some(stake_pool.inactive.to_string());
         } else if owner_account.is_pending_inactive_stake() {
             // BCS view endpoint wraps all return values in a vector (ULEB128 length + concatenated BCS).
-            let pending_distribution = view::<Vec<u64>>(
+            let pending_distribution = view(
                 rest_client,
                 version,
                 AccountAddress::ONE,
@@ -397,7 +404,7 @@ pub async fn get_stake_balances(
 
 /// Retrieve delegation stake balances for a given owner, pool, and version
 pub async fn get_delegation_stake_balances(
-    rest_client: &aptos_rest_client::Client,
+    rest_client: &dyn NodeClient,
     account_identifier: &AccountIdentifier,
     owner_address: AccountAddress,
     pool_address: AccountAddress,
@@ -405,7 +412,7 @@ pub async fn get_delegation_stake_balances(
 ) -> ApiResult<Option<BalanceResult>> {
     // get requested_balance
     let balances_response = rest_client
-        .view(
+        .view_json(
             &ViewRequest {
                 function: DELEGATION_POOL_GET_STAKE_FUNCTION.clone(),
                 type_arguments: vec![],
@@ -423,7 +430,7 @@ pub async fn get_delegation_stake_balances(
 
     // get lockup_secs
     let lockup_secs_response = rest_client
-        .view(
+        .view_json(
             &ViewRequest {
                 function: STAKE_GET_LOCKUP_SECS_FUNCTION.clone(),
                 type_arguments: vec![],
