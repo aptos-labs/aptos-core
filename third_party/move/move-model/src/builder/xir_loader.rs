@@ -36,6 +36,10 @@ pub struct XirStructData {
     pub fields: Vec<FieldData>,
     pub variants: Option<Vec<XirVariantData>>,
     pub visibility: Visibility,
+    /// Source attributes such as `#[event]`. Carried like a function's,
+    /// because consumers classify a struct by them — the framework's
+    /// `extended_checks` derives its module metadata from these.
+    pub attributes: Vec<Attribute>,
 }
 
 pub struct XirVariantData {
@@ -110,6 +114,7 @@ impl GlobalEnv {
                             variants,
                             false,
                             decl.visibility,
+                            decl.attributes,
                         ),
                     )
                     .is_none(),

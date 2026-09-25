@@ -84,8 +84,20 @@ pub const XIR_SCHEMA: &str = "move-xir-module";
 /// Current version of the deployable XIR module wrapper. Version 3 adds the
 /// `is_native` function flag and permits bodyless native declarations;
 /// version 4 transports source spans for declarations and stackless code;
-/// version 5 adds user-facing local names.
-pub const XIR_VERSION: u64 = 6;
+/// version 5 adds user-facing local names; version 6 adds cross-module type
+/// references and the enum reference operations; version 7 adds the remaining
+/// comparisons (`gt`, `ge`, `neq`) and `negate`, which the Move front end
+/// emits and which no combination of the existing operations reproduces
+/// without changing the bytecode described.
+///
+/// The Lean toolchain's decoder accepts versions 3 to 6 and checks the version
+/// before reading any of the body (`Frontend/XIR/Json.lean`), so it refuses
+/// every document this exporter produces — not only those using the new
+/// operations. Nothing is invalidated by that today: Lean encodes version 6 and
+/// decodes what it encodes, and no pipeline feeds a Move-exported document to
+/// it. Consuming one there needs the version accepted and the operations added
+/// to `MoveModel/IR/Syntax.lean` with their typing rules.
+pub const XIR_VERSION: u64 = 7;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -192,11 +204,10 @@ impl XirModule {
         if self.schema != XIR_SCHEMA {
             return Err(format!("unsupported XIR schema `{}`", self.schema));
         }
-        if self.version != 3
-            && self.version != 4
-            && self.version != 5
-            && self.version != XIR_VERSION
-        {
+        // A range rather than a list ending in `XIR_VERSION`: written as a
+        // list, bumping the constant drops the version that was current a
+        // moment earlier, which is how version 6 stopped loading.
+        if !(3..=XIR_VERSION).contains(&self.version) {
             return Err(format!("unsupported XIR version {}", self.version));
         }
         Ok(())
@@ -606,10 +617,17 @@ pub enum Instr {
 
 /// The operation of a [`Instr::Call`].
 ///
-/// There are deliberately no `gt`/`ge`/`neq` operations: producers
-/// normalize `gt`/`ge` to [`Oper::Lt`]/[`Oper::Le`] with swapped operands
-/// and lower `neq` to [`Oper::Eq`] followed by [`Oper::Not`] through a
-/// fresh local.
+/// Until version 7 there were no `gt`/`ge`/`neq`: a producer normalized
+/// `gt`/`ge` to [`Oper::Lt`]/[`Oper::Le`] with swapped operands and lowered
+/// `neq` to [`Oper::Eq`] followed by [`Oper::Not`]. That is lossy for a
+/// producer describing compiled Move, where `gt` and `lt` are different
+/// instructions, so version 7 carries all of them.
+///
+/// A width-annotated operation states the numeric type of its operands and
+/// result. The stackless form and the file format carry no such type — `Div`
+/// is one opcode for every width — so the annotation is *only* meaningful if
+/// a consumer checks it against the operands' declared types. `crate::xir`
+/// does; a consumer that does not will silently read a different program.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Oper {
@@ -642,9 +660,20 @@ pub enum Oper {
     Lt,
     Le,
     Eq,
+    /// `"gt"`, `"ge"`, `"neq"` — the remaining comparisons. Like `lt` and
+    /// `le` they carry no width: the operands' own types decide the ordering.
+    ///
+    /// They are kept as operations rather than rewritten into the existing
+    /// ones because `gt(a, b)` and `lt(b, a)` are different Move instructions,
+    /// so a producer that normalised would change the bytecode it describes.
+    Gt,
+    Ge,
+    Neq,
     And,
     Or,
     Not,
+    /// `{"negate": width}` — arithmetic negation, for the signed widths.
+    Negate(IntType),
     /// `"pack"` — build a struct value from field operands.
     Pack,
     /// `{\"pack_inst\": [type arguments]}`.
@@ -813,9 +842,14 @@ pub enum SpecExp {
 }
 
 /// A binary operation of a [`SpecExp::Binop`].  Arithmetic is over
-/// unbounded integers.  As with [`Oper`], there are no `gt`/`ge`/`neq`;
-/// producers normalize them by constructing through [`SpecExp::gt`],
-/// [`SpecExp::ge`], and [`SpecExp::neq`].
+/// unbounded integers.  There are no `gt`/`ge`/`neq`; producers normalize
+/// them by constructing through [`SpecExp::gt`], [`SpecExp::ge`], and
+/// [`SpecExp::neq`].
+///
+/// Unlike [`Oper`], which carries all six comparisons from version 7, this
+/// stays normalized: a spec expression denotes a proposition, so `a > b` and
+/// `b < a` are the same claim. An instruction is not a claim but a choice of
+/// opcode, and there the two differ.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SpecBinOp {
@@ -1234,6 +1268,38 @@ mod tests {
         // The rendering is still valid JSON denoting the same module.
         let back: Module = serde_json::from_str(&pretty).unwrap();
         assert_eq!(full_module(), back);
+    }
+
+    /// Every version the reader has ever accepted must keep loading.
+    ///
+    /// The test spells the versions out instead of deriving them from
+    /// [`XIR_VERSION`]: the accepted set used to be written as "3, 4, 5, or
+    /// the current one", so bumping the constant silently dropped the version
+    /// it had just stopped being. A list that moves with the constant cannot
+    /// catch that.
+    #[test]
+    fn every_released_xir_version_still_loads() {
+        for version in [3, 4, 5, 6, 7] {
+            let module = XirModule {
+                schema: XIR_SCHEMA.to_owned(),
+                version,
+                module: XirModuleMetadata {
+                    address: "0x42".to_owned(),
+                    name: "m".to_owned(),
+                    dialect: XirDialect::Stackless,
+                },
+                structs: vec![],
+                functions: vec![],
+                external_functions: vec![],
+                external_structs: vec![],
+            };
+            assert_eq!(
+                module.check_version(),
+                Ok(()),
+                "version {version} must still load"
+            );
+        }
+        assert_eq!(XIR_VERSION, 7, "extend the list above when this changes");
     }
 
     #[test]
