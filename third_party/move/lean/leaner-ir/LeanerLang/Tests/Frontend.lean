@@ -582,6 +582,8 @@ leaner module 0x42::nested_computed_index where
   pragma verify = false
   fun read_nested(values : &Vector<Vector<u64> >, i : u64, j : u64) -> u64 :=
     values[i][j + 1]
+  fun borrow_nested(values : &mut Vector<Vector<u64> >, i : u64, j : u64) -> &mut u64 :=
+    &mut values[i][j + 1]
 
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
@@ -1135,8 +1137,14 @@ elab "#guard_leaner_frontend" : command => do
   match LeanerLang.Print.render env nestedComputed with
   | .error error => throwError "the nested computed-index fixture did not render: {error}"
   | .ok printed =>
-      unless printed.contains "values[i][j + 1]" && !printed.contains "checkVectorIndex" do
-        throwError "nested indexing at a computed index lost its sugar:\n{printed}"
+      -- The borrow is the load-bearing case: a value read lowers through the
+      -- `index` primitive and emits no check at all, so it cannot catch a
+      -- check that goes missing. The place form emits one check per index
+      -- level, and eliding is all-or-nothing, so a check that is elided into
+      -- a place that keeps its unsugared spelling is dropped outright.
+      unless printed.contains "&mut values[i][j + 1]" &&
+          !printed.contains "checkVectorIndex" && !printed.contains "borrowPlace" do
+        throwError "a nested place at a computed index lost a bounds check:\n{printed}"
       match LeanerLang.Print.formatSource env printed with
       | .error error =>
           throwError "the nested computed-index fixture did not re-import: {error}"

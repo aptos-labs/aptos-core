@@ -1329,21 +1329,22 @@ private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
   | .operation _ _ arguments _ => actingPrefix context arguments
   | .letDecl pattern (some value) body =>
       let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
-      -- A `checkVectorIndex` binding is passed by no arm here. Crossing one is
-      -- never sound for an earlier check: both can abort, so whichever runs
-      -- first decides the error, and eliding the earlier one moves it after
-      -- this one. A nested `v[i][j]` is still reached, through this check's
-      -- own operands rather than past it.
-      --
-      -- An index temporary is passed, but only when its value cannot act: the
-      -- traversal runs for whichever check the caller tracks, which may be an
-      -- earlier one of another vector, and the lowering orders a computed
-      -- index against the check that tests it alone.
-      let precedesAccess : Bool := match patternKind with
-        | some (.variable slot) =>
+      -- Both arms here cross a binding that an earlier check's access may lie
+      -- beyond, which reorders that check against what the binding does. That
+      -- is a real defect, reported twice on this pull request, but narrowing
+      -- the arms is not a fix on its own: eliding is all-or-nothing per place
+      -- (`placeIndexesElided`), so when one of a nested place's checks stops
+      -- being elided the others are elided into a place that never gets the
+      -- sugar to carry them, and those checks are dropped outright. Losing a
+      -- check is worse than reordering two aborts, so the arms stay until the
+      -- elision decision is made per place rather than per check.
+      let valueKind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+      let precedesAccess : Bool := match patternKind, valueKind with
+        | some .wildcard, some (.operation (.primitive (.checkVectorIndex _)) _ _ _) => true
+        | some (.variable slot), _ =>
             (context.locals[slot.index]?).any (·.name.startsWith "$t") &&
-              bindsCheckedIndex context slot body && inertOperand context value
-        | _ => false
+              bindsCheckedIndex context slot body
+        | _, _ => false
       if precedesAccess then #[value, body] else #[value]
   | .letDecl _ none body => #[body]
   | .assign _ value => #[value]
