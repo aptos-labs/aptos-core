@@ -412,6 +412,28 @@ impl Payload {
         Ok(())
     }
 
+    /// Bounds the total number of batch entries a single payload may carry
+    fn verify_num_batch_entries(
+        num_proofs: usize,
+        num_inline_batches: usize,
+        num_opt_batches: usize,
+        max_num_batch_entries: u64,
+    ) -> anyhow::Result<()> {
+        let num_entries = (num_proofs as u64)
+            .saturating_add(num_inline_batches as u64)
+            .saturating_add(num_opt_batches as u64);
+        ensure!(
+            num_entries <= max_num_batch_entries,
+            "Payload batch entry count {} exceeds limit {} (proofs: {}, inline: {}, opt: {})",
+            num_entries,
+            max_num_batch_entries,
+            num_proofs,
+            num_inline_batches,
+            num_opt_batches,
+        );
+        Ok(())
+    }
+
     pub fn verify(
         &self,
         verifier: &ValidatorVerifier,
@@ -420,11 +442,19 @@ impl Payload {
         opt_qs_v2_rx_enabled: bool,
         max_batch_txns: u64,
         max_batch_bytes: u64,
+        max_num_batch_entries: u64,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::OptQuorumStore(OptQuorumStorePayload::V1(p))) => {
                 let proof_with_data = p.proof_with_data();
+                // Bound the batch entry count
+                Self::verify_num_batch_entries(
+                    proof_with_data.batch_summary.len(),
+                    p.inline_batches().len(),
+                    p.opt_batches().batch_summary.len(),
+                    max_num_batch_entries,
+                )?;
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
                 for proof in &proof_with_data.batch_summary {
                     verify_batch_info_limits(proof.info(), max_batch_txns, max_batch_bytes)?;
@@ -450,6 +480,13 @@ impl Payload {
                     "OptQuorumStorePayload::V2 cannot be accepted yet"
                 );
                 let proof_with_data = p.proof_with_data();
+                // Bound the batch entry count
+                Self::verify_num_batch_entries(
+                    proof_with_data.batch_summary.len(),
+                    p.inline_batches().len(),
+                    p.opt_batches().batch_summary.len(),
+                    max_num_batch_entries,
+                )?;
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
                 for proof in &proof_with_data.batch_summary {
                     verify_batch_info_limits(proof.info(), max_batch_txns, max_batch_bytes)?;
@@ -668,7 +705,8 @@ mod tests {
     use super::*;
     use crate::{
         payload::{
-            BatchPointer, InlineBatches, OptBatches, OptQuorumStorePayload, PayloadExecutionLimit,
+            BatchPointer, InlineBatch, InlineBatches, OptBatches, OptQuorumStorePayload,
+            PayloadExecutionLimit,
         },
         proof_of_store::{BatchInfo, ProofCache},
     };
@@ -685,6 +723,7 @@ mod tests {
 
     const MAX_BATCH_TXNS: u64 = 100;
     const MAX_BATCH_BYTES: u64 = 1024 * 1024;
+    const MAX_NUM_BATCH_ENTRIES: u64 = 1000;
 
     fn make_batch_info(author: PeerId, num_txns: u64, num_bytes: u64) -> BatchInfo {
         BatchInfo::new(
@@ -798,6 +837,122 @@ mod tests {
                 .unwrap_err();
         // Should fail on batch limit, not author
         assert!(err.to_string().contains("Batch txn count"));
+    }
+
+    #[test]
+    fn test_payload_verify_rejects_excessive_opt_batch_entries() {
+        // Create test validators and a proof cache
+        let (_signers, validators) = random_validator_verifier(1, None, false);
+        let proof_cache = ProofCache::new(16);
+        let author = validators.get_ordered_account_addresses()[0];
+
+        // Create a payload with more than the max allowed number of batch entries
+        let batches: Vec<BatchInfo> = (0..MAX_NUM_BATCH_ENTRIES + 1)
+            .map(|_| make_batch_info(author, 1, 100))
+            .collect();
+        let empty_inline: InlineBatches<BatchInfo> = Vec::<InlineBatch<BatchInfo>>::new().into();
+        let payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            empty_inline,
+            BatchPointer::new(batches),
+            BatchPointer::new(vec![]),
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify that the payload is rejected due to excessive batch entries
+        let error = payload
+            .verify(
+                &validators,
+                &proof_cache,
+                true,
+                true,
+                MAX_BATCH_TXNS,
+                MAX_BATCH_BYTES,
+                MAX_NUM_BATCH_ENTRIES,
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("Payload batch entry count"));
+
+        // Create a payload with exactly the max allowed number of batch entries
+        let batches: Vec<BatchInfo> = (0..MAX_NUM_BATCH_ENTRIES)
+            .map(|_| make_batch_info(author, 1, 100))
+            .collect();
+        let empty_inline: InlineBatches<BatchInfo> = Vec::<InlineBatch<BatchInfo>>::new().into();
+        let payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            empty_inline,
+            BatchPointer::new(batches),
+            BatchPointer::new(vec![]),
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify that the payload is accepted when the number of batch entries is within the limit
+        assert!(payload
+            .verify(
+                &validators,
+                &proof_cache,
+                true,
+                true,
+                MAX_BATCH_TXNS,
+                MAX_BATCH_BYTES,
+                MAX_NUM_BATCH_ENTRIES,
+            )
+            .is_ok());
+    }
+
+    #[test]
+    fn test_payload_verify_entry_limit_is_summed_across_buckets() {
+        // Create test validators and a proof cache
+        let (_signers, validators) = random_validator_verifier(1, None, false);
+        let proof_cache = ProofCache::new(16);
+        let author = validators.get_ordered_account_addresses()[0];
+
+        // Create a payload with a combination of inline and opt batches that is within the limit
+        let max_num_batches = 4;
+        let txns = vec![create_normal_signed_transaction()];
+        let inline_batch = make_batch_info_with_txns(author, &txns);
+        let inline_batches: InlineBatches<BatchInfo> = vec![(inline_batch, txns)].into();
+        let opt_batches: Vec<BatchInfo> = (0..3).map(|_| make_batch_info(author, 1, 100)).collect();
+        let payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            inline_batches.clone(),
+            BatchPointer::new(opt_batches),
+            BatchPointer::new(vec![]),
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify that the payload is accepted (total number of entries is 4)
+        assert!(payload
+            .verify(
+                &validators,
+                &proof_cache,
+                true,
+                true,
+                MAX_BATCH_TXNS,
+                MAX_BATCH_BYTES,
+                max_num_batches,
+            )
+            .is_ok());
+
+        // Create a payload with a combination of inline and opt batches that exceeds the limit
+        let opt_batches: Vec<BatchInfo> = (0..4).map(|_| make_batch_info(author, 1, 100)).collect();
+        let payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            inline_batches,
+            BatchPointer::new(opt_batches),
+            BatchPointer::new(vec![]),
+            PayloadExecutionLimit::None,
+        ));
+
+        // Verify that the payload is rejected (total number of entries is 5)
+        let error = payload
+            .verify(
+                &validators,
+                &proof_cache,
+                true,
+                true,
+                MAX_BATCH_TXNS,
+                MAX_BATCH_BYTES,
+                max_num_batches,
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("Payload batch entry count"));
     }
 
     #[test]
@@ -988,6 +1143,7 @@ mod tests {
                 true, // opt_qs_v2_rx_enabled
                 MAX_BATCH_TXNS,
                 MAX_BATCH_BYTES,
+                MAX_NUM_BATCH_ENTRIES,
             )
             .unwrap_err();
         assert!(
