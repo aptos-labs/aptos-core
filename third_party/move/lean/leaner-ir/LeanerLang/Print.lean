@@ -1296,6 +1296,30 @@ private def actingPrefix (context : Context) (operands : Array ExprId) : Array E
   | some index => operands.extract 0 (index + 1)
   | none => operands
 
+/-- Whether the binding of `slot` holds the index that a `checkVectorIndex`
+at the head of its body tests. Both the validated body and the re-import
+evaluate that index before the check -- a failure computing it must precede
+the bounds failure -- so what follows such a binding is still reached with
+nothing else run in between. A binding is not that merely by being named
+like a temporary: validation reserves no local name. -/
+private def bindsCheckedIndex (context : Context) (slot : LocalId) (body : ExprId) : Bool :=
+  let bodyKind : Option ExprKind := (context.ns.expressions[body.index]?).map (·.kind)
+  match bodyKind with
+  | some (.letDecl pattern (some check) _) =>
+      let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
+      let checkKind : Option ExprKind := (context.ns.expressions[check.index]?).map (·.kind)
+      let wildcard : Bool := match patternKind with
+        | some .wildcard => true
+        | _ => false
+      wildcard && (match checkKind with
+        | some (.operation (.primitive (.checkVectorIndex _)) _ #[_, index] _) =>
+            let indexKind : Option ExprKind := (context.ns.expressions[index.index]?).map (·.kind)
+            (match indexKind with
+              | some (.localVar read) => read == slot
+              | _ => false)
+        | _ => false)
+  | _ => false
+
 /-- The children an expression evaluates first and unconditionally: its
 leading operands, a binding's value, a condition, a scrutinee, a block's
 first statement. A branch, a loop body, an operand behind one that acts, and
@@ -1309,7 +1333,8 @@ private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
       let precedesAccess : Bool := match patternKind, valueKind with
         | some .wildcard, some (.operation (.primitive (.checkVectorIndex _)) _ _ _) => true
         | some (.variable slot), _ =>
-            (context.locals[slot.index]?).any (·.name.startsWith "$t")
+            (context.locals[slot.index]?).any (·.name.startsWith "$t") &&
+              bindsCheckedIndex context slot body
         | _, _ => false
       if precedesAccess then #[value, body] else #[value]
   | .letDecl _ none body => #[body]
