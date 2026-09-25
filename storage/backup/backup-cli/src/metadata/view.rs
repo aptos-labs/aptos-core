@@ -198,6 +198,7 @@ impl MetadataView {
     /// Compact the epoch ending metdata files and merge compaction_cnt files into 1 metadata file
     /// The generated chunks should be sorted based on version
     pub fn compact_backups<T>(backups: &[T], compaction_cnt: usize) -> Result<Vec<&[T]>> {
+        ensure!(compaction_cnt > 0, "Compaction factor must be positive.");
         // Initialize an empty vector to store the output
         let mut output_vec = Vec::new();
 
@@ -295,5 +296,18 @@ impl FromStr for BackupStorageState {
             latest_state_snapshot_version: captures.get(3).parse_option_u64()?,
             latest_transaction_version: captures.get(4).parse_option_u64()?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MetadataView;
+
+    #[test]
+    fn test_compact_backups() {
+        let backups = [1, 2, 3, 4, 5];
+        let chunks = MetadataView::compact_backups(&backups, 2).unwrap();
+        assert_eq!(chunks, vec![&[1, 2][..], &[3, 4][..], &[5][..]]);
+        assert!(MetadataView::compact_backups(&backups, 0).is_err());
     }
 }

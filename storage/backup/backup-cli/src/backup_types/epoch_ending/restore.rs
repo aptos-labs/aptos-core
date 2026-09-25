@@ -113,8 +113,8 @@ impl EpochEndingRestoreController {
                 ensure!(
                     li.ledger_info().epoch() == next_epoch,
                     "LedgerInfo epoch not expected. Expected: {}, actual: {}.",
-                    li.ledger_info().epoch(),
                     next_epoch,
+                    li.ledger_info().epoch(),
                 );
                 let wp_manifest = waypoint_iter.next().ok_or_else(|| {
                     anyhow!("More LedgerInfo's found than waypoints in manifest.")
@@ -210,10 +210,9 @@ impl PreheatedEpochEndingRestore {
             .preheat_result
             .map_err(|e| anyhow!("Preheat failed: {}", e))?;
 
-        let first_li = preheat_data
-            .ledger_infos
-            .first()
-            .expect("Epoch ending backup can't be empty.");
+        let first_li = preheat_data.ledger_infos.first().ok_or_else(|| {
+            anyhow!("Epoch ending backup can't be empty. Is the target version too small?")
+        })?;
 
         if let Some(li) = previous_epoch_ending_ledger_info {
             ensure!(
