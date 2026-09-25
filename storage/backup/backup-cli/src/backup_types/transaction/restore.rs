@@ -767,11 +767,10 @@ impl TransactionRestoreBatchController {
         let start = Instant::now();
         loaded_chunk_stream
             .try_fold(analysis, |mut analysis, chunk| async move {
-                let mut version = chunk.manifest.first_version;
                 let last_version = chunk.manifest.last_version;
 
-                for (txn, persisted_aux_info, txn_info, events, write_set) in
-                    itertools::multizip(chunk.unpack())
+                for (version, (txn, persisted_aux_info, txn_info, events, write_set)) in
+                    (chunk.manifest.first_version..).zip(itertools::multizip(chunk.unpack()))
                 {
                     if let Some(analysis) = &mut analysis {
                         analysis.add_transaction(
@@ -783,7 +782,6 @@ impl TransactionRestoreBatchController {
                             &write_set,
                         )?;
                     }
-                    version += 1;
                 }
 
                 VERIFY_TRANSACTION_VERSION.set(last_version as i64);
