@@ -417,6 +417,9 @@ pub enum RuntimeInvariantViolation {
     #[error("CallClosure: null captured_data for closure with captured params")]
     NullCapturedData,
 
+    #[error("CallClosure: unknown captured_data tag {tag}")]
+    InvalidCapturedDataTag { tag: u8 },
+
     #[error("CallClosure: provided_args[{provided_idx}].size {provided_size} != callee param_slots[{param_idx}].size {param_size}")]
     ClosureArgSizeMismatch {
         provided_idx: usize,

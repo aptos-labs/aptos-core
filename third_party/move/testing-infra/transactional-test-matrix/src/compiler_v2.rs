@@ -394,38 +394,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/no-v1-comparison/inlining_optimization/unlocked_caller_locked_helper.move",
         "no reentrancy checks",
     ),
-    // The six `signed-int` scripts: under `opt-extra`, inlining removes the
-    // called frame, so V1 prints no stack trace either.
-    MonoMoveDivergence::rendering(
-        "tests/signed-int/arithmetic_i128.move",
-        "no stack trace in exec_state",
-    )
-    .except(&["opt-extra"]),
-    MonoMoveDivergence::rendering(
-        "tests/signed-int/arithmetic_i16.move",
-        "no stack trace in exec_state",
-    )
-    .except(&["opt-extra"]),
-    MonoMoveDivergence::rendering(
-        "tests/signed-int/arithmetic_i256.move",
-        "no stack trace in exec_state",
-    )
-    .except(&["opt-extra"]),
-    MonoMoveDivergence::rendering(
-        "tests/signed-int/arithmetic_i32.move",
-        "no stack trace in exec_state",
-    )
-    .except(&["opt-extra"]),
-    MonoMoveDivergence::rendering(
-        "tests/signed-int/arithmetic_i64.move",
-        "no stack trace in exec_state",
-    )
-    .except(&["opt-extra"]),
-    MonoMoveDivergence::rendering(
-        "tests/signed-int/arithmetic_i8.move",
-        "no stack trace in exec_state",
-    )
-    .except(&["opt-extra"]),
 ];
 
 pub static COMPILER_V2: Corpus<CompilerV2Payload> = Corpus {

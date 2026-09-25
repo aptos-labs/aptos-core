@@ -39,6 +39,20 @@ pub enum ErrorLocation {
     Script,
 }
 
+/// A caller suspended at a call instruction, identified by its function and
+/// the call's original bytecode offset.
+///
+/// Stack traces list the most recent caller first and exclude the frame where
+/// execution stopped. Failures in the root frame or outside Move code have
+/// no caller frames.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallFrame {
+    /// [`None`] for a script frame.
+    pub module: Option<ModuleId>,
+    pub function: FunctionDefinitionIndex,
+    pub offset: BytecodeOffset,
+}
+
 pub struct VMInternalError(Box<ErrorData>);
 
 /// Boxed error data that keeps [`VMInternalError`] one word wide. Every VM
@@ -48,6 +62,8 @@ struct ErrorData {
     error: Box<dyn IntoExecutionError>,
     /// [`None`] for an error raised outside Move code.
     location: Option<ErrorLocation>,
+    /// The stack trace, empty until one is attached. See [`CallFrame`].
+    stack_trace: Vec<CallFrame>,
 }
 
 const _: () = assert!(std::mem::size_of::<VMInternalError>() == 8);
@@ -57,6 +73,7 @@ impl VMInternalError {
         VMInternalError(Box::new(ErrorData {
             error: Box::new(err),
             location: None,
+            stack_trace: Vec::new(),
         }))
     }
 
@@ -77,6 +94,17 @@ impl VMInternalError {
     /// Returns the attached location, or [`None`] if none was attached.
     pub fn location(&self) -> Option<&ErrorLocation> {
         self.0.location.as_ref()
+    }
+
+    /// Attaches `stack_trace`, replacing any previously attached trace.
+    pub fn with_stack_trace(mut self, stack_trace: Vec<CallFrame>) -> Self {
+        self.0.stack_trace = stack_trace;
+        self
+    }
+
+    /// The attached stack trace, empty if none was attached. See [`CallFrame`].
+    pub fn stack_trace(&self) -> &[CallFrame] {
+        &self.0.stack_trace
     }
 }
 

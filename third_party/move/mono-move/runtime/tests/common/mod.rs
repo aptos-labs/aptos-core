@@ -13,14 +13,15 @@ use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
 
 /// Runs `f` with a fresh [`InterpreterContext`] over an empty module provider
 /// and no natives, with `entry` verified. A fresh global context per call
-/// keeps cached module and interned state from leaking between tests.
+/// keeps cached module and interned state from leaking between tests. `f`
+/// receives `entry` at the context's lifetime, as `build_call` requires.
 // Not every test binary that includes `common` uses the helper.
 #[allow(dead_code)]
 pub fn with_test_interpreter<R>(
     entry: &Function,
     gas_budget: u64,
     extensions: NativeExtensions,
-    f: impl FnOnce(&mut InterpreterContext<'_>) -> R,
+    f: impl for<'guard> FnOnce(&mut InterpreterContext<'guard>, &'guard Function) -> R,
 ) -> R {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx
@@ -41,7 +42,7 @@ pub fn with_test_interpreter<R>(
         &natives,
     )
     .with_extensions(extensions);
-    f(&mut interp)
+    f(&mut interp, entry)
 }
 
 /// Builds an interned module id for hand-built test functions.

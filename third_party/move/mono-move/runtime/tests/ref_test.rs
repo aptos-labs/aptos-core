@@ -54,11 +54,15 @@ fn ref_self_copy() {
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
-    let result =
-        common::with_test_interpreter(&function, u64::MAX, NativeExtensions::new(), |ctx| {
-            ctx.build_call(&function).unwrap().run().unwrap();
+    let result = common::with_test_interpreter(
+        &function,
+        u64::MAX,
+        NativeExtensions::new(),
+        |ctx, entry| {
+            ctx.build_call(entry).unwrap().run().unwrap();
             ctx.root_result_u64_for_test()
-        });
+        },
+    );
 
     assert_eq!(
         result, 99,

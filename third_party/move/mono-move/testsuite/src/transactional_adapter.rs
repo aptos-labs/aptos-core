@@ -13,10 +13,13 @@ use crate::transactional_session::{
 };
 use anyhow::{bail, Result};
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
-use mono_move_core::{BytecodeOffset, FunctionDefinitionIndex, VMInternalError};
-use mono_move_output::v1_error::{describe, fallback_info, v1_location, V1Equivalent, V1Message};
+use mono_move_core::{BytecodeOffset, CallFrame, FunctionDefinitionIndex, VMInternalError};
+use mono_move_output::v1_error::{
+    describe, fallback_info, v1_execution_state, v1_location, v1_records_execution_state,
+    V1Equivalent, V1Message,
+};
 use move_binary_format::{
-    errors::{set_stable_test_display, ExecutionState, Location, PartialVMError, VMError},
+    errors::{set_stable_test_display, Location, PartialVMError, VMError},
     file_format::CompiledScript,
     CompiledModule,
 };
@@ -238,7 +241,8 @@ impl MonoVMTestAdapter<'_> {
                 message,
                 location,
                 offset,
-            }) => abort_error(code, message, location, offset, debugging),
+                stack_trace,
+            }) => abort_error(code, message, location, offset, &stack_trace, debugging),
             Err(RunError::Arguments(err)) => argument_error(err),
             Err(RunError::Vm(err)) => run_vm_error(&err, debugging),
             Err(
@@ -293,6 +297,7 @@ fn abort_error(
     message: Option<String>,
     location: AbortLocation,
     offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
+    stack_trace: &[CallFrame],
     debugging: bool,
 ) -> VMError {
     let mut error = PartialVMError::new(StatusCode::ABORTED).with_sub_status(code);
@@ -303,7 +308,7 @@ fn abort_error(
         error = error.at_code_offset(function, code_offset);
     }
     if debugging {
-        error = error.with_exec_state(ExecutionState::new(vec![]));
+        error = error.with_exec_state(v1_execution_state(stack_trace));
     }
     error.finish(match location {
         AbortLocation::Module(module) => Location::Module(module),
@@ -327,10 +332,9 @@ fn argument_error(err: ArgumentError) -> VMError {
         .finish(Location::Undefined)
 }
 
-/// Returns shared verifier errors unchanged. Other errors use the V1 mapping
-/// and attached location. With debugging enabled, mapped errors with instruction
-/// offsets include an empty execution state. MonoVM records no stack trace, so
-/// this matches V1's execution state for failures in the entry function.
+/// Maps errors to V1 format. Shared verifier errors are returned unchanged.
+/// Adds the caller stack trace when debugging is enabled, the error has an
+/// instruction offset, and [`v1_records_execution_state`] returns true.
 fn run_vm_error(err: &VMInternalError, debugging: bool) -> VMError {
     let info = match describe(err) {
         V1Equivalent::Verbatim(error) => return error,
@@ -349,8 +353,8 @@ fn run_vm_error(err: &VMInternalError, debugging: bool) -> VMError {
     let (location, offset) = v1_location(err.location());
     if let Some((function, code_offset)) = offset {
         error = error.at_code_offset(function, code_offset);
-        if debugging {
-            error = error.with_exec_state(ExecutionState::new(vec![]));
+        if debugging && v1_records_execution_state(err) {
+            error = error.with_exec_state(v1_execution_state(err.stack_trace()));
         }
     }
     error.finish(location)
