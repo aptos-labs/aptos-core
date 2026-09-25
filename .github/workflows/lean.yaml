@@ -55,6 +55,13 @@ jobs:
       - name: Build the standalone exchange frontend
         run: cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
 
+      - name: Install the Rust exporter's pinned toolchain
+        # The Lean suites build the exporter from several modules at once; a
+        # first use of its pinned nightly would install it from each build,
+        # and concurrent rustup installs of one toolchain collide.
+        working-directory: third_party/move/lean/leaner-rust/rust-exporter
+        run: cargo --version
+
       - name: Test LeanerIR
         working-directory: third_party/move/lean/leaner-ir
         run: |

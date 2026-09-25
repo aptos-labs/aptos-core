@@ -518,6 +518,14 @@ leaner module 0x42::module_invariants where
     invariant forall (address : Address),
       global<Debit>(address).value <= global<Credit>(address).value
 
+-- A bounds check on one vector followed by an unchecked element place of
+-- another is not the check index sugar implies; it stays spelled.
+leaner module 0x42::mismatched_index_check where
+  pragma verify = false
+  fun borrow_other(checked : &Vector<u64>, values : &mut Vector<u64>, index : u64) -> &mut u64 := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*checked, index)
+    core.borrowPlace(mut, values[index])
+
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
     value : u64
@@ -1007,6 +1015,18 @@ elab "#guard_leaner_frontend" : command => do
       | .error error => throwError "the Move 2 index-syntax fixture did not re-import: {error}"
       | .ok formatted => unless formatted == printed do
           throwError "Move 2 index syntax is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
+  let some mismatchedCheck := LeanerLang.registeredUnit? env `«0x42».mismatched_index_check
+    | throwError "the mismatched index-check fixture was not registered"
+  match LeanerLang.Print.render env mismatchedCheck with
+  | .error error => throwError "the mismatched index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*checked, index)" &&
+          printed.contains "core.borrowPlace(mut, values[index])" do
+        throwError "a bounds check on another vector was elided:\n{printed}"
+      match LeanerLang.Print.formatSource env printed with
+      | .error error => throwError "the mismatched index-check fixture did not re-import: {error}"
+      | .ok formatted => unless formatted == printed do
+          throwError "the mismatched index check is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
   let some surfaceRegressions := LeanerLang.registeredUnit? env `«0x42».surface_regressions
     | throwError "the surface-regression fixture was not registered"
   match LeanerLang.Print.render env surfaceRegressions with

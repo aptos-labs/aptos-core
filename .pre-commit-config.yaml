@@ -32,7 +32,7 @@ repos:
           - --comment-style
           - //
       - id: insert-license
-        files: ^(?=third_party/)(?!third_party/move/mono-move/).*\.rs$
+        files: ^(?=third_party/)(?!third_party/move/mono-move/)(?!third_party/move/lean/).*\.rs$
         args:
           - --license-filepath
           - devtools/assets/innovation_license_header.txt
@@ -40,3 +40,22 @@ repos:
           - devtools/assets/third_party_license_header.txt
           - --comment-style
           - //
+      # The Lean tree carries the Apache or the Innovation-Enabling header. The
+      # deprecated v0 packages and generated `.exp.lean` baselines are exempt.
+      - id: insert-license
+        files: ^third_party/move/lean/(?!v0/).*\.rs$
+        args:
+          - --license-filepath
+          - devtools/assets/apache_license_header.txt
+          - --license-filepath
+          - devtools/assets/innovation_license_header.txt
+          - --comment-style
+          - //
+      - id: insert-license
+        files: ^third_party/move/lean/(?!v0/).*(?<!\.exp)\.lean$
+        args:
+          - --license-filepath
+          - devtools/assets/apache_license_header.txt
+          - --license-filepath
+          - devtools/assets/innovation_license_header.txt
+          - --comment-style=--

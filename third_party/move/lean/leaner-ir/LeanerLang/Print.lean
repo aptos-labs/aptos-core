@@ -1229,13 +1229,80 @@ private def temporaryConstant? (context : Context) (pattern : PatternId)
       unless scalar || sequencing do return none
       pure (some (localId, ← localValueText context source))
 
-/-- The index a wildcard binding checks: `let _ := checkVectorIndex(v, i)`. -/
-private def indexCheck? (context : Context) (pattern : PatternId) (value : ExprId) :
-    Option ExprId := do
+/-- Whether two places name the same location. -/
+private partial def samePlace (context : Context) (fuel : Nat) (left right : PlaceId) : Bool :=
+  left == right || (match fuel, context.ns.places[left.index]?, context.ns.places[right.index]? with
+    | 0, _, _ => false
+    | _, some (.localVar a), some (.localVar b) => a == b
+    | fuel + 1, some (.deref a), some (.deref b) => samePlace context fuel a b
+    | fuel + 1, some (.field a owner field), some (.field b owner' field') =>
+        owner == owner' && field == field' && samePlace context fuel a b
+    | fuel + 1, some (.index a i), some (.index b j) => i == j && samePlace context fuel a b
+    | _, _, _ => false)
+
+/-- Whether an expression observes a place: reads it, or observes the place
+it projects from and projects the same way. -/
+private partial def observesPlace (context : Context) (fuel : Nat) (value : ExprId)
+    (place : PlaceId) : Bool :=
+  match fuel with
+  | 0 => false
+  | fuel + 1 =>
+    let kind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+    match kind, context.ns.places[place.index]? with
+    | some (.operation (.read read) _ _ _), _ => samePlace context fuel read place
+    | some (.localVar a), some (.localVar b) => a == b
+    | some (.operation (.reference .dereference) _ #[inner] _), some (.deref base) =>
+        observesPlace context fuel inner base
+    | some (.operation (.data (.select owner field)) _ #[inner] _), some (.field base owner' field') =>
+        owner == owner' &&
+          (context.ns.tables.names[field'.index]?).any (·.name == field) &&
+          observesPlace context fuel inner base
+    | some (.operation (.primitive .index) _ #[inner, i] _), some (.index base j) =>
+        i == j && observesPlace context fuel inner base
+    | _, _ => false
+
+/-- Whether an expression reads the element at `index` of the vector
+`collection` observes, as an index place rooted where `collection` looks or
+an element read of the same observation. -/
+private partial def indexesChecked (context : Context) (fuel : Nat) (collection index : ExprId)
+    (value : ExprId) : Bool :=
+  let placeChecked (place : PlaceId) : Bool :=
+    let rec along : Nat → PlaceId → Bool
+      | 0, _ => false
+      | fuel + 1, place => match context.ns.places[place.index]? with
+        | some (.index base i) =>
+            (i == index && observesPlace context fuel collection base) || along fuel base
+        | some (.deref base) | some (.field base ..) | some (.subslice base ..) => along fuel base
+        | _ => false
+    along (context.ns.places.size + 1) place
+  match fuel, context.ns.expressions[value.index]? with
+  | 0, _ | _, none => false
+  | fuel + 1, some expression =>
+    let direct := match expression.kind with
+      | .operation (.borrow _ place) _ _ _ | .operation (.read place) _ _ _ | .assign place _ =>
+          placeChecked place
+      | .operation (.primitive .index) _ #[inner, i] _ =>
+          let innerKind : Option ExprKind := (context.ns.expressions[inner.index]?).map (·.kind)
+          let collectionKind : Option ExprKind :=
+            (context.ns.expressions[collection.index]?).map (·.kind)
+          i == index && match innerKind, collectionKind with
+            | some (.operation (.read a) _ _ _), some (.operation (.read b) _ _ _) =>
+                samePlace context (context.ns.places.size + 1) a b
+            | some (.localVar a), some (.localVar b) => a == b
+            | _, _ => inner == collection
+      | _ => false
+    direct || (expressionChildren expression.kind).any (indexesChecked context fuel collection index)
+
+/-- A `checkVectorIndex` binding the surface implies: the continuation
+accesses the checked index of the checked vector through index sugar, whose
+re-import checks it again. -/
+private def indexCheck? (context : Context) (pattern : PatternId) (value : ExprId)
+    (body : ExprId) : Option ExprId := do
   let patternNode ← context.ns.patterns[pattern.index]?
   let .wildcard := patternNode.kind | none
   let valueNode ← context.ns.expressions[value.index]?
-  let .operation (.primitive (.checkVectorIndex _)) _ #[_, index] _ := valueNode.kind | none
+  let .operation (.primitive (.checkVectorIndex _)) _ #[collection, index] _ := valueNode.kind | none
+  guard (indexesChecked context (context.ns.expressions.size + 1) collection index body)
   some index
 
 /-- A hidden `$t` temporary holding a computed element index, whose only
@@ -1247,8 +1314,8 @@ private def indexTemporary? (context : Context) (pattern : PatternId) (body : Ex
   let localDecl ← context.locals[slot.index]?
   unless localDecl.name.startsWith "$t" do none
   let bodyNode ← context.ns.expressions[body.index]?
-  let .letDecl checkPattern (some check) _ := bodyNode.kind | none
-  let index ← indexCheck? context checkPattern check
+  let .letDecl checkPattern (some check) checkBody := bodyNode.kind | none
+  let index ← indexCheck? context checkPattern check checkBody
   let .localVar read ← (context.ns.expressions[index.index]?).map (·.kind) | none
   guard (read == slot)
   some slot
@@ -3215,7 +3282,7 @@ private partial def expressionText (context : Context) (id : ExprId)
         return ← expressionText
           { context with constantLocals := context.constantLocals.push (slot, valueText) }
           body (fuel - 1) tailPosition statementPosition
-      if let some index := indexCheck? context pattern value then
+      if let some index := indexCheck? context pattern value body then
         return ← expressionText
           { context with elidedIndexChecks := context.elidedIndexChecks.push index }
           body (fuel - 1) tailPosition statementPosition
@@ -3278,7 +3345,7 @@ private partial def expressionText (context : Context) (id : ExprId)
               let valueText ← expressionText active value (fuel - 1)
               collectTail { active with
                 constantLocals := active.constantLocals.push (slot, valueText) } body (fuel - 1)
-            else if let some index := indexCheck? active pattern value then
+            else if let some index := indexCheck? active pattern value body then
               collectTail { active with
                 elidedIndexChecks := active.elidedIndexChecks.push index } body (fuel - 1)
             else if (hiddenReferenceMutation? active pattern body).isSome then
