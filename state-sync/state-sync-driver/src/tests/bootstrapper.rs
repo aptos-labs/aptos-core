@@ -5,6 +5,7 @@ use crate::{
     bootstrapper::{Bootstrapper, GENESIS_TRANSACTION_VERSION},
     driver::DriverConfiguration,
     error::Error,
+    snapshot_kind::SnapshotKind,
     tests::{
         mocks::{
             create_mock_db_reader, create_mock_storage_synchronizer, create_mock_streaming_client,
@@ -15,13 +16,15 @@ use crate::{
             create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
             create_epoch_ending_ledger_info_for_epoch, create_full_node_driver_configuration,
             create_global_summary, create_global_summary_with_version,
-            create_output_list_with_proof, create_random_epoch_ending_ledger_info,
+            create_hot_state_value_chunk_with_proof, create_output_list_with_proof,
+            create_output_list_with_proof_with_hot_root, create_random_epoch_ending_ledger_info,
             create_state_value_chunk_with_proof, create_transaction_list_with_proof,
         },
     },
     utils::OutputFallbackHandler,
 };
 use aptos_config::config::BootstrappingMode;
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_data_client::global_summary::GlobalDataSummary;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
@@ -1567,6 +1570,436 @@ async fn test_snapshot_sync_main_complete_refetches_output() {
 }
 
 #[tokio::test]
+async fn test_snapshot_sync_hot_state_after_main() {
+    // A verified V1 target that commits a hot state root must cause the hot
+    // snapshot to be streamed once the main snapshot is written.
+    let synced_version = GENESIS_TRANSACTION_VERSION;
+    let highest_version = 1000;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // The hot stage (not another main-state stage) must be streamed
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (_notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_hot_state_values()
+        .times(1)
+        .with(eq(highest_version), eq(Some(0)))
+        .return_once(move |_, _| Ok(data_stream_listener));
+
+    // Main state is complete at the target; hot state hasn't started
+    let mut metadata_storage = MockMetadataStorage::new();
+    let highest_ledger_info_clone = highest_ledger_info.clone();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |kind| match kind {
+            SnapshotKind::MainState => Ok(Some(highest_ledger_info_clone.clone())),
+            SnapshotKind::HotState | SnapshotKind::Position => Ok(None),
+        });
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_, _| Ok(true));
+
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        synced_version,
+        true,
+    );
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+
+    // The target output commits a hot state root
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof_with_hot_root(
+            HashValue::random(),
+        ));
+
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to start the hot state stream. Note: the mock storage
+    // synchronizer has no `finalize_fast_sync` expectation, so finalizing here
+    // (i.e., skipping the hot stage) would panic the test.
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_hot_state_resumes_at_last_index() {
+    // A hot stage that started but hasn't completed must resume at the last
+    // persisted index (the receiver requires the overlap) and must not finalize.
+    let synced_version = GENESIS_TRANSACTION_VERSION;
+    let highest_version = 1000;
+    let last_persisted_index = 77;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (_notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_hot_state_values()
+        .times(1)
+        .with(eq(highest_version), eq(Some(last_persisted_index)))
+        .return_once(move |_, _| Ok(data_stream_listener));
+
+    // Both stages target the same ledger info, but only main state is complete
+    let mut metadata_storage = MockMetadataStorage::new();
+    let highest_ledger_info_clone = highest_ledger_info.clone();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |_| Ok(Some(highest_ledger_info_clone.clone())));
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_, kind| Ok(kind == SnapshotKind::MainState));
+    metadata_storage
+        .expect_get_last_persisted_index()
+        .with(always(), eq(SnapshotKind::HotState))
+        .returning(move |_, _| Ok(last_persisted_index));
+
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        synced_version,
+        true,
+    );
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof_with_hot_root(
+            HashValue::random(),
+        ));
+
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_hot_state_invalid_chunk_retries() {
+    // A hot chunk whose root doesn't match the committed hot root must be
+    // rejected before the receiver is created, and the stream retried.
+    let synced_version = GENESIS_TRANSACTION_VERSION;
+    let highest_version = 10000;
+    let notification_id = 54321;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let mut expectation_sequence = Sequence::new();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
+    for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
+        mock_streaming_client
+            .expect_get_all_hot_state_values()
+            .times(1)
+            .with(always(), eq(Some(0)))
+            .return_once(move |_, _| Ok(data_stream_listener))
+            .in_sequence(&mut expectation_sequence);
+    }
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .with(
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
+        )
+        .return_const(Ok(()));
+
+    // Main state is complete; hot state hasn't started
+    let mut metadata_storage = MockMetadataStorage::new();
+    let highest_ledger_info_clone = highest_ledger_info.clone();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |kind| match kind {
+            SnapshotKind::MainState => Ok(Some(highest_ledger_info_clone.clone())),
+            SnapshotKind::HotState | SnapshotKind::Position => Ok(None),
+        });
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_, _| Ok(true));
+
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        synced_version,
+        true,
+    );
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof_with_hot_root(
+            HashValue::random(),
+        ));
+
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to start the hot state stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Send a hot chunk carrying a root that isn't the committed hot root
+    let data_notification = DataNotification::new(
+        notification_id,
+        DataPayload::HotStateValuesWithProof(create_hot_state_value_chunk_with_proof(0, 4, false)),
+    );
+    notification_sender_1.send(data_notification).await.unwrap();
+
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::VerificationError(_));
+
+    // The stream must be retried, not wedged
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_hot_state_rejects_wrong_stage_payload() {
+    // A main-state payload arriving while the hot stage is active must be
+    // rejected rather than applied to the hot receiver.
+    let synced_version = GENESIS_TRANSACTION_VERSION;
+    let highest_version = 10000;
+    let notification_id = 999;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (mut notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_hot_state_values()
+        .times(1)
+        .return_once(move |_, _| Ok(data_stream_listener));
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .return_const(Ok(()));
+
+    let mut metadata_storage = MockMetadataStorage::new();
+    let highest_ledger_info_clone = highest_ledger_info.clone();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |kind| match kind {
+            SnapshotKind::MainState => Ok(Some(highest_ledger_info_clone.clone())),
+            SnapshotKind::HotState | SnapshotKind::Position => Ok(None),
+        });
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_, _| Ok(true));
+
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        synced_version,
+        true,
+    );
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof_with_hot_root(
+            HashValue::random(),
+        ));
+
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to start the hot state stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Send a main-state payload on the hot stream
+    let data_notification = DataNotification::new(
+        notification_id,
+        DataPayload::StateValuesWithProof(
+            StateKind::MainState,
+            create_state_value_chunk_with_proof(false),
+        ),
+    );
+    notification_sender.send(data_notification).await.unwrap();
+
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::InvalidPayload(_));
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_hot_state_empty_snapshot() {
+    // An empty hot snapshot is only accepted when the committed hot root is the
+    // empty-tree placeholder, and it is written (not just marked complete).
+    let synced_version = GENESIS_TRANSACTION_VERSION;
+    let highest_version = 10000;
+    let notification_id = 111;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (mut notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_hot_state_values()
+        .times(1)
+        .return_once(move |_, _| Ok(data_stream_listener));
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .return_const(Ok(()));
+
+    let mut metadata_storage = MockMetadataStorage::new();
+    let highest_ledger_info_clone = highest_ledger_info.clone();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |kind| match kind {
+            SnapshotKind::MainState => Ok(Some(highest_ledger_info_clone.clone())),
+            SnapshotKind::HotState | SnapshotKind::Position => Ok(None),
+        });
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_, _| Ok(true));
+
+    // The empty hot snapshot must be written through the storage synchronizer,
+    // so that a hot root exists at the restore version.
+    let mut mock_storage_synchronizer = create_ready_storage_synchronizer(true);
+    mock_storage_synchronizer
+        .expect_finish_empty_hot_snapshot()
+        .times(1)
+        .with(always(), eq(*SPARSE_MERKLE_PLACEHOLDER_HASH))
+        .returning(|_, _| Ok(()));
+
+    let mut bootstrapper = create_bootstrapper_with_synchronizer(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        mock_storage_synchronizer,
+        synced_version,
+    );
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof_with_hot_root(
+            *SPARSE_MERKLE_PLACEHOLDER_HASH,
+        ));
+
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to start the hot state stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // End the stream without any chunks
+    notification_sender
+        .send(DataNotification::new(
+            notification_id,
+            DataPayload::EndOfStream,
+        ))
+        .await
+        .unwrap();
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_hot_state_rejects_false_empty_snapshot() {
+    // A stream that ends with no chunks while the committed hot root is
+    // non-empty means the peer ended early: it must error (and be retried),
+    // never be mistaken for an empty snapshot.
+    let synced_version = GENESIS_TRANSACTION_VERSION;
+    let highest_version = 10000;
+    let notification_id = 222;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (mut notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_hot_state_values()
+        .times(1)
+        .return_once(move |_, _| Ok(data_stream_listener));
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .return_const(Ok(()));
+
+    let mut metadata_storage = MockMetadataStorage::new();
+    let highest_ledger_info_clone = highest_ledger_info.clone();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |kind| match kind {
+            SnapshotKind::MainState => Ok(Some(highest_ledger_info_clone.clone())),
+            SnapshotKind::HotState | SnapshotKind::Position => Ok(None),
+        });
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_, _| Ok(true));
+
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        synced_version,
+        true,
+    );
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof_with_hot_root(
+            HashValue::random(), // A non-empty committed hot root
+        ));
+
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // End the stream without any chunks
+    notification_sender
+        .send(DataNotification::new(
+            notification_id,
+            DataPayload::EndOfStream,
+        ))
+        .await
+        .unwrap();
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::UnexpectedError(_));
+}
+
+#[tokio::test]
 async fn test_snapshot_sync_lag() {
     // Create test data
     let num_versions_behind = 1000;
@@ -1863,11 +2296,47 @@ fn create_bootstrapper_with_storage(
     latest_synced_version: Version,
     expect_reset_executor: bool,
 ) -> Bootstrapper<MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient> {
+    let mock_storage_synchronizer = create_ready_storage_synchronizer(expect_reset_executor);
+    create_bootstrapper_with_mocks(
+        driver_configuration,
+        mock_streaming_client,
+        mock_metadata_storage,
+        mock_storage_synchronizer,
+        latest_synced_epoch,
+        latest_synced_version,
+    )
+}
+
+/// Creates a bootstrapper for testing with a mock metadata storage and a
+/// caller-supplied storage synchronizer (so its expectations can be asserted).
+fn create_bootstrapper_with_synchronizer(
+    driver_configuration: DriverConfiguration,
+    mock_streaming_client: MockStreamingClient,
+    mock_metadata_storage: MockMetadataStorage,
+    mock_storage_synchronizer: MockStorageSynchronizer,
+    latest_synced_version: Version,
+) -> Bootstrapper<MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient> {
+    create_bootstrapper_with_mocks(
+        driver_configuration,
+        mock_streaming_client,
+        mock_metadata_storage,
+        mock_storage_synchronizer,
+        None,
+        latest_synced_version,
+    )
+}
+
+/// Creates a bootstrapper for testing from the given mocks
+fn create_bootstrapper_with_mocks(
+    driver_configuration: DriverConfiguration,
+    mock_streaming_client: MockStreamingClient,
+    mock_metadata_storage: MockMetadataStorage,
+    mock_storage_synchronizer: MockStorageSynchronizer,
+    latest_synced_epoch: Option<u64>,
+    latest_synced_version: Version,
+) -> Bootstrapper<MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient> {
     // Initialize the logger for tests
     aptos_logger::Logger::init_for_testing();
-
-    // Create the mock storage synchronizer
-    let mock_storage_synchronizer = create_ready_storage_synchronizer(expect_reset_executor);
 
     // Determine the epoch state and ledger info
     let (epoch_state, epoch_ending_ledger_info) = match latest_synced_epoch {
