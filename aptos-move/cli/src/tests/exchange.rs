@@ -28,7 +28,7 @@ l2: move_loc x
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(json["version"], json!(10));
+    assert_eq!(json["version"], json!(11));
     let fun = &json["funs"][0];
     assert_eq!(fun["name"], json!("count_down"));
     assert_eq!(fun["params"], json!(1));

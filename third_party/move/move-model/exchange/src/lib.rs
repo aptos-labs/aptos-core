@@ -62,14 +62,13 @@
 //! adds the signed integer types (`i8` ... `i256`, distinguished from the
 //! unsigned widths by their `i` prefix) and, through the width-annotated
 //! operations, signed `add`/`mul`/`shl`/`shr`/`cast` (carrying a signed
-//! `IntType`).  The signed `sub`/`div`/`mod`/bitwise operations, whose unsigned
-//! forms are deliberately width-free, are represented only by the reference
-//! (Lean) toolchain for now; the move-model producer emits neither, since Move
-//! source has no signed integer types; version 10 annotates *every* integer
+//! `IntType`); version 10 annotates *every* integer
 //! operation with its numeric type, including `sub`, `div`, `mod`, and the
 //! bitwise operations, which were previously bare — signed and unsigned share
 //! one operation family whose only difference is the range consulted, so the
-//! type is always carried.
+//! type is always carried; version 11 adds the function value type (`fun`),
+//! transported for declarations even though this fragment models no closure,
+//! lambda, or invoke operation.
 
 pub mod ast;
 pub mod check;
@@ -77,15 +76,26 @@ pub mod check;
 use serde::{Deserialize, Serialize};
 
 /// The current version of the exchange format.
-pub const FORMAT_VERSION: u64 = 10;
+pub const FORMAT_VERSION: u64 = 11;
 
 /// Schema identifier for a finite, deployable XIR module.
 pub const XIR_SCHEMA: &str = "move-xir-module";
 /// Current version of the deployable XIR module wrapper. Version 3 adds the
 /// `is_native` function flag and permits bodyless native declarations;
 /// version 4 transports source spans for declarations and stackless code;
-/// version 5 adds user-facing local names.
-pub const XIR_VERSION: u64 = 6;
+/// version 5 adds user-facing local names; version 6 adds cross-module type
+/// references ([`XirModule::external_structs`]), the enum reference
+/// operations, and type visibility ([`XirStruct::visibility`]); version 7 adds
+/// module-level friend declarations ([`XirModule::friends`]) and per-function
+/// call graphs ([`XirFunction::calls`]).
+///
+/// 7 exists because 6 was assigned twice: another change landed the same
+/// number with a different field set. Since [`XirModule`] denies unknown
+/// fields, a reader built from that revision rejects a document carrying
+/// `friends` outright rather than ignoring it — so the two dialects are not
+/// interchangeable and must not share a number. Documents written before
+/// either addition are still read as 6.
+pub const XIR_VERSION: u64 = 7;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -164,10 +174,35 @@ pub struct XirModule {
     pub external_functions: Vec<XirExternalFunction>,
     /// Structs and enums of other modules whose types this module mentions.
     /// Struct ids greater than or equal to `structs.len()` index this table
-    /// after subtracting the local struct count.  Only the type is referenced:
-    /// its declaration belongs to the other module.
+    /// after subtracting the local struct count — the same convention
+    /// [`XirModule::external_functions`] uses for function ids. Only the type
+    /// is referenced: its declaration belongs to the other module.
+    ///
+    /// This mirrors how bytecode resolves cross-module types: a
+    /// `SignatureToken::Struct` carries one index into a handle table holding
+    /// local and foreign entries alike, with each handle naming its defining
+    /// module. Whether a type's definition is local is a property of
+    /// resolution, not of the type itself, so [`Type`] is unchanged.
+    ///
+    /// Note that [`Module`], which has no such table, is unaffected: the rule
+    /// is uniform and its external table is simply always empty, so every id
+    /// there is local.
     #[serde(default)]
     pub external_structs: Vec<XirExternalStruct>,
+    /// Modules this one grants friend access to.
+    ///
+    /// Required because [`XirVisibility::Friend`] on a declaration says that
+    /// it *is* friend-visible, not *to whom*: friendship is granted by the
+    /// declaring module, so it cannot be reconstructed from per-declaration
+    /// visibility. This list is also where `public(package)` ends up — the
+    /// compiler erases that modifier into `Friend` plus synthesized entries
+    /// here, which is why no `Package` visibility variant is needed.
+    ///
+    /// Top level, beside the other module-wide tables and where the Lean
+    /// producer already emits it — not inside [`XirModuleMetadata`], which
+    /// holds only the module's identity.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub friends: Vec<XirModuleRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -178,6 +213,8 @@ pub struct XirExternalFunction {
     pub function: String,
 }
 
+/// A struct or enum declared in another module, named by this one.
+/// See [`XirModule::external_structs`] for the indexing convention.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct XirExternalStruct {
@@ -186,18 +223,69 @@ pub struct XirExternalStruct {
     pub name: String,
 }
 
+/// A reference to another module, by address and name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirModuleRef {
+    pub address: String,
+    pub module: String,
+}
+
 impl XirModule {
     /// Checks the deployable wrapper's schema and version.
     pub fn check_version(&self) -> Result<(), String> {
         if self.schema != XIR_SCHEMA {
             return Err(format!("unsupported XIR schema `{}`", self.schema));
         }
-        if self.version != 3
-            && self.version != 4
-            && self.version != 5
-            && self.version != XIR_VERSION
-        {
+        // Read every version this reader understands; only `XIR_VERSION` is
+        // written. A 6 without `friends` is still a valid document, which is
+        // why the older number stays accepted rather than being retired.
+        const READABLE: &[u64] = &[3, 4, 5, 6, XIR_VERSION];
+        if !READABLE.contains(&self.version) {
             return Err(format!("unsupported XIR version {}", self.version));
+        }
+        self.check_fields_against_version()
+    }
+
+    /// Rejects a document carrying a field newer than the version it declares.
+    ///
+    /// Serde defaults let every field deserialize at any version, so the number
+    /// alone does not describe the document. A producer stamping an old version
+    /// while emitting new fields is read in full here but would be rejected, or
+    /// silently stripped, by a reader actually built at that version.
+    ///
+    /// Only fields with an "absent" encoding can be checked. [`XirStruct`]'s
+    /// visibility defaults to `private`, which a genuinely private struct also
+    /// produces, so version 6 is not enforceable for it. Version 3 is the
+    /// oldest readable, so its additions need no check.
+    fn check_fields_against_version(&self) -> Result<(), String> {
+        let require = |introduced: u64, field: &str| {
+            if self.version < introduced {
+                Err(format!(
+                    "`{field}` arrived in XIR version {introduced}, but this \
+                     document declares version {}",
+                    self.version
+                ))
+            } else {
+                Ok(())
+            }
+        };
+        if !self.friends.is_empty() {
+            require(7, "friends")?;
+        }
+        if !self.external_structs.is_empty() {
+            require(6, "external_structs")?;
+        }
+        for fun in &self.functions {
+            if !fun.calls.is_empty() {
+                require(7, "calls")?;
+            }
+            if !fun.local_names.is_empty() {
+                require(5, "local_names")?;
+            }
+            if fun.source_map.is_some() {
+                require(4, "source_map")?;
+            }
         }
         Ok(())
     }
@@ -222,6 +310,16 @@ pub enum XirDialect {
 #[serde(deny_unknown_fields)]
 pub struct XirStruct {
     pub name: String,
+    /// Visibility of the type itself (Move 2.4), governing construction,
+    /// destruction, field access, and variant matching from other modules.
+    ///
+    /// Three variants suffice: `package` is source-level sugar that the
+    /// compiler erases into `Friend` plus entries in
+    /// [`XirModule::friends`], so no compiled artifact carries a
+    /// `package` notion. Defaults to `Private` so documents predating this
+    /// field still deserialize.
+    #[serde(default = "XirVisibility::private")]
+    pub visibility: XirVisibility,
     #[serde(default)]
     pub abilities: Vec<String>,
     #[serde(default)]
@@ -251,6 +349,11 @@ pub struct XirFunction {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub local_names: Vec<Option<String>>,
     pub returns: Vec<Type>,
+    /// Functions called directly, as ids under the
+    /// [`XirModule::external_functions`] convention. Recorded for interfaces,
+    /// whose declaration-only functions would otherwise appear to call nothing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub calls: Vec<FunId>,
     pub blocks: Vec<Block>,
     pub entry: BlockId,
     pub loops: Vec<Loop>,
@@ -297,9 +400,16 @@ pub struct XirAttribute {
     pub args: Vec<XirAttributeArg>,
 }
 
-/// One positional attribute argument: a name path (optionally instantiated,
-/// so it can denote a constant, function, or type), a `u64` constant (a
-/// decimal string, per the format conventions), or a boolean constant.
+/// One attribute argument: a name path (optionally instantiated, so it can
+/// denote a constant, function, or type), a `u64` constant (a decimal string,
+/// per the format conventions), a boolean constant, or an assignment of any of
+/// those to a name.
+///
+/// The assignment form uses the key `assign` rather than reusing `name`
+/// because consumers discriminate these shapes by probing for a key: an
+/// `{"name": ..., "value": ...}` encoding would be *silently* read as a bare
+/// name by any consumer that probes `name` first and stops, dropping the
+/// assigned value. A disjoint key makes an unsupported form a hard error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum XirAttributeArg {
@@ -307,6 +417,23 @@ pub enum XirAttributeArg {
         name: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         args: Vec<XirAttributeArg>,
+    },
+    /// `{"assign": name, "value": argument}` — `name = value`, as in
+    /// `#[resource_group(scope = global)]` and
+    /// `#[resource_group_member(group = 0x1::object::ObjectGroup)]`.
+    ///
+    /// Produced by the interface exporter, which reads these from Move source.
+    /// The Lean producer does not *emit* this form — its attribute syntax has
+    /// no assignment, so it has nothing to encode — but it decodes and
+    /// re-encodes one, which is what lets a framework module carrying
+    /// `resource_group_member` reach the Lean path at all.
+    ///
+    /// The key is `assign` rather than `name` so the two forms stay disjoint.
+    /// Both sides probe keys to discriminate, and a shared key would let a
+    /// decoder match on the name and silently drop the value.
+    Assign {
+        assign: String,
+        value: Box<XirAttributeArg>,
     },
     Num {
         #[serde(rename = "num")]
@@ -324,6 +451,13 @@ pub enum XirVisibility {
     Private,
     Public,
     Friend,
+}
+
+impl XirVisibility {
+    /// Serde default for fields added after the initial schema.
+    fn private() -> Self {
+        XirVisibility::Private
+    }
 }
 
 /// A Move integer width, as carried by the width-annotated operations.
@@ -520,6 +654,20 @@ pub enum Type {
     Ref(Box<Type>),
     /// `{"mut_ref": type}` — mutable reference.
     MutRef(Box<Type>),
+    /// `{"fun": [[arguments], [results], [abilities]]}` — a Move function
+    /// value type (language version 2.2), mirroring `move_model::ty::Type::Fun`.
+    ///
+    /// Arguments and results are *lists*, as they are on a function
+    /// declaration ([`XirFunction::returns`]), rather than a single type that
+    /// is a tuple when the arity is not one: the format has no tuple type, and
+    /// Move has no first-class one either. `|&T, &V|` is therefore
+    /// `Fun([ref T, ref V], [], _)`.
+    ///
+    /// Transported for declarations only, like the reference types above: a
+    /// signature may name a function type even though this fragment models no
+    /// closure, lambda, or invoke *operation*. Producers that cannot express
+    /// those operations may still emit the type.
+    Fun(Vec<Type>, Vec<Type>, Vec<String>),
 }
 
 /// A declaration-scoped Move type parameter.
@@ -606,10 +754,12 @@ pub enum Instr {
 
 /// The operation of a [`Instr::Call`].
 ///
-/// There are deliberately no `gt`/`ge`/`neq` operations: producers
-/// normalize `gt`/`ge` to [`Oper::Lt`]/[`Oper::Le`] with swapped operands
-/// and lower `neq` to [`Oper::Eq`] followed by [`Oper::Not`] through a
-/// fresh local.
+/// There are deliberately no `gt`/`ge`/`neq`/`neg` operations: producers
+/// normalize `gt`/`ge` to [`Oper::Lt`]/[`Oper::Le`] with swapped operands,
+/// lower `neq` to [`Oper::Eq`] followed by [`Oper::Not`] through a
+/// fresh local, and lower unary negation to [`Oper::Sub`] against a fresh
+/// zero-valued local.  The last is exact: Move aborts on `-MIN` because the
+/// negated result is out of range, and `0 - MIN` fails the same range check.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Oper {
@@ -1073,7 +1223,7 @@ mod tests {
         // array-wrapping, so an innocent-looking refactor of a variant
         // changes the format.
         let json = serde_json::to_value(full_module()).unwrap();
-        assert_eq!(json["version"], json!(10));
+        assert_eq!(json["version"], json!(11));
         assert_eq!(
             json["structs"][0]["fields"][0],
             json!({"name": "balance", "ty": "u64"})
@@ -1225,6 +1375,42 @@ mod tests {
         assert_eq!(serde_json::to_value(&attribute).unwrap(), json);
     }
 
+    /// The assignment argument uses a key that no other argument shape has.
+    ///
+    /// This matters because the shapes are untagged: consumers tell them apart
+    /// by probing for a key. Had assignment been spelled `{"name": ...,
+    /// "value": ...}`, a consumer that probes `name` first and stops — which
+    /// both this `untagged` enum and the Lean decoder do — would read it as a
+    /// bare name and *silently drop the assigned value*. With a disjoint key,
+    /// a consumer that does not know the form fails loudly instead.
+    #[test]
+    fn assignment_argument_is_not_confusable_with_a_name() {
+        let json = json!({
+            "name": "resource_group_member",
+            "args": [{"assign": "group", "value": {"name": "0x1::object::ObjectGroup"}}]
+        });
+        let attribute: XirAttribute = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(attribute, XirAttribute {
+            name: "resource_group_member".to_string(),
+            args: vec![XirAttributeArg::Assign {
+                assign: "group".to_string(),
+                value: Box::new(XirAttributeArg::Name {
+                    name: "0x1::object::ObjectGroup".to_string(),
+                    args: vec![],
+                }),
+            }],
+        });
+        assert_eq!(serde_json::to_value(&attribute).unwrap(), json);
+
+        // A bare name is still a bare name: the two shapes do not collide in
+        // either direction.
+        let name: XirAttributeArg = serde_json::from_value(json!({"name": "group"})).unwrap();
+        assert_eq!(name, XirAttributeArg::Name {
+            name: "group".to_string(),
+            args: vec![],
+        });
+    }
+
     #[test]
     fn pretty_json_fill_layout() {
         let pretty = full_module().to_pretty_json();
@@ -1244,7 +1430,7 @@ mod tests {
         // Integer constants travel as opaque decimal strings; validation
         // against the local's width happens in the consumer.
         let module = serde_json::from_value::<Module>(json!({
-            "version": 10, "structs": [],
+            "version": 11, "structs": [],
             "funs": [{"name": "f", "params": 0,
                       "locals": ["u64"], "returns": [],
                       "blocks": [{"instrs": [{"load": [0, {"num": "5"}]}],
@@ -1255,5 +1441,229 @@ mod tests {
         }))
         .unwrap();
         assert!(module.check_version().is_ok());
+    }
+
+    /// A minimal deployable wrapper at the given version, used to check that
+    /// fields added after a version still deserialize from documents
+    /// predating them.
+    fn xir_module_json(version: u64) -> serde_json::Value {
+        json!({
+            "schema": XIR_SCHEMA,
+            "version": version,
+            "module": {"address": "0x42", "name": "m", "dialect": "stackless"},
+            "structs": [{"name": "S", "fields": [{"name": "f", "ty": "u64"}]}],
+            "functions": [],
+        })
+    }
+
+    /// Version 7 exists to separate two dialects that both called themselves
+    /// 6: one with `friends`, one without. The number has to be what tells
+    /// them apart, since `deny_unknown_fields` makes the difference fatal
+    /// rather than ignorable.
+    #[test]
+    fn version_7_is_written_and_6_is_still_read() {
+        assert_eq!(XIR_VERSION, 7, "friends and calls are version 7");
+
+        // A document predating either addition still reads.
+        let legacy: XirModule = serde_json::from_value(xir_module_json(6)).unwrap();
+        assert!(legacy.check_version().is_ok());
+        assert!(legacy.friends.is_empty());
+        assert!(legacy.functions.iter().all(|f| f.calls.is_empty()));
+
+        // What we write is 7.
+        let mut current: XirModule = serde_json::from_value(xir_module_json(6)).unwrap();
+        current.version = XIR_VERSION;
+        current.friends = vec![XirModuleRef {
+            address: "0x1".to_owned(),
+            module: "buddy".to_owned(),
+        }];
+        assert_eq!(serde_json::to_value(&current).unwrap()["version"], json!(7));
+
+        // A version this reader does not know is refused, in both directions.
+        for unknown in [2u64, 8] {
+            let module: XirModule = serde_json::from_value(xir_module_json(unknown)).unwrap();
+            assert!(
+                module.check_version().is_err(),
+                "version {unknown} must be refused"
+            );
+        }
+    }
+
+    /// One function declaration carrying whatever extra keys are given.
+    fn function_json(extra: serde_json::Value) -> serde_json::Value {
+        let mut function = json!({
+            "name": "f", "visibility": "public", "is_entry": false,
+            "is_native": false, "acquires": [], "params": 0,
+            "locals": [], "returns": [],
+            "blocks": [], "entry": 0, "loops": [],
+            "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+        });
+        for (key, value) in extra.as_object().unwrap() {
+            function[key] = value.clone();
+        }
+        json!([function])
+    }
+
+    /// A document may not carry a field newer than the version it declares.
+    ///
+    /// Every added field has a serde default, so deserialization accepts any
+    /// combination of version and fields. Without this check the version number
+    /// describes nothing, and a reader built at the declared version would
+    /// reject or silently strip what this one reads in full.
+    #[test]
+    fn a_field_newer_than_the_declared_version_is_rejected() {
+        // (field, version it arrived in, a document carrying it)
+        let cases: Vec<(&str, u64, Box<dyn Fn(u64) -> serde_json::Value>)> = vec![
+            (
+                "friends",
+                7,
+                Box::new(|version| {
+                    let mut doc = xir_module_json(version);
+                    doc["friends"] = json!([{"address": "0x1", "module": "buddy"}]);
+                    doc
+                }),
+            ),
+            (
+                "calls",
+                7,
+                Box::new(|version| {
+                    let mut doc = xir_module_json(version);
+                    doc["functions"] = function_json(json!({"calls": [0]}));
+                    doc
+                }),
+            ),
+            (
+                "local_names",
+                5,
+                Box::new(|version| {
+                    let mut doc = xir_module_json(version);
+                    doc["functions"] = function_json(json!({"local_names": [null]}));
+                    doc
+                }),
+            ),
+            (
+                "external_structs",
+                6,
+                Box::new(|version| {
+                    let mut doc = xir_module_json(version);
+                    doc["external_structs"] =
+                        json!([{"address": "0x1", "module": "string", "name": "String"}]);
+                    doc
+                }),
+            ),
+        ];
+
+        for (field, introduced, build) in cases {
+            let stale: XirModule = serde_json::from_value(build(introduced - 1)).unwrap();
+            let error = stale
+                .check_version()
+                .expect_err("a document older than the field must be refused");
+            assert!(
+                error.contains(&format!("`{field}` arrived in XIR version {introduced}")),
+                "the error names the field and its version: {error}"
+            );
+
+            let current: XirModule = serde_json::from_value(build(XIR_VERSION)).unwrap();
+            assert!(
+                current.check_version().is_ok(),
+                "`{field}` is fine at the current version"
+            );
+        }
+    }
+
+    #[test]
+    fn v6_additions_have_pinned_wire_shapes() {
+        // `friends` is a top-level field beside the other module-wide tables,
+        // not a member of `module`. `XirModule` denies unknown fields, so a
+        // producer placing it inside `module` — or a schema moving it there —
+        // would be rejected outright.
+        let module: XirModule = serde_json::from_value(json!({
+            "schema": XIR_SCHEMA,
+            "version": XIR_VERSION,
+            "module": {"address": "0x42", "name": "m", "dialect": "stackless"},
+            "structs": [],
+            "functions": [],
+            "friends": [{"address": "0x1", "module": "buddy"}],
+        }))
+        .unwrap();
+        assert_eq!(module.friends.len(), 1);
+        let encoded = serde_json::to_value(&module).unwrap();
+        assert!(
+            encoded["friends"].is_array(),
+            "friends must serialize at the top level"
+        );
+        assert!(
+            encoded["module"].get("friends").is_none(),
+            "friends must not be nested under `module`"
+        );
+
+        assert_eq!(
+            serde_json::to_value(XirExternalStruct {
+                address: "0x1".to_owned(),
+                module: "string".to_owned(),
+                name: "String".to_owned(),
+            })
+            .unwrap(),
+            json!({"address": "0x1", "module": "string", "name": "String"})
+        );
+        assert_eq!(
+            serde_json::to_value(XirModuleRef {
+                address: "0x1".to_owned(),
+                module: "friend_mod".to_owned(),
+            })
+            .unwrap(),
+            json!({"address": "0x1", "module": "friend_mod"})
+        );
+        // The function type is a tuple variant of arity three, so it wraps its
+        // payload in an array; changing that arity changes the wire shape.
+        // Its argument and result positions are lists, so an arity other than
+        // one needs no tuple type: `|&T, &V|` has an empty result list.
+        assert_eq!(
+            serde_json::to_value(Type::Fun(vec![Type::U64], vec![Type::Bool], vec![
+                "copy".to_owned(),
+                "drop".to_owned()
+            ],))
+            .unwrap(),
+            json!({"fun": [["u64"], ["bool"], ["copy", "drop"]]})
+        );
+        assert_eq!(
+            serde_json::to_value(Type::Fun(
+                vec![Type::Ref(Box::new(Type::U64)), Type::Bool],
+                vec![],
+                vec![]
+            ))
+            .unwrap(),
+            json!({"fun": [[{"ref": "u64"}, "bool"], [], []]})
+        );
+        assert_eq!(
+            serde_json::to_value(XirVisibility::Friend).unwrap(),
+            json!("friend")
+        );
+    }
+
+    #[test]
+    fn v6_fields_default_when_absent() {
+        // A version-5 document predates external_structs, friends, and struct
+        // visibility; each must take its default rather than fail.
+        let module: XirModule = serde_json::from_value(xir_module_json(5)).unwrap();
+        assert!(module.check_version().is_ok());
+        assert!(module.external_structs.is_empty());
+        assert!(module.friends.is_empty());
+        assert_eq!(module.structs[0].visibility, XirVisibility::Private);
+    }
+
+    #[test]
+    fn xir_version_window() {
+        for version in [3, 4, 5, XIR_VERSION] {
+            let module: XirModule = serde_json::from_value(xir_module_json(version)).unwrap();
+            assert!(
+                module.check_version().is_ok(),
+                "version {version} should be accepted"
+            );
+        }
+        let module: XirModule = serde_json::from_value(xir_module_json(2)).unwrap();
+        assert!(module.check_version().is_err());
+        let module: XirModule = serde_json::from_value(xir_module_json(XIR_VERSION + 1)).unwrap();
+        assert!(module.check_version().is_err());
     }
 }

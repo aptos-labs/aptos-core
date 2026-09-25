@@ -2049,6 +2049,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde",
+ "serde_json",
  "tempfile",
  "toml 0.7.8",
 ]
@@ -13394,7 +13395,9 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.6.5",
+ "serde",
  "serde_json",
+ "sha2 0.9.9",
  "tempfile",
  "walkdir",
 ]

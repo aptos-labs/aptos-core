@@ -157,6 +157,8 @@ structure StructDecl where
   fields : Array FieldDecl
   variants : Option (Array VariantDecl) := none
   attributes : List MoveModel.IR.Attribute := []
+  /-- Visibility of the type itself; never `entry`. -/
+  visibility : Visibility := .private_
   deriving BEq, Repr
 
 structure FunDecl where
@@ -540,6 +542,10 @@ def Module.toIR (module : Module) : Except String MoveModel.IR.Module := do
           (variant.moveName, variant.fields.toList.map (·.moveName))
       abilities := structDecl.abilities
       attributes := structDecl.attributes
+      visibility := match structDecl.visibility with
+        | .public_ => MoveModel.IR.Visibility.public_
+        | .friend_ => MoveModel.IR.Visibility.friend
+        | .private_ | .entry => MoveModel.IR.Visibility.private_
     }
   let mut funs : Array MoveModel.IR.FunDecl := #[]
   let mut funMeta : Array MoveModel.IR.FunMeta := #[]
