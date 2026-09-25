@@ -22,6 +22,7 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use cfg_if::cfg_if;
+use mono_move_aptos_transaction_executor::AptosTransactionExecutor;
 use mono_move_global_context::GlobalContext;
 use move_binary_format::{
     errors::{Location, VMError},
@@ -34,6 +35,13 @@ use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvi
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
 use std::{hash::Hash, ops::Deref, sync::Arc};
+
+/// A global context with everything the MonoMove executor reads preinstalled.
+fn new_global_context(num_workers: usize) -> Arc<GlobalContext> {
+    let mut ctx = GlobalContext::with_num_execution_workers(num_workers);
+    AptosTransactionExecutor::preinstall(&mut ctx);
+    Arc::new(ctx)
+}
 
 /// Raises an alert with the specified message. In case we run in testing mode, instead prints the
 /// message to standard output.
@@ -198,9 +206,7 @@ impl AptosModuleCacheManager {
     /// Returns a new manager in its default (empty) state, bound to the given
     /// local execution config.
     pub fn new(local_config: BlockExecutorLocalConfig) -> Self {
-        let global_context = Arc::new(GlobalContext::with_num_execution_workers(
-            local_config.concurrency_level,
-        ));
+        let global_context = new_global_context(local_config.concurrency_level);
         Self {
             local_config,
             legacy_module_cache_manager: Mutex::new(ModuleCacheManager::new()),
@@ -245,9 +251,7 @@ impl AptosModuleCacheManager {
                 AptosModuleCacheManagerGuard::None {
                     environment: storage_environment,
                     module_cache: GlobalModuleCache::empty(),
-                    global_context: Arc::new(GlobalContext::with_num_execution_workers(
-                        self.local_config.concurrency_level,
-                    )),
+                    global_context: new_global_context(self.local_config.concurrency_level),
                 }
             },
         })
@@ -368,7 +372,7 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
         AptosModuleCacheManagerGuard::None {
             environment: AptosEnvironment::new(state_view),
             module_cache: GlobalModuleCache::empty(),
-            global_context: Arc::new(GlobalContext::with_num_execution_workers(1)),
+            global_context: new_global_context(1),
         }
     }
 
@@ -380,7 +384,7 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
         AptosModuleCacheManagerGuard::None {
             environment: AptosEnvironment::new_with_delayed_field_optimization_enabled(state_view),
             module_cache: GlobalModuleCache::empty(),
-            global_context: Arc::new(GlobalContext::with_num_execution_workers(1)),
+            global_context: new_global_context(1),
         }
     }
 

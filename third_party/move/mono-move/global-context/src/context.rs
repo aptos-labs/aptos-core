@@ -60,6 +60,8 @@ use mono_move_core::{
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
     hash::{Hash, Hasher},
     marker::PhantomData,
 };
@@ -138,6 +140,9 @@ struct Context {
     /// Published type layouts (the type-driven walk shape, separate from the
     /// GC object descriptors above).
     layouts: Layouts,
+    /// Values a client preinstalls before execution for execution guards to
+    /// read, keyed by their type. See [`GlobalContext::preinstall`].
+    preinstalled: HashMap<TypeId, Box<dyn Any + Send + Sync>, ahash::RandomState>,
 }
 
 /// Storage for the published object-descriptor set.
@@ -351,10 +356,22 @@ impl GlobalContext {
                 script_cache: ScriptCache::new(),
                 descriptors: Descriptors::default(),
                 layouts: Layouts::default(),
+                preinstalled: HashMap::default(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
         }
+    }
+
+    /// Makes `value` available to every execution guard through
+    /// [`ExecutionGuard::preinstalled`]. This is for things a client needs in
+    /// every transaction but only has to prepare once per context, such as
+    /// interned framework symbols. A value of the same type replaces the
+    /// previous one, and all values are cleared when the arenas are reset.
+    pub fn preinstall<T: Any + Send + Sync>(&mut self, value: T) {
+        self.ctx
+            .preinstalled
+            .insert(TypeId::of::<T>(), Box::new(value));
     }
 
     /// Transitions to maintenance mode by obtaining a [`MaintenanceGuard`]
@@ -418,6 +435,11 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         self.ctx.type_lists.len()
     }
 
+    /// Returns the number of preinstalled values.
+    pub fn preinstalled_count(&self) -> usize {
+        self.ctx.preinstalled.len()
+    }
+
     /// Resets all caches that store pointers to the arenas, and then resets
     /// the arenas as well.
     pub fn reset_arena_pool(&mut self) {
@@ -452,6 +474,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// size is not pooled is dropped.
     pub fn return_region(&self, region: MemoryRegion) {
         self.global_arena.return_region(region)
+    }
+
+    /// The value of type `T` the context preinstalled (see
+    /// [`GlobalContext::preinstall`]), if any.
+    pub fn preinstalled<T: Any + Send + Sync>(&self) -> Option<&'ctx T> {
+        let ctx: &'ctx Context = self.ctx;
+        ctx.preinstalled
+            .get(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_ref::<T>())
     }
 
     /// Inserts a loaded module into the cache, keyed by its interned ID.
@@ -1026,6 +1057,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             script_cache,
             descriptors,
             layouts,
+            preinstalled,
         } = self.ctx;
 
         identifiers.clear();
@@ -1035,6 +1067,8 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         function_refs.clear();
         descriptors.reset();
         layouts.reset();
+        // Dropped, not rebuilt: whoever resets preinstalls again.
+        preinstalled.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to modules
