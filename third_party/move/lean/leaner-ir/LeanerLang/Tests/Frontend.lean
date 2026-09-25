@@ -576,6 +576,13 @@ leaner module 0x42::variant_field_index_check where
     let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
     core.assignPlace(values[index], core.read(choice.value))
 
+-- Nested indexing whose outer index is computed: the lowering binds the
+-- computed index between the two bounds checks.
+leaner module 0x42::nested_computed_index where
+  pragma verify = false
+  fun read_nested(values : &Vector<Vector<u64> >, i : u64, j : u64) -> u64 :=
+    values[i][j + 1]
+
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
     value : u64
@@ -1123,6 +1130,18 @@ elab "#guard_leaner_frontend" : command => do
   | .ok printed =>
       unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
         throwError "a bounds check before an assignment of a field read was elided:\n{printed}"
+  let some nestedComputed := LeanerLang.registeredUnit? env `«0x42».nested_computed_index
+    | throwError "the nested computed-index fixture was not registered"
+  match LeanerLang.Print.render env nestedComputed with
+  | .error error => throwError "the nested computed-index fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "values[i][j + 1]" && !printed.contains "checkVectorIndex" do
+        throwError "nested indexing at a computed index lost its sugar:\n{printed}"
+      match LeanerLang.Print.formatSource env printed with
+      | .error error =>
+          throwError "the nested computed-index fixture did not re-import: {error}"
+      | .ok formatted => unless formatted == printed do
+          throwError "nested indexing at a computed index is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
   let some surfaceRegressions := LeanerLang.registeredUnit? env `«0x42».surface_regressions
     | throwError "the surface-regression fixture was not registered"
   match LeanerLang.Print.render env surfaceRegressions with
