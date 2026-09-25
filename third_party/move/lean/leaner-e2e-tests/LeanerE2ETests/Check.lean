@@ -2,6 +2,12 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerIR.TestInfra
+-- The checks below are elaborated in their own `lean` process and are not
+-- modules of this library, so nothing else builds what they import. Naming
+-- their support module here is what puts its `.olean` on the path the driver
+-- hands those processes; without it every check fails to import on a clean
+-- checkout, where no earlier build left one behind.
+import LeanerE2ETests.CheckSupport
 
 /-!
 # LeanerLang checks
