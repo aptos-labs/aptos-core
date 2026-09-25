@@ -1332,9 +1332,14 @@ private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
       let valueKind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
       let precedesAccess : Bool := match patternKind, valueKind with
         | some .wildcard, some (.operation (.primitive (.checkVectorIndex _)) _ _ _) => true
+        -- The traversal runs for whichever check the caller tracks, which may
+        -- be an earlier one of another vector; the lowering orders a computed
+        -- index only against the check that tests it. So the binding is passed
+        -- only when its value cannot act before that earlier check's implied
+        -- position either.
         | some (.variable slot), _ =>
             (context.locals[slot.index]?).any (·.name.startsWith "$t") &&
-              bindsCheckedIndex context slot body
+              bindsCheckedIndex context slot body && inertOperand context value
         | _, _ => false
       if precedesAccess then #[value, body] else #[value]
   | .letDecl _ none body => #[body]
