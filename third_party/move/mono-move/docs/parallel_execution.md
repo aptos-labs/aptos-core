@@ -18,9 +18,9 @@ of which are load-bearing rather than optimizations:
 - **Resource groups.** `InMemoryStorageKey::ResourceGroup` gives a group its own
   addressable slot; members keep their `Resource` keys and are tags within it.
   `VersionedGroupData::group_members_at` reads a group as of a given index.
-- **Read-write sets on every outcome.** `TxnOutcome::Discarded` and
-  `ExecutedNoEffects` carry `Option<SessionEffects>`. A transaction that opened a
-  session has reads to validate even when its writes are thrown away.
+- **Read-write sets on discards.** `TxnOutcome::Discarded` carries
+  `Option<SessionEffects>`. A transaction that opened a session has reads to
+  validate even when its writes are thrown away.
 - **`SegmentedArena`.** Base values deserialized from storage outlive the
   transaction that read them, so they go in a block-lifetime arena rather than
   the session heap. It grows by segments, and each allocation returns the
@@ -51,6 +51,10 @@ still a pure optimization and none of the integration depends on it. Removed to
 keep the integration reviewable; worth reconsidering once the integration lands.
 
 ## Measurements
+
+The numbers below are a one-off profiling run. Per-workload speedups against
+the V1 VM at 16 threads come from the `mono-move-e2e-perf-parallel` CI job; see
+`../testsuite/e2e-perf/README.md`.
 
 Apple M4 Max, 10 performance + 4 efficiency cores. `aptos-executor-benchmark`
 replaying 200 identical recorded blocks of 1000 `apt-fa-transfer`,

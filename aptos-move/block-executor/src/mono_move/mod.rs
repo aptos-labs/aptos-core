@@ -187,7 +187,7 @@ fn committed_effects(outcome: &TxnOutcome) -> Option<&SessionEffects> {
     match outcome {
         TxnOutcome::Executed { effects, .. } => Some(effects),
         TxnOutcome::Discarded { .. } => None,
-        TxnOutcome::ExecutedNoEffects { .. } => None,
+        TxnOutcome::ExecutedNoEffects(_) => None,
         // TODO(correctness): Revisit this arm: unexpected system txn errors
         //   should be handled at execution time!
         TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
@@ -336,7 +336,7 @@ impl TxnOutput for MonoTxnOutput {
             MonoTxnOutput::Executed { outcome, .. } => match outcome {
                 TxnOutcome::Executed { fee_statement, .. } => *fee_statement,
                 TxnOutcome::Discarded { .. } => FeeStatement::zero(),
-                TxnOutcome::ExecutedNoEffects { .. } => FeeStatement::zero(),
+                TxnOutcome::ExecutedNoEffects(_) => FeeStatement::zero(),
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => FeeStatement::zero(),
                 TxnOutcome::Panic(_) => FeeStatement::zero(),
             },
@@ -362,12 +362,14 @@ impl TxnOutput for MonoTxnOutput {
     }
 
     fn storage_keys_read(&self) -> impl Iterator<Item = &Self::Key> {
-        // TODO(completeness): support read keys information.
+        // TODO(correctness): report read keys, including module reads, so the
+        // block epilogue promotes the same keys as the legacy VM.
         std::iter::empty()
     }
 
     fn storage_keys_written(&self) -> impl Iterator<Item = &Self::Key> {
-        // TODO(completeness): support written keys information.
+        // TODO(correctness): report written keys, for hot-state promotion
+        // parity with the legacy VM.
         std::iter::empty()
     }
 
