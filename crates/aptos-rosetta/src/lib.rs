@@ -29,6 +29,7 @@ mod network;
 
 pub mod client;
 pub mod common;
+pub mod currencies;
 pub mod error;
 pub mod types;
 
