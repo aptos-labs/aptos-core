@@ -3,28 +3,19 @@ name: "mono-move-miri"
 # Runs the MonoMove test suites under Miri, via scripts/miri.sh so that CI and
 # local runs share one definition of each pass.
 #
-# Advisory, not a required check: a path-filtered workflow that gets skipped
-# leaves a required check pending and the PR never becomes mergeable. To make it
-# required, drop the path filter and gate the expensive jobs with a job-level
-# `if` behind an always-present aggregate job.
+# The required check is `mono-move-miri-required`. The workflow runs on every
+# PR so that check always reports; `changes` decides whether Miri itself runs.
+# A path filter under `on:` would instead leave the check pending forever on
+# PRs outside those paths.
 #
-# Known gap: mono-move depends on crates outside these paths (`aptos-types`,
-# `move-core-types`, ...), so changes there do not trigger this workflow.
+# Known gap: mono-move depends on crates outside the watched paths
+# (`aptos-types`, `move-core-types`, ...), so changes there do not run Miri.
 on:
   # `pull_request`, never `pull_request_target`: this runs untrusted PR code on
   # a self-hosted runner, and `pull_request_target` would hand that code a
   # writable token in the base-repo context.
   pull_request:
-    types: [labeled, opened, synchronize, reopened]
-    paths:
-      - "third_party/move/mono-move/**"
-      # The wrapper's decimal formatter is the Miri-verified path that the
-      # mono-move-runtime tests print through.
-      - "third_party/move/move-core/types/src/int256.rs"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".cargo/config.toml"
-      - ".github/workflows/mono-move-miri.yaml"
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 concurrency:
@@ -39,12 +30,48 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Whether the PR touches the watched paths. Always true outside PRs.
+  changes:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      mono_move: ${{ steps.filter.outputs.mono_move }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A PR checkout is the merge commit; HEAD^1 is the base branch tip.
+          fetch-depth: 2
+
+      - id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        # The diff is captured before grepping: `grep -q` exits on the first
+        # match, and under pipefail the resulting SIGPIPE in `git diff` would
+        # read as no match. `int256.rs` holds the decimal formatter that the
+        # mono-move-runtime tests print through.
+        run: |
+          if [ "$EVENT_NAME" != pull_request ]; then
+            echo "mono_move=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if grep -qE \
+            -e '^third_party/move/mono-move/' \
+            -e '^third_party/move/move-core/types/src/int256\.rs$' \
+            -e '^Cargo\.(toml|lock)$' \
+            -e '^\.github/workflows/mono-move-miri\.yaml$' \
+            <<< "$changed"; then
+            echo "mono_move=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mono_move=false" >> "$GITHUB_OUTPUT"
+          fi
+
   miri:
-    # Dispatch, or a same-repo (non-fork) PR carrying the `mono-move` label.
+    needs: changes
+    # Fork PRs are skipped, so the required check passes for them without Miri.
     if: |
-      github.event_name != 'pull_request' ||
+      needs.changes.outputs.mono_move == 'true' &&
       (
-        contains(github.event.pull_request.labels.*.name, 'mono-move') &&
+        github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository
       )
     runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
@@ -80,3 +107,22 @@ jobs:
         # cannot diverge. UPBL is never set: baseline updates write to the
         # filesystem and must not happen in a Miri job.
         run: third_party/move/mono-move/scripts/miri.sh ${{ matrix.pass }}
+
+  # The required check, under a fixed name (matrix check names vary with
+  # `pass`). `always()` rather than `!cancelled()`: a cancelled run must fail,
+  # not skip, since a skipped required check counts as passing.
+  mono-move-miri-required:
+    needs: [changes, miri]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          MIRI_RESULT: ${{ needs.miri.result }}
+        run: |
+          echo "changes: $CHANGES_RESULT, miri: $MIRI_RESULT"
+          case "$CHANGES_RESULT/$MIRI_RESULT" in
+            success/success | success/skipped) ;;
+            *) exit 1 ;;
+          esac
