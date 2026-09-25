@@ -1296,13 +1296,94 @@ private def actingPrefix (context : Context) (operands : Array ExprId) : Array E
   | some index => operands.extract 0 (index + 1)
   | none => operands
 
+/-- Whether every index of a place had its check elided, so the place can
+keep the surface's index sugar. -/
+private def placeIndexesElided (context : Context) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, id => match context.ns.places[id.index]? with
+    | some (.index base index) =>
+        context.elidedIndexChecks.any (fun (collection, checked) =>
+          checked == index && observesPlace context fuel collection base) &&
+          placeIndexesElided context fuel base
+    | some (.deref base) | some (.field base ..) | some (.downcast base _) |
+        some (.subslice base ..) => placeIndexesElided context fuel base
+    | some (.localVar _) => true
+    | _ => false
+
+/-- Whether two expressions observe the same collection. A lowering builds a
+fresh observation at each place it needs one, so the same collection reaches
+two checks as two nodes, and they agree only structurally. -/
+private partial def sameCollection (context : Context) (left right : ExprId) : Bool :=
+  left == right ||
+    (let leftKind : Option ExprKind := (context.ns.expressions[left.index]?).map (·.kind)
+     let rightKind : Option ExprKind := (context.ns.expressions[right.index]?).map (·.kind)
+     match leftKind, rightKind with
+     | some (.localVar a), some (.localVar b) => a == b
+     | some (.operation (.read a) _ _ _), some (.operation (.read b) _ _ _) =>
+         samePlace context (context.ns.places.size + 1) a b
+     | some (.operation (.reference .dereference) _ #[a] _),
+       some (.operation (.reference .dereference) _ #[b] _) => sameCollection context a b
+     | some (.operation (.primitive .index) _ #[a, i] _),
+       some (.operation (.primitive .index) _ #[b, j] _) =>
+         i == j && sameCollection context a b
+     | some (.operation (.data (.select owner field)) _ #[a] _),
+       some (.operation (.data (.select owner' field')) _ #[b] _) =>
+         owner == owner' && field == field' && sameCollection context a b
+     | _, _ => false)
+
+/-- Whether a place reaches the element `collection` observes at `index`,
+through an index level of its own or of something it is projected from. -/
+private def placeUnderCheck (context : Context) (collection index : ExprId)
+    (place : PlaceId) : Bool :=
+  let rec along : Nat → PlaceId → Bool
+    | 0, _ => false
+    | fuel + 1, place => match context.ns.places[place.index]? with
+      | some (.index base i) =>
+          (i == index && observesPlace context fuel collection base) || along fuel base
+      | some (.deref base) | some (.field base ..) | some (.subslice base ..) => along fuel base
+      | _ => false
+  along (context.ns.places.size + 1) place
+
+/-- Whether an expression observes the element `collection` observes at
+`index`, as a place that reaches it or as an index of that collection. -/
+private partial def observesCheckedElement (context : Context) (collection index : ExprId)
+    (value : ExprId) : Bool :=
+  let kind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+  match kind with
+  | some (.operation (.read place) _ _ _) | some (.operation (.borrow _ place) _ _ _)
+  | some (.operation (.move place) _ _ _) | some (.operation (.copy place) _ _ _) =>
+      placeUnderCheck context collection index place
+  | some (.operation (.reference .dereference) _ #[inner] _) =>
+      observesCheckedElement context collection index inner
+  | some (.operation (.primitive .index) _ #[inner, i] _) =>
+      (i == index && sameCollection context inner collection) ||
+        observesCheckedElement context collection index inner
+  | _ => false
+
+/-- Whether a binding holds a `checkVectorIndex` of the element that the
+check being considered tests -- the next level of one nested access, as
+`values[i][j]` lowers to a check of `values` at `i` and then of `values[i]`.
+Re-importing the sugar for such an access emits these checks, and the index
+each one needs, in exactly the order they already stand in, so reaching past
+one to the access does not move the check under consideration. A check of an
+unrelated collection carries no such guarantee: both can abort, and whichever
+runs first decides the error. -/
+private def checksNestedElement (context : Context) (collection index : ExprId)
+    (value : ExprId) : Bool :=
+  let kind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+  match kind with
+  | some (.operation (.primitive (.checkVectorIndex _)) _ #[checked, _] _) =>
+      observesCheckedElement context collection index checked
+  | _ => false
+
 /-- Whether the binding of `slot` holds the index that a `checkVectorIndex`
-at the head of its body tests. Both the validated body and the re-import
-evaluate that index before the check -- a failure computing it must precede
-the bounds failure -- so what follows such a binding is still reached with
-nothing else run in between. A binding is not that merely by being named
-like a temporary: validation reserves no local name. -/
-private def bindsCheckedIndex (context : Context) (slot : LocalId) (body : ExprId) : Bool :=
+at the head of its body tests, and that check tests the element of the access
+under consideration. The lowering emits such an index where it stands, so
+reaching past it does not move the check under consideration; a binding is
+not that merely by being named like a temporary, since validation reserves no
+local name. -/
+private def bindsCheckedIndex (context : Context) (collection index : ExprId)
+    (slot : LocalId) (body : ExprId) : Bool :=
   let bodyKind : Option ExprKind := (context.ns.expressions[body.index]?).map (·.kind)
   match bodyKind with
   | some (.letDecl pattern (some check) _) =>
@@ -1311,40 +1392,35 @@ private def bindsCheckedIndex (context : Context) (slot : LocalId) (body : ExprI
       let wildcard : Bool := match patternKind with
         | some .wildcard => true
         | _ => false
-      wildcard && (match checkKind with
-        | some (.operation (.primitive (.checkVectorIndex _)) _ #[_, index] _) =>
-            let indexKind : Option ExprKind := (context.ns.expressions[index.index]?).map (·.kind)
-            (match indexKind with
-              | some (.localVar read) => read == slot
-              | _ => false)
-        | _ => false)
+      wildcard && checksNestedElement context collection index check &&
+        (match checkKind with
+          | some (.operation (.primitive (.checkVectorIndex _)) _ #[_, checkedIndex] _) =>
+              let indexKind : Option ExprKind :=
+                (context.ns.expressions[checkedIndex.index]?).map (·.kind)
+              (match indexKind with
+                | some (.localVar read) => read == slot
+                | _ => false)
+          | _ => false)
   | _ => false
 
-/-- The children an expression evaluates first and unconditionally: its
-leading operands, a binding's value, a condition, a scrutinee, a block's
-first statement. A branch, a loop body, an operand behind one that acts, and
-what follows a binding are not among them, except past an inert index
-temporary that precedes an element access. -/
-private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
+/-- The children an expression evaluates first and unconditionally, for a
+search that is looking for the access implying the check of `collection` at
+`index`: its leading operands, a binding's value, a condition, a scrutinee, a
+block's first statement. A branch, a loop body, an operand behind one that
+acts, and what follows a binding are not among them, except the checks and
+index temporaries of the nested access that the check under consideration
+opens, which re-import emits in the order they already stand in. -/
+private def evaluatedFirst (context : Context) (collection index : ExprId) :
+    ExprKind → Array ExprId
   | .operation _ _ arguments _ => actingPrefix context arguments
   | .letDecl pattern (some value) body =>
       let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
-      -- Both arms here cross a binding that an earlier check's access may lie
-      -- beyond, which reorders that check against what the binding does. That
-      -- is a real defect, reported twice on this pull request, but narrowing
-      -- the arms is not a fix on its own: eliding is all-or-nothing per place
-      -- (`placeIndexesElided`), so when one of a nested place's checks stops
-      -- being elided the others are elided into a place that never gets the
-      -- sugar to carry them, and those checks are dropped outright. Losing a
-      -- check is worse than reordering two aborts, so the arms stay until the
-      -- elision decision is made per place rather than per check.
-      let valueKind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
-      let precedesAccess : Bool := match patternKind, valueKind with
-        | some .wildcard, some (.operation (.primitive (.checkVectorIndex _)) _ _ _) => true
-        | some (.variable slot), _ =>
+      let precedesAccess : Bool := match patternKind with
+        | some .wildcard => checksNestedElement context collection index value
+        | some (.variable slot) =>
             (context.locals[slot.index]?).any (·.name.startsWith "$t") &&
-              bindsCheckedIndex context slot body
-        | _, _ => false
+              bindsCheckedIndex context collection index slot body
+        | _ => false
       if precedesAccess then #[value, body] else #[value]
   | .letDecl _ none body => #[body]
   | .assign _ value => #[value]
@@ -1364,48 +1440,56 @@ private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
 rooted where `collection` looks or an element read of the same observation. -/
 private partial def indexesChecked (context : Context) (fuel : Nat) (collection index : ExprId)
     (value : ExprId) : Bool :=
-  let placeChecked (place : PlaceId) : Bool :=
-    let rec along : Nat → PlaceId → Bool
-      | 0, _ => false
-      | fuel + 1, place => match context.ns.places[place.index]? with
-        | some (.index base i) =>
-            (i == index && observesPlace context fuel collection base) || along fuel base
-        | some (.deref base) | some (.field base ..) | some (.subslice base ..) => along fuel base
-        | _ => false
-    along (context.ns.places.size + 1) place
   match fuel, context.ns.expressions[value.index]? with
   | 0, _ | _, none => false
   | fuel + 1, some expression =>
     let direct := match expression.kind with
       | .operation (.borrow _ place) _ _ _ | .operation (.read place) _ _ _ =>
-          placeChecked place
+          placeUnderCheck context collection index place
       -- An assignment evaluates its value before it resolves the place
       -- (`assignValue`), and the lowering of index sugar binds a value that is
       -- not a literal ahead of the bounds check. Only an inert value keeps the
       -- check first, so only then does the sugar imply this check.
-      | .assign place value => inertOperand context value && placeChecked place
+      | .assign place value => inertOperand context value && placeUnderCheck context collection index place
       | .operation (.primitive .index) _ #[inner, i] _ =>
-          let innerKind : Option ExprKind := (context.ns.expressions[inner.index]?).map (·.kind)
-          let collectionKind : Option ExprKind :=
-            (context.ns.expressions[collection.index]?).map (·.kind)
-          i == index && match innerKind, collectionKind with
-            | some (.operation (.read a) _ _ _), some (.operation (.read b) _ _ _) =>
-                samePlace context (context.ns.places.size + 1) a b
-            | some (.localVar a), some (.localVar b) => a == b
-            | _, _ => inner == collection
+          i == index && sameCollection context inner collection
       | _ => false
-    direct || (evaluatedFirst context expression.kind).any
+    direct || (evaluatedFirst context collection index expression.kind).any
       (indexesChecked context fuel collection index)
+
+/-- Whether the collection a check tests already has index sugar of its own,
+so a place reaching through it can carry this check once it is elided.
+Eliding is all-or-nothing per place: `placeIndexesElided` grants sugar only
+when every level of a place was elided, so a check elided into a place whose
+outer levels were not is carried by nothing and is simply gone. -/
+private partial def collectionIndexesElided (context : Context) (fuel : Nat)
+    (collection : ExprId) : Bool :=
+  match fuel, (context.ns.expressions[collection.index]?).map (·.kind) with
+  | 0, _ => false
+  | _, none => false
+  | fuel + 1, some kind => match kind with
+    | .operation (.read place) _ _ _ | .operation (.borrow _ place) _ _ _
+    | .operation (.move place) _ _ _ | .operation (.copy place) _ _ _ =>
+        placeIndexesElided context (context.ns.places.size + 1) place
+    | .operation (.reference .dereference) _ #[inner] _ =>
+        collectionIndexesElided context fuel inner
+    | .operation (.primitive .index) _ #[inner, i] _ =>
+        context.elidedIndexChecks.any (fun (elided, checked) =>
+          checked == i && sameCollection context inner elided) &&
+          collectionIndexesElided context fuel inner
+    | _ => true
 
 /-- A `checkVectorIndex` binding the surface implies: the continuation
 accesses the checked index of the checked vector through index sugar, whose
-re-import checks it again. -/
+re-import checks it again, and the collection it tests already carries its
+own sugar so that the access can keep this check. -/
 private def indexCheck? (context : Context) (pattern : PatternId) (value : ExprId)
     (body : ExprId) : Option (ExprId × ExprId) := do
   let patternNode ← context.ns.patterns[pattern.index]?
   let .wildcard := patternNode.kind | none
   let valueNode ← context.ns.expressions[value.index]?
   let .operation (.primitive (.checkVectorIndex _)) _ #[collection, index] _ := valueNode.kind | none
+  guard (collectionIndexesElided context (context.ns.expressions.size + 1) collection)
   guard (indexesChecked context (context.ns.expressions.size + 1) collection index body)
   some (collection, index)
 
@@ -1424,19 +1508,6 @@ private def indexTemporary? (context : Context) (pattern : PatternId) (body : Ex
   guard (read == slot)
   some slot
 
-/-- Whether every index of a place had its check elided, so the place can
-keep the surface's index sugar. -/
-private def placeIndexesElided (context : Context) : Nat → PlaceId → Bool
-  | 0, _ => false
-  | fuel + 1, id => match context.ns.places[id.index]? with
-    | some (.index base index) =>
-        context.elidedIndexChecks.any (fun (collection, checked) =>
-          checked == index && observesPlace context fuel collection base) &&
-          placeIndexesElided context fuel base
-    | some (.deref base) | some (.field base ..) | some (.downcast base _) |
-        some (.subslice base ..) => placeIndexesElided context fuel base
-    | some (.localVar _) => true
-    | _ => false
 
 /-- A hidden holder bound to a storage borrow.  A field-focused mutable
 borrow of a resource reborrows through such a holder, because a place is

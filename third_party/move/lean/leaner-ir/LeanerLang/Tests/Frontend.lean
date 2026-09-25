@@ -585,6 +585,19 @@ leaner module 0x42::nested_computed_index where
   fun borrow_nested(values : &mut Vector<Vector<u64> >, i : u64, j : u64) -> &mut u64 :=
     &mut values[i][j + 1]
 
+-- A check of an unrelated vector between a check and its access is not part
+-- of that access's nested group: both checks can abort, so whichever runs
+-- first decides the error, and eliding the earlier one moves it after this
+-- one. The earlier check stays spelled.
+leaner module 0x42::independent_check_between where
+  pragma verify = false
+  fun borrow_after_other(
+    checked : &mut Vector<u64>, other : &Vector<u64>, index : u64
+  ) -> &mut u64 := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*checked, index)
+    let _ := core.prim.checkVectorIndex[moveVectorError](*other, index)
+    core.borrowPlace(mut, checked[index])
+
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
     value : u64
@@ -1145,6 +1158,12 @@ elab "#guard_leaner_frontend" : command => do
       unless printed.contains "&mut values[i][j + 1]" &&
           !printed.contains "checkVectorIndex" && !printed.contains "borrowPlace" do
         throwError "a nested place at a computed index lost a bounds check:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».independent_check_between) with
+  | .error error => throwError "the independent-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*checked, index)" &&
+          printed.contains "core.prim.checkVectorIndex[moveVectorError](*other, index)" do
+        throwError "a bounds check was elided across an unrelated check:\n{printed}"
       match LeanerLang.Print.formatSource env printed with
       | .error error =>
           throwError "the nested computed-index fixture did not re-import: {error}"
