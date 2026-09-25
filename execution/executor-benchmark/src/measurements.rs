@@ -11,6 +11,7 @@ use aptos_executor::metrics::{
 };
 use aptos_logger::info;
 use aptos_metrics_core::Histogram;
+use aptos_vm::counters::BLOCK_EXECUTOR_CONCURRENCY;
 use move_core_types::language_storage::StructTag;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -303,6 +304,15 @@ impl OverallMeasurement {
         let num_txns = self.num_txns as f64;
 
         info!("{}: {}", self.prefix, self.metadata);
+
+        // The level the block executor actually ran at, which is not always the
+        // one asked for: MonoMove caps it at the number of arenas its global
+        // context was built with.
+        info!(
+            "{} block executor concurrency: {}",
+            self.prefix,
+            BLOCK_EXECUTOR_CONCURRENCY.get()
+        );
 
         info!(
             "{} TPS: {} txn/s (over {} txns, in {} s)",
