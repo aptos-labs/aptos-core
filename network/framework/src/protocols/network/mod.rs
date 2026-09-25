@@ -19,13 +19,30 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
-    stream::{FusedStream, Stream, StreamExt},
+    stream::{FusedStream, FuturesUnordered, Stream, StreamExt},
     task::{Context, Poll},
 };
 use futures_util::ready;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    collections::{HashMap, HashSet, VecDeque},
+    fmt::Debug,
+    future,
+    marker::PhantomData,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+};
+
+/// Keep at most one message waiting behind each peer's active deserialization.
+/// The lower network queue remains the primary buffer; this slot exists so a
+/// short normal burst does not immediately shed the second message.
+const MAX_PENDING_DESERIALIZATIONS_PER_PEER: usize = 1;
+/// Bound how many immediately-ready lower-network messages a single stream poll
+/// handles before yielding back to the runtime.
+const MAX_INPUT_MESSAGES_PER_POLL: usize = 64;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -214,19 +231,17 @@ impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEven
         // Determine the number of parallel deserialization tasks to use
         let max_parallel_deserialization_tasks = max_parallel_deserialization_tasks.unwrap_or(1);
 
-        let data_event_stream = peer_mgr_notifs_rx.map(|notification| {
-            tokio::task::spawn_blocking(move || received_message_to_event(notification))
-        });
-
         let data_event_stream: Pin<
             Box<dyn Stream<Item = Event<TMessage>> + Send + Sync + 'static>,
         > = if allow_out_of_order_delivery {
-            Box::pin(
-                data_event_stream
-                    .buffer_unordered(max_parallel_deserialization_tasks)
-                    .filter_map(|res| future::ready(res.expect("JoinError from spawn blocking"))),
-            )
+            Box::pin(PeerFairDeserializationStream::new(
+                peer_mgr_notifs_rx,
+                max_parallel_deserialization_tasks,
+            ))
         } else {
+            let data_event_stream = peer_mgr_notifs_rx.map(|notification| {
+                tokio::task::spawn_blocking(move || received_message_to_event(notification))
+            });
             Box::pin(
                 data_event_stream
                     .buffered(max_parallel_deserialization_tasks)
@@ -238,6 +253,150 @@ impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEven
             event_stream: data_event_stream,
             done: false,
             _marker: PhantomData,
+        }
+    }
+}
+
+/// Schedules at most one blocking deserialization per peer while retaining the
+/// configured global parallelism across different peers. A peer that is already
+/// active gets one pending slot; further messages from that peer are shed so the
+/// scheduler can continue discovering and serving other peers.
+struct PeerFairDeserializationStream<TMessage> {
+    input: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
+    in_flight: FuturesUnordered<tokio::task::JoinHandle<(PeerNetworkId, Option<Event<TMessage>>)>>,
+    active_peers: HashSet<PeerNetworkId>,
+    pending_by_peer: HashMap<PeerNetworkId, VecDeque<ReceivedMessage>>,
+    ready_peers: VecDeque<PeerNetworkId>,
+    max_in_flight: usize,
+    input_done: bool,
+}
+
+impl<TMessage: Message + Send + 'static> PeerFairDeserializationStream<TMessage> {
+    fn new(
+        input: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
+        max_in_flight: usize,
+    ) -> Self {
+        Self {
+            input,
+            in_flight: FuturesUnordered::new(),
+            active_peers: HashSet::new(),
+            pending_by_peer: HashMap::new(),
+            ready_peers: VecDeque::new(),
+            max_in_flight: max_in_flight.max(1),
+            input_done: false,
+        }
+    }
+
+    fn start_deserialization(&mut self, message: ReceivedMessage) {
+        let peer = message.sender;
+        assert!(self.active_peers.insert(peer));
+        self.in_flight.push(tokio::task::spawn_blocking(move || {
+            (peer, received_message_to_event(message))
+        }));
+    }
+
+    fn enqueue(&mut self, message: ReceivedMessage) {
+        let peer = message.sender;
+        if !self.active_peers.contains(&peer) && self.in_flight.len() < self.max_in_flight {
+            self.start_deserialization(message);
+            return;
+        }
+
+        let peer_is_active = self.active_peers.contains(&peer);
+        let pending = self.pending_by_peer.entry(peer).or_default();
+        if pending.len() < MAX_PENDING_DESERIALIZATIONS_PER_PEER {
+            pending.push_back(message);
+            if !peer_is_active {
+                self.ready_peers.push_back(peer);
+            }
+        } else {
+            let protocol = message.protocol_id_as_str();
+            crate::counters::NETWORK_DESERIALIZATION_BACKPRESSURE_DROPS
+                .with_label_values(&[protocol])
+                .inc();
+        }
+    }
+
+    fn schedule_pending(&mut self) {
+        while self.in_flight.len() < self.max_in_flight {
+            let Some(peer) = self.ready_peers.pop_front() else {
+                break;
+            };
+            if self.active_peers.contains(&peer) {
+                continue;
+            }
+
+            let (message, remove_queue) = {
+                let Some(pending) = self.pending_by_peer.get_mut(&peer) else {
+                    continue;
+                };
+                let Some(message) = pending.pop_front() else {
+                    continue;
+                };
+                (message, pending.is_empty())
+            };
+            if remove_queue {
+                self.pending_by_peer.remove(&peer);
+            } else {
+                self.ready_peers.push_back(peer);
+            }
+            self.start_deserialization(message);
+        }
+    }
+
+    fn poll_completed(&mut self, context: &mut Context) -> Option<Event<TMessage>> {
+        loop {
+            let Poll::Ready(Some(result)) = self.in_flight.poll_next_unpin(context) else {
+                return None;
+            };
+            let (peer, event) = result.expect("JoinError from spawn blocking");
+            assert!(self.active_peers.remove(&peer));
+            if self.pending_by_peer.contains_key(&peer) {
+                self.ready_peers.push_back(peer);
+            }
+            self.schedule_pending();
+            if event.is_some() {
+                return event;
+            }
+        }
+    }
+}
+
+impl<TMessage: Message + Send + 'static> Stream for PeerFairDeserializationStream<TMessage> {
+    type Item = Event<TMessage>;
+
+    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
+        self.schedule_pending();
+        if let Some(event) = self.poll_completed(context) {
+            return Poll::Ready(Some(event));
+        }
+
+        let mut messages_polled = 0;
+        while messages_polled < MAX_INPUT_MESSAGES_PER_POLL && !self.input_done {
+            match self.input.poll_next_unpin(context) {
+                Poll::Ready(Some(message)) => {
+                    messages_polled += 1;
+                    self.enqueue(message);
+                    self.schedule_pending();
+                },
+                Poll::Ready(None) => self.input_done = true,
+                Poll::Pending => break,
+            }
+        }
+
+        // Poll newly-created blocking tasks once so their completion wakers are
+        // registered before returning Pending.
+        if let Some(event) = self.poll_completed(context) {
+            return Poll::Ready(Some(event));
+        }
+
+        if self.input_done && self.in_flight.is_empty() && self.pending_by_peer.is_empty() {
+            Poll::Ready(None)
+        } else {
+            if messages_polled == MAX_INPUT_MESSAGES_PER_POLL {
+                context.waker().wake_by_ref();
+            }
+            Poll::Pending
         }
     }
 }
@@ -480,5 +639,106 @@ pub trait SerializedRequest {
     /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]
     fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
         self.protocol_id().from_bytes(self.data())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocols::wire::messaging::v1::DirectSendMsg;
+    use aptos_channels::message_queues::QueueStyle;
+    use aptos_config::network_id::NetworkId;
+    use serde::{Deserialize, Deserializer};
+
+    #[derive(Debug, Eq, PartialEq, Serialize)]
+    struct DelayedMessage {
+        delay_ms: u64,
+        id: u8,
+    }
+
+    impl<'de> Deserialize<'de> for DelayedMessage {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct WireMessage {
+                delay_ms: u64,
+                id: u8,
+            }
+
+            let message = WireMessage::deserialize(deserializer)?;
+            std::thread::sleep(Duration::from_millis(message.delay_ms));
+            Ok(Self {
+                delay_ms: message.delay_ms,
+                id: message.id,
+            })
+        }
+    }
+
+    fn received_message(peer: PeerId, message: DelayedMessage) -> ReceivedMessage {
+        let protocol = ProtocolId::ConsensusDirectSendBcs;
+        let raw_msg = protocol.to_bytes(&message).unwrap();
+        ReceivedMessage::new(
+            NetworkMessage::DirectSendMsg(DirectSendMsg {
+                protocol_id: protocol,
+                priority: 0,
+                raw_msg,
+            }),
+            PeerNetworkId::new(NetworkId::Validator, peer),
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn busy_peer_cannot_fill_all_deserialization_slots() {
+        let protocol = ProtocolId::ConsensusDirectSendBcs;
+        let attacker = PeerId::random();
+        let honest_peer = PeerId::random();
+        let (sender, receiver) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let mut events = NetworkEvents::<DelayedMessage>::new(receiver, Some(2), true);
+
+        sender
+            .push(
+                (attacker, protocol),
+                received_message(attacker, DelayedMessage {
+                    delay_ms: 250,
+                    id: 1,
+                }),
+            )
+            .unwrap();
+        sender
+            .push(
+                (attacker, protocol),
+                received_message(attacker, DelayedMessage {
+                    delay_ms: 250,
+                    id: 2,
+                }),
+            )
+            .unwrap();
+
+        // Poll once so both attacker messages enter the scheduler before the
+        // honest message arrives. Only one may start deserializing.
+        let next_event = events.next();
+        tokio::pin!(next_event);
+        tokio::select! {
+            event = &mut next_event => panic!("slow attacker unexpectedly completed: {event:?}"),
+            _ = tokio::time::sleep(Duration::from_millis(25)) => {},
+        }
+
+        sender
+            .push(
+                (honest_peer, protocol),
+                received_message(honest_peer, DelayedMessage { delay_ms: 0, id: 3 }),
+            )
+            .unwrap();
+
+        let event = tokio::time::timeout(Duration::from_millis(100), &mut next_event)
+            .await
+            .expect("honest peer should use the other deserialization slot")
+            .expect("network event stream ended unexpectedly");
+        assert_eq!(
+            event,
+            Event::Message(honest_peer, DelayedMessage { delay_ms: 0, id: 3 },)
+        );
     }
 }
