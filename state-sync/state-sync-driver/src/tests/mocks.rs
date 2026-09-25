@@ -4,6 +4,7 @@
 use crate::{
     error::Error,
     metadata_storage::MetadataStorageInterface,
+    snapshot_kind::SnapshotKind,
     storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
     tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info},
 };
@@ -314,18 +315,18 @@ mock! {
         fn is_snapshot_sync_complete(
             &self,
             target_ledger_info: &LedgerInfoWithSignatures,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<bool, Error>;
 
         fn get_last_persisted_index(
             &self,
             target_ledger_info: &LedgerInfoWithSignatures,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<u64, Error>;
 
         fn previous_snapshot_sync_target(
             &self,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<Option<LedgerInfoWithSignatures>, Error>;
 
         fn update_last_persisted_index(
@@ -333,7 +334,7 @@ mock! {
             target_ledger_info: &LedgerInfoWithSignatures,
             last_persisted_index: u64,
             snapshot_sync_completed: bool,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<(), Error>;
     }
 
@@ -364,6 +365,12 @@ mock! {
             version: Version,
             start_index: Option<u64>,
             state_kind: StateKind,
+        ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
+
+        async fn get_all_hot_state_values(
+            &self,
+            version: Version,
+            start_index: Option<u64>,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(
