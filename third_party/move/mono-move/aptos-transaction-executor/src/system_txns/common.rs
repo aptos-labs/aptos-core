@@ -22,7 +22,7 @@ use mono_move_core::{
 };
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
-use mono_move_runtime::{CallBuilder, InterpreterContext, SessionEffects};
+use mono_move_runtime::{CallBuilder, InterpreterContext};
 use move_core_types::account_address::AccountAddress;
 
 /// The VM's signer (`0x0`), which every `0x1::block` call runs as.
@@ -107,17 +107,16 @@ pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>) -> TxnOutcome {
     }
 }
 
-/// Closes a system session whose writes are not published. The block either
-/// aborts or absorbs the failure, so the writes are dropped, but the reads
-/// still have to be validated — hence the effects come back to the caller.
-/// Finishing is also what returns the worker's stack and heap.
+/// Closes a system session whose effects are not published. The block either
+/// aborts or absorbs the failure, so the effects are dropped; finishing is what
+/// returns the worker's stack and heap.
 ///
 /// Closing can still fail on its own — evacuation runs here — so the caller
 /// decides what a second failure means.
-pub(super) fn finish_system_session(
+pub(super) fn discard_system_session(
     interp: InterpreterContext<'_>,
-) -> Result<SessionEffects, VMInternalError> {
-    interp.finish()
+) -> Result<(), VMInternalError> {
+    interp.finish().map(drop)
 }
 
 /// Calls `0x1::block::<function>` as the VM, with `place` filling the call

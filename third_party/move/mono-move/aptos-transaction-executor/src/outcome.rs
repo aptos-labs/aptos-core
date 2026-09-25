@@ -39,12 +39,12 @@ pub enum TxnOutcome {
     Interrupted,
     /// Committed with no side effects and a zero fee. The reason distinguishes
     /// a transaction that had nothing to do from a block epilogue whose
-    /// failure was absorbed; both render as an empty success. The effects are
-    /// kept for the same reason as in [`Self::Discarded`].
-    ExecutedNoEffects {
-        reason: NoEffectsReason,
-        effects: Option<SessionEffects>,
-    },
+    /// failure was absorbed; both render as an empty success.
+    //
+    // TODO(correctness): revisit for hot-state parity. The legacy VM promotes
+    // the read-only keys of a failed block epilogue, so the failed session's
+    // read keys need to be preserved here.
+    ExecutedNoEffects(NoEffectsReason),
     /// Executed: the fee is charged and the side effects are real, whether or
     /// not the payload succeeded.
     Executed {
@@ -65,10 +65,11 @@ impl TxnOutcome {
     pub fn read_write_set(&self) -> Option<&ResourceReadWriteSet> {
         match self {
             TxnOutcome::Executed { effects, .. } => Some(effects.read_write_set()),
-            TxnOutcome::Discarded { effects, .. }
-            | TxnOutcome::ExecutedNoEffects { effects, .. } => {
+            TxnOutcome::Discarded { effects, .. } => {
                 effects.as_ref().map(SessionEffects::read_write_set)
             },
+            // Nothing to commit or to validate.
+            TxnOutcome::ExecutedNoEffects(_) => None,
             // The block is aborted, so there is nothing left to validate.
             TxnOutcome::UnexpectedSystemTransactionFailure(_) | TxnOutcome::Panic(_) => None,
             // The incarnation is re-executed, so its reads are not validated.
@@ -85,7 +86,7 @@ impl TxnOutcome {
             | TxnOutcome::UnexpectedSystemTransactionFailure(_)
             | TxnOutcome::Panic(_)
             | TxnOutcome::Interrupted
-            | TxnOutcome::ExecutedNoEffects { .. } => Ok(false),
+            | TxnOutcome::ExecutedNoEffects(_) => Ok(false),
         }
     }
 
@@ -131,7 +132,7 @@ impl TxnOutcome {
             TxnOutcome::Interrupted => Err(MaterializationError::new(vec![
                 "interrupted transaction has no output".to_string(),
             ])),
-            TxnOutcome::ExecutedNoEffects { .. } => Ok((
+            TxnOutcome::ExecutedNoEffects(_) => Ok((
                 materialize::empty_success_output(auxiliary_data),
                 MaterializedGroups::new(),
             )),
