@@ -9,6 +9,10 @@ The calibrated quantity is a speedup ratio -- MonoMove throughput over V1 MoveVM
 throughput on the same recorded blocks -- not an absolute TPS. Machine speed
 cancels out of a ratio, so these numbers stay meaningful across runner changes in
 a way absolute TPS does not.
+
+The sequential and the parallel job each get their own file. A speedup measured
+at one execution-thread count says nothing about another: the two VMs contend
+for cores differently, so the ratios are not comparable.
 """
 
 import argparse
@@ -21,11 +25,17 @@ from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TSV_PATH = os.path.join(HERE, "e2e_perf_speedup.tsv")
+PARALLEL_TSV_PATH = os.path.join(HERE, "e2e_perf_speedup_parallel.tsv")
 
-# The Humio grep key and the CI job name. The job name is what the query filters
-# on, so renaming the job in the workflow empties the calibration history.
+# The Humio grep key and the CI job names. The job name is what the query filters
+# on, so renaming a job in its workflow empties that job's calibration history.
 GREP_KEY = "grep_json_mono_move_e2e_perf"
 JOB_NAME = "mono-move-e2e-perf"
+PARALLEL_JOB_NAME = "mono-move-e2e-perf-parallel"
+
+# The execution-thread count the parallel job runs at, and the one its bands are
+# measured at. Matches the concurrency level a production node runs with.
+PARALLEL_EXECUTION_THREADS = 16
 
 # A drift backed by fewer than this many runs in the query window is too noisy to
 # act on, so the row keeps its calibrated value until enough runs accumulate.
@@ -90,6 +100,11 @@ BAND_DEVIATIONS = 3.0
 # `output_bytes_per_txn` row) gets no band at all. Has to sit above the
 # self-compare deviation measured on the runner.
 BAND_FLOOR = 0.03
+
+
+def calibration_path(execution_threads):
+    """The calibration file a run at this thread count reads and writes."""
+    return TSV_PATH if execution_threads == 1 else PARALLEL_TSV_PATH
 
 
 def speedup_band(median_speedup, num_samples, lowest_over_median, highest_over_median):
@@ -181,9 +196,9 @@ def query_humio(query_string, time_interval):
     return resp.text.strip()
 
 
-def humio_query(branch):
+def humio_query(branch, job_name):
     prefix = f"""
-        github.job.name = "{JOB_NAME}"
+        github.job.name = "{job_name}"
         | github.workflow.head_branch = "{branch or "main"}"
         | "{GREP_KEY}"
         | parseJson(message)
@@ -202,8 +217,8 @@ def humio_query(branch):
     )
 
 
-def rows_from_humio(branch, time_interval):
-    response = query_humio(humio_query(branch), time_interval)
+def rows_from_humio(branch, job_name, time_interval):
+    response = query_humio(humio_query(branch, job_name), time_interval)
     rows = []
     for line in response.split("\n"):
         if not line.strip():
@@ -373,20 +388,32 @@ def parse_args():
         help="Aggregate these runner logs instead of querying Humio",
     )
     parser.add_argument(
-        "--output",
-        default=TSV_PATH,
-        help="Calibration file to update",
+        "--parallel",
+        action="store_true",
+        help=(
+            f"Calibrate the parallel job ({PARALLEL_EXECUTION_THREADS} execution "
+            f"threads) instead of the sequential one"
+        ),
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--output",
+        help="Calibration file to update; defaults to the one --parallel selects",
+    )
+    args = parser.parse_args()
+    # The job name and the file have to agree, so one flag picks both.
+    if args.output is None:
+        args.output = PARALLEL_TSV_PATH if args.parallel else TSV_PATH
+    return args
 
 
 def main():
     args = parse_args()
+    job_name = PARALLEL_JOB_NAME if args.parallel else JOB_NAME
 
     if args.from_jsonl:
         rows = rows_from_jsonl(args.from_jsonl)
     else:
-        rows = rows_from_humio(args.branch, args.time_interval)
+        rows = rows_from_humio(args.branch, job_name, args.time_interval)
 
     if not rows:
         print("No samples found; nothing to calibrate.")
