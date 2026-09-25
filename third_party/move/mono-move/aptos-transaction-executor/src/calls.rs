@@ -24,9 +24,31 @@ pub(crate) fn resolve_function_by_name<'a>(
     interp.load_function(module_id, function, ty_args)
 }
 
-/// Calls `module::function<ty_args>` as system code: nothing consumes the
-/// transaction's gas budget, `signers` fill the leading signer parameters,
+/// Calls `module::function<ty_args>` as system code, metered against the
+/// transaction's gas budget: `signers` fill the leading signer parameters,
 /// and `place` fills the rest.
+pub(crate) fn call_system_function<'a>(
+    guard: &ExecutionGuard<'a>,
+    interp: &mut InterpreterContext<'a>,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+    function_name: &IdentStr,
+    ty_args: InternedTypeList,
+    signers: &[AccountAddress],
+    place: impl FnOnce(&mut CallBuilder<'_, '_>) -> Result<(), VMInternalError>,
+) -> Result<RuntimeStatus, VMInternalError> {
+    let func =
+        resolve_function_by_name(guard, interp, address, module_name, function_name, ty_args)?;
+    let mut call = interp.build_call(func)?;
+    for signer in signers {
+        call.signer(signer)?;
+    }
+    place(&mut call)?;
+    call.run()
+}
+
+/// Like `call_system_function`, but nothing consumes the transaction's gas
+/// budget.
 pub(crate) fn call_system_function_unmetered<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
@@ -38,13 +60,15 @@ pub(crate) fn call_system_function_unmetered<'a>(
     place: impl FnOnce(&mut CallBuilder<'_, '_>) -> Result<(), VMInternalError>,
 ) -> Result<RuntimeStatus, VMInternalError> {
     interp.unmetered(|interp| {
-        let func =
-            resolve_function_by_name(guard, interp, address, module_name, function_name, ty_args)?;
-        let mut call = interp.build_call(func)?;
-        for signer in signers {
-            call.signer(signer)?;
-        }
-        place(&mut call)?;
-        call.run()
+        call_system_function(
+            guard,
+            interp,
+            address,
+            module_name,
+            function_name,
+            ty_args,
+            signers,
+            place,
+        )
     })
 }

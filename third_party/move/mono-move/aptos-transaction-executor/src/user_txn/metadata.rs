@@ -4,7 +4,9 @@
 use aptos_types::transaction::{
     authenticator::AnySignature,
     user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+    AuxiliaryInfo, EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SessionId,
+    SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionPayload,
+    TransactionPayloadInner,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -42,12 +44,27 @@ pub(crate) struct TxnMetadata {
     /// The transaction's index within its block and whether it comes from block
     /// execution or validation/simulation.
     pub transaction_index_kind: TransactionIndexKind,
+    /// The entry function the transaction calls directly, for the natives that
+    /// inspect it.
+    pub entry_function_payload: Option<EntryFunction>,
+    /// The multisig account and the payload provided for it, for the natives
+    /// that inspect them.
+    pub multisig_payload: Option<Multisig>,
 }
 
 impl TxnMetadata {
     pub fn new(txn: &SignedTransaction, aux_info: &AuxiliaryInfo) -> Self {
         let transaction_index_kind = aux_info.transaction_index_kind();
         let script_hash = txn.payload().script_hash();
+        let entry_function_payload = if txn.payload().is_multisig() {
+            None
+        } else if let Ok(TransactionExecutableRef::EntryFunction(entry)) =
+            txn.payload().executable_ref()
+        {
+            Some(entry.clone())
+        } else {
+            None
+        };
         let session_id = SessionId::txn(
             txn.sender(),
             txn.replay_protector(),
@@ -93,6 +110,8 @@ impl TxnMetadata {
             script_hash,
             session_counter: session_id.session_counter(),
             transaction_index_kind,
+            entry_function_payload,
+            multisig_payload: multisig_payload(txn.payload()),
         }
     }
 
@@ -101,9 +120,6 @@ impl TxnMetadata {
     }
 
     /// Builds the user transaction context used by some native functions.
-    //
-    // TODO(completeness): `entry_function_payload` and `multisig_payload` are
-    // left `None`; no implemented mono-move native reads them yet.
     pub(crate) fn as_user_transaction_context(&self) -> UserTransactionContext {
         UserTransactionContext::new(
             self.sender,
@@ -112,11 +128,59 @@ impl TxnMetadata {
             self.max_gas_amount,
             self.gas_unit_price,
             self.chain_id,
-            None,
-            None,
+            self.entry_function_payload
+                .as_ref()
+                .map(EntryFunction::as_entry_function_payload),
+            self.multisig_payload
+                .as_ref()
+                .map(Multisig::as_multisig_payload),
             self.transaction_index_kind,
             self.is_encrypted_txn,
             self.is_orderless(),
         )
+    }
+}
+
+/// The multisig account and the payload provided for it, if the transaction
+/// is a multisig transaction. Only an entry function counts as provided.
+fn multisig_payload(payload: &TransactionPayload) -> Option<Multisig> {
+    match payload {
+        TransactionPayload::Multisig(multisig) => Some(multisig.clone()),
+        TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable,
+            extra_config,
+        }) => extra_config
+            .multisig_address()
+            .map(|multisig_address| Multisig {
+                multisig_address,
+                transaction_payload: match executable {
+                    TransactionExecutable::EntryFunction(entry) => {
+                        Some(MultisigTransactionPayload::EntryFunction(entry.clone()))
+                    },
+                    TransactionExecutable::Script(_)
+                    | TransactionExecutable::Empty
+                    | TransactionExecutable::Encrypted => None,
+                },
+            }),
+        TransactionPayload::EncryptedPayload(encrypted) => encrypted
+            .extra_config()
+            .multisig_address()
+            .map(|multisig_address| Multisig {
+                multisig_address,
+                transaction_payload: match encrypted.executable_ref() {
+                    Ok(TransactionExecutableRef::EntryFunction(entry)) => {
+                        Some(MultisigTransactionPayload::EntryFunction(entry.clone()))
+                    },
+                    Ok(
+                        TransactionExecutableRef::Script(_)
+                        | TransactionExecutableRef::Empty
+                        | TransactionExecutableRef::Encrypted,
+                    )
+                    | Err(_) => None,
+                },
+            }),
+        TransactionPayload::Script(_)
+        | TransactionPayload::ModuleBundle(_)
+        | TransactionPayload::EntryFunction(_) => None,
     }
 }

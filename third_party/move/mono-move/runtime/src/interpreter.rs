@@ -724,8 +724,8 @@ impl<'guard> InterpreterContext<'guard> {
     /// BCS-serializes the value a successfully completed root call returned.
     /// Call only after a successful run, with `ty` that call's return type;
     /// the result lives at the start of the root frame's shared
-    /// parameter/return region. For tests.
-    pub fn serialize_root_result_for_test(&self, ty: InternedType) -> VMResult<Vec<u8>> {
+    /// parameter/return region.
+    pub fn serialize_root_result(&self, ty: InternedType) -> VMResult<Vec<u8>> {
         // SAFETY: the caller guarantees a completed call whose return value
         // of type `ty` sits at the region start; the context's heap still
         // owns every reachable object, and the guard outlives the context.
