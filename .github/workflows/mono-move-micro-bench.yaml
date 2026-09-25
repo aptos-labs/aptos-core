@@ -25,7 +25,7 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository
       )
     runs-on: benchmark-c3d-60
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -38,30 +38,35 @@ jobs:
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      # Copy the bench tooling out of the worktree, since the A/B driver checks
-      # out other refs and would otherwise replace the running scripts.
-      - name: Stage bench tooling
-        run: |
-          mkdir -p "$RUNNER_TEMP/perf"
-          cp third_party/move/mono-move/testsuite/benches/perf/compare.py \
-             third_party/move/mono-move/testsuite/benches/perf/run.sh \
-             third_party/move/mono-move/testsuite/benches/perf/config.json \
-             "$RUNNER_TEMP/perf/"
-
       - name: Run A/B benchmark gate
         id: gate
+        env:
+          # The PR's own base branch, so a stacked PR is measured on its own change.
+          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
         run: |
           set +e
-          # run.sh resolves the merge-base of HEAD_SHA and origin/main itself.
-          bash "$RUNNER_TEMP/perf/run.sh" ab \
-            origin/main "$HEAD_SHA" \
+          # run.sh resolves the merge-base of HEAD_SHA and BASE_REF itself.
+          bash third_party/move/mono-move/testsuite/benches/perf/run.sh ab \
+            "$BASE_REF" "$HEAD_SHA" \
             --out "$RUNNER_TEMP/mono-move-bench.md"
           code=$?
-          if [ ! -f "$RUNNER_TEMP/mono-move-bench.md" ]; then
-            printf '### mono-move benchmark gate\n\nBenches failed to run (build or runtime error). See job logs.\n' \
-              > "$RUNNER_TEMP/mono-move-bench.md"
+          # compare.py writes the report before reporting a regression, so a
+          # missing report means the run failed rather than regressed.
+          if [ "$code" = 1 ] && [ ! -f "$RUNNER_TEMP/mono-move-bench.md" ]; then
+            code=2
           fi
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      # Always replace the PR comment, so a gate that never finished (build or
+      # run failure, timeout, cancellation, setup failure) does not leave an
+      # earlier push's report in place.
+      - name: Ensure report exists
+        if: always()
+        run: |
+          if [ ! -f "$RUNNER_TEMP/mono-move-bench.md" ]; then
+            printf '### mono-move benchmark gate\n\nThe gate did not produce a report (build or run failure, timeout, or setup failure). See the job logs.\n' \
+              > "$RUNNER_TEMP/mono-move-bench.md"
+          fi
 
       - name: Write step summary
         if: always()
@@ -77,8 +82,14 @@ jobs:
           recreate: true
           path: ${{ runner.temp }}/mono-move-bench.md
 
-      - name: Fail on regression
+      - name: Fail on regression or bench error
         if: ${{ steps.gate.outputs.exit_code != '0' }}
+        env:
+          EXIT_CODE: ${{ steps.gate.outputs.exit_code }}
         run: |
-          echo "mono-move benchmark gate failed: regression beyond the noise band." >&2
+          if [ "$EXIT_CODE" = "1" ]; then
+            echo "mono-move benchmark gate failed: a gated bench regressed beyond the threshold. See the report above." >&2
+          else
+            echo "mono-move benchmark gate failed: benches did not build or run cleanly. See the job logs." >&2
+          fi
           exit 1

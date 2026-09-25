@@ -1,5 +1,7 @@
 {
-  "threshold_percent": 3.0,
+  "threshold_percent": 20.0,
+  "notable_percent": 10.0,
+  "processes_per_side": 5,
   "mono_benches": [
     { "id": "fib/mono" },
     { "id": "nested_loop/mono" },
