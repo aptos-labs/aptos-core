@@ -6,6 +6,7 @@
 
 use super::{
     entry_func::call_entry_function,
+    keyless::validate_keyless_authenticators,
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
     script::run_script,
@@ -61,6 +62,10 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ======================== Pre-execution checks ========================
         // Reject what this executor cannot execute, before touching any state.
+        //
+        // A keyless authenticator is proved here, in Rust: the Move prologue
+        // only ever sees the auth key it resolves to.
+        validate_keyless_authenticators(txn, self.env, guard, self.data_provider)?;
         let txn_data = TxnMetadata::new(txn, aux_info);
         let gas_params = self.env.gas_params().as_ref().map_err(|e| {
             DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
