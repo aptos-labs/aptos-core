@@ -1262,12 +1262,26 @@ private partial def observesPlace (context : Context) (fuel : Nat) (value : Expr
         i == j && observesPlace context fuel inner base
     | _, _ => false
 
+/-- Whether a place is reached without an index, so reading it neither
+aborts nor gains an implied bounds check when index sugar is re-imported. -/
+private def indexFreePlace (context : Context) (place : PlaceId) : Bool :=
+  let rec along : Nat → PlaceId → Bool
+    | 0, _ => false
+    | fuel + 1, place => match context.ns.places[place.index]? with
+      | some (.localVar _) => true
+      | some (.deref base) | some (.field base ..) => along fuel base
+      | _ => false
+  along (context.ns.places.size + 1) place
+
 /-- Whether an operand evaluates with no effect and no abort, so an operand
-after it still runs before anything observable. -/
+after it still runs before anything observable: a literal, a local, and a
+read of a place no index leads to. -/
 private def inertOperand (context : Context) (operand : ExprId) : Bool :=
   let kind : Option ExprKind := (context.ns.expressions[operand.index]?).map (·.kind)
   match kind with
   | some (.value ..) | some (.localVar _) => true
+  | some (.operation (.move place) _ _ _) | some (.operation (.copy place) _ _ _)
+  | some (.operation (.read place) _ _ _) => indexFreePlace context place
   | _ => false
 
 /-- The prefix of a left-to-right operand list that still evaluates before
@@ -1326,8 +1340,13 @@ private partial def indexesChecked (context : Context) (fuel : Nat) (collection 
   | 0, _ | _, none => false
   | fuel + 1, some expression =>
     let direct := match expression.kind with
-      | .operation (.borrow _ place) _ _ _ | .operation (.read place) _ _ _ | .assign place _ =>
+      | .operation (.borrow _ place) _ _ _ | .operation (.read place) _ _ _ =>
           placeChecked place
+      -- An assignment evaluates its value before it resolves the place
+      -- (`assignValue`), and the lowering of index sugar binds a value that is
+      -- not a literal ahead of the bounds check. Only an inert value keeps the
+      -- check first, so only then does the sugar imply this check.
+      | .assign place value => inertOperand context value && placeChecked place
       | .operation (.primitive .index) _ #[inner, i] _ =>
           let innerKind : Option ExprKind := (context.ns.expressions[inner.index]?).map (·.kind)
           let collectionKind : Option ExprKind :=

@@ -900,6 +900,9 @@ mutual
         let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector τ, vector => do
+            -- Both searches compare elements with `NTy.eqb`, which is `false`
+            -- at a reference whatever the executor's value equality reports.
+            unless τ.refFree do notCarried "a search for a value holding a reference"
             let needle ← (← compileExpr unit function ρ Γ ns namespaceId fuel needle).at? τ
             .ok (.at .bool (.contains vector needle))
         | _, _ => notCarried "a search in a non-vector"
@@ -907,6 +910,7 @@ mutual
         let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector τ, vector => do
+            unless τ.refFree do notCarried "a search for a value holding a reference"
             let needle ← (← compileExpr unit function ρ Γ ns namespaceId fuel needle).at? τ
             .ok (.at (.tuple (.cons .bool (.cons (.int 64 false) .nil))) (.indexOf vector needle))
         | _, _ => notCarried "a search in a non-vector"
