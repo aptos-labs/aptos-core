@@ -526,20 +526,6 @@ macro_rules! strat {
     };
 }
 
-/// Strategy that produces nonzero values of `$ty` (for Div / Mod imm,
-/// which the verifier rejects when imm == 0).
-macro_rules! nonzero {
-    (U256) => {
-        u256_strategy().prop_filter("nonzero", |v| *v != U256::ZERO)
-    };
-    (I256) => {
-        i256_strategy().prop_filter("nonzero", |v| *v != I256::ZERO)
-    };
-    ($ty:tt) => {
-        any::<$ty>().prop_filter("nonzero", |v| *v != 0)
-    };
-}
-
 /// Build a [`U256`] from a `u8`. Used by the U256 shift reference impl.
 fn u256_from_u8(s: u8) -> U256 {
     let mut bytes = [0u8; 32];
@@ -657,9 +643,9 @@ macro_rules! prop_imm {
     };
 }
 
-/// Arithmetic imm property: runtime matches `$ref_fn(a, imm) -> Option<T>`.
-/// `$imm_strategy` is bounded for Div / Mod kinds (must be nonzero) and
-/// open for Add / Sub / Mul. Default → unspec; flag → u64-specialized.
+/// Compares immediate arithmetic with `$ref_fn(a, imm) -> Option<T>`.
+/// Specialized u64 division and remainder require nonzero immediates.
+/// Uses unspecialized ops unless the `specialized` flag is supplied.
 macro_rules! prop_arith_imm {
     ($name:ident, $ty:tt, $kind:ident, $imm_strategy:expr, $ref_fn:expr) => {
         proptest! {
@@ -703,10 +689,9 @@ macro_rules! prop_bit_imm {
     };
 }
 
-/// Shift imm property. `$imm_strategy` is bounded to `0..bit_width($ty)`
-/// for native widths so the verifier accepts the op; u256 uses
-/// `any::<u8>()` because u8 caps at 255 < 256 = bit_width. Default →
-/// unspec; flag → u64-specialized.
+/// Tests immediate shifts with `any::<u8>()` for checked, unspecialized ops
+/// and `0..64` for unchecked u64 ops, matching lowering's guarantee.
+/// Uses unspecialized ops unless the `specialized` flag is supplied.
 macro_rules! prop_shift_imm {
     ($name:ident, $ty:tt, $kind:ident, $imm_strategy:expr, $ref_fn:expr) => {
         proptest! {
@@ -946,26 +931,26 @@ prop_shift!(u256_shr, U256, Shr, |a: U256, s: u8| Some(
 prop_arith_imm!(u8_add_imm, u8, Add, strat!(u8), u8::checked_add);
 prop_arith_imm!(u8_sub_imm, u8, Sub, strat!(u8), u8::checked_sub);
 prop_arith_imm!(u8_mul_imm, u8, Mul, strat!(u8), u8::checked_mul);
-prop_arith_imm!(u8_div_imm, u8, Div, nonzero!(u8), u8::checked_div);
-prop_arith_imm!(u8_mod_imm, u8, Mod, nonzero!(u8), u8::checked_rem);
+prop_arith_imm!(u8_div_imm, u8, Div, strat!(u8), u8::checked_div);
+prop_arith_imm!(u8_mod_imm, u8, Mod, strat!(u8), u8::checked_rem);
 
 prop_arith_imm!(u16_add_imm, u16, Add, strat!(u16), u16::checked_add);
 prop_arith_imm!(u16_sub_imm, u16, Sub, strat!(u16), u16::checked_sub);
 prop_arith_imm!(u16_mul_imm, u16, Mul, strat!(u16), u16::checked_mul);
-prop_arith_imm!(u16_div_imm, u16, Div, nonzero!(u16), u16::checked_div);
-prop_arith_imm!(u16_mod_imm, u16, Mod, nonzero!(u16), u16::checked_rem);
+prop_arith_imm!(u16_div_imm, u16, Div, strat!(u16), u16::checked_div);
+prop_arith_imm!(u16_mod_imm, u16, Mod, strat!(u16), u16::checked_rem);
 
 prop_arith_imm!(u32_add_imm, u32, Add, strat!(u32), u32::checked_add);
 prop_arith_imm!(u32_sub_imm, u32, Sub, strat!(u32), u32::checked_sub);
 prop_arith_imm!(u32_mul_imm, u32, Mul, strat!(u32), u32::checked_mul);
-prop_arith_imm!(u32_div_imm, u32, Div, nonzero!(u32), u32::checked_div);
-prop_arith_imm!(u32_mod_imm, u32, Mod, nonzero!(u32), u32::checked_rem);
+prop_arith_imm!(u32_div_imm, u32, Div, strat!(u32), u32::checked_div);
+prop_arith_imm!(u32_mod_imm, u32, Mod, strat!(u32), u32::checked_rem);
 
 prop_arith_imm!(u64_add_imm, u64, Add, any::<u64>(), u64::checked_add);
 prop_arith_imm!(u64_sub_imm, u64, Sub, any::<u64>(), u64::checked_sub);
 prop_arith_imm!(u64_mul_imm, u64, Mul, any::<u64>(), u64::checked_mul);
-prop_arith_imm!(u64_div_imm, u64, Div, 1u64.., u64::checked_div);
-prop_arith_imm!(u64_mod_imm, u64, Mod, 1u64.., u64::checked_rem);
+prop_arith_imm!(u64_div_imm, u64, Div, strat!(u64), u64::checked_div);
+prop_arith_imm!(u64_mod_imm, u64, Mod, strat!(u64), u64::checked_rem);
 
 prop_arith_imm!(
     u64_add_imm_specialized,
@@ -1011,50 +996,50 @@ prop_arith_imm!(
 prop_arith_imm!(u128_add_imm, u128, Add, strat!(u128), u128::checked_add);
 prop_arith_imm!(u128_sub_imm, u128, Sub, strat!(u128), u128::checked_sub);
 prop_arith_imm!(u128_mul_imm, u128, Mul, strat!(u128), u128::checked_mul);
-prop_arith_imm!(u128_div_imm, u128, Div, nonzero!(u128), u128::checked_div);
-prop_arith_imm!(u128_mod_imm, u128, Mod, nonzero!(u128), u128::checked_rem);
+prop_arith_imm!(u128_div_imm, u128, Div, strat!(u128), u128::checked_div);
+prop_arith_imm!(u128_mod_imm, u128, Mod, strat!(u128), u128::checked_rem);
 
 prop_arith_imm!(u256_add_imm, U256, Add, u256_strategy(), U256::checked_add);
 prop_arith_imm!(u256_sub_imm, U256, Sub, u256_strategy(), U256::checked_sub);
 prop_arith_imm!(u256_mul_imm, U256, Mul, u256_strategy(), U256::checked_mul);
-prop_arith_imm!(u256_div_imm, U256, Div, nonzero!(U256), U256::checked_div);
-prop_arith_imm!(u256_mod_imm, U256, Mod, nonzero!(U256), U256::checked_rem);
+prop_arith_imm!(u256_div_imm, U256, Div, strat!(U256), U256::checked_div);
+prop_arith_imm!(u256_mod_imm, U256, Mod, strat!(U256), U256::checked_rem);
 
 prop_arith_imm!(i8_add_imm, i8, Add, strat!(i8), i8::checked_add);
 prop_arith_imm!(i8_sub_imm, i8, Sub, strat!(i8), i8::checked_sub);
 prop_arith_imm!(i8_mul_imm, i8, Mul, strat!(i8), i8::checked_mul);
-prop_arith_imm!(i8_div_imm, i8, Div, nonzero!(i8), i8::checked_div);
-prop_arith_imm!(i8_mod_imm, i8, Mod, nonzero!(i8), i8::checked_rem);
+prop_arith_imm!(i8_div_imm, i8, Div, strat!(i8), i8::checked_div);
+prop_arith_imm!(i8_mod_imm, i8, Mod, strat!(i8), i8::checked_rem);
 
 prop_arith_imm!(i16_add_imm, i16, Add, strat!(i16), i16::checked_add);
 prop_arith_imm!(i16_sub_imm, i16, Sub, strat!(i16), i16::checked_sub);
 prop_arith_imm!(i16_mul_imm, i16, Mul, strat!(i16), i16::checked_mul);
-prop_arith_imm!(i16_div_imm, i16, Div, nonzero!(i16), i16::checked_div);
-prop_arith_imm!(i16_mod_imm, i16, Mod, nonzero!(i16), i16::checked_rem);
+prop_arith_imm!(i16_div_imm, i16, Div, strat!(i16), i16::checked_div);
+prop_arith_imm!(i16_mod_imm, i16, Mod, strat!(i16), i16::checked_rem);
 
 prop_arith_imm!(i32_add_imm, i32, Add, strat!(i32), i32::checked_add);
 prop_arith_imm!(i32_sub_imm, i32, Sub, strat!(i32), i32::checked_sub);
 prop_arith_imm!(i32_mul_imm, i32, Mul, strat!(i32), i32::checked_mul);
-prop_arith_imm!(i32_div_imm, i32, Div, nonzero!(i32), i32::checked_div);
-prop_arith_imm!(i32_mod_imm, i32, Mod, nonzero!(i32), i32::checked_rem);
+prop_arith_imm!(i32_div_imm, i32, Div, strat!(i32), i32::checked_div);
+prop_arith_imm!(i32_mod_imm, i32, Mod, strat!(i32), i32::checked_rem);
 
 prop_arith_imm!(i64_add_imm, i64, Add, strat!(i64), i64::checked_add);
 prop_arith_imm!(i64_sub_imm, i64, Sub, strat!(i64), i64::checked_sub);
 prop_arith_imm!(i64_mul_imm, i64, Mul, strat!(i64), i64::checked_mul);
-prop_arith_imm!(i64_div_imm, i64, Div, nonzero!(i64), i64::checked_div);
-prop_arith_imm!(i64_mod_imm, i64, Mod, nonzero!(i64), i64::checked_rem);
+prop_arith_imm!(i64_div_imm, i64, Div, strat!(i64), i64::checked_div);
+prop_arith_imm!(i64_mod_imm, i64, Mod, strat!(i64), i64::checked_rem);
 
 prop_arith_imm!(i128_add_imm, i128, Add, strat!(i128), i128::checked_add);
 prop_arith_imm!(i128_sub_imm, i128, Sub, strat!(i128), i128::checked_sub);
 prop_arith_imm!(i128_mul_imm, i128, Mul, strat!(i128), i128::checked_mul);
-prop_arith_imm!(i128_div_imm, i128, Div, nonzero!(i128), i128::checked_div);
-prop_arith_imm!(i128_mod_imm, i128, Mod, nonzero!(i128), i128::checked_rem);
+prop_arith_imm!(i128_div_imm, i128, Div, strat!(i128), i128::checked_div);
+prop_arith_imm!(i128_mod_imm, i128, Mod, strat!(i128), i128::checked_rem);
 
 prop_arith_imm!(i256_add_imm, I256, Add, i256_strategy(), I256::checked_add);
 prop_arith_imm!(i256_sub_imm, I256, Sub, i256_strategy(), I256::checked_sub);
 prop_arith_imm!(i256_mul_imm, I256, Mul, i256_strategy(), I256::checked_mul);
-prop_arith_imm!(i256_div_imm, I256, Div, nonzero!(I256), I256::checked_div);
-prop_arith_imm!(i256_mod_imm, I256, Mod, nonzero!(I256), I256::checked_rem);
+prop_arith_imm!(i256_div_imm, I256, Div, strat!(I256), I256::checked_div);
+prop_arith_imm!(i256_mod_imm, I256, Mod, strat!(I256), I256::checked_rem);
 
 // `RSubU64Imm` (`dst = imm - src`) is a u64-only fast path with no
 // unspecialized counterpart. Tested separately via the original
@@ -1092,31 +1077,31 @@ prop_bit_imm!(u256_xor_imm, U256, BitXor, |a: U256, b: U256| a ^ b);
 // Shift imm — u64 specialized + 5 unsigned unspecialized widths × 2 kinds
 // ---------------------------------------------------------------------------
 
-prop_shift_imm!(u8_shl_imm, u8, Shl, 0u8..8, |a: u8, s: u8| {
+prop_shift_imm!(u8_shl_imm, u8, Shl, any::<u8>(), |a: u8, s: u8| {
     u8::checked_shl(a, s as u32)
 });
-prop_shift_imm!(u8_shr_imm, u8, Shr, 0u8..8, |a: u8, s: u8| {
+prop_shift_imm!(u8_shr_imm, u8, Shr, any::<u8>(), |a: u8, s: u8| {
     u8::checked_shr(a, s as u32)
 });
 
-prop_shift_imm!(u16_shl_imm, u16, Shl, 0u8..16, |a: u16, s: u8| {
+prop_shift_imm!(u16_shl_imm, u16, Shl, any::<u8>(), |a: u16, s: u8| {
     u16::checked_shl(a, s as u32)
 });
-prop_shift_imm!(u16_shr_imm, u16, Shr, 0u8..16, |a: u16, s: u8| {
+prop_shift_imm!(u16_shr_imm, u16, Shr, any::<u8>(), |a: u16, s: u8| {
     u16::checked_shr(a, s as u32)
 });
 
-prop_shift_imm!(u32_shl_imm, u32, Shl, 0u8..32, |a: u32, s: u8| {
+prop_shift_imm!(u32_shl_imm, u32, Shl, any::<u8>(), |a: u32, s: u8| {
     u32::checked_shl(a, s as u32)
 });
-prop_shift_imm!(u32_shr_imm, u32, Shr, 0u8..32, |a: u32, s: u8| {
+prop_shift_imm!(u32_shr_imm, u32, Shr, any::<u8>(), |a: u32, s: u8| {
     u32::checked_shr(a, s as u32)
 });
 
-prop_shift_imm!(u64_shl_imm, u64, Shl, 0u8..64, |a: u64, s: u8| {
+prop_shift_imm!(u64_shl_imm, u64, Shl, any::<u8>(), |a: u64, s: u8| {
     u64::checked_shl(a, s as u32)
 });
-prop_shift_imm!(u64_shr_imm, u64, Shr, 0u8..64, |a: u64, s: u8| {
+prop_shift_imm!(u64_shr_imm, u64, Shr, any::<u8>(), |a: u64, s: u8| {
     u64::checked_shr(a, s as u32)
 });
 
@@ -1137,10 +1122,10 @@ prop_shift_imm!(
     specialized
 );
 
-prop_shift_imm!(u128_shl_imm, u128, Shl, 0u8..128, |a: u128, s: u8| {
+prop_shift_imm!(u128_shl_imm, u128, Shl, any::<u8>(), |a: u128, s: u8| {
     u128::checked_shl(a, s as u32)
 });
-prop_shift_imm!(u128_shr_imm, u128, Shr, 0u8..128, |a: u128, s: u8| {
+prop_shift_imm!(u128_shr_imm, u128, Shr, any::<u8>(), |a: u128, s: u8| {
     u128::checked_shr(a, s as u32)
 });
 

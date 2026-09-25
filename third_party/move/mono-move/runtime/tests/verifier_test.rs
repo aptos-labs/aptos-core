@@ -450,9 +450,9 @@ fn zero_frame_size() {
 // Static arithmetic constraints (imm-form ops)
 // ---------------------------------------------------------------------------
 //
-// Some imm-form ops would always abort at runtime for a particular imm
-// value (`Div`/`Mod` with `0`, shifts with `>= 64`). The verifier rejects
-// these statically.
+// Unchecked u64 division, remainder, and shift ops require nonzero divisors
+// and shift amounts below 64. The verifier rejects violations of these
+// lowering invariants.
 
 fn func_with_single_op(op: MicroOp) -> Function {
     Function {
