@@ -597,6 +597,8 @@ private def classifyPrimitiveOperation : PrimitiveOperation → Nat
   | .containsVector => 67
   | .indexOfVector => 68
   | .checkVectorIndex _ => 69
+  | .compare => 70
+  | .signerAddress => 71
   | .length => 3
   | .index => 4
   | .slice => 5
@@ -713,6 +715,7 @@ private def classifySpecOperation : SpecOperation → Nat
   | .eventStoreIncludes => 40
   | .eventStoreIncludedIn => 41
   | .noOp => 42
+  | .final => 43
 
 private def classifyOperation : Operation → Nat
   | .move _ => 0
@@ -806,7 +809,8 @@ private def allPrimitiveOperations : Array PrimitiveOperation := #[
   .greaterEqual, .logicalNot, .negate, .checkedNegate .panic,
   .copyValue, .moveValue, .cast, .checkedCast .panic, .range, .implies,
   .equivalent, .identical, .insertVector, .removeVector, .concatVector, .reverseSliceVector,
-  .destroyEmptyVector, .containsVector, .indexOfVector, .checkVectorIndex .abort]
+  .destroyEmptyVector, .containsVector, .indexOfVector, .checkVectorIndex .abort, .compare,
+  .signerAddress]
 
 private def allReferenceOperations : Array ReferenceOperation := #[
   .borrow (.profile extensionValue), .dereference, .freeze true, .mutate]
@@ -831,7 +835,7 @@ private def allSpecOperations : Array SpecOperation := #[
   .inVectorRange, .vectorRange, .maxValue 128, .bitVectorToInt,
   .intToBitVector, .abortFlag, .abortCode, .wellFormed, .boxValue,
   .unboxValue, .emptyEventStore, .extendEventStore, .eventStoreIncludes,
-  .eventStoreIncludedIn, .noOp]
+  .eventStoreIncludedIn, .noOp, .final]
 
 private def operationRepresentatives : Array Operation := #[
   .move ⟨0⟩,
@@ -921,13 +925,14 @@ private def operationConstructorUnit : RawUnit :=
   classifySurfaceSyntax == Array.range 3
 #guard #[GlobalKind.contains, .borrow .immutable, .take, .publish].map
   classifyGlobalKind == Array.range 4
-#guard allPrimitiveOperations.map classifyPrimitiveOperation == Array.range 46 ++ #[62, 63, 64, 65, 66, 67, 68, 69]
+#guard allPrimitiveOperations.map classifyPrimitiveOperation ==
+  Array.range 46 ++ #[62, 63, 64, 65, 66, 67, 68, 69, 70, 71]
 #guard allReferenceOperations.map classifyReferenceOperation == Array.range 4
 #guard allDataOperations.map classifyDataOperation == Array.range 5
 #guard #[TraceKind.user, .automatic, .subAutomatic].map classifyTraceKind == Array.range 3
 #guard #[BehaviorKind.requiresOf, .abortsOf, .ensuresOf, .resultOf,
     .unchangedOf, .foldsOf, .writeOf 1].map classifyBehaviorKind == Array.range 7
-#guard allSpecOperations.map classifySpecOperation == Array.range 43
+#guard allSpecOperations.map classifySpecOperation == Array.range 44
 #guard operationRepresentatives.map classifyOperation == Array.range 14
 #guard allQuantifierKinds.map classifyQuantifierKind == Array.range 5
 #guard allConditionKinds.map classifyConditionKind == Array.range 19

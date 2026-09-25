@@ -688,6 +688,8 @@ private def primitiveText : PrimitiveOperation → Except String String
   | .reverseSliceVector => pure "reverseSliceVector"
   | .destroyEmptyVector => pure "destroyEmptyVector"
   | .containsVector => pure "containsVector"
+  | .compare => pure "compare"
+  | .signerAddress => pure "signerAddress"
   | .indexOfVector => pure "indexOfVector"
   | .checkVectorIndex failure => checkedPrimitiveText "checkVectorIndex" failure
   | .length => pure "length"
@@ -990,6 +992,12 @@ private structure Context where
   logicalLocals : Array LocalId := #[]
   specification : Bool := false
   constantLocals : Array (LocalId × String) := #[]
+  /-- Index expressions whose bounds check the surface implies: `&v[i]`,
+  `v[i]`, and `v[i] := x` lower to a `checkVectorIndex` binding before the
+  element place, so the binding is not spelled and the access keeps its
+  sugar. Recorded by the vector the check observes and the index node the
+  check and the place share. -/
+  elidedIndexChecks : Array (ExprId × ExprId) := #[]
   /-- Shared pattern binders rendered as implicitly read field selections. -/
   fieldAliasLocals : Array LocalId := #[]
   temporaryLocals : Array LocalId := #[]
@@ -1211,12 +1219,305 @@ private def temporaryConstant? (context : Context) (pattern : PatternId)
       let some source := sourceLocal? | return none
       let some sourceDecl := context.locals[source.index]? | return none
       if sourceDecl.mutable then return none
+      -- A `$t` temporary exists only to sequence a value before the index
+      -- effects of the place it is stored to; naming the immutable local it
+      -- copies re-lowers to the same temporary, whatever the type.
+      let sequencing := localDecl.name.startsWith "$t"
       let scalar := match context.unit.tables.types[valueNode.typeId.index]? with
         | some .unit | some .bool | some .character | some .address |
             some .signer | some (.integer ..) => true
         | _ => false
-      unless scalar do return none
+      unless scalar || sequencing do return none
       pure (some (localId, ← localValueText context source))
+
+/-- Whether two places name the same location. -/
+private partial def samePlace (context : Context) (fuel : Nat) (left right : PlaceId) : Bool :=
+  left == right || (match fuel, context.ns.places[left.index]?, context.ns.places[right.index]? with
+    | 0, _, _ => false
+    | _, some (.localVar a), some (.localVar b) => a == b
+    | fuel + 1, some (.deref a), some (.deref b) => samePlace context fuel a b
+    | fuel + 1, some (.field a owner field), some (.field b owner' field') =>
+        owner == owner' && field == field' && samePlace context fuel a b
+    | fuel + 1, some (.index a i), some (.index b j) => i == j && samePlace context fuel a b
+    | _, _, _ => false)
+
+/-- Whether an expression observes a place: reads it, or observes the place
+it projects from and projects the same way. -/
+private partial def observesPlace (context : Context) (fuel : Nat) (value : ExprId)
+    (place : PlaceId) : Bool :=
+  match fuel with
+  | 0 => false
+  | fuel + 1 =>
+    let kind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+    match kind, context.ns.places[place.index]? with
+    | some (.operation (.read read) _ _ _), _ => samePlace context fuel read place
+    | some (.localVar a), some (.localVar b) => a == b
+    | some (.operation (.reference .dereference) _ #[inner] _), some (.deref base) =>
+        observesPlace context fuel inner base
+    | some (.operation (.data (.select owner field)) _ #[inner] _), some (.field base owner' field') =>
+        owner == owner' &&
+          (context.ns.tables.names[field'.index]?).any (·.name == field) &&
+          observesPlace context fuel inner base
+    | some (.operation (.primitive .index) _ #[inner, i] _), some (.index base j) =>
+        i == j && observesPlace context fuel inner base
+    | _, _ => false
+
+/-- Whether reading a place neither fails nor gains an implied bounds check
+when index sugar is re-imported. An index would gain one, and a field
+projection resolves against the value's active variant, so it fails when
+that variant does not carry the field; only a local and a dereference of
+one are unconditional. -/
+private def inertPlace (context : Context) (place : PlaceId) : Bool :=
+  let rec along : Nat → PlaceId → Bool
+    | 0, _ => false
+    | fuel + 1, place => match context.ns.places[place.index]? with
+      | some (.localVar _) => true
+      | some (.deref base) => along fuel base
+      | _ => false
+  along (context.ns.places.size + 1) place
+
+/-- Whether an operand evaluates with no effect and no abort, so an operand
+after it still runs before anything observable: a literal, a local, and a
+read of a place that resolves unconditionally. -/
+private def inertOperand (context : Context) (operand : ExprId) : Bool :=
+  let kind : Option ExprKind := (context.ns.expressions[operand.index]?).map (·.kind)
+  match kind with
+  | some (.value ..) | some (.localVar _) => true
+  | some (.operation (.move place) _ _ _) | some (.operation (.copy place) _ _ _)
+  | some (.operation (.read place) _ _ _) => inertPlace context place
+  | _ => false
+
+/-- The prefix of a left-to-right operand list that still evaluates before
+anything observable: the operands up to and including the first that is not
+inert. What follows it runs only after that operand's effects, or not at all
+if it aborts. -/
+private def actingPrefix (context : Context) (operands : Array ExprId) : Array ExprId :=
+  match operands.findIdx? (fun operand => !inertOperand context operand) with
+  | some index => operands.extract 0 (index + 1)
+  | none => operands
+
+/-- Whether every index of a place had its check elided, so the place can
+keep the surface's index sugar. -/
+private def placeIndexesElided (context : Context) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, id => match context.ns.places[id.index]? with
+    | some (.index base index) =>
+        context.elidedIndexChecks.any (fun (collection, checked) =>
+          checked == index && observesPlace context fuel collection base) &&
+          placeIndexesElided context fuel base
+    | some (.deref base) | some (.field base ..) | some (.downcast base _) |
+        some (.subslice base ..) => placeIndexesElided context fuel base
+    | some (.localVar _) => true
+    | _ => false
+
+/-- Whether two expressions observe the same collection. A lowering builds a
+fresh observation at each place it needs one, so the same collection reaches
+two checks as two nodes, and they agree only structurally. -/
+private partial def sameCollection (context : Context) (left right : ExprId) : Bool :=
+  left == right ||
+    (let leftKind : Option ExprKind := (context.ns.expressions[left.index]?).map (·.kind)
+     let rightKind : Option ExprKind := (context.ns.expressions[right.index]?).map (·.kind)
+     match leftKind, rightKind with
+     | some (.localVar a), some (.localVar b) => a == b
+     | some (.operation (.read a) _ _ _), some (.operation (.read b) _ _ _) =>
+         samePlace context (context.ns.places.size + 1) a b
+     | some (.operation (.reference .dereference) _ #[a] _),
+       some (.operation (.reference .dereference) _ #[b] _) => sameCollection context a b
+     | some (.operation (.primitive .index) _ #[a, i] _),
+       some (.operation (.primitive .index) _ #[b, j] _) =>
+         i == j && sameCollection context a b
+     | some (.operation (.data (.select owner field)) _ #[a] _),
+       some (.operation (.data (.select owner' field')) _ #[b] _) =>
+         owner == owner' && field == field' && sameCollection context a b
+     | _, _ => false)
+
+/-- Whether a place reaches the element `collection` observes at `index`,
+through an index level of its own or of something it is projected from. -/
+private def placeUnderCheck (context : Context) (collection index : ExprId)
+    (place : PlaceId) : Bool :=
+  let rec along : Nat → PlaceId → Bool
+    | 0, _ => false
+    | fuel + 1, place => match context.ns.places[place.index]? with
+      | some (.index base i) =>
+          (i == index && observesPlace context fuel collection base) || along fuel base
+      | some (.deref base) | some (.field base ..) | some (.subslice base ..) => along fuel base
+      | _ => false
+  along (context.ns.places.size + 1) place
+
+/-- Whether an expression observes the element `collection` observes at
+`index`, as a place that reaches it or as an index of that collection. -/
+private partial def observesCheckedElement (context : Context) (collection index : ExprId)
+    (value : ExprId) : Bool :=
+  let kind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+  match kind with
+  | some (.operation (.read place) _ _ _) | some (.operation (.borrow _ place) _ _ _)
+  | some (.operation (.move place) _ _ _) | some (.operation (.copy place) _ _ _) =>
+      placeUnderCheck context collection index place
+  | some (.operation (.reference .dereference) _ #[inner] _)
+  | some (.operation (.data (.select _ _)) _ #[inner] _)
+  | some (.operation (.data (.selectVariants _ _)) _ #[inner] _) =>
+      observesCheckedElement context collection index inner
+  | some (.operation (.primitive .index) _ #[inner, i] _) =>
+      (i == index && sameCollection context inner collection) ||
+        observesCheckedElement context collection index inner
+  | _ => false
+
+/-- Whether a binding holds a `checkVectorIndex` of the element that the
+check being considered tests -- the next level of one nested access, as
+`values[i][j]` lowers to a check of `values` at `i` and then of `values[i]`.
+Re-importing the sugar for such an access emits these checks, and the index
+each one needs, in exactly the order they already stand in, so reaching past
+one to the access does not move the check under consideration. A check of an
+unrelated collection carries no such guarantee: both can abort, and whichever
+runs first decides the error. -/
+private def checksNestedElement (context : Context) (collection index : ExprId)
+    (value : ExprId) : Bool :=
+  let kind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+  match kind with
+  | some (.operation (.primitive (.checkVectorIndex _)) _ #[checked, _] _) =>
+      observesCheckedElement context collection index checked
+  | _ => false
+
+/-- Whether the binding of `slot` holds the index that a `checkVectorIndex`
+at the head of its body tests, and that check tests the element of the access
+under consideration. The lowering emits such an index where it stands, so
+reaching past it does not move the check under consideration; a binding is
+not that merely by being named like a temporary, since validation reserves no
+local name. -/
+private def bindsCheckedIndex (context : Context) (collection index : ExprId)
+    (slot : LocalId) (body : ExprId) : Bool :=
+  let bodyKind : Option ExprKind := (context.ns.expressions[body.index]?).map (·.kind)
+  match bodyKind with
+  | some (.letDecl pattern (some check) _) =>
+      let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
+      let checkKind : Option ExprKind := (context.ns.expressions[check.index]?).map (·.kind)
+      let wildcard : Bool := match patternKind with
+        | some .wildcard => true
+        | _ => false
+      wildcard && checksNestedElement context collection index check &&
+        (match checkKind with
+          | some (.operation (.primitive (.checkVectorIndex _)) _ #[_, checkedIndex] _) =>
+              let indexKind : Option ExprKind :=
+                (context.ns.expressions[checkedIndex.index]?).map (·.kind)
+              (match indexKind with
+                | some (.localVar read) => read == slot
+                | _ => false)
+          | _ => false)
+  | _ => false
+
+/-- The children an expression evaluates first and unconditionally, for a
+search that is looking for the access implying the check of `collection` at
+`index`: its leading operands, a binding's value, a condition, a scrutinee, a
+block's first statement. A branch, a loop body, an operand behind one that
+acts, and what follows a binding are not among them, except the checks and
+index temporaries of the nested access that the check under consideration
+opens, which re-import emits in the order they already stand in. -/
+private def evaluatedFirst (context : Context) (collection index : ExprId) :
+    ExprKind → Array ExprId
+  | .operation _ _ arguments _ => actingPrefix context arguments
+  | .letDecl pattern (some value) body =>
+      let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
+      let precedesAccess : Bool := match patternKind with
+        | some .wildcard => checksNestedElement context collection index value
+        | some (.variable slot) =>
+            (context.locals[slot.index]?).any (·.name.startsWith "$t") &&
+              bindsCheckedIndex context collection index slot body
+        | _ => false
+      if precedesAccess then #[value, body] else #[value]
+  | .letDecl _ none body => #[body]
+  | .assign _ value => #[value]
+  | .ifElse condition _ _ => #[condition]
+  | .match_ scrutinee _ => #[scrutinee]
+  | .block statements result => match statements[0]?, result with
+      | some first, _ => #[first]
+      | none, some result => #[result]
+      | none, none => #[]
+  | .return_ values => actingPrefix context values
+  | .throw_ _ arguments => actingPrefix context arguments
+  | .break_ _ (some value) => #[value]
+  | _ => #[]
+
+/-- Whether an expression reads the element at `index` of the vector
+`collection` observes before anything else it evaluates, as an index place
+rooted where `collection` looks or an element read of the same observation. -/
+private partial def indexesChecked (context : Context) (fuel : Nat) (collection index : ExprId)
+    (value : ExprId) : Bool :=
+  match fuel, context.ns.expressions[value.index]? with
+  | 0, _ | _, none => false
+  | fuel + 1, some expression =>
+    let direct := match expression.kind with
+      | .operation (.borrow _ place) _ _ _ | .operation (.read place) _ _ _ =>
+          placeUnderCheck context collection index place
+      -- An assignment evaluates its value before it resolves the place
+      -- (`assignValue`), and the lowering of index sugar binds a value that is
+      -- not a literal ahead of the bounds check. Only an inert value keeps the
+      -- check first, so only then does the sugar imply this check.
+      | .assign place value => inertOperand context value && placeUnderCheck context collection index place
+      | .operation (.primitive .index) _ #[inner, i] _ =>
+          i == index && sameCollection context inner collection
+      | _ => false
+    direct || (evaluatedFirst context collection index expression.kind).any
+      (indexesChecked context fuel collection index)
+
+/-- Whether the collection a check tests already has index sugar of its own,
+so a place reaching through it can carry this check once it is elided.
+Eliding is all-or-nothing per place: `placeIndexesElided` grants sugar only
+when every level of a place was elided, so a check elided into a place whose
+outer levels were not is carried by nothing and is simply gone. -/
+private partial def collectionIndexesElided (context : Context) (fuel : Nat)
+    (collection : ExprId) : Bool :=
+  match fuel, (context.ns.expressions[collection.index]?).map (·.kind) with
+  | 0, _ => false
+  | _, none => false
+  | fuel + 1, some kind => match kind with
+    | .operation (.read place) _ _ _ | .operation (.borrow _ place) _ _ _
+    | .operation (.move place) _ _ _ | .operation (.copy place) _ _ _ =>
+        placeIndexesElided context (context.ns.places.size + 1) place
+    -- A projection carries whatever levels its base has, so it has to be
+    -- walked through rather than taken as level-free: a field of an element,
+    -- `items[i].values`, holds the check on `items` at `i`.
+    | .operation (.reference .dereference) _ #[inner] _
+    | .operation (.data (.select _ _)) _ #[inner] _
+    | .operation (.data (.selectVariants _ _)) _ #[inner] _ =>
+        collectionIndexesElided context fuel inner
+    | .operation (.primitive .index) _ #[inner, i] _ =>
+        context.elidedIndexChecks.any (fun (elided, checked) =>
+          checked == i && sameCollection context inner elided) &&
+          collectionIndexesElided context fuel inner
+    -- Anything else is not an observation chain -- a call builds a fresh
+    -- value rather than reaching through a place -- so no elided check of
+    -- this body is waiting on it.
+    | _ => true
+
+/-- A `checkVectorIndex` binding the surface implies: the continuation
+accesses the checked index of the checked vector through index sugar, whose
+re-import checks it again, and the collection it tests already carries its
+own sugar so that the access can keep this check. -/
+private def indexCheck? (context : Context) (pattern : PatternId) (value : ExprId)
+    (body : ExprId) : Option (ExprId × ExprId) := do
+  let patternNode ← context.ns.patterns[pattern.index]?
+  let .wildcard := patternNode.kind | none
+  let valueNode ← context.ns.expressions[value.index]?
+  let .operation (.primitive (.checkVectorIndex _)) _ #[collection, index] _ := valueNode.kind | none
+  guard (collectionIndexesElided context (context.ns.expressions.size + 1) collection)
+  guard (indexesChecked context (context.ns.expressions.size + 1) collection index body)
+  some (collection, index)
+
+/-- A hidden `$t` temporary holding a computed element index, whose only
+role is the check and the element place that follow it. -/
+private def indexTemporary? (context : Context) (pattern : PatternId) (body : ExprId) :
+    Option LocalId := do
+  let patternNode ← context.ns.patterns[pattern.index]?
+  let .variable slot := patternNode.kind | none
+  let localDecl ← context.locals[slot.index]?
+  unless localDecl.name.startsWith "$t" do none
+  let bodyNode ← context.ns.expressions[body.index]?
+  let .letDecl checkPattern (some check) checkBody := bodyNode.kind | none
+  let (_, index) ← indexCheck? context checkPattern check checkBody
+  let .localVar read ← (context.ns.expressions[index.index]?).map (·.kind) | none
+  guard (read == slot)
+  some slot
+
 
 /-- A hidden holder bound to a storage borrow.  A field-focused mutable
 borrow of a resource reborrows through such a holder, because a place is
@@ -1416,6 +1717,27 @@ private def incrementedContinue? (ns : ValidatedNamespace) (iterator : LocalId)
     let .continue_ 0 := continueNode.kind | none
     pure true).getD false
 
+/-- Whether a `break` or `continue` nested in a further loop inside `body`
+exits the loop owning `body`. Frontends erase loop labels into nesting
+depths, so such a loop needs a label its exits can name. -/
+private def exitedNonlocally (ns : ValidatedNamespace) (body : ExprId) : Bool :=
+  let rec go (pending : List (ExprId × Nat)) : Nat → Bool
+    | 0 => false
+    | fuel + 1 =>
+      match pending with
+      | [] => false
+      | (id, depth) :: rest =>
+        match ns.expressions[id.index]? with
+        | none => go rest fuel
+        | some expression =>
+          match expression.kind with
+          | .break_ nest _ | .continue_ nest =>
+              if nest == depth && depth > 0 then true
+              else go ((expressionChildren expression.kind).toList.map (·, depth) ++ rest) fuel
+          | .loop _ inner => go ((inner, depth + 1) :: rest) fuel
+          | kind => go ((expressionChildren kind).toList.map (·, depth) ++ rest) fuel
+  go [(body, 0)] (ns.expressions.size + 1)
+
 /-- Recognize the stable compiler-v2 expansion of a half-open range loop:
 `let $lb = lower; let i = $lb; let $ub = upper; while i < $ub { body; i += 1 }`.
 The hidden bound locals ensure both bounds retain their one-time evaluation
@@ -1451,6 +1773,7 @@ private def forRangeShape? (context : Context) (root : ExprId) : Option ForRange
     | _ => pure (none, loopId)
   let loopNode ← context.ns.expressions[loopId.index]?
   let .loop none guardedId := loopNode.kind | none
+  guard (!exitedNonlocally context.ns guardedId)
   let guardedNode ← context.ns.expressions[guardedId.index]?
   let .ifElse conditionId iterationId (some stopId) := guardedNode.kind | none
   guard (entryCondition?.all (· == conditionId))
@@ -1711,6 +2034,7 @@ private def returningWhile? (ns : ValidatedNamespace) (id : ExprId) :
     Option (ExprId × ExprId × ExprId) := do
   let loopNode ← ns.expressions[id.index]?
   let .loop none loopBody := loopNode.kind | none
+  guard (!exitedNonlocally ns loopBody)
   let bodyNode ← ns.expressions[loopBody.index]?
   let .block setupStatements (some branchId) := bodyNode.kind | none
   let branch ← ns.expressions[branchId.index]?
@@ -2130,10 +2454,49 @@ private def statementTerminator (ns : ValidatedNamespace) (id : ExprId)
     (text : String) : String :=
   if text.contains '\n' && endsInsideBlock ns id (ns.expressions.size + 1) then "" else ";"
 
-/-- Undo only the single-write holder introduced by `pushReferenceMutation`.
-The holder must not occur in the value (including through a place). This is
-not general reference substitution: shared/user-written bindings keep their
-identity and evaluation order. -/
+/-- Whether nothing reachable from `pending` reads the holder local. Place
+IDs are namespace-wide but local IDs are function-relative, so only places
+reachable from the roots are followed; an unrelated function can use the
+same local number without referring to this holder. -/
+private def holderUnused (context : Context) (holder : LocalId) :
+    List (Sum ExprId PlaceId) → Std.HashSet ExprId → Std.HashSet PlaceId → Nat → Bool
+  | [], _, _, _ => true
+  | .inl node :: rest, seenExpr, seenPlace, fuel =>
+      if seenExpr.contains node then holderUnused context holder rest seenExpr seenPlace fuel else
+      match fuel, context.ns.expressions[node.index]? with
+      | 0, _ | _, none => false
+      | fuel + 1, some expression =>
+          if expression.kind == .localVar holder then false else
+          let place? := match expression.kind with
+            | .assign place _ => some place
+            | .operation operation _ _ _ => match operation with
+              | .move place | .copy place | .borrow _ place | .read place |
+                  .write place | .drop place => some place
+              | _ => none
+            | _ => none
+          let pending := (expressionChildren expression.kind).toList.map Sum.inl ++ rest
+          let pending := place?.map (fun place => Sum.inr place :: pending) |>.getD pending
+          holderUnused context holder pending (seenExpr.insert node) seenPlace fuel
+  | .inr node :: rest, seenExpr, seenPlace, fuel =>
+      if seenPlace.contains node then holderUnused context holder rest seenExpr seenPlace fuel else
+      match fuel, context.ns.places[node.index]? with
+      | 0, _ | _, none => false
+      | fuel + 1, some place =>
+          let next := fun pending =>
+            holderUnused context holder pending seenExpr (seenPlace.insert node) fuel
+          match place with
+          | .localVar localId => localId != holder && next rest
+          | .index base index => next (.inr base :: .inl index :: rest)
+          | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
+              next (.inr base :: rest)
+  termination_by pending _ _ fuel => (fuel, pending.length)
+  decreasing_by all_goals simp_wf; simp_all [wfParam]; omega
+
+/-- Undo only the single-write holder introduced by `pushReferenceMutation`,
+`let $t := e; *$t := v`, which spells `*e := v`. The holder must not occur
+in the value (including through a place). This is not general reference
+substitution: shared/user-written bindings keep their identity and
+evaluation order. -/
 private def hiddenReferenceMutation? (context : Context) (pattern : PatternId)
     (body : ExprId) : Option ExprId := do
   let .variable holder := (← context.ns.patterns[pattern.index]?).kind | none
@@ -2143,46 +2506,32 @@ private def hiddenReferenceMutation? (context : Context) (pattern : PatternId)
     (← context.ns.expressions[body.index]?).kind | none
   let .localVar target := (← context.ns.expressions[reference.index]?).kind | none
   if target != holder then none else
-  -- Place IDs are namespace-wide but local IDs are function-relative. Only
-  -- follow places reachable from this value; an unrelated function can use
-  -- the same local number without referring to this holder.
-  let rec independent (pending : List (Sum ExprId PlaceId))
-      (seenExpr : Std.HashSet ExprId) (seenPlace : Std.HashSet PlaceId)
-      (fuel : Nat) : Bool :=
-    match pending with
-    | [] => true
-    | .inl node :: rest =>
-        if seenExpr.contains node then independent rest seenExpr seenPlace fuel else
-        match fuel, context.ns.expressions[node.index]? with
-        | 0, _ | _, none => false
-        | fuel + 1, some expression =>
-            if expression.kind == .localVar holder then false else
-            let place? := match expression.kind with
-              | .assign place _ => some place
-              | .operation operation _ _ _ => match operation with
-                | .move place | .copy place | .borrow _ place | .read place |
-                    .write place | .drop place => some place
-                | _ => none
-              | _ => none
-            let pending := (expressionChildren expression.kind).toList.map Sum.inl ++ rest
-            let pending := place?.map (fun place => Sum.inr place :: pending) |>.getD pending
-            independent pending (seenExpr.insert node) seenPlace fuel
-    | .inr node :: rest =>
-        if seenPlace.contains node then independent rest seenExpr seenPlace fuel else
-        match fuel, context.ns.places[node.index]? with
-        | 0, _ | _, none => false
-        | fuel + 1, some place =>
-            let next := fun pending => independent pending seenExpr (seenPlace.insert node) fuel
-            match place with
-            | .localVar localId => localId != holder && next rest
-            | .index base index => next (.inr base :: .inl index :: rest)
-            | .deref base | .field base .. | .subslice base .. | .downcast base _ =>
-                next (.inr base :: rest)
-    termination_by (fuel, pending.length)
-    decreasing_by all_goals simp_wf; simp_all [wfParam]; omega
-  if independent [.inl value] {} {} (context.ns.expressions.size + context.ns.places.size + 1) then
-    some value
-  else none
+  let fuel := context.ns.expressions.size + context.ns.places.size + 1
+  if holderUnused context holder [.inl value] {} {} fuel then some value else none
+
+/-- The holder of a computed reference that one assignment writes through as
+a place, `let $t := e; (*$t).f := v`, which spells `e.f := v`. The holder
+roots the place through field projections and appears nowhere else. -/
+private def hiddenPlaceMutation? (context : Context) (pattern : PatternId)
+    (body : ExprId) : Option LocalId := do
+  let .variable holder := (← context.ns.patterns[pattern.index]?).kind | none
+  let declaration ← context.locals[holder.index]?
+  if !declaration.name.startsWith "$t" then none else
+  let .assign place value := (← context.ns.expressions[body.index]?).kind | none
+  let rec rootedAtHolder (place : PlaceId) : Nat → Bool
+    | 0 => false
+    | fuel + 1 =>
+      match context.ns.places[place.index]? with
+      | some (.field base ..) => rootedAtHolder base fuel
+      | some (.deref base) =>
+          match context.ns.places[base.index]? with
+          | some (.localVar root) => root == holder
+          | _ => false
+      | _ => false
+  guard (rootedAtHolder place (context.ns.places.size + 1))
+  let fuel := context.ns.expressions.size + context.ns.places.size + 1
+  guard (holderUnused context holder [.inl value] {} {} fuel)
+  some holder
 
 private def referenceMutationText (context : Context) (referenceId : ExprId)
     (reference value : String) : String :=
@@ -2227,6 +2576,12 @@ private partial def expressionText (context : Context) (id : ExprId)
   | .value _ (some sourceConstant) =>
       pure (sourceIdentifier sourceConstant)
   | .value (.integer value) none =>
+      if context.specification then
+        if let some name := specificationBoundName? value then
+          let shadowed := context.localNames.contains name ||
+            context.ns.constants.any fun constant =>
+              context.ns.tables.names[constant.name.index]?.any (·.name == name)
+          unless shadowed do return name
       integerLiteralText context.unit context.ns context.specification expression.typeId value
   | .value value none => constText value
   | .constant reference =>
@@ -2298,7 +2653,8 @@ private partial def expressionText (context : Context) (id : ExprId)
             | .mutable => pure "mut"
             | .profile value => throw s!"profile borrow `{value.tag}` has no core spelling"
           if context.ns.profile == some .move &&
-              placeContainsIndex context.ns (context.ns.places.size + 1) place then
+              placeContainsIndex context.ns (context.ns.places.size + 1) place &&
+              !placeIndexesElided context (context.ns.places.size + 1) place then
             return s!"core.borrowPlace({kind}, {← placeText context
               (fun index => expressionText context index (fuel - 1)) place})"
           pure s!"({if kind == "mut" then "&mut " else "&"}{
@@ -2480,6 +2836,11 @@ private partial def expressionText (context : Context) (id : ExprId)
               let argument := (borrowedReferentText? argument).getD argument
               let argument := implicitDerefReceiverText argument
               pure s!"{argument}.length"
+          | .signerAddress =>
+              let [argument] := arguments.toList
+                | throw "a signer's address expects one operand"
+              let argument := (borrowedReferentText? argument).getD argument
+              pure s!"{implicitDerefReceiverText argument}.address"
           | .index =>
               let [value, index] := arguments.toList
                 | throw "vector indexing expects two operands"
@@ -2811,6 +3172,11 @@ private partial def expressionText (context : Context) (id : ExprId)
           -- A multi-result signature names its later results by index; Move
           -- packs them into one tuple-typed row.
           pure (if index == 0 then "result" else s!"spec.result[{index}]")
+      | .specification .final =>
+          unless instantiations.isEmpty && arguments.size == 1 do
+            throw "`final` must have one operand"
+          let argument ← expressionText context arguments[0]! (fuel - 1)
+          pure s!"final({argument})"
       | .specification .old =>
           let some typeIds := typeInstantiationIds? instantiations
             | throw "spec.old requires an inferred type argument"
@@ -2868,7 +3234,7 @@ private partial def expressionText (context : Context) (id : ExprId)
           | some (.integer .unbounded true) =>
               -- Compiler-v2 can retain a bv-to-int coercion after its operand
               -- has already entered the logical integer domain. It is then
-              -- the identity conversion, as in the legacy transpiler.
+              -- the identity conversion.
               unless argumentNode.typeId == expression.typeId do
                 throw "a projected bit-vector conversion changes its logical integer type"
               pure argument
@@ -3082,8 +3448,10 @@ private partial def expressionText (context : Context) (id : ExprId)
                 resultNode.kind matches .throw_ ..
               let exitTerminator : String :=
                 if statementPosition && resultNode.kind matches .return_ .. then ";" else ""
+              -- A block's value is its final bare expression; only an exit
+              -- (already spelled `return`) or a diverging result is terminal.
               pure (statements.push <|
-                if terminal then s!"{result}{exitTerminator}" else s!"return {result}")
+                if terminal then s!"{result}{exitTerminator}" else result)
           else pure statements
         return blockText entries
   | .letDecl pattern none body =>
@@ -3096,10 +3464,24 @@ private partial def expressionText (context : Context) (id : ExprId)
         temporaryLocals := context.temporaryLocals ++ temporaryLocals }
         body (fuel - 1) tailPosition
   | .letDecl pattern (some value) body =>
+      if let some slot := indexTemporary? context pattern body then
+        let valueText ← expressionText context value (fuel - 1)
+        return ← expressionText
+          { context with constantLocals := context.constantLocals.push (slot, valueText) }
+          body (fuel - 1) tailPosition statementPosition
+      if let some index := indexCheck? context pattern value body then
+        return ← expressionText
+          { context with elidedIndexChecks := context.elidedIndexChecks.push index }
+          body (fuel - 1) tailPosition statementPosition
       if let some assigned := hiddenReferenceMutation? context pattern body then
         return referenceMutationText context value
           (← expressionText context value (fuel - 1))
           (← expressionText context assigned (fuel - 1))
+      if let some holder := hiddenPlaceMutation? context pattern body then
+        let referenceText ← expressionText context value (fuel - 1)
+        return ← expressionText
+          { context with constantLocals := context.constantLocals.push (holder, referenceText) }
+          body (fuel - 1) tailPosition statementPosition
       if let some substitution ← temporaryConstant? context pattern value then
         return ← expressionText
           { context with constantLocals := context.constantLocals.push substitution }
@@ -3146,8 +3528,20 @@ private partial def expressionText (context : Context) (id : ExprId)
           return (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
         match expression.kind with
         | .letDecl pattern (some value) body =>
-            if (hiddenReferenceMutation? active pattern body).isSome then
+            if let some slot := indexTemporary? active pattern body then
+              let valueText ← expressionText active value (fuel - 1)
+              collectTail { active with
+                constantLocals := active.constantLocals.push (slot, valueText) } body (fuel - 1)
+            else if let some index := indexCheck? active pattern value body then
+              collectTail { active with
+                elidedIndexChecks := active.elidedIndexChecks.push index } body (fuel - 1)
+            else if (hiddenReferenceMutation? active pattern body).isSome then
               pure (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
+            else if let some holder := hiddenPlaceMutation? active pattern body then
+              let referenceText ← expressionText active value (fuel - 1)
+              collectTail { active with
+                constantLocals := active.constantLocals.push (holder, referenceText) }
+                body (fuel - 1)
             else if let some substitution ← temporaryConstant? active pattern value then
               collectTail { active with
                 constantLocals := active.constantLocals.push substitution } body (fuel - 1)
@@ -3207,7 +3601,7 @@ private partial def expressionText (context : Context) (id : ExprId)
                 entries.push s!"{result}{separator}"
             else if isDivergingExpression context.ns node then
               entries.push s!"{result}{exitTerminator node}"
-            else entries.push s!"return {result}"
+            else entries.push result
         | none => entries
       if entries.isEmpty then pure "()" else
         pure (blockText entries)
@@ -3289,6 +3683,14 @@ private partial def expressionText (context : Context) (id : ExprId)
         pure s!"| {← bindingPatternText context arm.pattern}{guard} => {body}"
       pure s!"match {scrutinee} with\n{indent (lines arms)}"
   | .loop label body =>
+      let label := label <|> do
+        guard (exitedNonlocally context.ns body)
+        let rec fresh (index : Nat) : Nat → String
+          | 0 => s!"l{index}"
+          | fuel + 1 =>
+            let name := s!"l{index}"
+            if context.loopLabels.contains (some name) then fresh (index + 1) fuel else name
+        some (fresh context.loopLabels.size (context.loopLabels.size + 1))
       let loopContext := { context with loopLabels := #[label] ++ context.loopLabels }
       let rec isLoopExit (node : ExprId) (fuel : Nat) : Bool :=
         if fuel == 0 then false else
@@ -3352,7 +3754,8 @@ private partial def expressionText (context : Context) (id : ExprId)
       pure s!"continue{suffix}"
   | .assign place value =>
       if context.ns.profile == some .move &&
-          placeContainsIndex context.ns (context.ns.places.size + 1) place then
+          placeContainsIndex context.ns (context.ns.places.size + 1) place &&
+          !placeIndexesElided context (context.ns.places.size + 1) place then
         return s!"core.assignPlace({← placeText context
           (fun index => expressionText context index (fuel - 1)) place}, \
           {← expressionText context value (fuel - 1)})"
@@ -3938,7 +4341,11 @@ private def specFunctionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
   unless declaration.signature.parameters.all fun parameter => !parameter.mutable do
     throw "mutable specification-function parameters have no LeanerLang spelling"
   let contract := declaration.contract
-  unless contract.conditions.isEmpty && contract.modifies.isEmpty && contract.reads.isEmpty &&
+  let decreases? ← match contract.conditions.toList with
+    | [] => pure none
+    | [{ kind := .decreases, expression, .. }] => pure (some expression)
+    | _ => throw "specification-function contracts are outside the current LeanerLang printer"
+  unless contract.modifies.isEmpty && contract.reads.isEmpty &&
       !contract.hasFrame && !contract.modifiesAll && !contract.readsAll do
     throw "specification-function contracts are outside the current LeanerLang printer"
   match declaration.body with
@@ -3971,6 +4378,10 @@ private def specFunctionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
           declaration.signature.parameters.size (some root)
         binders := declaration.signature.generics
         specification := true }
+      let signature ← match decreases? with
+        | some measure =>
+            pure s!"{signature} decreases {← expressionText context measure (ns.expressions.size + 1) true}"
+        | none => pure signature
       let body ← expressionText context root (ns.expressions.size + 1) true
       let compact := s!"{signature} := {body}"
       if fitsIndentedLine compact then pure compact
@@ -4026,8 +4437,7 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
       "namespace specification variables are outside the current LeanerLang printer"
   -- Intrinsic declarations print inverted, as source attributes on their
   -- owner and target declarations (`@[intrinsic_map]` on the owner,
-  -- `@[map_new (Owner)]` on each bound function or specification function),
-  -- following the attribute design the legacy transpiler settled.
+  -- `@[map_new (Owner)]` on each bound function or specification function).
   let mut intrinsicAttributes : Array (Nat × String) := #[]
   for declaration in ns.intrinsics do
     let some owner := ns.tables.names[declaration.owner.index]?

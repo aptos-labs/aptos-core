@@ -268,7 +268,7 @@ leaner module 0x1::big_ordered_map where
         && is_some(&constant_serialized_size::<V>()),
       invalid_argument(ECANNOT_USE_NEW_WITH_VARIABLE_SIZED_TYPES)
     )
-    return new_with_config::<K, V>(0u16, 0u16, false)
+    new_with_config::<K, V>(0u16, 0u16, false)
 
   spec new where
     pragma intrinsic
@@ -287,7 +287,7 @@ leaner module 0x1::big_ordered_map where
         && is_some(&constant_serialized_size::<V>()),
       invalid_argument(ECANNOT_USE_NEW_WITH_VARIABLE_SIZED_TYPES)
     )
-    return new_with_config::<K, V>(0u16, 0u16, true)
+    new_with_config::<K, V>(0u16, 0u16, true)
 
   spec new_with_reusable where
     pragma opaque
@@ -333,7 +333,7 @@ leaner module 0x1::big_ordered_map where
       leaf_max_degree_from_max >= LEAF_MIN_DEGREE as u64,
       invalid_argument(EINVALID_CONFIG_PARAMETER)
     )
-    return new_with_config::<K, V>(
+    new_with_config::<K, V>(
       min(inner_max_degree_from_avg, inner_max_degree_from_max) as u16,
       min(leaf_max_degree_from_avg, leaf_max_degree_from_max) as u16, false
     )
@@ -346,8 +346,8 @@ leaner module 0x1::big_ordered_map where
     aborts_if avg_key_bytes == 0
     aborts_if max_key_bytes > 0
         && HINT_MAX_NODE_BYTES / max_key_bytes < INNER_MIN_DEGREE
-    aborts_if avg_key_bytes + avg_value_bytes > 18446744073709551615
-    aborts_if max_key_bytes + max_value_bytes > 18446744073709551615
+    aborts_if avg_key_bytes + avg_value_bytes > MAX_U64
+    aborts_if max_key_bytes + max_value_bytes > MAX_U64
     aborts_if max_key_bytes + max_value_bytes > 0
         && HINT_MAX_NODE_BYTES / (max_key_bytes + max_value_bytes)
           < LEAF_MIN_DEGREE
@@ -404,7 +404,7 @@ leaner module 0x1::big_ordered_map where
         inner_max_degree, leaf_max_degree
       }
     self.validate_static_size_and_init_max_degrees()
-    return self
+    self
 
   spec new_with_config where
     pragma intrinsic
@@ -422,7 +422,7 @@ leaner module 0x1::big_ordered_map where
   ) -> BigOrderedMap<K, V> := do
     let mut map := new::<K, V>()
     map.add_all(keys, values)
-    return map
+    map
 
   spec new_from where
     pragma intrinsic
@@ -475,7 +475,8 @@ leaner module 0x1::big_ordered_map where
   @[map_is_empty (BigOrderedMap)]
   public fun is_empty {K has Store} {V has Store}(
     self : &BigOrderedMap<K, V>
-  ) -> Bool := self.root.is_leaf && ordered_map::is_empty(&(self.root).children)
+  ) -> Bool :=
+    self.root.is_leaf && ordered_map::is_empty(&(self.root).children)
 
   spec is_empty where
     pragma intrinsic
@@ -500,7 +501,7 @@ leaner module 0x1::big_ordered_map where
       iter := next_iter
     where
       invariant spec_leaf_iter_valid(iter, self)
-    return size
+    size
 
   spec compute_length where
     pragma intrinsic
@@ -528,12 +529,12 @@ leaner module 0x1::big_ordered_map where
     self : &mut BigOrderedMap<K, V>, key : K, value : V
   ) -> Option<V> := do
     let result := self.add_or_upsert_impl(key, value, true)
-    return if is_some(&result) then
+    if is_some(&result) then
       let Child<V>::Leaf { value := old_value } := destroy_some(result)
-      return some(old_value)
+      some(old_value)
     else
       destroy_none(result)
-      return none::<V>()
+      none::<V>()
 
   spec upsert where
     pragma intrinsic
@@ -555,12 +556,12 @@ leaner module 0x1::big_ordered_map where
     let old_leaf :=
       do
         let (self, path_to_node, key) := (self, path_to_leaf, key)
-        return self.remove_at_with_iter_hint(
+        self.remove_at_with_iter_hint(
           path_to_node, key, none::<ordered_map::IteratorPtr>()
         )
     assert!(is_some(&old_leaf), invalid_argument(EKEY_NOT_FOUND))
     let Child<V>::Leaf { value := value } := destroy_some(old_leaf)
-    return value
+    value
 
   spec remove where
     pragma intrinsic
@@ -585,25 +586,25 @@ leaner module 0x1::big_ordered_map where
         destroy_none(value_option)
         return none::<V>();
     let path_to_leaf := self.find_leaf_path(key)
-    return if path_to_leaf.is_empty() then none::<V>()
+    if path_to_leaf.is_empty() then none::<V>()
     else
       let old_leaf :=
         do
           let (self, path_to_node, key) := (self, path_to_leaf, key)
-          return self.remove_at_with_iter_hint(
+          self.remove_at_with_iter_hint(
             path_to_node, key, none::<ordered_map::IteratorPtr>()
           )
       let self := old_leaf
-      return if is_some(&self) then
+      if is_some(&self) then
         some(
           do
             let child := destroy_some(self)
             spec assume save_state_anchor!(54)
             let Child<V>::Leaf { value := value } := child
-            return value)
+            value)
       else
         destroy_none(self)
-        return none::<V>()
+        none::<V>()
 
   spec remove_or_none where
     pragma intrinsic
@@ -614,7 +615,7 @@ leaner module 0x1::big_ordered_map where
     let v := v
     let v := v
     *v := 11
-    return true
+    true
 
   -- /// If value exists, calls modify_f on it, which returns tuple (to_keep, result).
   -- /// If to_keep is false, value is deleted from the map, and option::some(result) is returned.
@@ -678,7 +679,7 @@ leaner module 0x1::big_ordered_map where
     let it := self.internal_new_begin_iter()
     let k := *it.iter_borrow_key()
     let v := self.remove(&k)
-    return (k, v)
+    (k, v)
 
   spec pop_front where
     pragma intrinsic
@@ -690,7 +691,7 @@ leaner module 0x1::big_ordered_map where
     let it := self.internal_new_end_iter().iter_prev(self)
     let k := *it.iter_borrow_key()
     let v := self.remove(&k)
-    return (k, v)
+    (k, v)
 
   spec pop_back where
     pragma intrinsic
@@ -711,17 +712,17 @@ leaner module 0x1::big_ordered_map where
     let node :=
       do
         let (self, node_index) := (self, leaf)
-        return (if node_index == ROOT_INDEX then &self.root
-        else storage_slots_allocator::borrow(&self.nodes, node_index))
+        if node_index == ROOT_INDEX then &self.root
+        else storage_slots_allocator::borrow(&self.nodes, node_index)
     assert!(node.is_leaf, invalid_state(EINTERNAL_INVARIANT_BROKEN))
     let children := &node.children
     let child_lower_bound := ordered_map::internal_lower_bound(children, key)
-    return if ordered_map::iter_is_end(&child_lower_bound, children) then
+    if ordered_map::iter_is_end(&child_lower_bound, children) then
       self.internal_new_end_iter()
     else
       let iter_key :=
         *ordered_map::iter_borrow_key(&child_lower_bound, children)
-      return new_iter(leaf, child_lower_bound, iter_key)
+      new_iter(leaf, child_lower_bound, iter_key)
 
   spec internal_lower_bound where
     pragma opaque
@@ -751,7 +752,7 @@ leaner module 0x1::big_ordered_map where
     self : &BigOrderedMap<K, V>, key : &K
   ) -> IteratorPtr<K> := do
     let internal_lower_bound := self.internal_lower_bound(key)
-    return if internal_lower_bound.iter_is_end(self) then internal_lower_bound
+    if internal_lower_bound.iter_is_end(self) then internal_lower_bound
     else
       if &internal_lower_bound.key == key then internal_lower_bound
       else self.internal_new_end_iter()
@@ -780,19 +781,19 @@ leaner module 0x1::big_ordered_map where
     let node :=
       do
         let (self, node_index) := (self, leaf)
-        return (if node_index == ROOT_INDEX then &self.root
-        else storage_slots_allocator::borrow(&self.nodes, node_index))
+        if node_index == ROOT_INDEX then &self.root
+        else storage_slots_allocator::borrow(&self.nodes, node_index)
     assert!(node.is_leaf, invalid_state(EINTERNAL_INVARIANT_BROKEN))
     let child_lower_bound :=
       ordered_map::internal_lower_bound(&node.children, key)
-    return if ordered_map::iter_is_end(&child_lower_bound, &node.children) then
+    if ordered_map::iter_is_end(&child_lower_bound, &node.children) then
       new IteratorPtrWithPath<K> {
         iterator := self.internal_new_end_iter(), path := vector<u64>[]
       }
     else
       let iter_key :=
         *ordered_map::iter_borrow_key(&child_lower_bound, &node.children)
-      return if &iter_key == key then
+      if &iter_key == key then
         new IteratorPtrWithPath<K> {
           iterator := new_iter(leaf, child_lower_bound, iter_key),
           path := leaf_path
@@ -826,7 +827,7 @@ leaner module 0x1::big_ordered_map where
     self : &BigOrderedMap<K, V>, key : &K
   ) -> Bool := do
     let internal_lower_bound := self.internal_lower_bound(key)
-    return if internal_lower_bound.iter_is_end(self) then false
+    if internal_lower_bound.iter_is_end(self) then false
     else &internal_lower_bound.key == key
 
   spec contains where
@@ -841,7 +842,7 @@ leaner module 0x1::big_ordered_map where
   ) -> &V := do
     let iter := self.internal_find(key)
     assert!(!iter.iter_is_end(self), invalid_argument(EKEY_NOT_FOUND))
-    return iter.iter_borrow(self)
+    iter.iter_borrow(self)
 
   spec borrow where
     pragma intrinsic
@@ -851,7 +852,7 @@ leaner module 0x1::big_ordered_map where
     self : &BigOrderedMap<K, V>, key : &K
   ) -> Option<V> := do
     let iter := self.internal_find(key)
-    return if iter.iter_is_end(self) then none::<V>()
+    if iter.iter_is_end(self) then none::<V>()
     else some(*iter.iter_borrow(self))
 
   spec get where
@@ -869,7 +870,7 @@ leaner module 0x1::big_ordered_map where
   ) -> &mut V := do
     let iter := self.internal_find(key)
     assert!(!iter.iter_is_end(self), invalid_argument(EKEY_NOT_FOUND))
-    return iter.iter_borrow_mut(self)
+    iter.iter_borrow_mut(self)
 
   spec borrow_mut where
     pragma intrinsic
@@ -880,7 +881,7 @@ leaner module 0x1::big_ordered_map where
   ) -> (K, &V) := do
     let it := self.internal_new_begin_iter()
     let key := *it.iter_borrow_key()
-    return (key, it.iter_borrow(self))
+    (key, it.iter_borrow(self))
 
   spec borrow_front where
     pragma intrinsic
@@ -890,7 +891,7 @@ leaner module 0x1::big_ordered_map where
     self : &BigOrderedMap<K, V>
   ) -> K := do
     let it := self.internal_new_begin_iter()
-    return *it.iter_borrow_key()
+    *it.iter_borrow_key()
 
   spec front_key where
     pragma intrinsic
@@ -901,7 +902,7 @@ leaner module 0x1::big_ordered_map where
   ) -> (K, &V) := do
     let it := self.internal_new_end_iter().iter_prev(self)
     let key := *it.iter_borrow_key()
-    return (key, it.iter_borrow(self))
+    (key, it.iter_borrow(self))
 
   spec borrow_back where
     pragma intrinsic
@@ -911,7 +912,7 @@ leaner module 0x1::big_ordered_map where
     self : &BigOrderedMap<K, V>
   ) -> K := do
     let it := self.internal_new_end_iter().iter_prev(self)
-    return *it.iter_borrow_key()
+    *it.iter_borrow_key()
 
   spec back_key where
     pragma intrinsic
@@ -921,7 +922,7 @@ leaner module 0x1::big_ordered_map where
     self : &BigOrderedMap<K, V>, key : &K
   ) -> Option<K> := do
     let it := self.internal_lower_bound(key)
-    return if it.iter_is_begin(self) then none::<K>()
+    if it.iter_is_begin(self) then none::<K>()
     else some(*it.iter_prev(self).iter_borrow_key())
 
   spec prev_key where
@@ -932,12 +933,12 @@ leaner module 0x1::big_ordered_map where
     self : &BigOrderedMap<K, V>, key : &K
   ) -> Option<K> := do
     let it := self.internal_lower_bound(key)
-    return if it.iter_is_end(self) then none::<K>()
+    if it.iter_is_end(self) then none::<K>()
     else
       let cur_key := it.iter_borrow_key()
-      return if key == cur_key then
+      if key == cur_key then
         let it := it.iter_next(self)
-        return if it.iter_is_end(self) then none::<K>()
+        if it.iter_is_end(self) then none::<K>()
         else some(*it.iter_borrow_key())
       else some(*cur_key)
 
@@ -976,7 +977,7 @@ leaner module 0x1::big_ordered_map where
       iter := next_iter
     where
       invariant spec_leaf_iter_valid(iter, self)
-    return result
+    result
 
   spec to_ordered_map where
     pragma intrinsic
@@ -1011,7 +1012,7 @@ leaner module 0x1::big_ordered_map where
       iter := next_iter
     where
       invariant spec_leaf_iter_valid(iter, self)
-    return result
+    result
 
   spec keys where
     pragma intrinsic
@@ -1030,8 +1031,8 @@ leaner module 0x1::big_ordered_map where
     let node :=
       do
         let (self, node_index) := (self, self.min_leaf_index)
-        return (if node_index == ROOT_INDEX then &self.root
-        else storage_slots_allocator::borrow(&self.nodes, node_index))
+        if node_index == ROOT_INDEX then &self.root
+        else storage_slots_allocator::borrow(&self.nodes, node_index)
     assert!(
       !ordered_map::is_empty(&node.children),
       invalid_state(EINTERNAL_INVARIANT_BROKEN)
@@ -1039,7 +1040,7 @@ leaner module 0x1::big_ordered_map where
     let begin_child_iter := ordered_map::internal_new_begin_iter(&node.children)
     let begin_child_key :=
       *ordered_map::iter_borrow_key(&begin_child_iter, &node.children)
-    return new_iter(self.min_leaf_index, begin_child_iter, begin_child_key)
+    new_iter(self.min_leaf_index, begin_child_iter, begin_child_key)
 
   spec internal_new_begin_iter where
     pragma opaque
@@ -1105,7 +1106,7 @@ leaner module 0x1::big_ordered_map where
   -/
   public fun iter_borrow_key {K}(self : &IteratorPtr<K>) -> &K := do
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
-    return &self.key
+    &self.key
 
   spec iter_borrow_key where
     pragma opaque
@@ -1129,9 +1130,9 @@ leaner module 0x1::big_ordered_map where
     let children :=
       &(do
         let (self, node_index) := (map, node_index)
-        return (if node_index == ROOT_INDEX then &self.root
-        else storage_slots_allocator::borrow(&self.nodes, node_index))).children
-    return &ordered_map::iter_borrow(child_iter, children).value
+        if node_index == ROOT_INDEX then &self.root
+        else storage_slots_allocator::borrow(&self.nodes, node_index)).children
+    &ordered_map::iter_borrow(child_iter, children).value
 
   spec iter_borrow where
     pragma opaque
@@ -1165,11 +1166,11 @@ leaner module 0x1::big_ordered_map where
     let children :=
       &mut (do
         let (self, node_index) := (map, node_index)
-        return (if node_index == ROOT_INDEX then &mut self.root
+        if node_index == ROOT_INDEX then &mut self.root
         else storage_slots_allocator::borrow_mut(
           &mut self.nodes, node_index
-        ))).children
-    return &mut ordered_map::iter_borrow_mut(child_iter, children).value
+        )).children
+    &mut ordered_map::iter_borrow_mut(child_iter, children).value
 
   spec iter_borrow_mut where
     pragma intrinsic
@@ -1187,10 +1188,10 @@ leaner module 0x1::big_ordered_map where
     let children :=
       &mut (do
         let (self, node_index) := (map, node_index)
-        return (if node_index == ROOT_INDEX then &mut self.root
+        if node_index == ROOT_INDEX then &mut self.root
         else storage_slots_allocator::borrow_mut(
           &mut self.nodes, node_index
-        ))).children
+        )).children
     let value_mut :=
       &mut ordered_map::iter_borrow_mut(child_iter, children).value
     let result := invoke(f, value_mut)
@@ -1198,7 +1199,7 @@ leaner module 0x1::big_ordered_map where
     let key_size := serialized_size(&key)
     let value_size := serialized_size(value_mut)
     map.validate_size_and_init_max_degrees(key_size, value_size)
-    return result
+    result
 
   spec iter_modify where
     pragma opaque
@@ -1246,7 +1247,7 @@ leaner module 0x1::big_ordered_map where
       map.remove_at_with_iter_hint(path_to_leaf, &key, some(child_iter))
     assert!(is_some(&old_leaf), invalid_argument(EKEY_NOT_FOUND))
     let Child<V>::Leaf { value := value } := destroy_some(old_leaf)
-    return value
+    value
 
   spec iter_remove where
     pragma opaque
@@ -1277,8 +1278,8 @@ leaner module 0x1::big_ordered_map where
     let node :=
       do
         let (self, node_index) := (map, node_index)
-        return (if node_index == ROOT_INDEX then &self.root
-        else storage_slots_allocator::borrow(&self.nodes, node_index))
+        if node_index == ROOT_INDEX then &self.root
+        else storage_slots_allocator::borrow(&self.nodes, node_index)
     let child_iter := ordered_map::iter_next(self.child_iter, &node.children)
     if !ordered_map::iter_is_end(&child_iter, &node.children) then
       let iter_key := *ordered_map::iter_borrow_key(&child_iter, &node.children)
@@ -1288,8 +1289,8 @@ leaner module 0x1::big_ordered_map where
       let next_node :=
         do
           let (self, node_index) := (map, next_index)
-          return (if node_index == ROOT_INDEX then &self.root
-          else storage_slots_allocator::borrow(&self.nodes, node_index))
+          if node_index == ROOT_INDEX then &self.root
+          else storage_slots_allocator::borrow(&self.nodes, node_index)
       let child_iter :=
         ordered_map::internal_new_begin_iter(&next_node.children)
       assert!(
@@ -1299,7 +1300,7 @@ leaner module 0x1::big_ordered_map where
       let iter_key :=
         *ordered_map::iter_borrow_key(&child_iter, &next_node.children)
       return new_iter(next_index, child_iter, iter_key);
-    return map.internal_new_end_iter()
+    map.internal_new_end_iter()
 
   spec iter_next where
     pragma opaque
@@ -1341,27 +1342,27 @@ leaner module 0x1::big_ordered_map where
         let node :=
           do
             let (self, node_index) := (map, node_index)
-            return (if node_index == ROOT_INDEX then &self.root
-            else storage_slots_allocator::borrow(&self.nodes, node_index))
+            if node_index == ROOT_INDEX then &self.root
+            else storage_slots_allocator::borrow(&self.nodes, node_index)
         if !ordered_map::iter_is_begin(&self.child_iter, &node.children) then
           let child_iter :=
             ordered_map::iter_prev(self.child_iter, &node.children)
           let key := *ordered_map::iter_borrow_key(&child_iter, &node.children)
           return new_iter(node_index, child_iter, key);
-        return node.prev
+        node.prev
     assert!(prev_index != NULL_INDEX, invalid_argument(EITER_OUT_OF_BOUNDS))
     let prev_node :=
       do
         let (self, node_index) := (map, prev_index)
-        return (if node_index == ROOT_INDEX then &self.root
-        else storage_slots_allocator::borrow(&self.nodes, node_index))
+        if node_index == ROOT_INDEX then &self.root
+        else storage_slots_allocator::borrow(&self.nodes, node_index)
     let prev_children := &prev_node.children
     let child_iter :=
       ordered_map::iter_prev(
         ordered_map::internal_new_end_iter(prev_children), prev_children
       )
     let iter_key := *ordered_map::iter_borrow_key(&child_iter, prev_children)
-    return new_iter(prev_index, child_iter, iter_key)
+    new_iter(prev_index, child_iter, iter_key)
 
   spec iter_prev where
     pragma opaque
@@ -1429,11 +1430,11 @@ leaner module 0x1::big_ordered_map where
     let node :=
       do
         let (self, node_index) := (map, self.node_index)
-        return (if node_index == ROOT_INDEX then &self.root
-        else storage_slots_allocator::borrow(&self.nodes, node_index))
+        if node_index == ROOT_INDEX then &self.root
+        else storage_slots_allocator::borrow(&self.nodes, node_index)
     assert!(node.is_leaf, EINTERNAL_INVARIANT_BROKEN)
     self.node_index := node.next
-    return (&node.children, self)
+    (&node.children, self)
 
   spec internal_leaf_iter_borrow_entries_and_next_leaf_index where
     pragma opaque
@@ -1501,10 +1502,10 @@ leaner module 0x1::big_ordered_map where
         let current_node :=
           do
             let (self, node_index) := (self, current)
-            return (if node_index == ROOT_INDEX then &mut self.root
+            if node_index == ROOT_INDEX then &mut self.root
             else storage_slots_allocator::borrow_mut(
               &mut self.nodes, node_index
-            ))
+            )
         if current_node.is_leaf then break
         let last_value :=
           ordered_map::iter_remove(
@@ -1516,11 +1517,7 @@ leaner module 0x1::big_ordered_map where
           )
         current := stored_to_index(&last_value.node_index)
         ordered_map::add(&mut current_node.children, key, last_value)
-    return self.add_at(
-      path_to_leaf, key, new_leaf_child(
-        value
-      ), allow_overwrite
-    )
+    self.add_at(path_to_leaf, key, new_leaf_child(value), allow_overwrite)
 
   -- Optimize case where only root node exists
   -- (optimizes out borrowing and path creation in `find_leaf_path`)
@@ -1607,7 +1604,7 @@ leaner module 0x1::big_ordered_map where
   -- Make sure that no nodes can exceed the upper size limit.
   fun destroy_inner_child {V has Store}(self : Child<V>) -> StoredSlot := do
     let Child<V>::Inner { node_index := node_index } := self
-    return node_index
+    node_index
 
   fun destroy_empty_node {K has Store} {V has Store}(
     self : Node<K, V>
@@ -1658,8 +1655,8 @@ leaner module 0x1::big_ordered_map where
       let node :=
         do
           let (self, node_index) := (self, current)
-          return (if node_index == ROOT_INDEX then &self.root
-          else storage_slots_allocator::borrow(&self.nodes, node_index))
+          if node_index == ROOT_INDEX then &self.root
+          else storage_slots_allocator::borrow(&self.nodes, node_index)
       if node.is_leaf then return current;
       let children := &node.children
       let child_iter := ordered_map::internal_lower_bound(children, key)
@@ -1686,8 +1683,8 @@ leaner module 0x1::big_ordered_map where
       let node :=
         do
           let (self, node_index) := (self, current)
-          return (if node_index == ROOT_INDEX then &self.root
-          else storage_slots_allocator::borrow(&self.nodes, node_index))
+          if node_index == ROOT_INDEX then &self.root
+          else storage_slots_allocator::borrow(&self.nodes, node_index)
       if node.is_leaf then return vec;
       let children := &node.children
       let child_iter := ordered_map::internal_lower_bound(children, key)
@@ -1725,7 +1722,7 @@ leaner module 0x1::big_ordered_map where
     let tmp_children := trim(&mut root.children, 0)
     append_disjoint(&mut root.children, trim(&mut new_root.children, 0))
     append_disjoint(&mut new_root.children, tmp_children)
-    return new_root
+    new_root
 
   -- TODO: once mem::replace is made public/released, update to:
   -- mem::replace(&mut self.root, new_root_node)
@@ -1752,8 +1749,8 @@ leaner module 0x1::big_ordered_map where
     let node :=
       do
         let (self, node_index) := (self, node_index)
-        return (if node_index == ROOT_INDEX then &mut self.root
-        else storage_slots_allocator::borrow_mut(&mut self.nodes, node_index))
+        if node_index == ROOT_INDEX then &mut self.root
+        else storage_slots_allocator::borrow_mut(&mut self.nodes, node_index)
     let children := &mut node.children
     let degree := length(children)
     let max_degree :=
@@ -1801,7 +1798,7 @@ leaner module 0x1::big_ordered_map where
                 root_children
               )
             if is_lt(&compare(&max_key, &key)) then max_key := key
-            return max_key
+            max_key
         ordered_map::add(
           &mut new_root_node.children, max_key,
           new_inner_child::<V>(replacement_node_slot)
@@ -1813,11 +1810,11 @@ leaner module 0x1::big_ordered_map where
         if node.is_leaf then
           self.min_leaf_index := replacement_index
           self.max_leaf_index := replacement_index
-        return (replacement_node_reserved_slot, node)
+        (replacement_node_reserved_slot, node)
       else
         let (cur_node_reserved_slot, node) :=
           remove_and_reserve(&mut self.nodes, node_index)
-        return (cur_node_reserved_slot, node)
+        (cur_node_reserved_slot, node)
     core.prim.moveValue(node_index)
     assert!(!path_to_node.is_empty(), invalid_state(EINTERNAL_INVARIANT_BROKEN))
     let right_node_reserved_slot := reserved_slot
@@ -1876,7 +1873,7 @@ leaner module 0x1::big_ordered_map where
         ), false
       )
     )
-    return none::<Child<V> >()
+    none::<Child<V> >()
 
   spec add_at where
     pragma opaque
@@ -1936,8 +1933,8 @@ leaner module 0x1::big_ordered_map where
       let node :=
         do
           let (self, node_index) := (self, node_index)
-          return (if node_index == ROOT_INDEX then &mut self.root
-          else storage_slots_allocator::borrow_mut(&mut self.nodes, node_index))
+          if node_index == ROOT_INDEX then &mut self.root
+          else storage_slots_allocator::borrow_mut(&mut self.nodes, node_index)
       let children := &mut node.children
       replace_key_inplace(children, old_key, new_key)
       if ordered_map::iter_borrow_key(
@@ -1960,23 +1957,23 @@ leaner module 0x1::big_ordered_map where
         let node :=
           do
             let (self, node_index) := (self, node_index)
-            return (if node_index == ROOT_INDEX then &mut self.root
+            if node_index == ROOT_INDEX then &mut self.root
             else storage_slots_allocator::borrow_mut(
               &mut self.nodes, node_index
-            ))
+            )
         let children := &mut node.children
         let is_leaf := node.is_leaf
         let old_child :=
           if is_some(&iter_hint) then
             let iter_hint := destroy_some(iter_hint)
-            return (if ordered_map::iter_is_end(&iter_hint, children) then
+            if ordered_map::iter_is_end(&iter_hint, children) then
               none::<Child<V> >()
             else
               assert!(
                 ordered_map::iter_borrow_key(&iter_hint, children) == key,
                 invalid_argument(EINTERNAL_INVARIANT_BROKEN)
               )
-              return some(ordered_map::iter_remove(iter_hint, children)))
+              some(ordered_map::iter_remove(iter_hint, children))
           else ordered_map::remove_or_none(children, key)
         if is_none(&old_child) then return old_child;
         if node_index == ROOT_INDEX then
@@ -2019,9 +2016,9 @@ leaner module 0x1::big_ordered_map where
           assert!(degree >= 1, invalid_state(EINTERNAL_INVARIANT_BROKEN))
           self.update_key(path_to_node, key, new_max_key)
         if big_enough then return old_child;
-        return old_child
+        old_child
     self.process_rebalance_after_child_removal(node_index, path_to_node)
-    return old_child
+    old_child
 
   spec remove_at_with_iter_hint where
     pragma opaque
@@ -2055,15 +2052,15 @@ leaner module 0x1::big_ordered_map where
           &(do
             let (self, node_index) :=
               (self, path_to_node[path_to_node.length - 1])
-            return (if node_index == ROOT_INDEX then &self.root
+            if node_index == ROOT_INDEX then &self.root
             else storage_slots_allocator::borrow(
               &self.nodes, node_index
-            ))).children
+            )).children
         assert!(
           length(parent_children)
             >= 2, invalid_state(EINTERNAL_INVARIANT_BROKEN)
         )
-        return (if stored_to_index(
+        if stored_to_index(
           &ordered_map::iter_borrow(
             ordered_map::iter_prev(
               ordered_map::internal_new_end_iter(
@@ -2075,7 +2072,7 @@ leaner module 0x1::big_ordered_map where
         )
           == node_index then
           prev
-        else next)
+        else next
     let children := &mut node.children
     let (sibling_slot, mut sibling_node) :=
       remove_and_reserve(&mut self.nodes, sibling_index)
@@ -2162,7 +2159,7 @@ leaner module 0x1::big_ordered_map where
           assert!(is_leaf, invalid_state(EINTERNAL_INVARIANT_BROKEN))
           self.min_leaf_index := sibling_index
         fill_reserved_slot(&mut self.nodes, sibling_slot, node)
-        return (key_to_remove, node_slot)
+        (key_to_remove, node_slot)
       else
         let Node<K, V>::V1 { is_leaf := _,
         children := node_children,
@@ -2196,13 +2193,13 @@ leaner module 0x1::big_ordered_map where
           assert!(is_leaf, invalid_state(EINTERNAL_INVARIANT_BROKEN))
           self.min_leaf_index := node_index
         fill_reserved_slot(&mut self.nodes, node_slot, sibling_node)
-        return (key_to_remove, sibling_slot)
+        (key_to_remove, sibling_slot)
     assert!(!path_to_node.is_empty(), invalid_state(EINTERNAL_INVARIANT_BROKEN))
     let slot_to_remove :=
       destroy_some(
         do
           let (self, path_to_node, key) := (self, path_to_node, &key_to_remove)
-          return self.remove_at_with_iter_hint(
+          self.remove_at_with_iter_hint(
             path_to_node, key, none::<ordered_map::IteratorPtr>()
           )
       ).destroy_inner_child()
@@ -2246,7 +2243,7 @@ leaner module 0x1::big_ordered_map where
   -- the closure's postcondition in return.
   fun __lambda__2__test_verify_modify(v : &mut u64) -> Bool := do
     *v := 12
-    return true
+    true
 
   spec __lambda__2__test_verify_modify where
     requires v == 11
@@ -2420,7 +2417,7 @@ leaner module 0x1::big_ordered_map where
       assert keys[0] == 1
       assert keys[3] == 1
     let map := new_from(keys, values)
-    return map
+    map
 
   spec test_aborts_if_new_from_1 where
     pragma verify
@@ -2430,7 +2427,7 @@ leaner module 0x1::big_ordered_map where
     keys : Vector<u64>, values : Vector<u64>
   ) -> BigOrderedMap<u64, u64> := do
     let map := new_from(keys, values)
-    return map
+    map
 
   spec test_aborts_if_new_from_2 where
     pragma verify
@@ -2516,7 +2513,7 @@ leaner module 0x1::big_ordered_map where
   fun __lambda__1__test_verify_iter_modify(v : &mut u64) -> u64 := do
     let o := *v
     *v := 50
-    return o
+    o
 
   -- Materialize ground membership facts so the frame quantifier
   -- (spec_unchanged_except_at) instantiates at keys 1 and 3.
@@ -2731,7 +2728,7 @@ leaner module 0x1::big_ordered_map where
       invariant sum == 10 * (3 - spec_len(map)) * (4 - spec_len(map)) / 2
     spec assert sum == 60
     map.destroy_empty()
-    return sum
+    sum
 
   spec test_verify_drain_loop where
     pragma verify
@@ -2760,7 +2757,7 @@ leaner module 0x1::big_ordered_map where
         ==> spec_contains_key(m, it.key)
           && sum == spec_test_sum_upto(m, spec_rank(m, it.key))
       invariant it is End ==> sum == spec_test_sum_upto(m, spec_len(m))
-    return sum
+    sum
 
   spec test_verify_iter_sum_symbolic where
     pragma verify
@@ -2780,7 +2777,7 @@ leaner module 0x1::big_ordered_map where
         spec_key_at(m, i) == spec_key_at(old(m), i + count)
       invariant ∀ (i in 0 .. spec_len(m)),
         spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
-    return count
+    count
 
   spec test_verify_drain_symbolic where
     pragma verify
@@ -2822,7 +2819,7 @@ leaner module 0x1::big_ordered_map where
         spec_key_at(m, i) == spec_key_at(old(m), i)
       invariant ∀ (i in 0 .. spec_len(m)),
         spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
-    return count
+    count
 
   spec test_verify_pop_back_drain_symbolic where
     pragma verify
@@ -2847,7 +2844,7 @@ leaner module 0x1::big_ordered_map where
       invariant !(it is End)
         ==> spec_contains_key(m, it.key) && out.length == spec_rank(m, it.key)
       invariant it is End ==> out.length == spec_len(m)
-    return out
+    out
 
   spec test_verify_iter_collect_symbolic where
     pragma verify
@@ -2919,7 +2916,7 @@ leaner module 0x1::big_ordered_map where
     m : &mut BigOrderedMap<u64, u64>, k : u64
   ) -> u64 := do
     let it := m.internal_find_with_path(&k)
-    return it.iter_remove(m)
+    it.iter_remove(m)
 
   spec test_verify_iter_remove_symbolic where
     pragma verify
@@ -2951,7 +2948,7 @@ leaner module 0x1::big_ordered_map where
       invariant !(it is End)
         ==> spec_contains_key(m, it.key)
           && spec_rank(m, it.key) == spec_len(m) - count
-    return count
+    count
 
   spec test_verify_iter_prev_loop_symbolic where
     pragma verify
@@ -2975,7 +2972,7 @@ leaner module 0x1::big_ordered_map where
         spec_key_at(m, i) == spec_key_at(old(m), i + count)
       invariant ∀ (i in 0 .. spec_len(m)),
         spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
-    return count
+    count
 
   spec test_verify_front_remove_drain_symbolic where
     pragma verify
@@ -3034,7 +3031,7 @@ leaner module 0x1::big_ordered_map where
         ==> spec_contains_key(m, it.key)
           && spec_rank(m, it.key) == spec_rank(m, k) + count
       invariant it is End ==> count + spec_rank(m, k) == spec_len(m)
-    return count
+    count
 
   spec test_verify_find_started_walk_symbolic where
     pragma verify
@@ -3052,7 +3049,8 @@ leaner module 0x1::big_ordered_map where
     let found := false
     let it := m.internal_new_begin_iter()
     let seen := 0
-    while !found && !it.iter_is_end(m) do
+    while !found && !it.iter_is_end(m)
+    do
       if *it.iter_borrow(m) == target then found := true
       else
         it := it.iter_next(m)
@@ -3065,7 +3063,7 @@ leaner module 0x1::big_ordered_map where
       invariant it is End ==> seen == spec_len(m)
       invariant !found
         ==> (∀ (i in 0 .. seen), spec_get(m, spec_key_at(m, i)) != target)
-    return found
+    found
 
   spec test_verify_early_exit_walk_symbolic where
     pragma verify
@@ -3083,7 +3081,8 @@ leaner module 0x1::big_ordered_map where
   ) -> Vector<u64> := do
     let mut out := vector<u64>[]
     let it := m.internal_new_begin_iter()
-    while out.length < limit && !it.iter_is_end(m) do
+    while out.length < limit && !it.iter_is_end(m)
+    do
       out := core.prim.pushVector(out, *it.iter_borrow_key())
       it := it.iter_next(m)
     where
@@ -3093,7 +3092,7 @@ leaner module 0x1::big_ordered_map where
       invariant !(it is End)
         ==> spec_contains_key(m, it.key) && spec_rank(m, it.key) == out.length
       invariant it is End ==> out.length == spec_len(m)
-    return out
+    out
 
   spec test_verify_bounded_walk_symbolic where
     pragma verify
@@ -3119,7 +3118,7 @@ leaner module 0x1::big_ordered_map where
       invariant n == spec_len(m)
       invariant i <= spec_len(m)
       invariant sum == spec_test_sum_upto(m, i)
-    return sum
+    sum
 
   spec test_verify_keys_for_loop_symbolic where
     pragma verify
@@ -3147,7 +3146,7 @@ leaner module 0x1::big_ordered_map where
         ==> spec_contains_key(m, spec_borrow(nxt))
           && spec_rank(m, spec_borrow(nxt)) == count
       invariant spec_is_none(nxt) ==> count == spec_len(m)
-    return count
+    count
 
   spec test_verify_next_key_scan_symbolic where
     pragma verify
@@ -3206,13 +3205,13 @@ leaner module 0x1::big_ordered_map where
     v : &mut u64
   ) -> u64 := do
     *v := 7
-    return *v
+    *v
 
   fun test_verify_iter_remove_shift_symbolic(
     m : &mut BigOrderedMap<u64, u64>, k : u64
   ) -> u64 := do
     let it := m.internal_find_with_path(&k)
-    return it.iter_remove(m)
+    it.iter_remove(m)
 
   spec test_verify_iter_remove_shift_symbolic where
     pragma verify
@@ -3263,7 +3262,7 @@ leaner module 0x1::big_ordered_map where
       invariant it.internal_leaf_iter_is_end()
         ==> spec_leaf_offset(it, m) == spec_len(m)
       invariant sum == spec_test_sum_upto(m, spec_leaf_offset(it, m))
-    return sum
+    sum
 
   spec test_verify_leaf_walk_sum_symbolic where
     pragma verify

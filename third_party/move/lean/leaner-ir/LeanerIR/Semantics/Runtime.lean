@@ -159,6 +159,117 @@ private theorem beq_eq_decide {α : Type} [BEq α] [LawfulBEq α] [DecidableEq �
   unfold RuntimeValue.beq
   exact beq_eq_decide _ _
 
+/-! ## Structural order
+
+The order of `std::cmp::compare`: a primitive value by its natural order;
+vectors, tuples, and fields lexicographically; an enum value by its
+variant's declaration position, then its fields. Values of different kinds
+order by kind, and spellings break the ties a position leaves, so the order
+is total on every value. -/
+
+/-- The position of a value's kind in the structural order. -/
+def RuntimeValue.kindRank : RuntimeValue → Nat
+  | .unit => 0
+  | .bool _ => 1
+  | .character _ => 2
+  | .integer _ => 3
+  | .address _ => 4
+  | .signer _ => 5
+  | .string _ => 6
+  | .bytes _ => 7
+  | .vector _ => 8
+  | .tuple _ => 9
+  | .nominal .. => 10
+  | .closure .. => 11
+  | .borrow .. => 12
+  | .loanHole _ => 13
+
+/-- The value of one hexadecimal digit. -/
+def hexDigitValue? (digit : Char) : Option Nat :=
+  if '0' ≤ digit ∧ digit ≤ '9' then some (digit.toNat - '0'.toNat)
+  else if 'a' ≤ digit ∧ digit ≤ 'f' then some (digit.toNat - 'a'.toNat + 10)
+  else if 'A' ≤ digit ∧ digit ≤ 'F' then some (digit.toNat - 'A'.toNat + 10)
+  else none
+
+/-- The number an address spells in hexadecimal, when it spells one. -/
+def addressNumber? (address : String) : Option Nat :=
+  match address.toList with
+  | '0' :: 'x' :: digit :: digits =>
+      (digit :: digits).foldl (fun number digit => do
+        pure (16 * (← number) + (← hexDigitValue? digit))) (some 0)
+  | _ => none
+
+/-- Addresses order by the number they spell, then by spelling. -/
+def compareAddress (left right : String) : Ordering :=
+  (compare (addressNumber? left) (addressNumber? right)).then (compare left right)
+
+/-- Variants order by declaration position, then by name; a plain struct
+value precedes a variant. -/
+def compareVariant (rank : StructHandle → String → Nat) (leftSource rightSource : StructHandle) :
+    Option String → Option String → Ordering
+  | none, none => .eq
+  | none, some _ => .lt
+  | some _, none => .gt
+  | some left, some right =>
+      (compare (rank leftSource left) (rank rightSource right)).then (compare left right)
+
+mutual
+
+/-- The structural order of two runtime values, given each declaration's
+variant positions. -/
+def RuntimeValue.order (rank : StructHandle → String → Nat) (left right : RuntimeValue) :
+    Ordering :=
+  (compare left.kindRank right.kindRank).then (RuntimeValue.orderPayload rank left right)
+termination_by sizeOf left + sizeOf right + 1
+
+/-- The order of two values of the same kind. -/
+def RuntimeValue.orderPayload (rank : StructHandle → String → Nat) :
+    RuntimeValue → RuntimeValue → Ordering
+  | .bool left, .bool right => compare left right
+  | .character left, .character right => compare left right
+  | .integer left, .integer right => compare left right
+  | .address left, .address right => compareAddress left right
+  | .signer left, .signer right => compareAddress left right
+  | .string left, .string right => compare left right
+  | .bytes left, .bytes right => List.compareLex compare left.toList right.toList
+  | .vector left, .vector right => RuntimeValue.orderList rank left.toList right.toList
+  | .tuple left, .tuple right => RuntimeValue.orderList rank left.toList right.toList
+  | .nominal leftSource leftVariant leftFields,
+      .nominal rightSource rightVariant rightFields =>
+      ((compare leftSource.namespaceId.index rightSource.namespaceId.index).then
+        (compare leftSource.structId rightSource.structId)).then
+      ((compareVariant rank leftSource rightSource leftVariant rightVariant).then
+        (RuntimeValue.orderList rank leftFields.toList rightFields.toList))
+  | .closure leftFunction leftCaptures, .closure rightFunction rightCaptures =>
+      ((compare leftFunction.namespaceId.index rightFunction.namespaceId.index).then
+        (compare leftFunction.functionId.index rightFunction.functionId.index)).then
+      (RuntimeValue.orderList rank leftCaptures.toList rightCaptures.toList)
+  | .borrow leftLoan leftCurrent, .borrow rightLoan rightCurrent =>
+      (compare leftLoan rightLoan).then (RuntimeValue.order rank leftCurrent rightCurrent)
+  | .loanHole left, .loanHole right => compare left right
+  | _, _ => .eq
+termination_by left right => sizeOf left + sizeOf right
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+
+/-- The lexicographic order of two value lists. -/
+def RuntimeValue.orderList (rank : StructHandle → String → Nat) :
+    List RuntimeValue → List RuntimeValue → Ordering
+  | [], [] => .eq
+  | [], _ :: _ => .lt
+  | _ :: _, [] => .gt
+  | left :: lefts, right :: rights =>
+      (RuntimeValue.order rank left right).then (RuntimeValue.orderList rank lefts rights)
+termination_by lefts rights => sizeOf lefts + sizeOf rights
+decreasing_by all_goals (simp_wf; omega)
+
+end
+
+/-- An ordering as the integer `compare` returns. -/
+def orderValue : Ordering → Int
+  | .lt => -1
+  | .eq => 0
+  | .gt => 1
+
 /-! ## Specification projections
 
 Generated contracts speak about aggregates through total projections: a

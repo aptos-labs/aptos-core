@@ -8,4 +8,4 @@ leaner namespace function_pointer where
 
   fun apply(value : u32) -> u32 := do
     let «function» := function[Fn(u32) -> u32 has Copy, Drop](increment)
-    return invoke(«function», value)
+    invoke(«function», value)

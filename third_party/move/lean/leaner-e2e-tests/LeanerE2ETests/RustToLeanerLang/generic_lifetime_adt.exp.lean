@@ -9,4 +9,4 @@ leaner namespace generic_lifetime_adt where
 
   fun read_u32(value : Borrowed<lifetime _, u32>) -> u32 := do
     let _2 := copy(value.value)
-    return *_2
+    *_2

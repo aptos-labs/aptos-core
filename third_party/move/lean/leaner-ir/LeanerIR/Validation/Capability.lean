@@ -266,6 +266,8 @@ def corePrimitiveFeature : PrimitiveOperation → SemanticFeature
   | .reverseSliceVector => feature "primitive.reverseSliceVector" .executable
   | .destroyEmptyVector => feature "primitive.destroyEmptyVector" .executable
   | .containsVector => feature "primitive.containsVector" .executable
+  | .compare => feature "primitive.compare" .executable
+  | .signerAddress => feature "primitive.signerAddress" .executable
   | .indexOfVector => feature "primitive.indexOfVector" .executable
   | .checkVectorIndex _ => feature "primitive.checkVectorIndex" .executable
   | .length => feature "primitive.length" .executable
@@ -347,6 +349,7 @@ def coreSpecOperationFeature : SpecOperation → SemanticFeature
   | .global _ => unsupportedSpecification "global"
   | .canModify => unsupportedSpecification "canModify"
   | .old => unsupportedSpecification "old"
+  | .final => unsupportedSpecification "final"
   | .saveStateAnchor _ => unsupportedSpecification "saveStateAnchor"
   | .withStateAnchor _ => unsupportedSpecification "withStateAnchor"
   | .foldsCaptureAnchor _ => unsupportedSpecification "foldsCaptureAnchor"
@@ -1293,6 +1296,16 @@ private def bitwisePrimitiveDiagnostics (ns : ValidatedNamespace)
   else
     fixedIntegerPrimitiveDiagnostics ns logical loc resultType arguments 2
 
+/-- Whether two operands have one type; in a specification, a projected
+spec representation agrees with its source type too. -/
+private def operandsAgree (ns : ValidatedNamespace) (logical : Bool) (left right : ExprId) :
+    Bool :=
+  match exprType? ns left, exprType? ns right with
+  | some leftType, some rightType => typesAgree ns leftType rightType ||
+      (logical && (specProjectedAgree ns leftType rightType ||
+        specProjectedAgree ns rightType leftType))
+  | _, _ => false
+
 private def equalityPrimitiveDiagnostics (ns : ValidatedNamespace) (logical : Bool)
     (loc : LocId)
     (resultType : TypeId) (arguments : Array ExprId) : Array Diagnostic :=
@@ -1300,13 +1313,22 @@ private def equalityPrimitiveDiagnostics (ns : ValidatedNamespace) (logical : Bo
     typeMismatch loc "equality primitive result is not Bool"
   else match arguments.toList with
     | [left, right] =>
-        if match exprType? ns left, exprType? ns right with
-          | some leftType, some rightType => typesAgree ns leftType rightType ||
-              (logical && (specProjectedAgree ns leftType rightType ||
-                specProjectedAgree ns rightType leftType))
-          | _, _ => false then #[]
+        if operandsAgree ns logical left right then #[]
         else typeMismatch loc "equality primitive operand types differ"
     | _ => #[]
+
+/-- The structural order compares two values of one type and returns an
+integer. -/
+private def structuralOrderDiagnostics (ns : ValidatedNamespace) (logical : Bool)
+    (loc : LocId) (resultType : TypeId) (arguments : Array ExprId) : Array Diagnostic :=
+  let resultErrors := if isFixedIntegerType ns resultType ||
+      (logical && isLogicalNumType ns resultType) then #[]
+    else typeMismatch loc "a structural comparison must return an integer"
+  match arguments.toList with
+  | [left, right] =>
+      if operandsAgree ns logical left right then resultErrors
+      else resultErrors ++ typeMismatch loc "compared values differ in type"
+  | _ => resultErrors
 
 private def comparisonPrimitiveDiagnostics (ns : ValidatedNamespace)
     (logical : Bool) (loc : LocId)
@@ -1594,6 +1616,18 @@ private def primitiveTypeDiagnostics (ns : ValidatedNamespace) (logical : Bool)
             | _ => typeMismatch loc "index check requires a vector"
           resultErrors ++ vectorErrors ++ vectorEditIndexDiagnostics ns logical loc index
       | _ => resultErrors
+  | .signerAddress =>
+      let resultErrors := if ns.tables.types[resultType.index]? == some .address then #[]
+        else typeMismatch loc "a signer's address must have type Address"
+      match arguments.toList with
+      | [signer] => match exprType? ns signer >>= (ns.tables.types[·.index]?) with
+          | some (.reference reference) =>
+              if ns.tables.types[reference.referent.index]? == some .signer then resultErrors
+              else resultErrors ++ typeMismatch loc "a signer's address requires a &Signer"
+          | some .signer => if logical then resultErrors
+              else resultErrors ++ typeMismatch loc "a signer's address requires a &Signer"
+          | _ => resultErrors ++ typeMismatch loc "a signer's address requires a &Signer"
+      | _ => resultErrors
   | .destroyEmptyVector =>
       let resultErrors := if ns.tables.types[resultType.index]? == some .unit then #[]
         else typeMismatch loc "empty-vector destruction must return unit"
@@ -1636,6 +1670,7 @@ private def primitiveTypeDiagnostics (ns : ValidatedNamespace) (logical : Bool)
       booleanPrimitiveDiagnostics ns loc resultType arguments 2
   | .equal | .notEqual | .identical =>
       equalityPrimitiveDiagnostics ns logical loc resultType arguments
+  | .compare => structuralOrderDiagnostics ns logical loc resultType arguments
   | .less | .greater | .lessEqual | .greaterEqual =>
       comparisonPrimitiveDiagnostics ns logical loc resultType arguments
   | .logicalNot => booleanPrimitiveDiagnostics ns loc resultType arguments 1
@@ -2823,6 +2858,12 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
           s!"resource-domain instantiation expects 1 argument, but has {instantiations.size}" loc]
   | .old | .withStateAnchor _ | .trace _ | .noOp =>
       unaryIdentityPrimitiveDiagnostics ns true loc resultType arguments
+  | .final => match arguments.toList with
+      | [reference] => match ns.expressions[reference.index]?.map (·.kind) with
+          | some (ExprKind.operation (.specification (.result _)) _ _ _) =>
+              unaryIdentityPrimitiveDiagnostics ns true loc resultType arguments
+          | _ => typeMismatch loc "`final` reads a returned mutable reference"
+      | _ => #[.at "LIR-SEMANTIC-ARITY" "`final` expects one operand" loc]
   | .bitVectorToInt => match arguments.toList with
       | [value] =>
           let resultErrors :=
@@ -3470,7 +3511,8 @@ mutual
       | .primitive .swapVector => exactArity loc "vector swap" 3 arguments.size
       | .primitive .reverseSliceVector => exactArity loc "vector range reversal" 3 arguments.size
       | .primitive .destroyEmptyVector => exactArity loc "empty-vector destruction" 1 arguments.size
-      | .primitive .length | .primitive .logicalNot | .primitive .bitwiseNot |
+      | .primitive .length | .primitive .signerAddress | .primitive .logicalNot |
+          .primitive .bitwiseNot |
           .primitive .negate |
           .primitive (.checkedNegate _) | .primitive .copyValue | .primitive .moveValue |
           .primitive .cast | .primitive (.checkedCast _) =>
@@ -4039,8 +4081,10 @@ private def scanContract (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (contract : FunctionContract) : Array Diagnostic :=
   let conditionErrors := contract.conditions.foldl (fun ds condition =>
     ds ++ scanCondition registry unit mode ns context condition) #[]
+  -- A frame target is a specification expression, as in a spec block.
   let modifiesErrors := contract.modifies.foldl (fun ds expression =>
-    ds ++ scanExpr registry unit mode ns context expression) conditionErrors
+    ds ++ scanExpr registry unit mode ns { context with logical := true } expression)
+    conditionErrors
   contract.reads.foldl (fun ds typeUse =>
     ds ++ scanType registry unit mode ns typeUse.loc typeUse.typeId
       context.generics) modifiesErrors

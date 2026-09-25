@@ -67,13 +67,13 @@ leaner module 0x1::option where
     mut vec : Vector<Element>
   ) -> Option<Element> := do
     assert!(vec.length <= 1, EOPTION_VEC_TOO_LONG)
-    return if vec.is_empty() then
+    if vec.is_empty() then
       vec.destroy_empty()
-      return new Option<Element>::None {}
+      new Option<Element>::None {}
     else
       let e := vec.pop_back()
       vec.destroy_empty()
-      return new Option<Element>::Some { e }
+      new Option<Element>::Some { e }
 
   spec from_vec where
     aborts_if vec.length > 1
@@ -186,7 +186,7 @@ leaner module 0x1::option where
   -/
   public fun extract {Element}(self : &mut Option<Element>) -> Element := do
     let inner := replace(self, new Option<Element>::None {})
-    return if inner is Some then inner.e else abort(EOPTION_NOT_SET)
+    if inner is Some then inner.e else abort(EOPTION_NOT_SET)
 
   spec extract where
     pragma opaque
@@ -204,7 +204,7 @@ leaner module 0x1::option where
     if self is None then abort(EOPTION_NOT_SET)
     else
       let e := &mut self.e
-      return e
+      e
 
   spec borrow_mut where
     aborts_if self.is_none() with EOPTION_NOT_SET
@@ -221,7 +221,7 @@ leaner module 0x1::option where
     if self is None then abort(EOPTION_NOT_SET)
     else
       let e := &mut self.e
-      return replace(e, el)
+      replace(e, el)
 
   spec swap where
     pragma opaque

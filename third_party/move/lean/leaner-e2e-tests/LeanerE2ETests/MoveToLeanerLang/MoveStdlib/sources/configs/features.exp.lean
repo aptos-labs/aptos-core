@@ -33,7 +33,6 @@ leaner module 0x1::features where
   use 0x1::std::error::invalid_argument
   use 0x1::std::error::invalid_state
   use 0x1::std::error::permission_denied
-  use 0x1::std::signer::address_of
   use 0x1::std::vector
 
   const EINVALID_FEATURE : u64 := 1
@@ -1013,8 +1012,9 @@ leaner module 0x1::features where
     framework : &Signer, enable : Vector<u64>, disable : Vector<u64>
   ) -> Unit := do
     assert!(
-      address_of(framework) == @0x1,
-      permission_denied(EFRAMEWORK_SIGNER_NEEDED)
+      framework.address == @0x1, permission_denied(
+        EFRAMEWORK_SIGNER_NEEDED
+      )
     )
     if !exists<Features>(@0x1) then
       move_to<Features>(framework, new Features { features := vector<u8>[] })
@@ -1026,7 +1026,7 @@ leaner module 0x1::features where
 
   spec change_feature_flags_internal where
     pragma opaque
-    aborts_if address_of(framework) != @0x1
+    aborts_if framework.address != @0x1
     modifies global<Features>(@0x1)
 
   -- `for_each_ref` is not supported in verification since
@@ -1038,14 +1038,15 @@ leaner module 0x1::features where
     framework : &Signer, enable : Vector<u64>, disable : Vector<u64>
   ) -> Unit := do
     assert!(
-      address_of(framework) == @0x1,
-      permission_denied(EFRAMEWORK_SIGNER_NEEDED)
+      framework.address == @0x1, permission_denied(
+        EFRAMEWORK_SIGNER_NEEDED
+      )
     )
     let mut new_feature_vec :=
       if exists<PendingFeatures>(@0x1) then
         let PendingFeatures { features := features } :=
           move_from<PendingFeatures>(@0x1)
-        return features
+        features
       else
         if exists<Features>(@0x1) then Features[@0x1].features else vector<u8>[]
     apply_diff(&mut new_feature_vec, enable, disable)
@@ -1057,7 +1058,7 @@ leaner module 0x1::features where
 
   spec change_feature_flags_for_next_epoch where
     pragma opaque
-    aborts_if address_of(framework) != @0x1
+    aborts_if framework.address != @0x1
     modifies global<Features>(@0x1)
     modifies global<PendingFeatures>(@0x1)
 
@@ -1083,7 +1084,7 @@ leaner module 0x1::features where
   spec on_new_epoch where
     let_pre features_pending := global<PendingFeatures>(@0x1).features
     let_post features_std := global<Features>(@0x1).features
-    requires @0x1 == address_of(framework)
+    requires @0x1 == framework.address
     ensures exists<PendingFeatures>(@0x1) ==> features_std == features_pending
     aborts_if false
 
@@ -1128,8 +1129,7 @@ leaner module 0x1::features where
   fun contains(features : &Vector<u8>, feature : u64) -> Bool := do
     let byte_index := feature / 8
     let bit_mask := 1u8 << (feature % 8) as u8
-    return features.length > byte_index
-      && features[byte_index] & bit_mask != 0u8
+    features.length > byte_index && features[byte_index] & bit_mask != 0u8
 
   spec contains where
     pragma bv = b"0"
@@ -1185,7 +1185,7 @@ leaner module 0x1::features where
           ==> spec_contains(features, i)
 
   fun ensure_framework_signer(account : &Signer) -> Unit := do
-    let addr := address_of(account)
+    let addr := account.address
     assert!(addr == @0x1, permission_denied(EFRAMEWORK_SIGNER_NEEDED))
 
   public fun change_feature_flags_for_verification(

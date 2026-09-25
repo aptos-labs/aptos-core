@@ -85,15 +85,26 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
               | some declaration =>
                   by_cases arity_ne : arguments.size != declaration.signature.parameters.size
                   · simp [namespace_eq, declaration_eq, arity_ne, failAt] at h
-                  · cases frame_eq : initialFrame? declaration arguments typeInstantiation with
-                    | none =>
-                        simp [namespace_eq, declaration_eq, arity_ne, frame_eq, failAt] at h
-                    | some initialFrame =>
-                        cases body_eq : declaration.body with
-                        | absent =>
+                  · cases body_eq : declaration.body with
+                    | absent =>
+                        cases native_eq :
+                            BigStep.nativeCall executable handle typeInstantiation state arguments with
+                        | none =>
+                            simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq,
+                              failAt] at h
+                        | some native =>
+                            obtain ⟨finalState, outcome⟩ := native
+                            simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq] at h
+                            cases h
+                            exact BigStep.EvalFunction.native handle typeInstantiation state arguments
+                              ns declaration finalState outcome namespace_eq declaration_eq
+                              (by simpa using arity_ne) body_eq native_eq
+                    | structured root =>
+                        cases frame_eq : initialFrame? declaration arguments typeInstantiation with
+                        | none =>
                             simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
                               failAt] at h
-                        | structured root =>
+                        | some initialFrame =>
                             cases evaluation_eq : Internal.evalExpr fuel executable
                                 handle.namespaceId initialFrame state root with
                             | error error =>

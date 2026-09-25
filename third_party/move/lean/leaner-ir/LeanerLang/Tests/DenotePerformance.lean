@@ -28,26 +28,22 @@ leaner module 0x42::denote_perf where
   spec add_values where
     ensures result == left + right
     aborts_if left + right > 18446744073709551615
-  verify add_values
 
   fun subtract_values(left : u64, right : u64) -> u64 := left - right
   spec subtract_values where
     ensures result == left - right
     aborts_if left < right
-  verify subtract_values
 
   fun divide_values(left : u64, right : u64) -> u64 := left / right
   spec divide_values where
     ensures result == left / right
     aborts_if right == 0
-  verify divide_values
 
   fun at_most(left : u64, right : u64) -> u64 :=
     if left <= right then 1 else 0
   spec at_most where
     ensures result == if left <= right then 1 else 0
     aborts_if false
-  verify at_most
 
   fun differs(left : u64, right : u64) -> u64 :=
     if left != right then 1 else 0
@@ -55,42 +51,35 @@ leaner module 0x42::denote_perf where
     ensures left == right ==> result == 0
     ensures !(left == right) ==> result == 1
     aborts_if false
-  verify differs
 
   fun is_less(left : u64, right : u64) -> Bool := left < right
   spec is_less where
     ensures result == (left < right)
-  verify is_less
 
   fun narrow(value : u64) -> u8 := value as u8
   spec narrow where
     ensures result == value
     aborts_if value > 255
-  verify narrow
 
   fun masked(value : u64, mask : u64) -> u64 := value & mask
   spec masked where
     ensures result == value & mask
     aborts_if false
-  verify masked
 
   fun shifted(value : u64, amount : u8) -> u64 := value << amount
   spec shifted where
     ensures result == (value << amount) % 18446744073709551616
     aborts_if amount >= 64
-  verify shifted
 
   fun halved(value : u16) -> u16 := value >> 1u8
   spec halved where
     ensures result == value >> 1u8
     aborts_if false
-  verify halved
 
   fun complex_constant() -> u64 := COMPLEX
   spec complex_constant where
     ensures result == 7
     aborts_if false
-  verify complex_constant
 
   fun classify_primitive(value : u64) -> u64 :=
     if value == 0 then 10
@@ -103,7 +92,6 @@ leaner module 0x42::denote_perf where
       else if 4 <= value && value <= 6 then 30
       else 40
     aborts_if false
-  verify classify_primitive
 
   fun primitive_match_reference(value : u64) -> u64 := do
     let reference := &value
@@ -115,7 +103,6 @@ leaner module 0x42::denote_perf where
       else if 1 <= value && value <= 9 then 2
       else 3
     aborts_if false
-  verify primitive_match_reference
 
 leaner module 0x44::denote_perf_loops where
   public fun count_to(limit : u64) -> u64 := do
@@ -129,7 +116,6 @@ leaner module 0x44::denote_perf_loops where
   spec count_to where
     ensures result == limit
     aborts_if false
-  verify count_to
 
   fun return_in_loop(n : u64) -> u64 := do
     let mut remaining := n
@@ -140,7 +126,6 @@ leaner module 0x44::denote_perf_loops where
   spec return_in_loop where
     ensures result <= 1
     aborts_if false
-  verify return_in_loop
 
   fun count(limit : u64) -> u64 := do
     let mut i := 0
@@ -152,7 +137,6 @@ leaner module 0x44::denote_perf_loops where
   spec count where
     ensures result == limit
     aborts_if false
-  verify count
 
   fun keeps(n : u64, limit : u64) -> u64 := do
     let mut i := 0
@@ -164,7 +148,6 @@ leaner module 0x44::denote_perf_loops where
   spec keeps where
     ensures result == n
     aborts_if false
-  verify keeps
 
 leaner module 0x45::denote_perf_aggregates where
   struct Pair has Copy, Drop, Store where
@@ -178,7 +161,6 @@ leaner module 0x45::denote_perf_aggregates where
   fun pure_pair(value : u64) -> (u64, Bool) := (value, true)
   spec pure_pair where
     ensures spec.result[0] == value && spec.result[1] == true
-  verify pure_pair
 
   fun destructure_local(value : u64) -> u64 := do
     let pair := (value, false)
@@ -186,28 +168,23 @@ leaner module 0x45::denote_perf_aggregates where
     return first
   spec destructure_local where
     ensures result == value
-  verify destructure_local
 
   fun read_pair(pair : Pair) -> u64 := pair.first
   spec read_pair where
     ensures result == pair.first
-  verify read_pair
 
   fun make_pair(value : u64) -> Pair := new Pair { first := value, second := true }
   spec make_pair where
     ensures result.first == value
     ensures result.second == true
-  verify make_pair
 
   fun make_transfer(amount : u64) -> Action := new Action::Transfer { amount }
   spec make_transfer where
     ensures result == new Action::Transfer { amount }
-  verify make_transfer
 
   fun is_transfer(action : Action) -> Bool := action is Transfer
   spec is_transfer where
     ensures result == (action is Transfer)
-  verify is_transfer
 
   fun total(action : Action) -> u64 :=
     match action with
@@ -222,7 +199,48 @@ leaner module 0x45::denote_perf_aggregates where
     aborts_if match action with
       | Action::Split { left := left, right := right } => left + right > 18446744073709551615
       | _ => false
-  verify total
+
+leaner module 0x46::denote_perf_storage where
+  struct Counter has Key where
+    value : u64
+
+  struct Ledger has Key where
+    total : u64
+
+  spec module where
+    invariant forall (a : Address),
+      0 < global<Counter>(a).value
+    invariant [update] forall (a : Address),
+      old(global<Counter>(a).value) <= global<Counter>(a).value
+
+  public fun value_of(addr : Address) -> u64 := Counter[addr].value
+  spec value_of where
+    aborts_if !exists<Counter>(addr)
+    ensures result == global<Counter>(addr).value
+
+  public entry fun increment(addr : Address) -> Unit := do
+    let value := &mut Counter[addr].value
+    *value := *value + 1
+  spec increment where
+    requires exists<Counter>(addr)
+    modifies global<Counter>(addr)
+    ensures global<Counter>(addr).value == old(global<Counter>(addr).value) + 1
+    aborts_if old(global<Counter>(addr).value) + 1 > 18446744073709551615
+
+  public entry fun record(addr : Address, amount : u64) -> Unit := do
+    let value := &mut Counter[addr].value
+    *value := *value + amount
+    let total := &mut Ledger[addr].total
+    *total := *total + amount
+  spec record where
+    requires exists<Counter>(addr) && exists<Ledger>(addr)
+    modifies global<Counter>(addr)
+    modifies global<Ledger>(addr)
+    ensures global<Counter>(addr).value ==
+        old(global<Counter>(addr).value) + amount &&
+      global<Ledger>(addr).total == old(global<Ledger>(addr).total) + amount
+    aborts_if old(global<Counter>(addr).value) + amount > 18446744073709551615 ||
+      old(global<Ledger>(addr).total) + amount > 18446744073709551615
 
 #leaner_perf "LeanerLang/Tests/DenotePerformance.exp"
 

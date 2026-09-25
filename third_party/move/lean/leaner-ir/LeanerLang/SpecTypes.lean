@@ -3,19 +3,8 @@
 
 import LeanerLang.Registry
 import LeanerIR.Proofs.Typed
-import LeanerIR.Proofs.Denotation
 import LeanerIR.Proofs.SimpAttrs
 import LeanerIR.Proofs.Denote.Attr
-import LeanerIR.Proofs.Plain
-
-/- Nested vector fields expose their element codecs only after the outer
-vector's pointwise plainness rule fires. Keep these reductions in that phase. -/
-attribute [leaner_plain] LeanerIR.Proofs.Codec.vector_encode
-  LeanerIR.Proofs.Codec.boundedVector_encode
-  LeanerIR.Proofs.Codec.specInt LeanerIR.Proofs.Codec.bool
-  LeanerIR.Proofs.Codec.string LeanerIR.Proofs.Codec.address
-  LeanerIR.Proofs.Codec.signer LeanerIR.Proofs.Codec.bytes
-  LeanerIR.Proofs.Codec.unit
 
 /-!
 # Generated typed twins of LIR nominal declarations
@@ -559,29 +548,10 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
     decode_encode := $roundtripName $codecIds*))
 
   let eraseEqName := rootIdent (info.twin ++ `erase_eq_erase)
-  elabCommand (← `(@[simp, lir_data_norm high] theorem $eraseEqName:ident
+  elabCommand (← `(@[simp] theorem $eraseEqName:ident
       $implicitTypeBinders* $codecBinders* (left right : $twinType) :
       $eraseName $codecIds* left = $eraseName $codecIds* right ↔ left = right :=
     LeanerIR.Proofs.Codec.encode_eq_encode ($codecName $codecIds*) left right))
-
-  for index in List.range info.fields.size do
-    let (fieldName, rep) := info.fields[index]!
-    let selectName := rootIdent (info.twin ++ Name.mkSimple s!"select_{fieldName}")
-    let projected ← ``($(rootIdent (info.twin ++ Name.mkSimple fieldName)) $value)
-    let selected ← rep.eraseSyntax projected codecTerms
-    elabCommand (← `(theorem $selectName:ident $implicitTypeBinders* $codecBinders*
-        ($value:ident : $twinType) (frame : LeanerIR.RuntimeFrame)
-        (state : LeanerIR.RuntimeState) :
-        (LeanerIR.Proofs.Denotation.NominalFieldLocation.mk
-            ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩ none
-            $(natLit index)).evaluateSelect?
-          #[$eraseName $codecIds* $value] frame state =
-        some (LeanerIR.SemanticOperations.GlobalOperationResult.value frame state
-          $selected) := by
-      simp [$eraseName:ident,
-        LeanerIR.Proofs.Denotation.NominalFieldLocation.evaluateSelect?,
-        LeanerIR.Proofs.Denotation.liftConstructorEvaluator,
-        LeanerIR.SemanticOperations.selectNominalFieldAt?]))
 
   let eraseLiteralName := rootIdent (info.twin ++ `erase_mk)
   elabCommand (← `(theorem $eraseLiteralName:ident
@@ -599,11 +569,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
   elabCommand (← `(instance $inhabitedName:ident
       $implicitTypeBinders* $inhabitedBinders* :
       Inhabited $twinType := ⟨⟨$defaults,*⟩⟩))
-  elabCommand (← `(attribute [lir_data_norm high]
-    $roundtripName:ident $mapName:ident))
   elabCommand (← `(attribute [irreducible] $decodeName:ident))
-  elabCommand (← `(attribute [lir_data_norm low]
-    $eraseLiteralName:ident $codecName:ident))
 
 /-- Emit one plain struct twin's declarations: the tagged structure, `erase`, `decode?`,
 their roundtrips, and `Inhabited`. -/
@@ -671,30 +637,6 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
     LeanerIR.map_erase_bind_decode $roundtripName contents))
   elabCommand (← `(attribute [lir_denote_norm] $mapName:ident $roundtripName:ident
     $literalRoundtripName:ident))
-  /- Field selections through the erasure: a proof that reads a field of
-  a stored value keeps the twin folded, so the roundtrips still apply to
-  the whole once the closing meets it. -/
-  for index in List.range info.fields.size do
-    let (name, rep) := info.fields[index]!
-    let selectName := rootIdent (info.twin ++ Name.mkSimple s!"select_{name}")
-    let projected ← ``($(rootIdent (info.twin ++ Name.mkSimple name)) $value)
-    let selected ← rep.eraseSyntax projected
-    elabCommand (← `(theorem $selectName:ident ($value:ident : $twin)
-        (frame : LeanerIR.RuntimeFrame) (state : LeanerIR.RuntimeState) :
-        (LeanerIR.Proofs.Denotation.NominalFieldLocation.mk
-            ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩ none
-            $(natLit index)).evaluateSelect?
-          #[$eraseName $value] frame state =
-        some (LeanerIR.SemanticOperations.GlobalOperationResult.value frame state
-          $selected) := by
-      simp [$eraseName:ident,
-        LeanerIR.Proofs.Denotation.NominalFieldLocation.evaluateSelect?,
-        LeanerIR.Proofs.Denotation.liftConstructorEvaluator,
-        LeanerIR.SemanticOperations.selectNominalFieldAt?]))
-  -- The roundtrips outrank the decoder's own unfolding wherever both
-  -- match, so an erase-image folds instead of reopening its range tests.
-  elabCommand (← `(attribute [lir_data_norm high] $roundtripName:ident
-    $literalRoundtripName:ident $mapName:ident))
   /- The decoder belongs to the simp phase, not to reduction.  Symbolic
   execution that unfolds it splits the range test of every certified
   integer it reaches, and the branch that assumes the test failed cannot be
@@ -708,43 +650,6 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
     encode := $eraseName
     decode? := $decodeName
     decode_encode := $roundtripName))
-  elabCommand (← `(attribute [leaner_plain] $codecName:ident))
-  -- Twin fields never contain references.  Pin that representation fact at
-  -- the boundary so function finalization does not inspect an erased native
-  -- argument as an arbitrary `RuntimeValue` looking for nested loans.
-  let noBorrowsName := rootIdent (info.twin ++ `outermostBorrows_erase)
-  elabCommand (← `(@[simp] theorem $noBorrowsName:ident
-      ($value:ident : $twin) :
-      LeanerIR.SemanticOperations.outermostBorrows ($eraseName $value) = #[] := by
-    apply LeanerIR.SemanticOperations.Plain.outermostBorrows_eq_empty
-    simp only [$eraseName:ident, LeanerIR.Proofs.Codec.vector_encode,
-      LeanerIR.Proofs.Codec.boundedVector_encode,
-      LeanerIR.Proofs.Codec.specInt, LeanerIR.Proofs.Codec.bool,
-      LeanerIR.Proofs.Codec.string, LeanerIR.Proofs.Codec.address,
-      LeanerIR.Proofs.Codec.signer, LeanerIR.Proofs.Codec.bytes,
-      LeanerIR.Proofs.Codec.unit]
-    leaner_plain))
-  -- A twin's erasure is loan-free: what lets a bracket walk a resource
-  -- through its focus alone.
-  let plainName := rootIdent (info.twin ++ `plain_erase)
-  elabCommand (← `(@[leaner_plain] theorem $plainName:ident ($value:ident : $twin) :
-      LeanerIR.SemanticOperations.Plain ($eraseName $value) := by
-    simp only [$eraseName:ident, LeanerIR.Proofs.Codec.vector_encode,
-      LeanerIR.Proofs.Codec.boundedVector_encode,
-      LeanerIR.Proofs.Codec.specInt, LeanerIR.Proofs.Codec.bool,
-      LeanerIR.Proofs.Codec.string, LeanerIR.Proofs.Codec.address,
-      LeanerIR.Proofs.Codec.signer, LeanerIR.Proofs.Codec.bytes,
-      LeanerIR.Proofs.Codec.unit]
-    leaner_plain))
-  let noParameterLoanName :=
-    rootIdent (info.twin ++ `parameterLoanLocations_erase)
-  elabCommand (← `(@[simp] theorem $noParameterLoanName:ident
-      ($value:ident : $twin) :
-      LeanerIR.SemanticOperations.parameterLoanLocations
-        #[$eraseName $value] = #[] := by
-    cases $value:ident
-    simp [$eraseName:ident,
-      LeanerIR.SemanticOperations.parameterLoanLocations]))
   /- The erasure of a literal twin is its runtime image; the erasure of a
   variable is an atom.  Only the literal equation joins the inventory: an
   unfolded variable erasure would bury the roundtrips under the nominal
@@ -761,14 +666,6 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
         LeanerIR.RuntimeValue.nominal
           ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩ none
           #[$literalErasures,*] := rfl))
-  -- A value the program built decodes by computation, and an erasure the
-  -- representation put in a hypothesis has to meet the nominal a split
-  -- produced.  Low priority keeps the roundtrips first, so a decode facing
-  -- a still-folded erasure collapses through them instead.
-  elabCommand (← `(attribute [lir_data_norm] $literalRoundtripName:ident))
-  elabCommand (← `(attribute [lir_data_norm low]
-    $eraseLiteralName:ident $codecName:ident $noBorrowsName:ident
-    $noParameterLoanName:ident))
   -- Inhabited
   let defaults ← info.fields.mapM fun (_, rep) => rep.defaultSyntax
   elabCommand (← `(instance : Inhabited $twin := ⟨⟨$defaults,*⟩⟩))
@@ -828,6 +725,23 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       ($value:ident : $twinType) :
       LeanerIR.RuntimeValue :=
     match $value:ident with $eraseArms:matchAlt*))
+  -- The erasure of each constructor is its literal, so a decoded variant's
+  -- erasure meets a clause's literal without unfolding the match.
+  for variant in info.variants do
+    let constructor := rootIdent (info.twin ++ Name.mkSimple variant.name)
+    let variables := variant.fields.mapIdx fun index _ =>
+      mkIdent (Name.mkSimple s!"field{index}")
+    let binders ← variant.fields.mapIdxM fun index (_, rep) => do
+      `(bracketedBinder| ($(variables[index]!):ident : $(← rep.typeSyntax typeParameters)))
+    let constructed ← constructorTerm constructor variables
+    let erasures ← variant.fields.mapIdxM fun index (_, rep) =>
+      rep.eraseSyntax variables[index]! codecTerms
+    let literalName := rootIdent (info.twin ++ Name.mkSimple s!"erase_{variant.name}")
+    elabCommand (← `(@[simp] theorem $literalName:ident $implicitTypeBinders* $codecBinders*
+        $binders* :
+        $eraseName $codecIds* $constructed = LeanerIR.RuntimeValue.nominal
+          ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩
+          (some $(quote variant.name)) #[$erasures,*] := rfl))
 
   let decodeName := rootIdent (info.twin ++ `decode?)
   let variantName := mkIdent `variant
@@ -869,7 +783,6 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
         ($decodeName $codecIds*) = contents :=
     LeanerIR.map_erase_bind_decode ($roundtripName $codecIds*) contents))
 
-  let mut normalizationNames : Array Ident := #[roundtripName, mapName]
   for variant in info.variants do
     -- A raw constructor literal must select its variant before field
     -- decoding. Native field projections need not unify with an erased
@@ -897,7 +810,6 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
           ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩
           (some $(quote variant.name)) #[$operands,*]) = $chain := by
       simp [$decodeName:ident]))
-    normalizationNames := normalizationNames.push rawLiteralName
     let erasures ← variant.fields.mapIdxM fun index (_, rep) =>
       rep.eraseSyntax variables[index]! codecTerms
     let runtime ← `(LeanerIR.RuntimeValue.nominal
@@ -913,11 +825,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       $implicitTypeBinders* $codecBinders* $binders* :
       $decodeName $codecIds* $runtime = some $constructed := by
         simp [$decodeName:ident]))
-    normalizationNames := normalizationNames.push literalName
-    elabCommand (← `(attribute [lir_data_norm low] $eraseCtorName:ident))
 
-  elabCommand (← `(attribute [lir_data_norm high]
-    $normalizationNames:ident*))
   elabCommand (← `(attribute [irreducible] $decodeName:ident))
   let codecName := rootIdent (info.twin ++ `codec)
   elabCommand (← `(def $codecName:ident $implicitTypeBinders* $codecBinders* :
@@ -927,7 +835,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
     decode_encode := $roundtripName $codecIds*))
 
   let eraseEqName := rootIdent (info.twin ++ `erase_eq_erase)
-  elabCommand (← `(@[simp, lir_data_norm high] theorem $eraseEqName:ident
+  elabCommand (← `(@[simp] theorem $eraseEqName:ident
       $implicitTypeBinders* $codecBinders* (left right : $twinType) :
       $eraseName $codecIds* left = $eraseName $codecIds* right ↔ left = right :=
     LeanerIR.Proofs.Codec.encode_eq_encode ($codecName $codecIds*) left right))
@@ -941,32 +849,6 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
   let inhabitedName := rootIdent (info.twin ++ `instInhabited)
   elabCommand (← `(instance $inhabitedName:ident $implicitTypeBinders* $inhabitedBinders* :
     Inhabited $twinType := ⟨$default⟩))
-  elabCommand (← `(attribute [lir_data_norm low] $codecName:ident))
-  -- Arbitrary parameter codecs need not erase to loan-free values. As for
-  -- generic structures, do not assert unconditional plainness for them.
-  if info.typeParameterCount != 0 then return
-
-  let plainName := rootIdent (info.twin ++ `plain_erase)
-  elabCommand (← `(@[leaner_plain] theorem $plainName:ident
-      ($value:ident : $twin) :
-      LeanerIR.SemanticOperations.Plain ($eraseName $value) := by
-    cases $value:ident <;> simp only [$eraseName:ident] <;> leaner_plain))
-  let noBorrowsName := rootIdent (info.twin ++ `outermostBorrows_erase)
-  elabCommand (← `(@[simp] theorem $noBorrowsName:ident
-      ($value:ident : $twin) :
-      LeanerIR.SemanticOperations.outermostBorrows ($eraseName $value) = #[] :=
-    LeanerIR.SemanticOperations.Plain.outermostBorrows_eq_empty ($plainName $value)))
-  let noParameterLoanName :=
-    rootIdent (info.twin ++ `parameterLoanLocations_erase)
-  elabCommand (← `(@[simp] theorem $noParameterLoanName:ident
-      ($value:ident : $twin) :
-      LeanerIR.SemanticOperations.parameterLoanLocations
-        #[$eraseName $value] = #[] := by
-    cases $value:ident <;>
-      simp [$eraseName:ident,
-        LeanerIR.SemanticOperations.parameterLoanLocations]))
-  elabCommand (← `(attribute [lir_data_norm low]
-    $codecName:ident $noBorrowsName:ident $noParameterLoanName:ident))
 
 /-- Emit one twin's declarations. -/
 private def emitTwin (info : TwinInfo) : CommandElabM Unit := do
@@ -1046,9 +928,6 @@ private def emitFamily (family : FamilyInfo) : CommandElabM Unit := do
     $containsAtName #[] globals key))
   -- A clause's read and the program's read of one key meet in the closing
   -- normalization only if both unfold to the same keyed lookup.
-  elabCommand (← `(attribute [lir_data_norm]
-    $keyAtName:ident $keyName:ident $readAtName:ident $readName:ident
-    $getAtName:ident $getName:ident $containsAtName:ident $containsName:ident))
   elabCommand (← `(attribute [lir_denote_norm]
     $keyAtName:ident $keyName:ident $readAtName:ident $readName:ident
     $getAtName:ident $getName:ident $containsAtName:ident $containsName:ident))

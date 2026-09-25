@@ -98,7 +98,7 @@ leaner module 0x1::table where
   ) -> &mut V := do
     if !self.contains(core.prim.copyValue(key)) then
       self.add(core.prim.copyValue(key), default)
-    return self.borrow_mut(key)
+    self.borrow_mut(key)
 
   spec borrow_mut_with_default where
     pragma intrinsic
@@ -129,7 +129,7 @@ leaner module 0x1::table where
     self : &mut Table<K, V>, key : K
   ) -> V := do
     let Box<V> { val := val } := remove_box::<K, V, Box<V> >(self, key)
-    return val
+    val
 
   spec remove where
     pragma intrinsic

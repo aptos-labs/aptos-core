@@ -55,6 +55,10 @@ bodies (or are explicitly absent). `tables` is an immutable cached view of the
 owning compilation-unit table. -/
 structure ValidatedNamespace extends Namespace FunctionBody where
   tables : Tables
+  /-- The variant names of every nominal declaration of the unit in
+  declaration order, by namespace and declaration: the order `compare` gives
+  enum values. A cached unit view, as `tables` is. -/
+  variantOrders : Array (Array (Array String)) := #[]
   deriving Repr, BEq, Inhabited
 
 /-- Checked dependency summary copied into `ValidatedUnit` after unit

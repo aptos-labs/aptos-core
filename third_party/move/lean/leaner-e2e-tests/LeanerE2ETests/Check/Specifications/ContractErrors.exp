@@ -1,0 +1,13 @@
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:12:4: error: the specification clause `ensures result == value` is not established
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:11:7: error: leaner verification failed
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:16:4: error: the specification clause `ensures result == value + 1` is not established
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:15:7: error: leaner verification failed
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:29:4: error: the specification clause `ensures x == old(x)` is not established
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:28:7: error: leaner verification failed
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:42:4: error: the specification clause `ensures slot == old(slot)` is not established
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:41:7: error: leaner verification failed
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:48:4: error: the specification clause `ensures slot == final(result) + 1` is not established
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:47:7: error: leaner verification failed
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:61:4: error: the specification clause `ensures result == (n % 2 == 1)` is not established
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:60:7: error: leaner verification failed
+LeanerE2ETests/Check/Specifications/ContractErrors.lean:65:7: error: `ping` reaches itself through `pong`, which is unspecified; a function on a cycle of calls is used through its contract, so specify `pong`

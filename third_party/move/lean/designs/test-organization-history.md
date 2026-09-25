@@ -164,16 +164,16 @@ The same six IR targets fail; all native regression/cost gates pass. Move
    commands, and its language and negative tests pinned elaboration,
    compilation, and diagnostics.  The leaner stack must reach parity on
    that corpus and then be measured against it:
-   - [`move/Move/Tests/Verification/`](../v0/move/Move/Tests/Verification/):
+   - v0's `Tests/Verification/` (ported to [`Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/)):
      23 files, 174 `verify` commands, 99 bare (automatic) and 75 with
      proof scripts; `Quicksort.lean` (3 verifies, ~220 proof lines) and
      `OrderedMap.lean` (9 verifies, ~480 proof lines) carry the
      AI-generated proofs.
-   - [`move/Move/Tests/Language/`](../v0/move/Move/Tests/Language/): 20
+   - v0's `Tests/Language/` (ported to [`Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/)): 20
      files covering the language surface (integers of every width, signed
      arithmetic, enums and their payloads and references, generics,
      loops, tuples, vectors, addresses, attributes, abilities).
-   - [`move/Move/Tests/Negative/`](../v0/move/Move/Tests/Negative/): 9 files
+   - v0's `Tests/Negative/` (ported to [`Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/)): 9 files
      pinning diagnostics (borrow errors, returned `&mut` shapes, lowering
      and surface rejections, spec-function and specification errors,
      verification failures).
@@ -310,8 +310,8 @@ commit status is no longer an outstanding step for these rows.
 | `Verification/Loans.lean` | 3 | **source checkpoint** (2026-09-06; all three original checks and admission guards pass the unchanged 50M cap. `extend` and `independent_element` use normalization; `splice` composes the proved `extend` contract twice. A syntactically guarded product-range rule avoids the unrelated u64 vector-length recursion blow-up. As in v0, `clear` is specified but not verified.) |
 | `Verification/LoopInvariants.lean` | 3 | **source checkpoint** (2026-09-07 revalidation, `Check/Verification/LoopInvariants.lean`; all three original verifies, admission guards, and six zero/multi-iteration execution checks pass under the unchanged 50M cap. Negative entry, preservation, and weak-exit invariants reject with specific errors. Shared optional-slot, indexed/shared-borrow, vector decoding/re-encoding, and immutable-snapshot rules have 1M regressions. Revalidated in the vector checkpoint's complete 55/55 audit.) |
 | `Verification/LooseFrame.lean` | 2 | **source checkpoint** (2026-09-05, `Check/Verification/LooseFrame.lean`; both original checks and an added temporary-reference/two-family write verify under the unchanged driver cap. A kernel-checked theorem also confirms that other keys in the listed family remain unchanged. No `.exp`.) |
-| `Verification/OrderedMap.lean` | 9 (9 proofs) | not ported |
-| `Verification/Quicksort.lean` | 3 (3 proofs) | not ported |
+| `Verification/OrderedMap.lean` | 9 (9 proofs) | **ported** (2026-09-24, `Check/Verification/OrderedMap.lean`; all nine targets verify, five by authored proofs over array lemmas; the eight execution scenarios run) |
+| `Verification/Quicksort.lean` | 3 (3 proofs) | **ported** (2026-09-24, `Check/Verification/Quicksort.lean`; all three targets verify, `partition` and `quick_sort_range` by authored proofs over count lemmas; the five execution cases run) |
 | `Verification/Read.lean` | 2 (2 proofs) | **source checkpoint** (`Check/Verification/Read.lean`; both contracts verify automatically under the driver cap; no `.exp`) |
 | `Verification/ResourceComposition.lean` | 1 | **source checkpoint** (`Check/Verification/ResourceComposition.lean`; sequential focused writes to distinct resource families verify under the driver cap; no `.exp`) |
 | `Verification/ReturnedMutRefs.lean` | 66 (51 proofs) | not ported |

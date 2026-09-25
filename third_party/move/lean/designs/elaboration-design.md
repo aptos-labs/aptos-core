@@ -341,12 +341,12 @@ Leaner source
 
 In particular:
 
-- `move/Move/Verify/Syntax.lean` stores a private retained `Declaration`
+- `v0/move/Move/Verify/Syntax.lean` stores a private retained `Declaration`
   containing raw `Syntax`, reparses source, reconstructs signatures, analyzes
   borrow scopes, and generates relational specifications;
-- `move/Move/Compiler/LIR.lean` independently recovers executable structure
+- `v0/move/Move/Compiler/LIR.lean` independently recovers executable structure
   from elaborated Lean declarations;
-- `move/Move/Compiler/Elab.lean` quotes the lowered `MoveModel.IR` back into
+- `v0/move/Move/Compiler/Elab.lean` quotes the lowered `MoveModel.IR` back into
   Lean; and
 - the current LIR path can print canonical Leaner source, but it does not yet
   supply the elaboration, execution, or proof meaning of that LIR.
@@ -586,7 +586,7 @@ came from Leaner, Move, MIR, or generated source.
 the nested inductive tying the knot — its one rule evaluates the body under
 `EvalFunction unit` itself.  `EvalExpr unit` and the other closed relations
 are the instances at that oracle, so every consumer keeps its spelling.
-The knot's metatheory lives in `LeanerIR/Proofs/Oracle.lean`: the open
+The knot's metatheory lived in `LeanerIR/Proofs/Oracle.lean`, removed with the pre-denotation routes: the open
 rules are monotone in the oracle, and `EvalFunction.induction` states that
 the closed semantics is below every oracle closed under one unfolding of
 the function boundary — the least-fixed-point induction a recursive
@@ -900,7 +900,7 @@ results on both paths, with no source-syntax fallback inside the LIR path.
 > reported by `leaner_report` as an error at that clause, which is the
 > LocId-attachment bullet delivered for LeanerLang-authored units. The
 > first verification tests copied from the reference stack
-> (`LeanerLang/Tests/VerificationAborts.lean`, from `AbortDirections`)
+> (`LeanerLang/Tests/VerificationAborts.lean`, now `Check/Control/Aborts.lean`, from `AbortDirections`)
 > prove the same public contracts from LIR, and a deliberately wrong body
 > fails at the expected `ensures` range under `#guard_msgs`. The prepared
 > unit is quoted once per namespace (`<ns>.semantics` with kernel-checked
