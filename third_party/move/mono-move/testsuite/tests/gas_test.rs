@@ -6,7 +6,7 @@
 use mono_move_core::{types::EMPTY_TYPE_LIST, GasExhaustedError, GasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
-use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
+use mono_move_runtime::{CompletedCall, InterpreterContext, ProductionNativeRegistry};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -56,7 +56,7 @@ module 0x1::test {
         .build_call(fib)
         .expect("the root frame fits on the stack");
     call.arg(&10u64).expect("argument placement succeeds");
-    let err = call.run().unwrap_err();
+    let err = call.run().map(CompletedCall::into_status).unwrap_err();
     assert!(err.downcast_ref::<GasExhaustedError>().is_some(),);
 }
 

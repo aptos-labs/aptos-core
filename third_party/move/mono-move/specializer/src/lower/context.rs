@@ -345,6 +345,8 @@ pub struct LoweringContext<'a> {
     /// Where `Instr::Ret` writes before the `Return` micro-op. Laid out
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SizedSlot>,
+    /// Substituted return types, parallel to `return_slots`.
+    pub return_types: InternedTypeList,
     pub num_transfer_positions: u16,
     /// TODO(cleanup): we should consider unifying the various scratch slots below,
     /// even though they are used for different purposes, only one is ever
@@ -794,6 +796,7 @@ pub fn try_build_context<'a>(
         frame_data_size,
         call_sites,
         return_slots,
+        return_types: own_ret_list,
         num_transfer_positions: func_ir.num_transfer_positions,
         scratch,
         resource_box_slot,
@@ -1056,6 +1059,8 @@ pub fn try_lower_function(
         entry_gas,
         param_slots,
         param_tys,
+        return_slots: ctx.return_slots,
+        return_tys: ctx.return_types,
         param_region_size: derived.param_region_size as usize,
         param_and_local_sizes_sum,
         extended_frame_size,

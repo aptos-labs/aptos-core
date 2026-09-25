@@ -9,6 +9,7 @@ mod common;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     native::{NativeExtension, NativeExtensions},
+    types::EMPTY_TYPE_LIST,
     Code, FrameLayoutInfo, Function, FunctionDefinitionIndex, MicroOp, SortedSafePointEntries,
     VMResult,
 };
@@ -46,6 +47,8 @@ fn trivial_program() -> Function {
         entry_gas: 0,
         param_slots: vec![],
         param_tys: vec![],
+        return_slots: vec![],
+        return_tys: EMPTY_TYPE_LIST,
         param_region_size: 0,
         param_and_local_sizes_sum: 40,
         extended_frame_size: 64,

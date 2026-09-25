@@ -459,7 +459,7 @@ pub enum RuntimeInvariantViolation {
 }
 
 /// Successful terminal outcomes from `Interpreter::run`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RuntimeStatus {
     Success,
     Aborted {

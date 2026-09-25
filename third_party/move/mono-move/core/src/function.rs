@@ -4,7 +4,7 @@
 use crate::{
     instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE},
     interner::InternedModuleId,
-    types::InternedType,
+    types::{InternedType, InternedTypeList},
 };
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
 use move_binary_format::file_format::FunctionDefinitionIndex;
@@ -178,6 +178,11 @@ pub struct Function {
     pub param_slots: Vec<SizedSlot>,
     /// Per-parameter substituted type, parallel to `param_slots`.
     pub param_tys: Vec<InternedType>,
+    /// Return-value frame slots in declaration order. `Return` writes the
+    /// values at these offsets in the function's frame, laid out from zero.
+    pub return_slots: Vec<SizedSlot>,
+    /// Substituted return types, parallel to `return_slots`.
+    pub return_tys: InternedTypeList,
     /// Byte size of the parameter region (includes padding in between parameters).
     pub param_region_size: usize,
     /// Size of the parameters + locals region. Frame metadata is stored

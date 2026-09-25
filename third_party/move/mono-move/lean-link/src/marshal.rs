@@ -14,8 +14,8 @@
 //! decode is an explicit error, never a silently wrong value.
 
 use crate::payload::Value;
-use mono_move_core::types::{view_type, InternedType, Type};
-use mono_move_runtime::InterpreterContext;
+use mono_move_core::types::{view_type, Type};
+use mono_move_runtime::CompletedCall;
 use move_core_types::{
     account_address::AccountAddress,
     int256::{I256, U256},
@@ -120,26 +120,14 @@ fn uleb128(mut value: u64) -> Vec<u8> {
 
 /// Decodes the root frame's results against the loaded return types.
 ///
-/// The runtime serializes each completed call's result to BCS by its return
-/// type; this decodes those bytes back into the value schema. Zero or one
-/// result per call is the shape Move source produces; more is explicit
-/// unsupported until the serializer covers multi-return calls.
-pub fn read_root_results(
-    interp: &InterpreterContext<'_>,
-    returns: &[InternedType],
-) -> Result<Vec<Value>, String> {
-    match returns.len() {
-        0 => Ok(vec![]),
-        1 => {
-            let bytes = interp
-                .serialize_root_result_for_test(returns[0])
-                .map_err(|error| format!("{error}"))?;
-            Ok(vec![decode_bcs(&bytes, view_type(returns[0]))?])
-        },
-        count => Err(format!(
-            "{count} return values per call are not yet supported"
-        )),
-    }
+/// The runtime serializes each completed call's results to BCS by their
+/// return types; this decodes those bytes back into the value schema.
+pub fn read_root_results(call: &CompletedCall<'_, '_>) -> Result<Vec<Value>, String> {
+    call.serialize_return_values()
+        .map_err(|error| format!("{error}"))?
+        .iter()
+        .map(|(ty, bytes)| decode_bcs(bytes, view_type(*ty)))
+        .collect()
 }
 
 /// Strictly decodes a complete BCS value of the given type.
