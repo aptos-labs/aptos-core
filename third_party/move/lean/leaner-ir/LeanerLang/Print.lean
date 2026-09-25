@@ -1353,7 +1353,9 @@ private partial def observesCheckedElement (context : Context) (collection index
   | some (.operation (.read place) _ _ _) | some (.operation (.borrow _ place) _ _ _)
   | some (.operation (.move place) _ _ _) | some (.operation (.copy place) _ _ _) =>
       placeUnderCheck context collection index place
-  | some (.operation (.reference .dereference) _ #[inner] _) =>
+  | some (.operation (.reference .dereference) _ #[inner] _)
+  | some (.operation (.data (.select _ _)) _ #[inner] _)
+  | some (.operation (.data (.selectVariants _ _)) _ #[inner] _) =>
       observesCheckedElement context collection index inner
   | some (.operation (.primitive .index) _ #[inner, i] _) =>
       (i == index && sameCollection context inner collection) ||
@@ -1471,12 +1473,20 @@ private partial def collectionIndexesElided (context : Context) (fuel : Nat)
     | .operation (.read place) _ _ _ | .operation (.borrow _ place) _ _ _
     | .operation (.move place) _ _ _ | .operation (.copy place) _ _ _ =>
         placeIndexesElided context (context.ns.places.size + 1) place
-    | .operation (.reference .dereference) _ #[inner] _ =>
+    -- A projection carries whatever levels its base has, so it has to be
+    -- walked through rather than taken as level-free: a field of an element,
+    -- `items[i].values`, holds the check on `items` at `i`.
+    | .operation (.reference .dereference) _ #[inner] _
+    | .operation (.data (.select _ _)) _ #[inner] _
+    | .operation (.data (.selectVariants _ _)) _ #[inner] _ =>
         collectionIndexesElided context fuel inner
     | .operation (.primitive .index) _ #[inner, i] _ =>
         context.elidedIndexChecks.any (fun (elided, checked) =>
           checked == i && sameCollection context inner elided) &&
           collectionIndexesElided context fuel inner
+    -- Anything else is not an observation chain -- a call builds a fresh
+    -- value rather than reaching through a place -- so no elided check of
+    -- this body is waiting on it.
     | _ => true
 
 /-- A `checkVectorIndex` binding the surface implies: the continuation

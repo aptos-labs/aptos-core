@@ -585,6 +585,15 @@ leaner module 0x42::nested_computed_index where
   fun borrow_nested(values : &mut Vector<Vector<u64> >, i : u64, j : u64) -> &mut u64 :=
     &mut values[i][j + 1]
 
+-- The same nesting reached through a field: the inner check tests a field of
+-- the checked element, so the group has to be seen through the projection.
+leaner module 0x42::nested_field_index where
+  pragma verify = false
+  struct Holder has Store, Key where
+    values : Vector<u64>
+  fun borrow_field_nested(items : &mut Vector<Holder>, i : u64, j : u64) -> &mut u64 :=
+    &mut items[i].values[j + 1]
+
 -- A check of an unrelated vector between a check and its access is not part
 -- of that access's nested group: both checks can abort, so whichever runs
 -- first decides the error, and eliding the earlier one moves it after this
@@ -1158,17 +1167,25 @@ elab "#guard_leaner_frontend" : command => do
       unless printed.contains "&mut values[i][j + 1]" &&
           !printed.contains "checkVectorIndex" && !printed.contains "borrowPlace" do
         throwError "a nested place at a computed index lost a bounds check:\n{printed}"
+      match LeanerLang.Print.formatSource env printed with
+      | .error error =>
+          throwError "the nested computed-index fixture did not re-import: {error}"
+      | .ok formatted => unless formatted == printed do
+          throwError "nested indexing at a computed index is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
+  let some nestedField := LeanerLang.registeredUnit? env `«0x42».nested_field_index
+    | throwError "the nested field-index fixture was not registered"
+  match LeanerLang.Print.render env nestedField with
+  | .error error => throwError "the nested field-index fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "&mut items[i].values[j + 1]" &&
+          !printed.contains "checkVectorIndex" && !printed.contains "borrowPlace" do
+        throwError "a nested place through a field lost a bounds check:\n{printed}"
   match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».independent_check_between) with
   | .error error => throwError "the independent-check fixture did not render: {error}"
   | .ok printed =>
       unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*checked, index)" &&
           printed.contains "core.prim.checkVectorIndex[moveVectorError](*other, index)" do
         throwError "a bounds check was elided across an unrelated check:\n{printed}"
-      match LeanerLang.Print.formatSource env printed with
-      | .error error =>
-          throwError "the nested computed-index fixture did not re-import: {error}"
-      | .ok formatted => unless formatted == printed do
-          throwError "nested indexing at a computed index is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
   let some surfaceRegressions := LeanerLang.registeredUnit? env `«0x42».surface_regressions
     | throwError "the surface-regression fixture was not registered"
   match LeanerLang.Print.render env surfaceRegressions with
