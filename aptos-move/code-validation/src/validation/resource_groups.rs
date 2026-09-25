@@ -33,7 +33,7 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Ensure that each member has a membership and it does not change
 /// * Ensure that each group has a scope and that it does not become more restrictive
 /// * For any new members, verify that they are in a valid resource group
-pub(crate) fn validate_resource_groups(
+pub fn validate_resource_groups(
     features: &Features,
     module_storage: &impl ModuleStorage,
     traversal_context: &mut TraversalContext,
@@ -107,7 +107,7 @@ pub(crate) fn validate_resource_groups(
 /// * Extract the resource group metadata
 /// * Verify all changes are compatible upgrades
 /// * Return any new members to validate correctness and all groups to assist in validation
-pub(crate) fn validate_module_and_extract_new_entries(
+pub fn validate_module_and_extract_new_entries(
     module_storage: &impl ModuleStorage,
     new_module: &CompiledModule,
     features: &Features,
@@ -189,7 +189,7 @@ pub(crate) fn validate_module_and_extract_new_entries(
 }
 
 /// Given a module id extract all resource group metadata
-pub(crate) fn extract_resource_group_metadata_from_module(
+pub fn extract_resource_group_metadata_from_module(
     old_module: &CompiledModule,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
@@ -213,7 +213,7 @@ pub(crate) fn extract_resource_group_metadata_from_module(
 }
 
 /// Given a module id extract all resource group metadata
-pub(crate) fn extract_resource_group_metadata(
+pub fn extract_resource_group_metadata(
     metadata: &RuntimeModuleMetadataV1,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
