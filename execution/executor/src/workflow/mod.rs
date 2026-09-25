@@ -15,6 +15,7 @@ use do_state_checkpoint::DoStateCheckpoint;
 
 pub mod do_get_execution_output;
 pub mod do_ledger_update;
+pub mod do_positions;
 pub mod do_state_checkpoint;
 
 pub struct ApplyExecutionOutput;
@@ -29,12 +30,15 @@ impl ApplyExecutionOutput {
             .compute_trading_native_state_roots
             .then(|| ProvablePositionStateSummary::new_persisted(reader))
             .transpose()?;
+        let positions =
+            do_positions::DoPositions::run(&execution_output, base_view.positions.as_ref())?;
         let state_checkpoint_output = DoStateCheckpoint::run()
             .execution_output(&execution_output)
             .parent_state_summary(&base_view.state_summary)
             .persisted_state_summary(&ProvableStateSummary::new_persisted(reader)?)
             .maybe_parent_position_state_summary(base_view.position_state_summary.as_ref())
             .maybe_persisted_position_state_summary(position_persisted.as_ref())
+            .maybe_positions(positions.clone())
             .build()?;
         let ledger_update_output = DoLedgerUpdate::run(
             &execution_output,
@@ -42,6 +46,7 @@ impl ApplyExecutionOutput {
             base_view.transaction_accumulator,
         )?;
         let output = PartialStateComputeResult::new(execution_output);
+        output.set_positions(positions);
         output.set_state_checkpoint_output(state_checkpoint_output);
         output.set_ledger_update_output(ledger_update_output);
 

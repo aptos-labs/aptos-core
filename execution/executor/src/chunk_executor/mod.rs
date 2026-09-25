@@ -14,7 +14,7 @@ use crate::{
     },
     workflow::{
         do_get_execution_output::DoGetExecutionOutput, do_ledger_update::DoLedgerUpdate,
-        do_state_checkpoint::DoStateCheckpoint,
+        do_positions::DoPositions, do_state_checkpoint::DoStateCheckpoint,
     },
 };
 use anyhow::{anyhow, bail, ensure, Result};
@@ -380,8 +380,15 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             )?;
         }
 
+        // Record what is now durable. The fold itself happens when the
+        // next chunk is enqueued, so the base cannot move while a chunk
+        // is being executed or applied.
+        let committed_positions = chunk.output.ensure_result_positions()?.cloned();
+
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["commit_chunk_impl__dequeue_and_return"]);
-        self.commit_queue.lock().dequeue_committed()?;
+        self.commit_queue
+            .lock()
+            .dequeue_committed(committed_positions)?;
 
         Ok(chunk)
     }
@@ -399,6 +406,17 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     ) -> Result<()> {
         let parent_state = self.commit_queue.lock().latest_state().clone();
 
+        // Advance here, not at commit, so the base can't move while a
+        // chunk is executed or applied. The chain is linear and the
+        // target is the last committed chunk, so everything in flight
+        // descends from it.
+        if let Some(committed) = self.commit_queue.lock().committed_positions() {
+            self.db
+                .writer
+                .advance_position_base(committed.latest())
+                .map_err(anyhow::Error::from)?;
+        }
+
         let first_version = parent_state.next_version();
         ensure!(
             chunk.first_version() == parent_state.next_version(),
@@ -411,7 +429,15 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
 
         let state_view = self.state_view(parent_state.latest())?;
         let execution_output = chunk.into_output::<V>(&parent_state, state_view)?;
+        // Extend the overlay in the execution phase, as the block
+        // executor does, so `ensure_result_positions` is satisfied from
+        // one place regardless of which executor produced the chunk.
+        let positions = DoPositions::run(
+            &execution_output,
+            self.commit_queue.lock().latest_positions().as_ref(),
+        )?;
         let output = PartialStateComputeResult::new(execution_output);
+        output.set_positions(positions);
 
         // Enqueue for next stage.
         self.commit_queue
@@ -482,6 +508,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .maybe_parent_position_state_summary(parent_position_state_summary.as_ref())
             .maybe_persisted_position_state_summary(position_persisted.as_ref())
             .maybe_known_position_state_checkpoints(known_position_state_checkpoints)
+            .maybe_positions(output.ensure_result_positions()?.cloned())
             .build()?;
 
         let ledger_update_output = DoLedgerUpdate::run(

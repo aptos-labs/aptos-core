@@ -10,8 +10,9 @@ use aptos_executor_types::{
 };
 use aptos_storage_interface::{
     state_store::{
-        sharded_jmt_state::PositionStateWithSummary, state::LedgerState,
-        state_summary::LedgerStateSummary, state_with_summary::LedgerWithSummary,
+        positions::PositionOverlay, sharded_jmt_state::PositionStateWithSummary,
+        state::LedgerState, state_summary::LedgerStateSummary,
+        state_with_summary::LedgerWithSummary,
     },
     LedgerSummary,
 };
@@ -20,6 +21,10 @@ use once_cell::sync::OnceCell;
 #[derive(Clone, Debug)]
 pub struct PartialStateComputeResult {
     pub execution_output: ExecutionOutput,
+    /// Set in the execution phase, not at state checkpoint, so a block's
+    /// overlay is available when its child's VM reads positions. `None`
+    /// when native position is off.
+    pub positions: OnceCell<Option<LedgerWithSummary<PositionOverlay>>>,
     pub state_checkpoint_output: OnceCell<StateCheckpointOutput>,
     pub ledger_update_output: OnceCell<LedgerUpdateOutput>,
 }
@@ -28,6 +33,7 @@ impl PartialStateComputeResult {
     pub fn new(execution_output: ExecutionOutput) -> Self {
         Self {
             execution_output,
+            positions: OnceCell::new(),
             state_checkpoint_output: OnceCell::new(),
             ledger_update_output: OnceCell::new(),
         }
@@ -37,6 +43,7 @@ impl PartialStateComputeResult {
         // Deliberately not reusing Self::new() here to make sure we don't leave
         // any OnceCell unset.
         let execution_output = ExecutionOutput::new_empty(ledger_summary.state);
+        let ledger_summary_positions = ledger_summary.positions.clone();
         let ledger_update_output = OnceCell::new();
         ledger_update_output
             .set(LedgerUpdateOutput::new_empty(
@@ -48,11 +55,16 @@ impl PartialStateComputeResult {
             .set(StateCheckpointOutput::new_empty(
                 ledger_summary.state_summary,
                 ledger_summary.position_state_summary,
+                ledger_summary.positions,
             ))
             .expect("First set.");
 
+        let positions = OnceCell::new();
+        positions.set(ledger_summary_positions).expect("First set.");
+
         Self {
             execution_output,
+            positions,
             state_checkpoint_output,
             ledger_update_output,
         }
@@ -82,6 +94,23 @@ impl PartialStateComputeResult {
     ) -> Result<Option<&LedgerWithSummary<PositionStateWithSummary>>> {
         self.ensure_state_checkpoint_output()
             .map(|out| out.position_state_summary.as_ref())
+    }
+
+    /// The overlay produced by this block's execution. Available as soon
+    /// as execution finishes, which is what lets the next block's VM
+    /// read positions before this block reaches state checkpoint.
+    pub fn ensure_result_positions(&self) -> Result<Option<&LedgerWithSummary<PositionOverlay>>> {
+        Ok(self
+            .positions
+            .get()
+            .context("Positions not set, execution not done?")?
+            .as_ref())
+    }
+
+    pub fn set_positions(&self, positions: Option<LedgerWithSummary<PositionOverlay>>) {
+        self.positions
+            .set(positions)
+            .expect("Positions already set");
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {

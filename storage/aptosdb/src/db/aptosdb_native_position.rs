@@ -4,27 +4,37 @@
 use crate::{
     db::AptosDB,
     native_state_committer::NativeStateCommitter,
+    native_state_reader::{install_global_reader, InMemoryNativeStateReader},
+    native_state_store::{position_key_of, PositionBase, PositionOverlay, PositionWrites},
     position_buffered_state::{
         new_empty_position_state, position_state_at_version, PositionLedgerStateWithSummary,
         PositionPersistedState, PositionProofReader, PositionSlot,
+        MAX_POSITION_WRITE_SETS_AFTER_SNAPSHOT,
     },
     position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_merkle_db::PositionMerkleDb,
     position_pruner::PositionPruner,
     position_state_store::PositionStateStore,
+    pruner::PrunerManager,
     utils::truncation_helper::{
-        get_position_commit_progress, get_position_merkle_commit_progress,
-        truncate_position_db_shards, truncate_position_merkle_db,
+        get_position_commit_progress, truncate_position_db_shards, truncate_position_merkle_db,
     },
 };
 use aptos_config::config::{
     LedgerPrunerConfig, RocksdbConfig, StateMerklePrunerConfig, StorageDirPaths,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
+use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
-use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_types::{
+    state_store::{native_position::NativePosition, state_value::StateValue},
+    transaction::Version,
+};
 use std::{collections::HashMap, sync::Arc};
 
 pub struct PositionBundle {
@@ -36,6 +46,24 @@ pub struct PositionBundle {
     /// driven from `commit_native_position`, the merkle pruners from the
     /// committer, and all are re-activated on restart from `open_internal`.
     pub(crate) position_pruner: Option<Arc<PositionPruner>>,
+    /// Complete account-grouped snapshot at the last folded version.
+    /// Resolves overlay misses, which is what lets `positions` be
+    /// a bounded delta rather than a chain pinned to a family root.
+    /// Advanced by `advance_position_base`, which the executor calls
+    /// while holding its execution lock so the base cannot move under a
+    /// block's reads.
+    pub(crate) position_base: Arc<PositionBase>,
+    /// Tip overlay over `position_base`, extended once
+    /// `position_db.commit(...)` succeeds. In readonly mode it stays at
+    /// cold-load. External callers reach this via [`NativeStateReader`]
+    /// (see `native_state_reader()`), not through the bundle directly.
+    ///
+    /// That commit runs in `pre_commit_ledger`, so this is the
+    /// pre-committed tip, not the proven one. Risk and ADL want the tip:
+    /// they decide about the block being built, not the last certified
+    /// one. The cost is that a pre-committed block which loses its fork is
+    /// briefly visible here.
+    pub(crate) positions: Arc<Mutex<PositionOverlay>>,
     /// `None` in readonly mode.
     pub(crate) state_store: Option<Arc<PositionStateStore>>,
     /// Latest persisted in-memory snapshot — the base the in-memory
@@ -54,6 +82,13 @@ impl AptosDB {
     pub fn native_state_committer(&self) -> Option<NativeStateCommitter> {
         let bundle = self.position.as_ref()?;
         Some(NativeStateCommitter::new(bundle.kv_db.clone()))
+    }
+
+    pub fn native_state_reader(&self) -> Option<InMemoryNativeStateReader> {
+        let bundle = self.position.as_ref()?;
+        Some(InMemoryNativeStateReader::new(Arc::clone(
+            &bundle.positions,
+        )))
     }
 
     /// Called automatically from `open_internal` when
@@ -104,6 +139,36 @@ impl AptosDB {
         let kv_db = Arc::new(position_db);
         let merkle_db = Arc::new(merkle_db);
 
+        // Cold-load: stream the durable JMT snapshot into `PositionBase`,
+        // decoding row by row so the live set is never materialized twice.
+        // The gap `[snapshot_version + 1, chain_tip]` left by a crash
+        // between JMT-snapshot and chain commit is closed by
+        // `replay_position_after_snapshot`.
+        let position_base = match merkle_progress {
+            Some(snapshot_version) => {
+                let iter = merkle_db.iter_active_leaves_with_values(
+                    Arc::clone(&kv_db),
+                    snapshot_version,
+                    0,
+                )?;
+                let base = PositionBase::new_from_rows(Some(snapshot_version), "position", iter)?;
+                info!(
+                    snapshot_version = snapshot_version,
+                    n_accounts = base.read(|view| view.num_accounts()),
+                    "Native-position cold-load complete."
+                );
+                base
+            },
+            None => PositionBase::new_empty("position"),
+        };
+        let position_base = Arc::new(position_base);
+        let positions = Arc::new(Mutex::new(PositionOverlay::new_at_base(Arc::clone(
+            &position_base,
+        ))));
+        install_global_reader(Arc::new(InMemoryNativeStateReader::new(Arc::clone(
+            &positions,
+        ))));
+
         // Pruner managers (value + merkle), grouped like main state's
         // `StatePruner`. Shared with the merkle batch committer via `Arc`.
         let position_pruner = if readonly {
@@ -152,13 +217,18 @@ impl AptosDB {
         if let Some(store) = state_store.as_ref()
             && let Some(v_overall) = self.ledger_db.metadata_db().get_synced_version()?
         {
-            let snapshot_next_version = merkle_progress.map_or(0, |v| v + 1);
+            // With no snapshot, start where the write sets still exist
+            // rather than at 0: a fast-synced node has no history below its
+            // target, and a pruned one cannot replay below the pruner.
+            let snapshot_next_version = merkle_progress
+                .map_or_else(|| self.ledger_pruner.get_min_readable_version(), |v| v + 1);
             if snapshot_next_version <= v_overall {
                 self.replay_position_after_snapshot(
                     store,
                     &merkle_db,
                     snapshot_next_version,
                     v_overall + 1,
+                    &positions,
                 )?;
             }
         }
@@ -167,6 +237,8 @@ impl AptosDB {
             kv_db,
             merkle_db,
             position_pruner,
+            position_base,
+            positions,
             state_store,
             persisted,
         }));
@@ -177,6 +249,80 @@ impl AptosDB {
             "Native-position subsystem initialized."
         );
 
+        Ok(())
+    }
+
+    /// Rebuild the position subsystem against the snapshot a fast sync just
+    /// restored at `version`. The resident index, the overlay, and the JMT
+    /// pipeline's baseline were all built at open time from a then-empty
+    /// database that the restore has since replaced underneath them.
+    pub(crate) fn reset_position_after_fast_sync(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<()> {
+        let Some(bundle) = self.position.as_ref() else {
+            return Ok(());
+        };
+
+        // A chain with the root feature on but no positions yet commits the
+        // empty-tree placeholder. The snapshot stage then streams no values
+        // and writes no JMT node, so there is nothing to load — but the
+        // baseline still has to move to `version`.
+        if expected_root_hash == *SPARSE_MERKLE_PLACEHOLDER_HASH {
+            bundle
+                .position_base
+                .reset_from_rows(Some(version), "position", std::iter::empty())?;
+        } else {
+            ensure!(
+                bundle
+                    .merkle_db
+                    .latest_snapshot_version_at_or_before(version)?
+                    == Some(version),
+                "Fast sync restored no position JMT snapshot at version {version}, but the target \
+                 transaction info commits position state root {expected_root_hash:?}.",
+            );
+            let root_hash = bundle.merkle_db.get_root_hash(version)?;
+            ensure!(
+                root_hash == expected_root_hash,
+                "Restored position root {root_hash:?} at version {version} does not match the \
+                 proved root {expected_root_hash:?}.",
+            );
+            let rows = bundle.merkle_db.iter_active_leaves_with_values(
+                Arc::clone(&bundle.kv_db),
+                version,
+                0,
+            )?;
+            bundle
+                .position_base
+                .reset_from_rows(Some(version), "position", rows)?;
+        }
+        // The old overlay sat on the pre-restore layer family and is
+        // unreachable now; every reader reaches this through the same `Arc`.
+        *bundle.positions.lock() = PositionOverlay::new_at_base(Arc::clone(&bundle.position_base));
+
+        if let (Some(store), Some(persisted)) =
+            (bundle.state_store.as_ref(), bundle.persisted.as_ref())
+        {
+            store.reset_at_snapshot(
+                Arc::clone(&bundle.merkle_db),
+                Arc::clone(&self.ledger_db),
+                position_state_at_version(version, expected_root_hash),
+                Arc::clone(
+                    bundle
+                        .position_pruner
+                        .as_ref()
+                        .expect("position_pruner present whenever state_store is"),
+                ),
+                persisted.clone(),
+            );
+        }
+
+        info!(
+            version = version,
+            n_accounts = bundle.position_base.read(|view| view.num_accounts()),
+            "Position subsystem reset after fast sync."
+        );
         Ok(())
     }
 
@@ -206,45 +352,68 @@ impl AptosDB {
             truncate_position_db_shards(position_db, target)?;
         }
 
-        let Some(v_merkle) = get_position_merkle_commit_progress(merkle_db)? else {
+        // Look for a tree root rather than reading `StateMerkleCommitProgress`,
+        // which the fast-sync restore never writes (it lands nodes through
+        // `commit_no_progress`), leaving a restored snapshot invisible. Main
+        // state discovers its snapshot the same way. Bounding by
+        // `OverallCommitProgress` also truncates a merkle DB left ahead of
+        // the chain by a crash between `commit_native_position()` and
+        // `commit_ledger()`.
+        let ceiling = v_overall.unwrap_or(Version::MAX);
+        let Some(target) = merkle_db.latest_snapshot_version_at_or_before(ceiling)? else {
+            // `truncate_position_merkle_db` peels down to an older snapshot
+            // and cannot empty the DB, so a lone snapshot above the chain
+            // tip has to be refused rather than cleaned up. Cold-loading an
+            // empty base beside it would leave the index and the durable
+            // tree describing different versions.
+            ensure!(
+                merkle_db
+                    .latest_snapshot_version_at_or_before(Version::MAX)?
+                    .is_none(),
+                "position_merkle_db has no snapshot at or before chain version \
+                 {v_overall:?}, only one above it.",
+            );
             return Ok(None);
         };
-
-        // `pre_commit_ledger()` runs `commit_native_position()` — which can
-        // advance the position merkle snapshot — before `commit_ledger()`
-        // records `OverallCommitProgress`. A crash in that window leaves the
-        // merkle DB ahead of the chain, so truncate down to the latest snapshot
-        // at or before the chain tip rather than panicking (matches main
-        // state's restart handling).
-        let target = match v_overall {
-            Some(v) if v < v_merkle => merkle_db.latest_snapshot_version_at_or_before(v)?,
-            _ => Some(v_merkle),
-        };
-        let target = target.ok_or_else(|| {
-            AptosDbError::Other(format!(
-                "position_merkle_db has no snapshot at or before chain version {v_overall:?}; \
-                 only an uncommitted snapshot at {v_merkle} exists"
-            ))
-        })?;
         truncate_position_merkle_db(merkle_db, target)?;
         Ok(Some(target))
     }
 
     /// Replay `WriteSet`s in `[snapshot_next_version, num_transactions)`
     /// — the gap between the persisted JMT snapshot and the chain
-    /// tip. Coalesces latest-wins-per-key, extends in one shot, and
-    /// sync-commits the resulting snapshot before returning.
+    /// tip. Coalesces latest-wins-per-key, extends the JMT pipeline
+    /// state in one shot, and folds the per-account updates into the
+    /// `PositionOverlay` before returning.
     fn replay_position_after_snapshot(
         &self,
         store: &PositionStateStore,
         merkle_db: &Arc<PositionMerkleDb>,
         snapshot_next_version: Version,
         num_transactions: u64,
+        positions: &Arc<Mutex<PositionOverlay>>,
     ) -> Result<()> {
         info!(
             snapshot_next_version = snapshot_next_version,
             num_transactions = num_transactions,
             "Replaying position write sets to catch up the in-memory pipeline."
+        );
+
+        // Same guard main state applies via `MAX_WRITE_SETS_AFTER_SNAPSHOT`:
+        // the replay path materializes every write set in the gap
+        // into one `Vec`, so unbounded gaps are an OOM risk. A node
+        // enabling trading-native before its first position snapshot
+        // (merkle_progress == None ⇒ snapshot_next_version == 0)
+        // against a long-running chain would otherwise pull the
+        // entire history.
+        let gap = num_transactions.saturating_sub(snapshot_next_version);
+        ensure!(
+            gap <= MAX_POSITION_WRITE_SETS_AFTER_SNAPSHOT,
+            "Too many versions to replay after position snapshot. snapshot_next_version: {}, \
+             num_transactions: {}, gap: {}, max: {}",
+            snapshot_next_version,
+            num_transactions,
+            gap,
+            MAX_POSITION_WRITE_SETS_AFTER_SNAPSHOT,
         );
 
         let write_sets = self
@@ -253,15 +422,26 @@ impl AptosDB {
             .get_write_sets(snapshot_next_version, num_transactions)?;
 
         let mut pending_leaf_updates: HashMap<HashValue, PositionSlot> = HashMap::new();
+        let mut pending_position_writes = PositionWrites::new();
         for write_set in &write_sets {
             for (key, op) in write_set.native_position_iter() {
                 let maybe_value = op.as_write_op().as_state_value_opt().cloned();
                 let value_hash = maybe_value.as_ref().map(StateValue::hash);
+                let position_key = position_key_of(key)?;
+                let typed = match maybe_value.as_ref() {
+                    Some(sv) => Some(NativePosition::deserialize(sv.bytes()).map_err(|e| {
+                        AptosDbError::Other(format!(
+                            "position value decode failed during replay: {e}"
+                        ))
+                    })?),
+                    None => None,
+                };
                 pending_leaf_updates.insert(key.hash(), PositionSlot {
                     state_key: key.clone(),
                     value_hash,
                     value: None,
                 });
+                pending_position_writes.push((position_key, typed));
             }
         }
 
@@ -284,6 +464,13 @@ impl AptosDB {
         let base_summary = pipeline_latest.summary().clone();
         let new_latest =
             pipeline_latest.extend(target_version, updates, &base_summary, &proof_reader)?;
+
+        // Fold the replayed account-level updates into `PositionOverlay`;
+        // this matches the durable JMT state we just extended to.
+        {
+            let mut user_pos = positions.lock();
+            *user_pos = user_pos.extend(target_version, pending_position_writes);
+        }
 
         // Treat the target as a checkpoint so the buffered_state
         // sync-commits the JMT snapshot before we return.
