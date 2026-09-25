@@ -995,8 +995,9 @@ private structure Context where
   /-- Index expressions whose bounds check the surface implies: `&v[i]`,
   `v[i]`, and `v[i] := x` lower to a `checkVectorIndex` binding before the
   element place, so the binding is not spelled and the access keeps its
-  sugar. Recorded by the index node the check and the place share. -/
-  elidedIndexChecks : Array ExprId := #[]
+  sugar. Recorded by the vector the check observes and the index node the
+  check and the place share. -/
+  elidedIndexChecks : Array (ExprId × ExprId) := #[]
   /-- Shared pattern binders rendered as implicitly read field selections. -/
   fieldAliasLocals : Array LocalId := #[]
   temporaryLocals : Array LocalId := #[]
@@ -1261,9 +1262,38 @@ private partial def observesPlace (context : Context) (fuel : Nat) (value : Expr
         i == j && observesPlace context fuel inner base
     | _, _ => false
 
+/-- The children an expression evaluates first and unconditionally: its
+operands, a binding's value, a condition, a scrutinee, a block's first
+statement. A branch, a loop body, and what follows a binding are not among
+them, except past the index checks and index temporaries that precede an
+element access. -/
+private def evaluatedFirst (context : Context) : ExprKind → Array ExprId
+  | .operation _ _ arguments _ => arguments
+  | .letDecl pattern (some value) body =>
+      let patternKind : Option PatternKind := (context.ns.patterns[pattern.index]?).map (·.kind)
+      let valueKind : Option ExprKind := (context.ns.expressions[value.index]?).map (·.kind)
+      let precedesAccess : Bool := match patternKind, valueKind with
+        | some .wildcard, some (.operation (.primitive (.checkVectorIndex _)) _ _ _) => true
+        | some (.variable slot), _ =>
+            (context.locals[slot.index]?).any (·.name.startsWith "$t")
+        | _, _ => false
+      if precedesAccess then #[value, body] else #[value]
+  | .letDecl _ none body => #[body]
+  | .assign _ value => #[value]
+  | .ifElse condition _ _ => #[condition]
+  | .match_ scrutinee _ => #[scrutinee]
+  | .block statements result => match statements[0]?, result with
+      | some first, _ => #[first]
+      | none, some result => #[result]
+      | none, none => #[]
+  | .return_ values => values
+  | .throw_ _ arguments => arguments
+  | .break_ _ (some value) => #[value]
+  | _ => #[]
+
 /-- Whether an expression reads the element at `index` of the vector
-`collection` observes, as an index place rooted where `collection` looks or
-an element read of the same observation. -/
+`collection` observes before anything else it evaluates, as an index place
+rooted where `collection` looks or an element read of the same observation. -/
 private partial def indexesChecked (context : Context) (fuel : Nat) (collection index : ExprId)
     (value : ExprId) : Bool :=
   let placeChecked (place : PlaceId) : Bool :=
@@ -1291,19 +1321,20 @@ private partial def indexesChecked (context : Context) (fuel : Nat) (collection 
             | some (.localVar a), some (.localVar b) => a == b
             | _, _ => inner == collection
       | _ => false
-    direct || (expressionChildren expression.kind).any (indexesChecked context fuel collection index)
+    direct || (evaluatedFirst context expression.kind).any
+      (indexesChecked context fuel collection index)
 
 /-- A `checkVectorIndex` binding the surface implies: the continuation
 accesses the checked index of the checked vector through index sugar, whose
 re-import checks it again. -/
 private def indexCheck? (context : Context) (pattern : PatternId) (value : ExprId)
-    (body : ExprId) : Option ExprId := do
+    (body : ExprId) : Option (ExprId × ExprId) := do
   let patternNode ← context.ns.patterns[pattern.index]?
   let .wildcard := patternNode.kind | none
   let valueNode ← context.ns.expressions[value.index]?
   let .operation (.primitive (.checkVectorIndex _)) _ #[collection, index] _ := valueNode.kind | none
   guard (indexesChecked context (context.ns.expressions.size + 1) collection index body)
-  some index
+  some (collection, index)
 
 /-- A hidden `$t` temporary holding a computed element index, whose only
 role is the check and the element place that follow it. -/
@@ -1315,7 +1346,7 @@ private def indexTemporary? (context : Context) (pattern : PatternId) (body : Ex
   unless localDecl.name.startsWith "$t" do none
   let bodyNode ← context.ns.expressions[body.index]?
   let .letDecl checkPattern (some check) checkBody := bodyNode.kind | none
-  let index ← indexCheck? context checkPattern check checkBody
+  let (_, index) ← indexCheck? context checkPattern check checkBody
   let .localVar read ← (context.ns.expressions[index.index]?).map (·.kind) | none
   guard (read == slot)
   some slot
@@ -1326,7 +1357,9 @@ private def placeIndexesElided (context : Context) : Nat → PlaceId → Bool
   | 0, _ => false
   | fuel + 1, id => match context.ns.places[id.index]? with
     | some (.index base index) =>
-        context.elidedIndexChecks.contains index && placeIndexesElided context fuel base
+        context.elidedIndexChecks.any (fun (collection, checked) =>
+          checked == index && observesPlace context fuel collection base) &&
+          placeIndexesElided context fuel base
     | some (.deref base) | some (.field base ..) | some (.downcast base _) |
         some (.subslice base ..) => placeIndexesElided context fuel base
     | some (.localVar _) => true

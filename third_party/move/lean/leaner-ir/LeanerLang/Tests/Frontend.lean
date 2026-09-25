@@ -526,6 +526,23 @@ leaner module 0x42::mismatched_index_check where
     let _ := core.prim.checkVectorIndex[moveVectorError](*checked, index)
     core.borrowPlace(mut, values[index])
 
+-- A bounds check followed by an element access on only one branch is not
+-- the check index sugar implies: the other branch must still abort.
+leaner module 0x42::conditional_index_check where
+  pragma verify = false
+  fun write_if(flag : Bool, values : &mut Vector<u64>, index : u64) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
+    if flag then core.assignPlace(values[index], 0)
+
+-- A check of one vector that one access implies does not license index sugar
+-- for another vector's access at the same index.
+leaner module 0x42::mixed_index_check where
+  pragma verify = false
+  fun write_both(checked : &mut Vector<u64>, other : &mut Vector<u64>, index : u64) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*checked, index)
+    core.assignPlace(checked[index], 0)
+    core.assignPlace(other[index], 0)
+
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
     value : u64
@@ -1027,6 +1044,37 @@ elab "#guard_leaner_frontend" : command => do
       | .error error => throwError "the mismatched index-check fixture did not re-import: {error}"
       | .ok formatted => unless formatted == printed do
           throwError "the mismatched index check is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
+  -- The element places share the check's index node, as a lowering's do.
+  -- Such a unit comes from no surface source, so it is assembled directly.
+  let shareCheckedIndex (name : Name) :
+      Lean.Elab.Command.CommandElabM LeanerIR.Validation.ValidatedUnit := do
+    let some unit := LeanerLang.registeredUnit? env name
+      | throwError "the index-check fixture {name} was not registered"
+    let some ns := unit.namespaces[0]?
+      | throwError "the index-check fixture {name} has no namespace"
+    let some checkedIndex := ns.expressions.findSome? fun expression =>
+        match expression.kind with
+        | .operation (.primitive (.checkVectorIndex _)) _ #[_, index] _ => some index
+        | _ => none
+      | throwError "the index-check fixture {name} has no bounds check"
+    let places := ns.places.map fun
+      | .index base _ => .index base checkedIndex
+      | place => place
+    pure <| LeanerIR.Validation.Internal.mkValidatedUnit unit.tables unit.profiles
+      (unit.namespaces.set! 0 { ns with places }) unit.dependencies unit.evidence unit.indexes
+      unit.structurizationWitnesses unit.resolution unit.initializationCertificates
+      unit.borrowCertificates unit.borrowDiagnostics
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».conditional_index_check) with
+  | .error error => throwError "the conditional index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
+        throwError "a bounds check before a conditional access was elided:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».mixed_index_check) with
+  | .error error => throwError "the mixed index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "checked[index] := 0" &&
+          printed.contains "core.assignPlace(other[index], 0)" do
+        throwError "an unchecked access of another vector gained index sugar:\n{printed}"
   let some surfaceRegressions := LeanerLang.registeredUnit? env `«0x42».surface_regressions
     | throwError "the surface-regression fixture was not registered"
   match LeanerLang.Print.render env surfaceRegressions with
