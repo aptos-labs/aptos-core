@@ -27,7 +27,6 @@ xclippy = [
   "-Aclippy::missing_spin_loop",
   "-Aclippy::needless_return_with_question_mark",
   "-Aclippy::question_mark",
-  "-Aclippy::single_range_in_vec_init",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 build-perf = ["build", "--profile", "performance", "--config", ".cargo/performance.toml"]
