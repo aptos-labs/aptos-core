@@ -752,10 +752,15 @@ mutual
         compileCompare unit function ρ Γ ns namespaceId fuel τ .greaterEqual left right
     | fuel + 1, .bool, .equal, [left, right] => do
         let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        -- `NTy.eqb` is equality only on a ref-free type; at a reference it is
+        -- `false` however the executor compares the borrows. Decline rather
+        -- than carry an equality the execution does not agree with.
+        unless σ.refFree do notCarried "an equality of a value holding a reference"
         let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? σ
         .ok (.at .bool (.equal false left right))
     | fuel + 1, .bool, .notEqual, [left, right] => do
         let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        unless σ.refFree do notCarried "an inequality of a value holding a reference"
         let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? σ
         .ok (.at .bool (.equal true left right))
     | fuel + 1, .bool, .logicalNot, [operand] => do
@@ -907,6 +912,11 @@ mutual
         | _, _ => notCarried "a search in a non-vector"
     | fuel + 1, .int 8 true, .compare, [left, right] => do
         let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        -- A reference is carried as its (current, prophecy) pair, so the
+        -- denotation would order it by its contents. The executor orders a
+        -- borrow by its loan before its contents, which the pair does not
+        -- record, so the order of a value holding one is not carried.
+        unless σ.refFree do notCarried "a structural order of a value holding a reference"
         let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? σ
         .ok (.at (.int 8 true) (.order ns.variantOrders left right))
     | _ + 1, _, primitive, _ => notCarried s!"primitive {repr primitive} at this type or arity"
