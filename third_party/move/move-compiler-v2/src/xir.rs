@@ -9,6 +9,8 @@
 //! compiler-v2 stackless checks, optimizations, file-format generator, and
 //! verifier own all later compilation stages.
 
+mod typing;
+
 use anyhow::{bail, ensure, Context, Result};
 use codespan::Span;
 use move_binary_format::file_format::Visibility as MoveVisibility;
@@ -959,6 +961,7 @@ fn translate_function(
         next_attr: 0,
         next_label: decl.blocks.len(),
     };
+    translator.check_types()?;
     translator.emit(|attr| Bytecode::Jump(attr, Label::new(decl.entry)))?;
     for (block_id, block) in decl.blocks.iter().enumerate() {
         let block_source_map = decl
@@ -1852,11 +1855,7 @@ impl FunctionTranslator<'_> {
     }
 
     fn type_args(&self, args: &[Ty]) -> Result<Vec<Type>> {
-        let scope = StructScope {
-            module_id: self.module_id,
-            local: self.struct_ids,
-            external: self.external_struct_ids,
-        };
+        let scope = self.scope();
         args.iter().map(|arg| model_type(arg, &scope)).collect()
     }
 
@@ -2736,6 +2735,158 @@ mod tests {
             warnings.contains("attribute `resource_group` on struct")
                 && warnings.contains("not carried"),
             "{warnings}"
+        );
+    }
+
+    /// Imports a copy of the golden module whose first function is replaced
+    /// by one with a single instruction and these locals:
+    /// l0-l2 `u64`, l3 `u8`, l4 `address`, l5 `u16`, l6 `u32`, l7 `u128`,
+    /// l8 `u256`, l9 `bool`, l10 `vector<u64>`, l11 `&u64`, l12 a struct.
+    fn load_instruction(instr: Instr) -> Result<()> {
+        let mut module = account_module();
+        let function = &mut module.functions[0];
+        function.params = 0;
+        function.locals = vec![
+            Ty::U64,
+            Ty::U64,
+            Ty::U64,
+            Ty::U8,
+            Ty::Address,
+            Ty::U16,
+            Ty::U32,
+            Ty::U128,
+            Ty::U256,
+            Ty::Bool,
+            Ty::Vector(Box::new(Ty::U64)),
+            Ty::Ref(Box::new(Ty::U64)),
+            Ty::Struct(0),
+        ];
+        function.local_names = vec![];
+        function.returns = vec![];
+        function.source_map = None;
+        function.entry = 0;
+        function.blocks = vec![Block {
+            instrs: vec![instr],
+            term: Term::Ret(vec![]),
+        }];
+        import_module(&module).map(|_| ())
+    }
+
+    fn two_operand_ops(width: IntType) -> Vec<Oper> {
+        vec![
+            Oper::Add(width),
+            Oper::Sub(width),
+            Oper::Mul(width),
+            Oper::Div(width),
+            Oper::Mod(width),
+            Oper::BitAnd(width),
+            Oper::BitOr(width),
+            Oper::BitXor(width),
+        ]
+    }
+
+    #[test]
+    fn a_consistent_width_annotation_loads() {
+        let mut cases: Vec<(Vec<usize>, Oper, Vec<usize>)> = two_operand_ops(IntType::U64)
+            .into_iter()
+            .map(|oper| (vec![2], oper, vec![0, 1]))
+            .collect();
+        cases.extend([
+            // A shift's amount is a `u8` the annotation does not describe.
+            (vec![2], Oper::Shl(IntType::U64), vec![0, 3]),
+            (vec![2], Oper::Shr(IntType::U64), vec![0, 3]),
+            // A cast's annotation names its result; the operand may be any width.
+            (vec![3], Oper::Cast(IntType::U8), vec![0]),
+            (vec![0], Oper::Cast(IntType::U64), vec![3]),
+        ]);
+        let rejected: Vec<_> = cases
+            .into_iter()
+            .filter_map(|(dsts, oper, srcs)| {
+                load_instruction(Instr::Call(dsts, oper.clone(), srcs))
+                    .err()
+                    .map(|error| format!("{oper:?}: {error:#}"))
+            })
+            .collect();
+        assert!(rejected.is_empty(), "rejected: {rejected:#?}");
+    }
+
+    #[test]
+    fn a_width_annotation_must_match_the_locals() {
+        let mut cases: Vec<(Vec<usize>, Oper, Vec<usize>)> = two_operand_ops(IntType::I64)
+            .into_iter()
+            .map(|oper| (vec![2], oper, vec![0, 1]))
+            .collect();
+        cases.extend([
+            (vec![2], Oper::Add(IntType::U64), vec![4, 1]), // first operand
+            (vec![2], Oper::Add(IntType::U64), vec![0, 4]), // second operand
+            (vec![3], Oper::Add(IntType::U64), vec![0, 1]), // destination
+            (vec![2], Oper::Shl(IntType::U64), vec![3, 3]), // shl value
+            (vec![2], Oper::Shr(IntType::U64), vec![3, 3]), // shr value
+            (vec![0], Oper::Cast(IntType::U8), vec![3]),    // cast result
+        ]);
+        let accepted: Vec<_> = cases
+            .into_iter()
+            .filter(|(dsts, oper, srcs)| {
+                load_instruction(Instr::Call(dsts.clone(), oper.clone(), srcs.clone())).is_ok()
+            })
+            .map(|(dsts, oper, srcs)| format!("{oper:?} {dsts:?} <- {srcs:?}"))
+            .collect();
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    /// Each integer width, with a local of that type: the matching annotation
+    /// loads and a neighbouring width does not. This pins every arm of
+    /// `int_type`, not just `u64`.
+    #[test]
+    fn every_width_is_checked_against_its_own_type() {
+        let widths = [
+            (3, IntType::U8, IntType::U16),
+            (5, IntType::U16, IntType::U32),
+            (6, IntType::U32, IntType::U64),
+            (0, IntType::U64, IntType::U128),
+            (7, IntType::U128, IntType::U256),
+            (8, IntType::U256, IntType::U8),
+        ];
+        let mut wrong = vec![];
+        for (local, width, neighbour) in widths {
+            let load =
+                |w| load_instruction(Instr::Call(vec![local], Oper::Add(w), vec![local, local]));
+            if load(width).is_err() {
+                wrong.push(format!("{width:?} over its own type was rejected"));
+            }
+            if load(neighbour).is_ok() {
+                wrong.push(format!("{neighbour:?} over {width:?} was accepted"));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// An operand that is not an integer at all is rejected, whatever its kind.
+    #[test]
+    fn a_non_integer_operand_is_rejected() {
+        let accepted: Vec<_> = [4, 9, 10, 11, 12] // address, bool, vector, reference, struct
+            .into_iter()
+            .filter(|&operand| {
+                load_instruction(Instr::Call(vec![2], Oper::Add(IntType::U64), vec![
+                    operand, 1,
+                ]))
+                .is_ok()
+            })
+            .collect();
+        assert!(
+            accepted.is_empty(),
+            "accepted non-integer locals: {accepted:?}"
+        );
+    }
+
+    #[test]
+    fn a_width_mismatch_names_the_operation_and_the_local() {
+        let error = load_instruction(Instr::Call(vec![2], Oper::Div(IntType::I64), vec![0, 1]))
+            .unwrap_err();
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("Div(I64)") && message.contains("l0") && message.contains("`u64`"),
+            "{message}"
         );
     }
 
