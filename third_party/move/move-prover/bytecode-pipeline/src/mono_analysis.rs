@@ -62,6 +62,32 @@ use std::{
 /// exceeding it is reported as an error rather than silently leaving cases unverified.
 const MAX_ALIASING_INSTANCES: usize = 256;
 
+/// Canonical form of a type-aliasing instantiation: the type parameters it maps to are
+/// renamed in order of first occurrence. Two instantiations that describe the same aliasing
+/// case but pick different representatives -- `T = U` written as `[U, U]` or as `[T, T]` --
+/// then compare equal, so each case is verified once and counted once against
+/// `MAX_ALIASING_INSTANCES`. The parameters are symbolic, so the renaming is only
+/// alpha-equivalence and does not change what is verified.
+fn canonical_aliasing_inst(inst: &[Type], arity: usize) -> Vec<Type> {
+    let mut order: Vec<u16> = vec![];
+    for ty in inst {
+        ty.visit(&mut |t| {
+            if let Type::TypeParameter(idx) = t {
+                if !order.contains(idx) {
+                    order.push(*idx);
+                }
+            }
+        });
+    }
+    let renaming: Vec<Type> = (0..arity)
+        .map(|old| match order.iter().position(|p| *p as usize == old) {
+            Some(new) => Type::TypeParameter(new as u16),
+            None => Type::TypeParameter(old as u16),
+        })
+        .collect();
+    inst.iter().map(|t| t.instantiate(&renaming)).collect()
+}
+
 /// The environment extension computed by this analysis.
 #[derive(Clone, Default, Debug)]
 pub struct MonoInfo {
@@ -1521,17 +1547,21 @@ impl Analyzer<'_> {
                             continue;
                         }
                         // find all instantiation combinations given by this unification
-                        out.extend(TypeInstantiationDerivation::progressive_instantiation(
-                            std::iter::once(lhs_ty),
-                            std::iter::once(rhs_ty),
-                            true,
-                            false,
-                            true,
-                            false,
-                            fun_type_params_arity,
-                            true,
-                            false,
-                        ));
+                        out.extend(
+                            TypeInstantiationDerivation::progressive_instantiation(
+                                std::iter::once(lhs_ty),
+                                std::iter::once(rhs_ty),
+                                true,
+                                false,
+                                true,
+                                false,
+                                fun_type_params_arity,
+                                true,
+                                false,
+                            )
+                            .into_iter()
+                            .map(|inst| canonical_aliasing_inst(&inst, fun_type_params_arity)),
+                        );
                     }
                 }
                 out
@@ -1556,8 +1586,13 @@ impl Analyzer<'_> {
                 }
                 let merged: Vec<Type> = accessed.iter().map(|m| m.instantiate(&inst)).collect();
                 for further in merges_of(&merged) {
-                    let composed: Vec<Type> =
-                        inst.iter().map(|t| t.instantiate(&further)).collect();
+                    let composed = canonical_aliasing_inst(
+                        &inst
+                            .iter()
+                            .map(|t| t.instantiate(&further))
+                            .collect::<Vec<_>>(),
+                        fun_type_params_arity,
+                    );
                     if all_insts.insert(composed.clone()) {
                         worklist.push(composed);
                     }
