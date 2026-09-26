@@ -671,6 +671,7 @@ fn import_source(
         added_id == module_id,
         "model assigned an unexpected module id"
     );
+    env.add_package_friends(module_id);
     for (decl, fun_id) in xir.functions.iter().zip(&function_ids) {
         let qid = module_id.qualified(*fun_id);
         let data = translate_function(
@@ -951,6 +952,7 @@ fn translate_function(
         external_struct_ids,
         function_ids,
         decl,
+        qid,
         loc: func_env.get_loc(),
         function_loc: func_env.get_loc(),
         code: vec![],
@@ -1089,6 +1091,8 @@ struct FunctionTranslator<'a> {
     external_struct_ids: &'a [QualifiedId<StructId>],
     function_ids: &'a [FunId],
     decl: &'a FunctionDecl,
+    /// The function being translated.
+    qid: QualifiedId<FunId>,
     loc: Loc,
     function_loc: Loc,
     code: Vec<Bytecode>,
