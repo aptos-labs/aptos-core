@@ -1254,6 +1254,15 @@ impl GlobalEnv {
         self.diags.borrow_mut().clear();
     }
 
+    /// Drops the diagnostics added after the first `start` that `keep` rejects.
+    pub fn retain_diags_since(&self, start: usize, keep: impl Fn(&Diagnostic<FileId>) -> bool) {
+        let mut index = 0;
+        self.diags.borrow_mut().retain(|(diag, _)| {
+            index += 1;
+            index <= start || keep(diag)
+        });
+    }
+
     /// Returns the unknown location.
     pub fn unknown_loc(&self) -> Loc {
         self.unknown_loc.clone()
