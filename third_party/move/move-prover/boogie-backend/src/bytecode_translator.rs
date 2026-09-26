@@ -25,7 +25,7 @@ use crate::{
         boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
         boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
         bv_flag_for_type, compute_evaluator_memory_union, field_bv_flag_global_state,
-        TypeIdentToken,
+        normalized_inst_id, EmittedEntities, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -602,7 +602,7 @@ impl<'env> BoogieTranslator<'env> {
                 // Emit uninterpreted function for arbitrary ordering of generic type
                 emitln!(
                     writer,
-                    "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1_cmp_Ordering;",
+                    "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1.cmp.Ordering;",
                     suffix,
                     param_type,
                     param_type
@@ -611,13 +611,13 @@ impl<'env> BoogieTranslator<'env> {
                 self.emit_function(
                     writer,
                     &format!(
-                        "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                        "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                         suffix, param_type, param_type
                     ),
                     || {
                         emitln!(
                             writer,
-                            "if $IsEqual'{}'(v1, v2) then $1_cmp_Ordering_Equal()",
+                            "if $IsEqual'{}'(v1, v2) then $1.cmp.Ordering.Equal()",
                             suffix
                         );
                         emitln!(writer, "else $Arbitrary_cmp_ordering'{}'(v1, v2)", suffix);
@@ -627,11 +627,11 @@ impl<'env> BoogieTranslator<'env> {
                 self.emit_procedure(
                     writer,
                     &format!(
-                        "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                        "$1.cmp.compare'{}'(v1: {}, v2: {}) returns ($ret0: $1.cmp.Ordering)",
                         suffix, param_type, param_type
                     ),
                     || {
-                        emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                        emitln!(writer, "$ret0 := $1.cmp.$compare'{}'(v1, v2);", suffix);
                     },
                 );
             }
@@ -641,9 +641,12 @@ impl<'env> BoogieTranslator<'env> {
         self.spec_translator
             .translate_axioms(env, mono_info.as_ref());
 
-        let mut translated_types = BTreeSet::new();
+        // Keyed on the entity, not on the rendered Boogie name -- see `EmittedEntities`.
+        let mut translated_types: EmittedEntities<QualifiedInstId<StructId>> =
+            EmittedEntities::default();
         let mut translated_memory: Vec<(QualifiedInstId<StructId>, String)> = vec![];
-        let mut translated_funs = BTreeSet::new();
+        let mut translated_funs: EmittedEntities<QualifiedInstId<FunId>> =
+            EmittedEntities::default();
         let mut verified_functions_count = 0;
         debug!("generating verification conditions");
         for module_env in self.env.get_modules() {
@@ -661,14 +664,23 @@ impl<'env> BoogieTranslator<'env> {
                     .get(&struct_env.get_qualified_id())
                     .unwrap_or(empty)
                 {
+                    let struct_qid = struct_env.get_qualified_id().instantiate(type_inst.clone());
                     let struct_name = boogie_struct_name(struct_env, type_inst, false);
-                    if !translated_types.insert(struct_name) {
+                    // Abilities are abstracted out of Boogie names, so two
+                    // instantiations differing only in the abilities of a nested
+                    // function type denote one Boogie entity. Normalize the key to
+                    // match, or they would look like a name collision.
+                    if !translated_types.insert(
+                        env,
+                        normalized_inst_id(struct_env.get_qualified_id(), type_inst),
+                        &struct_name,
+                        "struct",
+                    ) {
                         continue;
                     }
                     if struct_env.has_memory() {
-                        let mem_qid = struct_env.get_qualified_id().instantiate(type_inst.clone());
-                        let mem_name = boogie_resource_memory_name(env, &mem_qid, &None);
-                        translated_memory.push((mem_qid, mem_name))
+                        let mem_name = boogie_resource_memory_name(env, &struct_qid, &None);
+                        translated_memory.push((struct_qid, mem_name))
                     }
                     StructTranslator {
                         parent: self,
@@ -767,8 +779,19 @@ impl<'env> BoogieTranslator<'env> {
                             ))
                             .unwrap_or(empty)
                         {
+                            // The variant is deliberately not part of the key: several
+                            // non-verified variants legitimately collapse onto one
+                            // inlined body, which is what this guard is for.
                             let fun_name = boogie_function_name(fun_env, type_inst, &[]);
-                            if !translated_funs.insert(fun_name) {
+                            if !translated_funs.insert(
+                                env,
+                                normalized_inst_id(
+                                    fun_target.func_env.get_qualified_id(),
+                                    type_inst,
+                                ),
+                                &fun_name,
+                                "function",
+                            ) {
                                 continue;
                             }
                             FunctionTranslator {
@@ -790,7 +813,22 @@ impl<'env> BoogieTranslator<'env> {
         // so one target reachable under several function types (for instance
         // differing only in abilities) must still be declared once per file.
         let mut declared_behavioral_funs: BTreeSet<QualifiedInstId<FunId>> = BTreeSet::new();
+        // The fourth emission loop, and the last one keyed on the entity rather than
+        // on nothing at all: this one had no guard, so a non-injective rendering
+        // reached Boogie as a duplicate datatype declaration instead of a diagnostic
+        // naming the types that fused. Keys are normalized so that two function types
+        // differing only in abilities -- one Boogie entity -- are not reported.
+        let mut translated_fun_types: EmittedEntities<Type> = EmittedEntities::default();
         for (fun_type, closure_infos) in &mono_info.fun_infos {
+            let fun_ty_name = boogie_type(self.env, fun_type, false);
+            if !translated_fun_types.insert(
+                self.env,
+                fun_type.clone().normalize_nested_funs(),
+                &fun_ty_name,
+                "function type",
+            ) {
+                continue;
+            }
             let fun_param_infos = mono_info
                 .fun_param_infos
                 .get(fun_type)
@@ -3050,7 +3088,7 @@ impl<'env> BoogieTranslator<'env> {
                 let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, false);
 
                 // For native functions with no Move spec, use the Boogie "$-spec" inline
-                // function (e.g. `$1_vector_$empty'T'`) as a concrete, deterministic body
+                // function (e.g. `$1.vector.$empty'T'`) as a concrete, deterministic body
                 // instead of leaving the result function uninterpreted.  This ensures that
                 // `result_of<native_fun>(args)` in inferred specs is fully constrained.
                 // Only applies when there are no memory parameters — $-spec functions in
@@ -5175,7 +5213,7 @@ impl StructTranslator<'_> {
     }
 
     /// Return identity constraint for a function-valued field `f` if it has a
-    /// `StructFieldInfo` entry, e.g. `s->$0_Continuation is $struct_field'State$0'`.
+    /// `StructFieldInfo` entry, e.g. `s->$0.Continuation is $struct_field'State$0'`.
     /// Returns `None` if the field has no function type with a StructFieldInfo.
     pub fn boogie_field_identity_constraint(
         &self,
@@ -5350,13 +5388,14 @@ impl StructTranslator<'_> {
         let num_variants = struct_env.get_variants().count();
         for ((field, (field_type, field_type_uninst)), variant_name) in field_variant_map {
             // The field type is part of the name so that same-named fields of different
-            // types in different variants stay apart; `boogie_variant_field_update`
-            // renders it the same way caller-side.
+            // types in different variants stay apart. Field name before type, joined
+            // by `.` -- must stay byte-identical to `boogie_variant_field_update`,
+            // which documents why that order is load-bearing.
             let name_suffix = format!(
-                "'{}'_{}_{}",
+                "'{}'_{}.{}",
                 struct_name,
+                field,
                 boogie_field_type_name_component(&field_type_uninst),
-                field
             );
             let signature = format!("(s: {}, x: {}): {}", struct_name, field_type, struct_name);
             // A receiver outside `variant_name` lacks the field, so updating it yields an
@@ -5513,7 +5552,7 @@ impl StructTranslator<'_> {
         // Emit uninterpreted function for arbitrary ordering fallback
         emitln!(
             writer,
-            "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1_cmp_Ordering;",
+            "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1.cmp.Ordering;",
             suffix,
             struct_name,
             struct_name
@@ -5521,7 +5560,7 @@ impl StructTranslator<'_> {
 
         self.emit_function(
             &format!(
-                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                 suffix, struct_name, struct_name
             ),
             || {
@@ -5536,11 +5575,11 @@ impl StructTranslator<'_> {
                         let struct_variant_name_2 =
                             boogie_struct_variant_name(struct_env, self.type_inst, *v2);
                         let cmp_order_less = format!(
-                            "{} if v1 is {} && v2 is {} then $1_cmp_Ordering_Less()",
+                            "{} if v1 is {} && v2 is {} then $1.cmp.Ordering.Less()",
                             else_symbol, struct_variant_name_1, struct_variant_name_2
                         );
                         let cmp_order_greater = format!(
-                            "else if v1 is {} && v2 is {} then $1_cmp_Ordering_Greater()",
+                            "else if v1 is {} && v2 is {} then $1.cmp.Ordering.Greater()",
                             struct_variant_name_2, struct_variant_name_1
                         );
                         if else_symbol.is_empty() {
@@ -5556,7 +5595,7 @@ impl StructTranslator<'_> {
                     let suffix_variant =
                         boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, variant);
                     let cmp_order = format!(
-                        "{} if v1 is {} && v2 is {} then $1_cmp_$compare'{}'(v1, v2)",
+                        "{} if v1 is {} && v2 is {} then $1.cmp.$compare'{}'(v1, v2)",
                         else_symbol, struct_variant_name_1, struct_variant_name_1, suffix_variant
                     );
                     emitln!(writer, "{}", cmp_order);
@@ -5581,7 +5620,7 @@ impl StructTranslator<'_> {
             boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, &variant);
         self.emit_function(
             &format!(
-                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                 suffix_variant, struct_name, struct_name
             ),
             || {
@@ -5590,7 +5629,7 @@ impl StructTranslator<'_> {
                     .collect_vec()
                     .is_empty()
                 {
-                    emitln!(writer, "$1_cmp_Ordering_Equal()");
+                    emitln!(writer, "$1.cmp.Ordering.Equal()");
                 } else {
                     for (pos, field) in struct_env.get_fields_of_variant(variant).enumerate() {
                         let bv_flag = self.field_bv_flag(&field);
@@ -5600,19 +5639,19 @@ impl StructTranslator<'_> {
                             bv_flag,
                         );
                         let cmp_field_call = format!(
-                            "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                            "$1.cmp.$compare'{}'(v1->{}, v2->{})",
                             field_type_name,
                             boogie_field_sel(&field),
                             boogie_field_sel(&field)
                         );
                         let cmp_field_call_less =
-                            format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                            format!("{} == $1.cmp.Ordering.Less()", cmp_field_call);
                         let cmp_field_call_greater =
-                            format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                            format!("{} == $1.cmp.Ordering.Greater()", cmp_field_call);
                         emitln!(writer, "if {}", cmp_field_call_less);
-                        emitln!(writer, "then $1_cmp_Ordering_Less()");
+                        emitln!(writer, "then $1.cmp.Ordering.Less()");
                         emitln!(writer, "else if {}", cmp_field_call_greater);
-                        emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                        emitln!(writer, "then $1.cmp.Ordering.Greater()");
                         if pos
                             < struct_env
                                 .get_fields_of_variant(variant)
@@ -5622,7 +5661,7 @@ impl StructTranslator<'_> {
                         {
                             emitln!(writer, "else");
                         } else {
-                            emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                            emitln!(writer, "else $1.cmp.Ordering.Equal()");
                         }
                     }
                 }
@@ -5798,7 +5837,7 @@ impl StructTranslator<'_> {
                             boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
                         self.emit_function(
                             &format!(
-                                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                                "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                                 suffix, struct_name, struct_name
                             ),
                             || {
@@ -5810,34 +5849,34 @@ impl StructTranslator<'_> {
                                         bv_flag,
                                     );
                                     let cmp_field_call = format!(
-                                        "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                                        "$1.cmp.$compare'{}'(v1->{}, v2->{})",
                                         suffix_ty,
                                         boogie_field_sel(&field),
                                         boogie_field_sel(&field)
                                     );
                                     let cmp_field_call_less =
-                                        format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                                        format!("{} == $1.cmp.Ordering.Less()", cmp_field_call);
                                     let cmp_field_call_greater =
-                                        format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                                        format!("{} == $1.cmp.Ordering.Greater()", cmp_field_call);
                                     emitln!(writer, "if {}", cmp_field_call_less);
-                                    emitln!(writer, "then $1_cmp_Ordering_Less()");
+                                    emitln!(writer, "then $1.cmp.Ordering.Less()");
                                     emitln!(writer, "else if {}", cmp_field_call_greater);
-                                    emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                                    emitln!(writer, "then $1.cmp.Ordering.Greater()");
                                     if pos < struct_env.get_field_count() - 1 {
                                         emitln!(writer, "else");
                                     } else {
-                                        emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                                        emitln!(writer, "else $1.cmp.Ordering.Equal()");
                                     }
                                 }
                             },
                         );
                         self.emit_procedure(
                             &format!(
-                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            "$1.cmp.compare'{}'(v1: {}, v2: {}) returns ($ret0: $1.cmp.Ordering)",
                             suffix, struct_name, struct_name
                         ),
                             || {
-                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                                emitln!(writer, "$ret0 := $1.cmp.$compare'{}'(v1, v2);", suffix);
                             },
                         );
                     } else {
@@ -5846,11 +5885,11 @@ impl StructTranslator<'_> {
                             boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
                         self.emit_procedure(
                             &format!(
-                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            "$1.cmp.compare'{}'(v1: {}, v2: {}) returns ($ret0: $1.cmp.Ordering)",
                             suffix, struct_name, struct_name
                         ),
                             || {
-                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                                emitln!(writer, "$ret0 := $1.cmp.$compare'{}'(v1, v2);", suffix);
                             },
                         );
                     }

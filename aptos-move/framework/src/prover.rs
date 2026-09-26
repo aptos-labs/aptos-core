@@ -405,7 +405,7 @@ fn benchmark_status_rank(status: &BoogieRunStatus) -> u8 {
 ///
 /// This must be called before running the Move Prover on any Aptos package (or package that
 /// transitively depends on `move-stdlib`, which includes the `cmp` module with `pragma intrinsic`
-/// types). Without it, the Boogie backend lacks the `$1_cmp_Ordering` type declaration and the
+/// types). Without it, the Boogie backend lacks the `$1.cmp.Ordering` type declaration and the
 /// `cmp_vector_instances` axioms, causing Boogie compilation errors.
 pub fn configure_aptos_custom_natives(options: &mut Options) {
     options.backend.custom_natives =

@@ -549,7 +549,7 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
             }
         },
         // index_of returns `(true, i)` for the smallest `i` with `v[i] == e`,
-        // or `(false, 0)` if `e` is not contained (see `$1_vector_index_of`
+        // or `(false, 0)` if `e` is not contained (see `$1.vector.index_of`
         // in the Boogie prelude, which the intrinsic is verified against).
         "index_of" => {
             let v = arg(0)?;
