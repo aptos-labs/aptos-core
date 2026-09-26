@@ -14,6 +14,8 @@ use aptos_framework_natives::{cryptography::algebra::AlgebraContext, event::Nati
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
+use aptos_position_natives::NativePositionContext;
+#[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder};
 #[cfg(feature = "testing")]
@@ -219,6 +221,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
     exts.add(NativeObjectContext::default());
+    exts.add(NativePositionContext::new());
 
     let mut randomness_ctx = RandomnessContext::new();
     randomness_ctx.mark_unbiasable();

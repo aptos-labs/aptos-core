@@ -6,9 +6,12 @@ use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::{
         create_vm_change_set_with_module_write_set_when_delayed_field_optimization_disabled,
-        VMChangeSet,
+        ChangeSetInterface, VMChangeSet,
     },
+    module_write_set::ModuleWriteSet,
+    output::VMOutput,
     resolver::ResourceGroupSize,
+    storage::change_set_configs::{ChangeSetConfigs, MAX_POSITION_WRITE_OPS_PER_TRANSACTION},
     tests::utils::{
         as_bytes, as_state_key, mock_create_with_layout, mock_delete_with_layout,
         mock_modify_with_layout, mock_tag_1, raw_metadata, ExpandedVMChangeSetBuilder,
@@ -19,11 +22,13 @@ use aptos_aggregator::{
     delayed_change::{DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
 };
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_types::{
     delayed_fields::SnapshotToStringFormula,
+    fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::ChangeSet as StorageChangeSet,
-    write_set::{WriteOp, WriteSetMut},
+    transaction::{ChangeSet as StorageChangeSet, ExecutionStatus, TransactionStatus},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use bytes::Bytes;
 use claims::{assert_err, assert_ok, assert_some_eq};
@@ -544,6 +549,154 @@ fn test_squash_standalone_write_then_inplace_delayed_field_gated() {
         "unexpected error: {:?}",
         err
     );
+}
+
+fn position_key(exchange: &str, account: &str, market: &str) -> StateKey {
+    StateKey::position(
+        AccountAddress::from_hex_literal(exchange).unwrap(),
+        AccountAddress::from_hex_literal(account).unwrap(),
+        AccountAddress::from_hex_literal(market).unwrap(),
+    )
+}
+
+fn change_set_with_n_positions(n: usize) -> VMChangeSet {
+    let mut change_set = VMChangeSet::empty();
+    let writes = (0..n)
+        .map(|i| {
+            (
+                position_key("0x5", "0x1", &format!("0x{:x}", i + 1)),
+                WriteOp::legacy_creation(Bytes::from_static(b"payload")),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    change_set.set_position_bucket(writes).unwrap();
+    change_set
+}
+
+#[test]
+fn test_position_write_ops_limit() {
+    // Applies even to an otherwise unlimited config: position writes are not
+    // part of the gas-metered write set.
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+
+    let at_limit = change_set_with_n_positions(MAX_POSITION_WRITE_OPS_PER_TRANSACTION);
+    assert_eq!(
+        at_limit.num_position_write_ops(),
+        MAX_POSITION_WRITE_OPS_PER_TRANSACTION
+    );
+    assert_ok!(configs.check_change_set(&at_limit));
+
+    let over_limit = change_set_with_n_positions(MAX_POSITION_WRITE_OPS_PER_TRANSACTION + 1);
+    assert_err!(configs.check_change_set(&over_limit));
+}
+
+#[test]
+fn test_positions_survive_write_set_serialization() {
+    // `freeze()` yields V0, whose extension bucket is `#[serde(skip)]`; the
+    // output must upgrade to V1 or the writes vanish on any round-trip.
+    let change_set = change_set_with_n_positions(2);
+    let output = VMOutput::new(
+        change_set,
+        ModuleWriteSet::empty(),
+        FeeStatement::zero(),
+        TransactionStatus::Keep(ExecutionStatus::Success),
+    );
+    let txn_output = assert_ok!(output.into_transaction_output());
+    assert_eq!(txn_output.write_set().native_position_iter().count(), 2);
+
+    let bytes = bcs::to_bytes(txn_output.write_set()).unwrap();
+    let decoded: WriteSet = bcs::from_bytes(&bytes).unwrap();
+    assert_eq!(decoded.native_position_iter().count(), 2);
+}
+
+#[test]
+fn test_set_position_bucket_rejects_double_set() {
+    let mut change_set = change_set_with_n_positions(1);
+    let more = BTreeMap::from([(
+        position_key("0x5", "0x1", "0x9"),
+        WriteOp::legacy_deletion(),
+    )]);
+    assert_err!(change_set.set_position_bucket(more));
+}
+
+#[test]
+fn test_position_bucket_rejects_non_position_key() {
+    let mut change_set = VMChangeSet::empty();
+    let bad = BTreeMap::from([(StateKey::raw(b"not-a-position"), WriteOp::legacy_deletion())]);
+    assert_err!(change_set.set_position_bucket(bad));
+}
+
+#[test]
+fn test_combine_into_storage_change_set_rejects_unmaterialized_positions() {
+    let mut change_set = VMChangeSet::empty();
+    change_set
+        .set_position_bucket(BTreeMap::from([(
+            position_key("0x5", "0x1", "0x2"),
+            WriteOp::legacy_creation(Bytes::from_static(b"payload")),
+        )]))
+        .unwrap();
+    assert_err!(change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+}
+
+#[test]
+fn test_take_position_write_set_allows_combining() {
+    let mut change_set = VMChangeSet::empty();
+    change_set
+        .set_position_bucket(BTreeMap::from([(
+            position_key("0x5", "0x1", "0x2"),
+            WriteOp::legacy_creation(Bytes::from_static(b"payload")),
+        )]))
+        .unwrap();
+    assert_eq!(change_set.take_position_write_set().len(), 1);
+    assert!(change_set.position_write_set().is_empty());
+    assert_ok!(change_set.try_combine_into_storage_change_set(ModuleWriteSet::empty()));
+}
+
+#[test]
+fn test_position_bucket_accepts_position_keys() {
+    let mut change_set = VMChangeSet::empty();
+    let key = position_key("0x5", "0x1", "0x2");
+    let writes = BTreeMap::from([(
+        key.clone(),
+        WriteOp::legacy_creation(Bytes::from_static(b"payload")),
+    )]);
+    assert_ok!(change_set.set_position_bucket(writes));
+    assert_some_eq!(
+        change_set.position_write_set().get(&key),
+        &WriteOp::legacy_creation(Bytes::from_static(b"payload"))
+    );
+}
+
+#[test]
+fn test_squash_position_bucket_last_wins() {
+    let key = position_key("0x1", "0x2", "0x3");
+
+    // creation then deletion -> deletion (last wins, no collapse).
+    let mut cs1 = VMChangeSet::empty();
+    cs1.set_position_bucket(BTreeMap::from([(
+        key.clone(),
+        WriteOp::legacy_creation(Bytes::from_static(b"v")),
+    )]))
+    .unwrap();
+    let mut cs2 = VMChangeSet::empty();
+    cs2.set_position_bucket(BTreeMap::from([(key.clone(), WriteOp::legacy_deletion())]))
+        .unwrap();
+    assert_ok!(cs1.squash_additional_change_set(cs2, true));
+    assert_some_eq!(
+        cs1.position_write_set().get(&key),
+        &WriteOp::legacy_deletion()
+    );
+
+    // deletion then creation -> creation.
+    let creation = WriteOp::legacy_creation(Bytes::from_static(b"w"));
+    let mut cs3 = VMChangeSet::empty();
+    cs3.set_position_bucket(BTreeMap::from([(key.clone(), WriteOp::legacy_deletion())]))
+        .unwrap();
+    let mut cs4 = VMChangeSet::empty();
+    cs4.set_position_bucket(BTreeMap::from([(key.clone(), creation.clone())]))
+        .unwrap();
+    assert_ok!(cs3.squash_additional_change_set(cs4, true));
+    assert_some_eq!(cs3.position_write_set().get(&key), &creation);
 }
 
 // TODO[agg_v2](cleanup) combine utilities with above utilities, and see if tests need cleanup.
