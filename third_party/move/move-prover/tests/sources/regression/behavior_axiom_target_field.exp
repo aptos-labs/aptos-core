@@ -1,0 +1,36 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_target_field.move:51:9
+   │
+51 │         ensures result >= 5;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_target_field.move:47: g_lower
+   =         s = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:48: g_lower
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:51: g_lower (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_target_field.move:59:9
+   │
+59 │         ensures result <= 5;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_target_field.move:55: f_upper
+   =         s = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:56: f_upper
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:59: f_upper (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_target_field.move:77:9
+   │
+77 │         ensures result >= 5;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_target_field.move:73: other_instantiation
+   =         g = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:74: other_instantiation
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_target_field.move:77: other_instantiation (spec)

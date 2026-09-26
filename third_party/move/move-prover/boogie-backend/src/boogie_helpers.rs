@@ -1291,6 +1291,38 @@ fn type_name_to_ident_tokens(env: &GlobalEnv, ty: &Type) -> Vec<TypeIdentToken> 
                 *idx
             ))]
         },
+        // `FunctionTag::to_canonical_string`: `|args|(results)` then the abilities postfix,
+        // results always parenthesized, references rendered as `&T` and `&mut T`.
+        Type::Fun(params, results, abilities) => {
+            let render_list = |ty: &Type| {
+                let items = ty
+                    .clone()
+                    .flatten()
+                    .iter()
+                    .map(|t| match t {
+                        Type::Reference(ReferenceKind::Immutable, bt) => {
+                            let mut tokens = TypeIdentToken::make("&");
+                            tokens.extend(type_name_to_ident_tokens(env, bt));
+                            tokens
+                        },
+                        Type::Reference(ReferenceKind::Mutable, bt) => {
+                            let mut tokens = TypeIdentToken::make("&mut ");
+                            tokens.extend(type_name_to_ident_tokens(env, bt));
+                            tokens
+                        },
+                        _ => type_name_to_ident_tokens(env, t),
+                    })
+                    .collect();
+                TypeIdentToken::join(", ", items)
+            };
+            let mut tokens = TypeIdentToken::make("|");
+            tokens.extend(render_list(params));
+            tokens.extend(TypeIdentToken::make("|("));
+            tokens.extend(render_list(results));
+            tokens.extend(TypeIdentToken::make(")"));
+            tokens.extend(TypeIdentToken::make(&abilities.display_postfix()));
+            tokens
+        },
         // move types that are not allowed
         Type::Reference(..) | Type::Tuple(..) => {
             unreachable!("Prohibited move type in type_name call");
@@ -1299,7 +1331,6 @@ fn type_name_to_ident_tokens(env: &GlobalEnv, ty: &Type) -> Vec<TypeIdentToken> 
         Type::Primitive(PrimitiveType::Num)
         | Type::Primitive(PrimitiveType::Range)
         | Type::Primitive(PrimitiveType::EventStore)
-        | Type::Fun(..)
         | Type::TypeDomain(..)
         | Type::ResourceDomain(..)
         | Type::StateDomain => {
