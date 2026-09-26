@@ -465,9 +465,12 @@ function {:inline} $IsEqual'bool'(x: bool, y: bool): bool {
 // Memory
 
 datatype $Location {
-    // A global resource location within the statically known resource type's memory,
-    // where `a` is an address.
-    $Global(a: int),
+    // A global resource location, where `t` is the identity of the resource type's
+    // memory and `a` is an address. `t` is part of the location because an address
+    // alone is unique only within one resource type: without it, `&mut A[addr].f` and
+    // `&mut B[addr].f` share one identity, and `$IsSameMutation`/`$IsParentMutation`
+    // would let a write-back through one update the other.
+    $Global(t: int, a: int),
     // A local location. `i` is the unique index of the local.
     $Local(i: int),
     // The location of a reference outside of the verification scope, for example, a `&mut` parameter
