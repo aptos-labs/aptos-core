@@ -20,6 +20,7 @@ use aptos_sdk::{
     types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
 };
 use aptos_types::{
+    account_address::AccountAddress,
     account_config::AccountResource,
     chain_id::ChainId,
     transaction::{
@@ -48,6 +49,17 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
         payload: TransactionPayload,
     ) -> CliTypedResult<TransactionSummary> {
         // Validation
+        if options.unauthenticated && options.session.is_none() {
+            return Err(CliError::CommandArgumentError(
+                "`--unauthenticated` requires `--session` and cannot be used when submitting to a network"
+                    .to_string(),
+            ));
+        }
+        if options.sponsor_gas && !options.unauthenticated {
+            return Err(CliError::CommandArgumentError(
+                "`--sponsor-gas` requires `--unauthenticated` (and `--session`)".to_string(),
+            ));
+        }
         if options.profile_gas && options.benchmark {
             return Err(CliError::UnexpectedError(
                 "Cannot perform benchmarking and gas profiling at the same time.".to_string(),
@@ -246,12 +258,105 @@ async fn simulate_using_session(
 ) -> CliTypedResult<TransactionSummary> {
     use aptos_transaction_simulation::SimulationStateStore;
     use aptos_transaction_simulation_session::Session;
+    use aptos_types::transaction::authenticator::AccountAuthenticator;
 
     let mut sess = Session::load(session_path)?;
     let state_store = sess.state_store();
 
     const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
     const DEFAULT_MAX_GAS: u64 = 2_000_000;
+
+    if options.unauthenticated {
+        match &payload {
+            TransactionPayload::EncryptedPayload(_) => {
+                return Err(CliError::CommandArgumentError(
+                    "`--unauthenticated` does not support encrypted payloads".to_string(),
+                ));
+            },
+            TransactionPayload::Multisig(_) => {
+                return Err(CliError::CommandArgumentError(
+                    "`--unauthenticated` does not support multisig executables".to_string(),
+                ));
+            },
+            _ => {},
+        }
+
+        let sender_address = options.sender_account.ok_or_else(|| {
+            CliError::CommandArgumentError(
+                "`--unauthenticated` requires `--sender-account`".to_string(),
+            )
+        })?;
+
+        eprintln!(
+            "Warning: transaction was not authenticated and cannot be submitted to a network."
+        );
+
+        let account = state_store.get_resource::<AccountResource>(sender_address)?;
+        let seq_num = account.map(|a| a.sequence_number).unwrap_or(0);
+
+        let gas_unit_price = options
+            .gas_options
+            .gas_unit_price
+            .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+        let balance = state_store.get_apt_balance(sender_address)?;
+        let max_gas = options.gas_options.max_gas.unwrap_or_else(|| {
+            if gas_unit_price == 0 {
+                DEFAULT_MAX_GAS
+            } else {
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
+            }
+        });
+
+        let raw_transaction = TransactionFactory::new(state_store.get_chain_id()?)
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(options.gas_options.expiration_secs)
+            .payload(payload)
+            .sender(sender_address)
+            .sequence_number(seq_num)
+            .build();
+
+        let transaction = if options.sponsor_gas {
+            SignedTransaction::new_fee_payer(
+                raw_transaction,
+                AccountAuthenticator::NoAccountAuthenticator,
+                vec![],
+                vec![],
+                AccountAddress::ZERO,
+                AccountAuthenticator::NoAccountAuthenticator,
+            )
+        } else {
+            SignedTransaction::new_single_sender(
+                raw_transaction,
+                AccountAuthenticator::NoAccountAuthenticator,
+            )
+        };
+        let hash = transaction.committed_hash();
+
+        let (vm_status, txn_output) = sess.execute_unauthenticated_transaction(transaction)?;
+
+        let success = match txn_output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        return Ok(TransactionSummary {
+            transaction_hash: hash.into(),
+            gas_used: Some(txn_output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender_address),
+            sequence_number: Some(seq_num),
+            replay_protector: None,
+            success,
+            timestamp_us: None,
+            version: None,
+            vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
+            deployed_object_address: None,
+            events: None,
+            changes: None,
+        });
+    }
 
     let (sender_key, sender_address) = options.get_key_and_address()?;
 

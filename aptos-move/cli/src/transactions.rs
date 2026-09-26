@@ -22,12 +22,13 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
+    account_config::AccountResource,
     chain_id::ChainId,
     contract_event::ContractEvent,
     state_store::state_key::inner::StateKeyInner,
     transaction::{
-        PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        authenticator::AccountAuthenticator, PersistedAuxiliaryInfo, ReplayProtector,
+        SignedTransaction, TransactionOutput, TransactionPayload, TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -37,6 +38,7 @@ use move_core_types::vm_status::VMStatus;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
+    path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -213,6 +215,14 @@ pub(crate) struct TxnOptions {
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
     pub prompt_options: PromptOptions,
+
+    /// Dry-run against a local simulation session instead of a remote fullnode.
+    ///
+    /// Uses the simulation VM (same path as `POST /transactions/simulate`) and
+    /// never writes back to the session. Mutually exclusive with `--local`.
+    #[clap(long)]
+    pub(crate) session: Option<PathBuf>,
+
     /// Replay protection mechanism to use when generating the transaction.
     ///
     /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
@@ -464,6 +474,113 @@ impl TxnOptions {
             local_simulation::run_transaction_using_debugger,
         )
         .await
+    }
+
+    /// Dry-runs a transaction against a local simulation session without mutating it.
+    pub async fn simulate_using_session(
+        &self,
+        session_path: &std::path::Path,
+        payload: TransactionPayload,
+        show_details: bool,
+    ) -> CliTypedResult<TransactionSummary> {
+        use aptos_transaction_simulation::SimulationStateStore;
+        use aptos_transaction_simulation_session::Session;
+
+        match &payload {
+            TransactionPayload::EncryptedPayload(_) => {
+                return Err(CliError::CommandArgumentError(
+                    "`aptos move simulate --session` does not support encrypted payloads"
+                        .to_string(),
+                ));
+            },
+            TransactionPayload::Multisig(_) => {
+                return Err(CliError::CommandArgumentError(
+                    "`aptos move simulate --session` does not support multisig executables"
+                        .to_string(),
+                ));
+            },
+            _ => {},
+        }
+
+        let sess = Session::load(session_path)?;
+        let state_store = sess.state_store();
+
+        const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+        const DEFAULT_MAX_GAS: u64 = 2_000_000;
+
+        // Same auth-skip semantics as fullnode simulate: NoAccountAuthenticator.
+        let sender_address = self.sender_account.ok_or_else(|| {
+            CliError::CommandArgumentError(
+                "`aptos move simulate --session` requires `--sender-account`".to_string(),
+            )
+        })?;
+
+        eprintln!(
+            "Warning: session simulate is unauthenticated (NoAccountAuthenticator) and does not modify session state."
+        );
+
+        let account = state_store.get_resource::<AccountResource>(sender_address)?;
+        let seq_num = account.map(|a| a.sequence_number).unwrap_or(0);
+
+        let gas_unit_price = self
+            .gas_options
+            .gas_unit_price
+            .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+        let balance = state_store.get_apt_balance(sender_address)?;
+        let max_gas = self.gas_options.max_gas.unwrap_or_else(|| {
+            if gas_unit_price == 0 {
+                DEFAULT_MAX_GAS
+            } else {
+                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
+            }
+        });
+
+        let raw_transaction = TransactionFactory::new(state_store.get_chain_id()?)
+            .with_gas_unit_price(gas_unit_price)
+            .with_max_gas_amount(max_gas)
+            .with_transaction_expiration_time(self.gas_options.expiration_secs)
+            .payload(payload)
+            .sender(sender_address)
+            .sequence_number(seq_num)
+            .build();
+
+        let transaction = SignedTransaction::new_single_sender(
+            raw_transaction,
+            AccountAuthenticator::NoAccountAuthenticator,
+        );
+        let hash = transaction.committed_hash();
+
+        let (vm_status, txn_output) = sess.simulate_transaction(transaction)?;
+
+        let success = match txn_output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        let mut summary = TransactionSummary {
+            transaction_hash: hash.into(),
+            gas_used: Some(txn_output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender_address),
+            sequence_number: Some(seq_num),
+            replay_protector: None,
+            success,
+            timestamp_us: None,
+            version: None,
+            vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
+            deployed_object_address: None,
+            events: None,
+            changes: None,
+        };
+        if show_details {
+            summary.events =
+                Some(local_contract_events_to_json(state_store, txn_output.events())?);
+            summary.changes =
+                Some(local_write_set_to_json(state_store, txn_output.write_set())?);
+        }
+
+        Ok(summary)
     }
 }
 
