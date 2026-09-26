@@ -353,7 +353,7 @@ enum MonoNode {
 }
 
 /// Locate the `0x1::option::Option` struct. Pinned to `0x1` because the backend
-/// hard-codes `$1_option_*` Boogie symbols.
+/// hard-codes `$1.option.*` Boogie symbols.
 fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
     let option_module_sym = env.symbol_pool().make("option");
     let option_struct_sym = env.symbol_pool().make("Option");
@@ -370,7 +370,7 @@ fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
 }
 
 /// Locate the `0x1::cmp` module. Pinned to `0x1` because the backend hard-codes
-/// `$1_cmp_*` Boogie symbols.
+/// `$1.cmp.*` Boogie symbols.
 fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
     let cmp_sym = env.symbol_pool().make("cmp");
     let std_addr = Address::Numerical(AccountAddress::ONE);

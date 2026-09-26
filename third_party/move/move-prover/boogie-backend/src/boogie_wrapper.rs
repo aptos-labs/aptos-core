@@ -628,18 +628,14 @@ impl BoogieWrapper<'_> {
                     },
                     GlobalMem(node_id, ModelValue::List(elems)) => {
                         // The bytecode track_global_memory takes the form
-                        // "($Memory_107864 |T@[Int]Bool!val!2| |T@[Int]$1_DiemTimestamp_CurrentTimeMicroseconds!val!0|)"
+                        // "($Memory_107864 |T@[Int]Bool!val!2| |T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds!val!0|)"
                         // so the extracted list has three values where elems[2] is the reference to the model
                         // of the corresponding global memory array while elems[1] is the reference to the array to denote
                         // whether the memory exists
                         if elems.len() == 3 {
                             if let ModelValue::Literal(s) = &elems[2] {
-                                // Extract the struct name from elems[2]
-                                // e.g., $1_DiemTimestamp_CurrentTimeMicroseconds
-                                let struct_name_str =
-                                    &s[s.find('_').unwrap() + 1..s.find('!').unwrap()];
                                 global_mem_map.insert(
-                                    struct_name_str.to_string(),
+                                    global_memory_struct_name(s).to_string(),
                                     (*node_id, elems[1].clone(), elems[2].clone()),
                                 );
                             }
@@ -1135,6 +1131,19 @@ fn make_position(line_str: &str, col_str: &str) -> Location {
     Location::new(LineIndex(line), ColumnIndex(col))
 }
 
+/// Take the qualified struct name out of a global-memory model literal. It runs
+/// from the first name separator to the model-value marker, so
+/// `|T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds!val!0|` yields
+/// `DiemTimestamp.CurrentTimeMicroseconds`, dropping the leading address
+/// component. This is display-only, so fall back to the whole literal rather
+/// than failing when either marker is absent or out of order.
+fn global_memory_struct_name(literal: &str) -> &str {
+    match (literal.find('.'), literal.find('!')) {
+        (Some(dot), Some(bang)) if dot < bang => &literal[dot + 1..bang],
+        _ => literal,
+    }
+}
+
 fn deduct_table_name(map_key: &str) -> Option<String> {
     // The generic representation of map keys is `|T@[Int]<X>!val!0` where `<X>` is the
     // vector element type.
@@ -1500,8 +1509,8 @@ impl ModelValue {
         };
 
         // Each entry in value_array_map takes the form:
-        // key: |T@[Int]$1_Bug7_BallotCounter!val!0| 0
-        // value: ($1_Bug7_BallotCounter 18446744073709522257)
+        // key: |T@[Int]$1.Bug7.BallotCounter!val!0| 0
+        // value: ($1.Bug7.BallotCounter 18446744073709522257)
         // elems[1] is index to represent the instance of the memory
         for (key, value) in value_array_map {
             if let ModelValue::List(elems) = key {
@@ -2224,7 +2233,7 @@ mod tests {
         // Boogie quotes generated constructor names with `|`; the datatype
         // value the solver reports is `(<ctor> arg...)`.
         let value = ModelValue::List(vec![
-            ModelValue::literal("|$struct_field'$42_calculator_State$0'|"),
+            ModelValue::literal("|$struct_field'$42.calculator.State$0'|"),
             ModelValue::literal("2"),
         ]);
 
@@ -2232,8 +2241,32 @@ mod tests {
             .extract_ctor_name_and_list()
             .expect("is a datatype value");
 
-        assert_eq!("$struct_field'$42_calculator_State$0'", ctor);
+        assert_eq!("$struct_field'$42.calculator.State$0'", ctor);
         assert_eq!(vec![ModelValue::literal("2")], args.to_vec());
+    }
+
+    #[test]
+    fn a_global_memory_literal_yields_the_qualified_struct_name() {
+        assert_eq!(
+            "DiemTimestamp.CurrentTimeMicroseconds",
+            global_memory_struct_name("|T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds!val!0|")
+        );
+    }
+
+    #[test]
+    fn a_global_memory_literal_without_both_markers_is_read_as_is() {
+        // Missing the model-value marker, missing the name separator, and the
+        // two markers in the wrong order. All are display-only fallbacks, but
+        // none may panic: a `_`-joined name reaching here used to do exactly
+        // that.
+        for literal in [
+            "|T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds|",
+            "|T@[Int]$1_DiemTimestamp_CurrentTimeMicroseconds!val!0|",
+            "no_markers_at_all",
+            "val!0$1.m.S",
+        ] {
+            assert_eq!(literal, global_memory_struct_name(literal));
+        }
     }
 
     #[test]
