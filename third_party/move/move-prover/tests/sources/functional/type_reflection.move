@@ -45,14 +45,15 @@ module 0x42::test {
         spec {
             assert type_info::type_of<MyTable<address, u128>>().account_address == @0x42;
             assert type_info::type_of<MyTable<address, u128>>().module_name == b"test";
-            assert type_info::type_of<MyTable<address, u128>>().struct_name == b"MyTable";
+            // `struct_name` carries the type arguments, as the runtime native writes it.
+            assert type_info::type_of<MyTable<address, u128>>().struct_name == b"MyTable<address, u128>";
         };
         type_info::type_of<MyTable<vector<bool>, address>>()
     }
     spec test_type_info_concrete {
         ensures result.account_address == @0x42;
         ensures result.module_name == b"test";
-        ensures result.struct_name == b"MyTable";
+        ensures result.struct_name == b"MyTable<vector<bool>, address>";
     }
 
     fun test_type_info_symbolic<T>(): type_info::TypeInfo {
@@ -77,7 +78,16 @@ module 0x42::test {
         type_info::type_of<MyTable<T, address>>()
     }
     spec test_type_info_ignores_type_param {
+        // This should not pass: the type arguments are part of `struct_name`, so the two
+        // agree only when `T` is `address`.
         ensures result == type_info::type_of<MyTable<address, T>>();
+    }
+
+    fun test_type_info_keeps_type_param<T>(): type_info::TypeInfo {
+        type_info::type_of<MyTable<T, address>>()
+    }
+    spec test_type_info_keeps_type_param {
+        ensures result == type_info::type_of<MyTable<T, address>>();
     }
 
     fun test_type_info_can_abort<T>(): type_info::TypeInfo {
@@ -196,6 +206,8 @@ module 0x43::test {
         type_name::into_string(type_name::get<Pair<address, bool>>())
     }
     spec test_type_name_concrete_struct {
-        ensures result.bytes == b"00000000000000000000000000000043::test::Pair<address, bool>";
+        // `std::type_name::get` renders `TypeTag::to_canonical_string`, whose struct form is
+        // the `0x`-prefixed address with leading zeroes trimmed.
+        ensures result.bytes == b"0x43::test::Pair<address, bool>";
     }
 }

@@ -545,10 +545,17 @@ impl<'env> BoogieTranslator<'env> {
                 TypeIdentToken::convert_to_bytes(TypeIdentToken::make(">")),
             );
 
-            // type name <-> type info: struct
+            // type name <-> type info: struct. The runtime renders a struct type name as
+            // `StructTag::to_canonical_string` does: `0x`, the address in hex with leading
+            // zeroes trimmed, then `::module::Name<args>`. Hex-rendering an integer is not
+            // expressible here, so the digits are an uninterpreted function of the address:
+            // unconstrained, which is sound, where the previous single-element encoding of
+            // the integer asserted bytes the runtime does not produce.
+            emitln!(writer, "function $AddressShortHex(a: int): Vec int;");
             let mut tokens = TypeIdentToken::make("0x");
-            // TODO(mengxu): this is not a correct radix16 encoding of an integer
-            tokens.push(TypeIdentToken::Variable("MakeVec1(t->a)".to_string()));
+            tokens.push(TypeIdentToken::Variable(
+                "$AddressShortHex(t->a)".to_string(),
+            ));
             tokens.extend(TypeIdentToken::make("::"));
             tokens.push(TypeIdentToken::Variable("t->m".to_string()));
             tokens.extend(TypeIdentToken::make("::"));
@@ -558,13 +565,6 @@ impl<'env> BoogieTranslator<'env> {
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
                             t is $TypeParamStruct ==> $IsEqual'vec'u8''($TypeName(t), {}));",
                 TypeIdentToken::convert_to_bytes(tokens)
-            );
-            // TODO(mengxu): this will parse it to an uninterpreted struct
-            emitln!(
-                writer,
-                "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            $IsPrefix'vec'u8''($TypeName(t), {}) ==> t is $TypeParamVector);",
-                TypeIdentToken::convert_to_bytes(TypeIdentToken::make("0x")),
             );
         }
 
