@@ -13,6 +13,7 @@
 //! including where it accepts either a value or a reference.
 
 use super::*;
+use crate::env_pipeline::function_checker::call_access_error;
 
 impl FunctionTranslator<'_> {
     /// Checks every instruction and terminator of the function.
@@ -505,6 +506,10 @@ impl FunctionTranslator<'_> {
     fn call_rule(&self, id: usize, given: &[Ty], oper: &Oper) -> Result<(Vec<Type>, Vec<Type>)> {
         let target = function_at(self.env, self.xir, self.module_id, self.function_ids, id)?;
         let callee = self.env.get_function(target);
+        // The same visibility rule the source compiler applies to calls.
+        if let Some((message, _)) = call_access_error(&self.env.get_function(self.qid), &callee) {
+            bail!("{oper:?}: {message}");
+        }
         let args = self.type_args(given)?;
         ensure!(
             args.len() == callee.get_type_parameter_count(),
@@ -709,7 +714,9 @@ fn address_type() -> Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_model_exchange::{Field, TypeParameter as TypeParameterDecl, Variant};
+    use move_model_exchange::{
+        Field, TypeParameter as TypeParameterDecl, Variant, XirExternalFunction,
+    };
 
     /// A module whose first function has one local of each type the rules
     /// distinguish, plus two callees and two more declarations:
@@ -1118,6 +1125,104 @@ mod tests {
             ),
             (false, call(&[0], Oper::Function(2), &[1])),
         ]);
+    }
+
+    /// A call into another module follows the source compiler's visibility
+    /// rule. A package function is callable from the same package, which makes
+    /// the XIR module a friend of the callee, but not from a dependency's.
+    #[test]
+    fn calls_respect_the_callee_visibility() {
+        struct TempFile(std::path::PathBuf);
+        impl Drop for TempFile {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let write = |name: &str, text: &str| {
+            let file = TempFile(
+                std::env::temp_dir()
+                    .join(format!("xir_visibility_{name}_{}.move", std::process::id())),
+            );
+            std::fs::write(&file.0, text).unwrap();
+            file
+        };
+        let callee_text = |module: &str| {
+            format!(
+                "module 0x0::{module} {{
+                    public fun open(): u64 {{ 1 }}
+                    fun closed(): u64 {{ 2 }}
+                    public(friend) fun for_friends(): u64 {{ 3 }}
+                    public(package) fun for_package(): u64 {{ 4 }}
+                }}"
+            )
+        };
+        // `package` is compiled with the XIR module; `dependency` is only a
+        // dependency, loaded because `user` calls it.
+        let package = write("package", &callee_text("package"));
+        let dependency = write("dependency", &callee_text("dependency"));
+        let user = write(
+            "user",
+            "module 0x0::user { public fun f(): u64 { 0x0::dependency::open() } }",
+        );
+        let path = |file: &TempFile| file.0.to_string_lossy().into_owned();
+        let cases = [
+            ("package", "open", None),
+            ("package", "closed", Some("is private to module")),
+            ("package", "for_friends", Some("(not a friend of")),
+            ("package", "for_package", None),
+            ("dependency", "open", None),
+            (
+                "dependency",
+                "for_package",
+                Some("cannot be called from a different package"),
+            ),
+        ];
+        let mut wrong = vec![];
+        for (callee, function, expected) in cases {
+            let mut module = module_with(vec![], Term::Ret(vec![]), vec![]);
+            let id = module.functions.len();
+            module.functions[0].blocks[0].instrs = vec![call(&[0], Oper::Function(id), &[])];
+            module.external_functions = vec![XirExternalFunction {
+                address: "0x0".to_owned(),
+                module: callee.to_owned(),
+                function: function.to_owned(),
+            }];
+            // Sources, not dependencies, are always loaded.
+            let options = crate::Options {
+                sources: vec![path(&package), path(&user)],
+                dependencies: [move_stdlib::move_stdlib_files(), vec![path(&dependency)]].concat(),
+                named_address_mapping: vec!["std=0x1".to_owned()],
+                ..crate::Options::default()
+            };
+            let mut env = crate::run_checker(options).unwrap();
+            let source = parse_source(
+                std::path::PathBuf::from("typing.xir.json"),
+                String::new(),
+                &serde_json::to_string(&module).unwrap(),
+            )
+            .unwrap();
+            let result = import_sources(&mut env, &[source], &mut FunctionTargetsHolder::default());
+            match (expected, result) {
+                (None, Ok(())) => {},
+                (Some(fragment), Err(error)) if format!("{error:#}").contains(fragment) => {},
+                (_, result) => wrong.push(format!("`{callee}::{function}`: {result:?}")),
+            }
+            // The compiled callee must name the XIR module as a friend exactly
+            // when the call relies on package visibility.
+            if callee == "package" {
+                let pool = env.symbol_pool();
+                let find = |name: &str| {
+                    env.get_modules()
+                        .find(|m| m.get_name().name() == pool.make(name))
+                        .unwrap()
+                };
+                let friended = find("package").has_friend(&find(&module.module.name).get_id());
+                if friended != (function == "for_package") {
+                    wrong.push(format!("`{callee}::{function}`: friended = {friended}"));
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     #[test]
