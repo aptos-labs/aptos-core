@@ -276,6 +276,14 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 }
 
 impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
+    fn resource_bytes(
+        &self,
+        key: &InMemoryStorageKey,
+    ) -> Result<Option<Bytes>, ResourceProviderError> {
+        self.fetch_bytes(key, None)
+            .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))
+    }
+
     /// Loaded from the state view on first access, caching absence as well so a
     /// missing group is read at most once.
     // TODO(perf): Change read-API to be fine grained! We only need to get all members

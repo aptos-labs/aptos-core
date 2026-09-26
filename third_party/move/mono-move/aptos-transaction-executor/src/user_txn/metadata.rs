@@ -4,7 +4,7 @@
 use aptos_types::transaction::{
     authenticator::AnySignature,
     user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction, UserTxnLimitsRequest,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -18,6 +18,9 @@ pub(crate) struct TxnMetadata {
     pub secondary_auth_keys: Vec<Option<Vec<u8>>>,
     pub gas_unit_price: u64,
     pub max_gas_amount: u64,
+    /// A request for higher execution and IO limits. The prologue checks the
+    /// staking that backs it.
+    pub txn_limits_request: Option<UserTxnLimitsRequest>,
     /// Size of the full signed transaction.
     pub transaction_size: u64,
     /// Whether any signer authenticates with a keyless signature (a gas
@@ -55,6 +58,7 @@ impl TxnMetadata {
             txn.expiration_timestamp_secs(),
         );
         let authenticator = txn.authenticator_ref();
+        let extra_config = txn.payload().extra_config();
         Self {
             sender: txn.sender(),
             fee_payer: authenticator.fee_payer_address(),
@@ -73,6 +77,7 @@ impl TxnMetadata {
                 .collect(),
             gas_unit_price: txn.gas_unit_price(),
             max_gas_amount: txn.max_gas_amount(),
+            txn_limits_request: extra_config.txn_limits_request().cloned(),
             transaction_size: txn.txn_bytes_len() as u64,
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|auths| !auths.is_empty())
