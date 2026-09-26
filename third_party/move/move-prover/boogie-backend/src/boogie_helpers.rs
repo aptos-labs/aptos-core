@@ -16,8 +16,8 @@ use move_core_types::{
 use move_model::{
     ast::{Address, BehaviorKind, ConditionKind, MemoryLabel, TempIndex, Value},
     model::{
-        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
-        SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
+        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId,
+        QualifiedInstId, SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     spec_derivation,
@@ -29,7 +29,88 @@ use move_prover_bytecode_pipeline::number_operation::{
 };
 use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecode::Constant};
 use num::BigUint;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Builds an entity key for an emission loop: the qualified id at the given
+/// instantiation, with nested function types normalized.
+///
+/// Normalization matters because `fun_type` deliberately abstracts abilities out of
+/// Boogie names, so two instantiations differing only in the abilities of a nested
+/// function type denote *one* Boogie entity even though `mono_analysis` may keep them
+/// as two entries. Without it they look like a name collision.
+pub fn normalized_inst_id<Id: Clone>(id: QualifiedId<Id>, inst: &[Type]) -> QualifiedInstId<Id> {
+    id.instantiate(
+        inst.iter()
+            .map(|t| t.clone().normalize_nested_funs())
+            .collect(),
+    )
+}
+
+/// Tracks which entities an emission loop has already translated.
+///
+/// Keyed on the entity, never on its rendered Boogie name. A name-keyed set is only
+/// correct while name rendering is injective, and it fails open when it is not: the
+/// second of two entities sharing a name is silently skipped, and the surviving
+/// declaration then serves both -- one function's body discharges another's
+/// obligations, and two storage cells become one. That is not a hypothetical; it is
+/// what `$` + `_` joins used to do, where `0x42::a::b_c` and `0x42::a_b::c` both
+/// rendered `$42_a_b_c`. Keyed on the entity, every entity is translated regardless,
+/// so a collision can no longer delete an obligation.
+///
+/// The rendered names are retained so that a collision surviving in some other join
+/// is reported against the Move entities that caused it. Note that this reports
+/// through `GlobalEnv::error`, so the run stops at the condition-generation error
+/// check in `move_prover::run_move_prover_with_model_v2` and Boogie is never invoked.
+/// The reported name is therefore the only diagnostic; the duplicate declaration it
+/// describes is not itself surfaced.
+pub struct EmittedEntities<K: Ord + Clone> {
+    emitted: BTreeSet<K>,
+    by_name: BTreeMap<String, K>,
+    reported: BTreeSet<String>,
+}
+
+impl<K: Ord + Clone> Default for EmittedEntities<K> {
+    fn default() -> Self {
+        Self {
+            emitted: BTreeSet::new(),
+            by_name: BTreeMap::new(),
+            reported: BTreeSet::new(),
+        }
+    }
+}
+
+impl<K: Ord + Clone> EmittedEntities<K> {
+    /// Returns true if `key` has not been translated yet, and reports an error if a
+    /// *different* entity has already rendered to `name`. `what` names the kind of
+    /// entity for the diagnostic, e.g. "struct" or "function".
+    pub fn insert(&mut self, env: &GlobalEnv, key: K, name: &str, what: &str) -> bool {
+        match self.by_name.get(name) {
+            Some(existing) if existing != &key => {
+                // Report a given name once. Every later instantiation reaching the
+                // same collision would otherwise repeat it, and a verification root
+                // that hits it repeatedly can exhaust the package error limit and
+                // crowd out the diagnostics that say what failed.
+                if self.reported.insert(name.to_string()) {
+                    env.error(
+                        &env.internal_loc(),
+                        &format!(
+                            "two different {}s render to the Boogie name `{}`. Boogie \
+                             name rendering must be injective, so this is a bug in the \
+                             name mangling: the name shows which module and entity \
+                             parts fused",
+                            what, name
+                        ),
+                    );
+                }
+            },
+            None => {
+                self.by_name.insert(name.to_string(), key.clone());
+            },
+            Some(_) => {},
+        }
+        self.emitted.insert(key)
+    }
+}
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const MAX_TUPLE_SIZE: usize = 11;
@@ -77,7 +158,7 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
         mod_sym.to_string().replace(['<', '>'], "#")
     } else if let Address::Numerical(a) = mod_name.addr() {
         // qualify module by address.
-        format!("{}_{}", a.short_str_lossless(), mod_sym)
+        format!("{}.{}", a.short_str_lossless(), mod_sym)
     } else {
         env.env
             .error(&env.get_loc(), "unsupported symbolic address");
@@ -94,7 +175,7 @@ pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bo
             // convention including the value's bv twin, so twin instances
             // reference their own carrier.
             return format!(
-                "${}_{}{}",
+                "${}.{}{}",
                 boogie_module_name(&struct_env.module_env),
                 struct_env.get_name().display(struct_env.symbol_pool()),
                 boogie_inst_suffix(struct_env.module_env.env, inst, &[false, bv_flag])
@@ -107,7 +188,7 @@ pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bo
         format!("Table int ({})", boogie_type(env, &inst[1], bv_flag))
     } else {
         format!(
-            "${}_{}{}",
+            "${}.{}{}",
             boogie_module_name(&struct_env.module_env),
             struct_env.get_name().display(struct_env.symbol_pool()),
             // Non-Table structs use bv_flag=false for all type parameters: bv classification
@@ -125,22 +206,23 @@ pub fn boogie_struct_variant_name(
 ) -> String {
     let struct_name = boogie_struct_name(struct_env, inst, false);
     let variant_name = variant.display(struct_env.symbol_pool());
-    format!("{}_{}", struct_name, variant_name)
+    format!("{}.{}", struct_name, variant_name)
 }
 
 /// Return field selector for given field.
 pub fn boogie_field_sel(field_env: &FieldEnv<'_>) -> String {
     let struct_env = &field_env.struct_env;
-    // Attach variant name to field name if it is an enum field
-    // to distinguish fields with the same name but different types in different variants
-    let variant = if field_env.get_variant().is_some() {
-        format!(
-            "_{}",
-            field_env
-                .get_variant()
-                .unwrap()
-                .display(struct_env.symbol_pool())
-        )
+    // Attach the variant name to the field name if it is an enum field, to distinguish
+    // fields with the same name but different types in different variants.
+    //
+    // Joined with `.`, which a Move identifier cannot contain, so the boundary is
+    // recoverable. A bare `_` was not: field `a` of variant `B_C` and field `a_B` of
+    // variant `C` both rendered `$a_B_C`. Boogie shares identically-named fields
+    // across a datatype's constructors, so with equal field types the two Move fields
+    // silently became one selector, and with different types the datatype failed to
+    // type-check. A ghost field, which carries no variant, collided the same way.
+    let variant = if let Some(variant) = field_env.get_variant() {
+        format!(".{}", variant.display(struct_env.symbol_pool()))
     } else {
         "".to_string()
     };
@@ -169,11 +251,18 @@ pub fn boogie_variant_field_update(
     inst: &[Type],
 ) -> String {
     let struct_env = &field_env.struct_env;
+    // The field name comes before the type, separated by `.`. The order is
+    // load-bearing: a Move field name contains no `.`, so the first `.` after the
+    // `_` recovers the boundary, whereas a rendered type does contain `.` (and `_`,
+    // and `'`). With the type first and a bare `_` between, `|u64,u8|bool` with field
+    // `x` and `|u64|u8` with field `bool_x` both rendered
+    // `$Update'..'_$fun_u64_u8_bool_x`, which Boogie rejected as a duplicate
+    // declaration.
     format!(
-        "$Update'{}'_{}_{}",
+        "$Update'{}'_{}.{}",
         boogie_type_suffix_for_struct(struct_env, inst, false),
-        boogie_field_type_name_component(&field_type_name),
         field_env.get_name().display(struct_env.symbol_pool()),
+        boogie_field_type_name_component(&field_type_name),
     )
 }
 
@@ -234,7 +323,7 @@ pub fn boogie_type_for_struct_field(
 /// Otherwise uses standard type suffixes.
 pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type], bv_flag: &[bool]) -> String {
     format!(
-        "${}_{}{}",
+        "${}.{}{}",
         boogie_module_name(&fun_env.module_env),
         fun_env.get_name().display(fun_env.symbol_pool()),
         boogie_inst_suffix(fun_env.module_env.env, inst, bv_flag)
@@ -243,14 +332,14 @@ pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type], bv_flag: &
 
 /// Return the boogie "$-spec" function name for a native function.
 /// Native function prelude templates follow the naming convention
-/// `$module_$fname'inst'` for their pure, side-effect-free spec versions
-/// (e.g. `$1_vector_$empty'address'`).  When a native function has no
+/// `$module.$fname'inst'` for their pure, side-effect-free spec versions
+/// (e.g. `$1.vector.$empty'address'`).  When a native function has no
 /// Move-level spec, the Boogie backend can use this name to produce a
 /// concrete, deterministic body for the behavioral result function instead
 /// of leaving it as an unconstrained uninterpreted function.
 pub fn boogie_native_spec_fun_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> String {
     format!(
-        "${}_${}{}",
+        "${}.${}{}",
         boogie_module_name(&fun_env.module_env),
         fun_env.get_name().display(fun_env.symbol_pool()),
         boogie_inst_suffix(fun_env.module_env.env, inst, &[])
@@ -275,7 +364,7 @@ pub fn boogie_spec_var_name(
     memory_label: &Option<MemoryLabel>,
 ) -> String {
     format!(
-        "${}_{}{}{}",
+        "${}.{}{}{}",
         boogie_module_name(module_env),
         name.display(module_env.symbol_pool()),
         boogie_inst_suffix(module_env.env, inst, &[]),
@@ -296,7 +385,7 @@ pub fn boogie_spec_fun_name(
         .position(|(overload_id, _)| &id == overload_id)
         .expect("spec fun env inconsistent");
     let overload_qualifier = if pos > 0 {
-        format!("_{}", pos)
+        format!(".{}", pos)
     } else {
         "".to_string()
     };
@@ -311,7 +400,7 @@ pub fn boogie_spec_fun_name(
         suffix = boogie_inst_suffix(env.env, inst, &v);
     };
     format!(
-        "${}_{}{}{}",
+        "${}.{}{}{}",
         boogie_module_name(env),
         decl.name.display(env.symbol_pool()),
         overload_qualifier,
@@ -548,19 +637,34 @@ fn boogie_tuple_type(ty: &Type, elems: &[Type], type_fn: impl Fn(&Type) -> Strin
 fn fun_type(env: &GlobalEnv, params: &Type, results: &Type, _abilities: AbilitySet) -> String {
     // Abilities are abstracted out in the prover, but for completeness and future changes,
     // we pass them into this function.
-    let params = params
-        .clone()
-        .flatten()
-        .iter()
-        .map(|t| boogie_type_suffix(env, t, false))
-        .join("_");
-    let results = results
-        .clone()
-        .flatten()
-        .iter()
-        .map(|t| boogie_type_suffix(env, t, false))
-        .join("_");
-    format!("$fun_{}_{}", params, results)
+    let params = params.clone().flatten();
+    let results = results.clone().flatten();
+    let render = |tys: &[Type]| {
+        tys.iter()
+            .map(|t| boogie_type_suffix(env, t, false))
+            .join("_")
+    };
+    // The arities are part of the name, as they are for tuples (`$tup{n}'..'`).
+    // Without them the split between parameters and results was not recoverable:
+    // both sides are flat `_`-joined lists, so `|u64, u8| u8` and `|u64| (u8, u8)`
+    // rendered the same `$fun_u64_u8_u8`. That is not a cosmetic clash -- these are
+    // distinct `mono_info.fun_infos` keys, so both were emitted, and Boogie rejected
+    // the duplicate datatype, `$IsValid`, `$IsEqual` and `$apply` declarations,
+    // failing the whole file.
+    //
+    // This makes the parameter/result split recoverable. It does not make the suffix
+    // grammar injective on its own: the elements within each list are still joined
+    // by a bare `_` and are not self-delimiting, so a list-internal fusion remains
+    // possible in principle. No such fusion is constructible with today's element
+    // suffixes at a fixed arity, and closing it properly means making elements
+    // self-delimiting -- see `boogie_inst_suffix` and the tuple arm above.
+    format!(
+        "$fun{}_{}_{}_{}",
+        params.len(),
+        render(&params),
+        results.len(),
+        render(&results)
+    )
 }
 
 /// Return boogie BV type for a number type.
@@ -761,7 +865,7 @@ pub fn boogie_type_suffix_for_struct(
 ) -> String {
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
         format!(
-            "${}_{}{}",
+            "${}.{}{}",
             boogie_module_name(&struct_env.module_env),
             struct_env.get_name().display(struct_env.symbol_pool()),
             boogie_inst_suffix(struct_env.module_env.env, inst, &[false, bv_flag])
@@ -1244,14 +1348,14 @@ pub fn boogie_reflection_type_name(env: &GlobalEnv, ty: &Type, stdlib: bool) -> 
     let bytes = TypeIdentToken::convert_to_bytes(type_name_to_ident_tokens(env, ty, &formatter));
     if stdlib {
         format!(
-            "${}_type_name_TypeName(${}_ascii_String({}))",
+            "${}.type_name.TypeName(${}.ascii.String({}))",
             env.get_stdlib_address().expect_numerical().to_big_uint(),
             env.get_stdlib_address().expect_numerical().to_big_uint(),
             bytes
         )
     } else {
         format!(
-            "${}_string_String({})",
+            "${}.string.String({})",
             env.get_stdlib_address().expect_numerical().to_big_uint(),
             bytes
         )
@@ -1340,7 +1444,7 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
         None => (
             "false".to_string(),
             format!(
-                "${}_type_info_TypeInfo(0, EmptyVec(), EmptyVec())",
+                "${}.type_info.TypeInfo(0, EmptyVec(), EmptyVec())",
                 extlib_address.to_big_uint()
             ),
         ),
@@ -1350,7 +1454,7 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
             (
                 "true".to_string(),
                 format!(
-                    "${}_type_info_TypeInfo({}, {}, {})",
+                    "${}.type_info.TypeInfo({}, {}, {})",
                     extlib_address.to_big_uint(),
                     addr.expect_numerical().to_big_uint(),
                     module_repr,
@@ -1361,7 +1465,7 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
         Some(TypeInfoPack::Symbolic(idx)) => (
             get_symbol_is_struct(idx),
             format!(
-                "${}_type_info_TypeInfo({}, {}, {})",
+                "${}.type_info.TypeInfo({}, {}, {})",
                 extlib_address.to_big_uint(),
                 get_symbol_account_address(idx),
                 get_symbol_module_name(idx),
@@ -1424,9 +1528,9 @@ pub fn boogie_behavioral_spec_fun_name(
     let fun_name = fun_name_sym.display(env.symbol_pool());
     let param_name = param_sym.display(env.symbol_pool());
     // The spec function name format matches what spec_rewriter generates and what
-    // spec_translator expects: ${module}_$${kind}$${fun}$${param}${suffix}
+    // spec_translator expects: ${module}.$${kind}$${fun}$${param}${suffix}
     format!(
-        "${}_${}${}${}{}",
+        "${}.${}${}${}{}",
         module_name,
         kind,
         fun_name,
@@ -1438,9 +1542,9 @@ pub fn boogie_behavioral_spec_fun_name(
 /// Return name of a behavioral predicate result function for ensures_of.
 /// This is an uninterpreted function that returns the result value(s) for a given input.
 /// When `multi_result` is false (single result), the format is
-/// `${module}_$ensures_of_result$${fun}$${param}${suffix}`.
+/// `${module}.$ensures_of_result$${fun}$${param}${suffix}`.
 /// When `multi_result` is true (2+ results as a tuple), the format is
-/// `${module}_$ensures_of_results$${fun}$${param}${suffix}`.
+/// `${module}.$ensures_of_results$${fun}$${param}${suffix}`.
 pub fn boogie_behavioral_result_fun_name(
     env: &GlobalEnv,
     fun: &QualifiedInstId<FunId>,
@@ -1455,7 +1559,7 @@ pub fn boogie_behavioral_result_fun_name(
     let param_name = param_sym.display(env.symbol_pool());
     let plural = if multi_result { "s" } else { "" };
     format!(
-        "${}_$ensures_of_result{}${}${}{}",
+        "${}.$ensures_of_result{}${}${}{}",
         module_name,
         plural,
         fun_name,
@@ -1480,7 +1584,7 @@ pub fn boogie_struct_field_name(
 
 /// Return name of a behavioral predicate spec function for a struct field variant.
 /// These are uninterpreted functions parameterized by instance id `n`.
-/// Format: `${module}_$sf_{kind}${struct}${field}${suffix}`
+/// Format: `${module}.$sf_{kind}${struct}${field}${suffix}`
 pub fn boogie_struct_field_spec_fun_name(
     env: &GlobalEnv,
     struct_id: &QualifiedInstId<StructId>,
@@ -1494,7 +1598,7 @@ pub fn boogie_struct_field_spec_fun_name(
     let struct_name = struct_name_sym.display(env.symbol_pool());
     let field_name = field_sym.display(env.symbol_pool());
     format!(
-        "${}_$sf_{}${}${}{}",
+        "${}.$sf_{}${}${}{}",
         module_name,
         kind,
         struct_name,
@@ -1504,7 +1608,7 @@ pub fn boogie_struct_field_spec_fun_name(
 }
 
 /// Return name of a behavioral predicate result function for a struct field variant.
-/// Format: `${module}_$sf_ensures_of_result(s?)${struct}${field}${suffix}`
+/// Format: `${module}.$sf_ensures_of_result(s?)${struct}${field}${suffix}`
 pub fn boogie_struct_field_result_fun_name(
     env: &GlobalEnv,
     struct_id: &QualifiedInstId<StructId>,
@@ -1519,7 +1623,7 @@ pub fn boogie_struct_field_result_fun_name(
     let field_name = field_sym.display(env.symbol_pool());
     let plural = if multi_result { "s" } else { "" };
     format!(
-        "${}_$sf_ensures_of_result{}${}${}{}",
+        "${}.$sf_ensures_of_result{}${}${}{}",
         module_name,
         plural,
         struct_name,
@@ -1557,7 +1661,7 @@ pub fn boogie_behavioral_eval_fun_name(
 /// Return name of a per-function behavioral spec function for a closure target function.
 /// These inline functions have concrete bodies derived from the function's spec.
 /// Format: `$bp_{kind}'{fun_name}'`
-/// For example: `$bp_ensures_of'$1_m_callee'`
+/// For example: `$bp_ensures_of'$1.m.callee'`
 pub fn boogie_behavioral_fun_spec_name(
     env: &GlobalEnv,
     fun: &QualifiedInstId<FunId>,
@@ -1665,4 +1769,43 @@ pub fn compute_evaluator_memory_union(
     }
 
     (union_used_memory, union_old_memory)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The name mangling now keeps every in-tree collision from reaching
+    // `EmittedEntities`, so no prover test exercises the collision path. These pin it
+    // directly: were it keyed on the rendered name again, a colliding second entity
+    // would be skipped in silence rather than translated and reported.
+
+    #[test]
+    fn distinct_entities_sharing_a_name_are_both_emitted_and_reported_once() {
+        let env = GlobalEnv::new();
+        let mut emitted = EmittedEntities::<u32>::default();
+
+        assert!(emitted.insert(&env, 1, "$42_a_b_c", "function"));
+        assert_eq!(env.error_count(), 0);
+
+        // A different entity with the same rendered name is still emitted.
+        assert!(emitted.insert(&env, 2, "$42_a_b_c", "function"));
+        assert_eq!(env.error_count(), 1);
+
+        // A third colliding entity is emitted without repeating the report.
+        assert!(emitted.insert(&env, 3, "$42_a_b_c", "function"));
+        assert_eq!(env.error_count(), 1);
+    }
+
+    #[test]
+    fn an_entity_seen_again_is_not_re_emitted_and_not_reported() {
+        let env = GlobalEnv::new();
+        let mut emitted = EmittedEntities::<u32>::default();
+
+        assert!(emitted.insert(&env, 1, "$42.a.b_c", "struct"));
+        assert!(!emitted.insert(&env, 1, "$42.a.b_c", "struct"));
+        assert!(emitted.insert(&env, 2, "$42.a_b.c", "struct"));
+        assert!(!emitted.insert(&env, 2, "$42.a_b.c", "struct"));
+        assert_eq!(env.error_count(), 0);
+    }
 }
