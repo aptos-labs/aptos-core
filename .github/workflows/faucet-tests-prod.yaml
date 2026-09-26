@@ -28,10 +28,17 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Check repository permission for user which triggered workflow
-        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
-        with:
-          required-permission: write
-          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if ! perm=$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR}/permission" --jq .permission); then
+            echo "::error::Could not look up repository permission for $ACTOR."; exit 1
+          fi
+          case "$perm" in
+            admin|maintain|write) echo "$ACTOR has $perm permission" ;;
+            *) echo "::error::Sorry, you don't have permission to trigger this workflow ($ACTOR has '$perm', write required)."; exit 1 ;;
+          esac
 
   # These tests ensure that the faucet works with the nodes running on devnet.
   run-tests-devnet:
