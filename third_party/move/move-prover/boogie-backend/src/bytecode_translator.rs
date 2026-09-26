@@ -12,18 +12,20 @@ use crate::{
         boogie_behavioral_fun_spec_name, boogie_behavioral_result_fun_name,
         boogie_behavioral_spec_fun_name, boogie_byte_blob, boogie_closure_pack_name,
         boogie_constant_blob, boogie_debug_track_abort, boogie_debug_track_local,
-        boogie_debug_track_return, boogie_equality_for_type, boogie_field_sel, boogie_field_update,
-        boogie_fun_apply_name, boogie_fun_param_name, boogie_function_name, boogie_int_suffix,
+        boogie_debug_track_return, boogie_equality_for_type, boogie_field_sel,
+        boogie_field_type_name_component, boogie_field_update, boogie_fun_apply_name,
+        boogie_fun_param_name, boogie_function_name, boogie_int_suffix,
         boogie_make_vec_from_strings, boogie_modifies_memory_name, boogie_native_fun_has_spec_fun,
         boogie_native_spec_fun_name, boogie_num_literal, boogie_num_type_base,
-        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_struct_field_name, boogie_struct_field_result_fun_name,
-        boogie_struct_field_spec_fun_name, boogie_struct_name, boogie_struct_variant_name,
-        boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
-        boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
-        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
-        boogie_well_formed_check, boogie_well_formed_expr, bv_flag_for_type,
-        compute_evaluator_memory_union, field_bv_flag_global_state, TypeIdentToken,
+        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_id_name,
+        boogie_resource_memory_name, boogie_spec_fun_name, boogie_struct_field_name,
+        boogie_struct_field_result_fun_name, boogie_struct_field_spec_fun_name, boogie_struct_name,
+        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
+        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
+        boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
+        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
+        bv_flag_for_type, compute_evaluator_memory_union, field_bv_flag_global_state,
+        TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -5345,35 +5347,54 @@ impl StructTranslator<'_> {
                 &mut field_variant_map,
             );
         }
+        let num_variants = struct_env.get_variants().count();
         for ((field, (field_type, field_type_uninst)), variant_name) in field_variant_map {
-            self.emit_function(
-                &format!(
-                    "$Update'{}'_{}_{}(s: {}, x: {}): {}",
-                    struct_name,
-                    // type name is needed in the update function name
-                    // to distinguish fields with the same name but different types in different variants
-                    // remove parentheses and spaces from field type name
-                    field_type_uninst.replace(['(', ')'], "").replace(' ', "_"),
-                    field,
-                    struct_name,
-                    field_type,
-                    struct_name
-                ),
-                || {
-                    let mut else_symbol = "";
-                    for struct_variant_name in &variant_name {
-                        let match_condition = format!("s is {}", struct_variant_name);
-                        let update_str =
-                            format!("$Update'{}'_{}(s, x)", struct_variant_name, field);
-                        emitln!(writer, "{} if {} then", else_symbol, match_condition);
-                        emitln!(writer, "{}", update_str);
-                        if else_symbol.is_empty() {
-                            else_symbol = "else";
-                        }
-                    }
-                    emitln!(writer, "else s");
-                },
+            // The field type is part of the name so that same-named fields of different
+            // types in different variants stay apart; `boogie_variant_field_update`
+            // renders it the same way caller-side.
+            let name_suffix = format!(
+                "'{}'_{}_{}",
+                struct_name,
+                boogie_field_type_name_component(&field_type_uninst),
+                field
             );
+            let signature = format!("(s: {}, x: {}): {}", struct_name, field_type, struct_name);
+            // A receiver outside `variant_name` lacks the field, so updating it yields an
+            // unspecified value (`$Arbitrary_update`), never `s` unchanged. If every
+            // constructor is covered the last one becomes the bare `else`: no companion,
+            // so no unconstrained term is inlined into every update of this field.
+            let covers_all_variants = variant_name.len() == num_variants;
+            let (guarded, closing) = match variant_name.split_last() {
+                Some((last, rest)) if covers_all_variants => {
+                    (rest, format!("$Update'{}'_{}(s, x)", last, field))
+                },
+                Some(_) | None => (
+                    &variant_name[..],
+                    format!("$Arbitrary_update{}(s, x)", name_suffix),
+                ),
+            };
+            if !covers_all_variants {
+                emitln!(
+                    writer,
+                    "function $Arbitrary_update{}{};",
+                    name_suffix,
+                    signature
+                );
+            }
+            self.emit_function(&format!("$Update{}{}", name_suffix, signature), || {
+                for (i, struct_variant_name) in guarded.iter().enumerate() {
+                    let else_symbol = if i == 0 { "" } else { "else" };
+                    emitln!(
+                        writer,
+                        "{} if s is {} then",
+                        else_symbol,
+                        struct_variant_name
+                    );
+                    emitln!(writer, "$Update'{}'_{}(s, x)", struct_variant_name, field);
+                }
+                let else_symbol = if guarded.is_empty() { "" } else { "else " };
+                emitln!(writer, "{}{}", else_symbol, closing);
+            });
         }
 
         self.emit_is_valid_struct(struct_env, struct_name);
@@ -5756,15 +5777,15 @@ impl StructTranslator<'_> {
         }
 
         if struct_env.has_memory() {
-            // Emit memory variable.
-            let memory_name = boogie_resource_memory_name(
-                env,
-                &struct_env
-                    .get_qualified_id()
-                    .instantiate(self.type_inst.to_owned()),
-                &None,
-            );
+            // Emit memory variable, and the identity constant naming it (the `t` of
+            // `$Global`); `unique` gives pairwise distinctness across resource types.
+            let memory_name = boogie_resource_memory_name(env, &qid, &None);
             emitln!(writer, "var {}: $Memory {};", memory_name, struct_name);
+            emitln!(
+                writer,
+                "const unique {}: int;",
+                boogie_resource_memory_id_name(&memory_name)
+            );
         }
 
         // Emit compare function and procedure
@@ -7386,19 +7407,19 @@ impl FunctionTranslator<'_> {
                         let inst = self.inst_slice(inst);
                         let addr_str = str_local(srcs[0]);
                         let dest_str = str_local(dests[0]);
-                        let memory = boogie_resource_memory_name(
-                            env,
-                            &mid.qualified_inst(*sid, inst),
-                            &None,
-                        );
+                        let mem_qid = mid.qualified_inst(*sid, inst);
+                        let memory = boogie_resource_memory_name(env, &mem_qid, &None);
+                        let memory_id = boogie_resource_memory_id_name(&memory);
                         emitln!(writer, "if (!$ResourceExists({}, {})) {{", memory, addr_str);
                         writer.with_indent(|| emitln!(writer, "call $ExecFailureAbort();"));
                         emitln!(writer, "} else {");
                         writer.with_indent(|| {
                             emitln!(
                                 writer,
-                                "{} := $Mutation($Global({}), EmptyVec(), $ResourceValue({}, {}));",
+                                "{} := $Mutation($Global({}, {}), EmptyVec(), \
+                                 $ResourceValue({}, {}));",
                                 dest_str,
+                                memory_id,
                                 addr_str,
                                 memory,
                                 addr_str
@@ -8204,6 +8225,9 @@ impl FunctionTranslator<'_> {
             },
             GlobalRoot(memory) => {
                 assert!(matches!(edge, BorrowEdge::Direct));
+                // `t` is not re-checked: the typed `$Memory`/`$Mutation` pairing already
+                // pins the resource type, provided distinct resource types render to
+                // distinct Boogie names.
                 let memory = &memory.to_owned().instantiate(self.type_inst);
                 let memory_name = boogie_resource_memory_name(env, memory, &None);
                 emitln!(

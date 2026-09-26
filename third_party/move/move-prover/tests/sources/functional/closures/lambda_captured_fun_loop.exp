@@ -33,7 +33,8 @@ error: post-condition does not hold
    =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:23: wrap2
    =         i = <redacted>
    =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:24: wrap2
-   =     enter loop, variable(s) i havocked and reassigned
+   =     enter loop, variable(s) v, i havocked and reassigned
+   =         v = <redacted>
    =         i = <redacted>
    =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:24: wrap2
    =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:22: wrap2

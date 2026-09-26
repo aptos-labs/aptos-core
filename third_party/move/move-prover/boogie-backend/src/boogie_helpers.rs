@@ -169,14 +169,18 @@ pub fn boogie_variant_field_update(
     inst: &[Type],
 ) -> String {
     let struct_env = &field_env.struct_env;
-    let suffix = boogie_type_suffix_for_struct(struct_env, inst, false);
     format!(
         "$Update'{}'_{}_{}",
-        suffix,
-        // remove parentheses and spaces from field type name
-        field_type_name.replace(['(', ')'], "").replace(' ', "_"),
+        boogie_type_suffix_for_struct(struct_env, inst, false),
+        boogie_field_type_name_component(&field_type_name),
         field_env.get_name().display(struct_env.symbol_pool()),
     )
+}
+
+/// Mangles a rendered field type into a Boogie name component. Shared by the enum `$Update`
+/// wrapper's emitter and `boogie_variant_field_update`, whose names must match.
+pub fn boogie_field_type_name_component(field_type_name: &str) -> String {
+    field_type_name.replace(['(', ')'], "").replace(' ', "_")
 }
 
 /// Return whether the field renders as a bitvector. `ty` is the field's
@@ -342,6 +346,13 @@ pub fn boogie_resource_memory_name(
         boogie_struct_name(&struct_env, &memory.inst, false),
         boogie_memory_label(memory_label)
     )
+}
+
+/// Creates the name of the unique identity constant for a resource type's memory, given
+/// that memory's name (see `boogie_resource_memory_name`). The constant is the `t`
+/// component of a `$Global` location -- see `$Location` in prelude.bpl.
+pub fn boogie_resource_memory_id_name(memory_name: &str) -> String {
+    format!("{}_$id", memory_name)
 }
 
 /// Creates a string for a memory label.
