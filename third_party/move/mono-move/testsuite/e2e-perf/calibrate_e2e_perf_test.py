@@ -42,9 +42,13 @@ COLUMNS = [
 ]
 KEY_COLUMNS = 2
 
-# Metrics that get a calibrated row. `execution` is the one verdicts are read
-# from; the rest are recorded so drift in them is visible.
-CALIBRATED_METRICS = ["total", "execution", "inner_block_executor", "output_bytes_per_txn"]
+# Metrics that get a calibrated row. Only execution: it is what verdicts are
+# read from, and it is the only metric repeatable enough for a band to mean
+# anything. End-to-end throughput tracks whichever pipeline stage is slowest,
+# which makes it several times noisier without catching anything execution
+# would miss. Both row sources filter on this: `write_tsv` merges and never
+# deletes, so an unfiltered run would restore dropped rows out of old history.
+CALIBRATED_METRICS = ["execution"]
 
 
 # Expected range of `n` samples drawn from a normal distribution, in standard
@@ -86,9 +90,8 @@ BAND_DEVIATIONS = 3.0
 
 # Floor under the band, as a fraction of the calibrated speedup. Without it a
 # workload whose runs happened to agree closely gets a band narrower than the
-# next run's noise, and a metric that is identical every run (any
-# `output_bytes_per_txn` row) gets no band at all. Has to sit above the
-# self-compare deviation measured on the runner.
+# next run's noise: repeats inside one run cannot see the drift between runs.
+# Has to sit above the self-compare deviation measured on the runner.
 BAND_FLOOR = 0.03
 
 
@@ -213,7 +216,7 @@ def rows_from_humio(branch, time_interval):
             parts = key_value.split("->")
             if len(parts) == 2:
                 row[parts[0]] = parts[1]
-        if all(c in row for c in COLUMNS):
+        if all(c in row for c in COLUMNS) and row["metric"] in CALIBRATED_METRICS:
             rows.append(row)
     return rows
 
@@ -245,6 +248,8 @@ def rows_from_jsonl(paths):
 
     rows = []
     for (workload, metric), values in sorted(samples.items()):
+        if metric not in CALIBRATED_METRICS:
+            continue
         median = statistics.median(values)
         rows.append(
             {
