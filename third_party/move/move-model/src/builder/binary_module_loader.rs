@@ -330,6 +330,8 @@ impl<'a> BinaryModuleLoader<'a> {
                     variants.clone(),
                     false,
                     Visibility::Private,
+                    // The file format has no struct attributes to recover.
+                    vec![],
                 )
             });
 
