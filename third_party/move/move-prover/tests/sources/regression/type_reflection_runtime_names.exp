@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/type_reflection_runtime_names.move:49:9
+   │
+49 │         ensures result == type_info::type_of<G<u64>>();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/type_reflection_runtime_names.move:46: instantiations_differ
+   =         result = <redacted>
+   =     at tests/sources/regression/type_reflection_runtime_names.move:49: instantiations_differ (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/type_reflection_runtime_names.move:57:9
+   │
+57 │         ensures result.struct_name == b"G";
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/type_reflection_runtime_names.move:54: struct_name_without_args
+   =         result = <redacted>
+   =     at tests/sources/regression/type_reflection_runtime_names.move:57: struct_name_without_args (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/type_reflection_runtime_names.move:123:9
+    │
+123 │         ensures result.bytes == b"00000000000000000000000000000042::type_reflection_runtime_names::H";
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/type_reflection_runtime_names.move:120: std_name_padded
+    =     at ../move-stdlib/sources/type_name.move:25: into_string
+    =         self = <redacted>
+    =     at ../move-stdlib/sources/type_name.move:26: into_string
+    =         result = <redacted>
+    =     at tests/sources/regression/type_reflection_runtime_names.move:123: std_name_padded (spec)

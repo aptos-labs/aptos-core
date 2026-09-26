@@ -1,0 +1,14 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_shared_result.move:31:9
+   │
+31 │         ensures result == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:26: shared_result
+   =         b = <redacted>
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:27: shared_result
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:28: shared_result
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:26: shared_result
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_shared_result.move:31: shared_result (spec)

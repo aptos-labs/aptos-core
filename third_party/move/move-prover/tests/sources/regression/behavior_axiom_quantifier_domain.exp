@@ -1,0 +1,36 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_quantifier_domain.move:33:9
+   │
+33 │         ensures result == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:29: out_of_range
+   =         m = <redacted>
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:30: out_of_range
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:33: out_of_range (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_quantifier_domain.move:41:9
+   │
+41 │         ensures result == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:37: in_range
+   =         m = <redacted>
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:38: in_range
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:41: in_range (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavior_axiom_quantifier_domain.move:71:9
+   │
+71 │         ensures result == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:67: out_of_where
+   =         w = <redacted>
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:68: out_of_where
+   =         result = <redacted>
+   =     at tests/sources/regression/behavior_axiom_quantifier_domain.move:71: out_of_where (spec)

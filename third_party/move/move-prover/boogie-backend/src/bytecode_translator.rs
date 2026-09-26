@@ -545,10 +545,17 @@ impl<'env> BoogieTranslator<'env> {
                 TypeIdentToken::convert_to_bytes(TypeIdentToken::make(">")),
             );
 
-            // type name <-> type info: struct
+            // type name <-> type info: struct. The runtime renders a struct type name as
+            // `StructTag::to_canonical_string` does: `0x`, the address in hex with leading
+            // zeroes trimmed, then `::module::Name<args>`. Hex-rendering an integer is not
+            // expressible here, so the digits are an uninterpreted function of the address:
+            // unconstrained, which is sound, where the previous single-element encoding of
+            // the integer asserted bytes the runtime does not produce.
+            emitln!(writer, "function $AddressShortHex(a: int): Vec int;");
             let mut tokens = TypeIdentToken::make("0x");
-            // TODO(mengxu): this is not a correct radix16 encoding of an integer
-            tokens.push(TypeIdentToken::Variable("MakeVec1(t->a)".to_string()));
+            tokens.push(TypeIdentToken::Variable(
+                "$AddressShortHex(t->a)".to_string(),
+            ));
             tokens.extend(TypeIdentToken::make("::"));
             tokens.push(TypeIdentToken::Variable("t->m".to_string()));
             tokens.extend(TypeIdentToken::make("::"));
@@ -558,13 +565,6 @@ impl<'env> BoogieTranslator<'env> {
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
                             t is $TypeParamStruct ==> $IsEqual'vec'u8''($TypeName(t), {}));",
                 TypeIdentToken::convert_to_bytes(tokens)
-            );
-            // TODO(mengxu): this will parse it to an uninterpreted struct
-            emitln!(
-                writer,
-                "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            $IsPrefix'vec'u8''($TypeName(t), {}) ==> t is $TypeParamVector);",
-                TypeIdentToken::convert_to_bytes(TypeIdentToken::make("0x")),
             );
         }
 
@@ -4588,6 +4588,14 @@ impl<'env> BoogieTranslator<'env> {
             .get_spec()
             .filter_kind(ConditionKind::StructInvariant)
         {
+            // The axioms emitted here are named after `info`'s field (see
+            // `BpAxiomCtx::bp_fun_name`), so an invariant may be lifted for this field only
+            // if every behavioral-predicate call in it targets this field. Otherwise an
+            // invariant about field `f` is re-emitted under field `g`'s witness names and
+            // constrains `g` with `f`'s property. Skipping an invariant only loses precision.
+            if !Self::behavior_calls_all_target_field(env, &cond.exp, info) {
+                continue;
+            }
             let Some(lifted) =
                 self.extract_bp_invariant_body(&cond.exp, kind, params, ctx, mem_args)
             else {
@@ -4619,6 +4627,58 @@ impl<'env> BoogieTranslator<'env> {
                 body_str
             );
         }
+    }
+
+    /// Whether every behavioral-predicate call in `exp` targets `info`'s field of exactly
+    /// `info`'s struct instantiation: a `Select` of that field that either has no base (the
+    /// invariant's own value) or whose base, with the invariant's type parameters
+    /// instantiated as `info`'s, has type `info.struct_id`.
+    ///
+    /// Matching the declaration and field name alone is not enough: an invariant on `S<T>`
+    /// may name the field of some other value, e.g. `forall o: S<u64>: ensures_of<o.f>(..)`,
+    /// and emitting that for `S<bool>` would constrain `S<bool>`'s own field with a property
+    /// stated only for `S<u64>` values. A target of any other shape counts as not matching,
+    /// which keeps the check conservative.
+    fn behavior_calls_all_target_field(env: &GlobalEnv, exp: &Exp, info: &StructFieldInfo) -> bool {
+        let mut all_match = true;
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(_, AstOperation::Behavior(..), args) = e {
+                let targets_field = match args.first().map(|t| t.as_ref()) {
+                    Some(ExpData::Call(_, AstOperation::Select(mid, sid, fid), select_args)) => {
+                        let field_matches = env
+                            .get_module(*mid)
+                            .into_struct(*sid)
+                            .get_field(*fid)
+                            .get_name()
+                            == info.field_sym;
+                        let base_is_this_instance = match select_args.as_slice() {
+                            // A field named without a base inside a struct invariant, as in
+                            // `ensures_of<f>(..)`, is the invariant's own value: this instance.
+                            [] => true,
+                            [base] => {
+                                let base_ty = env
+                                    .get_node_type(base.node_id())
+                                    .instantiate(&info.struct_id.inst);
+                                match base_ty.skip_reference() {
+                                    Type::Struct(base_mid, base_sid, base_inst) => {
+                                        base_mid.qualified(*base_sid)
+                                            == info.struct_id.to_qualified_id()
+                                            && base_inst == &info.struct_id.inst
+                                    },
+                                    _ => false,
+                                }
+                            },
+                            _ => false,
+                        };
+                        field_matches && base_is_this_instance
+                    },
+                    _ => false,
+                };
+                all_match &= targets_field;
+            }
+            true
+        });
+        all_match
     }
 
     /// Render a spec-language constant as a Boogie literal. Mirrors the
@@ -4960,10 +5020,28 @@ impl BoogieTranslator<'_> {
         let env = self.env;
 
         // Strip the outer Forall.
+        // A `where` clause restricts the quantified domain just as a range does, and the
+        // lifted axiom has nowhere to put it, so an invariant with one is not lifted. The
+        // triggers are ignored deliberately: the axiom builds its own.
         let (ranges, body_exp) = match exp.as_ref() {
-            ExpData::Quant(_, QuantKind::Forall, ranges, _, _, body) => (ranges, body.clone()),
+            ExpData::Quant(_, QuantKind::Forall, ranges, _, None, body) => (ranges, body.clone()),
             _ => return None,
         };
+
+        // Only quantifiers over a whole domain are lifted: a whole type (`forall x: T`) or
+        // every state (`forall S in *`). The axiom quantifies each variable over its entire
+        // domain, so a narrower one -- `forall x in 0..10`, or over a vector or map -- would
+        // be silently widened, and an invariant that constrains a field only inside the
+        // domain would then be assumed everywhere. Skipping the invariant only loses
+        // precision.
+        if ranges.iter().any(|(_, range)| {
+            !matches!(
+                env.get_node_type(range.node_id()).skip_reference(),
+                Type::TypeDomain(_) | Type::StateDomain
+            )
+        }) {
+            return None;
+        }
 
         // Collect quantifier-bound symbol -> Type from ranges. Only
         // `Pattern::Var` bindings are supported.
@@ -5126,7 +5204,17 @@ impl BoogieTranslator<'_> {
                     result_fun_name, result_mem_rendered, data_args
                 )
             };
-            result_sub.insert(result_syms[0], fun_app);
+            // Each absorbed premise is replaced by `result == witness(inputs)`, expressed by
+            // substituting the result variable. That only works if the variable is bound by
+            // exactly one absorbed premise and nothing else: a second absorption would
+            // overwrite the first, and an input use would render as a free argument, and
+            // either way the equality the premise implied would be dropped, making the axiom
+            // strictly stronger than the invariant. Such invariants are not lifted.
+            if var_map.contains_key(&result_syms[0])
+                || result_sub.insert(result_syms[0], fun_app).is_some()
+            {
+                return None;
+            }
         }
 
         // Build trigger_apps for the lifted kind — one witness-function app

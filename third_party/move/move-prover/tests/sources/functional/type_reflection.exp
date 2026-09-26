@@ -1,15 +1,25 @@
 Move prover returns: exiting with verification errors
-error: abort not covered by any of the `aborts_if` clauses
-   ┌─ tests/sources/functional/type_reflection.move:86:5
+error: post-condition does not hold
+   ┌─ tests/sources/functional/type_reflection.move:83:9
    │
-84 │           type_info::type_of<T>()
+83 │         ensures result == type_info::type_of<MyTable<address, T>>();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/type_reflection.move:78: test_type_info_ignores_type_param
+   =         result = <redacted>
+   =     at tests/sources/functional/type_reflection.move:83: test_type_info_ignores_type_param (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/type_reflection.move:96:5
+   │
+94 │           type_info::type_of<T>()
    │           ----------------------- abort happened here with execution failure
-85 │       }
-86 │ ╭     spec test_type_info_can_abort {
-87 │ │         // this should not pass
-88 │ │         aborts_if false;
-89 │ │     }
+95 │       }
+96 │ ╭     spec test_type_info_can_abort {
+97 │ │         // this should not pass
+98 │ │         aborts_if false;
+99 │ │     }
    │ ╰─────^
    │
-   =     at tests/sources/functional/type_reflection.move:84: test_type_info_can_abort
+   =     at tests/sources/functional/type_reflection.move:94: test_type_info_can_abort
    =         ABORTED

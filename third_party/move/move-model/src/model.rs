@@ -1792,7 +1792,9 @@ impl GlobalEnv {
                     fun.name.display(module.symbol_pool())
                 );
                 REFLECTION_FUNS.contains(&name)
-                    && fun_id.inst.iter().any(|ty| ty.is_type_parameter())
+                    // `is_open`, not `is_type_parameter`: a type parameter nested inside an
+                    // argument, as in `type_of<G<T>>()`, is rendered through `#i_info` too.
+                    && fun_id.inst.iter().any(|ty| ty.is_open())
             } else {
                 false
             }
