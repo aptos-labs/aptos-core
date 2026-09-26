@@ -20,7 +20,14 @@ clap = { workspace = true }
 clap-verbosity-flag = { workspace = true }
 determinator = { workspace = true }
 env_logger = { workspace = true }
+glob = { workspace = true }
 guppy = { workspace = true }
 log = { workspace = true }
 reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
 url = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

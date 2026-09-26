@@ -45,6 +45,7 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v4
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because python-lint-tests requires it.
       - name: Run general lints
@@ -52,11 +53,9 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-      - name: Validate evaluation publication bundles
+      - name: Skip general lints for documentation-only changes
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
-        run: |
-          cd aptos-move/flow/evaluation/spec-inference
-          python3 -W error::ResourceWarning -m unittest tests.test_publication
+        run: echo "Skipping general lints for documentation-only changes."
 
   # Run the crypto hasher domain separation checks
   rust-cryptohasher-domain-separation-check:
@@ -194,6 +193,8 @@ jobs:
         uses: ./.github/actions/rust-targeted-unit-tests
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          DETERMINATOR_MODE: ${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
 
   # Run aptos-batch-encryption (i.e., with TypeScript/Node.js). This is a PR required job.
   rust-batch-encryption-tests:

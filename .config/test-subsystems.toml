@@ -1,0 +1,119 @@
+# Test selection only. Build/lint commands continue to use the legacy determinator.
+# Schema: [README](../devtools/aptos-cargo-cli/README.md#selection-model)
+version = 1
+unmatched_changes = "legacy"
+global_test_inputs = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain*",
+    ".cargo/**",
+    ".config/test-subsystems.toml",
+    ".config/nextest.toml",
+    "devtools/aptos-cargo-cli/**",
+    ".github/actions/rust-targeted-unit-tests/**",
+    ".github/workflows/lint-test.yaml",
+    ".github/actions/e2e-test-determinator/**",
+    ".github/workflows/e2e-test-selection.yaml",
+    ".github/workflows/docker-build-test.yaml",
+]
+ignored_paths = [
+    "**/README.md",
+    "**/AGENTS.md",
+    "**/CLAUDE.md",
+]
+
+[subsystems.move]
+roots = ["third_party/move", "aptos-move"]
+ignored_paths = [
+    "third_party/move/documentation/**",
+    "third_party/move/move-prover/doc/**",
+]
+selection = "affected"
+related_test_roots = ["api"]
+related_test_packages = [
+    "aptos-db-indexer",
+    "aptos-types",
+    "aptos-executor-benchmark",
+    "aptos-indexer-grpc-fullnode",
+]
+
+# Framework packages consume Move sources at runtime as well as through the
+# cached genesis bundle. The Prover directly reads framework stdlib sources.
+[[subsystems.move.path_rules]]
+paths = ["aptos-move/framework/**/*.move", "aptos-move/framework/**/Move.toml"]
+affects_packages = ["aptos-framework", "aptos-cached-packages", "move-prover"]
+
+# The compiler and Prover test harnesses read this stdlib without a Cargo edge.
+[[subsystems.move.path_rules]]
+paths = ["third_party/move/move-stdlib/**"]
+affects_packages = ["move-compiler-v2", "move-prover"]
+
+# e2e-move-tests reads example packages by filesystem path.
+[[subsystems.move.path_rules]]
+paths = ["aptos-move/move-examples/**"]
+affects_packages = ["aptos-move-examples", "e2e-move-tests"]
+
+# These packages anchor dependency analysis even though their own Rust tests
+# can be outside the subsystem boundary. Python and Docker inputs need mappings.
+[e2e_tests.cli-e2e]
+affected_packages = ["aptos"]
+input_paths = [
+    "crates/aptos/e2e/**",
+    "aptos-move/move-examples/cli-e2e-tests/**",
+    ".github/workflows/cli-e2e-tests.yaml",
+    ".github/actions/python-setup/**",
+    ".github/actions/docker-setup/**",
+    ".github/workflows/workflow-run-docker-rust-build.yaml",
+    "docker/**",
+]
+
+[e2e_tests.node-api-compatibility]
+affected_packages = ["aptos-openapi-spec-generator"]
+input_paths = [
+    "api/doc/spec.*",
+    ".github/workflows/node-api-compatibility-tests.yaml",
+    ".github/actions/docker-setup/**",
+    ".github/workflows/workflow-run-docker-rust-build.yaml",
+    "docker/**",
+]
+
+[e2e_tests.execution-performance]
+affected_packages = ["aptos-executor-benchmark", "aptos-move-e2e-benchmark"]
+input_paths = [
+    "testsuite/single_node_performance*",
+    ".github/workflows/execution-performance.yaml",
+    ".github/workflows/workflow-run-execution-performance.yaml"
+]
+
+[e2e_tests.faucet-integration]
+affected_packages = ["aptos-faucet-core", "aptos-node"]
+input_paths = [
+    "crates/aptos-faucet/integration-tests/**",
+    ".github/actions/run-faucet-tests/**",
+    ".github/workflows/faucet-tests-main.yaml",
+    "docker/**"
+]
+
+[e2e_tests.forge-compatibility]
+affected_packages = ["aptos-node", "aptos-forge", "aptos-testcases"]
+input_paths = [
+    "testsuite/run_forge.sh",
+    "testsuite/forge.py",
+    "testsuite/forge-test-runner/**",
+    "testsuite/forge-cli/**",
+    ".github/workflows/workflow-run-forge.yaml",
+    "terraform/helm/**",
+    "docker/**"
+]
+
+[e2e_tests.forge-e2e]
+affected_packages = ["aptos-node", "aptos-forge", "aptos-testcases"]
+input_paths = [
+    "testsuite/run_forge.sh",
+    "testsuite/forge.py",
+    "testsuite/forge-test-runner/**",
+    "testsuite/forge-cli/**",
+    ".github/workflows/workflow-run-forge.yaml",
+    "terraform/helm/**",
+    "docker/**"
+]

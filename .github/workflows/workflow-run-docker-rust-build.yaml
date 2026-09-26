@@ -92,9 +92,12 @@ env:
   GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
   TARGET_REGISTRY: ${{ inputs.TARGET_REGISTRY }}
   GCP_DOCKER_BUILD_LOCK_BUCKET: "aptos-docker-build-lock-bucket"
+  # A build of another variant cannot satisfy this job's image requirements.
+  DOCKER_BUILD_LOCK_KEY: ${{ inputs.GIT_SHA }}-${{ inputs.PROFILE }}-${{ inputs.FEATURES || 'default' }}
   PROFILE_RELEASE: ${{ inputs.PROFILE == 'release' && inputs.FEATURES == '' }}
   PROFILE_PERF: ${{ inputs.PROFILE == 'performance' }}
   FEATURE_FAILPOINTS: ${{ inputs.FEATURES == 'failpoints' }}
+  FEATURE_CONSENSUS_ONLY: ${{ inputs.FEATURES == 'consensus-only-perf-test' }}
 
 permissions:
   contents: read
@@ -133,6 +136,7 @@ jobs:
           PROFILE_RELEASE : ${{ env.PROFILE_RELEASE }}
           PROFILE_PERF: ${{ env.PROFILE_PERF }}
           FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
+          FEATURE_CONSENSUS_ONLY: ${{ env.FEATURE_CONSENSUS_ONLY }}
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -146,7 +150,7 @@ jobs:
         if: ${{ steps.check-images.outcome == 'failure' && inputs.DRY_RUN == false }}
         run: |
           set +e
-          output=$(gcloud storage cat gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt)
+          output=$(gcloud storage cat "gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${DOCKER_BUILD_LOCK_KEY}.txt")
           result=$?
           set -e
           if [[ $result -eq 0 ]]; then
@@ -161,7 +165,7 @@ jobs:
           else
             echo "Lock file does not exist"
             echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" > ${{ env.GIT_SHA }}.txt
-            gcloud storage cp ${{ env.GIT_SHA }}.txt gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${{ env.GIT_SHA }}.txt
+            gcloud storage cp ${{ env.GIT_SHA }}.txt "gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${DOCKER_BUILD_LOCK_KEY}.txt"
             echo "Docker Build locked"
           fi
       
@@ -175,6 +179,7 @@ jobs:
           PROFILE_RELEASE : ${{ env.PROFILE_RELEASE }}
           PROFILE_PERF: ${{ env.PROFILE_PERF }}
           FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
+          FEATURE_CONSENSUS_ONLY: ${{ env.FEATURE_CONSENSUS_ONLY }}
 
       - name: Build and Push Rust images
         if: ${{ steps.check-images.outcome == 'failure' && steps.lock.outputs.wait_images != 'true' && inputs.DRY_RUN == false }}
@@ -189,5 +194,5 @@ jobs:
       - name: Post-run Lock Cleanup 
         if: ${{ always() && steps.lock.outcome == 'success' }}
         run: | 
-          gcloud storage rm gs://${{ env.GCP_DOCKER_BUILD_LOCK_BUCKET }}/${GIT_SHA}.txt || true
+          gcloud storage rm "gs://${GCP_DOCKER_BUILD_LOCK_BUCKET}/${DOCKER_BUILD_LOCK_KEY}.txt" || true
           echo "Docker Build unlocked"

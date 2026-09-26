@@ -30,6 +30,11 @@ on:
         required: true
         type: string
         description: Use this to override the git SHA1, branch name (e.g. devnet) or tag to release the SDK from
+      SELECTION_RESULT:
+        required: false
+        default: success
+        type: string
+        description: Fail visibly if test planning failed
       SKIP_JOB:
         required: false
         default: false
@@ -50,11 +55,15 @@ jobs:
   # the image for the faucet private fullnode, the faucet and fullnode should always
   # be compatible in production.
   run-tests-main:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
+    if: ${{ inputs.SELECTION_RESULT != 'success' || !inputs.SKIP_JOB }}
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       id-token: write
     steps:
+      - name: Require successful test determination
+        env:
+          SELECTION_RESULT: ${{ inputs.SELECTION_RESULT }}
+        run: test "$SELECTION_RESULT" = success
       - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:

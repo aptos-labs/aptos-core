@@ -71,6 +71,11 @@ on:
         default: forge
         description: A unique ID for Forge sticky comment on your PR. See
           https://github.com/marocchino/sticky-pull-request-comment#keep-more-than-one-comment
+      SELECTION_RESULT:
+        required: false
+        default: success
+        type: string
+        description: Fail visibly if test planning failed
       SKIP_JOB:
         required: false
         default: false
@@ -155,6 +160,10 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
+      - name: Require successful test determination
+        env:
+          SELECTION_RESULT: ${{ inputs.SELECTION_RESULT }}
+        run: test "$SELECTION_RESULT" = success
       - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:
@@ -162,7 +171,7 @@ jobs:
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: inputs.GIT_SHA != null && 0 || 10
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         if: ${{ !inputs.SKIP_JOB }}
 
       - name: Install python deps

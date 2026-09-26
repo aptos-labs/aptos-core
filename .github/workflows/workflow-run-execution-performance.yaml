@@ -10,7 +10,7 @@ on:
         description: The git SHA1 to test.
       RUNNER_NAME:
         required: false
-        default: executor-benchmark-runner 
+        default: executor-benchmark-runner
         type: string
       FLOW:
         required: false
@@ -50,7 +50,7 @@ on:
         description: The git SHA1 to test.
       RUNNER_NAME:
         required: false
-        default: executor-benchmark-runner 
+        default: executor-benchmark-runner
         type: choice
         options:
         - executor-benchmark-runner
@@ -109,26 +109,53 @@ permissions:
   contents: read
 
 jobs:
-  # This job determines which tests to run
+  e2e-selection:
+    if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
+    uses: ./.github/workflows/e2e-test-selection.yaml
+    with:
+      ARTIFACT_NAME: execution-performance
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+
+  # This job determines which tests to run. A failed selection skips it, which
+  # the benchmark job reports as a failure.
   test-target-determinator:
+    needs: e2e-selection
+    if: ${{ !cancelled() && needs.e2e-selection.result != 'failure' }}
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
-      run_execution_performance_test: ${{ steps.determine_test_targets.outputs.run_execution_performance_test }}
+      run_execution_performance_test: ${{ inputs.IGNORE_TARGET_DETERMINATION || github.event_name == 'workflow_dispatch' || (contains(fromJSON(needs.e2e-selection.outputs.selected_e2e_tests || '[]'), 'execution-performance') && steps.determine_test_targets.outputs.run_execution_performance_test == 'true') }}
     steps:
+      # The legacy dependency selector still needs the actual tested revision.
       - uses: actions/checkout@v4
+        if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
         with:
           ref: ${{ inputs.GIT_SHA }}
           fetch-depth: 0
       - name: Run the test target determinator
+        if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
 
   # Run single node execution performance tests
   single-node-performance:
     needs: test-target-determinator
+    if: |
+      !cancelled() && (
+        needs.test-target-determinator.result != 'success' ||
+        inputs.IGNORE_TARGET_DETERMINATION ||
+        needs.test-target-determinator.outputs.run_execution_performance_test == 'true'
+      )
+    concurrency:
+      group: execution-benchmark-${{ inputs.RUNNER_NAME }}
+      cancel-in-progress: false
+      queue: max
     timeout-minutes: 120
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
+      - name: Require successful test determination
+        env:
+          SELECTION_RESULT: ${{ needs.test-target-determinator.result }}
+        run: test "$SELECTION_RESULT" = success
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
