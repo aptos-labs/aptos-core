@@ -4372,6 +4372,7 @@ impl StructData {
         variants: Option<BTreeMap<Symbol, StructVariant>>,
         is_native: bool,
         visibility: Visibility,
+        attributes: Vec<Attribute>,
     ) -> Self {
         Self {
             abilities,
@@ -4380,6 +4381,7 @@ impl StructData {
             variants,
             is_native,
             visibility,
+            attributes,
             is_empty_struct: false,
             ..Self::new(name, loc)
         }
