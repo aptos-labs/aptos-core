@@ -637,7 +637,7 @@ fn import_source(
             .iter()
             .map(|id| struct_at(&struct_ids, *id, &decl.name))
             .collect::<Result<BTreeSet<_>>>()?;
-        let called = called_functions(env, xir, decl, module_id, &function_ids)?;
+        let called = called_functions(env, xir, decl, &local_types, module_id, &function_ids)?;
         functions.push(ModelXirFunctionData {
             name: fun_id.symbol(),
             loc: function_loc.clone(),
@@ -884,6 +884,7 @@ fn called_functions(
     env: &GlobalEnv,
     xir: &XirModule,
     decl: &FunctionDecl,
+    local_types: &[Type],
     module_id: ModuleId,
     functions: &[FunId],
 ) -> Result<BTreeSet<QualifiedId<FunId>>> {
@@ -897,9 +898,10 @@ fn called_functions(
             if let Instr::Call(_, Oper::Lt, srcs) = instr {
                 let source_type = srcs
                     .first()
-                    .and_then(|id| decl.locals.get(*id))
+                    .and_then(|id| local_types.get(*id))
                     .with_context(|| format!("malformed comparison in `{}`", decl.name))?;
-                uses_generic_comparison |= !matches!(source_type, Ty::U64);
+                // The same test the translator uses to lower `<` through `cmp`.
+                uses_generic_comparison |= !source_type.is_number();
             }
         }
     }
@@ -2738,11 +2740,11 @@ mod tests {
         );
     }
 
-    /// Imports a copy of the golden module whose first function is replaced
-    /// by one with a single instruction and these locals:
+    /// A copy of the golden module whose first function is replaced by one
+    /// with a single instruction and these locals:
     /// l0-l2 `u64`, l3 `u8`, l4 `address`, l5 `u16`, l6 `u32`, l7 `u128`,
     /// l8 `u256`, l9 `bool`, l10 `vector<u64>`, l11 `&u64`, l12 a struct.
-    fn load_instruction(instr: Instr) -> Result<()> {
+    fn instruction_module(instr: Instr) -> XirModule {
         let mut module = account_module();
         let function = &mut module.functions[0];
         function.params = 0;
@@ -2769,7 +2771,11 @@ mod tests {
             instrs: vec![instr],
             term: Term::Ret(vec![]),
         }];
-        import_module(&module).map(|_| ())
+        module
+    }
+
+    fn load_instruction(instr: Instr) -> Result<()> {
+        import_module(&instruction_module(instr)).map(|_| ())
     }
 
     fn two_operand_ops(width: IntType) -> Vec<Oper> {
@@ -2888,6 +2894,116 @@ mod tests {
             message.contains("Div(I64)") && message.contains("l0") && message.contains("`u64`"),
             "{message}"
         );
+    }
+
+    /// `<` on an integer is a native comparison and loads without the
+    /// standard library; on any other type it is lowered through `std::cmp`.
+    #[test]
+    fn only_a_non_integer_less_than_needs_cmp() {
+        let lt = |local| load_instruction(Instr::Call(vec![9], Oper::Lt, vec![local, local]));
+        let mut wrong = vec![];
+        for local in [0, 3, 5, 6, 7, 8] {
+            if let Err(error) = lt(local) {
+                wrong.push(format!("l{local} was rejected: {error:#}"));
+            }
+        }
+        for local in [4, 9, 10, 11, 12] {
+            match lt(local) {
+                Ok(()) => wrong.push(format!("l{local} loaded without `cmp`")),
+                Err(error) if format!("{error:#}").contains("`cmp`") => {},
+                Err(error) => wrong.push(format!("l{local}: {error:#}")),
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// With `std::cmp` loaded, an integer `<` translates to a native `Lt` and
+    /// a non-integer one to a call into `cmp`, and the function's call graph
+    /// agrees with the code. The Move standard library here has no `cmp`, so
+    /// the parts the reader uses are copied from Aptos's.
+    #[test]
+    fn only_a_non_integer_less_than_calls_cmp() {
+        struct TempFile(PathBuf);
+        impl Drop for TempFile {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let cmp =
+            TempFile(std::env::temp_dir().join(format!("xir_cmp_{}.move", std::process::id())));
+        std::fs::write(
+            &cmp.0,
+            "module std::cmp {
+                enum Ordering has copy, drop { Less, Equal, Greater }
+                native public fun compare<T>(first: &T, second: &T): Ordering;
+                public fun is_lt(self: &Ordering): bool { self is Ordering::Less }
+            }",
+        )
+        .unwrap();
+        let mut dependencies = move_stdlib::move_stdlib_files();
+        dependencies.push(cmp.0.to_string_lossy().into_owned());
+        // Whether the call graph, and the code, call into `cmp`, and whether
+        // the code has a native `Lt`.
+        let translate = |local| -> (bool, bool, bool) {
+            let module = instruction_module(Instr::Call(vec![9], Oper::Lt, vec![local, local]));
+            let options = crate::Options {
+                dependencies: dependencies.clone(),
+                named_address_mapping: vec!["std=0x1".to_owned()],
+                ..crate::Options::default()
+            };
+            let mut env = crate::run_checker(options).unwrap();
+            let source = parse_source(
+                PathBuf::from("test.xir.json"),
+                String::new(),
+                &serde_json::to_string(&module).unwrap(),
+            )
+            .unwrap();
+            let mut targets = FunctionTargetsHolder::default();
+            import_sources(&mut env, &[source], &mut targets).unwrap();
+            let pool = env.symbol_pool();
+            let imported = env
+                .get_modules()
+                .find(|m| m.get_name().name() == pool.make(&module.module.name))
+                .unwrap();
+            let function = imported
+                .find_function(pool.make(&module.functions[0].name))
+                .unwrap();
+            let graph = function
+                .get_called_functions()
+                .unwrap()
+                .iter()
+                .any(|callee| env.get_module(callee.module_id).is_cmp());
+            let target = targets.get_target(&function, &FunctionVariant::Baseline);
+            let calls = |test: &dyn Fn(&StacklessOperation) -> bool| {
+                target
+                    .get_bytecode()
+                    .iter()
+                    .any(|bytecode| matches!(bytecode, Bytecode::Call(_, _, op, _, _) if test(op)))
+            };
+            let code = calls(
+                &|op| matches!(op, StacklessOperation::Function(mid, _, _) if env.get_module(*mid).is_cmp()),
+            );
+            let native = calls(&|op| matches!(op, StacklessOperation::Lt));
+            (graph, code, native)
+        };
+        let mut wrong = vec![];
+        for local in [0, 3, 5, 6, 7, 8] {
+            let outcome = translate(local);
+            if outcome != (false, false, true) {
+                wrong.push(format!(
+                    "integer l{local}: (graph, code, native) = {outcome:?}"
+                ));
+            }
+        }
+        for local in [4, 9, 10, 11, 12] {
+            let outcome = translate(local);
+            if outcome != (true, true, false) {
+                wrong.push(format!(
+                    "non-integer l{local}: (graph, code, native) = {outcome:?}"
+                ));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     #[test]
