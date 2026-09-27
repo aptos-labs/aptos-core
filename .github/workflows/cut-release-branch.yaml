@@ -36,15 +36,20 @@ jobs:
           token: ${{ secrets.CUT_RELEASE_BRANCH_CREDENTIALS }}
           fetch-depth: 0
       - name: Cut Release Branch
+        env:
+          BRANCH_PREFIX: ${{ inputs.BRANCH_PREFIX }}
+          NEW_VERSION: ${{ inputs.NEW_VERSION }}
+          BRANCH_SUFFIX: ${{ inputs.BRANCH_SUFFIX }}
+          GIT_HASH: ${{ inputs.GIT_HASH }}
         run: |
           set -ex
 
-          BRANCH_NAME="${{ inputs.BRANCH_PREFIX }}${{ inputs.NEW_VERSION }}${{ inputs.BRANCH_SUFFIX }}"
+          BRANCH_NAME="${BRANCH_PREFIX}${NEW_VERSION}${BRANCH_SUFFIX}"
           git branch
 
-          git checkout ${{ inputs.GIT_HASH }}
+          git checkout "$GIT_HASH"
           git checkout -b "$BRANCH_NAME"
 
-          perl -i -pe 's/version\s*=\s*"[^"]*"/version = "${{ inputs.NEW_VERSION }}.0"/g' aptos-node/Cargo.toml
+          perl -i -pe "s/version\s*=\s*\"[^\"]*\"/version = \"${NEW_VERSION}.0\"/g" aptos-node/Cargo.toml
 
           git push origin "$BRANCH_NAME"
