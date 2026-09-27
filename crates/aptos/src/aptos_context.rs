@@ -59,6 +59,19 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
                 "`--sponsor-gas` requires `--unauthenticated` (and `--session`)".to_string(),
             ));
         }
+        if (options.fee_payer_account.is_some() || !options.secondary_signer_accounts.is_empty())
+            && !options.unauthenticated
+        {
+            return Err(CliError::CommandArgumentError(
+                "`--fee-payer-account` and `--secondary-signer-accounts` require `--unauthenticated` (and `--session`)"
+                    .to_string(),
+            ));
+        }
+        if options.sponsor_gas && options.fee_payer_account.is_some() {
+            return Err(CliError::CommandArgumentError(
+                "`--sponsor-gas` and `--fee-payer-account` cannot be used together".to_string(),
+            ));
+        }
         if options.profile_gas && options.benchmark {
             return Err(CliError::UnexpectedError(
                 "Cannot perform benchmarking and gas profiling at the same time.".to_string(),
@@ -277,11 +290,15 @@ async fn simulate_using_session(
         let built = aptos_move_cli::build_unauthenticated_session_transaction(
             state_store,
             payload,
-            sender_address,
+            aptos_move_cli::UnauthenticatedSigners::from_flags(
+                sender_address,
+                options.secondary_signer_accounts.clone(),
+                options.sponsor_gas,
+                options.fee_payer_account,
+            ),
             options.gas_options.gas_unit_price,
             options.gas_options.max_gas,
             options.gas_options.expiration_secs,
-            options.sponsor_gas,
             options.replay_protection_type,
         )?;
         let hash = built.signed.committed_hash();

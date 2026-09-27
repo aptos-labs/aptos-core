@@ -2757,6 +2757,85 @@ mod simulate_flag_tests {
     }
 
     #[test]
+    fn unauthenticated_fee_payer_and_secondary_signers_parse() {
+        let run = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--sender-account",
+            "0x1",
+            "--fee-payer-account",
+            "0x3",
+            "--secondary-signer-accounts",
+            "0x4",
+            "0x5",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .expect("fee payer and secondary signers should parse");
+        assert_eq!(
+            run.txn_options.fee_payer_account,
+            Some(aptos_types::account_address::AccountAddress::THREE)
+        );
+        assert_eq!(run.txn_options.secondary_signer_accounts.len(), 2);
+    }
+
+    #[test]
+    fn sponsor_gas_conflicts_with_fee_payer_account() {
+        let err = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--sender-account",
+            "0x1",
+            "--sponsor-gas",
+            "--fee-payer-account",
+            "0x3",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .err()
+        .expect("--sponsor-gas and --fee-payer-account must conflict");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("sponsor-gas") || msg.contains("fee-payer-account"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn fee_payer_account_requires_unauthenticated() {
+        let err = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--sender-account",
+            "0x1",
+            "--fee-payer-account",
+            "0x3",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .err()
+        .expect("--fee-payer-account without --unauthenticated must fail");
+        assert!(
+            err.to_string().contains("unauthenticated"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn simulate_session_parses_and_conflicts_with_local() {
         let simulate = parse_simulate(&[
             "simulate",

@@ -2,7 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::Result;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    PrivateKey, Uniform,
+};
 use aptos_transaction_simulation::{Account, SimulationStateStore};
 use aptos_transaction_simulation_session::Session;
 use aptos_types::{
@@ -335,11 +338,13 @@ fn test_sponsor_gas_fee_payer_skips_sender_gas() -> Result<()> {
 }
 
 #[test]
-fn test_execute_unauthenticated_rejects_non_zero_fee_payer() -> Result<()> {
+fn test_unauthenticated_non_zero_fee_payer_pays_gas() -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let mut session = Session::init(temp_dir.path())?;
 
+    let funded = 1_000_000_000u64;
     let sender = fund_address_without_using_key(&mut session, 0)?;
+    let fee_payer = fund_address_without_using_key(&mut session, funded)?;
     let chain_id = session.state_store().get_chain_id()?;
     let raw = RawTransaction::new(
         sender,
@@ -355,14 +360,124 @@ fn test_execute_unauthenticated_rejects_non_zero_fee_payer() -> Result<()> {
         AccountAuthenticator::NoAccountAuthenticator,
         vec![],
         vec![],
-        AccountAddress::ONE,
+        fee_payer,
         AccountAuthenticator::NoAccountAuthenticator,
+    );
+
+    let (vm_status, output) = session.execute_unauthenticated_transaction(txn)?;
+    assert_eq!(vm_status, VMStatus::Executed);
+    assert!(matches!(
+        output.status(),
+        TransactionStatus::Keep(ExecutionStatus::Success)
+    ));
+
+    let gas_cost = output.gas_used() * GAS_UNIT_PRICE;
+    assert!(gas_cost > 0);
+    assert_eq!(session.state_store().get_apt_balance(sender)?, 0);
+    assert_eq!(
+        session.state_store().get_apt_balance(fee_payer)?,
+        funded - gas_cost,
+        "a real fee payer must be charged the gas"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_unauthenticated_multi_agent_passes_prologue() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let mut session = Session::init(temp_dir.path())?;
+
+    let funded = 1_000_000_000u64;
+    let sender = fund_address_without_using_key(&mut session, funded)?;
+    let receiver = fund_address_without_using_key(&mut session, funded)?;
+    let chain_id = session.state_store().get_chain_id()?;
+
+    // 0x3::token::direct_transfer_script takes (sender: &signer, receiver: &signer, ...).
+    // The token does not exist, so the call aborts in Move after the multi-agent
+    // prologue has accepted both unauthenticated signers.
+    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(AccountAddress::THREE, Identifier::new("token").unwrap()),
+        Identifier::new("direct_transfer_script").unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&sender).unwrap(),
+            bcs::to_bytes(&"collection".to_string()).unwrap(),
+            bcs::to_bytes(&"name".to_string()).unwrap(),
+            bcs::to_bytes(&0u64).unwrap(),
+            bcs::to_bytes(&1u64).unwrap(),
+        ],
+    ));
+    let raw = RawTransaction::new(
+        sender,
+        0,
+        payload,
+        MAX_GAS,
+        GAS_UNIT_PRICE,
+        EXPIRATION,
+        chain_id,
+    );
+    let txn = SignedTransaction::new_multi_agent(
+        raw,
+        AccountAuthenticator::NoAccountAuthenticator,
+        vec![receiver],
+        vec![AccountAuthenticator::NoAccountAuthenticator],
+    );
+
+    let (_vm_status, output) = session.execute_unauthenticated_transaction(txn)?;
+    assert!(
+        matches!(
+            output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
+        ),
+        "multi-agent prologue should accept the unauthenticated signers, got {:?}",
+        output.status()
+    );
+
+    let account_resource: AccountResource = session
+        .state_store()
+        .get_resource(sender)?
+        .expect("account resource should exist");
+    assert_eq!(account_resource.sequence_number(), 1);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_unauthenticated_rejects_signed_secondary_signer() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let mut session = Session::init(temp_dir.path())?;
+
+    let sender = fund_address_without_using_key(&mut session, 1_000_000_000)?;
+    let chain_id = session.state_store().get_chain_id()?;
+    let secondary_key = Ed25519PrivateKey::generate(&mut rand::thread_rng());
+    let raw = RawTransaction::new(
+        sender,
+        0,
+        transfer_payload(AccountAddress::ONE, 0),
+        MAX_GAS,
+        GAS_UNIT_PRICE,
+        EXPIRATION,
+        chain_id,
+    );
+    let signed_secondary = AccountAuthenticator::ed25519(
+        secondary_key.public_key(),
+        Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+    );
+    let txn = SignedTransaction::new_multi_agent(
+        raw,
+        AccountAuthenticator::NoAccountAuthenticator,
+        vec![AccountAddress::ONE],
+        vec![signed_secondary],
     );
 
     let err = session
         .execute_unauthenticated_transaction(txn)
-        .expect_err("non-zero fee payer must be rejected");
-    assert!(err.to_string().contains("@0x0"), "unexpected error: {err}");
+        .expect_err("a signed secondary signer must be rejected");
+    assert!(
+        err.to_string().contains("secondary signer"),
+        "unexpected error: {err}"
+    );
 
     Ok(())
 }

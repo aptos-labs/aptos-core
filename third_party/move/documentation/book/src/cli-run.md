@@ -28,7 +28,7 @@ aptos move run \
 | `--type-args <TYPE>...` | Type arguments separated by spaces, e.g., `--type-args 0x1::aptos_coin::AptosCoin`. |
 | `--args <TYPED-ARG>...` | Arguments as `<TYPE>:<VALUE>` pairs, separated by spaces. Supported types: `address`, `bool`, `hex`, `string`, `u8`, `u16`, `u32`, `u64`, `u128`, `u256`, `raw`. Vectors use JSON array syntax: `'u64:[1,2,3]'`. |
 | `--json-file <PATH>` | Read function id, type args, and args from a JSON file instead of the command line. |
-| `--session <PATH>` / `--unauthenticated` / `--sponsor-gas` | See [transaction options](./cli.md#transaction-options). |
+| `--session <PATH>` / `--unauthenticated` / `--sponsor-gas` / `--fee-payer-account` / `--secondary-signer-accounts` | See [transaction options](./cli.md#transaction-options). |
 
 ## `aptos move run-script`
 
@@ -94,7 +94,7 @@ aptos move simulate \
 | Flag | Meaning |
 |---|---|
 | `--local` | Simulate in a local VM (using the latest state pulled from the network), instead of asking the fullnode to simulate. Mutually exclusive with `--session`. |
-| `--session <PATH>` | Dry-run against a local simulation session. Uses `NoAccountAuthenticator` (requires `--sender-account`) and never writes back. Optional `--sponsor-gas` uses fee payer `@0x0`. |
+| `--session <PATH>` | Dry-run against a local simulation session. Uses `NoAccountAuthenticator` (requires `--sender-account`) and never writes back. Optional `--sponsor-gas` uses fee payer `@0x0`; `--fee-payer-account` charges another account; `--secondary-signer-accounts` adds multi-agent signers. |
 | `--show-details` | Include simulated events and state changes in the output. |
 | Plus the same `--function-id` / `--type-args` / `--args` shape as `run`. | |
 

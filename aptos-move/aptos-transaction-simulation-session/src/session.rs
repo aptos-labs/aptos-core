@@ -137,38 +137,66 @@ pub struct NewBlockResult {
 
 /// AptosSimulationVM panics when given a transaction with a valid signature.
 /// Reject those up front with a normal `Result` error instead.
+///
+/// Every signer slot (sender, secondary signers, fee payer) must be
+/// `NoAccountAuthenticator`. Any fee payer address is accepted: `@0x0` waives
+/// gas, any other address pays gas from its own balance.
 fn ensure_unauthenticated_simulation_txn(txn: &SignedTransaction) -> Result<()> {
     let is_no_account =
         |auth: &AccountAuthenticator| matches!(auth, AccountAuthenticator::NoAccountAuthenticator);
+    let ensure_secondaries = |addresses: &[AccountAddress], signers: &[AccountAuthenticator]| {
+        ensure!(
+            addresses.len() == signers.len(),
+            "secondary signer addresses ({}) and authenticators ({}) must have the same length",
+            addresses.len(),
+            signers.len()
+        );
+        ensure!(
+            signers.iter().all(is_no_account),
+            "unauthenticated simulation requires NoAccountAuthenticator for every secondary signer"
+        );
+        Ok(())
+    };
     match txn.authenticator_ref() {
         TransactionAuthenticator::SingleSender { sender } => {
             ensure!(
                 is_no_account(sender),
-                "unauthenticated simulation requires AccountAuthenticator::NoAccountAuthenticator \
-                 (got a signed SingleSender authenticator)"
+                "unauthenticated simulation requires NoAccountAuthenticator for the sender"
             );
+        },
+        TransactionAuthenticator::MultiAgent {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+        } => {
+            ensure!(
+                is_no_account(sender),
+                "unauthenticated simulation requires NoAccountAuthenticator for the sender"
+            );
+            ensure_secondaries(secondary_signer_addresses, secondary_signers)?;
         },
         TransactionAuthenticator::FeePayer {
             sender,
             secondary_signer_addresses,
             secondary_signers,
-            fee_payer_address,
+            fee_payer_address: _,
             fee_payer_signer,
         } => {
             ensure!(
-                is_no_account(sender)
-                    && is_no_account(fee_payer_signer)
-                    && secondary_signers.is_empty()
-                    && secondary_signer_addresses.is_empty()
-                    && *fee_payer_address == AccountAddress::ZERO,
-                "unauthenticated fee-payer simulation only supports fee payer @0x0 with \
-                 NoAccountAuthenticator and no secondary signers"
+                is_no_account(sender),
+                "unauthenticated simulation requires NoAccountAuthenticator for the sender"
             );
+            ensure!(
+                is_no_account(fee_payer_signer),
+                "unauthenticated simulation requires NoAccountAuthenticator for the fee payer"
+            );
+            ensure_secondaries(secondary_signer_addresses, secondary_signers)?;
         },
-        _ => {
+        TransactionAuthenticator::Ed25519 { .. }
+        | TransactionAuthenticator::MultiEd25519 { .. } => {
             bail!(
-                "unauthenticated simulation only supports SingleSender or FeePayer authenticators \
-                 with NoAccountAuthenticator"
+                "unauthenticated simulation cannot use a signed Ed25519 / MultiEd25519 \
+                 authenticator; use NoAccountAuthenticator"
             );
         },
     }
@@ -688,8 +716,9 @@ impl Session {
     /// Executes a transaction without authenticating the sender, using the same
     /// simulation-VM path as fullnode `POST /transactions/simulate`.
     ///
-    /// The transaction must use [`AccountAuthenticator::NoAccountAuthenticator`]
-    /// (optionally as a fee-payer transaction with fee payer `@0x0` to skip gas).
+    /// Every signer slot must use [`AccountAuthenticator::NoAccountAuthenticator`].
+    /// Single-sender, multi-agent, and fee-payer transactions are supported; a fee
+    /// payer of `@0x0` waives gas, any other fee payer pays from its own balance.
     /// On a kept status the write set is applied so subsequent session commands
     /// observe it; discarded outputs leave session state unchanged.
     ///

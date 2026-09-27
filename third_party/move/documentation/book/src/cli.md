@@ -54,7 +54,9 @@ The flags below are accepted by every subcommand that submits a transaction: `pu
 | `--profile-gas` | Locally simulate and emit a gas-usage flamegraph. |
 | `--session <PATH>` | Execute or dry-run against a local simulation session directory (see `aptos move sim`). |
 | `--unauthenticated` | With `--session`, build a `NoAccountAuthenticator` transaction and run it through the simulation VM. Requires `--sender-account`. Cannot be submitted on-chain. |
-| `--sponsor-gas` | With `--session` (and `--unauthenticated` for `run` / `run-script`), use fee payer `@0x0` to skip charging gas from the sender. |
+| `--sponsor-gas` | With `--session` (and `--unauthenticated` for `run` / `run-script`), use fee payer `@0x0` to skip charging gas from the sender. Conflicts with `--fee-payer-account`. |
+| `--fee-payer-account <ADDR>` | With `--session` (and `--unauthenticated` for `run` / `run-script`), charge gas to this account instead of the sender. No key needed. |
+| `--secondary-signer-accounts <ADDR>...` | With `--session` (and `--unauthenticated` for `run` / `run-script`), extra signers for multi-agent entry functions or scripts. No keys needed. |
 
 ## Output and exit code
 

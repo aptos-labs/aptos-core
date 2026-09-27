@@ -60,7 +60,7 @@ pub use resource_account::{ResourceAccountSeed, SeedEncoding};
 pub use script_compile::{compile_in_temp_dir, CompileScriptFunction};
 use std::sync::Arc;
 pub use stored_package::CachedPackageMetadata;
-pub use transactions::build_unauthenticated_session_transaction;
+pub use transactions::{build_unauthenticated_session_transaction, UnauthenticatedSigners};
 
 /// Trait for command structs that have an `env: Arc<MoveEnv>` field.
 ///

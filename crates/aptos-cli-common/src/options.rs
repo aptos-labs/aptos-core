@@ -1079,8 +1079,27 @@ pub struct TransactionOptions {
     /// When combined with `--session` and `--unauthenticated`, skip gas payment
     /// by using fee payer `@0x0` (same rule as fullnode simulate). Default off:
     /// gas is still charged from the sender when they are the gas payer.
-    #[clap(long, requires_all = ["session", "unauthenticated"])]
+    #[clap(long, requires_all = ["session", "unauthenticated"], conflicts_with = "fee_payer_account")]
     pub sponsor_gas: bool,
+
+    /// With `--unauthenticated`, charge gas to this account instead of the
+    /// sender. No key is needed for it.
+    #[clap(
+        long,
+        value_parser = crate::load_account_arg,
+        requires_all = ["session", "unauthenticated"]
+    )]
+    pub fee_payer_account: Option<AccountAddress>,
+
+    /// With `--unauthenticated`, extra signer accounts for multi-agent entry
+    /// functions or scripts. No keys are needed for them.
+    #[clap(
+        long,
+        value_parser = crate::load_account_arg,
+        num_args = 1..,
+        requires_all = ["session", "unauthenticated"]
+    )]
+    pub secondary_signer_accounts: Vec<AccountAddress>,
 
     /// Replay protection mechanism to use when generating the transaction.
     ///
@@ -1258,9 +1277,11 @@ mod unauthenticated_key_tests {
 
     #[test]
     fn unauthenticated_key_lookup_explains_the_limitation() {
-        let mut options = TransactionOptions::default();
-        options.unauthenticated = true;
-        options.sender_account = Some(AccountAddress::ONE);
+        let options = TransactionOptions {
+            unauthenticated: true,
+            sender_account: Some(AccountAddress::ONE),
+            ..Default::default()
+        };
 
         let private_key_err = options
             .get_key_and_address()
