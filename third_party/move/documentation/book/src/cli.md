@@ -52,6 +52,9 @@ The flags below are accepted by every subcommand that submits a transaction: `pu
 | `--assume-yes` / `-y` | Skip interactive confirmations. |
 | `--local` | Simulate the transaction locally instead of submitting it. |
 | `--profile-gas` | Locally simulate and emit a gas-usage flamegraph. |
+| `--session <PATH>` | Execute or dry-run against a local simulation session directory (see `aptos move sim`). |
+| `--unauthenticated` | With `--session`, build a `NoAccountAuthenticator` transaction and run it through the simulation VM. Requires `--sender-account`. Cannot be submitted on-chain. |
+| `--sponsor-gas` | With `--session` (and `--unauthenticated` for `run` / `run-script`), use fee payer `@0x0` to skip charging gas from the sender. |
 
 ## Output and exit code
 

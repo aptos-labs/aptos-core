@@ -961,6 +961,31 @@ pub struct GasOptions {
     pub expiration_secs: u64,
 }
 
+/// Default max gas used by session / local simulation when the user does not
+/// pass `--max-gas`.
+pub const DEFAULT_SESSION_MAX_GAS: u64 = 2_000_000;
+
+/// Resolve `--max-gas` for session / local simulation.
+///
+/// When `sponsor_gas` is set (fee payer `@0x0`), gas is not charged from the
+/// sender, so the default must not be capped by the sender's APT balance —
+/// otherwise a zero-balance sender gets `max_gas = 0` and the txn fails before
+/// any useful simulation.
+pub fn estimate_session_max_gas(
+    explicit: Option<u64>,
+    balance: u64,
+    gas_unit_price: u64,
+    sponsor_gas: bool,
+) -> u64 {
+    explicit.unwrap_or_else(|| {
+        if sponsor_gas || gas_unit_price == 0 {
+            DEFAULT_SESSION_MAX_GAS
+        } else {
+            std::cmp::min(balance / gas_unit_price, DEFAULT_SESSION_MAX_GAS)
+        }
+    })
+}
+
 impl Default for GasOptions {
     fn default() -> Self {
         GasOptions {
@@ -1171,4 +1196,37 @@ pub fn get_mint_site_url(address: Option<AccountAddress>) -> String {
         None => "".to_string(),
     };
     format!("https://aptos.dev/network/faucet{}", params)
+}
+
+#[cfg(test)]
+mod estimate_session_max_gas_tests {
+    use super::{estimate_session_max_gas, DEFAULT_SESSION_MAX_GAS};
+
+    #[test]
+    fn uses_explicit_max_gas_when_provided() {
+        assert_eq!(estimate_session_max_gas(Some(42), 0, 100, true), 42);
+        assert_eq!(estimate_session_max_gas(Some(42), 0, 100, false), 42);
+    }
+
+    #[test]
+    fn sponsor_gas_ignores_zero_sender_balance() {
+        assert_eq!(
+            estimate_session_max_gas(None, 0, 100, true),
+            DEFAULT_SESSION_MAX_GAS
+        );
+    }
+
+    #[test]
+    fn without_sponsor_caps_to_sender_balance() {
+        assert_eq!(estimate_session_max_gas(None, 50_000, 100, false), 500);
+        assert_eq!(estimate_session_max_gas(None, 0, 100, false), 0);
+    }
+
+    #[test]
+    fn zero_gas_unit_price_uses_default() {
+        assert_eq!(
+            estimate_session_max_gas(None, 0, 0, false),
+            DEFAULT_SESSION_MAX_GAS
+        );
+    }
 }

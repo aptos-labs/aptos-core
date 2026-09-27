@@ -6,7 +6,7 @@ use crate::{
     delta::{load_delta, save_delta},
     txn_output::{save_events, save_write_set},
 };
-use anyhow::Result;
+use anyhow::{bail, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
@@ -23,8 +23,9 @@ use aptos_types::{
     randomness::PerBlockRandomness,
     state_store::{state_key::StateKey, TStateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        SignedTransaction, Transaction, TransactionExecutable, TransactionOutput,
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        signature_verified_transaction::SignatureVerifiedTransaction,
+        AuxiliaryInfo, SignedTransaction, Transaction, TransactionExecutable, TransactionOutput,
         TransactionPayload, TransactionPayloadInner, TransactionStatus,
     },
     vm_status::VMStatus,
@@ -132,6 +133,43 @@ pub struct NewBlockResult {
     /// The epoch after the block. May differ from `old_epoch` if the block
     /// triggered a reconfiguration.
     pub new_epoch: u64,
+}
+
+/// AptosSimulationVM panics when given a transaction with a valid signature.
+/// Reject those up front with a normal `Result` error instead.
+fn ensure_unauthenticated_simulation_txn(txn: &SignedTransaction) -> Result<()> {
+    let is_no_account =
+        |auth: &AccountAuthenticator| matches!(auth, AccountAuthenticator::NoAccountAuthenticator);
+    match txn.authenticator_ref() {
+        TransactionAuthenticator::SingleSender { sender } => {
+            ensure!(
+                is_no_account(sender),
+                "unauthenticated simulation requires AccountAuthenticator::NoAccountAuthenticator \
+                 (got a signed SingleSender authenticator)"
+            );
+        },
+        TransactionAuthenticator::FeePayer {
+            sender,
+            secondary_signers,
+            fee_payer_signer,
+            ..
+        } => {
+            ensure!(
+                is_no_account(sender)
+                    && is_no_account(fee_payer_signer)
+                    && secondary_signers.iter().all(is_no_account),
+                "unauthenticated fee-payer simulation requires NoAccountAuthenticator for the \
+                 sender, fee payer, and any secondary signers"
+            );
+        },
+        _ => {
+            bail!(
+                "unauthenticated simulation only supports SingleSender or FeePayer authenticators \
+                 with NoAccountAuthenticator"
+            );
+        },
+    }
+    Ok(())
 }
 
 /// A session for simulating transactions, with data being persisted to a directory, allowing the session
@@ -651,10 +689,15 @@ impl Session {
     /// (optionally as a fee-payer transaction with fee payer `@0x0` to skip gas).
     /// On a kept status the write set is applied so subsequent session commands
     /// observe it; discarded outputs leave session state unchanged.
+    ///
+    /// Returns an error (instead of panicking inside the simulation VM) when the
+    /// transaction carries a verifiable signature.
     pub fn execute_unauthenticated_transaction(
         &mut self,
         txn: SignedTransaction,
     ) -> Result<(VMStatus, TransactionOutput)> {
+        ensure_unauthenticated_simulation_txn(&txn)?;
+
         let (vm_status, txn_output) =
             AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &self.state_store);
 
@@ -675,14 +718,15 @@ impl Session {
     ///
     /// Unlike [`execute_unauthenticated_transaction`], this never mutates session
     /// state or advances the op counter.
+    ///
+    /// Returns an error (instead of panicking inside the simulation VM) when the
+    /// transaction carries a verifiable signature.
     pub fn simulate_transaction(
         &self,
         txn: SignedTransaction,
     ) -> Result<(VMStatus, TransactionOutput)> {
-        Ok(AptosSimulationVM::create_vm_and_simulate_signed_transaction(
-            &txn,
-            &self.state_store,
-        ))
+        ensure_unauthenticated_simulation_txn(&txn)?;
+        Ok(AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &self.state_store))
     }
 
     /// Persists execution artifacts and advances the session op counter.

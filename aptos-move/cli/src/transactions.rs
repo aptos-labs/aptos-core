@@ -7,9 +7,9 @@ use crate::{local_simulation, MoveDebugger, MoveEnv};
 // Re-export from aptos-cli-common to eliminate the duplicate definition.
 pub use aptos_cli_common::ReplayProtectionType;
 use aptos_cli_common::{
-    format_txn_status, get_account_with_state, CliError, CliTypedResult, EncodingOptions,
-    GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions,
-    TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
+    estimate_session_max_gas, format_txn_status, get_account_with_state, CliError, CliTypedResult,
+    EncodingOptions, GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions,
+    RestOptions, TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
@@ -222,6 +222,12 @@ pub(crate) struct TxnOptions {
     /// never writes back to the session. Mutually exclusive with `--local`.
     #[clap(long)]
     pub(crate) session: Option<PathBuf>,
+
+    /// When combined with `--session`, skip gas payment by using fee payer
+    /// `@0x0` (same rule as fullnode simulate). Default off: gas is still
+    /// charged from the sender when they are the gas payer.
+    #[clap(long, requires = "session")]
+    pub(crate) sponsor_gas: bool,
 
     /// Replay protection mechanism to use when generating the transaction.
     ///
@@ -506,7 +512,6 @@ impl TxnOptions {
         let state_store = sess.state_store();
 
         const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
-        const DEFAULT_MAX_GAS: u64 = 2_000_000;
 
         // Same auth-skip semantics as fullnode simulate: NoAccountAuthenticator.
         let sender_address = self.sender_account.ok_or_else(|| {
@@ -527,13 +532,12 @@ impl TxnOptions {
             .gas_unit_price
             .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
         let balance = state_store.get_apt_balance(sender_address)?;
-        let max_gas = self.gas_options.max_gas.unwrap_or_else(|| {
-            if gas_unit_price == 0 {
-                DEFAULT_MAX_GAS
-            } else {
-                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
-            }
-        });
+        let max_gas = estimate_session_max_gas(
+            self.gas_options.max_gas,
+            balance,
+            gas_unit_price,
+            self.sponsor_gas,
+        );
 
         let raw_transaction = TransactionFactory::new(state_store.get_chain_id()?)
             .with_gas_unit_price(gas_unit_price)
@@ -544,10 +548,21 @@ impl TxnOptions {
             .sequence_number(seq_num)
             .build();
 
-        let transaction = SignedTransaction::new_single_sender(
-            raw_transaction,
-            AccountAuthenticator::NoAccountAuthenticator,
-        );
+        let transaction = if self.sponsor_gas {
+            SignedTransaction::new_fee_payer(
+                raw_transaction,
+                AccountAuthenticator::NoAccountAuthenticator,
+                vec![],
+                vec![],
+                AccountAddress::ZERO,
+                AccountAuthenticator::NoAccountAuthenticator,
+            )
+        } else {
+            SignedTransaction::new_single_sender(
+                raw_transaction,
+                AccountAuthenticator::NoAccountAuthenticator,
+            )
+        };
         let hash = transaction.committed_hash();
 
         let (vm_status, txn_output) = sess.simulate_transaction(transaction)?;
@@ -574,10 +589,14 @@ impl TxnOptions {
             changes: None,
         };
         if show_details {
-            summary.events =
-                Some(local_contract_events_to_json(state_store, txn_output.events())?);
-            summary.changes =
-                Some(local_write_set_to_json(state_store, txn_output.write_set())?);
+            summary.events = Some(local_contract_events_to_json(
+                state_store,
+                txn_output.events(),
+            )?);
+            summary.changes = Some(local_write_set_to_json(
+                state_store,
+                txn_output.write_set(),
+            )?);
         }
 
         Ok(summary)

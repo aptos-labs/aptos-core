@@ -4,7 +4,13 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- _No changes yet._
+- Add `--unauthenticated` (and optional `--sponsor-gas`) for `aptos move run` /
+  `run-script` inside a `--session`, so an arbitrary `--sender-account` can
+  execute through the simulation VM without a private key. Successful writes
+  update the session; the resulting authenticator cannot be submitted on-chain.
+- Add `aptos move simulate --session` to dry-run against a local simulation
+  session without mutating it (also supports `--sponsor-gas`). Mutually
+  exclusive with `--local`.
 
 ## [9.6.0]
 - Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.

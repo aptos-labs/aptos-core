@@ -2736,6 +2736,27 @@ mod simulate_flag_tests {
     }
 
     #[test]
+    fn sponsor_gas_with_unauthenticated_session_parses() {
+        let run = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--sponsor-gas",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .expect("sponsor-gas with unauthenticated session should parse");
+        assert!(run.txn_options.unauthenticated);
+        assert!(run.txn_options.sponsor_gas);
+    }
+
+    #[test]
     fn simulate_session_parses_and_conflicts_with_local() {
         let simulate = parse_simulate(&[
             "simulate",
@@ -2751,6 +2772,22 @@ mod simulate_flag_tests {
         ]);
         assert!(simulate.txn_options.session.is_some());
         assert!(!simulate.local);
+        assert!(!simulate.txn_options.sponsor_gas);
+
+        let with_sponsor = parse_simulate(&[
+            "simulate",
+            "--session",
+            "/tmp/fork",
+            "--sponsor-gas",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ]);
+        assert!(with_sponsor.txn_options.sponsor_gas);
 
         let err = TestCli::try_parse_from([
             "test",

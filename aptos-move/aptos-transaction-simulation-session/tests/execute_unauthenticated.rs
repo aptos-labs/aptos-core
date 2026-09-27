@@ -80,10 +80,7 @@ fn authenticated_transfer_with_key(
 /// Fund creates an APT balance without storing a private key for the address.
 /// `store_and_fund_account` is used so the Account resource (sequence number)
 /// exists; the private key is discarded after setup and never used to sign.
-fn fund_address_without_using_key(
-    session: &mut Session,
-    amount: u64,
-) -> Result<AccountAddress> {
+fn fund_address_without_using_key(session: &mut Session, amount: u64) -> Result<AccountAddress> {
     let account = Account::new();
     let address = *account.address();
     session
@@ -91,6 +88,32 @@ fn fund_address_without_using_key(
         .store_and_fund_account(account, amount, 0)?;
     // Drop the Account (and its key) — subsequent txs use NoAccountAuthenticator.
     Ok(address)
+}
+
+fn unauthenticated_fee_payer_transfer(
+    sender: AccountAddress,
+    recipient: AccountAddress,
+    amount: u64,
+    sequence_number: u64,
+    chain_id: ChainId,
+) -> SignedTransaction {
+    let raw = RawTransaction::new(
+        sender,
+        sequence_number,
+        transfer_payload(recipient, amount),
+        MAX_GAS,
+        GAS_UNIT_PRICE,
+        EXPIRATION,
+        chain_id,
+    );
+    SignedTransaction::new_fee_payer(
+        raw,
+        AccountAuthenticator::NoAccountAuthenticator,
+        vec![],
+        vec![],
+        AccountAddress::ZERO,
+        AccountAuthenticator::NoAccountAuthenticator,
+    )
 }
 
 #[test]
@@ -220,13 +243,10 @@ fn test_authenticated_wrong_key_still_invalid_auth_key() -> Result<()> {
         matches!(
             output.status(),
             TransactionStatus::Discard(StatusCode::INVALID_AUTH_KEY)
-        ) || matches!(
-            vm_status,
-            VMStatus::Error {
-                status_code: StatusCode::INVALID_AUTH_KEY,
-                ..
-            }
-        ),
+        ) || matches!(vm_status, VMStatus::Error {
+            status_code: StatusCode::INVALID_AUTH_KEY,
+            ..
+        }),
         "expected INVALID_AUTH_KEY discard, got status={:?} vm_status={:?}",
         output.status(),
         vm_status
@@ -237,6 +257,79 @@ fn test_authenticated_wrong_key_still_invalid_auth_key() -> Result<()> {
         balance_after, funded,
         "discarded INVALID_AUTH_KEY must not pay the transfer (or gas)"
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_unauthenticated_rejects_signed_transaction() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let mut session = Session::init(temp_dir.path())?;
+
+    let funded = 1_000_000_000u64;
+    let sender = Account::new();
+    let sender_address = *sender.address();
+    let signer_key = sender.privkey.clone();
+    session
+        .state_store()
+        .store_and_fund_account(sender, funded, 0)?;
+
+    let chain_id = session.state_store().get_chain_id()?;
+    let txn = authenticated_transfer_with_key(
+        sender_address,
+        &signer_key,
+        AccountAddress::ONE,
+        1,
+        0,
+        chain_id,
+    );
+
+    let err = session
+        .execute_unauthenticated_transaction(txn)
+        .expect_err("signed txn must be rejected before SimulationVM");
+    assert!(
+        err.to_string().contains("NoAccountAuthenticator"),
+        "unexpected error: {err}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_sponsor_gas_fee_payer_skips_sender_gas() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let mut session = Session::init(temp_dir.path())?;
+
+    // Account exists with zero APT — without @0x0 fee payer this cannot pay gas.
+    let sender = fund_address_without_using_key(&mut session, 0)?;
+    let chain_id = session.state_store().get_chain_id()?;
+    let transfer_amount = 0u64;
+
+    let txn = unauthenticated_fee_payer_transfer(
+        sender,
+        AccountAddress::ONE,
+        transfer_amount,
+        0,
+        chain_id,
+    );
+    let (vm_status, output) = session.execute_unauthenticated_transaction(txn)?;
+    assert_eq!(vm_status, VMStatus::Executed);
+    assert!(matches!(
+        output.status(),
+        TransactionStatus::Keep(ExecutionStatus::Success)
+    ));
+    assert!(output.gas_used() > 0);
+    assert_eq!(
+        session.state_store().get_apt_balance(sender)?,
+        0,
+        "fee payer @0x0 must leave a zero-balance sender untouched"
+    );
+
+    let account_resource: AccountResource = session
+        .state_store()
+        .get_resource(sender)?
+        .expect("account resource should exist");
+    assert_eq!(account_resource.sequence_number(), 1);
 
     Ok(())
 }

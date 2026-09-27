@@ -8,9 +8,9 @@
 //! gas profiling, benchmarking, and session-based execution.
 
 use aptos_cli_common::{
-    explorer_transaction_link, format_txn_status, get_account_with_state, prompt_yes_with_override,
-    AccountType, CliError, CliTypedResult, Network, ReplayProtectionType, TransactionOptions,
-    TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
+    estimate_session_max_gas, explorer_transaction_link, format_txn_status, get_account_with_state,
+    prompt_yes_with_override, AccountType, CliError, CliTypedResult, Network, ReplayProtectionType,
+    TransactionOptions, TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_global_constants::adjust_gas_headroom;
@@ -264,7 +264,6 @@ async fn simulate_using_session(
     let state_store = sess.state_store();
 
     const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
-    const DEFAULT_MAX_GAS: u64 = 2_000_000;
 
     if options.unauthenticated {
         match &payload {
@@ -299,13 +298,12 @@ async fn simulate_using_session(
             .gas_unit_price
             .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
         let balance = state_store.get_apt_balance(sender_address)?;
-        let max_gas = options.gas_options.max_gas.unwrap_or_else(|| {
-            if gas_unit_price == 0 {
-                DEFAULT_MAX_GAS
-            } else {
-                std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
-            }
-        });
+        let max_gas = estimate_session_max_gas(
+            options.gas_options.max_gas,
+            balance,
+            gas_unit_price,
+            options.sponsor_gas,
+        );
 
         let raw_transaction = TransactionFactory::new(state_store.get_chain_id()?)
             .with_gas_unit_price(gas_unit_price)
@@ -368,13 +366,12 @@ async fn simulate_using_session(
         .gas_unit_price
         .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
     let balance = state_store.get_apt_balance(sender_address)?;
-    let max_gas = options.gas_options.max_gas.unwrap_or_else(|| {
-        if gas_unit_price == 0 {
-            DEFAULT_MAX_GAS
-        } else {
-            std::cmp::min(balance / gas_unit_price, DEFAULT_MAX_GAS)
-        }
-    });
+    let max_gas = estimate_session_max_gas(
+        options.gas_options.max_gas,
+        balance,
+        gas_unit_price,
+        /*sponsor_gas=*/ false,
+    );
 
     let transaction_factory = TransactionFactory::new(state_store.get_chain_id()?)
         .with_gas_unit_price(gas_unit_price)
