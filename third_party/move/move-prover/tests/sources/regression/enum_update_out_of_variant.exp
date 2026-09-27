@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/enum_update_out_of_variant.move:29:9
+   │
+29 │         ensures result == update_field(e, f, _v); // error: unspecified for a C receiver
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/enum_update_out_of_variant.move:24: set_f_unchanged
+   =     at tests/sources/regression/enum_update_out_of_variant.move:28: set_f_unchanged (spec)
+   =     at tests/sources/regression/enum_update_out_of_variant.move:24: set_f_unchanged
+   =         e = <redacted>
+   =         _v = <redacted>
+   =     at tests/sources/regression/enum_update_out_of_variant.move:25: set_f_unchanged
+   =         result = <redacted>
+   =     at tests/sources/regression/enum_update_out_of_variant.move:29: set_f_unchanged (spec)
