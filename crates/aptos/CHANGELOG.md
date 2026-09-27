@@ -8,6 +8,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
   `run-script` inside a `--session`, so an arbitrary `--sender-account` can
   execute through the simulation VM without a private key. Successful writes
   update the session; the resulting authenticator cannot be submitted on-chain.
+  `--replay-protection-type nonce` is honored. Commands that still need a
+  signing key (`deploy-object`, chunked publish) reject the flag.
 - Add `aptos move simulate --session` to dry-run against a local simulation
   session without mutating it (also supports `--sponsor-gas`). Mutually
   exclusive with `--local`.

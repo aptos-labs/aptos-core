@@ -1069,6 +1069,10 @@ pub struct TransactionOptions {
     /// This transaction cannot be submitted to a network.
     ///
     /// Requires `--session` and `--sender-account`.
+    ///
+    /// Supported for `run`, `run-script`, non-chunked `publish`, `upgrade-object`
+    /// with `--session`, and `simulate --session`. Commands that derive an address
+    /// from a signing key (`deploy-object`, chunked publish) reject this flag.
     #[clap(long, requires_all = ["session", "sender_account"])]
     pub unauthenticated: bool,
 
@@ -1118,6 +1122,7 @@ impl TransactionOptions {
     /// Retrieves the private key and the associated address
     /// TODO: Cache this information
     pub fn get_key_and_address(&self) -> CliTypedResult<(Ed25519PrivateKey, AccountAddress)> {
+        self.reject_if_unauthenticated_needs_key()?;
         self.private_key_options.extract_private_key_and_address(
             self.encoding_options.encoding,
             &self.profile_options,
@@ -1126,12 +1131,27 @@ impl TransactionOptions {
     }
 
     pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
+        self.reject_if_unauthenticated_needs_key()?;
         self.private_key_options
             .extract_ed25519_public_key_and_address(
                 self.encoding_options.encoding,
                 &self.profile_options,
                 self.sender_account,
             )
+    }
+
+    /// `--unauthenticated` has no signing key. Commands that call the key helpers
+    /// (`deploy-object`, chunked publish, and similar) must fail here instead of
+    /// asking for a private key that will not be used.
+    fn reject_if_unauthenticated_needs_key(&self) -> CliTypedResult<()> {
+        if self.unauthenticated {
+            Err(CliError::CommandArgumentError(
+                "`--unauthenticated` has no signing key. It is supported for `aptos move run`, `run-script`, non-chunked `publish`, `upgrade-object --session`, and `simulate --session`. Commands that derive an address from a key (such as `deploy-object` or chunked publish) cannot use it."
+                    .to_string(),
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
@@ -1228,5 +1248,32 @@ mod estimate_session_max_gas_tests {
             estimate_session_max_gas(None, 0, 0, false),
             DEFAULT_SESSION_MAX_GAS
         );
+    }
+}
+
+#[cfg(test)]
+mod unauthenticated_key_tests {
+    use super::TransactionOptions;
+    use move_core_types::account_address::AccountAddress;
+
+    #[test]
+    fn unauthenticated_key_lookup_explains_the_limitation() {
+        let mut options = TransactionOptions::default();
+        options.unauthenticated = true;
+        options.sender_account = Some(AccountAddress::ONE);
+
+        let private_key_err = options
+            .get_key_and_address()
+            .expect_err("unauthenticated must not ask for a private key");
+        let public_key_err = options
+            .get_public_key_and_address()
+            .expect_err("unauthenticated must not ask for a public key");
+        for err in [private_key_err, public_key_err] {
+            let msg = err.to_string();
+            assert!(
+                msg.contains("unauthenticated") && msg.contains("deploy-object"),
+                "unexpected error: {msg}"
+            );
+        }
     }
 }

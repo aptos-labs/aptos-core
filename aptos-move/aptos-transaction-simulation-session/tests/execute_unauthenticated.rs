@@ -335,6 +335,39 @@ fn test_sponsor_gas_fee_payer_skips_sender_gas() -> Result<()> {
 }
 
 #[test]
+fn test_execute_unauthenticated_rejects_non_zero_fee_payer() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let mut session = Session::init(temp_dir.path())?;
+
+    let sender = fund_address_without_using_key(&mut session, 0)?;
+    let chain_id = session.state_store().get_chain_id()?;
+    let raw = RawTransaction::new(
+        sender,
+        0,
+        transfer_payload(AccountAddress::ONE, 0),
+        MAX_GAS,
+        GAS_UNIT_PRICE,
+        EXPIRATION,
+        chain_id,
+    );
+    let txn = SignedTransaction::new_fee_payer(
+        raw,
+        AccountAuthenticator::NoAccountAuthenticator,
+        vec![],
+        vec![],
+        AccountAddress::ONE,
+        AccountAuthenticator::NoAccountAuthenticator,
+    );
+
+    let err = session
+        .execute_unauthenticated_transaction(txn)
+        .expect_err("non-zero fee payer must be rejected");
+    assert!(err.to_string().contains("@0x0"), "unexpected error: {err}");
+
+    Ok(())
+}
+
+#[test]
 fn test_simulate_transaction_does_not_mutate_session() -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let mut session = Session::init(temp_dir.path())?;

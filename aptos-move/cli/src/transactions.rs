@@ -238,6 +238,96 @@ pub(crate) struct TxnOptions {
     pub(crate) replay_protection_type: ReplayProtectionType,
 }
 
+/// A session transaction built with `NoAccountAuthenticator`.
+pub struct UnauthenticatedSessionTransaction {
+    pub signed: SignedTransaction,
+    pub sender: AccountAddress,
+    pub gas_unit_price: u64,
+    /// `None` when replay protection is a nonce (orderless).
+    pub sequence_number: Option<u64>,
+    pub replay_protector: ReplayProtector,
+}
+
+/// Build an unauthenticated session transaction from the session's current state.
+///
+/// Shared by `aptos move run --session --unauthenticated` and
+/// `aptos move simulate --session`.
+pub fn build_unauthenticated_session_transaction(
+    state_store: &impl aptos_transaction_simulation::SimulationStateStore,
+    payload: TransactionPayload,
+    sender: AccountAddress,
+    gas_unit_price: Option<u64>,
+    max_gas: Option<u64>,
+    expiration_secs: u64,
+    sponsor_gas: bool,
+    replay_protection: ReplayProtectionType,
+) -> CliTypedResult<UnauthenticatedSessionTransaction> {
+    match &payload {
+        TransactionPayload::EncryptedPayload(_) => {
+            return Err(CliError::CommandArgumentError(
+                "unauthenticated session execution does not support encrypted payloads".to_string(),
+            ));
+        },
+        TransactionPayload::Multisig(_) => {
+            return Err(CliError::CommandArgumentError(
+                "unauthenticated session execution does not support multisig executables"
+                    .to_string(),
+            ));
+        },
+        _ => {},
+    }
+
+    const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+
+    let account = state_store.get_resource::<AccountResource>(sender)?;
+    let account_sequence = account.map(|a| a.sequence_number).unwrap_or(0);
+    let gas_unit_price = gas_unit_price.unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+    let balance = state_store.get_apt_balance(sender)?;
+    let max_gas = estimate_session_max_gas(max_gas, balance, gas_unit_price, sponsor_gas);
+
+    let mut builder = TransactionFactory::new(state_store.get_chain_id()?)
+        .with_gas_unit_price(gas_unit_price)
+        .with_max_gas_amount(max_gas)
+        .with_transaction_expiration_time(expiration_secs)
+        .payload(payload)
+        .sender(sender)
+        .sequence_number(account_sequence);
+    if replay_protection == ReplayProtectionType::Nonce {
+        let mut rng = rand::thread_rng();
+        builder = builder.upgrade_payload_with_rng(&mut rng, true, true);
+    }
+    let raw_transaction = builder.build();
+
+    let signed = if sponsor_gas {
+        SignedTransaction::new_fee_payer(
+            raw_transaction,
+            AccountAuthenticator::NoAccountAuthenticator,
+            vec![],
+            vec![],
+            AccountAddress::ZERO,
+            AccountAuthenticator::NoAccountAuthenticator,
+        )
+    } else {
+        SignedTransaction::new_single_sender(
+            raw_transaction,
+            AccountAuthenticator::NoAccountAuthenticator,
+        )
+    };
+    let replay_protector = signed.replay_protector();
+    let sequence_number = match replay_protector {
+        ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+        ReplayProtector::Nonce(_) => None,
+    };
+
+    Ok(UnauthenticatedSessionTransaction {
+        signed,
+        sender,
+        gas_unit_price,
+        sequence_number,
+        replay_protector,
+    })
+}
+
 impl TxnOptions {
     /// Builds a rest client
     pub fn rest_client(&self) -> CliTypedResult<Client> {
@@ -489,31 +579,8 @@ impl TxnOptions {
         payload: TransactionPayload,
         show_details: bool,
     ) -> CliTypedResult<TransactionSummary> {
-        use aptos_transaction_simulation::SimulationStateStore;
         use aptos_transaction_simulation_session::Session;
 
-        match &payload {
-            TransactionPayload::EncryptedPayload(_) => {
-                return Err(CliError::CommandArgumentError(
-                    "`aptos move simulate --session` does not support encrypted payloads"
-                        .to_string(),
-                ));
-            },
-            TransactionPayload::Multisig(_) => {
-                return Err(CliError::CommandArgumentError(
-                    "`aptos move simulate --session` does not support multisig executables"
-                        .to_string(),
-                ));
-            },
-            _ => {},
-        }
-
-        let sess = Session::load(session_path)?;
-        let state_store = sess.state_store();
-
-        const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
-
-        // Same auth-skip semantics as fullnode simulate: NoAccountAuthenticator.
         let sender_address = self.sender_account.ok_or_else(|| {
             CliError::CommandArgumentError(
                 "`aptos move simulate --session` requires `--sender-account`".to_string(),
@@ -524,48 +591,23 @@ impl TxnOptions {
             "Warning: session simulate is unauthenticated (NoAccountAuthenticator) and does not modify session state."
         );
 
-        let account = state_store.get_resource::<AccountResource>(sender_address)?;
-        let seq_num = account.map(|a| a.sequence_number).unwrap_or(0);
-
-        let gas_unit_price = self
-            .gas_options
-            .gas_unit_price
-            .unwrap_or(DEFAULT_GAS_UNIT_PRICE);
-        let balance = state_store.get_apt_balance(sender_address)?;
-        let max_gas = estimate_session_max_gas(
+        let sess = Session::load(session_path)?;
+        let built = build_unauthenticated_session_transaction(
+            sess.state_store(),
+            payload,
+            sender_address,
+            self.gas_options.gas_unit_price,
             self.gas_options.max_gas,
-            balance,
-            gas_unit_price,
+            self.gas_options.expiration_secs,
             self.sponsor_gas,
-        );
+            self.replay_protection_type,
+        )?;
+        let hash = built.signed.committed_hash();
+        let gas_unit_price = built.gas_unit_price;
+        let seq_num = built.sequence_number;
+        let replay_protector = built.replay_protector;
 
-        let raw_transaction = TransactionFactory::new(state_store.get_chain_id()?)
-            .with_gas_unit_price(gas_unit_price)
-            .with_max_gas_amount(max_gas)
-            .with_transaction_expiration_time(self.gas_options.expiration_secs)
-            .payload(payload)
-            .sender(sender_address)
-            .sequence_number(seq_num)
-            .build();
-
-        let transaction = if self.sponsor_gas {
-            SignedTransaction::new_fee_payer(
-                raw_transaction,
-                AccountAuthenticator::NoAccountAuthenticator,
-                vec![],
-                vec![],
-                AccountAddress::ZERO,
-                AccountAuthenticator::NoAccountAuthenticator,
-            )
-        } else {
-            SignedTransaction::new_single_sender(
-                raw_transaction,
-                AccountAuthenticator::NoAccountAuthenticator,
-            )
-        };
-        let hash = transaction.committed_hash();
-
-        let (vm_status, txn_output) = sess.simulate_transaction(transaction)?;
+        let (vm_status, txn_output) = sess.simulate_transaction(built.signed)?;
 
         let success = match txn_output.status() {
             TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
@@ -578,8 +620,8 @@ impl TxnOptions {
             gas_unit_price: Some(gas_unit_price),
             pending: None,
             sender: Some(sender_address),
-            sequence_number: Some(seq_num),
-            replay_protector: None,
+            sequence_number: seq_num,
+            replay_protector: Some(replay_protector),
             success,
             timestamp_us: None,
             version: None,
@@ -589,6 +631,7 @@ impl TxnOptions {
             changes: None,
         };
         if show_details {
+            let state_store = sess.state_store();
             summary.events = Some(local_contract_events_to_json(
                 state_store,
                 txn_output.events(),
@@ -605,17 +648,26 @@ impl TxnOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::{local_contract_events_to_json, local_write_set_to_json, serialize_as_json};
-    use aptos_cli_common::TransactionSummary;
+    use super::{
+        build_unauthenticated_session_transaction, local_contract_events_to_json,
+        local_write_set_to_json, serialize_as_json,
+    };
+    use aptos_cli_common::{ReplayProtectionType, TransactionSummary};
     use aptos_crypto::HashValue;
     use aptos_transaction_simulation::EmptyStateView;
+    use aptos_transaction_simulation_session::Session;
     use aptos_types::{
         account_address::AccountAddress,
         event::EventKey,
         state_store::{state_key::StateKey, table::TableHandle},
+        transaction::{EntryFunction, ReplayProtector, TransactionPayload},
         write_set::{WriteOp, WriteSet},
     };
-    use move_core_types::{ident_str, language_storage::TypeTag};
+    use move_core_types::{
+        ident_str,
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+    };
 
     #[test]
     fn simulation_summary_omits_optional_fields_by_default() {
@@ -760,5 +812,38 @@ mod tests {
 
         let err = local_write_set_to_json(&state_view, &write_set).unwrap_err();
         assert!(err.to_string().contains("TradingNative"));
+    }
+
+    #[test]
+    fn unauthenticated_session_txn_honors_nonce_replay_protection() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let session = Session::init(temp_dir.path()).unwrap();
+        let payload = TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new("aptos_account").unwrap(),
+            ),
+            Identifier::new("transfer").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(&AccountAddress::ONE).unwrap(),
+                bcs::to_bytes(&1u64).unwrap(),
+            ],
+        ));
+
+        let built = build_unauthenticated_session_transaction(
+            session.state_store(),
+            payload,
+            AccountAddress::ONE,
+            None,
+            Some(2_000),
+            60,
+            false,
+            ReplayProtectionType::Nonce,
+        )
+        .unwrap();
+
+        assert!(matches!(built.replay_protector, ReplayProtector::Nonce(_)));
+        assert!(built.sequence_number.is_none());
     }
 }

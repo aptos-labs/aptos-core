@@ -150,16 +150,19 @@ fn ensure_unauthenticated_simulation_txn(txn: &SignedTransaction) -> Result<()> 
         },
         TransactionAuthenticator::FeePayer {
             sender,
+            secondary_signer_addresses,
             secondary_signers,
+            fee_payer_address,
             fee_payer_signer,
-            ..
         } => {
             ensure!(
                 is_no_account(sender)
                     && is_no_account(fee_payer_signer)
-                    && secondary_signers.iter().all(is_no_account),
-                "unauthenticated fee-payer simulation requires NoAccountAuthenticator for the \
-                 sender, fee payer, and any secondary signers"
+                    && secondary_signers.is_empty()
+                    && secondary_signer_addresses.is_empty()
+                    && *fee_payer_address == AccountAddress::ZERO,
+                "unauthenticated fee-payer simulation only supports fee payer @0x0 with \
+                 NoAccountAuthenticator and no secondary signers"
             );
         },
         _ => {
