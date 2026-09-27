@@ -717,4 +717,37 @@ mod tests {
         // Extract the package name from the path (this should panic)
         get_package_name_from_path(package_path);
     }
+
+    #[test]
+    fn ignored_path_globs_are_recursive() {
+        // cargo-guppy marks *all* packages changed for unmatched paths. A glob
+        // like `docker/*` does not match `docker/builder/foo`, so ignore rules
+        // must use `/**` (or be a single filename).
+        for glob in crate::common::IGNORED_DETERMINATOR_PATHS {
+            assert!(
+                glob.ends_with("/**") || !glob.contains('/'),
+                "ignore glob `{glob}` must be recursive (`dir/**`) or a filename"
+            );
+        }
+    }
+
+    #[test]
+    fn markdown_ignore_matches_nested_files() {
+        assert!(
+            crate::common::IGNORED_DETERMINATOR_FILE_TYPES.contains(&"**/*.md"),
+            "nested markdown must be ignored; `*.md` only matches the repo root"
+        );
+    }
+
+    #[test]
+    fn buildtools_packer_paths_are_ignored() {
+        // Regression: changing buildtools/packer/aws-ubuntu.pkr.hcl previously
+        // selected every workspace package (~50 minutes of unit tests).
+        assert!(
+            crate::common::IGNORED_DETERMINATOR_PATHS
+                .iter()
+                .any(|glob| glob.starts_with("buildtools")),
+            "buildtools/** must be ignored by the unit-test determinator"
+        );
+    }
 }
