@@ -63,6 +63,33 @@ private def roundTrip : Except String String := do
 #test decodeMModule "{\"schema\":\"move-xir-module\",\"version\":99}"
   matches .error _
 
+/-- The fixture with its struct made public. -/
+private def publicStruct : MModule :=
+  { fixture with structMeta := fixture.structMeta.map ({ · with visibility := .public_ }) }
+
+private def decodedVisibility (text : Except String String) : Option Visibility :=
+  match text >>= decodeMModule with
+  | .ok m => m.structMeta.head?.map (·.visibility)
+  | .error _ => none
+
+-- A round trip only shows the codec agrees with itself; check the value.
+#guard decodedVisibility publicStruct.encodeJson == some .public_
+
+/-- `json` as a version 6 document, whose structs have no visibility. -/
+private def asVersion6 (json : Lean.Json) : Lean.Json :=
+  let structs := match json.getObjVal? "structs" with
+    | .ok (.arr xs) => Lean.Json.arr (xs.map fun
+        | .obj fields => .obj (fields.erase "visibility")
+        | other => other)
+    | _ => .arr #[]
+  (json.setObjVal! "structs" structs).setObjVal! "version" (Lean.toJson (6 : Nat))
+
+private def version6Text : Except String String := do
+  let json ← Lean.Json.parse (← publicStruct.encodeJson)
+  pure (asVersion6 json).compress
+
+#guard decodedVisibility version6Text == some .private_
+
 private def semantic : Module :=
   Module.ofLists 0 "Account"
     [{ fields := [.u64] }]

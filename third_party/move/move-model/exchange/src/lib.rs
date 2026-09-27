@@ -90,8 +90,9 @@ pub const XIR_SCHEMA: &str = "move-xir-module";
 /// Current version of the deployable XIR module wrapper. Version 3 adds the
 /// `is_native` function flag and permits bodyless native declarations;
 /// version 4 transports source spans for declarations and stackless code;
-/// version 5 adds user-facing local names.
-pub const XIR_VERSION: u64 = 6;
+/// version 5 adds user-facing local names; version 6 adds the external struct
+/// table; version 7 adds struct visibility.
+pub const XIR_VERSION: u64 = 7;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -201,6 +202,7 @@ impl XirModule {
         if self.version != 3
             && self.version != 4
             && self.version != 5
+            && self.version != 6
             && self.version != XIR_VERSION
         {
             return Err(format!("unsupported XIR version {}", self.version));
@@ -228,6 +230,9 @@ pub enum XirDialect {
 #[serde(deny_unknown_fields)]
 pub struct XirStruct {
     pub name: String,
+    /// Absent means private, the only visibility before version 7.
+    #[serde(default)]
+    pub visibility: XirVisibility,
     #[serde(default)]
     pub abilities: Vec<String>,
     #[serde(default)]
@@ -324,9 +329,10 @@ pub enum XirAttributeArg {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum XirVisibility {
+    #[default]
     Private,
     Public,
     Friend,
