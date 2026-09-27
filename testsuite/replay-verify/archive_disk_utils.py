@@ -186,7 +186,12 @@ def create_snapshot_with_gcloud(
     # Poll until the snapshot is READY
     logger.info(f"Waiting for snapshot '{snapshot_name}' to be ready...")
     start_time = time.time()
-    timeout = 5400  # 1.5 hour timeout
+    # 4 hour timeout. Snapshot creation duration grows with archive size and has
+    # been trending up: recent runs (both testnet and mainnet legs) consistently
+    # take 1h42m-2h13m (~7980s peak observed), which exceeded the previous 5400s
+    # (1.5h) timeout and made this step flake. 4h leaves real margin above that
+    # peak while staying under the 6h GitHub Actions job limit.
+    timeout = 14400
     while True:
         if time.time() - start_time > timeout:
             raise TimeoutError(
