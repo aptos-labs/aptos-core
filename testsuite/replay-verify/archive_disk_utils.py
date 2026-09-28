@@ -186,7 +186,7 @@ def create_snapshot_with_gcloud(
     # Poll until the snapshot is READY
     logger.info(f"Waiting for snapshot '{snapshot_name}' to be ready...")
     start_time = time.time()
-    # 4 hour timeout (bumped from the previous 1.5h, which snapshot creation now regularly exceeds).
+    # 4 hour timeout is enough.
     timeout = 14400
     while True:
         if time.time() - start_time > timeout:
