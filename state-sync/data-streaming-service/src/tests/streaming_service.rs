@@ -15,7 +15,8 @@ use crate::{
         MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_STATES, MAX_ADVERTISED_TRANSACTION,
         MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_REAL_EPOCH_END, MAX_REAL_TRANSACTION,
         MAX_REAL_TRANSACTION_OUTPUT, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
-        MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_STATE_VALUES,
+        MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_HOT_STATE_VALUES,
+        TOTAL_NUM_STATE_VALUES,
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
@@ -122,6 +123,52 @@ async fn test_notifications_state_values_multiple_streams() {
             data_payload => unexpected_payload_type!(data_payload),
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_hot_state_values() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service();
+
+    // Request a hot state value stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .get_all_hot_state_values(MAX_ADVERTISED_STATES, None)
+        .await
+        .unwrap();
+
+    // Verify that the stream listener receives all hot state value notifications
+    verify_continuous_hot_state_value_notifications(&mut stream_listener).await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_hot_state_values_limited_chunks() {
+    // Create a new streaming client and service where chunks may be truncated
+    let streaming_client = create_streaming_client_and_service_with_chunk_limits();
+
+    // Request a new hot state value stream starting at the first index
+    let mut stream_listener = streaming_client
+        .get_all_hot_state_values(MAX_ADVERTISED_STATES, Some(0))
+        .await
+        .unwrap();
+
+    // Verify that every truncated response is followed by its missing suffix
+    verify_continuous_hot_state_value_notifications(&mut stream_listener).await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_hot_state_values_nonzero_start_index() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service();
+
+    // Request a hot state value stream starting part way through the snapshot
+    let start_index = TOTAL_NUM_HOT_STATE_VALUES / 2;
+    let mut stream_listener = streaming_client
+        .get_all_hot_state_values(MAX_ADVERTISED_STATES, Some(start_index))
+        .await
+        .unwrap();
+
+    // Verify the stream serves only the remaining suffix, and ends once
+    verify_hot_state_value_notifications(&mut stream_listener, start_index).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1744,6 +1791,54 @@ async fn verify_continuous_state_value_notifications(stream_listener: &mut DataS
             },
             DataPayload::EndOfStream => {
                 assert_eq!(next_expected_index, TOTAL_NUM_STATE_VALUES);
+                return; // We've reached the end of the stream
+            },
+            data_payload => unexpected_payload_type!(data_payload),
+        }
+    }
+}
+
+/// Verifies that the stream listener receives every hot state value, in order,
+/// starting at index 0.
+async fn verify_continuous_hot_state_value_notifications(stream_listener: &mut DataStreamListener) {
+    verify_hot_state_value_notifications(stream_listener, 0).await
+}
+
+/// Verifies that the stream listener receives every hot state value from
+/// `start_index` onwards, in order, and that the stream ends exactly once. The
+/// payloads must carry `HotStateValue`s (i.e., preserve `hot_since_version`).
+async fn verify_hot_state_value_notifications(
+    stream_listener: &mut DataStreamListener,
+    start_index: u64,
+) {
+    let mut next_expected_index = start_index;
+
+    // Read notifications until we reach the end of the stream
+    loop {
+        let data_notification = get_data_notification(stream_listener).await.unwrap();
+        match data_notification.data_payload {
+            DataPayload::HotStateValuesWithProof(hot_state_values_with_proof) => {
+                // Verify the start index matches the expected index
+                assert_eq!(hot_state_values_with_proof.first_index, next_expected_index);
+
+                // Verify the chunk is non-empty and the indices match its length
+                let num_hot_state_values = hot_state_values_with_proof.raw_values.len() as u64;
+                assert!(num_hot_state_values > 0);
+                assert_eq!(
+                    hot_state_values_with_proof.last_index,
+                    next_expected_index + num_hot_state_values - 1,
+                );
+
+                // Verify the leaves are hot state values (and not converted state values)
+                for (_, hot_state_value) in &hot_state_values_with_proof.raw_values {
+                    assert_eq!(hot_state_value.hot_since_version(), MAX_ADVERTISED_STATES);
+                    assert!(hot_state_value.value_opt().is_some());
+                }
+
+                next_expected_index += num_hot_state_values;
+            },
+            DataPayload::EndOfStream => {
+                assert_eq!(next_expected_index, TOTAL_NUM_HOT_STATE_VALUES);
                 return; // We've reached the end of the stream
             },
             data_payload => unexpected_payload_type!(data_payload),
