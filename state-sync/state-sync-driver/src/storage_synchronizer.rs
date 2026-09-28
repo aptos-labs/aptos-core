@@ -10,6 +10,7 @@ use crate::{
         CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
         StorageServiceNotificationHandler,
     },
+    snapshot_kind::SnapshotKind,
     utils,
 };
 use aptos_config::config::StateSyncDriverConfig;
@@ -484,7 +485,7 @@ impl<
         let version = target_ledger_info.ledger_info().version();
         let last_committed_state_index = self
             .metadata_storage
-            .get_last_persisted_index(&target_ledger_info, StateKind::MainState)?;
+            .get_last_persisted_index(&target_ledger_info, SnapshotKind::MainState)?;
 
         // Bootstrap the transaction accumulator / ledger from the target output
         self.storage
@@ -1000,7 +1001,7 @@ async fn apply_snapshot_chunk<MetadataStorage: MetadataStorageInterface + Clone>
                         target_ledger_info,
                         last_committed_state_index,
                         false,
-                        kind,
+                        kind.into(),
                     );
                     if let Err(error) = update_result {
                         let error = format!("Failed to update the last persisted {} index at version: {:?}! Error: {:?}", noun, version, error);
@@ -1132,7 +1133,7 @@ fn spawn_snapshot_receiver<
                                     &target_ledger_info,
                                     last_index,
                                     true,
-                                    kind,
+                                    kind.into(),
                                 )
                                 .map_err(|error| {
                                     format!("Snapshot synced, but failed to update the metadata storage at version {:?}! Error: {:?}", version, error)
