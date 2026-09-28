@@ -170,6 +170,7 @@ jobs:
         uses: ./.github/actions/rust-check-merge-base
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
 
   # Run only the targeted rust unit tests. This is a PR required job.
   rust-targeted-unit-tests:

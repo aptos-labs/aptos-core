@@ -143,6 +143,8 @@ jobs:
         # Load the action outside the mutable workspace so changing its manifest
         # in a future PR cannot break the runner's cached post-step metadata.
         uses: aptos-labs/aptos-core/.github/actions/test-target-determinator@main
+        with:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
 
   # This is a PR required job.
   rust-images:

@@ -135,6 +135,8 @@ jobs:
         if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
+        with:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
 
   # Run single node execution performance tests
   single-node-performance:

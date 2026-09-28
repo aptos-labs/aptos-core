@@ -99,11 +99,15 @@ impl FromStr for Glob {
 }
 
 impl Glob {
+    /// Matches the path or any directory containing it, so a plain
+    /// directory path covers its whole tree.
     fn matches(&self, path: &str) -> bool {
-        self.0.matches_with(path, MatchOptions {
-            case_sensitive: true,
-            require_literal_separator: true,
-            require_literal_leading_dot: false,
+        Utf8Path::new(path).ancestors().any(|ancestor| {
+            self.0.matches_with(ancestor.as_str(), MatchOptions {
+                case_sensitive: true,
+                require_literal_separator: true,
+                require_literal_leading_dot: false,
+            })
         })
     }
 }
@@ -1296,6 +1300,11 @@ mod tests {
             .parse::<Glob>()
             .unwrap()
             .matches("move/main.move"));
+        let tree = "move/doc".parse::<Glob>().unwrap();
+        assert!(tree.matches("move/doc"));
+        assert!(tree.matches("move/doc/paper/main.tex"));
+        assert!(!tree.matches("move/docs/main.tex"));
+        assert!(!tree.matches("move"));
     }
 
     #[test]

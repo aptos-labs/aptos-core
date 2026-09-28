@@ -16,8 +16,8 @@ subsystems through configuration. Move is configured as follows:
 [subsystems.move]
 roots = ["third_party/move", "aptos-move"]
 ignored_paths = [
-    "third_party/move/documentation/**",
-    "third_party/move/move-prover/doc/**",
+    "third_party/move/documentation",
+    "third_party/move/move-prover/doc",
 ]
 selection = "affected"
 related_test_roots = ["api"]
@@ -64,11 +64,13 @@ only ignored changes select no targeted tests. Changes to the selected config
 always force global coverage, even if its rules try to ignore that change.
 
 Configured file mappings cover framework Move sources/manifests and cached-package
-consumers, stdlib inputs read by compiler/Prover harnesses, and Aptos examples.
-Extend these for dependencies absent from Cargo; there is no extension allowlist.
-Roots match directory components; repository-relative globs use `*` within a
-component and `**` across directories. Unknown fields, invalid paths/patterns,
-and unresolved explicit names are errors.
+consumers, stdlib inputs read by compiler/Prover harnesses, Aptos examples, and
+the prover paper example packages, which are mapped back out of the otherwise
+ignored paper trees. Extend these for dependencies absent from Cargo; there is no
+extension allowlist. Roots match directory components. A repository-relative path
+names a file or a whole directory tree; globs use `*` within a component and `**`
+across directories. Unknown fields, invalid paths/patterns, and unresolved
+explicit names are errors.
 
 ## E2E configuration and CI
 
