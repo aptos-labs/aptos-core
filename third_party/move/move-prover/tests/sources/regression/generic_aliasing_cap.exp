@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: too many type-aliasing cases to verify for `generic_aliasing_cap::seven` (more than 256): the function accesses too many global resources whose types can coincide under some instantiation of its type parameters
+   ┌─ tests/sources/regression/generic_aliasing_cap.move:12:5
+   │
+12 │ ╭     public fun seven<T1, T2, T3, T4, T5, T6, T7>(a: address) {
+13 │ │         R<T1>[a].value = true;
+14 │ │         R<T2>[a].value = true;
+15 │ │         R<T3>[a].value = true;
+   · │
+19 │ │         R<T7>[a].value = true;
+20 │ │     }
+   │ ╰─────^

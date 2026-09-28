@@ -1,26 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Generated Boogie names must be injective: struct datatypes and the
-// instantiation suffixes built from them.
-//
-// This is the fail-closed half of the collision that
-// `boogie_name_injectivity.move` records the fail-open half of. `0x42::Y_A::B`
-// and `0x42::Y::A_B` both rendered `$42_Y_A_B`, so the name-keyed emission dedup
-// declared only one of the two datatypes and the surviving declaration served
-// both. Their field layouts differ on purpose, so the dropped struct's field
-// selector then failed to type-check and Boogie rejected the whole file --
-// which is why nothing here verifies before the fix.
-//
-// `both_instantiations` exercises the same collision one level up, through
-// `boogie_inst_suffix`: `S<0x42::Y_A::B, u8>` and `S<0x42::Y::A_B, u8>` both
-// rendered the instantiation suffix `'$42_Y_A_B_u8'`, so a single element-type
-// collision reproduced into every generic name built from it.
-//
-// Both colliding entities must be reachable from ONE verification target.
-// Verification is sharded per target and only reachable types are emitted per
-// shard, so two colliding structs reached from two different functions never
-// meet in one Boogie file and the collision stays hidden.
+// Struct datatype names, and instantiation suffixes built from them, are injective:
+// `0x42::Y_A::B` and `0x42::Y::A_B` are distinct datatypes. Both are reachable from one
+// verification target, since only reachable types are emitted per shard.
 
 module 0x42::Y_A {
     struct B has copy, drop, store { v: u64 }

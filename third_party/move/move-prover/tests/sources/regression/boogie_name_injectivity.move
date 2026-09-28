@@ -1,21 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Generated Boogie names must be injective.
-//
-// `0x42::a::b_c` and `0x42::a_b::c` are two different Move functions, and
-// `0x42::m::A_B` and `0x42::m_A::B` are two different resource types. While the
-// address, module and entity parts of a Boogie name were joined with a bare `_`
-// -- a character a Move identifier may contain -- each pair rendered to one name.
-// The emission dedups were keyed on that rendered name, so the second entity was
-// dropped and the surviving declaration served both: one procedure for two
-// functions, one `$Memory` variable for two resource types.
-//
-// Both directions of the resulting unsoundness are pinned. `sum` is a true
-// specification that was unprovable, and `confuse` is a false one that was
-// proved. `no_collision_control` is the same false claim against a module whose
-// name does not collide; it must fail both before and after, so that `confuse`
-// failing is not merely everything failing.
+// Boogie names are injective: `0x42::a::b_c` and `0x42::a_b::c` are distinct functions, and
+// `0x42::m::A_B` and `0x42::m_A::B` distinct resource types. `sum` must verify and `confuse`
+// must fail; `no_collision_control` makes the same false claim without a name collision.
 
 module 0x42::a {
     public fun b_c(): u64 { 1 }
@@ -84,7 +72,7 @@ module 0x42::distinct_memories {
         ensures result == true;
     }
 
-    /// Must fail, before and after.
+    /// Must fail.
     public fun no_collision_control(s: &signer): bool {
         m_A::put(s);
         mq::has_it(signer::address_of(s))

@@ -1,21 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Two `&mut` references into global storage must not alias when they point into
-// different resource types at the same address.
-//
-// The root of a global borrow is a `$Location`, which used to carry the address and
-// nothing else. A field borrow appends only the field offset to the path, so
-// `&mut A[addr].x` and `&mut B[addr].x` produced the same location and the same path.
-// `$IsSameMutation` and `$IsParentMutation` decide on the location and the path alone,
-// so the two counted as one reference: when the write through either was written back,
-// the prover updated both memories and the field of the resource that was never
-// written also looked changed.
-//
-// Move keeps resources apart by type as well as by address, so `$Global` now carries
-// the identity of the resource type's memory next to the address. Each resource type's
-// memory gets a `unique` identity constant, which gives pairwise distinctness across
-// all resource types.
+// `&mut` references into different resource types at the same address do not alias.
 
 module 0x42::borrow_global_distinct_types {
 
@@ -43,8 +29,7 @@ module 0x42::borrow_global_distinct_types {
         ensures result == 0; // error: the field returned was never written
     }
 
-    /// Reads back the field that really was written. This must verify: separating the
-    /// two roots must not cost the legitimate write-back.
+    /// Must verify: reads back the field that was written.
     public fun write_zero_and_return_same(choose_a: bool, addr: address): u64 {
         let a = &mut A[addr].x;
         let b = &mut B[addr].x;

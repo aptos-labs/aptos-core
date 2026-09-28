@@ -1,22 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// A field selector must identify one Move field.
-//
-// `boogie_field_sel` appends the variant to the field name so that same-named
-// fields of different variants stay apart. Joined with a bare `_`, that was not
-// injective: field `a` of variant `B_C` and field `a_B` of variant `C` both
-// rendered `$a_B_C`, as did a ghost field literally named `a_B_C`, which carries
-// no variant at all.
-//
-// Boogie shares identically-named fields across a datatype's constructors, so the
-// collision was silent whenever the two fields had the same type -- two distinct
-// Move fields simply became one selector. With different types it surfaced as
-// `type mismatch between field $a_B_C and identically-named field in constructor`,
-// and against a ghost field as `more than one declaration of variable name`.
-//
-// `G` and `H` must be reachable from one verification target each; a datatype is
-// only emitted in shards that reach it.
+// A field selector identifies one Move field: same-named fields of different variants, and a
+// ghost field spelled like their join, stay distinct. `G` and `H` are each reachable from one
+// verification target, since a datatype is only emitted in shards that reach it.
 
 module 0x42::boogie_field_sel_injectivity {
 

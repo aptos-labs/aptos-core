@@ -1,20 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// The merged enum `$Update` wrapper's name must identify one field.
-//
-// The name carries the field's rendered type so that same-named fields of
-// different types stay apart. While the type came first and was joined to the
-// field name by a bare `_`, the two were not recoverable, because a rendered
-// function type contains `_` itself:
-//
-//   |u64, u8| bool  renders  $fun_u64_u8_bool , field `x`      -> .._$fun_u64_u8_bool_x
-//   |u64| u8        renders  $fun_u64_u8      , field `bool_x` -> .._$fun_u64_u8_bool_x
-//
-// Both wrappers were then declared under one name and Boogie rejected the
-// duplicate, so the enum could not be verified at all. The field name now comes
-// first, separated by `.`: a Move field name contains no `.`, so the boundary is
-// recoverable whatever the type renders as.
+// The merged enum `$Update` wrapper's name identifies one field, even when a rendered function
+// type contains `_`: field `x` of type `|u64, u8| bool` and field `bool_x` of type `|u64| u8`
+// get distinct wrappers.
 
 module 0x42::boogie_variant_update_injectivity {
 

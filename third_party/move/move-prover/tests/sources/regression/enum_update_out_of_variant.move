@@ -1,19 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Updating a field on an enum receiver whose variant does not declare that field
-// must not be provably a no-op.
-//
-// `update_field(s, f, v)` is a user-facing spec builtin that accepts enum receivers,
-// and for an enum field the backend emits a merged `$Update` wrapper that dispatches
-// on the receiver's constructor. That dispatch chain used to close with `else s`, so
-// a receiver outside the wrapper's variant set was returned unchanged. The encoding
-// therefore claimed that updating a field the dispatched variant does not carry is
-// the identity, which let the prover discharge `result == update_field(e, f, v)`
-// against a body that never wrote anything.
-//
-// The chain now closes with an uninterpreted value, so such a receiver is
-// unspecified rather than unchanged.
+// Updating a field on an enum receiver whose variant lacks that field is not provably a
+// no-op: the result is unspecified.
 
 module 0x42::enum_update_out_of_variant {
 

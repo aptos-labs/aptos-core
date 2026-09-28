@@ -1,29 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// A function type's Boogie name must record where its parameters end and its
-// results begin.
-//
-// `fun_type` rendered `$fun_<params>_<results>`, where each side is a flat
-// `_`-joined list of element suffixes. The split was therefore unrecoverable, and
-// every arity split of one token sequence produced one name:
-//
-//   |u64, u8| u8    ->  $fun_u64_u8_u8
-//   |u64| (u8, u8)  ->  $fun_u64_u8_u8
-//
-// These are distinct `mono_info.fun_infos` keys, so both were emitted. Boogie
-// rejected the duplicate datatype, `$IsValid`, `$IsEqual` and `$apply`
-// declarations and reported `wrong number of arguments in call to $apply`, so the
-// whole file failed -- a correct program could not be verified.
-//
-// The arities are now part of the name. `translate_fun_type` also gained the
-// entity-keyed emission guard the other three emission loops already had, so any
-// residual collision is reported against the Move types that fused rather than
-// reaching Boogie as a duplicate declaration.
-//
-// Both function types must be reachable from ONE verification target: function
-// types are emitted per shard, so two reached from two different functions never
-// meet in one Boogie file.
+// A function type's Boogie name records where its parameters end and its results begin:
+// `|u64, u8| u8` and `|u64| (u8, u8)` are distinct. Both are reachable from one verification
+// target, since function types are emitted per shard.
 
 module 0x42::fun_type_arity_injectivity {
 
