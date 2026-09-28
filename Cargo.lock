@@ -18659,6 +18659,7 @@ dependencies = [
  "aptos-schemadb",
  "aptos-sdk",
  "aptos-secure-storage",
+ "aptos-state-sync-driver",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-time-service",
