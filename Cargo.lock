@@ -13101,6 +13101,7 @@ dependencies = [
  "once_cell",
  "rand_core 0.5.1",
  "ripemd",
+ "serde",
  "sha2 0.10.9",
  "sha2 0.9.9",
  "sha3 0.9.1",
