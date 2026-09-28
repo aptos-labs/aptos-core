@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Module storage, publishing checks, and function execution for one
-//! transactional test.
+//! Module storage, publishing checks, and function or script execution for
+//! one transactional test.
 
 use crate::{
     engine::build_natives, extensions::seed_extensions, module_provider::InMemoryModuleProvider,
@@ -10,9 +10,7 @@ use crate::{
 };
 use bytes::Bytes;
 use mono_move_core::{
-    intern_type_tag,
-    interner::{InternedIdentifier, InternedModuleId},
-    nominal_tag,
+    intern_type_tag, nominal_tag,
     storage::resource_provider::InMemoryStorageKey,
     type_tag_of,
     types::{is_signer_or_signer_immut_ref, InternedType, InternedTypeList},
@@ -46,8 +44,8 @@ use thiserror::Error;
 /// [`InMemoryModuleProvider`] supplies the same module bytes to its loader,
 /// and each run reads resources from the storage through an
 /// [`InMemoryResourceProvider`]. [`commit`](Self::commit) updates both module
-/// stores together; a successful [`run`](Self::run) writes its effects back
-/// into the storage.
+/// stores together; a successful [`run`](Self::run) or
+/// [`run_script`](Self::run_script) writes its effects back into the storage.
 ///
 /// Each operation uses one execution guard, then releases it and resets the
 /// [`GlobalContext`]'s caches and arenas before returning, so nothing bound to
@@ -80,12 +78,12 @@ pub enum PublishError {
 // the outcome.
 #[derive(Debug)]
 pub enum RunOutcome {
-    /// The function returned; its effects are committed. Each return value is
-    /// BCS with its type tag.
+    /// The run succeeded and committed its effects. Return values carry BCS
+    /// bytes and type tags; scripts have no return values.
     Success {
         return_values: Vec<(TypeTag, Vec<u8>)>,
     },
-    /// The function aborted; nothing is committed. `offset` names the
+    /// The run aborted; nothing is committed. `offset` names the
     /// aborting instruction unless a native raised the abort.
     Aborted {
         code: u64,
@@ -98,10 +96,10 @@ pub enum RunOutcome {
 /// Why a run produced no [`RunOutcome`].
 #[derive(Debug, Error)]
 pub enum RunError {
-    /// The task's signers and arguments do not fit the function's parameters.
+    /// The task's signers and arguments do not fit the call's parameters.
     #[error(transparent)]
     Arguments(ArgumentError),
-    /// MonoVM failed to load or run the function in a way V1 could report.
+    /// MonoVM reported a load or execution error that maps to a V1 status.
     #[error(transparent)]
     Vm(VMInternalError),
     /// MonoVM does not implement a feature the run needs: a construct its
@@ -210,6 +208,34 @@ impl TransactionalSession {
         signers: &[AccountAddress],
         args: &[Vec<u8>],
     ) -> Result<RunOutcome, RunError> {
+        self.run_callee(
+            Callee::Function { module, function },
+            ty_args,
+            signers,
+            args,
+        )
+    }
+
+    /// Runs the serialized `script` on MonoVM with `ty_args`, unmetered.
+    /// Links against published modules and places `signers` before BCS `args`.
+    /// Commits resource writes only on success.
+    pub fn run_script(
+        &mut self,
+        script: &[u8],
+        ty_args: &[TypeTag],
+        signers: &[AccountAddress],
+        args: &[Vec<u8>],
+    ) -> Result<RunOutcome, RunError> {
+        self.run_callee(Callee::Script(script), ty_args, signers, args)
+    }
+
+    fn run_callee(
+        &mut self,
+        callee: Callee<'_>,
+        ty_args: &[TypeTag],
+        signers: &[AccountAddress],
+        args: &[Vec<u8>],
+    ) -> Result<RunOutcome, RunError> {
         let (outcome, changes) = with_guard(&mut self.ctx, |guard| -> Result<_, RunError> {
             let natives = build_natives();
             let resources = InMemoryResourceProvider::new(guard, &self.storage);
@@ -222,7 +248,7 @@ impl TransactionalSession {
             let mut interp =
                 InterpreterContext::new(loader, GasMeter::with_max_budget(), &resources, natives)
                     .with_extensions(seed_extensions(false));
-            let outcome = execute(guard, &mut interp, module, function, ty_args, signers, args)?;
+            let outcome = execute(guard, &mut interp, callee, ty_args, signers, args)?;
             let changes = match &outcome {
                 RunOutcome::Success { .. } => resource_changes(guard, &interp.finish()?)?,
                 RunOutcome::Aborted { .. } => ChangeSet::new(),
@@ -296,12 +322,20 @@ fn with_guard<T>(ctx: &mut GlobalContext, operation: impl FnOnce(&ExecutionGuard
     result
 }
 
-/// Loads and calls one function on `interp`, then serializes its return value.
+/// A published function or serialized script to execute.
+enum Callee<'a> {
+    Function {
+        module: &'a ModuleId,
+        function: &'a IdentStr,
+    },
+    Script(&'a [u8]),
+}
+
+/// Loads and calls `callee` on `interp`, then serializes its return value.
 fn execute(
     guard: &ExecutionGuard<'_>,
     interp: &mut InterpreterContext<'_>,
-    module: &ModuleId,
-    function: &IdentStr,
+    callee: Callee<'_>,
     ty_args: &[TypeTag],
     signers: &[AccountAddress],
     args: &[Vec<u8>],
@@ -312,14 +346,19 @@ fn execute(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|err| RunError::Unsupported(format!("intern the type arguments: {err:#}")))?;
     let ty_args = guard.type_list_of(&ty_args);
-    let module_id = guard.module_id_of(module.address(), module.name());
-    let function_id = guard.identifier_of(function);
 
-    // TODO(correctness): `load_function` performs no entry validation of
-    // `ty_args` (arity, ability constraints, struct constraints), so MonoVM
-    // runs instantiations V1 rejects. The check belongs in the loader; once it
-    // exists, `describe` needs the V1 statuses for it.
-    let func = interp.load_function(module_id, function_id, ty_args)?;
+    // TODO(correctness): validate `ty_args` arity, ability constraints, and
+    // struct constraints in `load_function` and `load_script`. Missing entry
+    // validation allows instantiations V1 rejects. Map validation failures
+    // to V1 statuses in `describe`.
+    let func = match callee {
+        Callee::Function { module, function } => interp.load_function(
+            guard.module_id_of(module.address(), module.name()),
+            guard.identifier_of(function),
+            ty_args,
+        )?,
+        Callee::Script(script) => interp.load_script(script, ty_args)?,
+    };
     match call(interp, func, signers, args)? {
         RuntimeStatus::Aborted {
             code,
@@ -333,7 +372,7 @@ fn execute(
             offset,
         }),
         RuntimeStatus::Success => Ok(RunOutcome::Success {
-            return_values: return_values(guard, interp, module_id, function_id, ty_args)?,
+            return_values: return_values(guard, interp, func, ty_args)?,
         }),
     }
 }
@@ -431,14 +470,13 @@ fn decode_signer(blob: &[u8]) -> Option<AccountAddress> {
 fn return_values(
     guard: &ExecutionGuard<'_>,
     interp: &InterpreterContext<'_>,
-    module_id: InternedModuleId,
-    function: InternedIdentifier,
+    func: &Function,
     ty_args: InternedTypeList,
 ) -> Result<Vec<(TypeTag, Vec<u8>)>, RunError> {
     let loaded = interp
         .read_set()
-        .get_loaded(guard.arena_ref_for_module_id(module_id))?;
-    let returns = match loaded.function_return_types(guard, function, ty_args) {
+        .get_loaded(guard.arena_ref_for_module_id(func.module_id))?;
+    let returns = match loaded.function_return_types(guard, func.name, ty_args) {
         Some(Ok(returns)) => view_type_list(returns),
         Some(Err(err)) => {
             return Err(RunError::Unsupported(format!(
