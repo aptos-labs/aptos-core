@@ -7,16 +7,19 @@ use crate::{monomorphic_natives, NativeEntry};
 use aptos_types::{
     error,
     transaction::{
-        authenticator::AuthenticationKey, user_transaction_context::UserTransactionContext,
+        authenticator::AuthenticationKey,
+        user_transaction_context::{EntryFunctionPayload, MultisigPayload, UserTransactionContext},
     },
 };
 use mono_move_core::{
     native::{
-        NativeContext, NativeContextFamily, NativeExtension, NativeStatus, TableHandle, VMValue,
+        native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
+        NativeStatus, TableHandle, VMValue,
     },
     VMResult,
 };
 use move_core_types::account_address::AccountAddress;
+use serde::Serialize;
 use sha3::{Digest, Sha3_256};
 
 /// Derives an AUID address: `sha3_256(txn_hash || auid_counter_le ||
@@ -121,6 +124,45 @@ fn txn_context_unavailable_msg(subject: &str) -> String {
     format!(
         "Transaction context is not available ({subject} can only be accessed during transaction execution)"
     )
+}
+
+/// Mirrors `0x1::transaction_context::EntryFunctionPayload`. The field order is
+/// what makes the BCS encoding match the Move struct's.
+#[derive(Serialize)]
+struct EntryFunctionPayloadRepr {
+    account_address: AccountAddress,
+    module_name: String,
+    function_name: String,
+    ty_args_names: Vec<String>,
+    args: Vec<Vec<u8>>,
+}
+
+impl From<EntryFunctionPayload> for EntryFunctionPayloadRepr {
+    fn from(payload: EntryFunctionPayload) -> Self {
+        Self {
+            account_address: payload.account_address,
+            module_name: payload.module_name,
+            function_name: payload.function_name,
+            ty_args_names: payload.ty_arg_names,
+            args: payload.args,
+        }
+    }
+}
+
+/// Mirrors `0x1::transaction_context::MultisigPayload`.
+#[derive(Serialize)]
+struct MultisigPayloadRepr {
+    multisig_address: AccountAddress,
+    entry_function_payload: Option<EntryFunctionPayloadRepr>,
+}
+
+impl From<MultisigPayload> for MultisigPayloadRepr {
+    fn from(payload: MultisigPayload) -> Self {
+        Self {
+            multisig_address: payload.multisig_address,
+            entry_function_payload: payload.entry_function_payload.map(Into::into),
+        }
+    }
 }
 
 /// `0x1::transaction_context::generate_unique_address(): address`
@@ -316,6 +358,64 @@ pub fn native_secondary_signers<C: NativeContext>(ctx: &C) -> VMResult<NativeSta
     Ok(NativeStatus::Success)
 }
 
+/// `0x1::transaction_context::entry_function_payload_internal(): Option<EntryFunctionPayload>`
+//
+// TODO(metering): charge gas.
+pub fn native_entry_function_payload<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    let payload = {
+        let ext = ctx.get_extension::<TransactionContextExtension>()?;
+        let Some(user_transaction_context) = &ext.user_transaction_context else {
+            return Ok(NativeStatus::Abort {
+                code: TRANSACTION_CONTEXT_NOT_AVAILABLE,
+                message: Some(txn_context_unavailable_msg("entry function payload")),
+            });
+        };
+        user_transaction_context
+            .entry_function_payload()
+            .map(EntryFunctionPayloadRepr::from)
+    };
+    return_optional_payload(ctx, &payload)
+}
+
+/// `0x1::transaction_context::multisig_payload_internal(): Option<MultisigPayload>`
+//
+// TODO(metering): charge gas.
+pub fn native_multisig_payload<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    let payload = {
+        let ext = ctx.get_extension::<TransactionContextExtension>()?;
+        let Some(user_transaction_context) = &ext.user_transaction_context else {
+            return Ok(NativeStatus::Abort {
+                code: TRANSACTION_CONTEXT_NOT_AVAILABLE,
+                message: Some(txn_context_unavailable_msg("multisig payload")),
+            });
+        };
+        user_transaction_context
+            .multisig_payload()
+            .map(MultisigPayloadRepr::from)
+    };
+    return_optional_payload(ctx, &payload)
+}
+
+/// Serializes `payload` and rebuilds it on the VM heap as the native's return
+/// value. `payload` must mirror the declared return type's Move struct.
+fn return_optional_payload<C: NativeContext, T: Serialize>(
+    ctx: &C,
+    payload: &Option<T>,
+) -> VMResult<NativeStatus> {
+    let ty = ctx
+        .return_type(0)
+        .ok_or_else(|| native_invariant_violation("payload native has no return type".into()))?;
+    let bytes = bcs::to_bytes(payload)
+        .map_err(|e| native_invariant_violation(format!("failed to serialize payload: {e}")))?;
+    let value = ctx.bcs_deserialize_value(ty, &bytes)?.ok_or_else(|| {
+        native_invariant_violation("payload encoding does not match its Move type".into())
+    })?;
+    // SAFETY: `value` is the in-frame representation of `ty`, the native's
+    // declared return type; it is written before any further heap allocation.
+    unsafe { ctx.set_return_raw(0, &value)? };
+    Ok(NativeStatus::Success)
+}
+
 /// `0x1::transaction_context::is_orderless_txn_internal(): bool`
 pub fn native_is_orderless_txn<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: `is_orderless_txn` returns `bool`, matching the native's `bool` return.
@@ -342,6 +442,35 @@ pub fn native_is_orderless_txn_for_test_only<C: NativeContext>(ctx: &C) -> VMRes
         .is_some_and(UserTransactionContext::is_orderless_txn);
     // SAFETY: return 0 is `bool`.
     unsafe { ctx.set_return(0, is_orderless)? };
+    Ok(NativeStatus::Success)
+}
+
+/// `0x1::transaction_context::is_multisig_payload_txn_internal(): bool`
+pub fn native_is_multisig_payload_txn<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // SAFETY: the read returns `bool`, matching the native's `bool` return.
+    unsafe {
+        return_user_transaction_context_field(ctx, "is_multisig_payload_txn", |context| {
+            context.multisig_payload().is_some()
+        })
+    }
+}
+
+/// `0x1::transaction_context::is_multisig_payload_txn_internal_for_test_only(): bool`
+///
+/// This is a test-only function but not gated behind `#[test_only]`. So it has
+/// to stay with other production natives.
+//
+// TODO(metering): charge gas.
+pub fn native_is_multisig_payload_txn_for_test_only<C: NativeContext>(
+    ctx: &C,
+) -> VMResult<NativeStatus> {
+    let ext = ctx.get_extension::<TransactionContextExtension>()?;
+    let is_multisig = ext
+        .user_transaction_context
+        .as_ref()
+        .is_some_and(|context| context.multisig_payload().is_some());
+    // SAFETY: return 0 is `bool`.
+    unsafe { ctx.set_return(0, is_multisig)? };
     Ok(NativeStatus::Success)
 }
 
@@ -445,12 +574,28 @@ pub fn make_all_transaction_context_natives<F: NativeContextFamily>() -> Vec<Nat
             native_secondary_signers
         ),
         (
+            "0x1::transaction_context::entry_function_payload_internal",
+            native_entry_function_payload
+        ),
+        (
+            "0x1::transaction_context::multisig_payload_internal",
+            native_multisig_payload
+        ),
+        (
             "0x1::transaction_context::is_orderless_txn_internal",
             native_is_orderless_txn
         ),
         (
             "0x1::transaction_context::is_orderless_txn_internal_for_test_only",
             native_is_orderless_txn_for_test_only
+        ),
+        (
+            "0x1::transaction_context::is_multisig_payload_txn_internal",
+            native_is_multisig_payload_txn
+        ),
+        (
+            "0x1::transaction_context::is_multisig_payload_txn_internal_for_test_only",
+            native_is_multisig_payload_txn_for_test_only
         ),
         (
             "0x1::transaction_context::monotonically_increasing_counter_internal_for_test_only",
