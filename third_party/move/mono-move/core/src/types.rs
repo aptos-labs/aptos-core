@@ -44,6 +44,7 @@
 
 use crate::{
     interner::{view_module_id, InternedIdentifier, InternedModuleId},
+    prepared_module::FunctionSignature,
     Interner,
 };
 use mono_move_alloc::GlobalArenaPtr;
@@ -263,6 +264,174 @@ pub fn is_assignable(expected: InternedType, actual: InternedType) -> bool {
         | Type::Vector { .. }
         | Type::Nominal { .. }
         | Type::TypeParam { .. } => false,
+    }
+}
+
+/// Why a declared function signature cannot be used at an expected function
+/// type. Mirrors the distinctions the caller turns into reflection error codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionTypeMismatch {
+    /// The expected type is not a function type at all.
+    NotAFunction,
+    /// The two signatures cannot be matched.
+    Incompatible,
+    /// Matching succeeded but left a declared type parameter unbound.
+    NotInstantiated,
+}
+
+/// Matches a function's declared signature against the concrete function type
+/// it is expected to have, inferring one type argument per declared type
+/// parameter.
+///
+/// Every inferred argument is a pointer taken from `expected`, so nothing new
+/// is interned.
+///
+/// # Preconditions
+///
+/// `expected` is closed: it comes from a monomorphized call site, where every
+/// type is already concrete. Otherwise the pointer-equality fast paths below
+/// would silently accept a type parameter without binding it.
+///
+/// TODO(metering): unbounded recursion on nesting depth, same family as the
+/// `TODO(metering)` on [`is_closed_type`].
+pub fn infer_function_type_args(
+    declared: FunctionSignature,
+    expected: InternedType,
+    num_ty_params: usize,
+) -> Result<Vec<InternedType>, FunctionTypeMismatch> {
+    debug_assert!(is_closed_type(expected), "expected type must be closed");
+
+    let Type::Function { args, results, .. } = view_type(expected) else {
+        return Err(FunctionTypeMismatch::NotAFunction);
+    };
+
+    let mut bindings = vec![None; num_ty_params];
+    if !match_ty_list(declared.params, *args, &mut bindings)
+        || !match_ty_list(declared.returns, *results, &mut bindings)
+    {
+        return Err(FunctionTypeMismatch::Incompatible);
+    }
+
+    bindings
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or(FunctionTypeMismatch::NotInstantiated)
+}
+
+/// Matches `declared` against `expected` positionally, recording any type
+/// parameter binding it discovers in `bindings`.
+fn match_ty_list(
+    declared: InternedTypeList,
+    expected: InternedTypeList,
+    bindings: &mut [Option<InternedType>],
+) -> bool {
+    if declared == expected {
+        return true;
+    }
+    let declared = view_type_list(declared);
+    let expected = view_type_list(expected);
+    declared.len() == expected.len()
+        && (declared.iter())
+            .zip(expected)
+            .all(|(&d, &e)| match_ty(d, e, bindings))
+}
+
+/// See [`match_ty_list`].
+fn match_ty(
+    declared: InternedType,
+    expected: InternedType,
+    bindings: &mut [Option<InternedType>],
+) -> bool {
+    // Interning makes pointer equality structural equality, so an identical
+    // subtree needs no walk. Since `expected` is closed, so is `declared` here,
+    // and there is no binding to record.
+    if declared == expected {
+        return true;
+    }
+    match view_type(declared) {
+        Type::TypeParam { idx } => {
+            // A reference is not a valid type argument, and every occurrence of
+            // the same parameter must agree.
+            if matches!(
+                view_type(expected),
+                Type::ImmutRef { .. } | Type::MutRef { .. }
+            ) {
+                return false;
+            }
+            match bindings.get_mut(*idx as usize) {
+                Some(slot) => *slot.get_or_insert(expected) == expected,
+                None => false,
+            }
+        },
+        Type::Vector { elem } => {
+            let Type::Vector { elem: expected } = view_type(expected) else {
+                return false;
+            };
+            match_ty(*elem, *expected, bindings)
+        },
+        Type::ImmutRef { inner } => {
+            let Type::ImmutRef { inner: expected } = view_type(expected) else {
+                return false;
+            };
+            match_ty(*inner, *expected, bindings)
+        },
+        Type::MutRef { inner } => {
+            let Type::MutRef { inner: expected } = view_type(expected) else {
+                return false;
+            };
+            match_ty(*inner, *expected, bindings)
+        },
+        Type::Nominal {
+            module_id,
+            name,
+            ty_args,
+        } => {
+            let Type::Nominal {
+                module_id: expected_module_id,
+                name: expected_name,
+                ty_args: expected_ty_args,
+            } = view_type(expected)
+            else {
+                return false;
+            };
+            module_id == expected_module_id
+                && name == expected_name
+                && match_ty_list(*ty_args, *expected_ty_args, bindings)
+        },
+        Type::Function {
+            args,
+            results,
+            abilities,
+        } => {
+            let Type::Function {
+                args: expected_args,
+                results: expected_results,
+                abilities: expected_abilities,
+            } = view_type(expected)
+            else {
+                return false;
+            };
+            abilities == expected_abilities
+                && match_ty_list(*args, *expected_args, bindings)
+                && match_ty_list(*results, *expected_results, bindings)
+        },
+        // Primitives: the pointer comparison above was the whole test. Listed
+        // explicitly so a new `Type` variant forces a decision here.
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer => false,
     }
 }
 
@@ -572,4 +741,265 @@ pub fn display_type_list(f: &mut fmt::Formatter<'_>, types: InternedTypeList) ->
         display_type(f, *ty)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interner::ModuleId;
+    use move_core_types::ability::Ability;
+    use std::collections::HashMap;
+
+    /// Leak-based stand-in for the global interner. Pointer equality has to be
+    /// structural equality, so each distinct type is allocated once and keyed
+    /// by its rendering.
+    #[derive(Default)]
+    struct TestInterner {
+        types: HashMap<String, InternedType>,
+        lists: HashMap<String, InternedTypeList>,
+        names: HashMap<String, InternedIdentifier>,
+        modules: HashMap<String, InternedModuleId>,
+    }
+
+    impl TestInterner {
+        fn ty(&mut self, ty: Type) -> InternedType {
+            let ptr = GlobalArenaPtr::from_static(Box::leak(Box::new(ty)));
+            *self.types.entry(type_to_string(ptr)).or_insert(ptr)
+        }
+
+        fn list(&mut self, tys: &[InternedType]) -> InternedTypeList {
+            let key = tys.iter().copied().map(type_to_string).collect::<String>();
+            *self.lists.entry(key).or_insert_with(|| {
+                let leaked = Box::leak(tys.to_vec().into_boxed_slice());
+                InternedTypeList::new(GlobalArenaPtr::from_static(leaked))
+            })
+        }
+
+        fn name(&mut self, name: &str) -> InternedIdentifier {
+            *self.names.entry(name.to_string()).or_insert_with(|| {
+                GlobalArenaPtr::from_static(Box::leak(name.to_string().into_boxed_str()))
+            })
+        }
+
+        fn nominal(&mut self, module: &str, name: &str, ty_args: &[InternedType]) -> InternedType {
+            let module_name = self.name(module);
+            let module_id = *self.modules.entry(module.to_string()).or_insert_with(|| {
+                GlobalArenaPtr::from_static(Box::leak(Box::new(ModuleId::new(
+                    AccountAddress::ONE,
+                    module_name,
+                ))))
+            });
+            let name = self.name(name);
+            let ty_args = self.list(ty_args);
+            self.ty(Type::Nominal {
+                module_id,
+                name,
+                ty_args,
+            })
+        }
+
+        fn vector(&mut self, elem: InternedType) -> InternedType {
+            self.ty(Type::Vector { elem })
+        }
+
+        fn param(&mut self, idx: u16) -> InternedType {
+            self.ty(Type::TypeParam { idx })
+        }
+
+        fn func(
+            &mut self,
+            args: &[InternedType],
+            results: &[InternedType],
+            abilities: AbilitySet,
+        ) -> InternedType {
+            let args = self.list(args);
+            let results = self.list(results);
+            self.ty(Type::Function {
+                args,
+                results,
+                abilities,
+            })
+        }
+
+        fn signature(
+            &mut self,
+            params: &[InternedType],
+            returns: &[InternedType],
+        ) -> FunctionSignature {
+            FunctionSignature {
+                params: self.list(params),
+                returns: self.list(returns),
+            }
+        }
+    }
+
+    fn copy_drop() -> AbilitySet {
+        AbilitySet::EMPTY | Ability::Copy | Ability::Drop
+    }
+
+    #[test]
+    fn non_generic_signature_infers_nothing() {
+        let mut i = TestInterner::default();
+        let declared = i.signature(&[U64_TY, U64_TY], &[U64_TY]);
+        let expected = i.func(&[U64_TY, U64_TY], &[U64_TY], copy_drop());
+
+        assert_eq!(infer_function_type_args(declared, expected, 0), Ok(vec![]));
+    }
+
+    #[test]
+    fn type_parameters_are_inferred_from_the_expected_type() {
+        let mut i = TestInterner::default();
+        let t0 = i.param(0);
+        let t1 = i.param(1);
+        let vec_t1 = i.vector(t1);
+        let declared = i.signature(&[t0, vec_t1], &[t0]);
+
+        let vec_bool = i.vector(BOOL_TY);
+        let expected = i.func(&[U64_TY, vec_bool], &[U64_TY], copy_drop());
+
+        assert_eq!(
+            infer_function_type_args(declared, expected, 2),
+            Ok(vec![U64_TY, BOOL_TY])
+        );
+    }
+
+    #[test]
+    fn inference_reaches_into_nominal_type_arguments() {
+        let mut i = TestInterner::default();
+        let t0 = i.param(0);
+        let box_t0 = i.nominal("boxes", "Box", &[t0]);
+        let declared = i.signature(&[box_t0], &[]);
+
+        let box_address = i.nominal("boxes", "Box", &[ADDRESS_TY]);
+        let expected = i.func(&[box_address], &[], copy_drop());
+
+        assert_eq!(
+            infer_function_type_args(declared, expected, 1),
+            Ok(vec![ADDRESS_TY])
+        );
+    }
+
+    #[test]
+    fn a_parameter_used_twice_must_agree() {
+        let mut i = TestInterner::default();
+        let t0 = i.param(0);
+        let declared = i.signature(&[t0, t0], &[]);
+
+        let agreeing = i.func(&[U64_TY, U64_TY], &[], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, agreeing, 1),
+            Ok(vec![U64_TY])
+        );
+
+        let conflicting = i.func(&[U64_TY, BOOL_TY], &[], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, conflicting, 1),
+            Err(FunctionTypeMismatch::Incompatible)
+        );
+    }
+
+    #[test]
+    fn a_reference_is_not_a_valid_type_argument() {
+        let mut i = TestInterner::default();
+        let t0 = i.param(0);
+        let declared = i.signature(&[t0], &[]);
+
+        for inner in [Type::ImmutRef { inner: U64_TY }, Type::MutRef {
+            inner: U64_TY,
+        }] {
+            let ref_ty = i.ty(inner);
+            let expected = i.func(&[ref_ty], &[], copy_drop());
+            assert_eq!(
+                infer_function_type_args(declared, expected, 1),
+                Err(FunctionTypeMismatch::Incompatible)
+            );
+        }
+    }
+
+    #[test]
+    fn a_reference_parameter_still_matches_a_reference() {
+        let mut i = TestInterner::default();
+        let t0 = i.param(0);
+        let ref_t0 = i.ty(Type::ImmutRef { inner: t0 });
+        let declared = i.signature(&[ref_t0], &[]);
+
+        let ref_u64 = i.ty(Type::ImmutRef { inner: U64_TY });
+        let expected = i.func(&[ref_u64], &[], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, expected, 1),
+            Ok(vec![U64_TY])
+        );
+
+        // Mutability is invariant.
+        let mut_u64 = i.ty(Type::MutRef { inner: U64_TY });
+        let expected = i.func(&[mut_u64], &[], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, expected, 1),
+            Err(FunctionTypeMismatch::Incompatible)
+        );
+    }
+
+    #[test]
+    fn a_nested_function_type_must_have_the_very_same_abilities() {
+        let mut i = TestInterner::default();
+        let t0 = i.param(0);
+        let callback = i.func(&[t0], &[], copy_drop());
+        let declared = i.signature(&[callback], &[]);
+
+        let matching = i.func(&[U64_TY], &[], copy_drop());
+        let expected = i.func(&[matching], &[], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, expected, 1),
+            Ok(vec![U64_TY])
+        );
+
+        let weaker = i.func(&[U64_TY], &[], AbilitySet::EMPTY | Ability::Drop);
+        let expected = i.func(&[weaker], &[], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, expected, 1),
+            Err(FunctionTypeMismatch::Incompatible)
+        );
+    }
+
+    #[test]
+    fn arity_mismatches_are_incompatible() {
+        let mut i = TestInterner::default();
+        let declared = i.signature(&[U64_TY], &[U64_TY]);
+
+        let too_few_args = i.func(&[], &[U64_TY], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, too_few_args, 0),
+            Err(FunctionTypeMismatch::Incompatible)
+        );
+
+        let too_many_returns = i.func(&[U64_TY], &[U64_TY, U64_TY], copy_drop());
+        assert_eq!(
+            infer_function_type_args(declared, too_many_returns, 0),
+            Err(FunctionTypeMismatch::Incompatible)
+        );
+    }
+
+    #[test]
+    fn a_parameter_the_signature_never_mentions_stays_unbound() {
+        let mut i = TestInterner::default();
+        let t0 = i.param(0);
+        let declared = i.signature(&[t0], &[]);
+        let expected = i.func(&[U64_TY], &[], copy_drop());
+
+        assert_eq!(
+            infer_function_type_args(declared, expected, 2),
+            Err(FunctionTypeMismatch::NotInstantiated)
+        );
+    }
+
+    #[test]
+    fn a_non_function_expected_type_is_rejected() {
+        let mut i = TestInterner::default();
+        let declared = i.signature(&[], &[]);
+
+        assert_eq!(
+            infer_function_type_args(declared, U64_TY, 0),
+            Err(FunctionTypeMismatch::NotAFunction)
+        );
+    }
 }

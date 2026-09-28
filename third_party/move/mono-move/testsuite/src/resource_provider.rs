@@ -9,6 +9,8 @@
 //! because a type's layout and GC descriptor are only published once the
 //! function that accesses it has been lowered.
 
+use aptos_types::on_chain_config::{Features, OnChainConfig};
+use move_core_types::account_address::AccountAddress;
 use mono_move_core::{
     nominal_tag,
     storage::resource_provider::{
@@ -121,6 +123,23 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
             InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist),
         }
     }
+}
+
+/// Storage publishing the framework `Features` resource at `0x1`, initialized
+/// to [`Features::default_for_tests`].
+pub(crate) fn features_storage() -> InMemoryStorage {
+    let mut storage = InMemoryStorage::new();
+    storage.publish_or_overwrite_resource(
+        AccountAddress::ONE,
+        Features::struct_tag(),
+        features_blob(),
+    );
+    storage
+}
+
+/// BCS bytes of the `Features` resource the test harnesses seed at `0x1`.
+pub(crate) fn features_blob() -> Vec<u8> {
+    bcs::to_bytes(&Features::default_for_tests()).expect("Features serializes")
 }
 
 fn materialize_one(

@@ -11,7 +11,20 @@ use crate::{
     interner::InternedModuleId, types::InternedType, DescriptorId, FormatOptions, VMResult,
 };
 use core::{cell::RefMut, cmp::Ordering};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+
+/// Why a function named at runtime cannot be turned into a function value.
+///
+/// The discriminants are part of the Move-visible API: they are the codes
+/// `std::reflect::ReflectionError` is built from. Code `0` belongs to the
+/// native itself, which rejects a malformed identifier before it gets here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionResolutionError {
+    FunctionNotFound = 1,
+    FunctionNotAccessible = 2,
+    FunctionIncompatibleType = 3,
+    FunctionNotInstantiated = 4,
+}
 
 /// Trait that native functions are written generic over.
 ///
@@ -294,6 +307,22 @@ pub trait NativeContext {
 
     /// Type of the native's `i`-th return value.
     fn return_type(&self, i: usize) -> VMResult<InternedType>;
+
+    /// The GC descriptor published for the enum type `ty`, if any.
+    fn enum_descriptor(&self, ty: InternedType) -> Option<DescriptorId>;
+
+    /// Resolves `address::module_name::func_name` at the function type
+    /// `expected_ty`, returning a function value that can be called back into.
+    ///
+    /// Inferring the target's type arguments is part of resolution, so the
+    /// returned value is guaranteed to have type `expected_ty`.
+    fn resolve_function<'a>(
+        &'a self,
+        address: AccountAddress,
+        module_name: &IdentStr,
+        func_name: &IdentStr,
+        expected_ty: InternedType,
+    ) -> VMResult<Result<Boxed<'a, Opaque>, FunctionResolutionError>>;
 
     /// Boxes the by-value argument `value_arg` into a fresh heap object built
     /// from `descriptor`, returning an owned handle that stays live for the
