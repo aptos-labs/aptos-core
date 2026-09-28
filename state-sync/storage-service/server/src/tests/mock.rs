@@ -422,9 +422,13 @@ pub fn create_mock_db_with_summary_updates(
     let mut db_reader = create_mock_db_reader();
 
     // Set up the basic expectations to handle storage summary updates
+    let synced_version = highest_ledger_info.ledger_info().version();
     db_reader
         .expect_get_latest_ledger_info()
         .returning(move || Ok(highest_ledger_info.clone()));
+    db_reader
+        .expect_get_synced_version()
+        .returning(move || Ok(Some(synced_version)));
     db_reader
         .expect_get_first_txn_version()
         .returning(move || Ok(Some(lowest_version)));

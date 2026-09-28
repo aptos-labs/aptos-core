@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    driver::DriverConfiguration,
+    driver::{DriverConfiguration, GenesisCommitter},
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
@@ -565,6 +565,14 @@ impl<
                 Some(target) => target,
                 None => highest_known_ledger_info,
             };
+            // The network has nothing beyond genesis, so there is no snapshot to
+            // sync to. Commit the local genesis blob rather than streaming a copy
+            // of it back from a peer.
+            if target.ledger_info().version() == GENESIS_TRANSACTION_VERSION
+                && let Some(commit_genesis) = self.driver_configuration.commit_genesis.clone()
+            {
+                return self.bootstrap_from_local_genesis(commit_genesis).await;
+            }
             self.drive_snapshot_stages(target).await
         } else {
             // This node has already synced some state. Ensure the node is not too far behind.
@@ -597,6 +605,28 @@ impl<
                        num_versions_behind, highest_known_ledger_version, max_num_versions_behind);
             }
         }
+    }
+
+    /// Commits the local genesis blob and completes bootstrapping.
+    ///
+    /// Used when the fast-sync target is genesis itself. The commit is
+    /// idempotent, so a node that already holds genesis (e.g. restarted after a
+    /// previous run took this path) just proceeds to completion.
+    async fn bootstrap_from_local_genesis(
+        &mut self,
+        commit_genesis: GenesisCommitter,
+    ) -> Result<(), Error> {
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(
+            "The network advertises nothing beyond genesis. Committing local genesis instead of fast syncing to it."
+        ));
+
+        commit_genesis().map_err(|error| {
+            Error::UnexpectedError(format!(
+                "Failed to commit the local genesis blob! Error: {error:?}"
+            ))
+        })?;
+
+        self.bootstrapping_complete().await
     }
 
     /// Attempts to fetch a data notification from the active stream

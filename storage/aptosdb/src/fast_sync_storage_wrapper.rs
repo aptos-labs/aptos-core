@@ -109,16 +109,20 @@ impl FastSyncStorageWrapper {
         *self.fast_sync_status.read()
     }
 
+    /// Retires the genesis DB without a snapshot restore.
+    ///
+    /// When the network advertises nothing beyond genesis there is no snapshot
+    /// to fast sync to, so the node commits genesis straight to
+    /// `db_for_fast_sync` instead. `finalize_state_snapshot` never runs in that
+    /// case, so the read switch has to be flipped here.
+    pub fn mark_bootstrapped_from_genesis(&self) {
+        *self.fast_sync_status.write() = FastSyncStatus::FINISHED;
+    }
+
     /// Check if the fast sync finished already
     fn is_fast_sync_bootstrap_finished(&self) -> bool {
         let status = self.get_fast_sync_status();
         status == FastSyncStatus::FINISHED
-    }
-
-    /// Check if the fast sync started already
-    fn is_fast_sync_bootstrap_started(&self) -> bool {
-        let status = self.get_fast_sync_status();
-        status == FastSyncStatus::STARTED
     }
 
     pub(crate) fn get_aptos_db_read_ref(&self) -> &AptosDB {
@@ -129,12 +133,11 @@ impl FastSyncStorageWrapper {
         }
     }
 
+    /// Writes never belong to the genesis DB. Genesis is committed to it
+    /// directly at startup, not through this wrapper, and everything written
+    /// afterwards is fast-sync data bound for `db_for_fast_sync`.
     pub(crate) fn get_aptos_db_write_ref(&self) -> &AptosDB {
-        if self.is_fast_sync_bootstrap_started() || self.is_fast_sync_bootstrap_finished() {
-            self.db_for_fast_sync.as_ref()
-        } else {
-            self.temporary_db_with_genesis.as_ref()
-        }
+        self.db_for_fast_sync.as_ref()
     }
 }
 
