@@ -12,7 +12,7 @@ pub mod value;
 // The root pool lives at the crate root; re-exported here for native authors.
 pub use crate::root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use abi::{FrameSlot, NativeABI, NativeABIError};
-pub use context::NativeContext;
+pub use context::{FunctionResolutionError, NativeContext};
 pub use extension::{NativeExtension, NativeExtensions};
 pub use registry::{
     Dispatch, NativeContextFamily, NativeFunction, NativeIdx, NativeName, NativeResolver, NoNatives,

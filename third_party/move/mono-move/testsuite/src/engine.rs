@@ -6,12 +6,13 @@
 use crate::{
     compile::{compile, SourceKind},
     module_provider::InMemoryModuleProvider,
+    resource_provider::{features_storage, InMemoryResourceProvider},
 };
 use anyhow::{anyhow, bail, Error, Result};
 use mono_move_core::{
     native::{NativeExtensions, NoNatives},
     types::{is_signer_or_signer_immut_ref, EMPTY_TYPE_LIST},
-    Function, GasMeter, NoResourceProvider, VMInternalError, VMResult,
+    Function, GasMeter, VMInternalError, VMResult,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -207,10 +208,14 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     if let Some(n) = heap_size {
         options.heap_size = n;
     }
+    // Framework code gates features on `exists<Features>(@std)`, so the
+    // resource has to be there for those paths to run at all.
+    let storage = features_storage();
+    let resource_provider = InMemoryResourceProvider::new(guard, &storage);
     let mut interp = InterpreterContext::new_with_options(
         loader,
         GasMeter::new(GAS_BUDGET),
-        &NoResourceProvider,
+        &resource_provider,
         natives,
         options,
     )
