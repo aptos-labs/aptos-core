@@ -625,17 +625,23 @@ fn select(
             // An ignore belongs only to this subsystem. Mark it covered so it
             // cannot trigger unmatched-path fallback; overlapping subsystems
             // still evaluate the path independently.
-            if mappings.is_empty() && !e2e_input && matches(&subsystem.ignored_paths, path) {
+            let ignored_here =
+                matches(&config.ignored_paths, path) || matches(&subsystem.ignored_paths, path);
+            if mappings.is_empty() && !e2e_input && ignored_here {
                 continue;
             }
             report.changed_paths.push(path.clone());
             let mut seeds = BTreeSet::new();
             let old_owner = owner(path, base);
             let new_owner = owner(path, head);
-            for package in old_owner.into_iter().chain(new_owner) {
-                report.seeds.insert(package.to_owned());
-                if current.contains_key(package) {
-                    seeds.insert(package.to_owned());
+            // An ignored tree is not an input of the crate containing it, so a
+            // mapped path inside one seeds only its mapped packages.
+            if !ignored_here {
+                for package in old_owner.into_iter().chain(new_owner) {
+                    report.seeds.insert(package.to_owned());
+                    if current.contains_key(package) {
+                        seeds.insert(package.to_owned());
+                    }
                 }
             }
             for mapping in &mappings {
@@ -1153,6 +1159,32 @@ mod tests {
         assert_eq!(
             selection(&config, &graph, &graph, &["shared/input.md"]),
             set(&["consumer", "related", "unrelated"])
+        );
+    }
+
+    #[test]
+    fn mapped_paths_inside_ignored_trees_seed_only_mapped_packages() {
+        let fixture = Fixture::new();
+        let graph = fixture.graph();
+        let mut config = config();
+        let subsystem = config.subsystems.get_mut("move").unwrap();
+        subsystem.ignored_paths = globs(&["move/core/doc"]);
+        subsystem.path_rules = vec![InputRule {
+            paths: globs(&["move/core/doc/examples"]),
+            affects_packages: vec!["consumer".into()],
+        }];
+        assert!(selection(&config, &graph, &graph, &["move/core/doc/paper.tex"]).is_empty());
+        // The containing crate `core` is not seeded by an ignored tree.
+        assert_eq!(
+            selection(&config, &graph, &graph, &["move/core/doc/examples/a.move"]),
+            set(&["consumer", "related"])
+        );
+        // The same holds for a globally ignored path that a mapping re-adds.
+        assert_eq!(
+            selection(&config, &graph, &graph, &[
+                "move/core/doc/examples/README.md"
+            ]),
+            set(&["consumer", "related"])
         );
     }
 

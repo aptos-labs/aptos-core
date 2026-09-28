@@ -44,7 +44,7 @@ related_test_packages = [
 | `always_test_packages` | Subsystem | Always included when the subsystem activates. |
 | `path_rules` | Subsystem | Add package seeds for filesystem dependencies missing from Cargo; matching rules are additive and can activate a subsystem. |
 | `e2e_tests` | Subsystem | Eligible named suites, selected when a declared dependency is affected or an input changes. |
-| `ignored_paths` | Both | Global: repository-wide. Subsystem: within its roots, without suppressing overlapping subsystems. Global inputs and explicit package/E2E mappings take precedence. |
+| `ignored_paths` | Both | Global: repository-wide. Subsystem: within its roots, without suppressing overlapping subsystems. Global inputs and explicit package/E2E mappings take precedence; a mapped path inside an ignored tree seeds only its mapped packages, not the crate containing it. |
 
 Changes are measured from the merge base of HEAD and `--base` (default
 `origin/main`), including tracked staged/unstaged edits, deletions, and both rename
