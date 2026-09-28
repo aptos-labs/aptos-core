@@ -6,7 +6,9 @@
 //! gets wrong is a failure.
 
 use crate::{
-    engine::build_natives, extensions::seed_extensions, module_provider::InMemoryModuleProvider,
+    engine::build_natives,
+    extensions::seed_extensions,
+    module_provider::InMemoryModuleProvider,
     resource_provider::InMemoryResourceProvider,
 };
 use aptos_types::on_chain_config::aptos_test_feature_flags_genesis;
