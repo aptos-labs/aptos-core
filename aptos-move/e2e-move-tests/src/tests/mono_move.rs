@@ -6,9 +6,9 @@
 //! Each test runs the same block twice through `FakeExecutor::execute_block`,
 //! which routes through `AptosVMBlockExecutorWrapper` and thus selects MonoMove
 //! when `ENABLE_MONO_MOVE` is on: once with the legacy VM (reference), once with
-//! MonoMove on the same starting account state. The block executor forces
-//! sequential execution for MonoMove (its milestone-1 scope), so this exercises
-//! the sequential Block-STM path end to end.
+//! MonoMove on the same starting account state. Both runs use
+//! [`ExecutorMode::BothComparison`], so each block also executes sequentially and
+//! in parallel and the two outputs must agree.
 //!
 //! MonoMove runs without gas metering, so it charges no transaction fee. It
 //! reports zero gas and does not write the fee-only slots: the APT supply, and
@@ -41,9 +41,9 @@ const GAS_DEPENDENT_EVENTS: &[&str] = &[
 
 /// A funded sender and receiver on a fresh genesis state.
 fn setup() -> (FakeExecutor, AccountData, AccountData) {
-    // Sequential only: MonoMove forces sequential in the block executor, and the
-    // legacy reference should run the same way for a faithful comparison.
-    let mut fx = FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::SequentialOnly);
+    // Every block runs both sequentially and in parallel, and the harness
+    // asserts the outputs match.
+    let mut fx = FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::BothComparison);
     let alice = fx.create_raw_account_data(1_000_000_000, 10);
     fx.add_account_data(&alice);
     let bob = fx.create_raw_account_data(100_000_000, 0);
@@ -193,7 +193,7 @@ fn transfer_to_fresh_recipient_block_matches_v1() {
 #[test]
 fn group_member_added_then_sibling_modified_matches_v1() {
     let executor =
-        FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::SequentialOnly);
+        FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::BothComparison);
     let mut harness = MoveHarness::new_with_executor(executor);
 
     // Publish the resource-group test module at its declared address, create the

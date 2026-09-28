@@ -19,6 +19,10 @@ the same epoch change, so the only difference is the flag's value.
 Initialization always runs on the V1 VM. MonoMove discards module-publish
 payloads, so a workload that publishes modules could not be set up under it.
 
+`EXECUTION_THREADS` sets the block executor's concurrency level for both VMs.
+At 1 the numbers are per-transaction cost. Above it they also carry how well
+each VM scales, so the two are calibrated separately.
+
 Run locally:
 
     REPEATS=1 NUM_BLOCKS_PER_TEST=3 NUM_INIT_ACCOUNTS=20000 \\
@@ -46,6 +50,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from calibrate_e2e_perf_test import (
     CALIBRATED_METRICS,
     GREP_KEY,
+    PARALLEL_EXECUTION_THREADS,
+    calibration_path,
     load_calibration,
     speedup_band,
 )
@@ -217,6 +223,7 @@ class RunStats:
     stage_tps: dict
     output_bytes_per_txn: float
     mono_move_enabled: bool
+    concurrency: int
 
     def metric(self, name):
         if name == "total":
@@ -243,6 +250,7 @@ class WorkloadResult:
 
 REPEATS = int(os.environ.get("REPEATS", default=3))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=30))
+EXECUTION_THREADS = int(os.environ.get("EXECUTION_THREADS", default=1))
 NUM_INIT_ACCOUNTS = int(os.environ.get("NUM_INIT_ACCOUNTS", default=2000000))
 CREATE_DB_THREADS = int(os.environ.get("CREATE_DB_THREADS", default=32))
 BUILD = os.environ.get("BUILD", default="release")
@@ -262,6 +270,10 @@ SILENCE_TIMEOUT_SECS = int(os.environ.get("SILENCE_TIMEOUT_SECS", default=30 * 6
 
 if BUILD not in ("release", "performance"):
     print(f"BUILD must be 'release' or 'performance', got {BUILD!r}")
+    sys.exit(1)
+
+if EXECUTION_THREADS < 1:
+    print(f"EXECUTION_THREADS must be at least 1, got {EXECUTION_THREADS}")
     sys.exit(1)
 
 if RUN_SOURCE not in ("ci", "manual", "local"):
@@ -404,7 +416,22 @@ def extract_run_stats(output):
         stage_tps=stage_tps,
         output_bytes_per_txn=output_bpt,
         mono_move_enabled=mono_move_was_enabled(output),
+        concurrency=block_executor_concurrency(output),
     )
+
+
+def block_executor_concurrency(output):
+    """The concurrency level the block executor ran the last block at.
+
+    Not the same as what `--execution-threads` asked for: MonoMove caps it at
+    the number of arenas its global context holds, so an under-provisioned
+    context turns a parallel run into a near-sequential one that still reports
+    a speedup.
+    """
+    matches = re.findall(r"Overall block executor concurrency: (\d+)", output)
+    if not matches:
+        raise ValueError("run did not report a block executor concurrency level")
+    return int(matches[-1])
 
 
 def mono_move_was_enabled(output):
@@ -488,7 +515,7 @@ def common_flags(workload, db_dir, checkpoint_dir):
     return (
         f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark "
         f"--block-executor-type aptos-vm-with-block-stm "
-        f"--execution-threads 1 --generate-then-execute "
+        f"--execution-threads {EXECUTION_THREADS} --generate-then-execute "
         # Several generator threads assign sequence numbers in whatever order
         # they run, but the block keeps the order the slots were laid out in. A
         # workload that draws the same account twice in a block then lands its
@@ -570,6 +597,13 @@ def run_workload(workload, db_dir, tmpdir, calibration):
         if not all(r.mono_move_enabled for r in result.mono_runs):
             raise ValueError("MonoMove run did not enable MonoMove")
 
+    for run in result.v1_runs + result.mono_runs:
+        if run.concurrency != EXECUTION_THREADS:
+            raise ValueError(
+                f"asked for {EXECUTION_THREADS} execution threads but the block "
+                f"executor ran at {run.concurrency}"
+            )
+
     for metric in METRICS:
         v1_median, v1_spread = summarize(result.v1_runs, metric)
         mono_median, mono_spread = summarize(result.mono_runs, metric)
@@ -630,6 +664,7 @@ def emit_json_lines(result, test_index):
                     "block_size": result.workload.block_size,
                     "blocks": NUM_BLOCKS,
                     "repeats": REPEATS,
+                    "execution_threads": EXECUTION_THREADS,
                     "warmup_num_accounts": NUM_ACCOUNTS,
                     "blocking": result.workload.blocking,
                     "verdict": result.verdict,
@@ -777,6 +812,14 @@ def glossary(selected, results):
     Collapsed, so it costs no vertical space in the PR comment until someone
     wants it.
     """
+    if EXECUTION_THREADS == 1:
+        how_it_ran = (
+            "run on the sequential path, since the executor only speculates above "
+            "concurrency 1"
+        )
+    else:
+        how_it_ran = f"run on {EXECUTION_THREADS} threads"
+
     parts = [
         "<details>",
         "<summary>Column reference, verdicts, workloads, pipeline stages</summary>",
@@ -791,13 +834,13 @@ def glossary(selected, results):
         "execution, ledger update, commit.",
         "- `execution speedup` — the executor's execute stage alone.",
         "- `calibrated` — the ratio in the column to its left as recorded in "
-        "`e2e_perf_speedup.tsv`: the median over the runs that row was last "
-        "seeded from, and in parentheses how far this run moved from it. "
-        "`-` when the workload has no row for that metric yet.",
-        "- `Block-STM speedup` — `BlockExecutor::execute_block`, run "
-        "sequentially here. The innermost of the three timers and the closest "
-        "proxy for VM-only time: it leaves out the block setup and output "
-        "conversion that `execution` carries.",
+        f"`{os.path.basename(calibration_path(EXECUTION_THREADS))}`: the median over "
+        "the runs that row was last seeded from, and in parentheses how far this "
+        "run moved from it. `-` when the workload has no row for that metric yet.",
+        f"- `Block-STM speedup` — `BlockExecutor::execute_block`, {how_it_ran}. "
+        "The innermost of the three timers and the closest proxy for VM-only "
+        "time: it leaves out the block setup and output conversion that "
+        "`execution` carries.",
         "- `run-to-run range` — `(max - min) / median` across one VM's repeats, "
         "reported for whichever VM and whichever of the two execution metrics "
         "came out worse. It says how repeatable each side was, not how uncertain "
@@ -856,17 +899,41 @@ def glossary(selected, results):
 
 
 def build_report(selected, results, failures):
-    title = "MonoMove vs V1 MoveVM, sequential execution"
+    if EXECUTION_THREADS == 1:
+        title = "MonoMove vs V1 MoveVM, sequential execution"
+    else:
+        title = (
+            "MonoMove vs V1 MoveVM, parallel execution on "
+            f"{EXECUTION_THREADS} threads"
+        )
     if SELF_COMPARE:
         title += " (SELF_COMPARE: V1 vs V1, everything should be 1.00x)"
 
+    calibration_file = os.path.basename(calibration_path(EXECUTION_THREADS))
     parts = [
         f"### {title}",
         "",
         f"{NUM_BLOCKS} blocks, {REPEATS} repeats per VM, {NUM_ACCOUNTS} account DB, "
-        f"`{BUILD}` build. Ratios are MonoMove over V1; above 1.00x means "
-        f"MonoMove is faster.",
+        f"`{BUILD}` build, {EXECUTION_THREADS} execution thread"
+        f"{'' if EXECUTION_THREADS == 1 else 's'}. Ratios are MonoMove over V1; "
+        "above 1.00x means MonoMove is faster.",
         "",
+        "Every replay behind these tables ran the block executor at concurrency "
+        f"{EXECUTION_THREADS}. A replay capped below it fails its workload rather "
+        "than reporting a speedup, so the two VMs are always compared at the same "
+        "level.",
+        "",
+    ]
+
+    if EXECUTION_THREADS not in (1, PARALLEL_EXECUTION_THREADS):
+        parts += [
+            f"**The bands in `{calibration_file}` were measured at "
+            f"{PARALLEL_EXECUTION_THREADS} threads, not {EXECUTION_THREADS}, so "
+            f"every verdict below is read against the wrong band.**",
+            "",
+        ]
+
+    parts += [
         "Gas is not compared. MonoMove runs unmetered, so its gas metrics are zero.",
         "",
         headline_table(results, failures),
@@ -947,7 +1014,7 @@ def main():
             print(f"Unknown workloads in ONLY_WORKLOADS: {sorted(unknown)}")
             return 1
 
-    calibration = load_calibration()
+    calibration = load_calibration(calibration_path(EXECUTION_THREADS))
     build()
 
     results = []

@@ -65,7 +65,10 @@ aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-move-stdlib = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
+aptos-vm-environment = { workspace = true }
 flate2 = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-package = { workspace = true }
 passkey-types = { workspace = true }
 percent-encoding = { workspace = true }

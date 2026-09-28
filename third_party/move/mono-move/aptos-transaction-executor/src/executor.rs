@@ -91,8 +91,9 @@ impl<'a> AptosTransactionExecutor<'a> {
             },
             // A state checkpoint runs nothing on-chain; it only marks a point
             // for the executor to checkpoint the state tree at.
-            Transaction::StateCheckpoint(_) => {
-                TxnOutcome::ExecutedNoEffects(NoEffectsReason::NothingToExecute)
+            Transaction::StateCheckpoint(_) => TxnOutcome::ExecutedNoEffects {
+                reason: NoEffectsReason::NothingToExecute,
+                effects: None,
             },
             Transaction::ValidatorTransaction(_) => TxnOutcome::Discarded {
                 reason: DiscardReason::Unsupported("validator transactions"),

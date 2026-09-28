@@ -5,7 +5,8 @@ use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     combinatorial_tests::{
         baseline::BaselineOutput,
-        mock_executor::{MockEvent, MockTask},
+        mock_executor::{MockEvent, MockOutput, MockTask},
+        mono_mock_executor::MonoMockExecutor,
         resource_tests::{execute_block_parallel, get_gas_limit_variants},
         types::{
             KeyType, MockTransaction, NonEmptyGroupDataView, TransactionGen, TransactionGenParams,
@@ -13,8 +14,8 @@ use crate::{
     },
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
-    single_transaction_executor::LegacyTransactionExecutor,
-    task::ExecutorTask,
+    single_transaction_executor::{LegacyTransactionExecutor, SingleTransactionExecutor},
+    task::{ExecutorTask, TxnOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
 };
@@ -42,26 +43,29 @@ pub(crate) fn create_non_empty_group_data_view(
     }
 }
 
-/// Run both parallel and sequential execution tests for a transaction provider
-pub(crate) fn run_tests_with_groups(
-    gas_limits: Vec<Option<u64>>,
-    transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+/// Run parallel execution tests for a transaction provider
+pub(crate) fn run_parallel_tests_with_groups<ExecutorType>(
+    gas_limits: &[Option<u64>],
+    txn_provider: &DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>, AuxiliaryInfo>,
     data_view: &NonEmptyGroupDataView<KeyType<[u8; 32]>>,
     num_executions_parallel: usize,
-    num_executions_sequential: usize,
-) {
-    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
-
-    // Run parallel execution tests
+) where
+    ExecutorType: SingleTransactionExecutor<
+        Txn = MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+        AuxiliaryInfo = AuxiliaryInfo,
+    >,
+    ExecutorType::Output: TxnOutput<CommittedOutput = MockOutput<KeyType<[u8; 32]>, MockEvent>>,
+{
     for block_stm_v2 in [false, true] {
         for i in 0..num_executions_parallel {
-            for maybe_block_gas_limit in &gas_limits {
+            for maybe_block_gas_limit in gas_limits {
                 if *maybe_block_gas_limit == Some(0) && i > 0 {
                     continue;
                 }
 
                 let output = execute_block_parallel::<
                     MockTransaction<KeyType<[u8; 32]>, MockEvent>,
+                    ExecutorType,
                     NonEmptyGroupDataView<KeyType<[u8; 32]>>,
                     DefaultTxnProvider<
                         MockTransaction<KeyType<[u8; 32]>, MockEvent>,
@@ -69,7 +73,7 @@ pub(crate) fn run_tests_with_groups(
                     >,
                 >(
                     *maybe_block_gas_limit,
-                    &txn_provider,
+                    txn_provider,
                     data_view,
                     None,
                     block_stm_v2,
@@ -80,6 +84,26 @@ pub(crate) fn run_tests_with_groups(
             }
         }
     }
+}
+
+/// Run both parallel and sequential execution tests for a transaction provider
+pub(crate) fn run_tests_with_groups(
+    gas_limits: Vec<Option<u64>>,
+    transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
+    data_view: &NonEmptyGroupDataView<KeyType<[u8; 32]>>,
+    num_executions_parallel: usize,
+    num_executions_sequential: usize,
+) {
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
+
+    run_parallel_tests_with_groups::<
+        LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
+    >(
+        &gas_limits,
+        &txn_provider,
+        data_view,
+        num_executions_parallel,
+    );
 
     // Run sequential execution tests
     for _ in 0..num_executions_sequential {
@@ -172,5 +196,52 @@ fn non_empty_group_transaction_tests(
         &data_view,
         num_executions_parallel,
         num_executions_sequential,
+    );
+}
+
+#[test_case(50, 100, false, 15 ; "basic group test")]
+#[test_case(50, 1000, false, 10 ; "basic group test 2")]
+#[test_case(50, 1000, true, 10 ; "basic group test 2 with gas limit")]
+#[test_case(15, 1000, false, 5 ; "small universe group test")]
+#[test_case(10, 500, false, 10 ; "contended group test")]
+fn mono_non_empty_group_transaction_tests(
+    universe_size: usize,
+    transaction_count: usize,
+    use_gas_limit: bool,
+    num_executions_parallel: usize,
+) {
+    let mut local_runner = TestRunner::default();
+
+    let key_universe = vec(any::<[u8; 32]>(), universe_size)
+        .new_tree(&mut local_runner)
+        .expect("creating a new value should succeed")
+        .current();
+
+    let transaction_gen = vec(
+        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        transaction_count,
+    )
+    .new_tree(&mut local_runner)
+    .expect("creating a new value should succeed")
+    .current();
+
+    // MonoMove does not serve group size or metadata queries, so all three
+    // percentages stay off.
+    let transactions = transaction_gen
+        .into_iter()
+        .map(|txn_gen| {
+            txn_gen.materialize_groups::<[u8; 32], MockEvent>(&key_universe, [None; 3], None)
+        })
+        .collect();
+
+    let data_view = create_non_empty_group_data_view(&key_universe, universe_size, false);
+    let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
+    let txn_provider = DefaultTxnProvider::new_without_info(transactions);
+
+    run_parallel_tests_with_groups::<MonoMockExecutor>(
+        &gas_limits,
+        &txn_provider,
+        &data_view,
+        num_executions_parallel,
     );
 }

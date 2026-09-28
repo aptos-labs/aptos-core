@@ -432,15 +432,22 @@ impl<
                 Transaction::GenesisTransaction(_)
             );
 
-        // TODO(correctness): Remove when parallel execution is supported.
-        let mut config = config;
         let is_mono_move = !is_genesis
             && module_cache_manager_guard
                 .environment()
                 .features()
                 .is_mono_move_enabled();
+
+        // MonoMove workers each take one arena out of the global context, which
+        // was sized when the module cache manager was built. A caller passing a
+        // higher concurrency level than that would leave a worker with no arena.
+        let mut config = config;
         if is_mono_move {
-            config.local.concurrency_level = 1;
+            config.local.concurrency_level = config.local.concurrency_level.min(
+                module_cache_manager_guard
+                    .global_context()
+                    .num_execution_workers(),
+            );
         }
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 

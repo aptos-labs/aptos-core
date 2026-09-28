@@ -14,6 +14,8 @@ pub(crate) mod mock_executor;
 #[cfg(test)]
 mod module_tests;
 #[cfg(test)]
+pub(crate) mod mono_mock_executor;
+#[cfg(test)]
 mod pre_write_tests;
 #[cfg(test)]
 mod resource_tests;

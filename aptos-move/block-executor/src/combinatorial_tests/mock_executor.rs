@@ -619,7 +619,7 @@ impl<K: Ord + Clone + Debug + Eq + PartialEq + Hash, E: Clone> MockOutputBuilder
 }
 
 impl<K, E> MockOutput<K, E> {
-    fn empty_success_output() -> Self {
+    pub(crate) fn empty_success_output() -> Self {
         Self {
             writes: vec![],
             group_writes: vec![],
@@ -673,7 +673,7 @@ impl<K, E> MockOutput<K, E> {
     }
 }
 
-fn mock_fee_statement(total_gas: u64) -> FeeStatement {
+pub(crate) fn mock_fee_statement(total_gas: u64) -> FeeStatement {
     // First argument is supposed to be total (not important for the test though).
     // Next two arguments are different kinds of execution gas that are counted
     // towards the block limit. We split the total into two pieces for these arguments.
