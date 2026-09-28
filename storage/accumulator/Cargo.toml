@@ -25,4 +25,3 @@ proptest = { workspace = true, optional = true }
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
-rand = { workspace = true }

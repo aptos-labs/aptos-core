@@ -15,6 +15,9 @@ rust-version = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["mime"]
 
+[package.metadata.cargo-shear]
+ignored = ["mime"]
+
 [features]
 failpoints = ["fail/failpoints"]
 
@@ -36,7 +39,6 @@ aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-bytes = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
@@ -59,14 +61,10 @@ tokio = { workspace = true }
 aptos-api-test-context = { workspace = true }
 aptos-batch-encryption = { workspace = true }
 aptos-cached-packages = { workspace = true, features = ["testing"] }
-aptos-framework = { workspace = true }
-aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
-aptos-move-stdlib = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
 flate2 = { workspace = true }
-move-package = { workspace = true }
 passkey-types = { workspace = true }
 percent-encoding = { workspace = true }
 poem = { workspace = true, features = ["test"] }

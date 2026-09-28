@@ -97,7 +97,6 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 criterion = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-rand_core = { workspace = true }
 
 [[bench]]
 name = "network_cloning"

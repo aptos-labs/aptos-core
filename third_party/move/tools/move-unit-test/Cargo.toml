@@ -42,14 +42,13 @@ move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }
-regex = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
-difference = { workspace = true }
 move-model = { path = "../../move-model" }
 move-package = { path = "../move-package" }
+regex = { workspace = true }
 tempfile = { workspace = true }
 
 [[test]]

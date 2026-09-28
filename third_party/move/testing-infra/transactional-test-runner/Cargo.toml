@@ -49,7 +49,6 @@ dearbitrary = { workspace = true, optional = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
-difference = { workspace = true }
 
 [[test]]
 name = "tests"

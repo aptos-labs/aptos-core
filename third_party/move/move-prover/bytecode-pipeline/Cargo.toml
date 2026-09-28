@@ -7,7 +7,6 @@ edition = { workspace = true }
 license = "Apache-2.0"
 
 [dependencies]
-anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
@@ -19,11 +18,9 @@ num = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 datatest-stable = { workspace = true }
 move-stackless-bytecode-test-utils = { workspace = true }
-shell-words = { workspace = true }
-tempfile = { workspace = true }
-walkdir = { workspace = true }
 
 [[test]]
 name = "testsuite"
