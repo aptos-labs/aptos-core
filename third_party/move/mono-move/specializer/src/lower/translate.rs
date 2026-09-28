@@ -2267,6 +2267,7 @@ impl<'a> LoweringState<'a> {
             returns,
             heap_ptr_offsets,
             cs.required_descriptors.clone(),
+            cs.ret_slots.iter().map(|s| s.ty).collect(),
         )
         .map_err(|e| VMInternalError::new(LoweringError::NativeAbi(e)))
     }

@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{DescriptorId, ExecutionErrorKind, FrameOffset, IntoExecutionError};
+use crate::{
+    types::InternedType, DescriptorId, ExecutionErrorKind, FrameOffset, IntoExecutionError,
+};
 use thiserror::Error;
 
 /// Location and size of an argument or return value in the calling frame.
@@ -34,6 +36,9 @@ pub struct NativeABI {
     heap_ptr_offsets: Vec<FrameOffset>,
     /// GC descriptors required by the native, in the order it expects.
     required_descriptors: Vec<DescriptorId>,
+    /// Type of each return value, parallel to `returns`. Natives that build an
+    /// aggregate return value need it to lay the value out.
+    return_types: Vec<InternedType>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -61,6 +66,7 @@ impl NativeABI {
         returns: Vec<FrameSlot>,
         heap_ptr_offsets: Vec<FrameOffset>,
         required_descriptors: Vec<DescriptorId>,
+        return_types: Vec<InternedType>,
     ) -> Result<Self, NativeABIError> {
         check_well_formed(&args, "arg")?;
         check_well_formed(&returns, "return")?;
@@ -74,12 +80,18 @@ impl NativeABI {
             total_frame_size: args_end.max(returns_end),
             heap_ptr_offsets,
             required_descriptors,
+            return_types,
         })
     }
 
     /// The `i`-th GC descriptor the native requires.
     pub fn required_descriptor(&self, i: usize) -> Option<DescriptorId> {
         self.required_descriptors.get(i).copied()
+    }
+
+    /// Type of the `i`-th return value.
+    pub fn return_type(&self, i: usize) -> Option<InternedType> {
+        self.return_types.get(i).copied()
     }
 
     pub fn args(&self) -> &[FrameSlot] {

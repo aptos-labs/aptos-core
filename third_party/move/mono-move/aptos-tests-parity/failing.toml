@@ -42,12 +42,6 @@ name = "aptos-api::aptos_api$tests::accounts_test::account_resource_created_only
 name = "aptos-api::aptos_api$tests::accounts_test::test_get_account_modules_by_ledger_version"
 
 [[test]]
-name = "aptos-api::aptos_api$tests::event_v2_translation_test::test_event_v2_translation_account_key_rotation_event::case_1"
-
-[[test]]
-name = "aptos-api::aptos_api$tests::event_v2_translation_test::test_event_v2_translation_account_key_rotation_event::case_2"
-
-[[test]]
 name = "aptos-api::aptos_api$tests::event_v2_translation_test::test_event_v2_translation_token_objects::case_1"
 
 [[test]]
@@ -881,43 +875,7 @@ name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_cod
 name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_code_object_fail_when_not_owner"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::offer_rotation_capability::offer_rotation_capability_test"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::offer_signer_capability::offer_signer_capability_v2"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::multisig_create_with_existing_account_and_revoke_auth_key_rejected_in_orderless_txn"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::multisig_create_with_existing_account_rejected_in_orderless_txn"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_rotation_capability_rejected_in_multisig_payload"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_rotation_capability_rejected_in_orderless_txn"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_signer_capability_rejected_in_orderless_txn"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::rotate_authentication_key_rejected_in_orderless_txn"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::rotate_authentication_key_with_rotation_capability_rejected_in_orderless_txn"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::upsert_ed25519_backup_key_rejected_in_orderless_txn"
 note = "TODO"
 
 [[test]]
@@ -965,22 +923,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::randomness_test_and_abort::test_un
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_ed25519_to_ed25519"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_ed25519_to_multi_ed25519"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_twice"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_with_rotation_capability_e2e"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::scripts::test_script_with_object_parameter"
 note = "TODO"
 
@@ -1013,12 +955,8 @@ name = "e2e-move-tests::e2e_move_tests$tests::string_utils::test_function_value_
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_context::test_transaction_context_entry_function_payload"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::transaction_context::test_transaction_context_multisig_payload"
-note = "TODO"
+note = "MonoMove does not execute multisig payloads."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_feature_disabled"

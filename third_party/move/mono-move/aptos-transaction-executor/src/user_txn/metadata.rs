@@ -3,8 +3,11 @@
 
 use aptos_types::transaction::{
     authenticator::AnySignature,
-    user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction, UserTxnLimitsRequest,
+    user_transaction_context::{
+        EntryFunctionPayload, MultisigPayload, TransactionIndexKind, UserTransactionContext,
+    },
+    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction, TransactionExecutableRef,
+    UserTxnLimitsRequest,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -45,6 +48,12 @@ pub(crate) struct TxnMetadata {
     /// The transaction's index within its block and whether it comes from block
     /// execution or validation/simulation.
     pub transaction_index_kind: TransactionIndexKind,
+    /// The entry function the transaction calls. Empty for a script, and for a
+    /// multisig transaction, whose inner executable is reported through
+    /// `multisig_payload` instead.
+    pub entry_function_payload: Option<EntryFunctionPayload>,
+    /// The multisig account the transaction runs as, with the inner executable.
+    pub multisig_payload: Option<MultisigPayload>,
 }
 
 impl TxnMetadata {
@@ -59,6 +68,24 @@ impl TxnMetadata {
         );
         let authenticator = txn.authenticator_ref();
         let extra_config = txn.payload().extra_config();
+        let executable_payload = match txn.payload().executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry)) => {
+                Some(entry.as_entry_function_payload())
+            },
+            Ok(TransactionExecutableRef::Script(_))
+            | Ok(TransactionExecutableRef::Encrypted)
+            | Ok(TransactionExecutableRef::Empty)
+            | Err(_) => None,
+        };
+        // A multisig transaction's executable belongs to the multisig account,
+        // so it is reported as the inner payload and not as the entry function.
+        let (entry_function_payload, multisig_payload) = match txn.multisig_address() {
+            Some(address) => (
+                None,
+                Some(MultisigPayload::new(address, executable_payload)),
+            ),
+            None => (executable_payload, None),
+        };
         Self {
             sender: txn.sender(),
             fee_payer: authenticator.fee_payer_address(),
@@ -98,6 +125,8 @@ impl TxnMetadata {
             script_hash,
             session_counter: session_id.session_counter(),
             transaction_index_kind,
+            entry_function_payload,
+            multisig_payload,
         }
     }
 
@@ -106,9 +135,6 @@ impl TxnMetadata {
     }
 
     /// Builds the user transaction context used by some native functions.
-    //
-    // TODO(completeness): `entry_function_payload` and `multisig_payload` are
-    // left `None`; no implemented mono-move native reads them yet.
     pub(crate) fn as_user_transaction_context(&self) -> UserTransactionContext {
         UserTransactionContext::new(
             self.sender,
@@ -117,8 +143,8 @@ impl TxnMetadata {
             self.max_gas_amount,
             self.gas_unit_price,
             self.chain_id,
-            None,
-            None,
+            self.entry_function_payload.clone(),
+            self.multisig_payload.clone(),
             self.transaction_index_kind,
             self.is_encrypted_txn,
             self.is_orderless(),
