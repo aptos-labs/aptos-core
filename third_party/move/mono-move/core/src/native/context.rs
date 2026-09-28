@@ -266,6 +266,9 @@ pub trait NativeContext {
     ) -> VMResult<Boxed<'a, Opaque>>;
 
     /// Whether a resource of type `ty` exists at `address` in global storage.
+    ///
+    /// `ty` must be a struct or enum type: resolving its resource group is an
+    /// invariant violation otherwise.
     //
     // TODO(cleanup): see if the specializer can lower the caller (object::exists_at) to
     // the `Exists` micro-op directly, dropping this native path.
