@@ -15,11 +15,9 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 bcs = { workspace = true }
-bytes = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
-hyper = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
@@ -47,23 +45,4 @@ aptos-types = { workspace = true }
 move-core-types = { workspace = true }
 
 [dev-dependencies]
-goldenfile = { workspace = true }
-rand = { workspace = true }
-regex = { workspace = true }
-
-aptos-api-test-context = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-db = { workspace = true }
-aptos-executor = { workspace = true }
-aptos-executor-types = { workspace = true }
-aptos-framework = { workspace = true }
-aptos-genesis = { workspace = true }
-aptos-global-constants = { workspace = true }
 aptos-mempool = { workspace = true }
-aptos-mempool-notifications = { workspace = true }
-aptos-proptest-helpers = { workspace = true }
-aptos-sdk = { workspace = true }
-aptos-secure-storage = { workspace = true }
-aptos-temppath = { workspace = true }
-aptos-vm = { workspace = true }
-aptos-vm-validator = { workspace = true }

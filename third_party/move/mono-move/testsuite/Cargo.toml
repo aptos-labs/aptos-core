@@ -52,7 +52,6 @@ thiserror = { workspace = true }
 aptos-framework = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
-datatest-stable = { workspace = true }
 libtest-mimic = { workspace = true }
 move-transactional-test-matrix = { workspace = true }
 walkdir = { workspace = true }
