@@ -57,7 +57,7 @@ use move_model::{
     spec_translator::wrap_mut_ref_spec_fun_inputs_deep,
     symbol::Symbol,
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
-    well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
+    well_known::{RECEIVER_PARAM_NAME, TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
 };
 use move_prover_bytecode_pipeline::{
     mono_analysis,
@@ -545,10 +545,14 @@ impl<'env> BoogieTranslator<'env> {
                 TypeIdentToken::convert_to_bytes(TypeIdentToken::make(">")),
             );
 
-            // type name <-> type info: struct
+            // type name <-> type info: struct, rendered as `0x<address>::module::Name<args>`
+            // with the address in hex without leading zeroes. The hex digits are left
+            // uninterpreted.
+            emitln!(writer, "function $AddressShortHex(a: int): Vec int;");
             let mut tokens = TypeIdentToken::make("0x");
-            // TODO(mengxu): this is not a correct radix16 encoding of an integer
-            tokens.push(TypeIdentToken::Variable("MakeVec1(t->a)".to_string()));
+            tokens.push(TypeIdentToken::Variable(
+                "$AddressShortHex(t->a)".to_string(),
+            ));
             tokens.extend(TypeIdentToken::make("::"));
             tokens.push(TypeIdentToken::Variable("t->m".to_string()));
             tokens.extend(TypeIdentToken::make("::"));
@@ -558,13 +562,6 @@ impl<'env> BoogieTranslator<'env> {
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
                             t is $TypeParamStruct ==> $IsEqual'vec'u8''($TypeName(t), {}));",
                 TypeIdentToken::convert_to_bytes(tokens)
-            );
-            // TODO(mengxu): this will parse it to an uninterpreted struct
-            emitln!(
-                writer,
-                "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            $IsPrefix'vec'u8''($TypeName(t), {}) ==> t is $TypeParamVector);",
-                TypeIdentToken::convert_to_bytes(TypeIdentToken::make("0x")),
             );
         }
 
@@ -813,11 +810,8 @@ impl<'env> BoogieTranslator<'env> {
         // so one target reachable under several function types (for instance
         // differing only in abilities) must still be declared once per file.
         let mut declared_behavioral_funs: BTreeSet<QualifiedInstId<FunId>> = BTreeSet::new();
-        // The fourth emission loop, and the last one keyed on the entity rather than
-        // on nothing at all: this one had no guard, so a non-injective rendering
-        // reached Boogie as a duplicate datatype declaration instead of a diagnostic
-        // naming the types that fused. Keys are normalized so that two function types
-        // differing only in abilities -- one Boogie entity -- are not reported.
+        // Keyed on the entity, normalized so that function types differing only in
+        // abilities, which are one Boogie entity, are not reported as a collision.
         let mut translated_fun_types: EmittedEntities<Type> = EmittedEntities::default();
         for (fun_type, closure_infos) in &mono_info.fun_infos {
             let fun_ty_name = boogie_type(self.env, fun_type, false);
@@ -4588,6 +4582,11 @@ impl<'env> BoogieTranslator<'env> {
             .get_spec()
             .filter_kind(ConditionKind::StructInvariant)
         {
+            // The axioms are named after `info`'s field, so only invariants whose calls all
+            // target that field are lifted.
+            if !Self::behavior_calls_all_target_field(env, &cond.exp, info) {
+                continue;
+            }
             let Some(lifted) =
                 self.extract_bp_invariant_body(&cond.exp, kind, params, ctx, mem_args)
             else {
@@ -4619,6 +4618,78 @@ impl<'env> BoogieTranslator<'env> {
                 body_str
             );
         }
+    }
+
+    /// Whether every behavioral-predicate call in the struct invariant `exp` targets `info`'s
+    /// field on the invariant's own value (no base or `self`) or on a variable universally
+    /// quantified at the top of `exp` whose type is `info.struct_id`. Any other target, such as
+    /// a fixed value of the struct type, counts as not matching.
+    fn behavior_calls_all_target_field(env: &GlobalEnv, exp: &Exp, info: &StructFieldInfo) -> bool {
+        // Admissible bases: `self` and the top-level universal variables.
+        let mut universal: BTreeSet<Symbol> = BTreeSet::new();
+        universal.insert(env.symbol_pool().make(RECEIVER_PARAM_NAME));
+        if let ExpData::Quant(_, QuantKind::Forall, ranges, ..) = exp.as_ref() {
+            for (pat, _) in ranges {
+                universal.extend(pat.vars().into_iter().map(|(_, sym)| sym));
+            }
+        }
+        // A variable rebound below names a different value.
+        exp.visit_pre_order(&mut |e| {
+            let rebound = match e {
+                ExpData::Quant(_, _, ranges, ..) if !std::ptr::eq(e, exp.as_ref()) => {
+                    ranges.iter().flat_map(|(pat, _)| pat.vars()).collect_vec()
+                },
+                ExpData::Block(_, pat, ..) | ExpData::Lambda(_, pat, ..) => pat.vars(),
+                _ => vec![],
+            };
+            for (_, sym) in rebound {
+                universal.remove(&sym);
+            }
+            true
+        });
+        !exp.any(&mut |e| match e {
+            ExpData::Call(_, AstOperation::Behavior(..), args) => {
+                !Self::behavior_target_is_field(env, args.first(), info, &universal)
+            },
+            _ => false,
+        })
+    }
+
+    /// Whether `target` is `info`'s field of the invariant's own value or of a `universal`
+    /// variable.
+    fn behavior_target_is_field(
+        env: &GlobalEnv,
+        target: Option<&Exp>,
+        info: &StructFieldInfo,
+        universal: &BTreeSet<Symbol>,
+    ) -> bool {
+        let Some(ExpData::Call(_, op, select_args)) = target.map(|t| t.as_ref()) else {
+            return false;
+        };
+        let (mid, sid, fids) = match op {
+            AstOperation::Select(mid, sid, fid) => (mid, sid, std::slice::from_ref(fid)),
+            AstOperation::SelectVariants(mid, sid, fids) => (mid, sid, fids.as_slice()),
+            _ => return false,
+        };
+        let struct_env = env.get_module(*mid).into_struct(*sid);
+        let field_matches = fids
+            .iter()
+            .all(|fid| struct_env.get_field(*fid).get_name() == info.field_sym);
+        let base_is_this_instance = match select_args.as_slice() {
+            // A field without a base is the invariant's own value.
+            [] => true,
+            [base] => matches!(base.as_ref(), ExpData::LocalVar(node_id, sym)
+                if universal.contains(sym)
+                    && env
+                        .get_node_type(*node_id)
+                        .instantiate(&info.struct_id.inst)
+                        .skip_reference()
+                        .clone()
+                        .normalize_nested_funs()
+                        == info.struct_id.to_type()),
+            _ => false,
+        };
+        field_matches && base_is_this_instance
     }
 
     /// Render a spec-language constant as a Boogie literal. Mirrors the
@@ -4960,10 +5031,23 @@ impl BoogieTranslator<'_> {
         let env = self.env;
 
         // Strip the outer Forall.
+        // An invariant with a `where` clause is not lifted: the axiom cannot express it.
+        // Triggers are ignored; the axiom builds its own.
         let (ranges, body_exp) = match exp.as_ref() {
-            ExpData::Quant(_, QuantKind::Forall, ranges, _, _, body) => (ranges, body.clone()),
+            ExpData::Quant(_, QuantKind::Forall, ranges, _, None, body) => (ranges, body.clone()),
             _ => return None,
         };
+
+        // Only whole-domain quantifiers (`forall x: T`, `forall S in *`) are lifted: the axiom
+        // quantifies over the entire domain, so a narrower range would be widened.
+        if ranges.iter().any(|(_, range)| {
+            !matches!(
+                env.get_node_type(range.node_id()).skip_reference(),
+                Type::TypeDomain(_) | Type::StateDomain
+            )
+        }) {
+            return None;
+        }
 
         // Collect quantifier-bound symbol -> Type from ranges. Only
         // `Pattern::Var` bindings are supported.
@@ -5126,7 +5210,14 @@ impl BoogieTranslator<'_> {
                     result_fun_name, result_mem_rendered, data_args
                 )
             };
-            result_sub.insert(result_syms[0], fun_app);
+            // An absorbed premise becomes `result == witness(inputs)` by substituting the result
+            // variable, so the variable must be bound by exactly one absorbed premise and not be
+            // an input; otherwise the invariant is not lifted.
+            if var_map.contains_key(&result_syms[0])
+                || result_sub.insert(result_syms[0], fun_app).is_some()
+            {
+                return None;
+            }
         }
 
         // Build trigger_apps for the lifted kind — one witness-function app
@@ -5388,9 +5479,8 @@ impl StructTranslator<'_> {
         let num_variants = struct_env.get_variants().count();
         for ((field, (field_type, field_type_uninst)), variant_name) in field_variant_map {
             // The field type is part of the name so that same-named fields of different
-            // types in different variants stay apart. Field name before type, joined
-            // by `.` -- must stay byte-identical to `boogie_variant_field_update`,
-            // which documents why that order is load-bearing.
+            // types in different variants stay apart. Must match
+            // `boogie_variant_field_update`.
             let name_suffix = format!(
                 "'{}'_{}.{}",
                 struct_name,
@@ -8299,9 +8389,8 @@ impl FunctionTranslator<'_> {
                     // Type and bitvector rendering of the value behind the
                     // destination reference (matching its declared Boogie
                     // type), for carrier detection and twin selection.
-                    let root_ty = self
-                        .inst(self.get_local_type(*idx).skip_reference())
-                        .clone();
+                    // `get_local_type` is already instantiated.
+                    let root_ty = self.get_local_type(*idx).skip_reference().clone();
                     let global_state = &self
                         .parent
                         .env

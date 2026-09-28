@@ -2255,10 +2255,7 @@ mod tests {
 
     #[test]
     fn a_global_memory_literal_without_both_markers_is_read_as_is() {
-        // Missing the model-value marker, missing the name separator, and the
-        // two markers in the wrong order. All are display-only fallbacks, but
-        // none may panic: a `_`-joined name reaching here used to do exactly
-        // that.
+        // Missing markers, or markers out of order, fall back without panicking.
         for literal in [
             "|T@[Int]$1.DiemTimestamp.CurrentTimeMicroseconds|",
             "|T@[Int]$1_DiemTimestamp_CurrentTimeMicroseconds!val!0|",

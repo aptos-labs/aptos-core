@@ -44,7 +44,7 @@ use move_model::{
     well_known::{self, TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
 };
 use move_prover_bytecode_pipeline::{
-    mono_analysis::MonoInfo,
+    mono_analysis::{type_params_in_order, MonoInfo},
     number_operation::{GlobalNumberOperationState, NumOperation, NumOperation::Bitwise},
 };
 use std::{
@@ -740,29 +740,17 @@ impl SpecTranslator<'_> {
             false
         };
         let type_info_params = if type_reflection {
-            let mut covered = BTreeSet::new();
-            (0..fun.type_params.len())
+            let inst = (0..fun.type_params.len())
                 .map(|i| {
-                    // Apply type instantiation if present
-                    let ty = self
-                        .type_inst
+                    self.type_inst
                         .get(i)
                         .cloned()
-                        .unwrap_or(Type::TypeParameter(i as u16));
-                    // There can be name clashes after instantiation. Parameters still need
-                    // to be there but all are instantiated with the same type. We escape
-                    // the redundant parameters.
-                    let prefix = if !covered.insert(ty.clone()) {
-                        format!("_{}_", i)
-                    } else {
-                        "".to_string()
-                    };
-                    format!(
-                        "{}{}_info: $TypeParamInfo",
-                        prefix,
-                        boogie_type(self.env, &ty, false)
-                    )
+                        .unwrap_or(Type::TypeParameter(i as u16))
                 })
+                .collect_vec();
+            type_params_in_order(&inst)
+                .into_iter()
+                .map(|idx| format!("#{}_info: $TypeParamInfo", idx))
                 .collect_vec()
         } else {
             vec![]
@@ -3331,9 +3319,9 @@ impl SpecTranslator<'_> {
             .env
             .spec_fun_uses_generic_type_reflection(&module_id.qualified_inst(fun_id, inst.clone()))
         {
-            for ty in inst {
+            for idx in type_params_in_order(inst) {
                 maybe_comma();
-                emit!(self.writer, "{}_info", boogie_type(self.env, ty, false))
+                emit!(self.writer, "#{}_info", idx)
             }
         }
         // Add memory parameters.

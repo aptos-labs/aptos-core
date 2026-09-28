@@ -642,12 +642,8 @@ impl MapImpl {
             })
             .collect();
         let struct_env = env.get_struct(struct_qid);
-        // Deliberately not `boogie_struct_name`: this struct is always an
-        // intrinsic map, for which that helper renders the *theory* type
-        // (`Table int (V)`) rather than a name, and needs a non-empty
-        // instantiation to do so. What the templates want here is the raw
-        // declaration-name prefix. Both must keep using the same separator as
-        // `boogie_module_name`.
+        // The declaration-name prefix; `boogie_struct_name` renders an intrinsic map as
+        // its theory type instead. Uses the same separator as `boogie_module_name`.
         let struct_name = format!(
             "${}.{}",
             boogie_module_name(&struct_env.module_env),

@@ -1,0 +1,41 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/generic_aliasing_many_resources.move:29:9
+   │
+29 │         ensures result == true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:18: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:27: only_at_b (spec)
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:18: only_at_b
+   =         a = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:19: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:20: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:22: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:22: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:22: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:22: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:23: only_at_b
+   =         <redacted> = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:21: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:23: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:24: only_at_b
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:18: only_at_b
+   =         result = <redacted>
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:28: only_at_b (spec)
+   =     at tests/sources/regression/generic_aliasing_many_resources.move:29: only_at_b (spec)

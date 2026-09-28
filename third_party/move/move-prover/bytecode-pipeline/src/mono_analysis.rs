@@ -39,7 +39,10 @@ use move_model::{
     },
     spec_derivation,
     symbol::Symbol,
-    ty::{NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext, Variance},
+    ty::{
+        NoUnificationContext, PrimitiveType, ReferenceKind, Substitution, Type, TypeDisplayContext,
+        Variance, WideningOrder,
+    },
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
         OBJECT_SPEC_EXISTS_AT, TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE,
@@ -57,6 +60,62 @@ use std::{
     fmt,
     rc::Rc,
 };
+
+/// Maximum number of aliasing cases verified for one function; exceeding it is an error.
+const MAX_ALIASING_INSTANCES: usize = 256;
+
+/// The type parameters occurring in `tys`, in order of first occurrence.
+pub fn type_params_in_order(tys: &[Type]) -> Vec<u16> {
+    let mut order = vec![];
+    for ty in tys {
+        ty.visit(&mut |t| {
+            if let Type::TypeParameter(idx) = t {
+                if !order.contains(idx) {
+                    order.push(*idx);
+                }
+            }
+        });
+    }
+    order
+}
+
+/// Renames the type parameters of an aliasing instantiation in order of first occurrence, so
+/// that instantiations describing the same case compare equal.
+fn canonical_aliasing_inst(inst: &[Type], arity: usize) -> Vec<Type> {
+    let renaming = Type::type_param_map_to_inst(
+        arity,
+        type_params_in_order(inst)
+            .into_iter()
+            .enumerate()
+            .map(|(new, old)| (old, Type::new_param(new)))
+            .collect(),
+    );
+    inst.iter().map(|t| t.instantiate(&renaming)).collect()
+}
+
+/// Maps `Var(i)` to `TypeParameter(i)`.
+fn vars_to_type_params(ty: &Type) -> Type {
+    match ty {
+        Type::Var(i) => Type::TypeParameter(*i as u16),
+        Type::Vector(et) => Type::Vector(Box::new(vars_to_type_params(et))),
+        Type::Struct(mid, sid, inst) => {
+            Type::Struct(*mid, *sid, inst.iter().map(vars_to_type_params).collect())
+        },
+        Type::Tuple(ts) => Type::Tuple(ts.iter().map(vars_to_type_params).collect()),
+        Type::Reference(kind, bt) => Type::Reference(*kind, Box::new(vars_to_type_params(bt))),
+        Type::Fun(params, results, abilities) => Type::Fun(
+            Box::new(vars_to_type_params(params)),
+            Box::new(vars_to_type_params(results)),
+            *abilities,
+        ),
+        Type::TypeDomain(bt) => Type::TypeDomain(Box::new(vars_to_type_params(bt))),
+        Type::Primitive(_)
+        | Type::TypeParameter(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error => ty.clone(),
+    }
+}
 
 /// The environment extension computed by this analysis.
 #[derive(Clone, Default, Debug)]
@@ -1490,35 +1549,138 @@ impl Analyzer<'_> {
             let fun_type_params_arity = target.get_type_parameter_count();
             let usage_state = UsageProcessor::analyze(self.targets, target.func_env, target.data);
 
-            // collect instantiations
-            let mut all_insts = BTreeSet::new();
-            for lhs_m in usage_state.accessed.all.iter() {
-                let lhs_ty = lhs_m.to_type();
-                for rhs_m in usage_state.accessed.all.iter() {
-                    let rhs_ty = rhs_m.to_type();
-
-                    // make sure these two types unify before trying to instantiate them
-                    let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
-                    if adapter
-                        .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
-                        .is_none()
-                    {
-                        continue;
+            // Collect aliasing instantiations: substitutions of the function's type parameters
+            // under which some accessed memories have the same type. Each case is the most
+            // general unifier of a set of equations between memories; the search extends every
+            // case found by each pair of memories it can still make equal.
+            //
+            // Ghost type parameters (indices at or above the declared count) are added by global
+            // invariant instrumentation. The search does not extend into them; pairs mentioning a
+            // ghost are matched by `progressive_instantiation` instead.
+            // Memory a function value may write by its `modifies_of` frame is included.
+            let accessed: Vec<Type> = usage_state
+                .accessed
+                .all
+                .iter()
+                .chain(usage_state.invoke_frame.all.iter())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .map(|m| m.to_type())
+                .collect();
+            let declared_arity = target.func_env.get_type_parameters().len();
+            let mentions_ghost: Vec<bool> = accessed
+                .iter()
+                .map(|ty| {
+                    type_params_in_order(std::slice::from_ref(ty))
+                        .iter()
+                        .any(|i| *i as usize >= declared_arity)
+                })
+                .collect();
+            let as_vars: Vec<Type> = (0..fun_type_params_arity)
+                .map(|i| Type::Var(i as u32))
+                .collect();
+            let adapted: Vec<Type> = accessed.iter().map(|m| m.instantiate(&as_vars)).collect();
+            // A case is verified as read back and identified by its canonical form.
+            let inst_of = |subst: &Substitution| -> Vec<Type> {
+                (0..fun_type_params_arity)
+                    .map(|i| vars_to_type_params(&subst.specialize(&Type::Var(i as u32))))
+                    .collect()
+            };
+            // Whether a ghost is bound, or occurs in another type parameter's binding.
+            let involves_ghost = |subst: &Substitution| -> bool {
+                let bound: Vec<Type> = (0..fun_type_params_arity)
+                    .map(|i| subst.specialize(&Type::Var(i as u32)))
+                    .collect();
+                (declared_arity..fun_type_params_arity).any(|g| {
+                    bound[g] != Type::Var(g as u32)
+                        || bound
+                            .iter()
+                            .enumerate()
+                            .any(|(v, ty)| v != g && ty.get_vars().contains(&(g as u32)))
+                })
+            };
+            let mut all_insts: BTreeSet<Vec<Type>> = BTreeSet::new();
+            let mut cases: BTreeSet<Vec<Type>> = BTreeSet::new();
+            // A function accessing no memory has no aliasing case.
+            if !adapted.is_empty() {
+                let open = inst_of(&Substitution::new());
+                cases.insert(canonical_aliasing_inst(&open, fun_type_params_arity));
+                all_insts.insert(open);
+                let mut work = vec![Substitution::new()];
+                'search: while let Some(subst) = work.pop() {
+                    let current: Vec<Type> = adapted.iter().map(|m| subst.specialize(m)).collect();
+                    for i in 0..current.len() {
+                        for j in i + 1..current.len() {
+                            if current[i] == current[j] {
+                                continue;
+                            }
+                            let mut next = subst.clone();
+                            // Exact unification: memories alias only if their types are equal.
+                            if next
+                                .unify(
+                                    &mut NoUnificationContext,
+                                    Variance::NoVariance,
+                                    WideningOrder::LeftToRight,
+                                    &current[i],
+                                    &current[j],
+                                )
+                                .is_err()
+                            {
+                                continue;
+                            }
+                            if involves_ghost(&next) {
+                                continue;
+                            }
+                            // Unifiers equal up to renaming extend alike.
+                            let inst = inst_of(&next);
+                            if !cases.insert(canonical_aliasing_inst(&inst, fun_type_params_arity))
+                            {
+                                continue;
+                            }
+                            all_insts.insert(inst);
+                            if cases.len() > MAX_ALIASING_INSTANCES {
+                                self.env.error(
+                                    &target.get_loc(),
+                                    &format!(
+                                        "too many type-aliasing cases to verify for `{}` (more \
+                                         than {}): the function accesses too many global \
+                                         resources whose types can coincide under some \
+                                         instantiation of its type parameters",
+                                        target.func_env.get_full_name_str(),
+                                        MAX_ALIASING_INSTANCES
+                                    ),
+                                );
+                                break 'search;
+                            }
+                            work.push(next);
+                        }
                     }
-
-                    // find all instantiation combinations given by this unification
-                    let fun_insts = TypeInstantiationDerivation::progressive_instantiation(
-                        std::iter::once(&lhs_ty),
-                        std::iter::once(&rhs_ty),
-                        true,
-                        false,
-                        true,
-                        false,
-                        fun_type_params_arity,
-                        true,
-                        false,
-                    );
-                    all_insts.extend(fun_insts);
+                }
+                for (i, lhs_ty) in accessed.iter().enumerate() {
+                    for (j, rhs_ty) in accessed.iter().enumerate() {
+                        if !(mentions_ghost[i] || mentions_ghost[j]) {
+                            continue;
+                        }
+                        let adapter = TypeUnificationAdapter::new_pair(lhs_ty, rhs_ty, true, true);
+                        if adapter
+                            .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
+                            .is_none()
+                        {
+                            continue;
+                        }
+                        let fun_insts = TypeInstantiationDerivation::progressive_instantiation(
+                            std::iter::once(lhs_ty),
+                            std::iter::once(rhs_ty),
+                            true,
+                            false,
+                            true,
+                            false,
+                            fun_type_params_arity,
+                            true,
+                            false,
+                        );
+                        all_insts.extend(fun_insts);
+                    }
                 }
             }
 
@@ -1712,7 +1874,7 @@ impl Analyzer<'_> {
             self.add_struct(struct_env, &mem.inst);
         }
 
-        let mut exps = {
+        let exps = {
             let spec = fun_env.get_spec();
             spec.conditions
                 .iter()
@@ -1730,17 +1892,22 @@ impl Analyzer<'_> {
         // declarations that were never produced. Reachable whenever a spec-less
         // lambda is named by a behavioral predicate -- its spec is empty by design,
         // so the loop above sees nothing.
-        if !spec_derivation::spec_aborts_are_exact(self.env, fun.to_qualified_id()) {
-            if let Some(derived) = spec_derivation::derive_fun_aborts_conditions(
+        let derived = if spec_derivation::spec_aborts_are_exact(self.env, fun.to_qualified_id()) {
+            None
+        } else {
+            spec_derivation::derive_fun_aborts_conditions(
                 self.env,
                 fun.to_qualified_id(),
                 &fun.inst,
-            ) {
-                exps.extend(derived);
-            }
-        }
+            )
+        };
         let saved_inst = self.inst_opt.replace(fun.inst.clone());
         for exp in exps {
+            self.analyze_exp(&exp);
+        }
+        // Derived conditions are already instantiated at `fun.inst`.
+        self.inst_opt = None;
+        for exp in derived.into_iter().flatten() {
             self.analyze_exp(&exp);
         }
         self.inst_opt = saved_inst;

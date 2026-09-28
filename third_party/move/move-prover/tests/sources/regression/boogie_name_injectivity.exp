@@ -1,50 +1,50 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-   ┌─ tests/sources/regression/boogie_name_injectivity.move:84:9
+   ┌─ tests/sources/regression/boogie_name_injectivity.move:72:9
    │
-84 │         ensures result == true;
+72 │         ensures result == true;
    │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/regression/boogie_name_injectivity.move:78: confuse
+   =     at tests/sources/regression/boogie_name_injectivity.move:66: confuse
    =         s = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:79: confuse
-   =     at tests/sources/regression/boogie_name_injectivity.move:54: put
+   =     at tests/sources/regression/boogie_name_injectivity.move:67: confuse
+   =     at tests/sources/regression/boogie_name_injectivity.move:42: put
    =         s = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:55: put
-   =     at tests/sources/regression/boogie_name_injectivity.move:80: confuse
+   =     at tests/sources/regression/boogie_name_injectivity.move:43: put
+   =     at tests/sources/regression/boogie_name_injectivity.move:68: confuse
    =     at ../move-stdlib/sources/signer.move:30: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:31: address_of
    =         result = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:46: has_it
+   =     at tests/sources/regression/boogie_name_injectivity.move:34: has_it
    =         a = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:47: has_it
+   =     at tests/sources/regression/boogie_name_injectivity.move:35: has_it
    =         result = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:78: confuse
+   =     at tests/sources/regression/boogie_name_injectivity.move:66: confuse
    =         result = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:84: confuse (spec)
+   =     at tests/sources/regression/boogie_name_injectivity.move:72: confuse (spec)
 
 error: post-condition does not hold
-   ┌─ tests/sources/regression/boogie_name_injectivity.move:94:9
+   ┌─ tests/sources/regression/boogie_name_injectivity.move:82:9
    │
-94 │         ensures result == true;
+82 │         ensures result == true;
    │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/regression/boogie_name_injectivity.move:88: no_collision_control
+   =     at tests/sources/regression/boogie_name_injectivity.move:76: no_collision_control
    =         s = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:89: no_collision_control
-   =     at tests/sources/regression/boogie_name_injectivity.move:54: put
+   =     at tests/sources/regression/boogie_name_injectivity.move:77: no_collision_control
+   =     at tests/sources/regression/boogie_name_injectivity.move:42: put
    =         s = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:55: put
-   =     at tests/sources/regression/boogie_name_injectivity.move:90: no_collision_control
+   =     at tests/sources/regression/boogie_name_injectivity.move:43: put
+   =     at tests/sources/regression/boogie_name_injectivity.move:78: no_collision_control
    =     at ../move-stdlib/sources/signer.move:30: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:31: address_of
    =         result = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:64: has_it
+   =     at tests/sources/regression/boogie_name_injectivity.move:52: has_it
    =         a = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:65: has_it
+   =     at tests/sources/regression/boogie_name_injectivity.move:53: has_it
    =         result = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:88: no_collision_control
+   =     at tests/sources/regression/boogie_name_injectivity.move:76: no_collision_control
    =         result = <redacted>
-   =     at tests/sources/regression/boogie_name_injectivity.move:94: no_collision_control (spec)
+   =     at tests/sources/regression/boogie_name_injectivity.move:82: no_collision_control (spec)
