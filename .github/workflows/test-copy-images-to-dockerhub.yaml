@@ -1,5 +1,10 @@
 name: Test Release Images
 on:
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
   pull_request:
     paths:
       - "docker/release-images.mjs"
@@ -19,6 +24,8 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version

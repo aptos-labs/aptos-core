@@ -24,6 +24,11 @@ on:
         required: true
         type: string
         description: Use this to override the git SHA1, branch name (e.g. devnet) or tag to release the SDK from
+      SELECTION_RESULT:
+        required: false
+        default: success
+        type: string
+        description: Planner job result; a failed planner must fail this required check
       SKIP_JOB:
         required: false
         default: false
@@ -51,6 +56,11 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Require successful test determination
+        env:
+          SELECTION_RESULT: ${{ inputs.SELECTION_RESULT }}
+        run: test "$SELECTION_RESULT" = success
+
       - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:
@@ -110,5 +120,26 @@ jobs:
           git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.yaml api/doc/spec.yaml
           git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
         if: ${{ !inputs.SKIP_JOB }}
+
+      # Archive first so upload-artifact never traverses PR-created symlinks.
+      - name: Archive generated API specs
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
+        shell: bash
+        run: |
+          if [[ -d "$RUNNER_TEMP/specs" ]]; then
+            tar --create --gzip \
+              --file "$RUNNER_TEMP/api-compatibility-specs.tar.gz" \
+              --directory "$RUNNER_TEMP" \
+              -- specs
+          fi
+
+      - name: Preserve generated API specs
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-compatibility-specs-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/api-compatibility-specs.tar.gz
+          if-no-files-found: warn
+          retention-days: 14
 
       # TODO: Need to use the other SDKs here to verify correctness
