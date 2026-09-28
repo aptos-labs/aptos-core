@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    driver::{DriverConfiguration, StateSyncDriver},
+    driver::{DriverConfiguration, GenesisCommitter, StateSyncDriver},
     driver_client::{ClientNotificationListener, DriverClient, DriverNotification},
     metadata_storage::MetadataStorageInterface,
     notification_handlers::{
@@ -48,6 +48,7 @@ impl DriverFactory {
         runtime: Option<Handle>,
         node_config: &NodeConfig,
         waypoint: Waypoint,
+        commit_genesis: Option<GenesisCommitter>,
         storage: DbReaderWriter,
         chunk_executor: Arc<ChunkExecutor>,
         mempool_notification_sender: MempoolNotifier,
@@ -63,6 +64,7 @@ impl DriverFactory {
             runtime,
             node_config,
             waypoint,
+            commit_genesis,
             storage,
             chunk_executor,
             mempool_notification_sender,
@@ -89,6 +91,7 @@ impl DriverFactory {
         runtime: Option<Handle>,
         node_config: &NodeConfig,
         waypoint: Waypoint,
+        commit_genesis: Option<GenesisCommitter>,
         storage: DbReaderWriter,
         chunk_executor: Arc<ChunkExecutor>,
         mempool_notification_sender: MempoolNotifier,
@@ -154,6 +157,7 @@ impl DriverFactory {
             node_config.consensus_observer,
             node_config.base.role,
             waypoint,
+            commit_genesis,
         );
 
         // Create the state sync driver

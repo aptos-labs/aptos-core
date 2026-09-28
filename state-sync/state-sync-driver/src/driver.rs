@@ -48,6 +48,16 @@ use tokio_stream::wrappers::IntervalStream;
 const DRIVER_INFO_LOG_FREQ_SECS: u64 = 2;
 const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
 
+/// Commits the node's local genesis blob to storage, returning once it is
+/// durable. Supplied by the node, which owns both the genesis blob and the VM
+/// needed to execute it.
+///
+/// Fast sync calls this when the network advertises nothing beyond genesis:
+/// there is no snapshot to sync to, so there is no reason to stream genesis
+/// back from a peer. Implementations must be idempotent, since the node may
+/// already have committed genesis on an earlier run.
+pub type GenesisCommitter = Arc<dyn Fn() -> anyhow::Result<()> + Send + Sync>;
+
 /// The configuration of the state sync driver
 #[derive(Clone)]
 pub struct DriverConfiguration {
@@ -62,6 +72,10 @@ pub struct DriverConfiguration {
 
     // The trusted waypoint for the node
     pub waypoint: Waypoint,
+
+    // Commits genesis locally instead of fast syncing to it. `None` when the
+    // node has no genesis blob, in which case genesis is streamed from a peer.
+    pub commit_genesis: Option<GenesisCommitter>,
 }
 
 impl DriverConfiguration {
@@ -70,12 +84,14 @@ impl DriverConfiguration {
         consensus_observer_config: ConsensusObserverConfig,
         role: RoleType,
         waypoint: Waypoint,
+        commit_genesis: Option<GenesisCommitter>,
     ) -> Self {
         Self {
             config,
             consensus_observer_config,
             role,
             waypoint,
+            commit_genesis,
         }
     }
 }

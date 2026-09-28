@@ -1178,6 +1178,94 @@ async fn test_snapshot_sync_epoch_change_genesis() {
 }
 
 #[tokio::test]
+async fn test_snapshot_sync_genesis_committed_locally() {
+    // Create a driver configuration that can commit genesis locally
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+    let num_commits = Arc::new(AtomicUsize::new(0));
+    let num_commits_clone = num_commits.clone();
+    driver_configuration.commit_genesis = Some(Arc::new(move || {
+        num_commits_clone.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }));
+
+    // Create a mock streaming client. No state value stream should ever be
+    // requested, so leave the expectation unset (any call panics).
+    let mock_streaming_client = create_mock_streaming_client();
+
+    // Create the mock metadata storage
+    let mut metadata_storage = MockMetadataStorage::new();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |_| Ok(None));
+
+    // Create the bootstrapper (the node is at genesis)
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        GENESIS_TRANSACTION_VERSION,
+        true,
+    );
+
+    // Drive progress to verify the waypoint
+    let global_data_summary = create_global_summary(0);
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Drive progress again. The target is genesis, so the node should commit
+    // the local genesis blob rather than streaming it back from a peer.
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    assert_eq!(num_commits.load(Ordering::SeqCst), 1);
+    assert!(bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_genesis_commit_failure() {
+    // Create a driver configuration whose genesis commit fails
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+    driver_configuration.commit_genesis = Some(Arc::new(|| {
+        Err(anyhow::anyhow!("Failed to commit genesis!"))
+    }));
+
+    // Create the mock metadata storage
+    let mut metadata_storage = MockMetadataStorage::new();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |_| Ok(None));
+
+    // Create the bootstrapper (the node is at genesis)
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        create_mock_streaming_client(),
+        metadata_storage,
+        None,
+        GENESIS_TRANSACTION_VERSION,
+        true,
+    );
+
+    // Drive progress to verify the waypoint
+    let global_data_summary = create_global_summary(0);
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Drive progress again. The commit fails, so the node must surface the
+    // error rather than reporting itself bootstrapped.
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::UnexpectedError(_));
+    assert!(!bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
 async fn test_snapshot_sync_state_values_invalid_chunk_retries() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION;

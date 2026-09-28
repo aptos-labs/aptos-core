@@ -736,7 +736,7 @@ pub fn setup_environment_and_start_node(
     }
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
+    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver, commit_genesis) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -810,6 +810,7 @@ pub fn setup_environment_and_start_node(
             &node_config,
             storage_service_network_interfaces,
             genesis_waypoint,
+            commit_genesis,
             event_subscription_service,
             db_rw.clone(),
         )?;

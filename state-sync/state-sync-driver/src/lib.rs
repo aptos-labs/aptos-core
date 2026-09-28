@@ -17,5 +17,7 @@ mod snapshot_chunk;
 mod storage_synchronizer;
 mod utils;
 
+pub use driver::GenesisCommitter;
+
 #[cfg(test)]
 mod tests;
