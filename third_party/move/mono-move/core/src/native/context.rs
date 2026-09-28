@@ -271,6 +271,18 @@ pub trait NativeContext {
     // the `Exists` micro-op directly, dropping this native path.
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool>;
 
+    /// Borrows the resource of type `ty` at `address`, returning a reference to
+    /// it. Returns `None` if the resource does not exist.
+    ///
+    /// `ty` must be a struct or enum type: resolving its resource group is an
+    /// invariant violation otherwise.
+    fn resource_borrow(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+        mutable: bool,
+    ) -> VMResult<Option<Ref<'_, Opaque>>>;
+
     /// BCS-serializes the by-value argument `i` of type `ty` (e.g. a table key).
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>>;
 

@@ -828,6 +828,58 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(rws.exists(self.resource_provider, &key, group)?)
     }
 
+    fn resource_borrow(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+        mutable: bool,
+    ) -> VMResult<Option<Ref<'_, Opaque>>> {
+        // Resolved before the `rws` reborrow; the resolver reads the module
+        // read-set, disjoint from the read-write set.
+        let group = (self.resource_group_of)(ty)?;
+
+        let storage_key = InMemoryStorageKey::resource(address, ty);
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = if mutable {
+            match rws.try_borrow_global_mut(self.resource_provider, &storage_key, group) {
+                Ok(EntryPtr::Writable(ptr)) => ptr,
+                Ok(EntryPtr::NonWritable(ptr)) => {
+                    // Copy-on-write: an external or stale value must be copied
+                    // into the local heap before it can be mutated.
+                    let heap = unsafe { &mut **self.heap.get() };
+                    // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
+                    let copied = unsafe {
+                        deep_copy_or_gc(
+                            heap,
+                            self.guard,
+                            rws,
+                            &self.pool,
+                            self.extensions,
+                            self.frame_ptr,
+                            TopFrame::Native(self.abi),
+                            ptr,
+                        )
+                    }?;
+                    rws.commit_borrow_global_mut(&storage_key, copied);
+                    copied
+                },
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            match rws.borrow_global(self.resource_provider, &storage_key, group) {
+                Ok(ptr) => ptr,
+                Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+        };
+        // SAFETY: `ptr` is the live entry value; the reference points at its
+        // start, so the offset is 0. The pool roots it for the rest of the call.
+        let handle = unsafe { self.pool.root_reference(ptr.as_ptr(), 0) };
+        Ok(Some(Ref::from_handle(handle)))
+    }
+
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>> {
         let slot =
             self.abi.args().get(i).copied().ok_or_else(|| {

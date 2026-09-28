@@ -185,6 +185,19 @@ impl Ref<'_, TableHandle> {
     }
 }
 
+impl Ref<'_, AccountAddress> {
+    /// Reads the referenced address out by value.
+    ///
+    /// Unlike [`Ref<TableHandle>::get`] this hands back no borrow: callers pass
+    /// the result into context methods that may collect, which would relocate
+    /// the referent.
+    pub fn get(&self) -> AccountAddress {
+        // SAFETY: the reference points at a live `address`, and a frame slot is
+        // not guaranteed to be aligned.
+        unsafe { core::ptr::read_unaligned(self.ptr() as *const AccountAddress) }
+    }
+}
+
 /// Marker for a type that is not statically known.
 ///
 /// This can be used to build composite types in generic native functions — e.g. the
