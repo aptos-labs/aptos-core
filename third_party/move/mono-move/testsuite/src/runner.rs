@@ -15,6 +15,7 @@ use crate::{
     module_provider::InMemoryModuleProvider,
     parser::{Check, PrintSection, Step},
     print_sections,
+    resource_provider::features_blob,
 };
 use anyhow::{anyhow, bail};
 use aptos_framework_natives::{
@@ -28,7 +29,7 @@ use aptos_framework_natives::{
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     contract_event::ContractEvent,
-    on_chain_config::{Features, TimedFeaturesBuilder},
+    on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     state_store::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         StateViewId,
@@ -334,6 +335,12 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
         storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
         module_provider.add_module(module);
     }
+    // V2 seeds the same resource inside `with_mono_function`.
+    storage.publish_or_overwrite_resource(
+        AccountAddress::ONE,
+        Features::struct_tag(),
+        features_blob(),
+    );
 
     for step in steps {
         match step {
