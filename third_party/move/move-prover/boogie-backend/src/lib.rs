@@ -94,7 +94,7 @@ struct TypeInfo {
     has_ghost: bool,
     is_bv: bool,
     is_type_param: bool,
-    /// True iff `$1_cmp_$compare'<suffix>'` is emitted in the prelude. Only set on K
+    /// True iff `$1.cmp.$compare'<suffix>'` is emitted in the prelude. Only set on K
     /// types in `MapImpl::insts`; templates referencing cmp for K must guard on this to
     /// avoid undeclared-function errors.
     cmp_available: bool,
@@ -642,8 +642,14 @@ impl MapImpl {
             })
             .collect();
         let struct_env = env.get_struct(struct_qid);
+        // Deliberately not `boogie_struct_name`: this struct is always an
+        // intrinsic map, for which that helper renders the *theory* type
+        // (`Table int (V)`) rather than a name, and needs a non-empty
+        // instantiation to do so. What the templates want here is the raw
+        // declaration-name prefix. Both must keep using the same separator as
+        // `boogie_module_name`.
         let struct_name = format!(
-            "${}_{}",
+            "${}.{}",
             boogie_module_name(&struct_env.module_env),
             struct_env.get_name().display(struct_env.symbol_pool()),
         );
@@ -1005,11 +1011,9 @@ impl MapImpl {
             return empty;
         };
         let iter_env = env.get_struct(mid.qualified(*sid));
-        let prefix = format!(
-            "${}_{}",
-            boogie_module_name(&iter_env.module_env),
-            iter_env.get_name().display(iter_env.symbol_pool())
-        );
+        // With an empty instantiation this is exactly the uninstantiated name
+        // prefix, as in `iter_payload_parts` below.
+        let prefix = boogie_helpers::boogie_struct_name(&iter_env, &[], false);
         (name, prefix, !inst.is_empty())
     }
 
@@ -1118,7 +1122,7 @@ impl MapImpl {
             None => String::new(),
             Some((addr, mod_name, fun_name)) => {
                 format!(
-                    "${}_{}_{}",
+                    "${}.{}.{}",
                     addr.expect_numerical().short_str_lossless(),
                     mod_name,
                     fun_name

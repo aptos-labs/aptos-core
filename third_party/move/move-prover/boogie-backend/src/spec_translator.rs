@@ -16,7 +16,7 @@ use crate::{
         boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
         boogie_type, boogie_type_for_struct_field, boogie_type_suffix, boogie_value_blob,
         boogie_variant_field_update, boogie_well_formed_expr, bv_flag_for_type,
-        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
+        compute_evaluator_memory_union, EmittedEntities, MAX_TUPLE_SIZE,
     },
     bytecode_translator::has_native_equality,
     options::BoogieOptions,
@@ -375,7 +375,8 @@ impl SpecTranslator<'_> {
 impl SpecTranslator<'_> {
     pub fn translate_spec_vars(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
-        let mut translated = BTreeSet::new();
+        // Keyed on the entity, not on the rendered name -- see `EmittedEntities`.
+        let mut translated: EmittedEntities<(SpecVarId, Vec<Type>)> = EmittedEntities::default();
         for (id, var) in module_env.get_spec_vars() {
             for type_inst in mono_info
                 .spec_vars
@@ -390,7 +391,18 @@ impl SpecTranslator<'_> {
                     &type_inst,
                     &None,
                 );
-                if !translated.insert(name) {
+                if !translated.insert(
+                    module_env.env,
+                    (
+                        *id,
+                        type_inst
+                            .iter()
+                            .map(|t| t.clone().normalize_nested_funs())
+                            .collect::<Vec<_>>(),
+                    ),
+                    &name,
+                    "specification variable",
+                ) {
                     continue;
                 }
                 if type_inst.is_empty() {
@@ -427,7 +439,8 @@ impl SpecTranslator<'_> {
 impl SpecTranslator<'_> {
     pub fn translate_spec_funs(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
-        let mut translated = BTreeSet::new();
+        // Keyed on the entity, not on the rendered name -- see `EmittedEntities`.
+        let mut translated: EmittedEntities<(SpecFunId, Vec<Type>)> = EmittedEntities::default();
         for (id, fun) in module_env.get_spec_funs() {
             for type_inst in mono_info
                 .spec_funs
@@ -437,7 +450,18 @@ impl SpecTranslator<'_> {
                 .cloned()
             {
                 let name = boogie_spec_fun_name(module_env, *id, &type_inst, false);
-                if !translated.insert(name) {
+                if !translated.insert(
+                    module_env.env,
+                    (
+                        *id,
+                        type_inst
+                            .iter()
+                            .map(|t| t.clone().normalize_nested_funs())
+                            .collect::<Vec<_>>(),
+                    ),
+                    &name,
+                    "specification function",
+                ) {
                     continue;
                 }
                 if type_inst.is_empty() {
@@ -5377,11 +5401,11 @@ impl SpecTranslator<'_> {
                     };
                     emit!(
                         self.writer,
-                        &format!(" && $1_signer_is_txn_signer({})", target)
+                        &format!(" && $1.signer.is_txn_signer({})", target)
                     );
                     emit!(
                         self.writer,
-                        &format!(" && $1_signer_is_txn_signer_addr({}->$addr)", target)
+                        &format!(" && $1.signer.is_txn_signer_addr({}->$addr)", target)
                     );
                 }
             },

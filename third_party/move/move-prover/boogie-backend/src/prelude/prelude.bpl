@@ -845,36 +845,36 @@ function {:inline} $SliceVecByRange<T>(v: Vec T, r: $Range): Vec T {
 // assert that sha2/3 are injections without using global quantified axioms.
 
 
-function $1_hash_sha2(val: Vec int): Vec int;
+function $1.hash.sha2(val: Vec int): Vec int;
 
 // This says that Hash_sha2 is bijective.
-axiom (forall v1,v2: Vec int :: {$1_hash_sha2(v1), $1_hash_sha2(v2)}
-       $IsEqual'vec'u8''(v1, v2) <==> $IsEqual'vec'u8''($1_hash_sha2(v1), $1_hash_sha2(v2)));
+axiom (forall v1,v2: Vec int :: {$1.hash.sha2(v1), $1.hash.sha2(v2)}
+       $IsEqual'vec'u8''(v1, v2) <==> $IsEqual'vec'u8''($1.hash.sha2(v1), $1.hash.sha2(v2)));
 
-procedure $1_hash_sha2_256(val: Vec int) returns (res: Vec int);
-ensures res == $1_hash_sha2(val);     // returns Hash_sha2 Value
+procedure $1.hash.sha2_256(val: Vec int) returns (res: Vec int);
+ensures res == $1.hash.sha2(val);     // returns Hash_sha2 Value
 ensures $IsValid'vec'u8''(res);    // result is a legal vector of U8s.
 ensures LenVec(res) == 32;               // result is 32 bytes.
 
 // Spec version of Move native function.
-function {:inline} $1_hash_$sha2_256(val: Vec int): Vec int {
-    $1_hash_sha2(val)
+function {:inline} $1.hash.$sha2_256(val: Vec int): Vec int {
+    $1.hash.sha2(val)
 }
 
 // similarly for Hash_sha3
-function $1_hash_sha3(val: Vec int): Vec int;
+function $1.hash.sha3(val: Vec int): Vec int;
 
-axiom (forall v1,v2: Vec int :: {$1_hash_sha3(v1), $1_hash_sha3(v2)}
-       $IsEqual'vec'u8''(v1, v2) <==> $IsEqual'vec'u8''($1_hash_sha3(v1), $1_hash_sha3(v2)));
+axiom (forall v1,v2: Vec int :: {$1.hash.sha3(v1), $1.hash.sha3(v2)}
+       $IsEqual'vec'u8''(v1, v2) <==> $IsEqual'vec'u8''($1.hash.sha3(v1), $1.hash.sha3(v2)));
 
-procedure $1_hash_sha3_256(val: Vec int) returns (res: Vec int);
-ensures res == $1_hash_sha3(val);     // returns Hash_sha3 Value
+procedure $1.hash.sha3_256(val: Vec int) returns (res: Vec int);
+ensures res == $1.hash.sha3(val);     // returns Hash_sha3 Value
 ensures $IsValid'vec'u8''(res);    // result is a legal vector of U8s.
 ensures LenVec(res) == 32;               // result is 32 bytes.
 
 // Spec version of Move native function.
-function {:inline} $1_hash_$sha3_256(val: Vec int): Vec int {
-    $1_hash_sha3(val)
+function {:inline} $1.hash.$sha3_256(val: Vec int): Vec int {
+    $1.hash.sha3(val)
 }
 
 // ==================================================================================
@@ -882,30 +882,30 @@ function {:inline} $1_hash_$sha3_256(val: Vec int): Vec int {
 
 // TODO: correct implementation of strings
 
-procedure {:inline 1} $1_string_internal_check_utf8(x: Vec int) returns (r: bool) {
+procedure {:inline 1} $1.string.internal_check_utf8(x: Vec int) returns (r: bool) {
 }
 
-procedure {:inline 1} $1_string_internal_sub_string(x: Vec int, i: int, j: int) returns (r: Vec int) {
+procedure {:inline 1} $1.string.internal_sub_string(x: Vec int, i: int, j: int) returns (r: Vec int) {
 }
 
-procedure {:inline 1} $1_string_internal_index_of(x: Vec int, y: Vec int) returns (r: int) {
+procedure {:inline 1} $1.string.internal_index_of(x: Vec int, y: Vec int) returns (r: int) {
 }
 
-procedure {:inline 1} $1_string_internal_is_char_boundary(x: Vec int, i: int) returns (r: bool) {
+procedure {:inline 1} $1.string.internal_is_char_boundary(x: Vec int, i: int) returns (r: bool) {
 }
 
 
 // ==================================================================================
 // Native diem_account
 
-procedure {:inline 1} $1_DiemAccount_create_signer(
+procedure {:inline 1} $1.DiemAccount.create_signer(
   addr: int
 ) returns (signer: $signer) {
     // A signer is currently identical to an address.
     signer := $signer(addr);
 }
 
-procedure {:inline 1} $1_DiemAccount_destroy_signer(
+procedure {:inline 1} $1.DiemAccount.destroy_signer(
   signer: $signer
 ) {
   return;
@@ -914,7 +914,7 @@ procedure {:inline 1} $1_DiemAccount_destroy_signer(
 // ==================================================================================
 // Native account
 
-procedure {:inline 1} $1_Account_create_signer(
+procedure {:inline 1} $1.Account.create_signer(
   addr: int
 ) returns (signer: $signer) {
     // A signer is currently identical to an address.
@@ -936,18 +936,18 @@ function {:inline} $IsEqual'signer'(s1: $signer, s2: $signer): bool {
     s1 == s2
 }
 
-procedure {:inline 1} $1_signer_borrow_address(signer: $signer) returns (res: int) {
+procedure {:inline 1} $1.signer.borrow_address(signer: $signer) returns (res: int) {
     res := signer->$addr;
 }
 
-function {:inline} $1_signer_$borrow_address(signer: $signer): int
+function {:inline} $1.signer.$borrow_address(signer: $signer): int
 {
     signer->$addr
 }
 
-function $1_signer_is_txn_signer(s: $signer): bool;
+function $1.signer.is_txn_signer(s: $signer): bool;
 
-function $1_signer_is_txn_signer_addr(a: int): bool;
+function $1.signer.is_txn_signer_addr(a: int): bool;
 
 
 // ==================================================================================
@@ -957,26 +957,26 @@ function $1_signer_is_txn_signer_addr(a: int): bool;
 // currently because we verify every code path based on signature verification with
 // an arbitrary interpretation.
 
-function $1_Signature_$ed25519_validate_pubkey(public_key: Vec int): bool;
-function $1_Signature_$ed25519_verify(signature: Vec int, public_key: Vec int, message: Vec int): bool;
+function $1.Signature.$ed25519_validate_pubkey(public_key: Vec int): bool;
+function $1.Signature.$ed25519_verify(signature: Vec int, public_key: Vec int, message: Vec int): bool;
 
 // Needed because we do not have extensional equality:
 axiom (forall k1, k2: Vec int ::
-    {$1_Signature_$ed25519_validate_pubkey(k1), $1_Signature_$ed25519_validate_pubkey(k2)}
-    $IsEqual'vec'u8''(k1, k2) ==> $1_Signature_$ed25519_validate_pubkey(k1) == $1_Signature_$ed25519_validate_pubkey(k2));
+    {$1.Signature.$ed25519_validate_pubkey(k1), $1.Signature.$ed25519_validate_pubkey(k2)}
+    $IsEqual'vec'u8''(k1, k2) ==> $1.Signature.$ed25519_validate_pubkey(k1) == $1.Signature.$ed25519_validate_pubkey(k2));
 axiom (forall s1, s2, k1, k2, m1, m2: Vec int ::
-    {$1_Signature_$ed25519_verify(s1, k1, m1), $1_Signature_$ed25519_verify(s2, k2, m2)}
+    {$1.Signature.$ed25519_verify(s1, k1, m1), $1.Signature.$ed25519_verify(s2, k2, m2)}
     $IsEqual'vec'u8''(s1, s2) && $IsEqual'vec'u8''(k1, k2) && $IsEqual'vec'u8''(m1, m2)
-    ==> $1_Signature_$ed25519_verify(s1, k1, m1) == $1_Signature_$ed25519_verify(s2, k2, m2));
+    ==> $1.Signature.$ed25519_verify(s1, k1, m1) == $1.Signature.$ed25519_verify(s2, k2, m2));
 
 
-procedure {:inline 1} $1_Signature_ed25519_validate_pubkey(public_key: Vec int) returns (res: bool) {
-    res := $1_Signature_$ed25519_validate_pubkey(public_key);
+procedure {:inline 1} $1.Signature.ed25519_validate_pubkey(public_key: Vec int) returns (res: bool) {
+    res := $1.Signature.$ed25519_validate_pubkey(public_key);
 }
 
-procedure {:inline 1} $1_Signature_ed25519_verify(
+procedure {:inline 1} $1.Signature.ed25519_verify(
         signature: Vec int, public_key: Vec int, message: Vec int) returns (res: bool) {
-    res := $1_Signature_$ed25519_verify(signature, public_key, message);
+    res := $1.Signature.$ed25519_verify(signature, public_key, message);
 }
 
 
@@ -1013,21 +1013,21 @@ procedure {:inline 1} $1_Signature_ed25519_verify(
 {% set_global emit_generic_event = false %}
 
 // Generic code for dealing with mutations (havoc) still requires type and memory declarations.
-type $1_event_EventHandleGenerator;
-var $1_event_EventHandleGenerator_$memory: $Memory $1_event_EventHandleGenerator;
+type $1.event.EventHandleGenerator;
+var $1.event.EventHandleGenerator_$memory: $Memory $1.event.EventHandleGenerator;
 
 // Abstract type of event handles.
-type $1_event_EventHandle;
+type $1.event.EventHandle;
 
 // Global state to implement uniqueness of event handles.
-var $1_event_EventHandles: [$1_event_EventHandle]bool;
+var $1.event.EventHandles: [$1.event.EventHandle]bool;
 
 // Universal representation of an an event. For each concrete event type, we generate a constructor.
 type $EventRep;
 
 // Representation of EventStore that consists of event streams.
 datatype $EventStore {
-    $EventStore(counter: int, streams: [$1_event_EventHandle]Multiset $EventRep)
+    $EventStore(counter: int, streams: [$1.event.EventHandle]Multiset $EventRep)
 }
 
 // Global state holding EventStore.
@@ -1039,7 +1039,7 @@ procedure {:inline 1} $InitEventStore() {
 
 function {:inline} $EventStore__is_empty(es: $EventStore): bool {
     (es->counter == 0) &&
-    (forall handle: $1_event_EventHandle ::
+    (forall handle: $1.event.EventHandle ::
         (var stream := es->streams[handle];
         IsEmptyMultiset(stream)))
 }
@@ -1047,7 +1047,7 @@ function {:inline} $EventStore__is_empty(es: $EventStore): bool {
 // This function returns (es1 - es2). This function assumes that es2 is a subset of es1.
 function {:inline} $EventStore__subtract(es1: $EventStore, es2: $EventStore): $EventStore {
     $EventStore(es1->counter-es2->counter,
-        (lambda handle: $1_event_EventHandle ::
+        (lambda handle: $1.event.EventHandle ::
         SubtractMultiset(
             es1->streams[handle],
             es2->streams[handle])))
@@ -1055,7 +1055,7 @@ function {:inline} $EventStore__subtract(es1: $EventStore, es2: $EventStore): $E
 
 function {:inline} $EventStore__is_subset(es1: $EventStore, es2: $EventStore): bool {
     (es1->counter <= es2->counter) &&
-    (forall handle: $1_event_EventHandle ::
+    (forall handle: $1.event.EventHandle ::
         IsSubsetMultiset(
             es1->streams[handle],
             es2->streams[handle]
