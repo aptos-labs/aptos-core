@@ -3,6 +3,7 @@
     "description": "Complete Python CLI tests on devnet/testnet/mainnet",
     "workflow": ".github/workflows/cli-e2e-tests.yaml",
     "job": "run-cli-tests",
+    "nightly_workflow": ".github/workflows/nightly-full-suite.yaml",
     "nightly_jobs": [
       "cli-e2e"
     ]
@@ -11,22 +12,16 @@
     "description": "Single-node execution and Move performance regressions",
     "workflow": ".github/workflows/execution-performance.yaml",
     "job": "execution-performance",
+    "nightly_workflow": ".github/workflows/execution-performance.yaml",
     "nightly_jobs": [
       "execution-performance"
-    ]
-  },
-  "faucet-integration": {
-    "description": "Faucet integration with the current node image",
-    "workflow": ".github/workflows/faucet-tests-main.yaml",
-    "job": "run-tests-main",
-    "nightly_jobs": [
-      "faucet-current"
     ]
   },
   "forge-compatibility": {
     "description": "Deployed Forge release compatibility",
     "workflow": ".github/workflows/docker-build-test.yaml",
     "job": "forge-compat-test",
+    "nightly_workflow": ".github/workflows/nightly-full-suite.yaml",
     "nightly_jobs": [
       "forge-deployed"
     ]
@@ -35,6 +30,7 @@
     "description": "Deployed Forge realistic environment load test",
     "workflow": ".github/workflows/docker-build-test.yaml",
     "job": "forge-e2e-test",
+    "nightly_workflow": ".github/workflows/nightly-full-suite.yaml",
     "nightly_jobs": [
       "forge-deployed"
     ]
@@ -43,6 +39,7 @@
     "description": "Generated OpenAPI specification compatibility",
     "workflow": ".github/workflows/node-api-compatibility-tests.yaml",
     "job": "node-api-compatibility-tests",
+    "nightly_workflow": ".github/workflows/nightly-full-suite.yaml",
     "nightly_jobs": [
       "node-api-compatibility"
     ]

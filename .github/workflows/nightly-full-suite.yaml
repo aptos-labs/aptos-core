@@ -102,10 +102,6 @@ jobs:
       only_docs_changed: ${{ 'false' }}
 
   e2e-images:
-    strategy:
-      fail-fast: false
-      matrix:
-        features: ["", "consensus-only-perf-test"]
     uses: ./.github/workflows/workflow-run-docker-rust-build.yaml
     permissions:
       contents: read
@@ -114,7 +110,6 @@ jobs:
     with:
       GIT_SHA: ${{ github.sha }}
       TARGET_CACHE_ID: nightly-e2e
-      FEATURES: ${{ matrix.features }}
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: remote
@@ -141,16 +136,6 @@ jobs:
       GIT_SHA: ${{ github.sha }}
       SKIP_JOB: false
 
-  execution-performance:
-    uses: ./.github/workflows/workflow-run-execution-performance.yaml
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ github.sha }}
-      RUNNER_NAME: benchmark-c3d-60
-      IGNORE_TARGET_DETERMINATION: true
-      FLOW: CONTINUOUS
-      NOTIFY_SLACK: false
-
   mono-move-performance:
     uses: ./.github/workflows/mono-move-e2e-perf.yaml
     permissions:
@@ -162,26 +147,6 @@ jobs:
 
   mono-move-parity:
     uses: ./.github/workflows/mono-move-tests-parity.yaml
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ github.sha }}
-
-  faucet-current:
-    needs: e2e-images
-    uses: ./.github/workflows/faucet-tests-main.yaml
-    permissions:
-      contents: read
-      id-token: write
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ github.sha }}
-      SKIP_JOB: false
-
-  faucet-release:
-    uses: ./.github/workflows/faucet-tests-prod.yaml
-    permissions:
-      contents: read
-      id-token: write
     secrets: inherit
     with:
       GIT_SHA: ${{ github.sha }}
@@ -240,12 +205,6 @@ jobs:
           - name: forge-framework-upgrade
             suite: framework_upgrade
             duration: 3600
-          - name: forge-consensus-only-performance
-            suite: consensus_only_realistic_env_max_tps
-            duration: 300
-          - name: forge-multiregion
-            suite: multiregion_benchmark_test
-            duration: 300
     uses: ./.github/workflows/workflow-run-forge.yaml
     permissions:
       contents: read
@@ -257,16 +216,15 @@ jobs:
       GIT_SHA: ${{ github.sha }}
       FORGE_TEST_SUITE: ${{ matrix.suite }}
       FORGE_RUNNER_DURATION_SECS: ${{ matrix.duration }}
-      IMAGE_TAG: ${{ (matrix.name == 'forge-compatibility' || matrix.name == 'forge-framework-upgrade') && needs.forge-baseline.outputs.image_tag || matrix.name == 'forge-consensus-only-performance' && format('consensus_only_perf_test_{0}', github.sha) || github.sha }}
+      IMAGE_TAG: ${{ (matrix.name == 'forge-compatibility' || matrix.name == 'forge-framework-upgrade') && needs.forge-baseline.outputs.image_tag || github.sha }}
       FORGE_NAMESPACE: forge-nightly-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-      FORGE_CLUSTER_NAME: ${{ matrix.name == 'forge-multiregion' && 'forge-multiregion' || '' }}
       COMMENT_HEADER: nightly-${{ matrix.name }}
       SKIP_JOB: false
       POST_TO_SLACK: false
 
   result:
     name: Nightly full-suite result
-    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, execution-performance, mono-move-performance, mono-move-parity, faucet-current, faucet-release, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed]
+    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, mono-move-performance, mono-move-parity, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed]
     if: always()
     runs-on: ubuntu-latest
     permissions:

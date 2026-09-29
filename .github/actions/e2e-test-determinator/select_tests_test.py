@@ -38,10 +38,13 @@ class E2eSelectionTest(unittest.TestCase):
 
     def test_registry_has_real_workflow_jobs_and_required_nightly_coverage(self):
         root = Path(__file__).resolve().parents[3]
-        nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
-        nightly_jobs = set(re.findall(r"^  ([a-z][a-z0-9-]*):$", nightly, re.M))
+        full_suite = ".github/workflows/nightly-full-suite.yaml"
         required = (
-            re.search(r"  result:\n.*?    needs: \[(.*?)\]", nightly, re.S)
+            re.search(
+                r"  result:\n.*?    needs: \[(.*?)\]",
+                (root / full_suite).read_text(),
+                re.S,
+            )
             .group(1)
             .split(", ")
         )
@@ -51,10 +54,16 @@ class E2eSelectionTest(unittest.TestCase):
                 self.assertRegex(
                     workflow, r"(?m)^  " + re.escape(runner["job"]) + r":$"
                 )
+                nightly = (root / runner["nightly_workflow"]).read_text()
+                nightly_jobs = set(re.findall(r"^  ([a-z][a-z0-9-]*):$", nightly, re.M))
                 self.assertTrue(runner["nightly_jobs"])
                 for job in runner["nightly_jobs"]:
                     self.assertIn(job, nightly_jobs)
-                    self.assertIn(job, required)
+                    if runner["nightly_workflow"] == full_suite:
+                        self.assertIn(job, required)
+                    else:
+                        # Dispatched on its own schedule, outside the full suite.
+                        self.assertIn("workflow_dispatch:", nightly)
         self.assertNotIn("flow-evaluation", REGISTRY)
 
     def test_manual_suites_bypass_selection_but_keep_trigger_gates(self):
@@ -89,7 +98,7 @@ class E2eSelectionTest(unittest.TestCase):
                     self.assertIn("SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') }}", body)
         self.assertTrue({"mono-move-parity", "mono-move-performance",
                          "forge-framework-upgrade", "forge-consensus-only-performance",
-                         "forge-multiregion"}.isdisjoint(REGISTRY))
+                         "forge-multiregion", "faucet-integration"}.isdisjoint(REGISTRY))
 
     def test_full_run_label_reaches_compat_prerequisite(self):
         root = Path(__file__).resolve().parents[3]
@@ -109,13 +118,12 @@ class E2eSelectionTest(unittest.TestCase):
         ).read_text()
         faucet_job = self.workflow_job(faucet, "run-tests-main")
         faucet_gate = faucet_job.split("    runs-on:", 1)[0]
-        self.assertIn("inputs.SELECTION_RESULT != 'success'", faucet_gate)
         self.assertIn("!inputs.SKIP_JOB", faucet_gate)
 
         caller = (root / ".github/workflows/docker-build-test.yaml").read_text()
         faucet_call = self.workflow_job(caller, "faucet-tests-main")
+        self.assertNotIn("e2e-test-determinator", faucet_call)
         skip = next(line for line in faucet_call.splitlines() if "SKIP_JOB:" in line)
-        self.assertIn("needs.e2e-test-determinator.outputs.mode != 'subsystem'", skip)
         self.assertIn("CICD:non-required-tests", skip)
         self.assertIn("CICD:run-all-e2e-tests", skip)
 

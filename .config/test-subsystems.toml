@@ -94,15 +94,6 @@ input_paths = [
     ".github/workflows/workflow-run-execution-performance.yaml"
 ]
 
-[e2e_tests.faucet-integration]
-affected_packages = ["aptos-faucet-core", "aptos-node"]
-input_paths = [
-    "crates/aptos-faucet/integration-tests",
-    ".github/actions/run-faucet-tests",
-    ".github/workflows/faucet-tests-main.yaml",
-    "docker"
-]
-
 [e2e_tests.forge-compatibility]
 affected_packages = ["aptos-node", "aptos-forge", "aptos-testcases"]
 input_paths = [
