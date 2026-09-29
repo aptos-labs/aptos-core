@@ -13,8 +13,8 @@ use crate::{
         utils::{prompt_yes_with_override, read_from_file},
     },
     governance::{
-        create_proposal, execution_payload, get_metadata_from_url, parse_proposal_metadata,
-        ProposalSubmissionSummary,
+        create_proposal, delegation_pool::delegation_pool_governance_precheck, execution_payload,
+        get_metadata_from_url, parse_proposal_metadata, ProposalSubmissionSummary, ProposerPool,
     },
     CliCommand,
 };
@@ -95,8 +95,13 @@ fn bundle_error(err: anyhow::Error) -> CliError {
 /// Submit a governance bundle's proposal
 ///
 /// Verifies the bundle, checks that the metadata URL serves the bundle's
-/// `metadata.json`, checks that the stake pool may propose, and creates a
-/// multi-step proposal for the bundle's compiled scripts. Nothing is compiled.
+/// `metadata.json`, checks that the pool may propose, and creates a multi-step
+/// proposal for the bundle's compiled scripts. Nothing is compiled.
+///
+/// The pool may be a stake pool, signed by its delegated voter, or a delegation
+/// pool, signed by a delegator whose delegated votes meet the required proposer
+/// stake. Partial governance voting is enabled on a delegation pool first if it
+/// isn't yet.
 #[derive(Parser)]
 pub struct ProposeBundle {
     #[clap(flatten)]
@@ -146,57 +151,74 @@ impl CliCommand<ProposalSubmissionSummary> for ProposeBundle {
         let pool_address = self.pool_address_args.pool_address;
         let client = self.txn_options.rest_client()?;
         let (_, sender) = self.txn_options.get_public_key_and_address()?;
-        check_proposer_eligibility(&client, sender, pool_address).await?;
+        let pool = proposer_pool(&client, pool_address).await?;
+        let enabled_partial_governance_voting = match pool {
+            ProposerPool::Stake(_) => None,
+            ProposerPool::Delegation(_) => {
+                delegation_pool_governance_precheck(&self.txn_options, pool_address).await?
+            },
+        };
+        check_proposer_eligibility(&client, sender, pool).await?;
 
         println!(
-            "{}\n\tMetadata Hash: {}\n\tScript Hash: {}\n\tSteps: {}",
+            "{}\n\tMetadata Hash: {}\n\tScript Hash: {}\n\tSteps: {}\n\tProposer: {}",
             metadata,
             metadata_hash.to_hex(),
             scripts[0].hash.to_hex(),
-            scripts.len()
+            scripts.len(),
+            pool
         );
         prompt_yes_with_override(
             "Do you want to submit this proposal?",
             self.txn_options.prompt_options,
         )?;
 
-        create_proposal(
+        let mut summary = create_proposal(
             &self.txn_options,
-            pool_address,
+            pool,
             scripts[0].hash,
             &self.metadata_url,
             metadata_hash,
             true,
         )
-        .await
+        .await?;
+        summary.enabled_partial_governance_voting = enabled_partial_governance_voting;
+        Ok(summary)
     }
 }
 
-/// Fail early, with a readable message, on the conditions `create_proposal_v2`
-/// checks on-chain.
-/// - The sender is the stake pool's delegated voter.
-/// - The stake pool has the required proposer stake.
-/// - The stake pool's lockup outlasts the voting period.
+/// The kind of pool at `pool_address`.
+async fn proposer_pool(
+    client: &Client,
+    pool_address: AccountAddress,
+) -> CliTypedResult<ProposerPool> {
+    let is_delegation_pool: bool = view_one(
+        client,
+        ident_str!("delegation_pool"),
+        ident_str!("delegation_pool_exists"),
+        vec![],
+        vec![bcs_arg(&pool_address)],
+    )
+    .await?;
+    Ok(if is_delegation_pool {
+        ProposerPool::Delegation(pool_address)
+    } else {
+        ProposerPool::Stake(pool_address)
+    })
+}
+
+/// Fail early, with a readable message, on the conditions the chain checks when
+/// creating a proposal.
+/// - The sender may propose with the pool, and with which voting power.
+/// - That voting power meets the required proposer stake.
+/// - The pool's lockup outlasts the voting period.
 async fn check_proposer_eligibility(
     client: &Client,
     sender: AccountAddress,
-    pool_address: AccountAddress,
+    pool: ProposerPool,
 ) -> CliTypedResult<()> {
-    let (voter, voting_power, required_stake, voting_duration, lockup_end, now) = try_join!(
-        view_one::<Address>(
-            client,
-            ident_str!("stake"),
-            ident_str!("get_delegated_voter"),
-            vec![],
-            vec![bcs_arg(&pool_address)],
-        ),
-        view_one::<U64>(
-            client,
-            ident_str!("aptos_governance"),
-            ident_str!("get_voting_power"),
-            vec![],
-            vec![bcs_arg(&pool_address)],
-        ),
+    let (voting_power, required_stake, voting_duration, lockup_end, now) = try_join!(
+        proposer_voting_power(client, sender, pool),
         view_one::<U64>(
             client,
             ident_str!("aptos_governance"),
@@ -216,33 +238,84 @@ async fn check_proposer_eligibility(
             ident_str!("stake"),
             ident_str!("get_lockup_secs"),
             vec![],
-            vec![bcs_arg(&pool_address)],
+            vec![bcs_arg(&pool.address())],
         ),
         ledger_timestamp_secs(client),
     )?;
 
-    let voter = AccountAddress::from(voter);
-    if voter != sender {
+    if voting_power < required_stake.0 {
+        let holder = match pool {
+            ProposerPool::Stake(_) => pool.to_string(),
+            ProposerPool::Delegation(_) => format!("the sender {} in {}", sender, pool),
+        };
         return Err(CliError::CommandArgumentError(format!(
-            "the sender {} is not the delegated voter of stake pool {} (the voter is {})",
-            sender, pool_address, voter
-        )));
-    }
-    if voting_power.0 < required_stake.0 {
-        return Err(CliError::CommandArgumentError(format!(
-            "stake pool {} has voting power {} but proposing requires at least {}",
-            pool_address, voting_power.0, required_stake.0
+            "{} has voting power {} but proposing requires at least {}",
+            holder, voting_power, required_stake.0
         )));
     }
     let voting_end = now + voting_duration.0;
     if voting_end >= lockup_end.0 {
+        let hint = match pool {
+            ProposerPool::Stake(_) => "the pool owner must increase the lockup before proposing",
+            ProposerPool::Delegation(_) => {
+                "the lockup renews each epoch while the pool is an active validator"
+            },
+        };
         return Err(CliError::CommandArgumentError(format!(
-            "the lockup of stake pool {} ends at unix second {}, before the voting period would \
-             end at {}; the pool owner must increase the lockup before proposing",
-            pool_address, lockup_end.0, voting_end
+            "the lockup of {} ends at unix second {}, before the voting period would end at {}; {}",
+            pool, lockup_end.0, voting_end, hint
         )));
     }
     Ok(())
+}
+
+/// The voting power `sender` proposes with: a stake pool's whole power, if the
+/// sender is its delegated voter, or the sender's delegated votes in a
+/// delegation pool.
+async fn proposer_voting_power(
+    client: &Client,
+    sender: AccountAddress,
+    pool: ProposerPool,
+) -> CliTypedResult<u64> {
+    match pool {
+        ProposerPool::Stake(pool_address) => {
+            let (voter, voting_power) = try_join!(
+                view_one::<Address>(
+                    client,
+                    ident_str!("stake"),
+                    ident_str!("get_delegated_voter"),
+                    vec![],
+                    vec![bcs_arg(&pool_address)],
+                ),
+                view_one::<U64>(
+                    client,
+                    ident_str!("aptos_governance"),
+                    ident_str!("get_voting_power"),
+                    vec![],
+                    vec![bcs_arg(&pool_address)],
+                ),
+            )?;
+            let voter = AccountAddress::from(voter);
+            if voter != sender {
+                return Err(CliError::CommandArgumentError(format!(
+                    "the sender {} is not the delegated voter of {} (the voter is {})",
+                    sender, pool, voter
+                )));
+            }
+            Ok(voting_power.0)
+        },
+        ProposerPool::Delegation(pool_address) => {
+            let voting_power: U64 = view_one(
+                client,
+                ident_str!("delegation_pool"),
+                ident_str!("calculate_and_update_voter_total_voting_power"),
+                vec![],
+                vec![bcs_arg(&pool_address), bcs_arg(&sender)],
+            )
+            .await?;
+            Ok(voting_power.0)
+        },
+    }
 }
 
 /// Execute an approved governance bundle's proposal
