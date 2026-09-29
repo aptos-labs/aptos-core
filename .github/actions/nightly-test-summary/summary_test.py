@@ -86,10 +86,14 @@ class NightlySummaryTest(unittest.TestCase):
             {"workspace": {"result": "success"}},
             previous_runs=previous,
             attempt=2,
-            jobs=[{"name": "flaky", "conclusion": "success"}],
+            jobs=[
+                {"name": "flaky", "conclusion": "success"},
+                {"name": "Nightly full-suite result", "conclusion": None},
+            ],
             first_attempt_jobs=[
                 {"name": "flaky", "conclusion": "failure"},
                 {"name": "steady", "conclusion": "success"},
+                {"name": "Nightly full-suite result", "conclusion": "failure"},
             ],
         )
         self.assertFalse(failed)

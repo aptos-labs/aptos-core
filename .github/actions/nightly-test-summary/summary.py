@@ -120,7 +120,9 @@ def build_summary(
         else:
             # Without job details, name the incomplete suites themselves.
             lines.append("Required suites: " + "; ".join(incomplete))
-    recovered = sorted(failed_names(first_attempt_jobs) - failed_names(jobs))
+    # Jobs still running, such as this one, are neither failed nor passed.
+    passed = {job["name"] for job in jobs or [] if job.get("conclusion") == "success"}
+    recovered = sorted(failed_names(first_attempt_jobs) & passed)
     if recovered:
         lines.append(html.escape("Passed on retry: " + ", ".join(recovered), quote=False))
     if previous_sha:
