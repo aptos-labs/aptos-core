@@ -290,11 +290,13 @@ jobs:
         run: exit 1
 
   # Every nightly posts its result with the linked seven-night bar; the result
-  # job's status decides the colour of this run's square.
+  # job's status decides the colour of this run's square. Delivery errors must
+  # not change the run conclusion, which the bar reads for past nights.
   notify:
     name: Notify Move alerts
     needs: result
     if: always()
+    continue-on-error: true
     runs-on: ubuntu-latest
     permissions: {}
     steps:
