@@ -4777,9 +4777,9 @@ impl SpecTranslator<'_> {
         // runtime state for ghost-bearing types.
         if let Type::Tuple(elems) = ty {
             if elems.len() >= 2 {
-                let has_ghost = elems
+                let has_ghost = !elems
                     .iter()
-                    .any(|e| crate::bytecode_translator::type_has_ghost_transitively(self.env, e));
+                    .all(|e| has_native_equality(self.env, self.options, e));
                 let negated = boogie_val_fun.starts_with('!');
                 if !has_ghost {
                     emit!(self.writer, "(");
