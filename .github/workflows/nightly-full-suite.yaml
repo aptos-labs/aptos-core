@@ -136,21 +136,6 @@ jobs:
       GIT_SHA: ${{ github.sha }}
       SKIP_JOB: false
 
-  mono-move-performance:
-    uses: ./.github/workflows/mono-move-e2e-perf.yaml
-    permissions:
-      contents: read
-      pull-requests: write
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ github.sha }}
-
-  mono-move-parity:
-    uses: ./.github/workflows/mono-move-tests-parity.yaml
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ github.sha }}
-
   docker-release-images:
     uses: ./.github/workflows/test-copy-images-to-dockerhub.yaml
     with:
@@ -202,9 +187,6 @@ jobs:
           - name: forge-compatibility
             suite: compat
             duration: 300
-          - name: forge-framework-upgrade
-            suite: framework_upgrade
-            duration: 3600
     uses: ./.github/workflows/workflow-run-forge.yaml
     permissions:
       contents: read
@@ -216,7 +198,7 @@ jobs:
       GIT_SHA: ${{ github.sha }}
       FORGE_TEST_SUITE: ${{ matrix.suite }}
       FORGE_RUNNER_DURATION_SECS: ${{ matrix.duration }}
-      IMAGE_TAG: ${{ (matrix.name == 'forge-compatibility' || matrix.name == 'forge-framework-upgrade') && needs.forge-baseline.outputs.image_tag || github.sha }}
+      IMAGE_TAG: ${{ matrix.name == 'forge-compatibility' && needs.forge-baseline.outputs.image_tag || github.sha }}
       FORGE_NAMESPACE: forge-nightly-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
       COMMENT_HEADER: nightly-${{ matrix.name }}
       SKIP_JOB: false
@@ -224,7 +206,7 @@ jobs:
 
   result:
     name: Nightly full-suite result
-    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, mono-move-performance, mono-move-parity, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed]
+    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed]
     if: always()
     runs-on: ubuntu-latest
     permissions:

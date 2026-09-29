@@ -119,8 +119,7 @@ These suites bypass subsystem selection and cannot appear in `e2e_tests`:
 | Forge multiregion | `CICD:run-multiregion-test` label. |
 | Faucet (current node and production networks) | `CICD:non-required-tests` label. |
 
-Nightly calls the MonoMove and framework-upgrade suites independently; the others
-have not run on recent CI and are not part of the nightly. Execution performance
+Manual suites stay manual: the nightly runs none of them. Execution performance
 remains registered because its `LAND_BLOCKING` flow supports PRs/automerge; its own
 PIES dispatch runs `CONTINUOUS` and serves as its nightly coverage.
 
@@ -161,15 +160,15 @@ The targeted-test command prints the same plan it executes.
 The [nightly workflow](../../.github/workflows/nightly-full-suite.yaml) bypasses
 selection and documentation skips while preserving legacy CI test eligibility
 and exclusions, running the workspace baseline and the E2E suites listed below.
-It includes only suites that also run on PR CI; execution performance has its
-own dispatched nightly. Required failures or skipped
+It includes only suites that PR CI runs without an opt-in label; execution
+performance has its own dispatched nightly. Required failures or skipped
 suites fail the aggregate result; independent suites continue.
 
 | Coverage | Execution |
 | --- | --- |
 | Rust baseline | Workspace Nextest (`ci`, three retries), doc tests, VM feature validation, and framework bundle freshness. |
 | Dedicated Rust suites | Eight smoke partitions and batch encryption with Node/pnpm. |
-| Application E2E | CLI against devnet/testnet/mainnet, API specs, MonoMove performance/parity, and three deployed Forge variants (E2E, compatibility, framework upgrade). |
+| Application E2E | CLI against devnet/testnet/mainnet, API specs, and two deployed Forge variants (E2E, compatibility). |
 | CI tooling | Docker release-image and Python selection/alert tests. |
 
 Tests and images use the dispatched SHA; comparison networks use released images.

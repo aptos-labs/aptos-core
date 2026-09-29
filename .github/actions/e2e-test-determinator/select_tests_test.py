@@ -99,6 +99,19 @@ class E2eSelectionTest(unittest.TestCase):
         self.assertTrue({"mono-move-parity", "mono-move-performance",
                          "forge-framework-upgrade", "forge-consensus-only-performance",
                          "forge-multiregion", "faucet-integration"}.isdisjoint(REGISTRY))
+        # Manual suites stay manual: the nightly calls none of them.
+        nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
+        for manual in (
+            "mono-move-tests-parity.yaml",
+            "mono-move-e2e-perf.yaml",
+            "faucet-tests-prod.yaml",
+            "faucet-tests-main.yaml",
+            "suite: framework_upgrade",
+            "suite: consensus_only_realistic_env_max_tps",
+            "suite: multiregion_benchmark_test",
+        ):
+            with self.subTest(nightly=manual):
+                self.assertNotIn(manual, nightly)
 
     def test_full_run_label_reaches_compat_prerequisite(self):
         root = Path(__file__).resolve().parents[3]
