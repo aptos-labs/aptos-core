@@ -141,9 +141,51 @@ class NightlySummaryTest(unittest.TestCase):
             previous_sha="base123",
         )
         self.assertTrue(failed)
-        self.assertIn("storage: failure", payload["text"])
-        self.assertIn("cargo (workspace): Run tests", payload["text"])
+        self.assertIn(f"{RED}  cargo (workspace) \u2014 Run tests", payload["text"])
         self.assertIn("base123...abc123", payload["text"])
+        # Without job details the incomplete suites are named instead.
+        _, payload = self.summary({"storage": {"result": "failure"}})
+        self.assertIn("Required suites: storage: failure", payload["text"])
+
+    def test_failed_jobs_show_their_seven_night_history(self):
+        def night(day, jobs, first_attempt_jobs=None):
+            return {
+                "createdAt": f"2026-09-{day:02d}T02:00:00Z",
+                "status": "completed",
+                "conclusion": "success",
+                "attempt": 2 if first_attempt_jobs else 1,
+                "url": f"https://github.com/org/repo/actions/runs/{day}",
+                "jobs": jobs,
+                "first_attempt_jobs": first_attempt_jobs,
+            }
+
+        passed = [{"name": "parity", "conclusion": "success"}]
+        previous = [night(day, passed) for day in range(1, 5)]
+        previous.append(night(5, passed, [{"name": "parity", "conclusion": "failure"}]))
+        previous.append(night(6, [{"name": "parity", "conclusion": "failure"}]))
+        previous.append(night(7, []))
+        _, payload = self.summary(
+            {"mono-move-parity": {"result": "failure"}, "cli-e2e": {"result": "skipped"}},
+            previous_runs=previous,
+            jobs=[
+                {
+                    "name": "parity",
+                    "conclusion": "failure",
+                    "html_url": "https://github.com/org/repo/actions/runs/1/job/9",
+                    "steps": [{"name": "Check parity", "conclusion": "failure"}],
+                },
+                {"name": "cli", "conclusion": "skipped"},
+            ],
+        )
+        # Six prior nights (the oldest drops out), then tonight linked to the job log.
+        self.assertIn(
+            f"{GREEN * 3}{YELLOW}{RED}{GREY}"
+            f"<https://github.com/org/repo/actions/runs/1/job/9|{RED}>"
+            "  parity \u2014 Check parity",
+            payload["text"],
+        )
+        self.assertIn("Skipped suites: cli-e2e", payload["text"])
+        self.assertNotIn("Required suites", payload["text"])
 
     def test_skipped_jobs_are_omitted_from_failure_details(self):
         _, payload = self.summary(
@@ -153,7 +195,7 @@ class NightlySummaryTest(unittest.TestCase):
                 {"name": "expected skip", "conclusion": "skipped", "steps": []},
             ],
         )
-        self.assertIn("failed:", payload["text"])
+        self.assertIn(f"{RED}  failed", payload["text"])
         self.assertNotIn("expected skip", payload["text"])
 
     def test_skips_timeouts_cancellations_and_missing_results_are_not_green(self):

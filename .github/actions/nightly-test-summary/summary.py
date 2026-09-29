@@ -15,25 +15,54 @@ GREEN, YELLOW, RED, GREY = "\U0001f7e9", "\U0001f7e8", "\U0001f7e5", "\u2b1c"
 FAILED = ("failure", "timed_out", "cancelled")
 
 
-def square(conclusion, attempt=1):
+def square(conclusion, retried=False):
     if conclusion == "success":
         # Passing only after the retry mixes green and red.
-        return YELLOW if attempt > 1 else GREEN
+        return YELLOW if retried else GREEN
     if conclusion in (*FAILED, "startup_failure"):
         return RED
     return GREY
 
 
+def failed_names(jobs):
+    return {job["name"] for job in jobs or [] if job.get("conclusion") in FAILED}
+
+
+def recent_nights(previous):
+    """The completed nights before this run, oldest first."""
+    runs = [run for run in previous or [] if run.get("status") == "completed"]
+    return sorted(runs, key=lambda run: run["createdAt"])[-(HISTORY_NIGHTS - 1) :]
+
+
 def build_history(previous, run_url, failed, attempt=1):
     """One linked square per night, oldest first, ending with this run."""
-    runs = [run for run in previous or [] if run.get("status") == "completed"]
-    runs = sorted(runs, key=lambda run: run["createdAt"])[-(HISTORY_NIGHTS - 1) :]
     cells = [
-        f"<{run['url']}|{square(run.get('conclusion'), run.get('attempt', 1))}>"
-        for run in runs
+        f"<{run['url']}|{square(run.get('conclusion'), run.get('attempt', 1) > 1)}>"
+        for run in recent_nights(previous)
     ]
-    cells.append(f"<{run_url}|{square('failure' if failed else 'success', attempt)}>")
+    cells.append(f"<{run_url}|{square('failure' if failed else 'success', attempt > 1)}>")
     return f"Last {len(cells)} nights: " + "".join(cells)
+
+
+def job_rows(jobs, first_attempt_jobs, previous):
+    """One row per failed job: its square on each night of the bar, then its failed steps."""
+    nights = recent_nights(previous)
+    rows = []
+    for job in jobs or []:
+        if job.get("conclusion") not in FAILED:
+            continue
+        cells = []
+        for run in nights:
+            past = {past["name"]: past.get("conclusion") for past in run.get("jobs") or []}
+            retried = job["name"] in failed_names(run.get("first_attempt_jobs"))
+            cells.append(square(past.get(job["name"]), retried))
+        cells.append(f"<{job['html_url']}|{RED}>" if job.get("html_url") else RED)
+        steps = [
+            step["name"] for step in job.get("steps", []) if step.get("conclusion") in FAILED
+        ]
+        text = job["name"] + (" \u2014 " + ", ".join(steps) if steps else "")
+        rows.append("".join(cells) + "  " + html.escape(text, quote=False))
+    return rows
 
 
 def build_summary(
@@ -67,22 +96,16 @@ def build_summary(
         f"<{run_url}|Run, logs, and artifacts>",
     ]
     if incomplete:
-        lines.append("Required suites: " + "; ".join(incomplete))
-        for job in jobs or []:
-            if job.get("conclusion") not in FAILED:
-                continue
-            failed_steps = [
-                step["name"]
-                for step in job.get("steps", [])
-                if step.get("conclusion") in FAILED
-            ]
-            lines.append(
-                html.escape(job["name"] + ": " + ", ".join(failed_steps), quote=False)
-            )
-    recovered = sorted(
-        {job["name"] for job in first_attempt_jobs or [] if job.get("conclusion") in FAILED}
-        - {job["name"] for job in jobs or [] if job.get("conclusion") in FAILED}
-    )
+        rows = job_rows(jobs, first_attempt_jobs, previous_runs)
+        skipped = sorted(name for name, job in needs.items() if job["result"] == "skipped")
+        if rows:
+            lines.extend(rows)
+            if skipped:
+                lines.append("Skipped suites: " + ", ".join(skipped))
+        else:
+            # Without job details, name the incomplete suites themselves.
+            lines.append("Required suites: " + "; ".join(incomplete))
+    recovered = sorted(failed_names(first_attempt_jobs) - failed_names(jobs))
     if recovered:
         lines.append(html.escape("Passed on retry: " + ", ".join(recovered), quote=False))
     if previous_sha:
@@ -107,12 +130,15 @@ def main():
     run_id = os.environ["GITHUB_RUN_ID"]
     run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{run_id}"
     attempt = int(os.environ["GITHUB_RUN_ATTEMPT"])
+    repo = os.environ["GITHUB_REPOSITORY"]
 
-    def attempt_jobs(number):
-        view = ["run", "view", run_id, "--attempt", str(number), "--json", "jobs"]
-        return (gh_json(view) or {}).get("jobs")
+    def run_jobs(run, number=None):
+        """Jobs of one attempt, or the latest execution of every job."""
+        runs = f"repos/{repo}/actions/runs/{run}"
+        path = f"attempts/{number}/jobs?" if number else "jobs?filter=latest&"
+        return (gh_json(["api", f"{runs}/{path}per_page=100"]) or {}).get("jobs")
 
-    jobs = attempt_jobs(attempt)
+    jobs = run_jobs(run_id)
     previous = gh_json(
         [
             "run",
@@ -143,6 +169,13 @@ def main():
             "databaseId,status,conclusion,attempt,url,createdAt",
         ]
     )
+    nights = recent_nights(
+        [run for run in history or [] if str(run.get("databaseId")) != run_id]
+    )
+    for run in nights:
+        run["jobs"] = run_jobs(run["databaseId"])
+        if run.get("attempt", 1) > 1:
+            run["first_attempt_jobs"] = run_jobs(run["databaseId"], 1)
     failed, payload = build_summary(
         needs,
         os.environ["GITHUB_REF_NAME"],
@@ -150,9 +183,9 @@ def main():
         run_url,
         jobs,
         previous[0]["headSha"] if previous else None,
-        [run for run in history or [] if str(run.get("databaseId")) != run_id],
+        nights,
         attempt,
-        attempt_jobs(1) if attempt > 1 else None,
+        run_jobs(run_id, 1) if attempt > 1 else None,
     )
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"failed={str(failed).lower()}\n")
