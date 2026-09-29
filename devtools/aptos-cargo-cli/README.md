@@ -182,11 +182,15 @@ schedules. Standalone scripts are not auto-discovered.
 
 [PIES](https://github.com/aptos-labs/internal-ops/pull/9422) dispatches `main` daily
 at **09:00 UTC (01:00 PST / 02:00 PDT)**. Land the workflow before deploying that
-registration. Manual dispatch is supported. Every attempt posts its result to
+registration. Manual dispatch is supported. A failed first attempt re-runs its
+failed jobs once through the [retry workflow](../../.github/workflows/nightly-full-suite-retry.yaml),
+which absorbs lost runners and other infrastructure failures. The final attempt
+posts its result to
 `#feed-move-alerts` via `EXECUTION_PERF_SLACK_WEBHOOK_URL`, headed by a bar of
 one linked square per night for the last seven completed runs on the branch
-(green, red, or grey for skipped), oldest first, ending with the current run.
-Failed attempts add the failed suites, including failures outside Move, and
+(green, yellow for passing only after the retry, red, or grey for skipped),
+oldest first, ending with the current run. A retried pass names the jobs that
+passed on retry. Failed attempts add the failed suites, including failures outside Move, and
 link the revision, logs/artifacts, and available details; add a notification
 step for any further channel. Missing dispatches or runs cancelled before
 notification need external scheduler monitoring.

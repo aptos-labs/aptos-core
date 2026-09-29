@@ -247,13 +247,29 @@ jobs:
         if: steps.summary.outputs.failed != 'false'
         run: exit 1
 
-  # Every nightly posts its result with the linked seven-night bar; the result
-  # job's status decides the colour of this run's square. Delivery errors must
-  # not change the run conclusion, which the bar reads for past nights.
+  # A failed first attempt re-runs its failed jobs once. A run cannot re-run
+  # itself while in progress, so a separate workflow waits for it to complete.
+  retry:
+    name: Retry failed suites once
+    needs: result
+    if: ${{ always() && needs.result.result != 'success' && github.run_attempt == '1' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the retry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nightly-full-suite-retry.yaml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f run_id="$GITHUB_RUN_ID"
+
+  # Every run posts its result with the linked seven-night bar, except a first
+  # attempt whose retry was dispatched: the retry posts instead. The result job's
+  # status decides the colour of this run's square. Delivery errors must not
+  # change the run conclusion, which the bar reads for past nights.
   notify:
     name: Notify Move alerts
-    needs: result
-    if: always()
+    needs: [result, retry]
+    if: ${{ always() && needs.retry.result != 'success' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     permissions: {}

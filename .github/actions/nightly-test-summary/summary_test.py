@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import shlex
 import unittest
-from summary import GREEN, GREY, RED, build_history, build_summary
+from summary import GREEN, GREY, RED, YELLOW, build_history, build_summary
 
 
 class NightlySummaryTest(unittest.TestCase):
@@ -71,6 +71,58 @@ class NightlySummaryTest(unittest.TestCase):
         # Every nightly message carries the bar.
         _, payload = self.summary({"workspace": {"result": "success"}})
         self.assertIn("Last 1 nights: <https://github.com/org/repo/actions/runs/1|", payload["text"])
+
+    def test_passing_only_on_retry_is_yellow_and_names_recovered_jobs(self):
+        previous = [
+            {
+                "createdAt": "2026-09-01T02:00:00Z",
+                "status": "completed",
+                "conclusion": "success",
+                "attempt": 2,
+                "url": "https://github.com/org/repo/actions/runs/1",
+            }
+        ]
+        failed, payload = self.summary(
+            {"workspace": {"result": "success"}},
+            previous_runs=previous,
+            attempt=2,
+            jobs=[{"name": "flaky", "conclusion": "success"}],
+            first_attempt_jobs=[
+                {"name": "flaky", "conclusion": "failure"},
+                {"name": "steady", "conclusion": "success"},
+            ],
+        )
+        self.assertFalse(failed)
+        self.assertIn("Nightly full-suite passed after retry", payload["text"])
+        self.assertIn(
+            f"<https://github.com/org/repo/actions/runs/1|{YELLOW}>"
+            f"<https://github.com/org/repo/actions/runs/1|{YELLOW}>",
+            payload["text"],
+        )
+        self.assertIn("Passed on retry: flaky\n", payload["text"] + "\n")
+        # Failing again after the retry stays red.
+        failed, payload = self.summary(
+            {"workspace": {"result": "failure"}},
+            attempt=2,
+            jobs=[{"name": "broken", "conclusion": "failure", "steps": []}],
+            first_attempt_jobs=[{"name": "broken", "conclusion": "failure"}],
+        )
+        self.assertTrue(failed)
+        self.assertIn(f"|{RED}>", payload["text"])
+        self.assertNotIn("Passed on retry", payload["text"])
+
+    def test_failed_first_attempt_retries_instead_of_posting(self):
+        root = Path(__file__).resolve().parents[3]
+        nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
+        retry = re.search(r"^  retry:\n(.*?)(?=^  [a-z-]+:$)", nightly, re.M | re.S).group(1)
+        notify = re.search(r"^  notify:\n(.*?)(?=^  [a-z-]+:$|\Z)", nightly, re.M | re.S).group(1)
+        self.assertIn("needs.result.result != 'success' && github.run_attempt == '1'", retry)
+        self.assertIn("gh workflow run nightly-full-suite-retry.yaml", retry)
+        self.assertIn("needs.retry.result != 'success'", notify)
+        rerun = (root / ".github/workflows/nightly-full-suite-retry.yaml").read_text()
+        self.assertIn(".github/workflows/nightly-full-suite.yaml", rerun)
+        self.assertIn('--jq .run_attempt)" = 1', rerun)
+        self.assertIn("--failed", rerun)
 
     def test_green_run_is_not_failed(self):
         failed, _ = self.summary({"workspace": {"result": "success"}})
