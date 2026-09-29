@@ -240,9 +240,25 @@ impl Context {
             .map_err(|e| E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError))
     }
 
+    /// Whether the node has committed any data yet.
+    ///
+    /// A node that is still bootstrapping (e.g. one that is fast syncing) is
+    /// given the genesis ledger info up front so it can establish provenance,
+    /// but holds none of the ledger data behind it until its snapshot lands.
+    pub fn is_bootstrapped(&self) -> bool {
+        matches!(self.db.get_synced_version(), Ok(Some(_)))
+    }
+
     pub fn get_latest_storage_ledger_info<E: ServiceUnavailableError>(
         &self,
     ) -> Result<LedgerInfo, E> {
+        if !self.is_bootstrapped() {
+            return Err(E::service_unavailable_with_code_no_info(
+                "The node has not finished bootstrapping and has no ledger data to serve yet",
+                AptosErrorCode::NodeNotBootstrapped,
+            ));
+        }
+
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
             .context("Failed to retrieve latest ledger info")

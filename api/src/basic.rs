@@ -9,7 +9,7 @@ use crate::{
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::AptosErrorCode;
+use aptos_api_types::{AptosErrorCode, LedgerInfo};
 use aptos_config::config::NodeType;
 use poem_openapi::{
     param::Query,
@@ -147,13 +147,18 @@ impl BasicApi {
 
     /// Check basic node health
     ///
-    /// By default this endpoint just checks that it can get the latest ledger
-    /// info and then returns 200.
+    /// By default this endpoint returns 200 as long as the node is running.
+    /// It is meant to be used as a liveness check, so a node that is still
+    /// bootstrapping (and therefore has no ledger data yet) still passes: it
+    /// is alive and must not be restarted.
     ///
     /// If the duration_secs param is provided, this endpoint will return a
     /// 200 if the following condition is true:
     ///
     /// `server_latest_ledger_info_timestamp >= server_current_time_timestamp - duration_secs`
+    ///
+    /// That form is a readiness check, and a node that has not caught up (or
+    /// has not bootstrapped at all) fails it.
     #[oai(
         path = "/-/healthy",
         method = "get",
@@ -169,7 +174,16 @@ impl BasicApi {
         duration_secs: Query<Option<u32>>,
     ) -> HealthCheckResult<HealthCheckSuccess> {
         let context = self.context.clone();
-        let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+
+        // A node that has not bootstrapped has no ledger info to report, but it
+        // is running and must not be restarted. Note that this is specifically
+        // the not-bootstrapped case: if the node has data and reading it fails,
+        // the error propagates so the liveness check does fail.
+        let ledger_info = if context.is_bootstrapped() {
+            api_spawn_blocking(move || context.get_latest_ledger_info()).await?
+        } else {
+            LedgerInfo::not_bootstrapped(&context.chain_id())
+        };
 
         // If we have a duration, check that it's close to the current time, otherwise it's ok
         if let Some(max_skew) = duration_secs.0 {
