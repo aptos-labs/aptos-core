@@ -26,7 +26,7 @@ vcpkg install openssl:x64-windows-static-md --clean-after-build
 
 # Build the CLI.
 echo "Building release $VERSION of $NAME for Windows"
-cargo build -p $CRATE_NAME --profile cli
+cargo build --locked -p $CRATE_NAME --profile cli
 
 # Compress the CLI.
 $ZIP_NAME="$NAME-$VERSION-Windows-x86_64.zip"

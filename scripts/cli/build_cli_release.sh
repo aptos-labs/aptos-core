@@ -53,9 +53,9 @@ fi
 
 echo "Building release $VERSION of $NAME for $OS-$PLATFORM_NAME on $ARCH"
 if [[ "$COMPATIBILITY_MODE" == "true" ]]; then
-  RUSTFLAGS="-C target-cpu=generic --cfg tokio_unstable -C target-feature=-sse4.2,-avx" cargo build -p "$CRATE_NAME" --profile cli
+  RUSTFLAGS="-C target-cpu=generic --cfg tokio_unstable -C target-feature=-sse4.2,-avx" cargo build --locked -p "$CRATE_NAME" --profile cli
 else
-  cargo build -p "$CRATE_NAME" --profile cli
+  cargo build --locked -p "$CRATE_NAME" --profile cli
 fi
 cd target/cli/
 
