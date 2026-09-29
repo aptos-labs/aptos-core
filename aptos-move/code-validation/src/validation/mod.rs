@@ -1,5 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-pub(crate) mod module_init;
-pub mod transaction_arg_validation;
-pub(crate) mod view_function;
+
+pub mod bytecode;
+pub mod events;
+pub mod natives;
+pub mod resource_groups;
