@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import shlex
 import unittest
-from summary import build_summary
+from summary import GREEN, GREY, RED, build_history, build_summary
 
 
 class NightlySummaryTest(unittest.TestCase):
@@ -36,7 +36,43 @@ class NightlySummaryTest(unittest.TestCase):
         self.assertEqual(cargo_test_args(nightly), cargo_test_args(legacy))
         self.assertIn("FORGE_NAMESPACE: forge-nightly-", nightly)
 
-    def test_green_run_does_not_alert(self):
+    def test_history_bar_links_each_night_oldest_first_and_ends_with_this_run(self):
+        def run(day, conclusion, status="completed"):
+            return {
+                "createdAt": f"2026-09-{day:02d}T02:00:00Z",
+                "conclusion": conclusion,
+                "status": status,
+                "url": f"https://github.com/org/repo/actions/runs/{day}",
+            }
+
+        previous = [run(3, "failure"), run(1, "success"), run(2, "skipped")]
+        line = build_history(previous, "https://github.com/org/repo/actions/runs/9", False)
+        self.assertEqual(
+            line,
+            "Last 4 nights: "
+            f"<https://github.com/org/repo/actions/runs/1|{GREEN}>"
+            f"<https://github.com/org/repo/actions/runs/2|{GREY}>"
+            f"<https://github.com/org/repo/actions/runs/3|{RED}>"
+            f"<https://github.com/org/repo/actions/runs/9|{GREEN}>",
+        )
+        # Only the newest six completed nights precede this run; an in-progress
+        # run is not a night, and this run's own colour follows its result.
+        previous = [run(day, "success") for day in range(1, 10)]
+        previous.append(run(11, None, status="in_progress"))
+        line = build_history(previous, "https://github.com/org/repo/actions/runs/9", True)
+        self.assertEqual(line.count("<"), 7)
+        self.assertNotIn("/runs/3|", line)
+        self.assertNotIn("/runs/11", line)
+        self.assertTrue(line.endswith(f"<https://github.com/org/repo/actions/runs/9|{RED}>"))
+        self.assertEqual(
+            build_history(None, "https://github.com/org/repo/actions/runs/9", False),
+            f"Last 1 nights: <https://github.com/org/repo/actions/runs/9|{GREEN}>",
+        )
+        # Every nightly message carries the bar.
+        _, payload = self.summary({"workspace": {"result": "success"}})
+        self.assertIn("Last 1 nights: <https://github.com/org/repo/actions/runs/1|", payload["text"])
+
+    def test_green_run_is_not_failed(self):
         failed, _ = self.summary({"workspace": {"result": "success"}})
         self.assertFalse(failed)
 
