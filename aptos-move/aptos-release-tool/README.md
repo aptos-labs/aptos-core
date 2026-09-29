@@ -279,7 +279,7 @@ same way `verify-bundle` does and submit only the compiled scripts under
 
 | Command | What it does |
 |---------|-------------|
-| `propose-bundle` | Checks that `--metadata-url` serves the bundle's `metadata.json` and that the stake pool may propose, then creates the multi-step proposal for the first script's hash. |
+| `propose-bundle` | Checks that `--metadata-url` serves the bundle's `metadata.json` and that the pool may propose, then creates the multi-step proposal for the first script's hash. The pool may be a stake pool (signed by its delegated voter) or a delegation pool (signed by a delegator with enough delegated votes). |
 | `execute-bundle` | Executes the steps of an approved proposal that have not run yet, starting from the one the chain expects next, so a re-run after a failure resumes where it stopped. |
 
 ```bash
