@@ -103,6 +103,9 @@ pub trait NativeContext {
     /// or `None` if the frame is the entry point (which has no caller).
     fn caller_module(&self) -> Option<InternedModuleId>;
 
+    /// Like `caller_module`, but returns `None` if that caller used a function value.
+    fn direct_caller_module(&self) -> Option<InternedModuleId>;
+
     /// Allocates a `vector<u8>` on the VM heap initialized with `bytes` and
     /// returns a handle to it. The vector stays live for the rest of the
     /// native call.

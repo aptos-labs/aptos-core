@@ -10,12 +10,16 @@ use crate::{
         },
         AptosMoveResolver,
     },
+    system_module_names::{INIT_MODULE, RESET_INITIALIZED},
     transaction_metadata::TransactionMetadata,
     verifier, AptosVM,
 };
 use aptos_gas_meter::AptosGasMeter;
-use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
-use aptos_types::{on_chain_config::Features, transaction::ModuleBundle};
+use aptos_gas_schedule::gas_feature_versions::{RELEASE_V1_30, RELEASE_V1_50};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features},
+    transaction::ModuleBundle,
+};
 use aptos_vm_types::{
     change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
     module_write_set::ModuleWriteSet, storage::change_set_configs::ChangeSetConfigs,
@@ -23,7 +27,10 @@ use aptos_vm_types::{
 use derive_more::{Deref, DerefMut};
 use move_binary_format::{compatibility::Compatibility, errors::Location, CompiledModule};
 use move_core_types::{
-    account_address::AccountAddress, ident_str, value::MoveValue, vm_status::VMStatus,
+    account_address::AccountAddress,
+    ident_str,
+    value::{serialize_values, MoveValue},
+    vm_status::VMStatus,
 };
 use move_vm_runtime::{
     dispatch_loader, execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext,
@@ -102,6 +109,8 @@ impl<'r> UserSession<'r> {
         )?;
 
         let init_func_name = ident_str!("init_module");
+        let mut upgraded_module_names = vec![];
+        let mut new_modules = vec![];
         for module in modules {
             // INVARIANT:
             //   We have charged for the old version (if it exists) before when pre-processing the
@@ -116,9 +125,43 @@ impl<'r> UserSession<'r> {
                 .unmetered_check_module_exists(module.self_addr(), module.self_name())?
             {
                 // Module existed before, so do not run initialization.
+                upgraded_module_names
+                    .push(MoveValue::vector_u8(module.self_name().as_bytes().to_vec()));
+            } else {
+                new_modules.push(module);
+            }
+        }
+
+        // Lazy module initialization: reset the initialization state of upgraded modules only now
+        // that their new code is live, so the old code cannot observe the reset (`init.move`).
+        // Do this before legacy initializers of new modules, which may lazily initialize an
+        // upgraded sibling. Resetting afterwards would discard that initialization.
+        if features.is_enabled(FeatureFlag::LAZY_MODULE_INITIALIZATION)
+            && !upgraded_module_names.is_empty()
+        {
+            self.session.execute(|session| {
+                session.execute_function_bypass_visibility(
+                    &INIT_MODULE,
+                    RESET_INITIALIZED,
+                    vec![],
+                    serialize_values(&vec![
+                        MoveValue::Address(destination),
+                        MoveValue::Vector(upgraded_module_names),
+                    ]),
+                    gas_meter,
+                    traversal_context,
+                    &staging_module_storage,
+                )
+            })?;
+        }
+
+        for module in new_modules {
+            // A lazily initialized module runs `init_module` on first use instead.
+            if gas_feature_version >= RELEASE_V1_50
+                && verifier::framework_call_validation::uses_lazy_initialization(module)
+            {
                 continue;
             }
-
             self.session.execute(|session| {
                 dispatch_loader!(&staging_module_storage, loader, {
                     #[allow(clippy::collapsible_else_if)]
