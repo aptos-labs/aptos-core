@@ -195,6 +195,12 @@ fn verify_first_ledger_info(node: &mut LocalNode) {
     let mut db_path_buf = db_path.to_path_buf();
     db_path_buf.push("db");
 
+    // Verify that fast syncing didn't leave a second DB behind
+    assert!(
+        !db_path_buf.join("fast_sync_secondary").exists(),
+        "Fast sync should not create a secondary genesis DB!"
+    );
+
     // Stop the node to prevent any DB contention
     node.stop();
 

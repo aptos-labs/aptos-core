@@ -512,8 +512,18 @@ impl<
                 .await;
         }
 
-        // Get the highest synced and known ledger info versions
-        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
+        // Get the highest synced and known ledger info versions. A node that
+        // has never committed anything (i.e. one about to fast sync) reports no
+        // version at all, which is the same starting point as genesis here.
+        let highest_synced_version = self
+            .storage
+            .get_pre_committed_version()
+            .map_err(|error| {
+                Error::StorageError(format!(
+                    "Failed to get the pre-committed version: {error:?}"
+                ))
+            })?
+            .unwrap_or(GENESIS_TRANSACTION_VERSION);
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
@@ -580,7 +590,11 @@ impl<
             // sync to. Commit the local genesis blob rather than streaming a copy
             // of it back from a peer.
             if target.ledger_info().version() == GENESIS_TRANSACTION_VERSION
-                && let Some(commit_genesis) = self.driver_configuration.commit_genesis.clone()
+                && let Some(commit_genesis) = self
+                    .driver_configuration
+                    .local_genesis
+                    .as_ref()
+                    .map(|local_genesis| local_genesis.commit.clone())
             {
                 return self.bootstrap_from_local_genesis(commit_genesis).await;
             }

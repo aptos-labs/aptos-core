@@ -3,7 +3,7 @@
 
 use crate::{
     bootstrapper::{Bootstrapper, GENESIS_TRANSACTION_VERSION},
-    driver::DriverConfiguration,
+    driver::{DriverConfiguration, LocalGenesis},
     error::Error,
     tests::{
         mocks::{
@@ -1184,10 +1184,13 @@ async fn test_snapshot_sync_genesis_committed_locally() {
     driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
     let num_commits = Arc::new(AtomicUsize::new(0));
     let num_commits_clone = num_commits.clone();
-    driver_configuration.commit_genesis = Some(Arc::new(move || {
-        num_commits_clone.fetch_add(1, Ordering::SeqCst);
-        Ok(())
-    }));
+    driver_configuration.local_genesis = Some(LocalGenesis {
+        state_reader: Arc::new(create_mock_db_reader()),
+        commit: Arc::new(move || {
+            num_commits_clone.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }),
+    });
 
     // Create a mock streaming client. No state value stream should ever be
     // requested, so leave the expectation unset (any call panics).
@@ -1230,9 +1233,10 @@ async fn test_snapshot_sync_genesis_commit_failure() {
     // Create a driver configuration whose genesis commit fails
     let mut driver_configuration = create_full_node_driver_configuration();
     driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
-    driver_configuration.commit_genesis = Some(Arc::new(|| {
-        Err(anyhow::anyhow!("Failed to commit genesis!"))
-    }));
+    driver_configuration.local_genesis = Some(LocalGenesis {
+        state_reader: Arc::new(create_mock_db_reader()),
+        commit: Arc::new(|| Err(anyhow::anyhow!("Failed to commit genesis!"))),
+    });
 
     // Create the mock metadata storage
     let mut metadata_storage = MockMetadataStorage::new();

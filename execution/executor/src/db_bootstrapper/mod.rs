@@ -96,6 +96,13 @@ impl GenesisCommitter {
         self.waypoint
     }
 
+    /// The epoch-0 ledger info produced by executing genesis. Available without
+    /// committing, so a caller that only needs provenance to genesis (e.g. a
+    /// node about to fast sync past it) can take this and drop the rest.
+    pub fn ledger_info(&self) -> Option<&LedgerInfoWithSignatures> {
+        self.output.ledger_info_opt.as_ref()
+    }
+
     pub fn commit(self) -> Result<()> {
         self.db.save_transactions(
             self.output
