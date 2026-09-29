@@ -185,7 +185,7 @@ registration. Manual dispatch is supported. A failed first attempt re-runs its
 failed jobs once through the [retry workflow](../../.github/workflows/nightly-full-suite-retry.yaml),
 which absorbs lost runners and other infrastructure failures. The final attempt
 posts its result to
-`#feed-move-alerts` via `NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
+`#cicd-testing` via `NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
 one linked square per night for the last seven completed runs on the branch
 (green, yellow for passing only after the retry, red, or grey for skipped),
 oldest first, ending with the current run. A retried pass names the jobs that

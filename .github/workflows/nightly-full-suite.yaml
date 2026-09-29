@@ -249,7 +249,7 @@ jobs:
   # status decides the colour of this run's square. Delivery errors must not
   # change the run conclusion, which the bar reads for past nights.
   notify:
-    name: Notify Move alerts
+    name: Notify Slack
     needs: [result, retry]
     if: ${{ always() && needs.retry.result != 'success' }}
     continue-on-error: true
