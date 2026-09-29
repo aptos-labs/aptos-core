@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import shlex
 import unittest
-from summary import GREEN, GREY, RED, YELLOW, build_history, build_summary
+from summary import CANCELLED, GREEN, GREY, RED, YELLOW, build_history, build_summary
 
 
 class NightlySummaryTest(unittest.TestCase):
@@ -116,7 +116,12 @@ class NightlySummaryTest(unittest.TestCase):
         nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
         retry = re.search(r"^  retry:\n(.*?)(?=^  [a-z-]+:$)", nightly, re.M | re.S).group(1)
         notify = re.search(r"^  notify:\n(.*?)(?=^  [a-z-]+:$|\Z)", nightly, re.M | re.S).group(1)
-        self.assertIn("needs.result.result != 'success' && github.run_attempt == '1'", retry)
+        self.assertIn(
+            "!cancelled() && needs.result.result != 'success' && github.run_attempt == '1'",
+            retry,
+        )
+        result = re.search(r"^  result:\n(.*?)(?=^  [a-z-]+:$)", nightly, re.M | re.S).group(1)
+        self.assertIn("if: cancelled()\n        run: echo RUN_CANCELLED=true", result)
         self.assertIn("gh workflow run nightly-full-suite-retry.yaml", retry)
         self.assertIn("needs.retry.result != 'success'", notify)
         self.assertIn("errors: true", notify)
@@ -124,6 +129,39 @@ class NightlySummaryTest(unittest.TestCase):
         self.assertIn(".github/workflows/nightly-full-suite.yaml", rerun)
         self.assertIn('--jq .run_attempt)" = 1', rerun)
         self.assertIn("--failed", rerun)
+
+    def test_cancelled_runs_are_crossed_out_but_timeouts_stay_red(self):
+        def night(day, conclusion, job_conclusion):
+            return {
+                "createdAt": f"2026-09-{day:02d}T02:00:00Z",
+                "status": "completed",
+                "conclusion": conclusion,
+                "url": f"https://github.com/org/repo/actions/runs/{day}",
+                "jobs": [{"name": "forge", "conclusion": job_conclusion}],
+            }
+
+        previous = [night(1, "cancelled", "cancelled"), night(2, "failure", "cancelled")]
+        _, payload = self.summary(
+            {"forge": {"result": "failure"}},
+            previous_runs=previous,
+            jobs=[{"name": "forge", "conclusion": "cancelled", "steps": []}],
+        )
+        self.assertIn(
+            f"<https://github.com/org/repo/actions/runs/1|{CANCELLED}>"
+            f"<https://github.com/org/repo/actions/runs/2|{RED}>",
+            payload["text"],
+        )
+        # The cancelled night crosses out; the timed-out job of a failed night is red.
+        self.assertIn(f"{CANCELLED}{RED}{RED}  forge", payload["text"])
+        _, payload = self.summary(
+            {"forge": {"result": "cancelled"}},
+            previous_runs=previous,
+            jobs=[{"name": "forge", "conclusion": "cancelled", "steps": []}],
+            cancelled=True,
+        )
+        self.assertIn("Nightly full-suite CANCELLED", payload["text"])
+        self.assertIn(f"|{CANCELLED}>\nBranch:", payload["text"])
+        self.assertIn(f"{CANCELLED}{RED}{CANCELLED}  forge", payload["text"])
 
     def test_green_run_is_not_failed(self):
         failed, _ = self.summary({"workspace": {"result": "success"}})

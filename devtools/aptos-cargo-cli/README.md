@@ -187,7 +187,8 @@ which absorbs lost runners and other infrastructure failures. The final attempt
 posts its result to
 `#cicd-testing` via `NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
 one linked square per night for the last seven completed runs on the branch
-(green, yellow for passing only after the retry, red, or grey for skipped),
+(green, yellow for passing only after the retry, red, a cross for a cancelled run
+that is not retried, or grey for skipped),
 oldest first, ending with the current run. A retried pass names the jobs that
 passed on retry. Failed attempts add one row per failed job, including failures
 outside Move: its square on each night of the bar, tonight's linked to the job

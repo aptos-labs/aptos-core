@@ -219,6 +219,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+      - name: Record a cancelled run
+        if: cancelled()
+        run: echo RUN_CANCELLED=true >> "$GITHUB_ENV"
       - name: Summarize all required suites
         id: summary
         run: python3 .github/actions/nightly-test-summary/summary.py
@@ -234,7 +237,8 @@ jobs:
   retry:
     name: Retry failed suites once
     needs: result
-    if: ${{ always() && needs.result.result != 'success' && github.run_attempt == '1' }}
+    # A deliberately cancelled run is not retried.
+    if: ${{ !cancelled() && needs.result.result != 'success' && github.run_attempt == '1' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
