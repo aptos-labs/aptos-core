@@ -14,7 +14,7 @@ use crate::transactional_session::{
 use anyhow::{bail, Result};
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
 use mono_move_core::{BytecodeOffset, FunctionDefinitionIndex, VMInternalError};
-use mono_move_output::v1_error::{describe_or_fallback, v1_location, V1Message};
+use mono_move_output::v1_error::{describe, fallback_info, v1_location, V1Equivalent, V1Message};
 use move_binary_format::{
     errors::{set_stable_test_display, ExecutionState, Location, PartialVMError, VMError},
     file_format::CompiledScript,
@@ -242,14 +242,25 @@ impl MonoVMTestAdapter<'_> {
         Err(execution_error(&vm_error, verbose).to_string())
     }
 
-    /// Pairs each BCS return value with the layout V1's renderer needs.
+    /// Pairs each BCS return value with its V1 layout. Rejects decoding failures
+    /// to prevent a panic in the renderer.
     fn serialized_return_values(
         &self,
         return_values: Vec<(TypeTag, Vec<u8>)>,
     ) -> Result<SerializedReturnValues> {
         let return_values = return_values
             .into_iter()
-            .map(|(tag, bytes)| Ok((bytes, type_layout(self.session.storage(), &tag)?)))
+            .map(|(tag, bytes)| {
+                let layout = type_layout(self.session.storage(), &tag)?;
+                if self.deserialize(&bytes, &layout).is_none() {
+                    bail!(
+                        "the MonoVM adapter cannot render a return value of type `{}`: it does not \
+                         decode under V1's layout",
+                        tag.to_canonical_string()
+                    );
+                }
+                Ok((bytes, layout))
+            })
             .collect::<Result<Vec<_>>>()?;
         Ok(SerializedReturnValues {
             mutable_reference_outputs: vec![],
@@ -310,12 +321,17 @@ fn argument_error(err: ArgumentError) -> VMError {
         .finish(Location::Undefined)
 }
 
-/// Converts a MonoVM failure to a `VMError` using the V1 mapping and attached
-/// location. With debugging enabled, errors with instruction offsets include
-/// an empty execution state. MonoVM records no stack trace, so this matches
-/// V1's execution state for failures in the entry function.
+/// Returns shared verifier errors unchanged. Other errors use the V1 mapping
+/// and attached location. With debugging enabled, mapped errors with instruction
+/// offsets include an empty execution state. MonoVM records no stack trace, so
+/// this matches V1's execution state for failures in the entry function.
 fn run_vm_error(err: &VMInternalError, debugging: bool) -> VMError {
-    let info = describe_or_fallback(err);
+    let info = match describe(err) {
+        V1Equivalent::Verbatim(error) => return error,
+        equivalent @ (V1Equivalent::Described(_)
+        | V1Equivalent::NoV1Failure
+        | V1Equivalent::V1StatusUnknown) => fallback_info(err, equivalent),
+    };
     let mut error = PartialVMError::new(info.status);
     if let Some(sub_status) = info.sub_status.known() {
         error = error.with_sub_status(sub_status);

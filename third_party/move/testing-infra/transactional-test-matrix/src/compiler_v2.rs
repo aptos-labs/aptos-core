@@ -29,30 +29,21 @@ fn effective_payload(payload: &CompilerV2Payload, backend: VmBackend) -> Compile
     }
 }
 
-impl Resolution<'_, CompilerV2Payload> {
-    /// Builds run settings for this source/config pair and VM backend.
-    /// Cross-compiled output depends on compiler settings, so its baseline
-    /// suffix always includes the config name.
-    pub fn test_run_config(&self) -> TestRunConfig {
-        let experiments = self
-            .config
-            .experiments
-            .iter()
-            .map(|(name, value)| (name.to_string(), *value))
-            .collect();
-        let run_config =
-            TestRunConfig::new(self.config.language_version, experiments).with_runtime_ref_checks();
-        if self.effective_payload.cross_compile {
-            run_config.cross_compile_into(
-                SyntaxChoice::Source,
-                true,
-                self.canonical_exp_suffix
-                    .clone()
-                    .or_else(|| Some(format!("{}.{}", self.config.name, EXP_EXT))),
-            )
-        } else {
-            run_config
-        }
+/// Builds run settings for one resolved cell. Cross-compiled output depends on
+/// compiler settings, so its baseline suffix always includes the config name.
+fn test_run_config(resolution: &Resolution<'_, CompilerV2Payload>) -> TestRunConfig {
+    let run_config = resolution.config.run_config().with_runtime_ref_checks();
+    if resolution.effective_payload.cross_compile {
+        run_config.cross_compile_into(
+            SyntaxChoice::Source,
+            true,
+            resolution
+                .canonical_exp_suffix
+                .clone()
+                .or_else(|| Some(format!("{}.{}", resolution.config.name, EXP_EXT))),
+        )
+    } else {
+        run_config
     }
 }
 
@@ -327,7 +318,7 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/closure_equality.move",
-        "function types as resource type arguments, function value equality",
+        "function values in resources, function value equality",
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/closure_equality_operand_order.move",
@@ -339,7 +330,7 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/funs_as_storage_key.move",
-        "function types as resource type arguments",
+        "function values in resources",
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/fv_enum.move",
@@ -383,7 +374,7 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/fv_as_keys.move",
-        "function types as resource type arguments",
+        "function values in resources",
     ),
     MonoMoveDivergence::semantic(
         "tests/no-v1-comparison/inlining_optimization/locked_caller_inlined_helper.move",
@@ -438,5 +429,6 @@ pub static COMPILER_V2: Corpus<CompilerV2Payload> = Corpus {
     configs: CONFIGS,
     separate_baseline: SEPARATE_BASELINE,
     effective_payload,
+    test_run_config,
     mono_move_divergences: MONO_MOVE_DIVERGENCES,
 };

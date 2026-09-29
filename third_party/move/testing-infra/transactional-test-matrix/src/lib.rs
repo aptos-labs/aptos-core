@@ -12,6 +12,7 @@
 
 use move_command_line_common::testing::{add_exp_suffix, EXP_EXT};
 use move_model::metadata::LanguageVersion;
+use move_transactional_test_runner::vm_test_harness::TestRunConfig;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -60,6 +61,8 @@ pub struct Corpus<P: 'static> {
     /// Adjusts a config's payload for the VM backend that will run it. The
     /// identity function when this corpus has no backend-dependent settings.
     pub effective_payload: fn(&P, VmBackend) -> P,
+    /// Builds the test runner's settings for one resolved cell.
+    pub test_run_config: fn(&Resolution<'_, P>) -> TestRunConfig,
     /// Sources whose MonoMove output is known to differ from the canonical
     /// baseline. Their trials run against MonoMove-owned override baselines
     /// (see [`mono_move_override_path`]) instead of the canonical ones.
@@ -73,8 +76,8 @@ pub enum DivergenceCategory {
     Unsupported,
     /// MonoMove behaves differently from V1.
     Semantic,
-    /// Execution behavior matches V1, but diagnostic offsets, messages, or
-    /// stack traces differ.
+    /// Execution behavior matches V1, but diagnostic offsets, messages, stack
+    /// traces, or invariant-violation sub-statuses differ.
     Rendering,
 }
 
@@ -130,6 +133,18 @@ pub struct MatrixConfig<P: 'static> {
 }
 
 impl<P> MatrixConfig<P> {
+    /// Builds runner settings with this config's language version and
+    /// experiments, using defaults for all other settings.
+    pub fn run_config(&self) -> TestRunConfig {
+        TestRunConfig::new(
+            self.language_version,
+            self.experiments
+                .iter()
+                .map(|(name, value)| (name.to_string(), *value))
+                .collect(),
+        )
+    }
+
     /// Whether the include/exclude filters select `identity`.
     pub fn selects(&self, identity: &str) -> bool {
         (self.include.is_empty() || self.include.iter().any(|inc| identity.contains(inc)))

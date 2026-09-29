@@ -22,7 +22,7 @@ fn run(
         .resolve(config, identity, VmBackend::V1)
         .expect("the trial was registered, so the config selects its source");
     vm_test_harness::run_test_with_config_and_exp_suffix(
-        resolution.test_run_config(),
+        (COMPILER_V2.test_run_config)(&resolution),
         Path::new(identity),
         &resolution.canonical_exp_suffix,
     )
