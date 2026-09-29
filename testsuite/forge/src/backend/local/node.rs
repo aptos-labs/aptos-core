@@ -7,9 +7,9 @@ use aptos_config::{
     config::{NodeConfig, SECURE_STORAGE_FILENAME},
     keys::ConfigKey,
 };
-use aptos_db::{
-    common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME},
-    fast_sync_storage_wrapper::SECONDARY_DB_DIR,
+use aptos_db::common::{
+    HOT_STATE_KV_DB_NAME, HOT_STATE_MERKLE_DB_NAME, LEDGER_DB_NAME, STATE_KV_DB_NAME,
+    STATE_MERKLE_DB_NAME,
 };
 use aptos_logger::{debug, error, info};
 use aptos_sdk::{
@@ -413,17 +413,24 @@ impl Node for LocalNode {
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
+        // The state value and hot state DBs must go too. Leaving them behind
+        // leaves rows from the wiped history in place, which a later fast sync
+        // would restore a newer snapshot on top of.
+        let other_state_db_paths = [
+            STATE_KV_DB_NAME,
+            HOT_STATE_MERKLE_DB_NAME,
+            HOT_STATE_KV_DB_NAME,
+        ]
+        .map(|db_name| node_config.storage.dir().join(db_name));
         let secure_storage_path = node_config.get_working_dir().join(SECURE_STORAGE_FILENAME);
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
-        let secondary_db_path = node_config.storage.dir().join(SECONDARY_DB_DIR);
 
         debug!(
-            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}, {:?}) for node {:?}",
+            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}) for node {:?}",
             ledger_db_path.as_path(),
             state_db_path.as_path(),
             secure_storage_path.as_path(),
             state_sync_db_path.as_path(),
-            secondary_db_path.as_path(),
             self.name
         );
 
@@ -444,12 +451,12 @@ impl Node for LocalNode {
         fs::remove_dir_all(state_sync_db_path)
             .map_err(anyhow::Error::from)
             .context("Failed to delete state_sync_db_path")?;
-
-        // Remove the secondary DB files
-        if secondary_db_path.as_path().exists() {
-            fs::remove_dir_all(secondary_db_path)
-                .map_err(anyhow::Error::from)
-                .context("Failed to delete secondary_db_path")?;
+        for path in other_state_db_paths {
+            if path.exists() {
+                fs::remove_dir_all(&path)
+                    .map_err(anyhow::Error::from)
+                    .with_context(|| format!("Failed to delete {:?}", path))?;
+            }
         }
 
         // Remove the secure storage file

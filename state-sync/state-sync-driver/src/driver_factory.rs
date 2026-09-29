@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    driver::{DriverConfiguration, GenesisCommitter, StateSyncDriver},
+    bootstrapper::GENESIS_TRANSACTION_VERSION,
+    driver::{DriverConfiguration, LocalGenesis, StateSyncDriver},
     driver_client::{ClientNotificationListener, DriverClient, DriverNotification},
     metadata_storage::MetadataStorageInterface,
     notification_handlers::{
@@ -18,6 +19,7 @@ use aptos_data_streaming_service::streaming_client::StreamingServiceClient;
 use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
 use aptos_executor_types::ChunkExecutorTrait;
 use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
@@ -48,7 +50,7 @@ impl DriverFactory {
         runtime: Option<Handle>,
         node_config: &NodeConfig,
         waypoint: Waypoint,
-        commit_genesis: Option<GenesisCommitter>,
+        local_genesis: Option<LocalGenesis>,
         storage: DbReaderWriter,
         chunk_executor: Arc<ChunkExecutor>,
         mempool_notification_sender: MempoolNotifier,
@@ -64,7 +66,7 @@ impl DriverFactory {
             runtime,
             node_config,
             waypoint,
-            commit_genesis,
+            local_genesis,
             storage,
             chunk_executor,
             mempool_notification_sender,
@@ -91,7 +93,7 @@ impl DriverFactory {
         runtime: Option<Handle>,
         node_config: &NodeConfig,
         waypoint: Waypoint,
-        commit_genesis: Option<GenesisCommitter>,
+        local_genesis: Option<LocalGenesis>,
         storage: DbReaderWriter,
         chunk_executor: Arc<ChunkExecutor>,
         mempool_notification_sender: MempoolNotifier,
@@ -103,7 +105,14 @@ impl DriverFactory {
         streaming_service_client: StreamingServiceClient,
         time_service: TimeService,
     ) -> (Self, UnboundedSender<CommitNotification>) {
-        // Notify subscribers of the initial on-chain config values
+        // Notify subscribers of the initial on-chain config values.
+        //
+        // A node that is about to fast sync has no state of its own to read
+        // them from, so it falls back to its local genesis blob. Failing that,
+        // subscribers are notified once bootstrapping completes instead: the
+        // fast-sync target is an epoch-ending ledger info, so the transaction
+        // it commits always carries a new epoch event, which drives a
+        // reconfiguration notification.
         match storage.reader.get_latest_state_checkpoint_version() {
             Ok(Some(synced_version)) => {
                 if let Err(error) =
@@ -115,8 +124,22 @@ impl DriverFactory {
                     )
                 }
             },
-            Ok(None) => {
-                panic!("Latest state checkpoint version not found.")
+            Ok(None) => match &local_genesis {
+                Some(local_genesis) => {
+                    info!("No state checkpoint found. Notifying subscribers of the genesis on-chain configs.");
+                    if let Err(error) = event_subscription_service.notify_initial_configs_from(
+                        local_genesis.state_reader.clone(),
+                        GENESIS_TRANSACTION_VERSION,
+                    ) {
+                        panic!(
+                            "Failed to notify subscribers of the genesis on-chain configs: {:?}",
+                            error
+                        )
+                    }
+                },
+                None => {
+                    info!("No state checkpoint and no local genesis. Deferring the initial on-chain config notification until bootstrapping completes.");
+                },
             },
             Err(error) => panic!("Failed to fetch the initial synced version: {:?}", error),
         }
@@ -157,7 +180,7 @@ impl DriverFactory {
             node_config.consensus_observer,
             node_config.base.role,
             waypoint,
-            commit_genesis,
+            local_genesis,
         );
 
         // Create the state sync driver

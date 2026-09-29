@@ -58,6 +58,20 @@ const DRIVER_ERROR_LOG_FREQ_SECS: u64 = 3;
 /// already have committed genesis on an earlier run.
 pub type GenesisCommitter = Arc<dyn Fn() -> anyhow::Result<()> + Send + Sync>;
 
+/// What a node that is about to fast sync can get out of its local genesis
+/// blob, before any state of its own has landed.
+#[derive(Clone)]
+pub struct LocalGenesis {
+    /// Serves the genesis state. Subscribers need the genesis on-chain configs
+    /// to make progress at all: on-chain network discovery needs the validator
+    /// set before it can connect to the peers it would fast sync from.
+    pub state_reader: Arc<dyn DbReader>,
+
+    /// Commits genesis outright. Used when the network turns out to advertise
+    /// nothing beyond genesis, so there is no snapshot to sync to.
+    pub commit: GenesisCommitter,
+}
+
 /// The configuration of the state sync driver
 #[derive(Clone)]
 pub struct DriverConfiguration {
@@ -73,9 +87,9 @@ pub struct DriverConfiguration {
     // The trusted waypoint for the node
     pub waypoint: Waypoint,
 
-    // Commits genesis locally instead of fast syncing to it. `None` when the
-    // node has no genesis blob, in which case genesis is streamed from a peer.
-    pub commit_genesis: Option<GenesisCommitter>,
+    // The node's local genesis blob. `None` when it has none, in which case
+    // genesis has to be streamed from a peer like any other data.
+    pub local_genesis: Option<LocalGenesis>,
 }
 
 impl DriverConfiguration {
@@ -84,14 +98,14 @@ impl DriverConfiguration {
         consensus_observer_config: ConsensusObserverConfig,
         role: RoleType,
         waypoint: Waypoint,
-        commit_genesis: Option<GenesisCommitter>,
+        local_genesis: Option<LocalGenesis>,
     ) -> Self {
         Self {
             config,
             consensus_observer_config,
             role,
             waypoint,
-            commit_genesis,
+            local_genesis,
         }
     }
 }

@@ -8,6 +8,7 @@
 compile_error!("Testing features shouldn't be compiled for production aptos-node");
 
 mod consensus;
+mod genesis_state;
 mod logger;
 mod network;
 mod services;
@@ -736,7 +737,7 @@ pub fn setup_environment_and_start_node(
     }
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver, commit_genesis) =
+    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver, local_genesis) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
 
     admin_service.set_aptos_db(db_rw.clone().into());
@@ -745,7 +746,7 @@ pub fn setup_environment_and_start_node(
     utils::set_aptos_vm_configurations(&node_config);
 
     // Obtain the chain_id from the DB
-    let chain_id = utils::fetch_chain_id(&db_rw)?;
+    let chain_id = utils::fetch_chain_id(&db_rw, &node_config)?;
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
@@ -810,7 +811,7 @@ pub fn setup_environment_and_start_node(
             &node_config,
             storage_service_network_interfaces,
             genesis_waypoint,
-            commit_genesis,
+            local_genesis,
             event_subscription_service,
             db_rw.clone(),
         )?;

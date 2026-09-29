@@ -23,7 +23,7 @@ use aptos_network::application::{
 use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntime},
     metadata_storage::PersistentMetadataStorage,
-    GenesisCommitter,
+    LocalGenesis,
 };
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_storage_service_client::StorageServiceClient;
@@ -133,7 +133,7 @@ pub fn start_state_sync_and_get_notification_handles(
     node_config: &NodeConfig,
     storage_network_interfaces: ApplicationNetworkInterfaces<StorageServiceMessage>,
     waypoint: Waypoint,
-    commit_genesis: Option<GenesisCommitter>,
+    local_genesis: Option<LocalGenesis>,
     event_subscription_service: EventSubscriptionService,
     db_rw: DbReaderWriter,
 ) -> anyhow::Result<(
@@ -198,7 +198,7 @@ pub fn start_state_sync_and_get_notification_handles(
         Some(handle),
         node_config,
         waypoint,
-        commit_genesis,
+        local_genesis,
         db_rw,
         chunk_executor,
         mempool_notifier,

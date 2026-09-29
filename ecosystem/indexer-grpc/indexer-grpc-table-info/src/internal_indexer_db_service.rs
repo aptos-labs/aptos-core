@@ -93,12 +93,23 @@ impl InternalIndexerDBService {
             .state_sync_driver
             .bootstrapping_mode
             .is_fast_sync();
-        let mut main_db_synced_version = self.db_indexer.main_db_reader.ensure_synced_version()?;
+        // A node that is still fast syncing reports no synced version at all
+        // until its snapshot is finalized, which is the same "nothing to index
+        // yet" state as being at genesis.
+        let mut main_db_synced_version = self
+            .db_indexer
+            .main_db_reader
+            .get_synced_version()?
+            .unwrap_or(0);
 
         // Wait till fast sync is done
         while fast_sync_enabled && main_db_synced_version == 0 {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            main_db_synced_version = self.db_indexer.main_db_reader.ensure_synced_version()?;
+            main_db_synced_version = self
+                .db_indexer
+                .main_db_reader
+                .get_synced_version()?
+                .unwrap_or(0);
         }
 
         let start_version = self

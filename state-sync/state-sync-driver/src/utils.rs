@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    bootstrapper::GENESIS_TRANSACTION_VERSION,
     driver::DriverConfiguration,
     error::Error,
     logging::{LogEntry, LogSchema},
@@ -278,11 +279,16 @@ pub fn fetch_latest_synced_ledger_info(
     })
 }
 
-/// Fetches the latest synced version from the specified storage
+/// Fetches the latest synced version from the specified storage.
+///
+/// A node that has never committed anything (i.e. one that is about to fast
+/// sync) reports no version at all, which is the same starting point as genesis
+/// as far as state sync is concerned.
 pub fn fetch_pre_committed_version(storage: Arc<dyn DbReader>) -> Result<Version, Error> {
-    storage.ensure_pre_committed_version().map_err(|e| {
+    let version = storage.get_pre_committed_version().map_err(|e| {
         Error::StorageError(format!("Failed to get latest version from storage: {e:?}"))
-    })
+    })?;
+    Ok(version.unwrap_or(GENESIS_TRANSACTION_VERSION))
 }
 
 /// Initializes all relevant metric gauges (e.g., after a reboot

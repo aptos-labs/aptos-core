@@ -16,7 +16,7 @@ mod notification_handlers;
 mod storage_synchronizer;
 mod utils;
 
-pub use driver::GenesisCommitter;
+pub use driver::{GenesisCommitter, LocalGenesis};
 
 #[cfg(test)]
 mod tests;
