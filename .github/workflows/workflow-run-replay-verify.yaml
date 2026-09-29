@@ -125,7 +125,7 @@ jobs:
         if: steps.cache-aptos-debugger-binary.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          cargo build --release -p aptos-debugger
+          cargo build --locked --release -p aptos-debugger
           strip -s target/release/aptos-debugger
           cp target/release/aptos-debugger .
 

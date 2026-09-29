@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -x "${OLD_CLI}" ]]      || { echo "--old-cli must be an executable aptos CLI" >&2; exit 2; }
-[[ -x "${RELEASE_TOOL}" ]] || { echo "aptos-release-tool not found at ${RELEASE_TOOL}; build it with 'cargo build -p aptos-release-tool'" >&2; exit 2; }
+[[ -x "${RELEASE_TOOL}" ]] || { echo "aptos-release-tool not found at ${RELEASE_TOOL}; build it with 'cargo build --locked -p aptos-release-tool'" >&2; exit 2; }
 
 # Only --control needs a second binary. Elsewhere the CLI is just a client
 # submitting to the node under test, so the node's own CLI is used.

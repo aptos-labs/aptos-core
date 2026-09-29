@@ -129,7 +129,7 @@ fi
 echo "Building release $VERSION of $BINARY_NAME for $TARGET_TRIPLE using profile '$BUILD_PROFILE'"
 
 # Build the binary
-cargo build -p "$CRATE_NAME" --profile "$BUILD_PROFILE"
+cargo build --locked -p "$CRATE_NAME" --profile "$BUILD_PROFILE"
 
 # Determine the output directory based on profile
 if [ "$BUILD_PROFILE" = "tool" ]; then

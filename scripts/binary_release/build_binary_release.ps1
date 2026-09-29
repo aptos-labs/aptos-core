@@ -109,7 +109,7 @@ vcpkg install openssl:x64-windows-static-md --clean-after-build
 
 # Build the binary
 Write-Host "Building release $Version of $BinaryName for $TARGET_TRIPLE using profile '$BuildProfile'"
-cargo build -p $CrateName --profile $BuildProfile
+cargo build --locked -p $CrateName --profile $BuildProfile
 
 # Determine the output directory based on profile
 $BUILD_DIR = "target\$BuildProfile"
