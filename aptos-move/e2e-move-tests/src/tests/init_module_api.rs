@@ -192,6 +192,42 @@ fn init_module_remains_supported_with_lazy_initialization() {
 }
 
 #[test]
+fn init_module_not_run_at_publish_with_lazy_initialization() {
+    let mut h = new_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
+    publish(
+        &mut h,
+        &acc,
+        "module 0xcafe::test {
+            use aptos_framework::init;
+            struct Counter has key { value: u64 }
+            public entry fun run(_s: &signer) {
+                let s = init::internal_maybe_initialize(true);
+                if (s.is_some()) { init_module(&s.destroy_some()) }
+            }
+            fun init_module(s: &signer) {
+                if (exists<Counter>(@0xcafe)) {
+                    Counter[@0xcafe].value += 1;
+                } else {
+                    move_to(s, Counter { value: 1 });
+                }
+            }
+        }",
+    );
+    assert!(h
+        .read_resource::<Counter>(
+            acc.address(),
+            parse_struct_tag("0xcafe::test::Counter").unwrap()
+        )
+        .is_none());
+
+    run(&mut h, &acc);
+    assert_eq!(counter(&h, *acc.address()), 1);
+    run(&mut h, &acc);
+    assert_eq!(counter(&h, *acc.address()), 1);
+}
+
+#[test]
 fn init_maybe_initialize_only_once_survives_upgrade() {
     let mut h = new_harness();
     let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());

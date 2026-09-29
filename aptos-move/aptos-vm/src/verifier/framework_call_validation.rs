@@ -342,6 +342,16 @@ pub(crate) fn verify_no_restricted_functions_in_compiled_script(
     Ok(())
 }
 
+/// Returns true if `module` references `0x1::init::internal_maybe_initialize`, i.e., it initializes
+/// itself lazily on first use, and its `init_module` must not also run at publish.
+pub(crate) fn uses_lazy_initialization(module: &CompiledModule) -> bool {
+    let view = BinaryIndexedView::Module(module);
+    module
+        .function_handles
+        .iter()
+        .any(|func_handle| is_maybe_initialize_call(view, func_handle))
+}
+
 /// Returns true if the handle corresponds to `0x1::init::internal_maybe_initialize`.
 fn is_maybe_initialize_call(view: BinaryIndexedView, func_handle: &FunctionHandle) -> bool {
     let module_handle = view.module_handle_at(func_handle.module);

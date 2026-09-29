@@ -15,7 +15,7 @@ use crate::{
     verifier, AptosVM,
 };
 use aptos_gas_meter::AptosGasMeter;
-use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_30;
+use aptos_gas_schedule::gas_feature_versions::{RELEASE_V1_30, RELEASE_V1_50};
 use aptos_types::{
     on_chain_config::{FeatureFlag, Features},
     transaction::ModuleBundle,
@@ -156,6 +156,12 @@ impl<'r> UserSession<'r> {
         }
 
         for module in new_modules {
+            // A lazily initialized module runs `init_module` on first use instead.
+            if gas_feature_version >= RELEASE_V1_50
+                && verifier::framework_call_validation::uses_lazy_initialization(module)
+            {
+                continue;
+            }
             self.session.execute(|session| {
                 dispatch_loader!(&staging_module_storage, loader, {
                     #[allow(clippy::collapsible_else_if)]
