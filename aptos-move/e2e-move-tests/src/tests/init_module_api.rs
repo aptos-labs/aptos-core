@@ -30,6 +30,8 @@ const EOWNER_CHANGED_SINCE_DEPLOY: u64 = error::permission_denied(2);
 
 const ELAZY_MODULE_INITIALIZATION_NOT_ENABLED: u64 = error::invalid_state(3);
 
+const EINVALID_INITIALIZE_CALLER: u64 = error::invalid_argument(1);
+
 fn make_module(only_once: bool, extra: &str) -> String {
     format!(
         r#"module 0xcafe::test {{
@@ -302,6 +304,104 @@ fn init_maybe_initialize_closure_rejected_at_publish() {
     let path = builder.write_to_temp().unwrap();
     let status = h.publish_package_with_options(&acc, path.path(), BuildOptions::move_2());
     assert_vm_status!(status, StatusCode::CLOSURE_OVER_RESTRICTED_FUNCTION);
+}
+
+#[test_case::test_case(false, false; "legacy_bytecode")]
+#[test_case::test_case(false, true; "legacy_stored_value")]
+#[test_case::test_case(true, false; "mono_bytecode")]
+fn init_maybe_initialize_preexisting_closure_rejected(mono_vm: bool, persisted: bool) {
+    let mut h = MoveHarness::new_with_features(
+        if mono_vm {
+            vec![FeatureFlag::ENABLE_MONO_MOVE]
+        } else {
+            vec![]
+        },
+        if mono_vm {
+            vec![FeatureFlag::LAZY_MODULE_INITIALIZATION]
+        } else {
+            vec![
+                FeatureFlag::LAZY_MODULE_INITIALIZATION,
+                FeatureFlag::ENABLE_MONO_MOVE,
+            ]
+        },
+    );
+    let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
+    let mut builder = PackageBuilder::new("StoredInitializer");
+    builder.add_local_dep(
+        "AptosFramework",
+        &common::framework_dir_path("aptos-framework").to_string_lossy(),
+    );
+    builder.add_source(
+        "stored.move",
+        r#"module 0xcafe::stored {
+            use std::option::Option;
+            use std::signer;
+            use aptos_framework::init;
+            struct Saved has key {
+                callback: |bool|Option<signer> has copy + drop + store,
+            }
+            public entry fun save(s: &signer) {
+                move_to(s, Saved { callback: |once| init::internal_maybe_initialize(once) });
+            }
+            public entry fun attack() {
+                let Saved { callback } = move_from<Saved>(@0xcafe);
+                let forged = 0xbeef::victim::invoke(callback).destroy_some();
+                assert!(signer::address_of(&forged) == @0xbeef, 100);
+            }
+            public entry fun attack_fresh() {
+                let forged = 0xbeef::victim::invoke(
+                    |once| init::internal_maybe_initialize(once)
+                ).destroy_some();
+                assert!(signer::address_of(&forged) == @0xbeef, 100);
+            }
+            public entry fun direct() {
+                let own = init::internal_maybe_initialize(false).destroy_some();
+                assert!(signer::address_of(&own) == @0xcafe, 101);
+            }
+        }
+        module 0xbeef::victim {
+            use std::option::Option;
+            public fun invoke(callback: |bool|Option<signer> has drop): Option<signer> {
+                callback(false)
+            }
+        }"#,
+    );
+    let path = builder.write_to_temp().unwrap();
+    let package = BuiltPackage::build(path.path().to_owned(), BuildOptions::move_2()).unwrap();
+    // Model bytecode accepted by the old publisher. The current publication validator rejects
+    // it, but upgrades must also protect existing code and function values already in storage.
+    for code in package.extract_code() {
+        let module = move_binary_format::CompiledModule::deserialize(&code).unwrap();
+        h.executor.add_module(&module.self_id(), code);
+    }
+    if persisted {
+        assert_success!(h.run_entry_function(
+            &acc,
+            str::parse("0xcafe::stored::save").unwrap(),
+            vec![],
+            vec![],
+        ));
+    }
+    h.enable_features(vec![FeatureFlag::LAZY_MODULE_INITIALIZATION], vec![]);
+    let entry = if persisted { "attack" } else { "attack_fresh" };
+    let status = h.run_entry_function(
+        &acc,
+        str::parse(&format!("0xcafe::stored::{entry}")).unwrap(),
+        vec![],
+        vec![],
+    );
+    assert!(
+        matches!(status, TransactionStatus::Keep(
+            aptos_types::transaction::ExecutionStatus::MoveAbort { code, .. }
+        ) if code == EINVALID_INITIALIZE_CALLER),
+        "{status:?}",
+    );
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::stored::direct").unwrap(),
+        vec![],
+        vec![],
+    ));
 }
 
 #[test]
