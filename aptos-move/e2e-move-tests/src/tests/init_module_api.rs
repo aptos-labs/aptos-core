@@ -69,7 +69,8 @@ fn publish(h: &mut MoveHarness, acc: &aptos_language_e2e_tests::account::Account
     builder.add_source("test.move", source);
     let path = builder.write_to_temp().unwrap();
     let txn = h.create_publish_package(acc, path.path(), Some(BuildOptions::move_2()), |_| {});
-    assert_success!(h.run(txn));
+    // MonoVM does not support publishing yet; use the same fallback as MoveHarness.
+    assert_success!(h.without_mono_move(|h| h.run(txn)));
 }
 
 fn run(h: &mut MoveHarness, acc: &aptos_language_e2e_tests::account::Account) {
@@ -248,25 +249,16 @@ fn init_module_not_run_at_publish_with_lazy_initialization(mono_vm: bool, disabl
     assert_eq!(counter(&h, *acc.address()), 1);
 }
 
-#[test_case::test_case(false, false; "legacy_lazy_disabled")]
-#[test_case::test_case(false, true; "legacy_lazy_enabled")]
-#[test_case::test_case(true, false; "mono_lazy_disabled")]
-#[test_case::test_case(true, true; "mono_lazy_enabled")]
-fn init_module_eager_initialization_disabled(mono_vm: bool, lazy_enabled: bool) {
+#[test_case::test_case(false; "lazy_disabled")]
+#[test_case::test_case(true; "lazy_enabled")]
+fn init_module_eager_initialization_disabled(lazy_enabled: bool) {
     let mut h = new_harness();
     h.enable_features(
         vec![FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION],
-        vec![],
+        vec![FeatureFlag::ENABLE_MONO_MOVE],
     );
-    for (flag, enabled) in [
-        (FeatureFlag::ENABLE_MONO_MOVE, mono_vm),
-        (FeatureFlag::LAZY_MODULE_INITIALIZATION, lazy_enabled),
-    ] {
-        if enabled {
-            h.enable_features(vec![flag], vec![]);
-        } else {
-            h.enable_features(vec![], vec![flag]);
-        }
+    if !lazy_enabled {
+        h.enable_features(vec![], vec![FeatureFlag::LAZY_MODULE_INITIALIZATION]);
     }
     let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
     let mut builder = PackageBuilder::new("TestPack").with_policy(UpgradePolicy::compat());
