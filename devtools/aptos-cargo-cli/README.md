@@ -179,11 +179,13 @@ schedules. Standalone scripts are not auto-discovered.
 
 [PIES](https://github.com/aptos-labs/internal-ops/pull/9422) dispatches `main` daily
 at **09:00 UTC (01:00 PST / 02:00 PDT)**. Land the workflow before deploying that
-registration. Manual dispatch is supported. Each failed attempt sends a
-consolidated alert, including failures outside Move, to `#feed-move-alerts` via
-`EXECUTION_PERF_SLACK_WEBHOOK_URL`; add a notification step for any further
-channel. Alerts link the revision, failed suites, logs/artifacts, and available
-details. Missing dispatches or runs cancelled before
+registration. Manual dispatch is supported. Every attempt posts its result to
+`#feed-move-alerts` via `EXECUTION_PERF_SLACK_WEBHOOK_URL`, headed by a bar of
+one linked square per night for the last seven completed runs on the branch
+(green, red, or grey for skipped), oldest first, ending with the current run.
+Failed attempts add the failed suites, including failures outside Move, and
+link the revision, logs/artifacts, and available details; add a notification
+step for any further channel. Missing dispatches or runs cancelled before
 notification need external scheduler monitoring.
 
 ## Validation and rollout
@@ -213,7 +215,8 @@ for GitHub's `queue: max` setting.
    Verify every required suite, tested SHA, artifacts, and aggregate result.
 4. On a temporary validation branch, replace expensive jobs with lightweight
    passing/failing jobs to check aggregation and Slack delivery, including a
-   failure outside Move. Do not merge those substitutions; green runs send no alert.
+   failure outside Move. Do not merge those substitutions; green runs post the
+   bar without failure details.
 5. Deploy PIES, trigger Cloud Scheduler's **Run now**, and verify daily dispatch.
    Enable `subsystem` after these checks; reset to `legacy` or unset the variable
    to roll back. Passing local tests do not establish live CI or alert delivery.

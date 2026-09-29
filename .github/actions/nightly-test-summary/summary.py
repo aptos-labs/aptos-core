@@ -10,7 +10,30 @@ import os
 import subprocess
 
 
-def build_summary(needs, branch, sha, run_url, jobs=None, previous_sha=None):
+HISTORY_NIGHTS = 7
+GREEN, RED, GREY = "\U0001f7e9", "\U0001f7e5", "\u2b1c"
+
+
+def square(conclusion):
+    if conclusion == "success":
+        return GREEN
+    if conclusion in ("failure", "timed_out", "cancelled", "startup_failure"):
+        return RED
+    return GREY
+
+
+def build_history(previous, run_url, failed):
+    """One linked square per night, oldest first, ending with this run."""
+    runs = [run for run in previous or [] if run.get("status") == "completed"]
+    runs = sorted(runs, key=lambda run: run["createdAt"])[-(HISTORY_NIGHTS - 1) :]
+    cells = [f"<{run['url']}|{square(run.get('conclusion'))}>" for run in runs]
+    cells.append(f"<{run_url}|{RED if failed else GREEN}>")
+    return f"Last {len(cells)} nights: " + "".join(cells)
+
+
+def build_summary(
+    needs, branch, sha, run_url, jobs=None, previous_sha=None, previous_runs=None
+):
     incomplete = sorted(
         f"{name}: {job['result']}"
         for name, job in needs.items()
@@ -20,6 +43,7 @@ def build_summary(needs, branch, sha, run_url, jobs=None, previous_sha=None):
         incomplete = ["No required suite results received"]
     lines = [
         f"Nightly full-suite {'FAILED / INCOMPLETE' if incomplete else 'passed'}",
+        build_history(previous_runs, run_url, bool(incomplete)),
         f"Branch: {html.escape(branch, quote=False)}; commit: {sha}",
         f"<{run_url}|Run, logs, and artifacts>",
     ]
@@ -88,6 +112,20 @@ def main():
             "headSha",
         ]
     )
+    history = gh_json(
+        [
+            "run",
+            "list",
+            "--workflow",
+            "nightly-full-suite.yaml",
+            "--branch",
+            os.environ["GITHUB_REF_NAME"],
+            "--limit",
+            str(HISTORY_NIGHTS),
+            "--json",
+            "databaseId,status,conclusion,url,createdAt",
+        ]
+    )
     failed, payload = build_summary(
         needs,
         os.environ["GITHUB_REF_NAME"],
@@ -95,6 +133,7 @@ def main():
         run_url,
         (jobs or {}).get("jobs"),
         previous[0]["headSha"] if previous else None,
+        [run for run in history or [] if str(run.get("databaseId")) != run_id],
     )
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"failed={str(failed).lower()}\n")

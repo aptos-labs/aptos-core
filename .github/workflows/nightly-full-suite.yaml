@@ -289,12 +289,14 @@ jobs:
         if: steps.summary.outputs.failed != 'false'
         run: exit 1
 
-  # The result job fails whenever any suite is not green, so its status alone
-  # decides whether to alert.
+  # Every nightly posts its result with the linked seven-night bar; the result
+  # job's status decides the colour of this run's square. Delivery errors must
+  # not change the run conclusion, which the bar reads for past nights.
   notify:
     name: Notify Move alerts
     needs: result
-    if: ${{ always() && needs.result.result != 'success' }}
+    if: always()
+    continue-on-error: true
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -302,7 +304,7 @@ jobs:
         env:
           ALERT_WEBHOOK: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
         run: test -n "$ALERT_WEBHOOK"
-      - name: Prepare failure payload
+      - name: Prepare result payload
         id: payload
         env:
           SUMMARY_PAYLOAD: ${{ needs.result.outputs.payload }}
@@ -316,7 +318,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('json=' + json.dumps(json.loads(payload)) + '\n')
           PY
-      - name: Post nightly failure to Slack
+      - name: Post nightly result to Slack
         uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
         with:
           webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
