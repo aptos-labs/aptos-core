@@ -2,21 +2,19 @@ name: "execution-performance"
 on:
   workflow_dispatch:
   pull_request:
-    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+    types: [labeled, opened, synchronize, reopened]
   # schedule: # NOTE: the schedule is dictated by PIES
 permissions:
   contents: read
 
 jobs:
   execution-performance:
-    if: | # Only run on each PR once an appropriate event occurs
+    # The PIES dispatch is the nightly; PRs run it only on explicit request.
+    if: |
       (
         github.event_name == 'workflow_dispatch' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') ||
-        github.event.pull_request.auto_merge != null
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')
       )
     uses: ./.github/workflows/workflow-run-execution-performance.yaml
     secrets: inherit
@@ -25,7 +23,7 @@ jobs:
       RUNNER_NAME: benchmark-c3d-60
       # Run all tests only on the scheduled cadence, or explicitly requested
       FLOW: ${{ (github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || 'LAND_BLOCKING' }}
-      # Ignore target determination if on the scheduled cadence, or explicitly requested
-      IGNORE_TARGET_DETERMINATION: ${{ contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}
+      # Every run is scheduled or explicitly requested.
+      IGNORE_TARGET_DETERMINATION: true
       # Notify Slack only on scheduled runs (PIES triggers workflow_dispatch), not on PRs
       NOTIFY_SLACK: ${{ github.event_name == 'workflow_dispatch' }}

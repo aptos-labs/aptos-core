@@ -94,8 +94,7 @@ cargo x list-e2e-tests                  # Also supports --format json
 ```
 
 The shared [registry](../../.github/actions/e2e-test-determinator/registry.json)
-covers CLI/API, PR execution performance, current-node faucet tests, and Forge
-E2E and compatibility. Unknown E2E names or missing referenced definitions fail both `subsystem`
+covers CLI/API and Forge E2E and compatibility. Unknown E2E names or missing referenced definitions fail both `subsystem`
 and `compare` with a nonzero exit. Registry tests verify workflow jobs and required
 nightly coverage. A new runner needs registration, dependencies, workflow wiring,
 and nightly coverage; assigning a registered runner is configuration-only.
@@ -117,10 +116,12 @@ These suites bypass subsystem selection and cannot appear in `e2e_tests`:
 | Forge framework upgrade | `CICD:run-framework-upgrade-test` label; separate scheduled/dispatch workflow. |
 | Forge consensus-only performance | `CICD:run-consensus-only-perf-test` label. |
 | Forge multiregion | `CICD:run-multiregion-test` label. |
-| Production-network faucet | `CICD:non-required-tests` label. |
+| Faucet (current node and production networks) | `CICD:non-required-tests` label. |
+| Execution performance | `CICD:run-execution-performance-test` or `-full-test` label; nightly by PIES dispatch. |
 
-Nightly calls these independently. Execution performance remains registered because
-its `LAND_BLOCKING` flow supports PRs/automerge; dispatch uses `CONTINUOUS`.
+Manual suites stay manual: the nightly runs none of them. Execution performance
+has its own nightly, a PIES dispatch running the `CONTINUOUS` flow; its labels run
+`LAND_BLOCKING` or `CONTINUOUS` on a PR.
 
 Flow evaluation infrastructure in `aptos-move/flow/evaluation/spec-inference`
 is **manual-only** and has no E2E runner; only its publication-bundle test runs,
@@ -158,19 +159,20 @@ The targeted-test command prints the same plan it executes.
 
 The [nightly workflow](../../.github/workflows/nightly-full-suite.yaml) bypasses
 selection and documentation skips while preserving legacy CI test eligibility
-and exclusions, running the workspace baseline, registered
-E2E suites, and manual PR suites listed below. Required failures or skipped
+and exclusions, running the workspace baseline and the E2E suites listed below.
+It includes only suites that PR CI runs without an opt-in label; execution
+performance has its own dispatched nightly. Required failures or skipped
 suites fail the aggregate result; independent suites continue.
 
 | Coverage | Execution |
 | --- | --- |
 | Rust baseline | Workspace Nextest (`ci`, three retries), doc tests, VM feature validation, and framework bundle freshness. |
 | Dedicated Rust suites | Eight smoke partitions and batch encryption with Node/pnpm. |
-| Application E2E | CLI against devnet/testnet/mainnet, API specs, full execution performance, MonoMove performance/parity, faucet against the dispatched SHA/devnet/testnet, and five deployed Forge variants. |
+| Application E2E | CLI against devnet/testnet/mainnet, API specs, and two deployed Forge variants (E2E, compatibility). |
 | CI tooling | Docker release-image and Python selection/alert tests. |
 
 Tests and images use the dispatched SHA; comparison networks use released images.
-Consensus-only images have separate readiness checks and build locks. Benchmark
+Benchmark
 jobs serialize with `queue: max` (100 pending jobs). Logs, available JUnit results,
 CLI output, API specs, and smoke failure artifacts are retained. Tests respect the
 profile exclusions in [`.config/nextest.toml`](../../.config/nextest.toml).
@@ -179,12 +181,18 @@ schedules. Standalone scripts are not auto-discovered.
 
 [PIES](https://github.com/aptos-labs/internal-ops/pull/9422) dispatches `main` daily
 at **09:00 UTC (01:00 PST / 02:00 PDT)**. Land the workflow before deploying that
-registration. Manual dispatch is supported. Every attempt posts its result to
-`#feed-move-alerts` via `EXECUTION_PERF_SLACK_WEBHOOK_URL`, headed by a bar of
+registration. Manual dispatch is supported. A failed first attempt re-runs its
+failed jobs once through the [retry workflow](../../.github/workflows/nightly-full-suite-retry.yaml),
+which absorbs lost runners and other infrastructure failures. The final attempt
+posts its result to
+`#cicd-testing` via `NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
 one linked square per night for the last seven completed runs on the branch
-(green, red, or grey for skipped), oldest first, ending with the current run.
-Failed attempts add the failed suites, including failures outside Move, and
-link the revision, logs/artifacts, and available details; add a notification
+(green, yellow for passing only after the retry, red, a cross for a cancelled run
+that is not retried, or grey for skipped),
+oldest first, ending with the current run. A retried pass names the jobs that
+passed on retry. Failed attempts add one row per failed job, including failures
+outside Move: its square on each night of the bar, tonight's linked to the job
+log, then the failed steps. Skipped suites follow on one line. Add a notification
 step for any further channel. Missing dispatches or runs cancelled before
 notification need external scheduler monitoring.
 
