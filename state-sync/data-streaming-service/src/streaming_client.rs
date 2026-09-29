@@ -43,7 +43,7 @@ pub trait DataStreamingClient {
         &self,
         version: Version,
         start_index: Option<u64>,
-        state_kind: StateKind,
+        snapshot_kind: SnapshotKind,
     ) -> Result<DataStreamListener, Error>;
 
     /// Fetches all epoch ending ledger infos starting at `start_epoch`
@@ -215,7 +215,26 @@ pub struct GetAllEpochEndingLedgerInfosRequest {
 pub struct GetAllStatesRequest {
     pub version: Version,
     pub start_index: u64,
-    pub state_kind: StateKind,
+    pub snapshot_kind: SnapshotKind,
+}
+
+/// A snapshot that can be streamed at a version. Hot state is not a `StateKind`
+/// because its leaves are `HotStateValue`s.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SnapshotKind {
+    State(StateKind),
+    HotState,
+}
+
+impl SnapshotKind {
+    /// Describes the snapshot in logs and errors.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::State(StateKind::MainState) => "state",
+            Self::State(StateKind::Position) => "position state",
+            Self::HotState => "hot state",
+        }
+    }
 }
 
 /// A client request for fetching all transactions with proofs.
@@ -341,13 +360,13 @@ impl DataStreamingClient for StreamingServiceClient {
         &self,
         version: u64,
         start_index: Option<u64>,
-        state_kind: StateKind,
+        snapshot_kind: SnapshotKind,
     ) -> Result<DataStreamListener, Error> {
         let start_index = start_index.unwrap_or(0);
         let client_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version,
             start_index,
-            state_kind,
+            snapshot_kind,
         });
         self.send_request_and_await_response(client_request).await
     }
