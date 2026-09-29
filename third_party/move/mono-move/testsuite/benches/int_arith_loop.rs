@@ -5,7 +5,7 @@
 //! `i64_loop` run the same loop, so the u64 (specialized) vs i64
 //! (unspecialized) delta is the per-op dispatch difference.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, SamplingMode};
 
 const ITERS: u64 = 1_000;
 
@@ -28,7 +28,8 @@ fn bench_int_arith_loop(c: &mut Criterion) {
         let mut group = c.benchmark_group("int_arith_loop");
         group
             .warm_up_time(std::time::Duration::from_secs(1))
-            .measurement_time(std::time::Duration::from_secs(3));
+            .measurement_time(std::time::Duration::from_secs(3))
+            .sampling_mode(SamplingMode::Flat);
 
         group.bench_function("native_u64", |b| {
             b.iter(|| black_box(native_u64_loop(ITERS)));

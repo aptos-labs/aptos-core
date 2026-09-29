@@ -1,0 +1,10 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/type_reflection_spec_fun_inst.move:46:29
+   │
+46 │     spec differs_from_u64 { ensures info<vector<T>>() != info<vector<u64>>(); }
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/type_reflection_spec_fun_inst.move:45: differs_from_u64
+   =         result = <redacted>
+   =     at tests/sources/regression/type_reflection_spec_fun_inst.move:46: differs_from_u64 (spec)

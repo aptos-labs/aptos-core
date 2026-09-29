@@ -12,6 +12,7 @@
 
 use move_command_line_common::testing::{add_exp_suffix, EXP_EXT};
 use move_model::metadata::LanguageVersion;
+use move_transactional_test_runner::vm_test_harness::TestRunConfig;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -60,6 +61,59 @@ pub struct Corpus<P: 'static> {
     /// Adjusts a config's payload for the VM backend that will run it. The
     /// identity function when this corpus has no backend-dependent settings.
     pub effective_payload: fn(&P, VmBackend) -> P,
+    /// Builds the test runner's settings for one resolved cell.
+    pub test_run_config: fn(&Resolution<'_, P>) -> TestRunConfig,
+    /// Sources whose MonoMove output is known to differ from the canonical
+    /// baseline. Their trials run against MonoMove-owned override baselines
+    /// (see [`mono_move_override_path`]) instead of the canonical ones.
+    pub mono_move_divergences: &'static [MonoMoveDivergence],
+}
+
+/// Why a source's MonoMove output differs from the canonical baseline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DivergenceCategory {
+    /// MonoMove or its test adapter lacks a feature the source needs.
+    Unsupported,
+    /// MonoMove behaves differently from V1.
+    Semantic,
+    /// Execution behavior matches V1, but diagnostic offsets, messages, stack
+    /// traces, or invariant-violation sub-statuses differ.
+    Rendering,
+}
+
+/// A recorded divergence of MonoMove from a source's canonical baseline.
+#[derive(Debug, PartialEq, Eq)]
+pub struct MonoMoveDivergence {
+    /// Source path relative to the corpus root, e.g. `tests/misc/x.move`.
+    pub source: &'static str,
+    pub category: DivergenceCategory,
+    pub reason: &'static str,
+}
+
+impl MonoMoveDivergence {
+    pub const fn unsupported(source: &'static str, reason: &'static str) -> Self {
+        Self {
+            source,
+            category: DivergenceCategory::Unsupported,
+            reason,
+        }
+    }
+
+    pub const fn semantic(source: &'static str, reason: &'static str) -> Self {
+        Self {
+            source,
+            category: DivergenceCategory::Semantic,
+            reason,
+        }
+    }
+
+    pub const fn rendering(source: &'static str, reason: &'static str) -> Self {
+        Self {
+            source,
+            category: DivergenceCategory::Rendering,
+            reason,
+        }
+    }
 }
 
 /// One column of a corpus's matrix.
@@ -79,6 +133,18 @@ pub struct MatrixConfig<P: 'static> {
 }
 
 impl<P> MatrixConfig<P> {
+    /// Builds runner settings with this config's language version and
+    /// experiments, using defaults for all other settings.
+    pub fn run_config(&self) -> TestRunConfig {
+        TestRunConfig::new(
+            self.language_version,
+            self.experiments
+                .iter()
+                .map(|(name, value)| (name.to_string(), *value))
+                .collect(),
+        )
+    }
+
     /// Whether the include/exclude filters select `identity`.
     pub fn selects(&self, identity: &str) -> bool {
         (self.include.is_empty() || self.include.iter().any(|inc| identity.contains(inc)))
@@ -92,6 +158,13 @@ impl<P> Corpus<P> {
         self.separate_baseline
             .iter()
             .any(|entry| identity.contains(entry))
+    }
+
+    /// The recorded MonoMove divergence for `source`, if any.
+    pub fn mono_move_divergence(&self, source: &str) -> Option<&'static MonoMoveDivergence> {
+        self.mono_move_divergences
+            .iter()
+            .find(|divergence| divergence.source == source)
     }
 
     /// Resolves one (source, config, VM backend) cell, or [`None`] when the

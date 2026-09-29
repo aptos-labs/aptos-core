@@ -43,11 +43,12 @@ use mono_move_core::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
     },
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
-    FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
-    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    BytecodeOffset, CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex,
+    ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
+    PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -290,8 +291,15 @@ impl<'a> CallBuilder<'a, '_> {
     ///
     /// On error, the parameter slot is left partially written and the call
     /// must be abandoned.
+    // TODO(completeness): place reference arguments as V1 does, decoding the
+    // target into the heap and passing a pointer; until then they are rejected.
+    // Only direct callers such as the test harnesses need this: transactions
+    // reject reference parameters at entry validation.
     pub fn arg_bcs(&mut self, bytes: &[u8]) -> VMResult<()> {
         let (dst, ty) = self.next_slot()?;
+        if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
+            return Err(RuntimeError::Unsupported("reference parameters").into());
+        }
         let guard = self.interp.loader.guard();
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
@@ -316,6 +324,18 @@ fn abort_location(module_id: InternedModuleId) -> AbortLocation {
         return AbortLocation::Script;
     }
     AbortLocation::Module(module_id_of(module_id))
+}
+
+/// The bytecode instruction the micro-op at `pc` originates from, or `None`
+/// when `pc` is past the end of the code.
+fn bytecode_origin(
+    func: &Function,
+    pc: usize,
+) -> Option<(FunctionDefinitionIndex, BytecodeOffset)> {
+    func.code
+        .origins()
+        .get(pc)
+        .map(|&offset| (func.def_idx, offset))
 }
 
 /// Materializes the [`AbortLocation`] naming a native's own module from its
@@ -1524,6 +1544,7 @@ impl InterpreterContext<'_> {
                                 code,
                                 message,
                                 location,
+                                offset: None,
                             };
                         }
                     },
@@ -1774,6 +1795,7 @@ impl InterpreterContext<'_> {
                             code,
                             message: None,
                             location: abort_location(func.module_id),
+                            offset: bytecode_origin(func, regs.pc),
                         };
                     },
 
@@ -1806,6 +1828,7 @@ impl InterpreterContext<'_> {
                             code,
                             message: Some(message),
                             location: abort_location(func.module_id),
+                            offset: bytecode_origin(func, regs.pc),
                         };
                     },
 
@@ -1889,28 +1912,20 @@ impl InterpreterContext<'_> {
                         checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div)
                             .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Div })?
                     },
-                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
-                    // cannot trigger Rust's div-by-zero panic. Asserted below in
-                    // debug builds as a defensive check.
+                    // INVARIANT: lowering guarantees `imm != 0`; zero divisors
+                    // use the checked `IntDiv`.
                     MicroOp::DivU64Imm { dst, src, imm } => {
-                        debug_assert!(
-                            imm != 0,
-                            "DivU64Imm: imm must be non-zero (verifier invariant)"
-                        );
+                        debug_assert!(imm != 0, "DivU64Imm: imm must be non-zero");
                         imm_op_u64(fp, dst, src, imm, |s, i| s / i)
                     },
                     MicroOp::ModU64 { dst, lhs, rhs } => {
                         checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem)
                             .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Mod })?
                     },
-                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
-                    // cannot trigger Rust's div-by-zero panic. Asserted below in
-                    // debug builds as a defensive check.
+                    // INVARIANT: lowering guarantees `imm != 0`; zero divisors
+                    // use the checked `IntMod`.
                     MicroOp::ModU64Imm { dst, src, imm } => {
-                        debug_assert!(
-                            imm != 0,
-                            "ModU64Imm: imm must be non-zero (verifier invariant)"
-                        );
+                        debug_assert!(imm != 0, "ModU64Imm: imm must be non-zero");
                         imm_op_u64(fp, dst, src, imm, |s, i| s % i)
                     },
 
@@ -1935,11 +1950,10 @@ impl InterpreterContext<'_> {
                         shift_amount,
                         bit_width: 64,
                     })?,
-                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
-                    // cannot wrap or trigger UB. Asserted below in debug builds as a
-                    // defensive check.
+                    // INVARIANT: lowering guarantees `imm < 64`; larger shift
+                    // amounts use the checked `IntShl`.
                     MicroOp::ShlU64Imm { dst, src, imm } => {
-                        debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
+                        debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64");
                         imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
                     },
                     MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| {
@@ -1951,11 +1965,10 @@ impl InterpreterContext<'_> {
                         shift_amount,
                         bit_width: 64,
                     })?,
-                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
-                    // cannot wrap or trigger UB. Asserted below in debug builds as a
-                    // defensive check.
+                    // INVARIANT: lowering guarantees `imm < 64`; larger shift
+                    // amounts use the checked `IntShr`.
                     MicroOp::ShrU64Imm { dst, src, imm } => {
-                        debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
+                        debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64");
                         imm_op_u64(fp, dst, src, imm as u64, |s, i| s >> i)
                     },
 

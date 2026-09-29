@@ -31,7 +31,8 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap, SharedArena};
-use move_binary_format::CompiledModule;
+use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
@@ -80,16 +81,19 @@ impl<S: StateView> ModuleProvider for StateViewModuleProvider<'_, S> {
             .map(|value| value.bytes().clone()))
     }
 
-    fn deserialize_module(&self, bytes: &[u8]) -> VMResult<CompiledModule> {
-        // TODO(correctness): use the on-chain deserializer config (max version, etc.).
-        CompiledModule::deserialize(bytes)
-            .map_err(|e| provider_error(format!("deserialize failed: {e:?}")))
+    fn verify_module(&self, module: &CompiledModule) -> VMResult<()> {
+        move_bytecode_verifier::verify_module_with_config(self.verifier_config(), module)
+            .map_err(|e| provider_error(format!("verification failed: {e:?}")))
     }
 
-    fn verify_module(&self, module: &CompiledModule) -> VMResult<()> {
-        // TODO(correctness): use the on-chain verifier config instead of the default.
-        move_bytecode_verifier::verify_module(module)
-            .map_err(|e| provider_error(format!("verification failed: {e:?}")))
+    fn deserializer_config(&self) -> &DeserializerConfig {
+        // TODO(correctness): return the on-chain deserializer config.
+        &DeserializerConfig::DEFAULT
+    }
+
+    fn verifier_config(&self) -> &VerifierConfig {
+        // TODO(correctness): return the on-chain verifier config.
+        &VerifierConfig::DEFAULT
     }
 
     // TODO(perf): fetches and BCS-deserializes the address's entire

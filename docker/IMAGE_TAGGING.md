@@ -77,11 +77,11 @@ Images are built by [`workflow-run-docker-rust-build.yaml`](../.github/workflows
 | `rust-images-performance` | `performance` | — | `CICD:build-performance-images` |
 | `rust-images-failpoints` | `release` | `failpoints` | `CICD:build-failpoints-images` |
 
-`docker-build-test.yaml` also sets `PROFILE_RELEASE`, `PROFILE_PERF`, and `FEATURE_FAILPOINTS` flags that are forwarded to the wait-images step.
+The reusable Docker build workflow forwards the requested profile/feature flags to the wait-images step and uses a separate build lock for each SHA/profile/feature combination.
 
 ## Waiting for images
 
-[`docker/wait-images-ci.mjs`](wait-images-ci.mjs) polls GCP for staged images before dependent CI jobs run. It is wrapped by the [`wait-images-ci` composite action](../.github/actions/wait-images-ci/action.yaml) which accepts the same three boolean flags (`PROFILE_RELEASE`, `PROFILE_PERF`, `FEATURE_FAILPOINTS`) to know which variant tags to wait for. The set of image+profile combinations it checks is defined by `getImagesToWaitFor` in [`docker/image-helpers.js`](image-helpers.js).
+[`docker/wait-images-ci.mjs`](wait-images-ci.mjs) polls GCP for staged images before dependent CI jobs run. Its [`wait-images-ci` composite action](../.github/actions/wait-images-ci/action.yaml) accepts `PROFILE_RELEASE`, `PROFILE_PERF`, `FEATURE_FAILPOINTS`, and `FEATURE_CONSENSUS_ONLY`. The last flag requires `consensus_only_perf_test_<SHA>` tags; ordinary images cannot satisfy it. With no flags set, the historical release/performance/failpoints checks apply. The combinations are defined by `getImagesToWaitFor` in [`docker/image-helpers.js`](image-helpers.js).
 
 ## Release workflows
 

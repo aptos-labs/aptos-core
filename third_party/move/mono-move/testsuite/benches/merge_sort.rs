@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, SamplingMode};
 
 const N: u64 = 1000;
 const SEED: u64 = 42;
@@ -21,7 +21,8 @@ fn bench_merge_sort(c: &mut Criterion) {
         let mut group = c.benchmark_group("merge_sort");
         group
             .warm_up_time(std::time::Duration::from_secs(1))
-            .measurement_time(std::time::Duration::from_secs(3));
+            .measurement_time(std::time::Duration::from_secs(3))
+            .sampling_mode(SamplingMode::Flat);
 
         group.bench_function("native", |b| {
             b.iter(|| black_box(native_sort_checksum(N, SEED)));

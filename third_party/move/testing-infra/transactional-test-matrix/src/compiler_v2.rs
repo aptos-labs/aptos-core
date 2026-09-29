@@ -4,7 +4,7 @@
 //! The Compiler V2 transactional-test corpus: Move sources compiled by
 //! Compiler V2 and run on the VM, plus Lean sources under `tests/leaner/`.
 
-use crate::{Applicability, Corpus, MatrixConfig, Resolution, VmBackend};
+use crate::{Applicability, Corpus, MatrixConfig, MonoMoveDivergence, Resolution, VmBackend};
 use move_command_line_common::testing::EXP_EXT;
 use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
@@ -29,35 +29,26 @@ fn effective_payload(payload: &CompilerV2Payload, backend: VmBackend) -> Compile
     }
 }
 
-impl Resolution<'_, CompilerV2Payload> {
-    /// Builds run settings for this source/config pair and VM backend.
-    /// Cross-compiled output depends on compiler settings, so its baseline
-    /// suffix always includes the config name.
-    pub fn test_run_config(&self) -> TestRunConfig {
-        let experiments = self
-            .config
-            .experiments
-            .iter()
-            .map(|(name, value)| (name.to_string(), *value))
-            .collect();
-        let run_config =
-            TestRunConfig::new(self.config.language_version, experiments).with_runtime_ref_checks();
-        if self.effective_payload.cross_compile {
-            run_config.cross_compile_into(
-                SyntaxChoice::Source,
-                true,
-                self.canonical_exp_suffix
-                    .clone()
-                    .or_else(|| Some(format!("{}.{}", self.config.name, EXP_EXT))),
-            )
-        } else {
-            run_config
-        }
+/// Builds run settings for one resolved cell. Cross-compiled output depends on
+/// compiler settings, so its baseline suffix always includes the config name.
+fn test_run_config(resolution: &Resolution<'_, CompilerV2Payload>) -> TestRunConfig {
+    let run_config = resolution.config.run_config().with_runtime_ref_checks();
+    if resolution.effective_payload.cross_compile {
+        run_config.cross_compile_into(
+            SyntaxChoice::Source,
+            true,
+            resolution
+                .canonical_exp_suffix
+                .clone()
+                .or_else(|| Some(format!("{}.{}", resolution.config.name, EXP_EXT))),
+        )
+    } else {
+        run_config
     }
 }
 
 /// Excluded by every config that takes all tests: these directories are served
-/// by the specialized configs below, which need non-default settings.
+/// by the specialized configs below (non-default settings, or no cross-compilation).
 const COMMON_EXCLUSIONS: &[&str] = &[
     "/leaner/",
     "/operator_eval/",
@@ -74,7 +65,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
 /// They compile to ordinary Move bytecode, so we can change this in the future.
 const LEAN_ONLY: Applicability = Applicability::Deferred("requires the lake toolchain");
 
-/// Only the `baseline` config is enabled for MonoMove.
+/// The same sources as `baseline`, under other optimization settings.
 const LATER_TIER: Applicability = Applicability::Deferred("a later MonoMove rollout tier");
 
 const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
@@ -167,44 +158,44 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         experiments: &[(Experiment::OPTIMIZE, true)],
         language_version: LanguageVersion::latest(),
         include: &["/operator_eval/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: true,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "no-recursive-check",
         experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-check/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "no-access-check",
         experiments: &[(Experiment::ACCESS_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-access-check/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "no-recursive-type-check",
         experiments: &[(Experiment::RECURSIVE_TYPE_CHECK, false)],
         language_version: LanguageVersion::latest(),
         include: &["/no-recursive-type-check/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "public-struct",
@@ -215,7 +206,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "public-const",
@@ -226,29 +217,29 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "testing-constant-true",
         experiments: &[(Experiment::COMPILE_FOR_TESTING, true)],
         language_version: LanguageVersion::latest(),
         include: &["/testing-constant/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     MatrixConfig {
         name: "testing-constant-false",
         experiments: &[(Experiment::COMPILE_FOR_TESTING, false)],
         language_version: LanguageVersion::latest(),
         include: &["/testing-constant/"],
-        exclude: &["/structs_visibility/"],
+        exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
     // Under language version 2.4, a `for` loop evaluates its upper bound inside
     // the iterator's scope.
@@ -261,7 +252,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
         payload: CompilerV2Payload {
             cross_compile: false,
         },
-        mono_move: LATER_TIER,
+        mono_move: Applicability::Applicable,
     },
 ];
 
@@ -286,7 +277,6 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/enum/enum_field_select_different_offsets.move",
     "no-v1-comparison/assert_one.move",
     "no-v1-comparison/closures/reentrancy",
-    "no-v1-comparison/structs_visibility/migrated_tests/public_enum_field_select.move",
     "control_flow/for_loop_non_terminating.move",
     "control_flow/for_loop_nested_break.move",
     "evaluation_order/lazy_assert.move",
@@ -305,6 +295,136 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/testing-constant/",
 ];
 
+/// Sources whose MonoMove output differs from the canonical baseline; each
+/// runs against its override baseline.
+const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
+    MonoMoveDivergence::unsupported(
+        "tests/misc/struct_assign_swap.move",
+        "multiple return values",
+    ),
+    MonoMoveDivergence::unsupported("tests/misc/tuple_swap.move", "multiple return values"),
+    MonoMoveDivergence::unsupported(
+        "tests/more-v1/parser/return_not_binary.move",
+        "reference arguments",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/calculator.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/capturing_generic_option.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/closure_equality.move",
+        "function values in resources, function value equality",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/closure_equality_operand_order.move",
+        "function value equality",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/closure_equality_widened.move",
+        "function value equality",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/funs_as_storage_key.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/fv_enum.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/misc_1.move",
+        "function value serialization",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/persistent.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy_local.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy_module_lock.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/closures/reentrancy_nested.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/registry.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/resolve_from_storage.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/closures/storage_examples.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/fv_as_keys.move",
+        "function values in resources",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/inlining_optimization/locked_caller_inlined_helper.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/inlining_optimization/module_lock_wrapper.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/inlining_optimization/pure_helper_under_lock.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/inlining_optimization/resource_lock_wrapper.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/no-v1-comparison/inlining_optimization/unlocked_caller_locked_helper.move",
+        "no reentrancy checks",
+    ),
+    MonoMoveDivergence::unsupported(
+        "tests/no-v1-comparison/structs_visibility/public_struct_assign_swap.move",
+        "multiple return values",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i128.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i16.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i256.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i32.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i64.move",
+        "no stack trace in exec_state",
+    ),
+    MonoMoveDivergence::rendering(
+        "tests/signed-int/arithmetic_i8.move",
+        "no stack trace in exec_state",
+    ),
+];
+
 pub static COMPILER_V2: Corpus<CompilerV2Payload> = Corpus {
     name: "compiler-v2",
     root: "third_party/move/move-compiler-v2/transactional-tests",
@@ -312,4 +432,6 @@ pub static COMPILER_V2: Corpus<CompilerV2Payload> = Corpus {
     configs: CONFIGS,
     separate_baseline: SEPARATE_BASELINE,
     effective_payload,
+    test_run_config,
+    mono_move_divergences: MONO_MOVE_DIVERGENCES,
 };

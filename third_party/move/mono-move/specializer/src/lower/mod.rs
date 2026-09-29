@@ -108,8 +108,8 @@ enum LoweringError {
     #[error("bitwise op on a signed value is invalid")]
     BitwiseOnSignedValue,
 
-    #[error("shift op requires an unsigned non-u64 integer type")]
-    ShiftRequiresUnsignedNonU64,
+    #[error("shift op requires an unsigned integer type")]
+    ShiftRequiresUnsigned,
 
     #[error("unexpected op in arith/bitwise lowering arm")]
     UnexpectedOpInArithArm,
@@ -210,7 +210,7 @@ impl IntoExecutionError for LoweringError {
             | UnresolvedLabel { .. }
             | CastSourceNotInteger
             | BitwiseOnSignedValue
-            | ShiftRequiresUnsignedNonU64
+            | ShiftRequiresUnsigned
             | UnexpectedOpInArithArm
             | UnexpectedOpInShiftArm
             | ImmMustBeBool

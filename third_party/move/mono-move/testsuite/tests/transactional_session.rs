@@ -1,13 +1,31 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tests that [`TransactionalSession::publish`] replaces stored bytes on a
-//! compatible upgrade and preserves them when V1 rejects an incompatible upgrade.
+//! Tests [`TransactionalSession`]: publishing replaces stored bytes on a
+//! compatible upgrade and preserves them when V1 rejects an incompatible
+//! upgrade; running a function or a script commits resource writes only when
+//! the call succeeds.
 
 use bytes::Bytes;
-use mono_move_testsuite::{compile_move_source, PublishError, TransactionalSession};
-use move_binary_format::compatibility::Compatibility;
-use move_core_types::{account_address::AccountAddress, ident_str, vm_status::StatusCode};
+use mono_move_core::{ErrorLocation, VMInternalError};
+use mono_move_loader::LoaderError;
+use mono_move_output::v1_error::describe_or_fallback;
+use mono_move_testsuite::{
+    compile_move_script, compile_move_source, function_def_index, ArgumentError, PublishError,
+    RunError, RunOutcome, TransactionalSession,
+};
+use move_binary_format::{
+    compatibility::Compatibility, errors::Location, file_format::FunctionDefinitionIndex,
+    CompiledModule,
+};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
+    value::MoveValue,
+    vm_status::{AbortLocation, StatusCode},
+};
 use move_transactional_test_runner::vm_test_harness::TestRunConfig;
 use move_vm_types::code::ModuleBytesStorage;
 
@@ -22,18 +40,58 @@ const COMPATIBLE: &str = "module 0x42::m { public fun f(): u64 { 2 } public fun 
 /// Drops the public `f`: an incompatible upgrade.
 const INCOMPATIBLE: &str = "module 0x42::m { public fun g(): u64 { 3 } }";
 
+/// A counter resource with functions that create, bump, read, and bump-then-abort.
+const COUNTER: &str = r#"module 0x42::m {
+    struct Counter has key { value: u64 }
+    public fun init(account: &signer) { move_to(account, Counter { value: 1 }) }
+    public fun bump(addr: address) acquires Counter {
+        let counter = borrow_global_mut<Counter>(addr);
+        counter.value = counter.value + 1;
+    }
+    public fun read(addr: address): u64 acquires Counter { borrow_global<Counter>(addr).value }
+    public fun bump_then_abort(addr: address) acquires Counter { bump(addr); abort 7 }
+}"#;
+
+const INIT_SCRIPT: &str = "script { fun main(account: &signer) { 0x42::m::init(account) } }";
+const BUMP_SCRIPT: &str = "script { fun main(addr: address) { 0x42::m::bump(addr) } }";
+const BUMP_THEN_ABORT_SCRIPT: &str =
+    "script { fun main(addr: address) { 0x42::m::bump(addr); abort 9 } }";
+
 fn session() -> TransactionalSession {
     TransactionalSession::new(&TestRunConfig::default().vm_config)
 }
 
-fn serialized(source: &str) -> Bytes {
-    let module = compile_move_source(source)
+fn compiled(source: &str) -> CompiledModule {
+    compile_move_source(source)
         .expect("the source compiles")
         .pop()
-        .expect("the source defines one module");
+        .expect("the source defines one module")
+}
+
+fn serialized(module: &CompiledModule) -> Bytes {
     let mut bytes = vec![];
     module.serialize(&mut bytes).expect("the module serializes");
     bytes.into()
+}
+
+/// Compiles and serializes `source` against the counter module.
+fn script(source: &str) -> Vec<u8> {
+    let script = compile_move_script(&format!("{COUNTER}\n{source}")).expect("the script compiles");
+    let mut bytes = vec![];
+    script.serialize(&mut bytes).expect("the script serializes");
+    bytes
+}
+
+/// A session with `source` published, and the module it compiled to.
+fn session_with(source: &str) -> (TransactionalSession, CompiledModule) {
+    let module = compiled(source);
+    let mut session = session();
+    session
+        .publish(&ADDRESS, Compatibility::full_check(), vec![serialized(
+            &module,
+        )])
+        .expect("the module publishes");
+    (session, module)
 }
 
 fn stored(session: &TransactionalSession) -> Option<Bytes> {
@@ -43,11 +101,49 @@ fn stored(session: &TransactionalSession) -> Option<Bytes> {
         .expect("the store is readable")
 }
 
+fn module() -> ModuleId {
+    ModuleId::new(ADDRESS, ident_str!("m").to_owned())
+}
+
+fn address_arg() -> Vec<u8> {
+    MoveValue::Address(ADDRESS)
+        .simple_serialize()
+        .expect("an address serializes")
+}
+
+fn run(
+    session: &mut TransactionalSession,
+    function: &IdentStr,
+    signers: &[AccountAddress],
+    args: &[Vec<u8>],
+) -> Result<RunOutcome, RunError> {
+    session.run(&module(), function, &[], signers, args)
+}
+
+/// Runs `function` with `args` and returns its single `u64` result.
+fn run_u64(session: &mut TransactionalSession, function: &IdentStr, args: &[Vec<u8>]) -> u64 {
+    match run(session, function, &[], args).unwrap_or_else(|err| panic!("`{function}` runs: {err}"))
+    {
+        RunOutcome::Success { return_values } => {
+            let [(TypeTag::U64, bytes)] = return_values.as_slice() else {
+                panic!("`{function}` returns one u64, got {return_values:?}");
+            };
+            bcs::from_bytes(bytes).expect("a u64 decodes")
+        },
+        RunOutcome::Aborted { code, .. } => panic!("`{function}` aborted with {code}"),
+    }
+}
+
+/// The counter's value.
+fn read_counter(session: &mut TransactionalSession) -> u64 {
+    run_u64(session, ident_str!("read"), &[address_arg()])
+}
+
 #[test]
 fn a_compatible_republish_replaces_the_module() {
     let mut session = session();
-    let original = serialized(ORIGINAL);
-    let upgrade = serialized(COMPATIBLE);
+    let original = serialized(&compiled(ORIGINAL));
+    let upgrade = serialized(&compiled(COMPATIBLE));
 
     session
         .publish(
@@ -64,10 +160,25 @@ fn a_compatible_republish_replaces_the_module() {
     assert_eq!(stored(&session), Some(upgrade));
 }
 
+/// Each operation resets the context's caches, so a run after a republish
+/// executes the new code rather than the code loaded for an earlier run.
+#[test]
+fn a_run_after_a_compatible_republish_executes_the_new_code() {
+    let (mut session, _) = session_with(ORIGINAL);
+    assert_eq!(run_u64(&mut session, ident_str!("f"), &[]), 1);
+
+    session
+        .publish(&ADDRESS, Compatibility::full_check(), vec![serialized(
+            &compiled(COMPATIBLE),
+        )])
+        .expect("a compatible upgrade succeeds");
+    assert_eq!(run_u64(&mut session, ident_str!("f"), &[]), 2);
+}
+
 #[test]
 fn an_incompatible_republish_is_rejected_and_keeps_the_original() {
     let mut session = session();
-    let original = serialized(ORIGINAL);
+    let original = serialized(&compiled(ORIGINAL));
     session
         .publish(
             &ADDRESS,
@@ -78,7 +189,7 @@ fn an_incompatible_republish_is_rejected_and_keeps_the_original() {
 
     let error = session
         .publish(&ADDRESS, Compatibility::full_check(), vec![serialized(
-            INCOMPATIBLE,
+            &compiled(INCOMPATIBLE),
         )])
         .expect_err("dropping a public function is incompatible");
     match error {
@@ -91,4 +202,188 @@ fn an_incompatible_republish_is_rejected_and_keeps_the_original() {
         },
     }
     assert_eq!(stored(&session), Some(original));
+}
+
+#[test]
+fn a_successful_run_commits_its_writes_for_later_runs() {
+    let (mut session, _) = session_with(COUNTER);
+    run(&mut session, ident_str!("init"), &[ADDRESS], &[]).expect("`init` runs");
+    assert_eq!(read_counter(&mut session), 1);
+
+    run(&mut session, ident_str!("bump"), &[], &[address_arg()]).expect("`bump` runs");
+    assert_eq!(read_counter(&mut session), 2);
+}
+
+#[test]
+fn an_abort_discards_the_run_writes() {
+    let (mut session, counter) = session_with(COUNTER);
+    run(&mut session, ident_str!("init"), &[ADDRESS], &[]).expect("`init` runs");
+
+    let outcome = run(&mut session, ident_str!("bump_then_abort"), &[], &[
+        address_arg(),
+    ])
+    .expect("an abort is an outcome, not an error");
+    match outcome {
+        RunOutcome::Aborted {
+            code,
+            location,
+            offset,
+            ..
+        } => {
+            assert_eq!(code, 7);
+            assert_eq!(location, AbortLocation::Module(module()));
+            let (function, _) = offset.expect("a Move-level abort names its instruction");
+            assert_eq!(
+                Some(function),
+                function_def_index(&counter, "bump_then_abort")
+            );
+        },
+        RunOutcome::Success { .. } => panic!("`bump_then_abort` aborts"),
+    }
+    assert_eq!(read_counter(&mut session), 1);
+}
+
+/// V1 encodes a signer as a one-variant enum, so a signer handed to an
+/// `address` parameter does not decode.
+#[test]
+fn a_signer_on_an_address_parameter_is_undecodable() {
+    let (mut session, _) = session_with(COUNTER);
+    let error = run(&mut session, ident_str!("read"), &[ADDRESS], &[])
+        .expect_err("`read` takes an address, not a signer");
+    match error {
+        RunError::Arguments(error) => assert_eq!(error, ArgumentError::Undecodable),
+        other => panic!("expected an argument error, got {other}"),
+    }
+}
+
+/// Script signers precede BCS arguments, and successful runs commit writes.
+#[test]
+fn a_successful_script_commits_its_writes_for_later_runs() {
+    let (mut session, _) = session_with(COUNTER);
+    session
+        .run_script(&script(INIT_SCRIPT), &[], &[ADDRESS], &[])
+        .expect("the init script runs");
+    assert_eq!(read_counter(&mut session), 1);
+
+    session
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .expect("the bump script runs");
+    assert_eq!(read_counter(&mut session), 2);
+}
+
+/// An abort in script code has `AbortLocation::Script` and function definition
+/// index zero, and discards the run's resource writes.
+#[test]
+fn a_script_abort_is_located_at_the_script_and_discards_its_writes() {
+    let (mut session, _) = session_with(COUNTER);
+    run(&mut session, ident_str!("init"), &[ADDRESS], &[]).expect("`init` runs");
+
+    let outcome = session
+        .run_script(&script(BUMP_THEN_ABORT_SCRIPT), &[], &[], &[address_arg()])
+        .expect("an abort is an outcome, not an error");
+    match outcome {
+        RunOutcome::Aborted {
+            code,
+            location,
+            offset,
+            ..
+        } => {
+            assert_eq!(code, 9);
+            assert_eq!(location, AbortLocation::Script);
+            let (function, _) = offset.expect("a Move-level abort names its instruction");
+            assert_eq!(function, FunctionDefinitionIndex(0));
+        },
+        RunOutcome::Success { .. } => panic!("the script aborts"),
+    }
+    assert_eq!(read_counter(&mut session), 1);
+}
+
+/// Unwraps `RunError::Vm`; panics on other error variants.
+fn vm_error(error: RunError) -> VMInternalError {
+    match error {
+        RunError::Vm(error) => error,
+        other => panic!("expected a VM error, got {other}"),
+    }
+}
+
+/// Returns the V1 status for `RunError::Vm`; panics on other error variants.
+fn vm_status(error: RunError) -> StatusCode {
+    describe_or_fallback(&vm_error(error)).status
+}
+
+#[test]
+fn an_undeserializable_script_fails_at_the_script() {
+    let mut session = session();
+    let error = vm_error(
+        session
+            .run_script(&[0xFF, 0x00], &[], &[], &[])
+            .expect_err("garbage is not a script"),
+    );
+    assert_eq!(
+        describe_or_fallback(&error).status,
+        StatusCode::CODE_DESERIALIZATION_ERROR
+    );
+    assert_eq!(error.location(), Some(&ErrorLocation::Script));
+}
+
+#[test]
+fn scripts_are_verified_under_the_session_vm_config() {
+    let mut vm_config = TestRunConfig::default().vm_config;
+    vm_config.verifier_config.max_function_parameters = Some(0);
+    let mut session = TransactionalSession::new(&vm_config);
+    let error = vm_error(
+        session
+            .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+            .expect_err("one parameter exceeds the limit"),
+    );
+    assert_eq!(
+        describe_or_fallback(&error).status,
+        StatusCode::TOO_MANY_PARAMETERS
+    );
+    let Some(LoaderError::ScriptVerificationFailed { error: report }) =
+        error.downcast_ref::<LoaderError>()
+    else {
+        panic!("expected the verifier's report, got {error}");
+    };
+    assert_eq!(report.location(), &Location::Script);
+}
+
+#[test]
+fn a_script_whose_module_is_unpublished_fails_to_link() {
+    let mut session = session();
+    let error = session
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .expect_err("nothing is published");
+    assert_eq!(vm_status(error), StatusCode::LINKER_ERROR);
+}
+
+/// The script names `m::bump`, which the published `m` lacks.
+#[test]
+fn a_script_naming_a_missing_function_fails_verification() {
+    let (mut session, _) = session_with(ORIGINAL);
+    let error = session
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .expect_err("`bump` is not in the published module");
+    assert_eq!(vm_status(error), StatusCode::LOOKUP_FAILED);
+}
+
+/// The count check precedes the call, so a miscounted `bump` leaves the
+/// counter untouched.
+#[test]
+fn an_argument_count_mismatch_is_reported_before_running() {
+    let (mut session, _) = session_with(COUNTER);
+    run(&mut session, ident_str!("init"), &[ADDRESS], &[]).expect("`init` runs");
+
+    let error =
+        run(&mut session, ident_str!("bump"), &[], &[]).expect_err("`bump` takes one argument");
+    match error {
+        RunError::Arguments(error) => {
+            assert_eq!(error, ArgumentError::CountMismatch {
+                expected: 1,
+                actual: 0
+            })
+        },
+        other => panic!("expected an argument error, got {other}"),
+    }
+    assert_eq!(read_counter(&mut session), 1);
 }

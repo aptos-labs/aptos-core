@@ -19,15 +19,16 @@ pub mod unit_test;
 pub mod v1_test_natives;
 
 pub use compile::{
-    assemble_masm_source, compile, compile_move_path, compile_move_source, function_def_index,
-    SourceKind,
+    assemble_masm_source, compile, compile_move_path, compile_move_script, compile_move_source,
+    function_def_index, SourceKind,
 };
 pub use engine::{
     build_natives, with_loaded_module, with_loaded_mono_function, with_mono_function, MonoRunner,
     RunResult,
 };
 pub use module_provider::InMemoryModuleProvider;
-pub use resource_provider::InMemoryResourceProvider;
 pub use runner::{finalize_events_v1, finalize_events_v2};
 pub use transactional_adapter::{run_transactional_test, supports_source};
-pub use transactional_session::{PublishError, TransactionalSession};
+pub use transactional_session::{
+    ArgumentError, PublishError, RunError, RunOutcome, TransactionalSession,
+};

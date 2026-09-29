@@ -9,7 +9,9 @@ use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
 use move_asm::assembler::{self, Options as AsmOptions};
 use move_binary_format::{
-    access::ModuleAccess, file_format::FunctionDefinitionIndex, CompiledModule,
+    access::ModuleAccess,
+    file_format::{CompiledScript, FunctionDefinitionIndex},
+    CompiledModule,
 };
 use move_compiler_v2::Options;
 use move_model::metadata::LanguageVersion;
@@ -58,6 +60,7 @@ pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
     })
+    .map(modules)
 }
 
 /// Compile the Move stdlib into its modules, so they can be published into a
@@ -70,10 +73,11 @@ pub fn compile_move_stdlib() -> Result<Vec<CompiledModule>> {
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
     })
+    .map(modules)
 }
 
-/// Run the v2 compiler and collect the produced modules (scripts dropped).
-fn run_compiler(options: Options) -> Result<Vec<CompiledModule>> {
+/// Runs the v2 compiler and returns its modules and scripts.
+fn run_compiler(options: Options) -> Result<Vec<CompiledUnit>> {
     let mut errors = Buffer::no_color();
     let result = {
         let mut emitter = options.error_emitter(&mut errors);
@@ -86,14 +90,21 @@ fn run_compiler(options: Options) -> Result<Vec<CompiledModule>> {
             String::from_utf8_lossy(&errors.into_inner())
         )
     })?;
-
     Ok(units
         .into_iter()
-        .filter_map(|unit| match unit.into_compiled_unit() {
-            CompiledUnit::Module(m) => Some(m.module),
+        .map(|unit| unit.into_compiled_unit())
+        .collect())
+}
+
+/// Extracts modules from compiled units, discarding scripts.
+fn modules(units: Vec<CompiledUnit>) -> Vec<CompiledModule> {
+    units
+        .into_iter()
+        .filter_map(|unit| match unit {
+            CompiledUnit::Module(module) => Some(module.module),
             CompiledUnit::Script(_) => None,
         })
-        .collect())
+        .collect()
 }
 
 /// Compile Move source text into all contained modules.
@@ -101,6 +112,29 @@ fn run_compiler(options: Options) -> Result<Vec<CompiledModule>> {
 /// The Move stdlib and the `test_utils` library are injected as dependencies,
 /// so test sources can reference both.
 pub fn compile_move_source(source: &str) -> Result<Vec<CompiledModule>> {
+    compile_move_units(source).map(modules)
+}
+
+/// Compiles source text containing exactly one script.
+/// Modules in `source` resolve references during compilation but are not
+/// returned or published; execution links against published modules.
+pub fn compile_move_script(source: &str) -> Result<CompiledScript> {
+    let mut scripts = compile_move_units(source)?
+        .into_iter()
+        .filter_map(|unit| match unit {
+            CompiledUnit::Script(script) => Some(script.script),
+            CompiledUnit::Module(_) => None,
+        });
+    match (scripts.next(), scripts.next()) {
+        (Some(script), None) => Ok(script),
+        (None, _) => Err(anyhow!("the source defines no script")),
+        (Some(_), Some(_)) => Err(anyhow!("the source defines more than one script")),
+    }
+}
+
+/// Compiles Move source text with the Move stdlib and the `test_utils` library
+/// as dependencies.
+fn compile_move_units(source: &str) -> Result<Vec<CompiledUnit>> {
     let tmp_dir = tempfile::tempdir().context("failed to create temp dir")?;
     let path = tmp_dir.path().join("sources.move");
     std::fs::File::create(&path)
