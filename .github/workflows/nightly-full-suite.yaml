@@ -258,7 +258,7 @@ jobs:
     steps:
       - name: Require configured webhook
         env:
-          ALERT_WEBHOOK: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          ALERT_WEBHOOK: ${{ secrets.NIGHTLY_SLACK_WEBHOOK_URL }}
         run: test -n "$ALERT_WEBHOOK"
       - name: Prepare result payload
         id: payload
@@ -277,6 +277,6 @@ jobs:
       - name: Post nightly result to Slack
         uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
         with:
-          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          webhook: ${{ secrets.NIGHTLY_SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: ${{ steps.payload.outputs.json }}
