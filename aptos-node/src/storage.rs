@@ -43,17 +43,22 @@ pub(crate) fn maybe_apply_genesis(
     }
 }
 
+/// The storage handles the rest of the node is built on
+pub struct StorageHandles {
+    /// The opened DB, held so the backup service can be started against it
+    /// once the node has finished bootstrapping. Absent in consensus-only
+    /// mode, which runs no backup service.
+    pub db: Option<Arc<AptosDB>>,
+    pub db_rw: DbReaderWriter,
+    pub internal_indexer_db: Option<InternalIndexerDB>,
+    pub update_receiver: Option<WatchReceiver<(Instant, Version)>>,
+    /// Present only when the node is about to fast sync and still holds a
+    /// usable genesis blob.
+    pub local_genesis: Option<LocalGenesis>,
+}
+
 #[cfg(not(feature = "consensus-only-perf-test"))]
-pub(crate) fn bootstrap_db(
-    node_config: &NodeConfig,
-) -> Result<(
-    Arc<dyn DbReader>,
-    DbReaderWriter,
-    Option<Runtime>,
-    Option<InternalIndexerDB>,
-    Option<WatchReceiver<(Instant, Version)>>,
-    Option<LocalGenesis>,
-)> {
+pub(crate) fn bootstrap_db(node_config: &NodeConfig) -> Result<StorageHandles> {
     let internal_indexer_db = InternalIndexerDBService::get_indexer_db(node_config);
     let (update_sender, update_receiver) = if internal_indexer_db.is_some() {
         let (sender, receiver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
@@ -97,20 +102,25 @@ pub(crate) fn bootstrap_db(
         None
     };
 
-    let backup_service = start_backup_service(
-        node_config.storage.backup_service_address,
-        db_arc.clone(),
-        node_config.storage.backup_service_runtime_threads,
-    );
-
-    Ok((
-        db_arc as Arc<dyn DbReader>,
+    Ok(StorageHandles {
+        db: Some(db_arc),
         db_rw,
-        Some(backup_service),
         internal_indexer_db,
         update_receiver,
         local_genesis,
-    ))
+    })
+}
+
+/// Starts the backup service.
+///
+/// Deferred until the node has bootstrapped: until then there is nothing worth
+/// backing up, and on a fast syncing node the DB is mid-restore.
+pub(crate) fn start_backup_service_for(node_config: &NodeConfig, db: Arc<AptosDB>) -> Runtime {
+    start_backup_service(
+        node_config.storage.backup_service_address,
+        db,
+        node_config.storage.backup_service_runtime_threads,
+    )
 }
 
 /// Executes genesis and persists only the resulting epoch-0 ledger info.
@@ -181,9 +191,7 @@ fn build_local_genesis(node_config: &NodeConfig, db_rw: &DbReaderWriter) -> Opti
 /// In consensus-only mode, return a in-memory based [FakeAptosDB] and
 /// do not run the backup service.
 #[cfg(feature = "consensus-only-perf-test")]
-pub(crate) fn bootstrap_db(
-    node_config: &NodeConfig,
-) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
+pub(crate) fn bootstrap_db(node_config: &NodeConfig) -> Result<StorageHandles> {
     use aptos_db::db::fake_aptosdb::FakeAptosDB;
 
     let aptos_db = AptosDB::open(
@@ -197,9 +205,15 @@ pub(crate) fn bootstrap_db(
         node_config.storage.hot_state_config,
     )
     .map_err(|err| anyhow!("DB failed to open {}", err))?;
-    let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
+    let (_fake_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
     maybe_apply_genesis(&db_rw, node_config)?;
-    Ok((aptos_db, db_rw, None))
+    Ok(StorageHandles {
+        db: None,
+        db_rw,
+        internal_indexer_db: None,
+        update_receiver: None,
+        local_genesis: None,
+    })
 }
 
 /// Creates a RocksDb checkpoint for the consensus_db, state_sync_db,
@@ -240,14 +254,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
 /// the various handles.
 pub fn initialize_database_and_checkpoints(
     node_config: &mut NodeConfig,
-) -> Result<(
-    DbReaderWriter,
-    Option<Runtime>,
-    Waypoint,
-    Option<InternalIndexerDB>,
-    Option<WatchReceiver<(Instant, Version)>>,
-    Option<LocalGenesis>,
-)> {
+) -> Result<(StorageHandles, Waypoint)> {
     // If required, create RocksDB checkpoints and change the working directory.
     // This is test-only.
     if let Some(working_dir) = node_config.base.working_dir.clone() {
@@ -256,8 +263,7 @@ pub fn initialize_database_and_checkpoints(
 
     // Open the database
     let instant = Instant::now();
-    let (_aptos_db, db_rw, backup_service, indexer_db_opt, update_receiver, local_genesis) =
-        bootstrap_db(node_config)?;
+    let storage_handles = bootstrap_db(node_config)?;
 
     // Log the duration to open storage
     debug!(
@@ -266,11 +272,7 @@ pub fn initialize_database_and_checkpoints(
     );
 
     Ok((
-        db_rw,
-        backup_service,
+        storage_handles,
         node_config.base.waypoint.genesis_waypoint(),
-        indexer_db_opt,
-        update_receiver,
-        local_genesis,
     ))
 }
