@@ -94,11 +94,10 @@ cargo x list-e2e-tests                  # Also supports --format json
 ```
 
 The shared [registry](../../.github/actions/e2e-test-determinator/registry.json)
-covers CLI/API, PR execution performance, and Forge E2E and compatibility. Unknown E2E names or missing referenced definitions fail both `subsystem`
+covers CLI/API and Forge E2E and compatibility. Unknown E2E names or missing referenced definitions fail both `subsystem`
 and `compare` with a nonzero exit. Registry tests verify workflow jobs and required
 nightly coverage. A new runner needs registration, dependencies, workflow wiring,
-and nightly coverage, in the full suite or in its own dispatched workflow
-(`nightly_workflow`); assigning a registered runner is configuration-only.
+and nightly coverage; assigning a registered runner is configuration-only.
 
 The [E2E action](../../.github/actions/e2e-test-determinator/action.yaml) emits
 selected names; consumers gate jobs or set `SKIP_JOB`. Workflow event, label,
@@ -118,10 +117,11 @@ These suites bypass subsystem selection and cannot appear in `e2e_tests`:
 | Forge consensus-only performance | `CICD:run-consensus-only-perf-test` label. |
 | Forge multiregion | `CICD:run-multiregion-test` label. |
 | Faucet (current node and production networks) | `CICD:non-required-tests` label. |
+| Execution performance | `CICD:run-execution-performance-test` or `-full-test` label; nightly by PIES dispatch. |
 
 Manual suites stay manual: the nightly runs none of them. Execution performance
-remains registered because its `LAND_BLOCKING` flow supports PRs/automerge; its own
-PIES dispatch runs `CONTINUOUS` and serves as its nightly coverage.
+has its own nightly, a PIES dispatch running the `CONTINUOUS` flow; its labels run
+`LAND_BLOCKING` or `CONTINUOUS` on a PR.
 
 Flow evaluation infrastructure in `aptos-move/flow/evaluation/spec-inference`
 is **manual-only** and has no E2E runner; only its publication-bundle test runs,

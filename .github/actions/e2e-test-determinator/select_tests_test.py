@@ -38,13 +38,10 @@ class E2eSelectionTest(unittest.TestCase):
 
     def test_registry_has_real_workflow_jobs_and_required_nightly_coverage(self):
         root = Path(__file__).resolve().parents[3]
-        full_suite = ".github/workflows/nightly-full-suite.yaml"
+        nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
+        nightly_jobs = set(re.findall(r"^  ([a-z][a-z0-9-]*):$", nightly, re.M))
         required = (
-            re.search(
-                r"  result:\n.*?    needs: \[(.*?)\]",
-                (root / full_suite).read_text(),
-                re.S,
-            )
+            re.search(r"  result:\n.*?    needs: \[(.*?)\]", nightly, re.S)
             .group(1)
             .split(", ")
         )
@@ -54,16 +51,10 @@ class E2eSelectionTest(unittest.TestCase):
                 self.assertRegex(
                     workflow, r"(?m)^  " + re.escape(runner["job"]) + r":$"
                 )
-                nightly = (root / runner["nightly_workflow"]).read_text()
-                nightly_jobs = set(re.findall(r"^  ([a-z][a-z0-9-]*):$", nightly, re.M))
                 self.assertTrue(runner["nightly_jobs"])
                 for job in runner["nightly_jobs"]:
                     self.assertIn(job, nightly_jobs)
-                    if runner["nightly_workflow"] == full_suite:
-                        self.assertIn(job, required)
-                    else:
-                        # Dispatched on its own schedule, outside the full suite.
-                        self.assertIn("workflow_dispatch:", nightly)
+                    self.assertIn(job, required)
         self.assertNotIn("flow-evaluation", REGISTRY)
 
     def test_manual_suites_bypass_selection_but_keep_trigger_gates(self):
@@ -98,7 +89,13 @@ class E2eSelectionTest(unittest.TestCase):
                     self.assertIn("SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') }}", body)
         self.assertTrue({"mono-move-parity", "mono-move-performance",
                          "forge-framework-upgrade", "forge-consensus-only-performance",
-                         "forge-multiregion", "faucet-integration"}.isdisjoint(REGISTRY))
+                         "forge-multiregion", "faucet-integration",
+                         "execution-performance"}.isdisjoint(REGISTRY))
+        # Execution performance has its own dispatched nightly; PRs opt in by label.
+        performance = (root / ".github/workflows/execution-performance.yaml").read_text()
+        self.assertIn("CICD:run-execution-performance-test", performance)
+        for automatic in ("auto_merge", "CICD:run-e2e-tests", "CICD:run-all-e2e-tests"):
+            self.assertNotIn(automatic, performance)
         # Manual suites stay manual: the nightly calls none of them.
         nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
         for manual in (
@@ -109,6 +106,7 @@ class E2eSelectionTest(unittest.TestCase):
             "suite: framework_upgrade",
             "suite: consensus_only_realistic_env_max_tps",
             "suite: multiregion_benchmark_test",
+            "execution-performance",
         ):
             with self.subTest(nightly=manual):
                 self.assertNotIn(manual, nightly)

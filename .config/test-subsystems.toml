@@ -86,14 +86,6 @@ input_paths = [
     "docker",
 ]
 
-[e2e_tests.execution-performance]
-affected_packages = ["aptos-executor-benchmark", "aptos-move-e2e-benchmark"]
-input_paths = [
-    "testsuite/single_node_performance*",
-    ".github/workflows/execution-performance.yaml",
-    ".github/workflows/workflow-run-execution-performance.yaml"
-]
-
 [e2e_tests.forge-compatibility]
 affected_packages = ["aptos-node", "aptos-forge", "aptos-testcases"]
 input_paths = [

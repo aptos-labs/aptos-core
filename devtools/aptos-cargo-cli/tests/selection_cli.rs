@@ -292,7 +292,6 @@ fn list_e2e_tests_does_not_require_a_workspace_or_valid_base() {
     for name in [
         "cli-e2e",
         "node-api-compatibility",
-        "execution-performance",
         "forge-e2e",
         "forge-compatibility",
     ] {
@@ -307,6 +306,7 @@ fn list_e2e_tests_does_not_require_a_workspace_or_valid_base() {
         "forge-consensus-only-performance",
         "forge-multiregion",
         "faucet-integration",
+        "execution-performance",
     ] {
         assert!(
             listed[name].is_null(),

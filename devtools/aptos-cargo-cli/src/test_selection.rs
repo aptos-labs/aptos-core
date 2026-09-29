@@ -33,7 +33,6 @@ pub struct E2eRunner {
     description: String,
     workflow: String,
     job: String,
-    nightly_workflow: String,
     nightly_jobs: Vec<String>,
 }
 
