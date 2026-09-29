@@ -156,7 +156,7 @@ impl DynamicPrefetchingState {
 mod test {
     use super::*;
     use crate::streaming_client::{
-        GetAllStatesRequest, GetAllTransactionsOrOutputsRequest, StreamRequest,
+        GetAllStatesRequest, GetAllTransactionsOrOutputsRequest, SnapshotKind, StreamRequest,
     };
     use aptos_data_client::global_summary::AdvertisedData;
 
@@ -695,7 +695,7 @@ mod test {
         let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version: 0,
             start_index: 0,
-            state_kind: StateKind::MainState,
+            snapshot_kind: SnapshotKind::State(StateKind::MainState),
         });
 
         // Create and return the stream engine

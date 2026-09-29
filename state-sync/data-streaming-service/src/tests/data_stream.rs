@@ -17,7 +17,7 @@ use crate::{
         ContinuouslyStreamTransactionsOrOutputsRequest, ContinuouslyStreamTransactionsRequest,
         GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, GetAllTransactionOutputsRequest,
         GetAllTransactionsOrOutputsRequest, GetAllTransactionsRequest, NotificationFeedback,
-        StreamRequest,
+        SnapshotKind, StreamRequest,
     },
     streaming_service::StreamUpdateNotification,
     tests::utils::{
@@ -3320,7 +3320,7 @@ fn create_state_value_stream(
     let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
         start_index: 0,
-        state_kind: StateKind::MainState,
+        snapshot_kind: SnapshotKind::State(StateKind::MainState),
     });
     let (data_stream, data_stream_listener, _) =
         create_data_stream(data_client_config, streaming_service_config, stream_request);
