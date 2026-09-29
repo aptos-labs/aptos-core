@@ -8,10 +8,8 @@
 // calling the PURE spec-level form of `get` -- `$42_producer_$get`, distinct from
 // the procedure `$42_producer_get` -- which was never declared.
 //
-// Expected today: Boogie rejects the program with
-//   "use of undeclared function: $42_producer_$get"
-// rather than either verifying, or reporting the backend's own diagnostic
-// ("this function has no specification but is referenced by a behavioral predicate").
+// Guards against Boogie rejecting the program with
+//   "use of undeclared function: $42_producer_$get".
 //
 // REQUIRED (each checked by deleting it and watching the error vanish):
 //   1. `apply`'s spec has `aborts_if aborts_of<f>(s)` -- a behavioral predicate over
