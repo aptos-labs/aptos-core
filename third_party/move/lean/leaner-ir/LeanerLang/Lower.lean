@@ -180,6 +180,9 @@ private structure ExprContext where
   declarations : Array ScopedLocal := #[]
   returnType : TypeId
   resultType : Option TypeId := none
+  /-- The declared result type, before a specification projects its
+  references to their referents: what `final` checks. -/
+  declaredResultType : Option TypeId := none
   specification : Bool := false
   /-- Only a genuine function-tail return may become a fallthrough value.
   A nested block's tail can still exit enclosing statements or loops. -/
@@ -444,6 +447,7 @@ private def specificationExprContext (context : ExprContext) : LowerM ExprContex
     declarations
     returnType := ← projectSpecTypeId context.returnType
     resultType := ← context.resultType.mapM projectSpecTypeId
+    declaredResultType := context.resultType
     specification := true
     loopResults := ← context.loopResults.mapM projectSpecTypeId }
 
@@ -961,7 +965,8 @@ private def ensureType (expected actual : TypeId) (span : Span) : LowerM Unit :=
       {repr expectedType}{expectedDetail} (arena entry {expected.index})" (some span)
 
 private def primitiveArity : Primitive → Nat
-  | .repeatVector _ | .length | .destroyEmptyVector | .bitwiseNot | .logicalNot | .negate |
+  | .repeatVector _ | .length | .signerAddress | .destroyEmptyVector | .bitwiseNot |
+      .logicalNot | .negate |
       .checkedNegate _ | .cast | .checkedCast _ | .profileNegate | .profileCast |
       .copyValue | .moveValue => 1
   | .slice | .swapVector | .reverseSliceVector | .insertVector => 3
@@ -981,6 +986,8 @@ private def primitiveLIR (specification : Bool) : Primitive → PrimitiveOperati
   | .destroyEmptyVector => .destroyEmptyVector
   | .containsVector => .containsVector
   | .indexOfVector => .indexOfVector
+  | .compare => .compare
+  | .signerAddress => .signerAddress
   | .checkVectorIndex failure => .checkVectorIndex failure.toLIR
   | .length => .length
   | .index => .index
@@ -1688,6 +1695,25 @@ private partial def expressionPlace? : Expr → Option Place
       some (.deref (← expressionPlace? value) span)
   | _ => none
 
+/-- Borrow a field of a mutable reference as a place: through the source's
+own place when it names one, otherwise through a hidden holder of the
+computed reference. A select through a mutable reference has no executable
+meaning, so executable LIR reaches the field only by a place. -/
+private def borrowFieldOfReference (context : ExprContext) (loc : LocId)
+    (borrowType : TypeId) (source : Expr) (base : ExprId × TypeId) (referent : TypeId)
+    (field : String) (span : Span) : LowerM ExprId := do
+  if let some place := expressionPlace? source then
+    let (place, _) ← lowerPlace context place
+    return ← pushExpression loc borrowType <| .operation (.borrow .mutable place) #[] #[]
+  let holder ← pushTemporaryLocal base.2 loc
+  let pattern ← pushPattern { loc, typeId := base.2, kind := .variable holder }
+  let root ← pushPlace (.localVar holder)
+  let dereferenced ← pushPlace (.deref root)
+  let (owner, fieldName, _) ← resolveNominalField referent field span
+  let place ← pushPlace (.field dereferenced owner fieldName)
+  let borrow ← pushExpression loc borrowType <| .operation (.borrow .mutable place) #[] #[]
+  pushExpression loc borrowType (.letDecl pattern (some base.1) borrow)
+
 private def literalIndex? : Expr → Option Nat
   | .integer value _ | .typedInteger value _ _ =>
       if value < 0 then none else some value.toNat
@@ -2067,7 +2093,10 @@ private partial def incrementForContinues (root : ExprId)
         s!"a `for` body references missing expression {root.index}"
   let recur child := incrementForContinues child iteratorPattern iterator iteratorType
     specification (fuel - 1)
-  let rebuild kind := pushExpression expression.loc expression.typeId kind
+  -- Copy only along paths that change: shared nodes such as a range loop's
+  -- entry test and guard stay shared, which the source backend relies on.
+  let rebuild kind := if kind == expression.kind then pure root
+    else pushExpression expression.loc expression.typeId kind
   match expression.kind with
   | .continue_ 0 => do
       let increment ← pushForIncrement iteratorPattern iterator iteratorType
@@ -2226,8 +2255,11 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
         return (id, typeId)
       let some (localId, typeId) := lookupLocal? context name | do
         let state ← get
-        let some declaration := sourceConstant? state.sourceNamespace name
-          | failAt "LEANER-LOCAL-NAME" s!"unknown local or constant `{name}`" (some span)
+        let some declaration := sourceConstant? state.sourceNamespace name | do
+          if context.specification then
+            if let some value := specificationBound? name then
+              return ← lowerExpr context expected (.integer value span)
+          failAt "LEANER-LOCAL-NAME" s!"unknown local or constant `{name}`" (some span)
         let physicalType := (← lowerTypeUse context.types declaration.type).typeId
         let some constantName := nameId? state.tables state.namespaceId name
           | failAt "LEANER-CONSTANT-NAME" s!"constant `{name}` was not interned" (some span)
@@ -2473,6 +2505,33 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
         if let some expected := expected then ensureType expected resultType span
         let id ← pushExpression loc resultType <|
           .operation (.primitive lirOperation) #[] operands
+        return (id, resultType)
+      if operation == .signerAddress then
+        unless arguments.size == 1 do
+          failAt "LEANER-PRIMITIVE-ARITY" "`signerAddress` takes one operand" (some span)
+        let signer ← lowerExpr context none arguments[0]!
+        let signerType ← match ← typeNode? signer.2 with
+          | some (.reference reference) => typeNode? reference.referent
+          | other => pure other
+        unless signerType == some .signer do
+          failAt "LEANER-TYPE-MISMATCH" "`signerAddress` takes a `&Signer`" (some span)
+        let addressType ← internType .address
+        if let some expected := expected then ensureType expected addressType span
+        let id ← pushExpression loc addressType <|
+          .operation (.primitive .signerAddress) #[] #[signer.1]
+        return (id, addressType)
+      if operation == .compare then
+        -- Two values of one type; the result is `-1`, `0`, or `1`.
+        unless arguments.size == 2 do
+          failAt "LEANER-PRIMITIVE-ARITY" "`compare` takes two operands" (some span)
+        let left ← lowerExpr context none arguments[0]!
+        let right ← lowerExpr context (some left.2) arguments[1]!
+        ensureType left.2 right.2 arguments[1]!.span
+        let resultType ← if context.specification then internType (.integer .unbounded true)
+          else internType (.integer (.bits 8) true)
+        if let some expected := expected then ensureType expected resultType span
+        let id ← pushExpression loc resultType <| .operation
+          (.primitive .compare) #[] #[left.1, right.1]
         return (id, resultType)
       if operation == .concatVector then
         let left ← lowerExpr context expected arguments[0]!
@@ -2826,6 +2885,25 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
             | some (.vector element _) => pure (some element)
             | _ => pure none
         | _ => pure none
+      if field == "address" then
+        -- The address primitive reads its signer through a shared reference,
+        -- as Move's `signer::address_of`: a signer has no `Copy`.
+        let signerValue? ← match valueType with
+          | some .signer =>
+              if context.specification then pure (some value)
+              else match expressionPlace? source with
+                | some place => some <$> lowerExpr context none (.borrowPlace false place span)
+                | none => some <$> lowerExpr context none (.borrowValue false source span)
+          | some (.reference reference) => match ← typeNode? reference.referent with
+              | some .signer => pure (some value)
+              | _ => pure none
+          | _ => pure none
+        if let some signerValue := signerValue? then
+          let addressType ← internType .address
+          if let some expected := expected then ensureType expected addressType span
+          let id ← pushExpression loc addressType <|
+            .operation (.primitive .signerAddress) #[] #[signerValue.1]
+          return (id, addressType)
       if field == "length" then
         if let some elementType := vectorElement? then
           let value ← if context.specification then pure value else
@@ -2903,13 +2981,29 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
           let selection : LeanerIR.DataOperation ←
             if ← nominalHasVariants baseType then pure (.selectVariants reference #[field])
             else pure (.select reference field)
-          let selected ← pushExpression loc selectedType <| .operation
-            (.data selection) #[] #[value.1]
           let expectedIsReference ← match expected with
             | some expected => pure ((← typeNode? expected).any fun
                 | .reference _ => true
                 | _ => false)
             | none => pure false
+          -- A mutable reference is a live loan, and selecting through it has
+          -- no executable meaning: the executable lowering reads the field of
+          -- the dereferenced referent, or borrows it as a place when a
+          -- reference is expected.
+          if sourceReference.kind == .mutable && !context.specification then
+            if expectedIsReference then
+              if let some expected := expected then ensureType expected selectedType span
+              let id ← borrowFieldOfReference context loc selectedType
+                (.field source field span) value baseType field span
+              return (id, selectedType)
+            if let some expected := expected then ensureType expected fieldType span
+            let dereferenced ← pushExpression loc baseType <| .operation
+              (.reference .dereference) #[] #[value.1]
+            let id ← pushExpression loc fieldType <| .operation
+              (.data selection) #[] #[dereferenced]
+            return (id, fieldType)
+          let selected ← pushExpression loc selectedType <| .operation
+            (.data selection) #[] #[value.1]
           if expectedIsReference then
             if let some expected := expected then ensureType expected selectedType span
             return (selected, selectedType)
@@ -4043,6 +4137,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
           | "in_range" => some .inVectorRange
           | "range" => some .vectorRange
           | "len" => some .lengthVector
+          | "final" => some .final
           | _ => none
         else none
       if let some operation := specificationBuiltin? then
@@ -4054,6 +4149,33 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
             | some (.vector element _) => pure (some element)
             | _ => pure none
           | none => pure none
+        if operation == .final then
+          -- The final value of a returned mutable reference.
+          unless arguments.size == 1 do
+            failAt "LEANER-SPEC-ARITY" "`final` expects one operand" (some span)
+          let reference ← lowerExpr context none arguments[0]!
+          let notReturned := "`final` reads a returned mutable reference"
+          let some index := match (← get).output.expressions[reference.1.index]?.map (·.kind) with
+              | some (.operation (.specification (.result index)) _ _ _) => some index
+              | _ => none
+            | failAt "LEANER-SPEC-FINAL" notReturned (some span)
+          let some declared := context.declaredResultType
+            | failAt "LEANER-SPEC-FINAL" notReturned (some span)
+          let declared ← match ← typeNode? declared with
+            | some (.tuple components) =>
+                if (← get).sourceNamespace.profile == .move then pure components[index]?
+                else pure (if index == 0 then some declared else none)
+            | _ => pure (if index == 0 then some declared else none)
+          let some declared := declared | failAt "LEANER-SPEC-FINAL" notReturned (some span)
+          let some (.reference referenceType) ← typeNode? declared
+            | failAt "LEANER-SPEC-FINAL" notReturned (some span)
+          unless referenceType.kind == .mutable do
+            failAt "LEANER-SPEC-FINAL" notReturned (some span)
+          let resultType := reference.2
+          if let some expected := expected then ensureType expected resultType span
+          let id ← pushExpression loc resultType <| .operation
+            (.specification .final) #[] #[reference.1]
+          return (id, resultType)
         if operation == .singletonVector then
           unless arguments.size == 1 do
             failAt "LEANER-SPEC-ARITY" "`vec` expects one operand" (some span)
@@ -4802,22 +4924,6 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let unitType ← internType .unit
       if let some expected := expected then ensureType expected unitType span
       if (← get).sourceNamespace.profile == .move then
-        if let .field (.local baseName _) field _ := place then
-          if let some (baseLocal, baseType) := lookupLocal? context baseName then
-            if let some (.reference reference) ← typeNode? baseType then
-              let base ← pushExpression loc baseType (.localVar baseLocal)
-              let (owner, _, fieldType) ←
-                resolveNominalField reference.referent field span
-              let referenceType ← inferredReferenceType .mutable fieldType loc
-              let selection : LeanerIR.DataOperation ←
-                if ← nominalHasVariants reference.referent then
-                  pure (.selectVariants owner #[field])
-                else pure (.select owner field)
-              let selected ← pushExpression loc referenceType <| .operation
-                (.data selection) #[] #[base]
-              let value ← lowerExpr context (some fieldType) value
-              let id ← pushReferenceMutation loc unitType referenceType selected value.1
-              return (id, unitType)
         if let .deref (.local baseName _) _ := place then
           if let some (baseLocal, baseType) := lookupLocal? context baseName then
             if let some (.reference reference) ← typeNode? baseType then
@@ -4864,41 +4970,54 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
               return (← pushExpression loc unitType (.value .unit), unitType)
             let resource ← lowerTypeUse context.types head
             let key ← lowerExpr context none index
-            let mut referent := resource.typeId
-            let mut referenceType ← inferredReferenceType .mutable referent loc
-            let mut selected ← pushExpression loc referenceType <| .operation
+            let referenceType ← inferredReferenceType .mutable resource.typeId loc
+            let borrow ← pushExpression loc referenceType <| .operation
               (.global (.borrow .mutable)) #[.typeArg resource] #[key.1]
+            if fields.isEmpty then
+              let value ← lowerExpr context (some resource.typeId) value
+              let id ← pushReferenceMutation loc unitType referenceType borrow value.1
+              return (id, unitType)
+            -- The resource is borrowed into a hidden holder and the field is
+            -- written as a place through it: a select through a mutable
+            -- reference has no executable meaning.
+            let holder ← pushTemporaryLocal referenceType loc
+            let pattern ← pushPattern { loc, typeId := referenceType, kind := .variable holder }
+            let root ← pushPlace (.localVar holder)
+            let mut place ← pushPlace (.deref root)
+            let mut referent := resource.typeId
             for field in fields do
-              let (owner, _, fieldType) ← resolveNominalField referent field span
-              let selection : LeanerIR.DataOperation ←
-                if ← nominalHasVariants referent then
-                  pure (.selectVariants owner #[field])
-                else
-                  pure (.select owner field)
+              let (owner, fieldName, fieldType) ← resolveNominalField referent field span
+              place ← pushPlace (.field place owner fieldName)
               referent := fieldType
-              referenceType ← inferredReferenceType .mutable referent loc
-              selected ← pushExpression loc referenceType <| .operation
-                (.data selection) #[] #[selected]
             let value ← lowerExpr context (some referent) value
-            let id ← pushReferenceMutation loc unitType referenceType selected value.1
+            let assignment ← pushExpression loc unitType (.assign place value.1)
+            let id ← pushExpression loc unitType (.letDecl pattern (some borrow) assignment)
             return (id, unitType)
       -- Move assigns through a reference a call returns. The target's base is
-      -- then an expression rather than a place, so the field selection is
-      -- itself the reference the assignment mutates.
-      if (← get).sourceNamespace.profile == .move then
+      -- then an expression rather than a place: the reference rests in a
+      -- hidden holder and the field is written as a place through it.
+      if (← get).sourceNamespace.profile == .move &&
+          (localStoragePlace? context target).isNone then
         if let .field base field _ := target then
+          if context.specification then
+            -- The derived pure reading erases the write, but still checks
+            -- both operands in the projected domain.
+            let target ← lowerExpr context none target
+            let value ← lowerExpr context (some target.2) value
+            ensureType target.2 value.2 span
+            return (← pushExpression loc unitType (.value .unit), unitType)
           let baseValue ← lowerExpr context none base
           if let some (.reference reference) ← typeNode? baseValue.2 then
-            let (owner, _, fieldType) ← resolveNominalField reference.referent field span
-            let referenceType ← inferredReferenceType .mutable fieldType loc
-            let selection : LeanerIR.DataOperation ←
-              if ← nominalHasVariants reference.referent then
-                pure (.selectVariants owner #[field])
-              else pure (.select owner field)
-            let selected ← pushExpression loc referenceType <| .operation
-              (.data selection) #[] #[baseValue.1]
+            let (owner, fieldName, fieldType) ←
+              resolveNominalField reference.referent field span
+            let holder ← pushTemporaryLocal baseValue.2 loc
+            let pattern ← pushPattern { loc, typeId := baseValue.2, kind := .variable holder }
+            let root ← pushPlace (.localVar holder)
+            let dereferenced ← pushPlace (.deref root)
+            let place ← pushPlace (.field dereferenced owner fieldName)
             let value ← lowerExpr context (some fieldType) value
-            let id ← pushReferenceMutation loc unitType referenceType selected value.1
+            let assignment ← pushExpression loc unitType (.assign place value.1)
+            let id ← pushExpression loc unitType (.letDecl pattern (some baseValue.1) assignment)
             return (id, unitType)
         if let .dereference base _ := target then
           let baseValue ← lowerExpr context none base
@@ -5316,6 +5435,7 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
     declarations := specDeclarations
     returnType := resultSpecType
     resultType := some resultSpecType
+    declaredResultType := some result.typeId
     specification := true }
   let contractPragmas ← declaration.pragmas.mapM pragmaAttribute
   let inheritedPragmas ← state.sourceNamespace.pragmas.mapM pragmaAttribute
@@ -5492,6 +5612,13 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
     let lowered ← lowerExpr context (some result.typeId) source
     ensureType result.typeId lowered.2 source.span
     pure lowered.1
+  -- A recursive definition's measure is a mathematical integer.
+  let decreases ← declaration.decreases.mapM fun source => do
+    let intType ← internType (.integer .unbounded true)
+    let lowered ← lowerExpr context (some intType) source
+    ensureType intType lowered.2 source.span
+    pure ({ loc := ← addLoc source.span, kind := .decreases, expression := lowered.1 } :
+      LeanerIR.Condition)
   let function : LeanerIR.SpecFunctionDecl := {
     loc
     name
@@ -5502,7 +5629,9 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
     locals
     -- Specification declarations use the existing unified annotation slot;
     -- the source printer restores these pragmas to declaration attributes.
-    contract := { pragmas := ← sourceAttributes declaration.attributes } }
+    contract := {
+      pragmas := ← sourceAttributes declaration.attributes
+      conditions := decreases.toArray } }
   modify fun state => { state with output := { state.output with
     specFunctions := state.output.specFunctions.push function } }
 

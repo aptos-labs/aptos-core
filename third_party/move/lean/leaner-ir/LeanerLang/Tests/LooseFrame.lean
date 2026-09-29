@@ -17,6 +17,8 @@ run_cmd do
       throwError "valid identifier or dereference rejected: {source}"
 
 leaner module 0x42::loose_frame_frontend where
+  -- A frontend fixture: its contracts are not verified.
+  pragma verify = false
   struct Counter has Key where
     value : u64
   fun touch(addr : Address) -> Unit := ()

@@ -74,7 +74,7 @@ theorem SpecInt.signed_bounds {width : Nat} (n : SpecInt (.bits width) true) :
 
 /-! ## Certified Move vectors
 
-Move's native vector carries the same unsigned-64 length bound as v0.
+Move's native vector carries an unsigned-64 length bound.
 The neutral runtime and non-Move native arrays remain unrestricted. -/
 
 structure SpecVector (α : Type) where
@@ -88,6 +88,14 @@ theorem SpecVector.ext {a b : SpecVector α} (h : a.values = b.values) : a = b :
   rfl
 
 instance : Inhabited (SpecVector α) := ⟨⟨#[], by change 0 < 2 ^ 64; decide⟩⟩
+
+/-- The vector of the images of the elements: a vector of twins viewed
+natively element by element. -/
+def SpecVector.map (f : α → β) (vector : SpecVector α) : SpecVector β :=
+  ⟨vector.values.map f, by simpa only [Array.size_map] using vector.bounded⟩
+
+@[simp] theorem SpecVector.map_values (f : α → β) (vector : SpecVector α) :
+    (vector.map f).values = vector.values.map f := rfl
 
 /-! ## Field codecs
 
@@ -285,8 +293,7 @@ theorem erase_self
     simp [updateContents, same]
 
 /-- Distinct families are disjoint locations: publishing under another
-family leaves this family's representation untouched.  The proved analogue
-of the frozen stack's `IndependentResourceStores` assumption. -/
+family leaves this family's representation untouched. -/
 theorem insert_other
     (represented : FamilyRepresentation erase namespaceId typeId contents globals)
     (written : GlobalKey) (value : RuntimeValue)

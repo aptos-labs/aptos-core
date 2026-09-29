@@ -109,14 +109,14 @@ leaner module 0x1::storage_slots_allocator where
         ECANNOT_HAVE_SPARES_WITHOUT_REUSE
       )
     )
-    return self.reuse_spare_count
+    self.reuse_spare_count
 
   public fun add {T has Store}(
     self : &mut StorageSlotsAllocator<T>, val : T
   ) -> StoredSlot := do
     let (stored_slot, reserved_slot) := self.reserve_slot()
     self.fill_reserved_slot(reserved_slot, val)
-    return stored_slot
+    stored_slot
 
   public fun remove {T has Store}(
     self : &mut StorageSlotsAllocator<T>, slot : StoredSlot
@@ -124,7 +124,7 @@ leaner module 0x1::storage_slots_allocator where
     let (reserved_slot, value) :=
       self.remove_and_reserve(slot.stored_to_index())
     self.free_reserved_slot(reserved_slot, slot)
-    return value
+    value
 
   public fun destroy_empty {T has Store}(
     mut self : StorageSlotsAllocator<T>
@@ -163,7 +163,7 @@ leaner module 0x1::storage_slots_allocator where
   ) -> (StoredSlot, ReservedSlot) := do
     let slot_index := self.maybe_pop_from_reuse_queue()
     if slot_index == NULL_INDEX then slot_index := self.next_slot_index()
-    return (new StoredSlot { slot_index }, new ReservedSlot { slot_index })
+    (new StoredSlot { slot_index }, new ReservedSlot { slot_index })
 
   public fun fill_reserved_slot {T has Store}(
     self : &mut StorageSlotsAllocator<T>, slot : ReservedSlot, val : T
@@ -178,7 +178,7 @@ leaner module 0x1::storage_slots_allocator where
     self : &mut StorageSlotsAllocator<T>, slot_index : u64
   ) -> (ReservedSlot, T) := do
     let Link<T>::Occupied { value := value } := self.remove_link(slot_index)
-    return (new ReservedSlot { slot_index }, value)
+    (new ReservedSlot { slot_index }, value)
 
   public fun free_reserved_slot {T has Store}(
     self : &mut StorageSlotsAllocator<T>, reserved_slot : ReservedSlot,
@@ -209,7 +209,7 @@ leaner module 0x1::storage_slots_allocator where
       self.reuse_head_index := next
       let _t1 := &mut self.reuse_spare_count
       *_t1 := *_t1 - 1u32
-    return slot_index
+    slot_index
 
   fun maybe_push_to_reuse_queue {T has Store}(
     self : &mut StorageSlotsAllocator<T>, slot_index : u64
@@ -229,7 +229,7 @@ leaner module 0x1::storage_slots_allocator where
     *_t1 := *_t1 + 1
     if is_none(&self.slots) then
       fill(&mut self.slots, table_with_length::new::<u64, Link<T> >())
-    return slot_index
+    slot_index
 
   fun add_link {T has Store}(
     self : &mut StorageSlotsAllocator<T>, slot_index : u64, link : Link<T>

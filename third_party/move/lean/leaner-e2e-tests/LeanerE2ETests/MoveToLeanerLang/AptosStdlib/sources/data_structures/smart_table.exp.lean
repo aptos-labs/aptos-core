@@ -134,7 +134,7 @@ leaner module 0x1::smart_table where
     while num_initial_buckets > 1 do
       num_initial_buckets := num_initial_buckets - 1
       table.split_one_bucket()
-    return table
+    table
 
   spec new_with_config where
     pragma verify = false
@@ -215,7 +215,7 @@ leaner module 0x1::smart_table where
           result := do
             let «entry» := &self[i]
             let e := «entry»
-            return &e.key != &key
+            &e.key != &key
           if !result then break
           i := i + 1
         where
@@ -223,7 +223,7 @@ leaner module 0x1::smart_table where
           invariant result
           invariant ∀ (j in 0 .. i), self[j].key != key
         spec assert result <==> (∀ (j in 0 .. self.length), self[j].key != key)
-        return result, invalid_argument(EALREADY_EXIST))
+        result, invalid_argument(EALREADY_EXIST))
     let e := new Entry<K, V> { hash, key, value }
     if self.target_bucket_size == 0 then
       let estimated_entry_size := max(size_of_val(&e), 1)
@@ -307,9 +307,9 @@ leaner module 0x1::smart_table where
             invariant ∀ (j in i .. len), true
             invariant ∀ (x : Entry<K, V>),
               ∀ (j in 0 .. i), x != self[j] ==> true
-          return (keys, values)
+          (keys, values)
       simple_map::add_all(&mut res, keys, values)
-    return res
+    res
 
   spec to_simple_map where
     pragma verify = false
@@ -324,7 +324,7 @@ leaner module 0x1::smart_table where
     self : &SmartTable<K, V>
   ) -> Vector<K> := do
     let (keys, _, _) := self.keys_paginated(0, 0, self.length())
-    return keys
+    keys
 
   spec keys where
     pragma verify = false
@@ -371,12 +371,12 @@ leaner module 0x1::smart_table where
           vector_index := vector_index + 1
           return (if vector_index == bucket_length then
             bucket_index := bucket_index + 1
-            return (if bucket_index
+            if bucket_index
               < num_buckets then (keys, some(bucket_index), some(0))
-            else (keys, none::<u64>(), none::<u64>()))
+            else (keys, none::<u64>(), none::<u64>())
           else (keys, some(bucket_index), some(vector_index)));
       starting_vector_index := 0
-    return (keys, none::<u64>(), none::<u64>())
+    (keys, none::<u64>(), none::<u64>())
 
   spec keys_paginated where
     pragma verify = false
@@ -407,7 +407,7 @@ leaner module 0x1::smart_table where
           if !(do
             let e := &self'[i]
             let «entry» := e
-            return bucket_index(self.level, self.num_buckets, «entry».hash)
+            bucket_index(self.level, self.num_buckets, «entry».hash)
               != new_bucket_index) then
             break
           i := i + 1
@@ -417,12 +417,12 @@ leaner module 0x1::smart_table where
           if (do
             let e := &self'[i]
             let «entry» := e
-            return bucket_index(self.level, self.num_buckets, «entry».hash)
+            bucket_index(self.level, self.num_buckets, «entry».hash)
               != new_bucket_index) then
             self'.swap(p, i)
             p := p + 1
           i := i + 1
-        return p
+        p
     let new_bucket := old_bucket.trim_reverse(p)
     table_with_length::add(&mut self.buckets, new_bucket_index, new_bucket)
 
@@ -440,7 +440,7 @@ leaner module 0x1::smart_table where
   -/
   fun bucket_index(level : u8, num_buckets : u64, hash : u64) -> u64 := do
     let index := hash % (1 << level + 1u8)
-    return if index < num_buckets then index else index % (1 << level)
+    if index < num_buckets then index else index % (1 << level)
 
   spec bucket_index where
     pragma verify = false
@@ -502,7 +502,7 @@ leaner module 0x1::smart_table where
   ) -> &mut V := do
     if !self.contains(core.prim.copyValue(key)) then
       self.add(core.prim.copyValue(key), default)
-    return self.borrow_mut(key)
+    self.borrow_mut(key)
 
   /--
   Returns true iff `table` contains an entry for `key`.
@@ -520,21 +520,18 @@ leaner module 0x1::smart_table where
     while self.length > i do
       result := do
         let e := &self[i]
-        return e.hash == hash && &e.key == &key
+        e.hash == hash && &e.key == &key
       if result then break
       i := i + 1
     where
       invariant self.length >= i
       invariant !result
       invariant ∀ (j in 0 .. i),
-        !(if self[j].hash
-          == hash then self[j].hash == hash && self[j].key == key
-        else false)
+        !(self[j].hash == hash && (self[j].hash == hash && self[j].key == key))
     spec assert result
       <==> (∃ (j in 0 .. self.length),
-        if self[j].hash == hash then self[j].hash == hash && self[j].key == key
-        else false)
-    return result
+        self[j].hash == hash && (self[j].hash == hash && self[j].key == key))
+    result
 
   /--
   Remove from `table` and return the value which `key` maps to.
@@ -696,7 +693,7 @@ leaner module 0x1::smart_table where
     else
       let («keys$acc», «values$acc») :=
         «spec_fold$gen$0»(_v, «keys$init», «values$init», _end - 1)
-      return (concat(«keys$acc», vec(_v[_end - 1].key)),
+      (concat(«keys$acc», vec(_v[_end - 1].key)),
         concat(«values$acc», vec(_v[_end - 1].value)))
 
   -- We need to reverse the vectors to consume it efficiently

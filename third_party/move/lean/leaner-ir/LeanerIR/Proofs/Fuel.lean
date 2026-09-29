@@ -76,14 +76,16 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                   by_cases arity_ne : arguments.size != declaration.signature.parameters.size
                   · simp [arity_ne, failAt] at h
                   · simp only [arity_ne] at h ⊢
-                    cases frame_eq : initialFrame? declaration arguments typeInstantiation with
-                    | none => simp [frame_eq, failAt] at h
-                    | some initialFrame =>
-                        simp only [frame_eq] at h ⊢
-                        cases body_eq : declaration.body with
-                        | absent => simp [body_eq, failAt] at h
-                        | structured root =>
-                            simp only [body_eq] at h ⊢
+                    cases body_eq : declaration.body with
+                    | absent =>
+                        simp only [body_eq, ↓reduceIte] at h ⊢
+                        exact h
+                    | structured root =>
+                        simp only [body_eq, reduceCtorEq, ↓reduceIte] at h ⊢
+                        cases frame_eq : initialFrame? declaration arguments typeInstantiation with
+                        | none => simp [frame_eq, failAt] at h
+                        | some initialFrame =>
+                            simp only [frame_eq] at h ⊢
                             cases evaluation_eq : Internal.evalExpr fuel executable
                                 handle.namespaceId initialFrame state root with
                             | error error => simp [evaluation_eq] at h

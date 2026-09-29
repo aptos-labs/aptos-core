@@ -463,6 +463,11 @@ inductive PrimitiveOperation where
   | greater
   | lessEqual
   | greaterEqual
+  /-- The structural order of two values of one type (`std::cmp::compare`):
+  `-1`, `0`, or `1`. -/
+  | compare
+  /-- The address a signer holds: Move's `signer::address_of`. -/
+  | signerAddress
   | logicalNot
   | negate
   | checkedNegate (failure : ThrowKind)
@@ -545,6 +550,9 @@ inductive SpecOperation where
   | global (label : Option Nat := none)
   | canModify
   | old
+  /-- The final value of a returned mutable reference: its prophecy, which a
+  later write through the reference fixes. -/
+  | final
   | saveStateAnchor (label : Nat)
   | withStateAnchor (label : Nat)
   | foldsCaptureAnchor (label : Nat)

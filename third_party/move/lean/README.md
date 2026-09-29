@@ -45,7 +45,8 @@ Three claims stay separate:
 | [`leaner-e2e-tests`](leaner-e2e-tests/) | Move-to-LeanerLang and Rust-to-LeanerLang baselines and the verification check ledger ([`designs/test-organization.md`](designs/test-organization.md)). |
 
 [`v0/`](v0/) holds the deprecated reference packages `move`, `move-model`,
-and `transpiler`; nothing current links them. Designs live in [`designs/`](designs/), with
+and `transpiler`; no leaner package links them, and only compiler-v2's Lean
+integration still builds against `v0/move`. Designs live in [`designs/`](designs/), with
 executed or superseded ones under [`designs/historical/`](designs/historical/);
 [`designs/roadmap.md`](designs/roadmap.md) orders the work.
 

@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Control/Aborts.lean:97:4: error: the specification clause `ensures result == value + 1` is not established
+LeanerE2ETests/Check/Control/Aborts.lean:95:7: error: leaner verification failed

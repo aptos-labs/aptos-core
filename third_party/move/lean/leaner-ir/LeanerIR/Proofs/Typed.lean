@@ -191,14 +191,8 @@ theorem array_map_reverse_toArray (map : Native → Runtime)
     values.reverse.toArray.map map = (values.map map).reverse.toArray := by
   simp
 
-attribute [lir_data_norm high] vector_encode boundedVector_encode array_map_reverse_toArray
 -- A preceding operation may already have normalized the literal's reverse.
 -- Pointwise encoding must normalize in that spelling as well.
-attribute [lir_data_norm] List.map_toArray List.map_cons List.map_nil
-attribute [lir_data_norm] identity specInt bool string address signer bytes unit
-  tupleNil tupleCons tuple vector boundedVector
-attribute [lir_data_norm] decodeBool?_bool decodeString?_string decodeAddress?_address
-  decodeSigner?_signer decodeBytes?_bytes decodeUnit?_unit
 
 end Codec
 
@@ -223,7 +217,6 @@ def mutable (codec : Codec Native RuntimeValue) :
     cases argument
     simp [codec.decode_encode]
 
-attribute [lir_data_norm] mutable
 
 /-! ### Decoding is exact
 
@@ -362,7 +355,7 @@ end Contract
 /-- Weakest precondition of a decoded result view.  Besides the native
 continuation, the runtime computation must establish that every successful
 result is in the codec image. -/
-@[lir_wp_norm] theorem wp_decodeSpec
+theorem wp_decodeSpec
     (codec : Codec NativeResult RuntimeResult)
     (action : Spec State Error RuntimeResult)
     (ensures : NativeResult → State → Prop) (aborts : Error → Prop)
@@ -404,7 +397,7 @@ result is in the codec image. -/
 
 /-- The generated typed function exposes `wp_decodeSpec` without requiring
 the proof script to unfold the adapter itself. -/
-@[lir_wp_norm] theorem wp_typedFunction
+theorem wp_typedFunction
     (arguments : Codec NativeArgs RuntimeArgs)
     (results : Codec NativeResult RuntimeResult)
     (function : RuntimeArgs → Spec State Error RuntimeResult)

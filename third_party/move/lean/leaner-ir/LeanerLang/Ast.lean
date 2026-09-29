@@ -193,6 +193,8 @@ inductive Primitive where
   | destroyEmptyVector
   | containsVector
   | indexOfVector
+  | compare
+  | signerAddress
   | checkVectorIndex (failure : ThrowKind)
   | length
   | index
@@ -516,6 +518,8 @@ structure SpecFunctionDecl where
   generics : Array GenericBinder := #[]
   parameters : Array Parameter := #[]
   result : Located Ty := { value := .unit }
+  /-- The measure a recursive definition decreases. -/
+  decreases : Option Expr := none
   body : Option Expr := none
   attributes : Array SourceAttribute := #[]
   span : Span := {}

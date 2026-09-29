@@ -8,8 +8,7 @@ import LeanerIR.Proofs.Spec
 
 Contracts are ordinary Lean predicates over the relational verification
 semantics.  They deliberately cannot mention reference identities or prophecy
-variables.  This is the frozen reference stack's `Move.Verify.Contract`
-generalized over the failure vocabulary `ε`.
+variables.  They are generic over the failure vocabulary `ε`.
 -/
 
 namespace LeanerIR.Proofs
@@ -171,19 +170,35 @@ theorem wp_total_iff {action : Spec σ ε Result}
       (∀ error, action.aborts initial error → aborts error) := by
   simp [wp, total]
 
-@[simp, lir_wp_norm] theorem wp_pure (value : Result) (state : σ)
+@[simp] theorem wp_pure (value : Result) (state : σ)
     (ensures : Result → σ → Prop) (aborts : ε → Prop) :
     wp (Spec.pure value) ensures aborts state ↔ ensures value state := by
   simp [wp, Spec.pure]
 
-@[simp, lir_wp_norm] theorem wp_abort (error : ε) (state : σ)
+@[simp] theorem wp_abort (error : ε) (state : σ)
     (ensures : Result → σ → Prop) (aborts : ε → Prop) :
     wp (Spec.abort error : Spec σ ε Result) ensures aborts state ↔ aborts error := by
   simp [wp, Spec.abort]
 
+@[simp] theorem wp_choose (state : σ) (ensures : Result → σ → Prop)
+    (aborts : ε → Prop) :
+    wp (Spec.choose : Spec σ ε Result) ensures aborts state ↔ ∀ value, ensures value state := by
+  simp [wp, Spec.choose]
+
+@[simp] theorem wp_assume (proposition : Prop) (state : σ)
+    (ensures : Unit → σ → Prop) (aborts : ε → Prop) :
+    wp (Spec.assume proposition : Spec σ ε Unit) ensures aborts state ↔
+      (proposition → ensures () state) := by
+  constructor
+  · intro h holds
+    exact h.1 () state ⟨holds, rfl, rfl⟩
+  · intro h
+    exact ⟨fun result final ⟨holds, resultEq, finalEq⟩ => resultEq ▸ finalEq ▸ h holds,
+      fun _ failure => failure.elim, fun obligation => obligation⟩
+
 /-- The weakest precondition through a summary: the precondition, and the
 continuation under what the contract guarantees. -/
-@[simp, lir_wp_norm] theorem wp_summary (contract : Contract σ ε Args Result)
+@[simp] theorem wp_summary (contract : Contract σ ε Args Result)
     (args : Args) (ensures : Result → σ → Prop) (aborts : ε → Prop)
     (initial : σ) :
     wp (contract.summary args) ensures aborts initial ↔
@@ -207,7 +222,7 @@ continuation under what the contract guarantees. -/
       fun error h => habort error h.2, ?_⟩
     simp [Contract.summary, permitted]
 
-@[lir_wp_norm] theorem wp_bind (action : Spec σ ε α) (next : α → Spec σ ε β)
+theorem wp_bind (action : Spec σ ε α) (next : α → Spec σ ε β)
     (ensures : β → σ → Prop) (aborts : ε → Prop) (initial : σ) :
     wp (Spec.bind action next) ensures aborts initial ↔
       wp action (fun value state => wp (next value) ensures aborts state)
@@ -257,6 +272,17 @@ theorem satisfies_of_wp (function : Args → Spec σ ε Result)
         initial) :
     Satisfies function contract := by
   exact proof
+
+/-- A contract of a computation holds of every computation refining it. -/
+theorem satisfies_of_refines {left right : Args → Spec σ ε Result}
+    (refines : ∀ args, Spec.Refines (left args) (right args))
+    {contract : Contract σ ε Args Result} (verified : Satisfies right contract) :
+    Satisfies left contract := by
+  intro args initial permitted
+  obtain ⟨normal, failing, defined⟩ := verified args initial permitted
+  exact ⟨fun result final execution => normal result final ((refines args).ok _ _ _ execution),
+    fun error execution => failing error ((refines args).aborts _ _ execution),
+    fun obligation => defined ((refines args).undefined _ obligation)⟩
 
 /-- The empty finite approximation satisfies every partial-correctness
 contract because it has no observable outcome. -/

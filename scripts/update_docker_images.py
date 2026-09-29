@@ -10,7 +10,7 @@ OS = "linux"
 
 IMAGES = {
     "debian": "debian:trixie",
-    "rust": "rust:1.98.0-trixie",
+    "rust": "rust:1.98.1-trixie",
 }
 
 

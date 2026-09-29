@@ -49,7 +49,7 @@ leaner module 0x1::math64 where
         if e % 2 == 1 then p := p * n
         e := e / 2
         n := n * n
-      return p * n
+      p * n
 
   /--
   Returns floor(lg2(x))
@@ -66,7 +66,7 @@ leaner module 0x1::math64 where
     where
       invariant res + 2 * n <= 64
       invariant n == 0 ==> res <= 63
-    return res
+    res
 
   -- Effectively the position of the most significant set bit
   -- Returns log2(x)
@@ -83,7 +83,7 @@ leaner module 0x1::math64 where
         frac := frac + delta
         y := y >> 1u8
       delta := delta >> 1u8
-    return create_from_raw_value((integer_part as u64 << 32u8) + frac)
+    create_from_raw_value((integer_part as u64 << 32u8) + frac)
 
   -- Normalize x to [1, 2) in fixed point 32.
   -- log x = 1/2 log x^2
@@ -100,7 +100,7 @@ leaner module 0x1::math64 where
     res := res + x / res >> 1u8
     res := res + x / res >> 1u8
     res := res + x / res >> 1u8
-    return min(res, x / res)
+    min(res, x / res)
 
   -- Note the plus 1 in the expression. Let n = floor_lg2(x) we have x in [2^n, 2^(n+1)> and thus the answer in
   -- the half-open interval [2^(n/2), 2^((n+1)/2)>. For even n we can write this as [2^(n/2), sqrt(2) 2^(n/2)>

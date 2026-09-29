@@ -35,18 +35,18 @@ leaner module 0x42::ordered_map where
     while low < high do
       let mid := low + (high - low) / 2
       if map.entries[mid].key < key then low := mid + 1 else high := mid
-    return low
+    low
 
   public fun contains(map : &Map, key : u64) -> Bool := do
     let index := lower_bound(map, key)
-    return map.entries.length > index && map.entries[index].key == key
+    map.entries.length > index && map.entries[index].key == key
 
   public fun get(map : &Map, key : u64) -> u64 := do
     let index := lower_bound(map, key)
     assert!(map.entries.length > index, E_ABSENT)
     let «entry» := &map.entries[index]
     assert!(«entry».key == key, E_ABSENT)
-    return «entry».value
+    «entry».value
 
   public fun add(map : &mut Map, key : u64, value : u64) -> Unit := do
     let index := lower_bound(map, key)
@@ -63,4 +63,4 @@ leaner module 0x42::ordered_map where
     assert!(map.entries.length > index, E_ABSENT)
     let «entry» := map.entries.remove(index)
     assert!(«entry».key == key, E_ABSENT)
-    return «entry».value
+    «entry».value

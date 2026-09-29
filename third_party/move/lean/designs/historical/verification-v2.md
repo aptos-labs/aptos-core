@@ -150,8 +150,8 @@ deprecated and excluded from CI but still present in the tree:
     references).
   - [`../move/Move/Verify/`](../../v0/move/Move/Verify/) — contracts, the
     weakest-precondition rules, and the `verify` command.
-  - [`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/)
-    — the acceptance corpus this proposal is measured against.
+  - the v0 verification corpus (ported to
+    [`Check/`](../../leaner-e2e-tests/LeanerE2ETests/Check/)) — the acceptance corpus this proposal is measured against.
 - [`../move-model/`](../../v0/move-model/) — the logical model of Move stackless
   bytecode.
 - [`../transpiler/`](../../v0/transpiler/) — the original Move exchange frontend.
@@ -179,20 +179,21 @@ The measured consequence, as of 2026-08-29:
 - The frozen v0 stack ([`../move/`](../../v0/move/)) verifies **225 functions fully
   automatically** out of 330 `verify` items — a bare `verify f` with no
   proof body. Its global-storage suites are automatic outright:
-  [`Account.lean`](../../v0/move/Move/Tests/Verification/Account.lean) 2/2,
-  [`GlobalBorrows.lean`](../../v0/move/Move/Tests/Verification/GlobalBorrows.lean)
-  6/6, [`GlobalInv.lean`](../../v0/move/Move/Tests/Verification/GlobalInv.lean)
+  [`Account.lean`](../../leaner-e2e-tests/LeanerE2ETests/Check/Examples/Account.lean) 2/2,
+  [`GlobalBorrows.lean`](../../leaner-e2e-tests/LeanerE2ETests/Check/Storage/GlobalBorrows.lean)
+  6/6, [`GlobalInv.lean`](../../leaner-e2e-tests/LeanerE2ETests/Check/Storage/GlobalInv.lean)
   5/5,
-  [`GenericStorage.lean`](../../v0/move/Move/Tests/Verification/GenericStorage.lean)
+  [`GenericStorage.lean`](../../leaner-e2e-tests/LeanerE2ETests/Check/Generics/GenericStorage.lean)
   7/7 including generic resources. Manual proofs cluster only where real
   mathematical work lives
-  ([`OrderedMap.lean`](../../v0/move/Move/Tests/Verification/OrderedMap.lean),
-  [`Quicksort.lean`](../../v0/move/Move/Tests/Verification/Quicksort.lean),
-  [`ReturnedMutRefs.lean`](../../v0/move/Move/Tests/Verification/ReturnedMutRefs.lean)).
+  ([`OrderedMap.lean`](../../leaner-e2e-tests/LeanerE2ETests/Check/Examples/OrderedMap.lean),
+  [`Quicksort.lean`](../../leaner-e2e-tests/LeanerE2ETests/Check/Examples/Quicksort.lean),
+  [`ReturnedMutRefs.lean`](../../leaner-e2e-tests/LeanerE2ETests/Check/References/ReturnedMutRefs.lean)).
 
 Those tests still exist in the tree; the deprecated packages were removed
 from CI, not deleted.
-[`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/) is the
+The v0 verification corpus (ported to
+[`Check/`](../../leaner-e2e-tests/LeanerE2ETests/Check/)) is the
 acceptance corpus this proposal should be measured against.
 
 The gap is not a fixture-by-fixture deficit to be closed with more tactic
@@ -432,7 +433,8 @@ Staged so the premise is tested before the largest investment is made.
   one denotation proof, while a storage-key-dependent fixture is rejected
   for V4 specialization.
 - **DONE — V2: Automation measurement.** Ten functions from
-  [`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/)
+  the v0 verification corpus (ported to
+  [`Check/`](../../leaner-e2e-tests/LeanerE2ETests/Check/))
   (`Account`, `GlobalBorrows`, `GlobalInv`, `Callees`) — all ten automatic
   in v0 — are ported, and all ten verify with a bare `verify f`. The gate
   was a written comparison against v0 on the same functions, recorded in
@@ -674,7 +676,8 @@ translation is already shallow and already typed.
   `verify f`, compared against the v0 rate on the same functions. Automation
   rate is the metric this proposal exists to move; tactic-time
   improvements alone do not satisfy a gate.
-- [`../move/Move/Tests/Verification/`](../../v0/move/Move/Tests/Verification/) is
+- The v0 verification corpus (ported to
+  [`Check/`](../../leaner-e2e-tests/LeanerE2ETests/Check/)) is
   the acceptance corpus. Port, do not
   rewrite: a ported test that needs a manual proof where v0 needed none is a
   finding to record, not a test to weaken.

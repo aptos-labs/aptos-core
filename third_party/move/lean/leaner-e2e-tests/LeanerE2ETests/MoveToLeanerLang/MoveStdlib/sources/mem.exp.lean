@@ -25,7 +25,7 @@ leaner module 0x1::mem where
   -/
   public fun replace {T}(ref : &mut T, mut new : T) -> T := do
     swap(ref, &mut new)
-    return new
+    new
 
   spec replace where
     pragma opaque

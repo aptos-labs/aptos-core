@@ -19,6 +19,12 @@ open Validation
 
 open SemanticOperations
 
+/-- The runtime's implementation of a function without a body: the final
+state and outcome of a native call, where the runtime provides one. It is
+fixed but unknown, so a proof about a caller assumes the native's contract. -/
+opaque nativeCall : ExecutableUnit → FunctionHandle → Array (TypeId × TypeId) → RuntimeState →
+    Array RuntimeValue → Option (RuntimeState × Outcome)
+
 /-- Control which must propagate through ordinary expression sequencing. -/
 inductive Abrupt : Control → Prop where
   | break_ (nest : Nat) (value : Option RuntimeValue) : Abrupt (.break_ nest value)
@@ -763,6 +769,14 @@ inductive EvalFunction (unit : ExecutableUnit) : FunctionHandle →
       (finalize_eq : finalizeFunctionState unit declaration.profile initialState evaluatedState
         finalFrame outcome = finalState) :
       EvalFunction unit handle typeInstantiation initialState arguments finalState outcome
+  | native (handle typeInstantiation initialState arguments ns declaration finalState outcome)
+      (namespace_eq : unit.unit.namespaces[handle.namespaceId.index]? = some ns)
+      (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
+      (arity_eq : arguments.size = declaration.signature.parameters.size)
+      (body_eq : declaration.body = .absent)
+      (native_eq : nativeCall unit handle typeInstantiation initialState arguments =
+        some (finalState, outcome)) :
+      EvalFunction unit handle typeInstantiation initialState arguments finalState outcome
 
 
 /-- Big-step evaluation of one structured expression, calls resolved by the
@@ -802,7 +816,7 @@ def EvalFunctionWith (unit : ExecutableUnit) (callee : CalleeRelation)
     (initialState : RuntimeState)
     (arguments : Array RuntimeValue) (finalState : RuntimeState)
     (outcome : Outcome) : Prop :=
-  ∃ ns declaration frame root finalFrame evaluatedState control,
+  (∃ ns declaration frame root finalFrame evaluatedState control,
     unit.unit.namespaces[handle.namespaceId.index]? = some ns ∧
     ns.functions[handle.functionId.index]? = some declaration ∧
     initialFrame? declaration arguments typeInstantiation = some frame ∧
@@ -811,7 +825,13 @@ def EvalFunctionWith (unit : ExecutableUnit) (callee : CalleeRelation)
       finalFrame evaluatedState control ∧
     finishControl? declaration.signature.results.size control = some outcome ∧
     finalizeFunctionState unit declaration.profile initialState evaluatedState
-      finalFrame outcome = finalState
+      finalFrame outcome = finalState) ∨
+  (∃ ns declaration,
+    unit.unit.namespaces[handle.namespaceId.index]? = some ns ∧
+    ns.functions[handle.functionId.index]? = some declaration ∧
+    arguments.size = declaration.signature.parameters.size ∧
+    declaration.body = .absent ∧
+    nativeCall unit handle typeInstantiation initialState arguments = some (finalState, outcome))
 
 theorem EvalFunction_iff (unit : ExecutableUnit) (handle : FunctionHandle)
     (typeInstantiation : Array (TypeId × TypeId))
@@ -823,13 +843,16 @@ theorem EvalFunction_iff (unit : ExecutableUnit) (handle : FunctionHandle)
   constructor
   · intro step
     cases step
-    exact ⟨_, _, _, _, _, _, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
-  · rintro ⟨ns, declaration, frame, root, finalFrame, evaluatedState, control,
+    · exact .inl ⟨_, _, _, _, _, _, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
+    · exact .inr ⟨_, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
+  · rintro (⟨ns, declaration, frame, root, finalFrame, evaluatedState, control,
       namespace_eq, declaration_eq, frame_eq, body_eq, body_step, outcome_eq,
-      finalize_eq⟩
-    exact .body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq
-      frame_eq body_eq body_step outcome_eq finalize_eq
+      finalize_eq⟩ | ⟨ns, declaration, namespace_eq, declaration_eq, arity_eq, body_eq, native_eq⟩)
+    · exact .body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
+        evaluatedState finalState control outcome namespace_eq declaration_eq
+        frame_eq body_eq body_step outcome_eq finalize_eq
+    · exact .native handle typeInstantiation initialState arguments ns declaration finalState outcome
+        namespace_eq declaration_eq arity_eq body_eq native_eq
 
 
 /-- A source-independent function meaning over the declarative relation. -/

@@ -30,7 +30,7 @@ leaner module 0x42::enums where
 
   fun guarded(value : u64) -> u64 := do
     let «_$disc» := value
-    return if «_$disc» == 0 then 10
+    if «_$disc» == 0 then 10
     else
       if «_$disc» >= 1 && «_$disc» < 4 && value != 2 then 20
       else

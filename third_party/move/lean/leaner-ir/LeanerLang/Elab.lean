@@ -236,6 +236,34 @@ private def isItemSyntax (stx : Syntax) : Bool :=
     ``leanerFunctionItem, ``leanerSpecFunctionItem, ``leanerContractItem,
     ``leanerContractWhereItem, ``leanerNamespaceInvariantItem].contains stx.getKind
 
+/-- The Leaner items of a module, not descending into its Lean items. -/
+private partial def moduleItems (stx : Syntax) : Array Syntax :=
+  stx.getArgs.foldl (fun found child =>
+    if isItemSyntax child then found.push child
+    else if child.isOfKind ``leanerTheoremItem then found
+    else found ++ moduleItems child) #[]
+
+/-- The theorems among a module's items, as Lean commands in source order. -/
+partial def theoremItems (stx : Syntax) : Array Syntax :=
+  stx.getArgs.foldl (fun found child =>
+    if child.isOfKind ``leanerTheoremItem then
+      let theoremSyntax := child[1]!
+      let declaration := mkNode ``Lean.Parser.Command.declaration
+        #[theoremSyntax[0]!, theoremSyntax[1]!]
+      found.push <| match child[0]!.getArgs with
+        | #[openSyntax, inAtom] => mkNode ``Lean.Parser.Command.in #[openSyntax, inAtom, declaration]
+        | _ => declaration
+    else found ++ theoremItems child) #[]
+
+/-- The in-module `verify` items and function specifications, in source
+order: what the module verifies explicitly and automatically. -/
+partial def verificationItems (stx : Syntax) : Array Syntax :=
+  stx.getArgs.foldl (fun found child =>
+    if child.isOfKind ``leanerVerifyItem || child.isOfKind ``leanerContractItem ||
+        child.isOfKind ``leanerContractWhereItem then found.push child
+    else if child.isOfKind ``leanerTheoremItem then found
+    else found ++ verificationItems child) #[]
+
 /-- Collect category nodes without crossing into a nested expression: a
 subexpression owns its own branches, arms, and binders. -/
 private partial def childrenWhereOutsideExpressions (predicate : Syntax → Bool)
@@ -615,6 +643,8 @@ private def primitiveOf (name : String) (failure : Option ThrowKind) : Except St
   | "destroyEmptyVector", none => pure .destroyEmptyVector
   | "containsVector", none => pure .containsVector
   | "indexOfVector", none => pure .indexOfVector
+  | "compare", none => pure .compare
+  | "signerAddress", none => pure .signerAddress
   | "checkVectorIndex", some failure => pure (.checkVectorIndex failure)
   | "checkVectorIndexAbort", none => pure (.checkVectorIndex .abort)
   | "checkVectorIndexPanic", none => pure (.checkVectorIndex .panic)
@@ -884,13 +914,13 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
     let some target := expressions[0]?
       | throw "a behavior predicate requires a function-value target"
     let numbers := allNatsOutsideExpressions stx
-    let kind ← if containsAtom "requires_of" stx then pure BehaviorOperation.requiresOf
-      else if containsAtom "aborts_of" stx then pure .abortsOf
-      else if containsAtom "ensures_of" stx then pure .ensuresOf
-      else if containsAtom "result_of" stx then pure .resultOf
-      else if containsAtom "unchanged_of" stx then pure .unchangedOf
-      else if containsAtom "folds_of" stx then pure .foldsOf
-      else if containsAtom "write_of" stx then match numbers.back? with
+    let kind ← if containsAtomOutsideExpressions "requires_of" stx then pure BehaviorOperation.requiresOf
+      else if containsAtomOutsideExpressions "aborts_of" stx then pure .abortsOf
+      else if containsAtomOutsideExpressions "ensures_of" stx then pure .ensuresOf
+      else if containsAtomOutsideExpressions "result_of" stx then pure .resultOf
+      else if containsAtomOutsideExpressions "unchanged_of" stx then pure .unchangedOf
+      else if containsAtomOutsideExpressions "folds_of" stx then pure .foldsOf
+      else if containsAtomOutsideExpressions "write_of" stx then match numbers.back? with
         | some index => pure (.writeOf index)
         | none => throw "write_of requires a mutable-reference result index"
       else throw "unknown behavior predicate"
@@ -943,7 +973,10 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
         pure (← bindingPatternOf pattern, none, ← expressionOf armExpressions[0]!)
     pure (.match_ (← expressionOf scrutinee) arms span)
   else if stx.isOfKind ``leanerQuantifierExpr then
-    let kind := if containsAtom "forall" stx || containsAtom "∀" stx then QuantifierKind.forall
+    -- The quantifier's own keyword: a nested quantifier in the binder domain
+    -- or the body names a kind of its own.
+    let kind := if containsAtomOutsideExpressions "forall" stx ||
+        containsAtomOutsideExpressions "∀" stx then QuantifierKind.forall
       else QuantifierKind.exists
     let binderNodes := childrenWhereOutsideExpressions (fun node =>
       node.isOfKind ``LeanerLang.leanerQuantifierBinderSyntax ||
@@ -1702,6 +1735,8 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
       parameters := ← (childrenOfKind ``leanerParameterSyntax stx).mapM parameterOf
       result := ← typeOf result
+      decreases := ← ((childrenOfKind ``leanerSpecDecreasesSyntax stx)[0]?.bind
+        (exprChildren · |>.back?)).mapM expressionOf
       body := ← expressions.back?.mapM expressionOf
       attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
@@ -1798,7 +1833,7 @@ def compilationUnitOfSyntax (stx : Syntax) (sourceName : String)
         "a Move module path must be exactly `0xADDRESS::module_name`")
   else if profile == .rust && path[0]?.any (fun segment => segment.startsWith "0x") then
     throw (pathSyntax, "a hexadecimal address may lead a path only in the Move profile")
-  let parsedItems ← (childrenWhere isItemSyntax stx).mapM itemOf |>.mapError (stx, ·)
+  let parsedItems ← (moduleItems stx).mapM itemOf |>.mapError (stx, ·)
   let pragmas := parsedItems.filterMap fun
     | .namespacePragma pragma => some pragma
     | _ => none
@@ -1825,7 +1860,11 @@ def elaborateNamespace : CommandElab := fun stx => do
   let sourceName ← getFileName
   let source := (← getFileMap).source
   let span := spanOf stx
-  let comments := commentsForCommand source span
+  -- Comments of the module's theorems belong to those theorems.
+  let leanSpans := (theoremItems stx).map spanOf
+  let comments := (commentsForCommand source span).filter fun comment =>
+    !leanSpans.any fun lean =>
+      lean.startByte <= comment.span.startByte && comment.span.endByte <= lean.endByte
   let namespaceDoc := documentationBefore source span.startByte
   let unit ← match compilationUnitOfSyntax stx sourceName comments namespaceDoc with
     | .ok unit => pure unit

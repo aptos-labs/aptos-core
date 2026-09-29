@@ -16,7 +16,7 @@ death — and the death of the loan assumes the reconciliation equation
 `current = prophecy`. Shared borrows are observations: plain values.
 
 This is the RustHorn encoding (Matsushita/Tsukada/Kobayashi), the same model
-the V0 stack (`move/Move/Semantics/Reference.lean`, `Verify/Borrow.lean`)
+the V0 stack (`v0/move/Move/Semantics/Reference.lean`, `v0/move/Move/Verify/Borrow.lean`)
 used successfully for full Move verification. It covers nested references,
 reborrowing, and reference-returning functions, and it makes aliasing
 *unrepresentable* after validation: exclusivity is structural, so no
@@ -124,9 +124,12 @@ value, universally quantified in the rule, and threads a ghost environment
   the outer's current becomes the inner's prophecy. Nested references
   (`&mut &mut T`, references inside ADTs, `generic_lifetime_adt`) need
   nothing further: borrows nest as values nest.
-- **Freeze** (`&mut` → `&`, explicit or implicit): kills the mutable loan at
-  the freeze point — reconciliation `v = π ℓ` — and yields the shared
-  observation `v`.
+- **Freeze** (`&mut` → `&`, explicit or implicit): a shared reborrow. It
+  yields the shared observation `v` of the current value; the mutable loan
+  stays live and is reconciled where its holder dies (its `endLoan`), so
+  writes through the mutable reference after the freeze reach the lender.
+  Killing the loan at the freeze point would lose those writes: the runtime
+  would drop them and the verifier would prove contracts that ignore them.
 - **Returned references**: a reference crossing a call boundary is an
   ordinary value. The callee's summary relates argument and result
   borrow/prophecy pairs; `pick` needs no special treatment because which
@@ -231,6 +234,10 @@ remains for what elimination rejects).
 | `LeanerLang/Contract.lean` | `&mut` parameters/results in generated contracts translate to (current, prophecy) binder pairs; `old(x)` is the parameter's entry value, the prophecy is its exit value. |
 | Frame clause | Back to `final = initial`: no released heap slots to trim, `finalizeFunctionState` loses its heap pass. |
 
+Paths are relative to `leaner-ir/LeanerIR/`. `Proofs/WP.lean` was later
+removed with the pre-denotation routes, and `Proofs/Mutation.lean` was not
+needed.
+
 ## 5. Proof plan
 
 1. **Invariant.** Well-holed values (unique hole/borrow per live loan) as a
@@ -318,12 +325,13 @@ remains for what elimination rejects).
     (`List.toArray`), numerals (`OfNat.ofNat`, `Int.ofNat`), and the
     definitional connectives (`Not`, `Ne`, order notations) stay in simp
     normal form.
-  Gate met: `LeanerLang/Tests/Verification.lean` verified `replace`
+  Gate met: `LeanerLang/Tests/Verification.lean` (now
+  `Check/References/Prophecies.lean`) verified `replace`
   (`&mut u64` parameter) end-to-end through `leaner_wp` in seconds, sorry-
   free, with the contract phrased as a pending export.  (`leaner_wp` and
   that hand proof were retired with the frame route on 2026-09-02; the
   same functions verify through the generated row route as the check
-  `Check/Verification/Prophecies.lean`.)
+  `Check/References/Prophecies.lean`.)
 - **DONE — P4: Verification layer.** 2026-08-28. Contract generation in
   `LeanerLang/Contract.lean` covers reference parameters: a `&mut T`
   parameter contributes a loan binder and an entry/exit value pair — in a
@@ -333,7 +341,7 @@ remains for what elimination rejects).
   parameter order) naming the exit, exit-range facts, and a
   `holeInGlobals … = false` precondition per mutable loan; a `&T`
   parameter is a loan binder plus one unchanging value. The
-  `#leaner_verify` command materializes the unit and generated contract
+  `verify` command materializes the unit and generated contract
   and proves `SatisfiesFunction` by the scripted symbolic execution
   (`leaner_cases` destructs the precondition tracking hypotheses by
   name across substitutions; `leaner_wp!` feeds every hypothesis to the
@@ -346,7 +354,8 @@ remains for what elimination rejects).
   so a symbolic frame never exposes a search. V0's `Mutation`/
   `mutationWP` vocabulary was not needed: ownership passing plus pending
   exports carries the same content through the one judgment. Gate met:
-  `LeanerLang/Tests/Verification.lean` proves the generated contracts of
+  `LeanerLang/Tests/Verification.lean` (now `Check/References/Prophecies.lean`)
+  proves the generated contracts of
   `replace` (`&mut`), `swap_in` (`&mut` with `old`), and `observe`
   (`&`), sorry-free. Reference-typed results and multiple `&mut` parameters
   were deferred here and are closed by P7. `spec.old` in a one-state clause
@@ -378,8 +387,8 @@ remains for what elimination rejects).
   (shared borrows kept a `.borrow loan .shared value` wrapper for uniform
   typing) is closed: `RuntimeValue.borrow` drops its kind field and is
   always a mutable loan, shared borrows return the observed value with no
-  loan instance minted, and freeze consumes the mutable loan into the
-  bare snapshot. Because dereference and freeze cannot see their operand
+  loan instance minted, and freeze yields the bare snapshot of the mutable
+  loan's current value (the loan itself stays live, see Freeze above). Because dereference and freeze cannot see their operand
   kind in a value-blind runtime, semantic preparation erases the shared
   vocabulary type-directedly: `prepareSemantics` (markers, then erasure)
   rewrites shared-operand dereference/freeze to `copyValue` and collapses

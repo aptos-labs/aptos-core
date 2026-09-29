@@ -38,9 +38,6 @@ concurrency:
 
 jobs:
   build-and-test:
-    # Lean CI is disabled while the verification design is rebuilt.
-    # Skip the entire job, including toolchain setup and Rust integration tests.
-    if: ${{ false }}
     runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +54,13 @@ jobs:
 
       - name: Build the standalone exchange frontend
         run: cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
+
+      - name: Install the Rust exporter's pinned toolchain
+        # The Lean suites build the exporter from several modules at once; a
+        # first use of its pinned nightly would install it from each build,
+        # and concurrent rustup installs of one toolchain collide.
+        working-directory: third_party/move/lean/leaner-rust/rust-exporter
+        run: cargo --version
 
       - name: Test LeanerIR
         working-directory: third_party/move/lean/leaner-ir
@@ -83,6 +87,14 @@ jobs:
         run: |
           source "$HOME/.profile"
           lake test
+
+      - name: Build the Lean-authored Move library for compiler-v2
+        # compiler-v2 elaborates `.lean` sources against this package; its
+        # tests also compile two of its fixtures.
+        working-directory: third_party/move/lean/v0/move
+        run: |
+          source "$HOME/.profile"
+          lake build Move Move.Tests.Verification.Account Move.Tests.Compiler.MultipleModules
 
       - name: Test compiler-v2 Lean integration
         run: |

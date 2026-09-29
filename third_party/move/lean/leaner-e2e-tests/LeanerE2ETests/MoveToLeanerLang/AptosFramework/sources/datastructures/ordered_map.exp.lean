@@ -120,7 +120,7 @@ leaner module 0x1::ordered_map where
   ) -> OrderedMap<K, V> := do
     let mut map := new::<K, V>()
     map.add_all(keys, values)
-    return map
+    map
 
   spec new_from where
     pragma intrinsic
@@ -175,13 +175,13 @@ leaner module 0x1::ordered_map where
   ) -> Option<V> := do
     let len := self.entries.length
     let index := binary_search(&key, &self.entries, 0, len)
-    return if index < len && &self.entries[index].key == &key then
+    if index < len && &self.entries[index].key == &key then
       let Entry<K, V> { key := _, value := old_value } :=
         self.entries.replace(index, new Entry<K, V> { key, value })
-      return some(old_value)
+      some(old_value)
     else
       self.entries.insert(index, new Entry<K, V> { key, value })
-      return none::<V>()
+      none::<V>()
 
   spec upsert where
     pragma intrinsic
@@ -200,7 +200,7 @@ leaner module 0x1::ordered_map where
     let Entry<K, V> { key := old_key, value := value } :=
       self.entries.remove(index)
     assert!(key == &old_key, invalid_argument(EKEY_NOT_FOUND))
-    return value
+    value
 
   spec remove where
     pragma intrinsic
@@ -215,9 +215,9 @@ leaner module 0x1::ordered_map where
   ) -> Option<V> := do
     let len := self.entries.length
     let index := binary_search(key, &self.entries, 0, len)
-    return if index < len && key == &self.entries[index].key then
+    if index < len && key == &self.entries[index].key then
       let Entry<K, V> { key := _, value := value } := self.entries.remove(index)
-      return some(value)
+      some(value)
     else none::<V>()
 
   spec remove_or_none where
@@ -253,7 +253,7 @@ leaner module 0x1::ordered_map where
     self : &OrderedMap<K, V>, key : &K
   ) -> Option<V> := do
     let iter := self.internal_find(key)
-    return if iter.iter_is_end(self) then none::<V>()
+    if iter.iter_is_end(self) then none::<V>()
     else some(*iter.iter_borrow(self))
 
   spec get where
@@ -449,7 +449,7 @@ leaner module 0x1::ordered_map where
           break
         else other_i := other_i - 1
     self.entries.reverse_append(reverse_result)
-    return overwritten
+    overwritten
 
   spec append_impl where
     pragma opaque
@@ -476,7 +476,7 @@ leaner module 0x1::ordered_map where
     self : &mut OrderedMap<K, V>, at : u64
   ) -> OrderedMap<K, V> := do
     let rest := self.entries.trim(at)
-    return new OrderedMap<K, V>::SortedVectorMap { entries := rest }
+    new OrderedMap<K, V>::SortedVectorMap { entries := rest }
 
   spec trim where
     pragma intrinsic
@@ -484,7 +484,7 @@ leaner module 0x1::ordered_map where
   @[map_borrow_front (OrderedMap)]
   public fun borrow_front {K} {V}(self : &OrderedMap<K, V>) -> (&K, &V) := do
     let «entry» := &self.entries[0]
-    return (&«entry».key, &«entry».value)
+    (&«entry».key, &«entry».value)
 
   spec borrow_front where
     pragma intrinsic
@@ -492,7 +492,7 @@ leaner module 0x1::ordered_map where
   @[map_borrow_back (OrderedMap)]
   public fun borrow_back {K} {V}(self : &OrderedMap<K, V>) -> (&K, &V) := do
     let «entry» := &self.entries[self.entries.length - 1]
-    return (&«entry».key, &«entry».value)
+    (&«entry».key, &«entry».value)
 
   spec borrow_back where
     pragma intrinsic
@@ -500,7 +500,7 @@ leaner module 0x1::ordered_map where
   @[map_pop_front (OrderedMap)]
   public fun pop_front {K} {V}(self : &mut OrderedMap<K, V>) -> (K, V) := do
     let Entry<K, V> { key := key, value := value } := self.entries.remove(0)
-    return (key, value)
+    (key, value)
 
   spec pop_front where
     pragma intrinsic
@@ -508,7 +508,7 @@ leaner module 0x1::ordered_map where
   @[map_pop_back (OrderedMap)]
   public fun pop_back {K} {V}(self : &mut OrderedMap<K, V>) -> (K, V) := do
     let Entry<K, V> { key := key, value := value } := self.entries.pop_back()
-    return (key, value)
+    (key, value)
 
   spec pop_back where
     pragma intrinsic
@@ -518,7 +518,7 @@ leaner module 0x1::ordered_map where
     self : &OrderedMap<K, V>, key : &K
   ) -> Option<K> := do
     let it := self.internal_lower_bound(key)
-    return if it.iter_is_begin(self) then none::<K>()
+    if it.iter_is_begin(self) then none::<K>()
     else some(*it.iter_prev(self).iter_borrow_key(self))
 
   spec prev_key where
@@ -529,12 +529,12 @@ leaner module 0x1::ordered_map where
     self : &OrderedMap<K, V>, key : &K
   ) -> Option<K> := do
     let it := self.internal_lower_bound(key)
-    return if it.iter_is_end(self) then none::<K>()
+    if it.iter_is_end(self) then none::<K>()
     else
       let cur_key := it.iter_borrow_key(self)
-      return if key == cur_key then
+      if key == cur_key then
         let it := it.iter_next(self)
-        return if it.iter_is_end(self) then none::<K>()
+        if it.iter_is_end(self) then none::<K>()
         else some(*it.iter_borrow_key(self))
       else some(*cur_key)
 
@@ -557,10 +557,10 @@ leaner module 0x1::ordered_map where
     let entries := &self.entries
     let len := entries.length
     let index := binary_search(key, entries, 0, len)
-    return if index == len then self.internal_new_end_iter()
+    if index == len then self.internal_new_end_iter()
     else
       let index := index
-      return new IteratorPtr::Position { index }
+      new IteratorPtr::Position { index }
 
   spec internal_lower_bound where
     pragma opaque
@@ -589,7 +589,7 @@ leaner module 0x1::ordered_map where
     self : &OrderedMap<K, V>, key : &K
   ) -> IteratorPtr := do
     let internal_lower_bound := self.internal_lower_bound(key)
-    return if internal_lower_bound.iter_is_end(self) then internal_lower_bound
+    if internal_lower_bound.iter_is_end(self) then internal_lower_bound
     else
       if internal_lower_bound.iter_borrow_key(self) == key then
         internal_lower_bound
@@ -613,7 +613,7 @@ leaner module 0x1::ordered_map where
   ) -> IteratorPtr := do
     if self.is_empty() then return new IteratorPtr::End {};
     let index := 0
-    return new IteratorPtr::Position { index }
+    new IteratorPtr::Position { index }
 
   spec internal_new_begin_iter where
     pragma opaque
@@ -650,9 +650,9 @@ leaner module 0x1::ordered_map where
   ) -> IteratorPtr := do
     assert!(!self.iter_is_end(map), invalid_argument(EITER_OUT_OF_BOUNDS))
     let index := self.index + 1
-    return if map.entries.length > index then
+    if map.entries.length > index then
       let index := index
-      return new IteratorPtr::Position { index }
+      new IteratorPtr::Position { index }
     else map.internal_new_end_iter()
 
   spec iter_next where
@@ -672,7 +672,7 @@ leaner module 0x1::ordered_map where
     assert!(!self.iter_is_begin(map), invalid_argument(EITER_OUT_OF_BOUNDS))
     let index := if self is End then map.entries.length - 1 else self.index - 1
     let index := index
-    return new IteratorPtr::Position { index }
+    new IteratorPtr::Position { index }
 
   spec iter_prev where
     pragma opaque
@@ -731,7 +731,7 @@ leaner module 0x1::ordered_map where
     self : &IteratorPtr, map : &OrderedMap<K, V>
   ) -> &K := do
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
-    return &map.entries[self.index].key
+    &map.entries[self.index].key
 
   spec iter_borrow_key where
     pragma opaque
@@ -748,7 +748,7 @@ leaner module 0x1::ordered_map where
     self : IteratorPtr, map : &OrderedMap<K, V>
   ) -> &V := do
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
-    return &map.entries[self.index].value
+    &map.entries[self.index].value
 
   spec iter_borrow where
     pragma opaque
@@ -766,7 +766,7 @@ leaner module 0x1::ordered_map where
     self : IteratorPtr, map : &mut OrderedMap<K, V>
   ) -> &mut V := do
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
-    return &mut map.entries[self.index].value
+    &mut map.entries[self.index].value
 
   spec iter_borrow_mut where
     pragma intrinsic
@@ -782,7 +782,7 @@ leaner module 0x1::ordered_map where
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
     let Entry<K, V> { key := _, value := value } :=
       map.entries.remove(self.index)
-    return value
+    value
 
   spec iter_remove where
     pragma opaque
@@ -812,7 +812,7 @@ leaner module 0x1::ordered_map where
     let key := map.entries[self.index].key
     let Entry<K, V> { key := _, value := prev_value } :=
       map.entries.replace(self.index, new Entry<K, V> { key, value })
-    return prev_value
+    prev_value
 
   spec iter_replace where
     pragma opaque
@@ -911,7 +911,7 @@ leaner module 0x1::ordered_map where
             do
               let e := &self[i]
               let e := e
-              return e.key)
+              e.key)
           i := i + 1
         where
           invariant i <= len
@@ -920,10 +920,10 @@ leaner module 0x1::ordered_map where
           invariant !«spec_map_ref_aborts$lambda$1»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].key
           invariant ∀ (j in 0 .. i), !false
-        return result
+        result
     spec assert _inline_summary_result_33
       == «spec_map_ref$lambda$0»(self, self.length)
-    return _inline_summary_result_33
+    _inline_summary_result_33
 
   spec keys where
     pragma intrinsic
@@ -951,7 +951,7 @@ leaner module 0x1::ordered_map where
             do
               let e := &self[i]
               let e := e
-              return e.value)
+              e.value)
           i := i + 1
         where
           invariant i <= len
@@ -960,10 +960,10 @@ leaner module 0x1::ordered_map where
           invariant !«spec_map_ref_aborts$lambda$3»(self, i)
           invariant ∀ (j in 0 .. i), result[j] == self[j].value
           invariant ∀ (j in 0 .. i), !false
-        return result
+        result
     spec assert _inline_summary_result_38
       == «spec_map_ref$lambda$2»(self, self.length)
-    return _inline_summary_result_38
+    _inline_summary_result_38
 
   spec values where
     pragma intrinsic
@@ -999,7 +999,7 @@ leaner module 0x1::ordered_map where
       invariant ∀ (j in len .. with_state_anchor!(39, old(self)).length), true
       invariant true
     self.destroy_empty()
-    return (keys, values)
+    (keys, values)
 
   spec to_vec_pair where
     pragma intrinsic
@@ -1015,7 +1015,7 @@ leaner module 0x1::ordered_map where
       let mid := l + (r - l >> 1u8)
       let comparison := compare(&entries[mid].key, key)
       if is_lt(&comparison) then l := mid + 1 else r := mid
-    return l
+    l
 
   spec binary_search where
     pragma opaque
@@ -1126,7 +1126,7 @@ leaner module 0x1::ordered_map where
       assert keys[0] == 1
       assert keys[3] == 1
     let map := new_from(keys, values)
-    return map
+    map
 
   spec test_aborts_if_new_from_1 where
     aborts_if true
@@ -1135,7 +1135,7 @@ leaner module 0x1::ordered_map where
     keys : Vector<u64>, values : Vector<u64>
   ) -> OrderedMap<u64, u64> := do
     let map := new_from(keys, values)
-    return map
+    map
 
   spec test_aborts_if_new_from_2 where
     aborts_if ∃ (i in 0 .. keys.length; j in 0 .. keys.length),
@@ -1309,7 +1309,7 @@ leaner module 0x1::ordered_map where
         spec_key_at(m, i) == spec_key_at(old(m), i + count)
       invariant ∀ (i in 0 .. spec_len(m)),
         spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
-    return count
+    count
 
   spec test_verify_drain_symbolic where
     aborts_if false
@@ -1330,7 +1330,7 @@ leaner module 0x1::ordered_map where
       invariant !(it is End)
         ==> it.index == out.length && it.index < spec_len(m)
       invariant it is End ==> out.length == spec_len(m)
-    return out
+    out
 
   spec test_verify_iter_collect_symbolic where
     aborts_if false
@@ -1353,7 +1353,7 @@ leaner module 0x1::ordered_map where
       invariant !(it is End) ==> it.index == count && it.index < spec_len(m)
       invariant sum == spec_om_sum_upto(m, count)
       invariant it is End ==> count == spec_len(m)
-    return sum
+    sum
 
   spec test_verify_iter_sum_symbolic where
     ensures result == spec_om_sum_upto(m, spec_len(m))
@@ -1387,7 +1387,7 @@ leaner module 0x1::ordered_map where
     m : &mut OrderedMap<u64, u64>, i : u64
   ) -> u64 := do
     let it := new IteratorPtr::Position { index := i }
-    return it.iter_replace(m, 7)
+    it.iter_replace(m, 7)
 
   spec test_verify_iter_replace_symbolic where
     pragma verify
@@ -1403,7 +1403,7 @@ leaner module 0x1::ordered_map where
     m : &mut OrderedMap<u64, u64>, i : u64
   ) -> u64 := do
     let it := new IteratorPtr::Position { index := i }
-    return it.iter_remove(m)
+    it.iter_remove(m)
 
   spec test_verify_iter_remove_shift_at_position where
     pragma verify
@@ -1508,7 +1508,7 @@ leaner module 0x1::ordered_map where
     m : &mut OrderedMap<u64, u64>, i : u64
   ) -> u64 := do
     let it := new IteratorPtr::Position { index := i }
-    return it.iter_remove(m)
+    it.iter_remove(m)
 
   spec test_aborts_if_iter_remove_out_of_range where
     pragma verify

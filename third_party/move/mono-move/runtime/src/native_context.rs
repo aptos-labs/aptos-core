@@ -15,7 +15,7 @@ use crate::{
     },
     memory::{
         read_descriptor, read_obj_size, read_ptr, read_vec_len, write_enum_tag, write_ptr,
-        write_u64, MemoryRegion,
+        write_u64,
     },
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
@@ -32,6 +32,7 @@ use mono_move_core::{
     ObjectDescriptorInner, ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE,
     OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
+use mono_move_global_context::ExecutionGuard;
 use move_core_types::account_address::AccountAddress;
 use shared_dsa::UnorderedMap;
 use std::{
@@ -64,11 +65,10 @@ pub struct ProductionNativeContext<'a> {
     abi: &'a NativeABI,
     /// Type arguments to the native.
     ty_args: &'a [InternedType],
-    /// Descriptor provider, used by any GC the native triggers while allocating.
-    desc_provider: &'a dyn DescriptorProvider,
-    /// Value layouts, used by natives that serialize, deserialize, or compare
-    /// values driven by their types.
-    layouts: &'a dyn LayoutProvider,
+    /// The worker's execution guard: object descriptors and value layouts for
+    /// natives driven by their types, and the memory regions any GC the native
+    /// triggers needs.
+    guard: &'a ExecutionGuard<'a>,
     /// Start of the native's slot region within the caller's frame. Args are
     /// read and returns written here, within the ABI-verified bounds.
     frame_ptr: *mut u8,
@@ -105,8 +105,7 @@ impl<'a> ProductionNativeContext<'a> {
         abi: &'a NativeABI,
         ty_args: &'a [InternedType],
         gas_meter: &'a mut GasMeter,
-        desc_provider: &'a dyn DescriptorProvider,
-        layouts: &'a dyn LayoutProvider,
+        guard: &'a ExecutionGuard<'a>,
         resource_provider: &'a dyn ResourceProvider,
         resource_group_of: &'a dyn Fn(InternedType) -> VMResult<Option<InternedType>>,
         heap: &'a mut Heap,
@@ -116,8 +115,7 @@ impl<'a> ProductionNativeContext<'a> {
         Self {
             abi,
             ty_args,
-            desc_provider,
-            layouts,
+            guard,
             resource_provider,
             resource_group_of,
             frame_ptr,
@@ -257,7 +255,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn value_size(&self, ty: InternedType) -> VMResult<u32> {
-        self.layouts
+        self.guard
             .size_and_align(ty)
             .map(|(size, _)| size)
             .ok_or_else(|| {
@@ -354,7 +352,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let rws = unsafe { &mut **self.rws.get() };
         let ptr = alloc_vec(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -419,7 +417,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Pointer-free elements, so the vector uses the trivial descriptor.
         let ptr = alloc_vec(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -455,7 +453,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // matching vector descriptor would walk the payload at the wrong
         // offsets. `Trivial` is the pointer-free element case.
         let desc = self
-            .desc_provider
+            .guard
             .descriptor(descriptor)
             .ok_or_else(|| native_invariant_violation("new_vector: unknown descriptor".into()))?;
         match desc.inner() {
@@ -487,7 +485,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let rws = unsafe { &mut **self.rws.get() };
         let ptr = alloc_vec(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -531,7 +529,7 @@ impl NativeContext for ProductionNativeContext<'_> {
 
         // SAFETY: `ptr` is a live object, so its header names its descriptor.
         let descriptor = DescriptorId(unsafe { read_descriptor(ptr) });
-        let desc = self.desc_provider.descriptor(descriptor).ok_or_else(|| {
+        let desc = self.guard.descriptor(descriptor).ok_or_else(|| {
             native_invariant_violation(
                 "vector_write_elements_raw_test_only: unknown descriptor".into(),
             )
@@ -606,7 +604,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let copies = unsafe {
             deep_copy_batch_or_gc(
                 heap,
-                self.desc_provider,
+                self.guard,
                 rws,
                 &self.pool,
                 self.extensions,
@@ -687,7 +685,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             let new_ptr = unsafe {
                 realloc_vec(
                     heap,
-                    self.desc_provider,
+                    self.guard,
                     rws,
                     &self.pool,
                     self.extensions,
@@ -742,25 +740,26 @@ impl NativeContext for ProductionNativeContext<'_> {
     unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>> {
         // SAFETY: forwarded from this method's contract; serialization performs
         // no VM-heap allocation, so `base` stays valid throughout.
-        unsafe { crate::value_conv::bcs::serialize(self.layouts, base, ty) }
+        unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) }
     }
 
     unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_conv::bcs::serialized_size(self.layouts, base, ty) }
+        unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) }
     }
 
     fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>> {
-        let layout = self.layouts.layout_by_ty(ty).ok_or_else(|| {
+        let layout = self.guard.layout_by_ty(ty).ok_or_else(|| {
             native_invariant_violation("bcs deserialize: no layout for type".into())
         })?;
-        // `MemoryRegion` meets the alignment `deserialize` requires. Zeroed, not
-        // uninit: the copy below reads padding the deserializer skips. `max(1)`
-        // keeps zero-size types on the normal path, so trailing input is still
-        // rejected.
+        // `MemoryRegion` meets the alignment `deserialize` requires. Zeroed
+        // rather than left as is, because the copy below reads the padding the
+        // deserializer skips. `max(1)` because a region cannot be empty.
         let size = layout.size as usize;
-        let region = MemoryRegion::new_zeroed(size.max(1));
+        let region = self.guard.take_region(size.max(1));
         let dst = region.as_ptr();
+        // SAFETY: the region is `size` writable bytes.
+        unsafe { std::ptr::write_bytes(dst, 0, size) };
         // SAFETY: heap and rws are distinct fields (see the type-level aliasing
         // rule), so reborrowing both through `&self` at once is sound.
         let heap = unsafe { &mut **self.heap.get() };
@@ -770,12 +769,11 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: `dst` is `size` writable, correctly aligned bytes.
         let result = unsafe {
             deserialize_or_gc(
-                self.layouts,
                 heap,
+                self.guard,
                 ty,
                 bytes,
                 dst,
-                self.desc_provider,
                 rws,
                 &self.pool,
                 self.extensions,
@@ -783,7 +781,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                 TopFrame::Native(self.abi),
             )
         };
-        match result {
+        let out = match result {
             // SAFETY: `deserialize_or_gc` initialized `size` bytes at `dst`.
             Ok(()) => Ok(Some(
                 unsafe { std::slice::from_raw_parts(dst, size) }.to_vec(),
@@ -792,7 +790,9 @@ impl NativeContext for ProductionNativeContext<'_> {
             // exhaustion and missing layouts carry other kinds and still propagate.
             Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
             Err(e) => Err(e),
-        }
+        };
+        self.guard.return_region(region);
+        out
     }
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
@@ -822,13 +822,13 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>> {
-        let size = crate::value_conv::bcs::fixed_serialized_size(self.layouts, ty)?;
+        let size = crate::value_conv::bcs::fixed_serialized_size(self.guard, ty)?;
         Ok(size.map(|n| n as u64))
     }
 
     unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_cmp::compare(self.layouts, a, b, ty) }
+        unsafe { crate::value_cmp::compare(self.guard, a, b, ty) }
     }
 
     unsafe fn new_enum<'a, V: VMValue<'a>>(
@@ -843,7 +843,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let rws = unsafe { &mut **self.rws.get() };
         let obj = alloc_or_gc(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -895,7 +895,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                     let copied = unsafe {
                         deep_copy_or_gc(
                             heap,
-                            self.desc_provider,
+                            self.guard,
                             rws,
                             &self.pool,
                             self.extensions,
@@ -947,7 +947,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // GC-safe.
         let obj = alloc_or_gc(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -1006,7 +1006,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                 let copied = unsafe {
                     deep_copy_or_gc(
                         heap,
-                        self.desc_provider,
+                        self.guard,
                         rws,
                         &self.pool,
                         self.extensions,

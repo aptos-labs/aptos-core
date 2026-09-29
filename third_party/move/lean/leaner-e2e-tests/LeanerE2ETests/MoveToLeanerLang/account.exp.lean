@@ -24,8 +24,7 @@ leaner module 0x42::account where
     requires exists<Balance>(addr)
     ensures global<Balance>(addr).balance.value
         == old(global<Balance>(addr).balance.value) + amount
-    aborts_if global<Balance>(addr).balance.value + amount
-        > 18446744073709551615
+    aborts_if global<Balance>(addr).balance.value + amount > MAX_U64
     modifies global<Balance>(addr)
 
   public entry fun withdraw(addr : Address, amount : u64) -> Unit := do
@@ -52,7 +51,7 @@ leaner module 0x42::account where
 
   public fun remove(addr : Address) -> u64 := do
     let Balance { balance := balance } := move_from<Balance>(addr)
-    return balance.value
+    balance.value
 
   public fun balance_of(addr : Address) -> u64 := Balance[addr].balance.value
 

@@ -1717,7 +1717,9 @@ preserves only later-used carrier loans through nested operands and initializers
 transfers
 argument loans whose instantiated, structurally known direct/tuple/vector
 parameter lifetimes transitively outlive a structurally known call result while
-ending uncarried temporary argument loans after the call, removes loans
+ending uncarried temporary argument loans after the call (and after a
+primitive operation, whose result carries its operands' loans only when its
+type may contain a reference), removes loans
 unused by both a loop body and its continuation before the loop fixed point,
 ends unbound temporary loans at wildcard let and assignment patterns,
 releases a direct reference holder when it is moved or dropped while retaining

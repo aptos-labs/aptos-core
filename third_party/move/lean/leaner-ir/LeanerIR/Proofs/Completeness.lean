@@ -935,8 +935,8 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       | true => simp [initialFrame?, hb] at frame_eq
     refine ⟨f₀ + 1, ?_⟩
     rw [Internal.evalFunction.eq_2]
-    simp only [namespace_eq, declaration_eq, arity, frame_eq, body_eq, e₀,
-      bind, Except.bind, rc]
+    simp only [namespace_eq, declaration_eq, arity, body_eq, reduceCtorEq, ↓reduceIte,
+      frame_eq, e₀, bind, Except.bind, rc]
     cases control with
     | value value =>
         cases unpack_eq : unpackFallthrough declaration.signature.results.size value with
@@ -961,6 +961,16 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
         exact ⟨_, rfl, finalize_eq, rfl⟩
     | break_ nest value => simp [finishControl?] at outcome_eq
     | continue_ nest => simp [finishControl?] at outcome_eq
+  case native =>
+    intro handle typeInstantiation initialState arguments ns declaration finalState outcome
+      namespace_eq declaration_eq arity_eq body_eq native_eq
+    have arity : (arguments.size != declaration.signature.parameters.size) = false := by
+      simp [arity_eq]
+    refine ⟨1, ?_⟩
+    rw [Internal.evalFunction.eq_2]
+    simp only [namespace_eq, declaration_eq, arity, body_eq, ↓reduceIte, native_eq,
+      bind, Except.bind, pure, Except.pure]
+    exact ⟨_, rfl, rfl, rfl⟩
   case nil =>
     intro namespaceId frame state
     exact ⟨0, .values state frame [], rfl, rfl⟩
@@ -1090,8 +1100,8 @@ theorem evalFunction_complete {unit : ExecutableUnit} {handle typeInstantiation 
       | true => simp [initialFrame?, hb] at frame_eq
     refine ⟨f₀ + 1, ?_⟩
     rw [Internal.evalFunction.eq_2]
-    simp only [namespace_eq, declaration_eq, arity, frame_eq, body_eq, e₀,
-      bind, Except.bind, rc]
+    simp only [namespace_eq, declaration_eq, arity, body_eq, reduceCtorEq, ↓reduceIte,
+      frame_eq, e₀, bind, Except.bind, rc]
     cases control with
     | value value =>
         cases unpack_eq : unpackFallthrough declaration.signature.results.size value with
@@ -1116,6 +1126,15 @@ theorem evalFunction_complete {unit : ExecutableUnit} {handle typeInstantiation 
         exact ⟨_, rfl, finalize_eq, rfl⟩
     | break_ nest value => simp [finishControl?] at outcome_eq
     | continue_ nest => simp [finishControl?] at outcome_eq
+  | native handle typeInstantiation initialState arguments ns declaration finalState outcome
+      namespace_eq declaration_eq arity_eq body_eq native_eq =>
+    have arity : (arguments.size != declaration.signature.parameters.size) = false := by
+      simp [arity_eq]
+    refine ⟨1, ?_⟩
+    rw [Internal.evalFunction.eq_2]
+    simp only [namespace_eq, declaration_eq, arity, body_eq, ↓reduceIte, native_eq,
+      bind, Except.bind, pure, Except.pure]
+    exact ⟨_, rfl, rfl, rfl⟩
 
 /-- Completeness of `Interpreter.run` up to fuel and location erasure. -/
 theorem run_complete {unit : ExecutableUnit} {handle state arguments finalState outcome}

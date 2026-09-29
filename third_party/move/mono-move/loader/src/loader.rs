@@ -28,17 +28,18 @@ use mono_move_core::{
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
-    LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
+    DescriptorId, ErrorLocation, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter,
+    Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult,
+    ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
     ModuleMandatoryDependencies, ModuleSlot, ScriptHash,
 };
 use move_binary_format::{
-    access::ScriptAccess, file_format::CompiledScript, module_script_conversion::script_into_module,
+    access::ScriptAccess, errors::VMError, file_format::CompiledScript,
+    module_script_conversion::script_into_module,
 };
-use move_bytecode_verifier::VerifierConfig;
 use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
@@ -102,6 +103,11 @@ pub struct Loader<'guard, 'ctx> {
     module_provider: &'guard dyn ModuleProvider,
     policy: LoadingPolicy,
     natives: &'guard dyn NativeResolver,
+}
+
+/// Preserves the verifier's error details, including its location.
+fn script_verification_failed(error: VMError) -> VMInternalError {
+    VMInternalError::new(LoaderError::ScriptVerificationFailed { error })
 }
 
 impl<'guard, 'ctx> Loader<'guard, 'ctx> {
@@ -263,6 +269,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// `ty_args`. A script is loaded as a module holding that one function,
     /// under a module ID all scripts share, and cached by the hash of its
     /// bytes. Its cost and its dependencies' loads are charged on every call.
+    /// On a cache miss, the module provider's configs govern deserialization
+    /// and verification.
     ///
     /// # Precondition
     ///
@@ -312,18 +320,19 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         hash: ScriptHash,
         script_code: &[u8],
     ) -> VMResult<&'guard LoadedModule> {
-        // TODO(correctness): use the on-chain deserializer and verifier
-        // configs instead of the defaults.
-        let script = CompiledScript::deserialize(script_code).map_err(|err| {
+        let script = CompiledScript::deserialize_with_config(
+            script_code,
+            self.module_provider.deserializer_config(),
+        )
+        .map_err(|err| {
             VMInternalError::new(LoaderError::ScriptDeserializationFailed {
                 message: err.to_string(),
             })
+            .at(ErrorLocation::Script)
         })?;
-        move_bytecode_verifier::verify_script(&script).map_err(|err| {
-            VMInternalError::new(LoaderError::ScriptVerificationFailed {
-                status: err.major_status(),
-            })
-        })?;
+        let verifier_config = self.module_provider.verifier_config();
+        move_bytecode_verifier::verify_script_with_config(verifier_config, &script)
+            .map_err(script_verification_failed)?;
         let dependencies = script
             .immediate_dependencies_iter()
             .map(|(address, name)| {
@@ -332,17 +341,13 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             })
             .collect::<VMResult<Vec<_>>>()?;
         move_bytecode_verifier::dependencies::verify_script(
-            &VerifierConfig::default(),
+            verifier_config,
             &script,
             dependencies
                 .iter()
                 .map(|dependency| &*dependency.ir().module),
         )
-        .map_err(|err| {
-            VMInternalError::new(LoaderError::ScriptVerificationFailed {
-                status: err.major_status(),
-            })
-        })?;
+        .map_err(script_verification_failed)?;
 
         // TODO(metering): placeholder cost model, as for modules.
         let cost = script_code.len() as u64;

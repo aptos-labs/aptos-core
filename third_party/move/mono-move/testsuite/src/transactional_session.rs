@@ -1,0 +1,566 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! Module storage, publishing checks, and function or script execution for
+//! one transactional test.
+
+use crate::{
+    engine::build_natives, extensions::seed_extensions, module_provider::InMemoryModuleProvider,
+    resource_provider::InMemoryResourceProvider,
+};
+use bytes::Bytes;
+use mono_move_core::{
+    intern_type_tag, nominal_tag,
+    storage::resource_provider::InMemoryStorageKey,
+    type_tag_of,
+    types::{is_signer_or_signer_immut_ref, InternedType},
+    BytecodeOffset, CallFrame, Function, FunctionDefinitionIndex, GasMeter, Interner,
+    VMInternalError,
+};
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_runtime::{
+    serialize, CompletedCall, InterpreterContext, RuntimeError, RuntimeStatus, SessionEffects,
+    WriteClass,
+};
+use move_binary_format::{compatibility::Compatibility, errors::VMError};
+use move_core_types::{
+    account_address::AccountAddress,
+    effects::{ChangeSet, Op},
+    identifier::IdentStr,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    value::{MoveStruct, MoveStructLayout, MoveValue, MASTER_SIGNER_VARIANT},
+    vm_status::AbortLocation,
+};
+use move_transactional_test_runner::vm_test_harness::create_runtime_environment;
+use move_vm_runtime::{config::VMConfig, AsUnsyncModuleStorage, StagingModuleStorage};
+use move_vm_test_utils::InMemoryStorage;
+use std::ptr::NonNull;
+use thiserror::Error;
+
+/// Published modules and global state shared by V1's publishing checks and
+/// MonoVM's execution.
+///
+/// V1 stages, links, and checks compatibility against [`InMemoryStorage`],
+/// which also holds the committed resources as canonical BCS. MonoVM's
+/// [`InMemoryModuleProvider`] supplies the same module bytes to its loader,
+/// and each run reads resources from the storage through an
+/// [`InMemoryResourceProvider`]. [`commit`](Self::commit) updates both module
+/// stores together; a successful [`run`](Self::run) or
+/// [`run_script`](Self::run_script) writes its effects back into the storage.
+///
+/// Each operation uses one execution guard, then releases it and resets the
+/// [`GlobalContext`]'s caches and arenas before returning, so nothing bound to
+/// an arena (interned types, materialized values) outlives its operation and
+/// subsequent operations read republished modules from storage.
+pub struct TransactionalSession {
+    ctx: GlobalContext,
+    storage: InMemoryStorage,
+    module_provider: InMemoryModuleProvider,
+}
+
+/// Failure in V1 publishing checks or MonoVM loading.
+#[derive(Debug, Error)]
+pub enum PublishError {
+    /// V1's publishing checks rejected the bundle.
+    #[error(transparent)]
+    Staging(VMError),
+    /// V1 accepted the bundle, but MonoVM failed to load a module.
+    /// Loading includes deserialization, verification, and translation, but no lowering.
+    #[error("Unable to load module '{module}' into MonoVM. Got error: {error}")]
+    MonoLoad {
+        module: ModuleId,
+        error: VMInternalError,
+    },
+}
+
+/// How a run ended. Only a successful run commits its effects.
+// TODO(cleanup): unify with the differential harness's `engine::MonoRunner`
+// and `RunResult`; both load a function, place arguments, run, and classify
+// the outcome.
+#[derive(Debug)]
+pub enum RunOutcome {
+    /// The run succeeded and committed its effects. Return values carry BCS
+    /// bytes and type tags; scripts have no return values.
+    Success {
+        return_values: Vec<(TypeTag, Vec<u8>)>,
+    },
+    /// The run aborted; nothing is committed. `offset` names the
+    /// aborting instruction unless a native raised the abort.
+    Aborted {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+        offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
+        /// The abort's stack trace. See [`CallFrame`].
+        stack_trace: Vec<CallFrame>,
+    },
+}
+
+/// Why a run produced no [`RunOutcome`].
+#[derive(Debug, Error)]
+pub enum RunError {
+    /// The task's signers and arguments do not fit the call's parameters.
+    #[error(transparent)]
+    Arguments(ArgumentError),
+    /// MonoVM reported a load or execution error that maps to a V1 status.
+    #[error(transparent)]
+    Vm(VMInternalError),
+    /// MonoVM does not implement a feature the run needs: a construct its
+    /// lowering skips, a missing native, or a runtime operation it rejects.
+    #[error("unsupported by MonoVM: {0}")]
+    VmUnsupported(String),
+    /// A transactional-session limitation prevents the run from completing.
+    #[error("the MonoVM transactional session cannot {0}")]
+    Unsupported(String),
+    /// V1's storage rejected the effects.
+    #[error("the effects could not be committed to storage: {0}")]
+    Commit(String),
+}
+
+/// An argument shape or decoding failure, as V1 classifies it.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ArgumentError {
+    /// Counting signers as arguments, as V1 does.
+    #[error("argument length mismatch: expected {expected} got {actual}")]
+    CountMismatch { expected: usize, actual: usize },
+    #[error("an argument does not decode as its parameter type")]
+    Undecodable,
+}
+
+impl From<VMInternalError> for RunError {
+    /// Separates MonoVM's own feature gaps from failures V1 could also report,
+    /// so a baseline records them as gaps rather than as VM statuses.
+    // TODO(completeness): lowering failures on unsupported constructs (function
+    // value equality) surface as `LoweringError` invariant violations, not as
+    // skips, so they still render as VM statuses here.
+    fn from(err: VMInternalError) -> Self {
+        if let Some(RuntimeError::Unsupported(what)) = err.downcast_ref::<RuntimeError>() {
+            return RunError::VmUnsupported(what.to_string());
+        }
+        match err.downcast_ref::<LoaderError>() {
+            Some(LoaderError::LoweringSkipped { reason }) => {
+                RunError::VmUnsupported(reason.to_string())
+            },
+            Some(native @ LoaderError::NativeFunctionNotLoadable { .. }) => {
+                RunError::VmUnsupported(native.to_string())
+            },
+            Some(
+                LoaderError::ModuleNotFound { .. }
+                | LoaderError::FunctionNotFound { .. }
+                | LoaderError::ScriptDeserializationFailed { .. }
+                | LoaderError::ScriptVerificationFailed { .. }
+                | LoaderError::GlobalContext(_)
+                | LoaderError::InvariantViolation(_),
+            )
+            | None => RunError::Vm(err),
+        }
+    }
+}
+
+impl TransactionalSession {
+    pub fn new(vm_config: &VMConfig) -> Self {
+        Self {
+            ctx: GlobalContext::with_num_execution_workers(1),
+            storage: InMemoryStorage::new_with_runtime_environment(create_runtime_environment(
+                vm_config.clone(),
+            )),
+            module_provider: InMemoryModuleProvider::with_configs(
+                vm_config.deserializer_config.clone(),
+                vm_config.verifier_config.clone(),
+            ),
+        }
+    }
+
+    /// V1's view of the published code and the committed state.
+    pub fn storage(&self) -> &InMemoryStorage {
+        &self.storage
+    }
+
+    /// Publishes `bundle` from `sender` after V1's checks under `compat` and
+    /// MonoVM's loading checks. Modules are translated without lowering.
+    /// Both stores remain unchanged if either check fails.
+    pub fn publish(
+        &mut self,
+        sender: &AccountAddress,
+        compat: Compatibility,
+        bundle: Vec<Bytes>,
+    ) -> Result<(), PublishError> {
+        let verified = StagingModuleStorage::create_with_compat_config(
+            sender,
+            compat,
+            &self.storage.as_unsync_module_storage(),
+            bundle,
+        )
+        .map_err(PublishError::Staging)?
+        .release_verified_module_bundle()
+        .into_iter()
+        .collect::<Vec<_>>();
+        self.load_into_mono(&verified)?;
+        self.commit(verified);
+        Ok(())
+    }
+
+    /// Runs `module::function<ty_args>` on MonoVM, unmetered, with `signers`
+    /// and BCS `args` placed positionally as V1 places them (signers first).
+    /// A successful run commits its resource writes to the storage; an abort
+    /// or error commits nothing.
+    pub fn run(
+        &mut self,
+        module: &ModuleId,
+        function: &IdentStr,
+        ty_args: &[TypeTag],
+        signers: &[AccountAddress],
+        args: &[Vec<u8>],
+    ) -> Result<RunOutcome, RunError> {
+        self.run_callee(
+            Callee::Function { module, function },
+            ty_args,
+            signers,
+            args,
+        )
+    }
+
+    /// Runs the serialized `script` on MonoVM with `ty_args`, unmetered.
+    /// Links against published modules and places `signers` before BCS `args`.
+    /// Commits resource writes only on success.
+    pub fn run_script(
+        &mut self,
+        script: &[u8],
+        ty_args: &[TypeTag],
+        signers: &[AccountAddress],
+        args: &[Vec<u8>],
+    ) -> Result<RunOutcome, RunError> {
+        self.run_callee(Callee::Script(script), ty_args, signers, args)
+    }
+
+    fn run_callee(
+        &mut self,
+        callee: Callee<'_>,
+        ty_args: &[TypeTag],
+        signers: &[AccountAddress],
+        args: &[Vec<u8>],
+    ) -> Result<RunOutcome, RunError> {
+        let (outcome, changes) = with_guard(&mut self.ctx, |guard| -> Result<_, RunError> {
+            let natives = build_natives();
+            let resources = InMemoryResourceProvider::new(guard, &self.storage);
+            let loader = Loader::new_with_policy(
+                guard,
+                &self.module_provider,
+                LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+                natives,
+            );
+            let mut interp =
+                InterpreterContext::new(loader, GasMeter::with_max_budget(), &resources, natives)
+                    .with_extensions(seed_extensions(false));
+            let outcome = execute(guard, &mut interp, callee, ty_args, signers, args)?;
+            let changes = match &outcome {
+                RunOutcome::Success { .. } => resource_changes(guard, &interp.finish()?)?,
+                RunOutcome::Aborted { .. } => ChangeSet::new(),
+            };
+            Ok((outcome, changes))
+        })?;
+        // TODO(correctness): `InMemoryStorage::apply` is not atomic. It applies
+        // changes key by key and stops at the first error, so a `Commit` error
+        // leaves the earlier writes in storage, contradicting "an error commits
+        // nothing" above. Stage the changes on a copy and swap it in on success.
+        self.storage
+            .apply(changes)
+            .map_err(|err| RunError::Commit(err.to_string()))?;
+        Ok(outcome)
+    }
+
+    /// Updates both stores with modules that have passed V1's publishing checks.
+    pub(crate) fn commit(&mut self, modules: impl IntoIterator<Item = (ModuleId, Bytes)>) {
+        for (id, bytes) in modules {
+            self.storage
+                .add_module_bytes(id.address(), id.name(), bytes.clone());
+            self.module_provider
+                .add_module_bytes(*id.address(), id.name().to_owned(), bytes);
+        }
+    }
+
+    /// Deserializes, verifies, and translates each module without lowering.
+    /// A temporary provider includes the candidate modules, so failed loads
+    /// leave the stored modules unchanged.
+    fn load_into_mono(&mut self, modules: &[(ModuleId, Bytes)]) -> Result<(), PublishError> {
+        let mut provider = self.module_provider.clone();
+        for (id, bytes) in modules {
+            provider.add_module_bytes(*id.address(), id.name().to_owned(), bytes.clone());
+        }
+        with_guard(&mut self.ctx, |guard| {
+            let loader = Loader::new_with_policy(
+                guard,
+                &provider,
+                LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+                build_natives(),
+            );
+            modules.iter().try_for_each(|(id, _)| {
+                let mut read_set = ModuleReadSet::new();
+                let mut gas_meter = GasMeter::with_max_budget();
+                loader
+                    .load_module(
+                        &mut read_set,
+                        &mut gas_meter,
+                        guard.intern_address_name(id.address(), id.name()),
+                    )
+                    .map(|_| ())
+                    .map_err(|error| PublishError::MonoLoad {
+                        module: id.clone(),
+                        error,
+                    })
+            })
+        })
+    }
+}
+
+/// Runs `operation` under a fresh execution guard, then resets the context's
+/// caches and arenas so nothing arena-bound outlives the operation.
+fn with_guard<T>(ctx: &mut GlobalContext, operation: impl FnOnce(&ExecutionGuard<'_>) -> T) -> T {
+    let result = {
+        let guard = ctx
+            .try_execution_context(0)
+            .expect("the session releases its guard after every operation");
+        operation(&guard)
+    };
+    ctx.maintenance_context().reset_arena_pool();
+    result
+}
+
+/// A published function or serialized script to execute.
+enum Callee<'a> {
+    Function {
+        module: &'a ModuleId,
+        function: &'a IdentStr,
+    },
+    Script(&'a [u8]),
+}
+
+/// Loads and calls `callee` on `interp`, then serializes its return values.
+fn execute(
+    guard: &ExecutionGuard<'_>,
+    interp: &mut InterpreterContext<'_>,
+    callee: Callee<'_>,
+    ty_args: &[TypeTag],
+    signers: &[AccountAddress],
+    args: &[Vec<u8>],
+) -> Result<RunOutcome, RunError> {
+    let ty_args = ty_args
+        .iter()
+        .map(|tag| intern_type_tag(tag, guard))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| RunError::Unsupported(format!("intern the type arguments: {err:#}")))?;
+    let ty_args = guard.type_list_of(&ty_args);
+
+    // TODO(correctness): validate `ty_args` arity, ability constraints, and
+    // struct constraints in `load_function` and `load_script`. Missing entry
+    // validation allows instantiations V1 rejects. Map validation failures
+    // to V1 statuses in `describe`.
+    let func = match callee {
+        Callee::Function { module, function } => interp.load_function(
+            guard.module_id_of(module.address(), module.name()),
+            guard.identifier_of(function),
+            ty_args,
+        )?,
+        Callee::Script(script) => interp.load_script(script, ty_args)?,
+    };
+    let placements = placements(func, signers, args)?;
+    let call = run_call(interp, func, &placements)?;
+    match call.status().clone() {
+        RuntimeStatus::Success => Ok(RunOutcome::Success {
+            return_values: call
+                .bcs_serialize_return_values()?
+                .into_iter()
+                .map(|(ty, bytes)| to_v1_bcs(ty, bytes))
+                .collect::<Result<_, _>>()?,
+        }),
+        RuntimeStatus::Aborted {
+            code,
+            message,
+            location,
+            offset,
+        } => Ok(RunOutcome::Aborted {
+            code,
+            message,
+            location,
+            offset,
+            stack_trace: call.stack_trace()?,
+        }),
+    }
+}
+
+/// One parameter's value: a signer address, or BCS bytes.
+enum Placement {
+    Signer(AccountAddress),
+    Bcs(Vec<u8>),
+}
+
+/// Pairs signers and arguments with parameters in order. A value in a signer
+/// position must use V1's serialized signer representation; otherwise the run
+/// fails with [`ArgumentError::Undecodable`].
+// TODO(cleanup): place arguments with the executor's `place_user_txn_args` so
+// the corpus exercises the production path.
+fn placements(
+    func: &Function,
+    signers: &[AccountAddress],
+    args: &[Vec<u8>],
+) -> Result<Vec<Placement>, RunError> {
+    let expected = func.param_tys.len();
+    let actual = signers.len() + args.len();
+    if expected != actual {
+        return Err(RunError::Arguments(ArgumentError::CountMismatch {
+            expected,
+            actual,
+        }));
+    }
+    let blobs = signers
+        .iter()
+        .map(|signer| encode_signer(*signer))
+        .chain(args.iter().cloned());
+    func.param_tys
+        .iter()
+        .zip(blobs)
+        .map(|(&ty, blob)| {
+            if is_signer_or_signer_immut_ref(ty) {
+                decode_signer(&blob)
+                    .map(Placement::Signer)
+                    .ok_or(RunError::Arguments(ArgumentError::Undecodable))
+            } else {
+                Ok(Placement::Bcs(blob))
+            }
+        })
+        .collect()
+}
+
+/// Places the arguments and runs the call, attaching a VM error's stack trace.
+/// A `&signer` parameter borrows its address from `placements`, so they must
+/// outlive the completed call.
+fn run_call<'a, 'guard>(
+    interp: &'a mut InterpreterContext<'guard>,
+    func: &'guard Function,
+    placements: &'a [Placement],
+) -> Result<CompletedCall<'a, 'guard>, RunError> {
+    let mut call = interp.build_call(func)?;
+    for placement in placements {
+        match placement {
+            Placement::Signer(address) => call.signer(address)?,
+            Placement::Bcs(bytes) => call.arg_bcs(bytes).map_err(|err| {
+                if err
+                    .downcast_ref::<RuntimeError>()
+                    .is_some_and(RuntimeError::is_bcs_decode_error)
+                {
+                    RunError::Arguments(ArgumentError::Undecodable)
+                } else {
+                    RunError::from(err)
+                }
+            })?,
+        }
+    }
+    match call.run() {
+        Ok(call) => Ok(call),
+        Err(err) => {
+            let stack_trace = err.stack_trace()?;
+            Err(err.into_error().with_stack_trace(stack_trace).into())
+        },
+    }
+}
+
+/// Encodes a signer as V1's single-variant enum containing its address.
+fn encode_signer(address: AccountAddress) -> Vec<u8> {
+    MoveValue::Signer(address)
+        .simple_serialize()
+        .expect("a signer serializes")
+}
+
+/// The address of a signer in V1's wire encoding, or `None` for any other
+/// bytes.
+fn decode_signer(blob: &[u8]) -> Option<AccountAddress> {
+    let value =
+        MoveStruct::simple_deserialize(blob, &MoveStructLayout::signer_serialization_layout())
+            .ok()?;
+    match value {
+        MoveStruct::RuntimeVariant(MASTER_SIGNER_VARIANT, fields) => match fields.as_slice() {
+            [MoveValue::Address(address)] => Some(*address),
+            _ => None,
+        },
+        MoveStruct::RuntimeVariant(..)
+        | MoveStruct::Runtime(_)
+        | MoveStruct::WithFields(_)
+        | MoveStruct::WithTypes { .. }
+        | MoveStruct::WithVariantFields(..) => None,
+    }
+}
+
+/// The value's BCS as V1 serializes it, with its type tag.
+fn to_v1_bcs(ty: InternedType, bytes: Vec<u8>) -> Result<(TypeTag, Vec<u8>), RunError> {
+    let tag = type_tag_of(ty).ok_or_else(|| {
+        RunError::Unsupported("report a value whose type has no type tag".to_string())
+    })?;
+    // Convert a top-level signer from MonoVM's bare address to V1's variant.
+    // TODO(completeness): a signer nested in a returned vector or struct keeps
+    // the bare encoding, so the adapter rejects the value as undecodable under
+    // V1's layout (or renders it wrongly if the bytes happen to decode).
+    // Re-encode through the value's layout instead of by top-level tag.
+    let bytes = if tag == TypeTag::Signer {
+        let address =
+            AccountAddress::from_bytes(&bytes).expect("MonoVM serializes a signer as its address");
+        encode_signer(address)
+    } else {
+        bytes
+    };
+    Ok((tag, bytes))
+}
+
+/// Converts a successful run's resource writes to a V1 change set, using the
+/// layouts `guard` published. Resource group and table writes are
+/// unsupported. Among conversion errors, returns the one whose message sorts
+/// first, independent of write order.
+// TODO(cleanup): commit through the executor's write-set materialization,
+// draining the `WriteSet` into `InMemoryStorage`, instead of this conversion.
+fn resource_changes(
+    guard: &ExecutionGuard<'_>,
+    effects: &SessionEffects,
+) -> Result<ChangeSet, RunError> {
+    let write_op = |key: &InMemoryStorageKey,
+                    class: WriteClass,
+                    group: Option<InternedType>|
+     -> Result<(AccountAddress, StructTag, Op<Bytes>), RunError> {
+        if group.is_some() {
+            return Err(RunError::Unsupported(
+                "commit resource group writes".to_string(),
+            ));
+        }
+        let InMemoryStorageKey::Resource { address, ty } = key else {
+            return Err(RunError::Unsupported("commit table writes".to_string()));
+        };
+        let tag = nominal_tag(*ty).map_err(|err| RunError::Commit(format!("{err:#}")))?;
+        // SAFETY: written pointers refer to live values in the effects' frozen
+        // heap, and `guard` is the guard that described them.
+        let written = |ptr: NonNull<u8>| {
+            unsafe { serialize(guard, ptr.as_ptr(), *ty) }
+                .map(Bytes::from)
+                .map_err(RunError::from)
+        };
+        let op = match class {
+            WriteClass::Creation(ptr) => Op::New(written(ptr)?),
+            WriteClass::Modification(ptr) => Op::Modify(written(ptr)?),
+            WriteClass::Deletion => Op::Delete,
+        };
+        Ok((*address, tag, op))
+    };
+
+    let mut changes = ChangeSet::new();
+    let mut failures = Vec::new();
+    for (key, class, group) in effects.read_write_set().writes_unordered() {
+        match write_op(key, class, group) {
+            Ok((address, tag, op)) => changes
+                .add_resource_op(address, tag, op)
+                .map_err(|err| RunError::Commit(format!("{err:#}")))?,
+            Err(err) => failures.push(err),
+        }
+    }
+    match failures.into_iter().min_by_key(|err| err.to_string()) {
+        Some(failure) => Err(failure),
+        None => Ok(changes),
+    }
+}

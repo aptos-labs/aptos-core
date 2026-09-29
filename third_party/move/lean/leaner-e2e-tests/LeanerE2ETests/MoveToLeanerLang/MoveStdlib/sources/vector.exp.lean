@@ -125,7 +125,7 @@ leaner module 0x1::vector where
   public fun singleton {Element}(e : Element) -> Vector<Element> := do
     let mut v := vector<Element>[]
     v := core.prim.pushVector(v, e)
-    return v
+    v
 
   spec singleton where
     aborts_if false
@@ -136,7 +136,7 @@ leaner module 0x1::vector where
   -/
   public fun last {Element}(self : &Vector<Element>) -> &Element := do
     assert!(self.length > 0, EINDEX_OUT_OF_BOUNDS)
-    return &self[self.length - 1]
+    &self[self.length - 1]
 
   /--
   Returns a mutable reference to the last element in the vector, or aborts if the vector is empty.
@@ -146,7 +146,7 @@ leaner module 0x1::vector where
   ) -> &mut Element := do
     assert!(self.length > 0, EINDEX_OUT_OF_BOUNDS)
     let len := self.length
-    return &mut self[len - 1]
+    &mut self[len - 1]
 
   /--
   Reverses the order of the elements in the vector `self` in place.
@@ -228,7 +228,7 @@ leaner module 0x1::vector where
         other := core.prim.pushVector(other, self.pop_back())
         len := len - 1
       other.reverse()
-    return other
+    other
 
   spec trim where
     pragma intrinsic
@@ -245,7 +245,7 @@ leaner module 0x1::vector where
     while new_len < len do
       result := core.prim.pushVector(result, self.pop_back())
       len := len - 1
-    return result
+    result
 
   spec trim_reverse where
     pragma intrinsic
@@ -270,7 +270,7 @@ leaner module 0x1::vector where
     while i < len do
       if &self[i] == e then return true;
       i := i + 1
-    return false
+    false
 
   spec contains where
     pragma intrinsic
@@ -287,7 +287,7 @@ leaner module 0x1::vector where
     while i < len do
       if &self[i] == e then return (true, i);
       i := i + 1
-    return (false, 0)
+    (false, 0)
 
   spec index_of where
     pragma intrinsic
@@ -332,7 +332,7 @@ leaner module 0x1::vector where
   ) -> Element := do
     let len := self.length
     if i >= len then abort(EINDEX_OUT_OF_BOUNDS)
-    return if USE_MOVE_RANGE then
+    if USE_MOVE_RANGE then
       if i + 3 >= len then
         len := len - 1
         while i < len do
@@ -340,14 +340,14 @@ leaner module 0x1::vector where
             i,
             do
               i := i + 1
-              return i)
-        return self.pop_back()
+              i)
+        self.pop_back()
       else
         let mut other := vector<Element>[]
         move_range(self, i, 1, &mut other, 0)
         let result := other.pop_back()
         other.destroy_empty()
-        return result
+        result
     else
       len := len - 1
       while i < len do
@@ -355,8 +355,8 @@ leaner module 0x1::vector where
           i,
           do
             i := i + 1
-            return i)
-      return self.pop_back()
+            i)
+      self.pop_back()
 
   spec remove where
     pragma intrinsic
@@ -376,8 +376,7 @@ leaner module 0x1::vector where
     self : &mut Vector<Element>, val : &Element
   ) -> Vector<Element> := do
     let (found, index) := self.index_of(val)
-    return if found then vector<Element>[self.remove(index)]
-    else vector<Element>[]
+    if found then vector<Element>[self.remove(index)] else vector<Element>[]
 
   spec remove_value where
     pragma intrinsic
@@ -395,7 +394,7 @@ leaner module 0x1::vector where
     assert!(!self.is_empty(), EINDEX_OUT_OF_BOUNDS)
     let last_idx := self.length - 1
     self.swap(i, last_idx)
-    return self.pop_back()
+    self.pop_back()
 
   spec swap_remove where
     pragma intrinsic
@@ -410,11 +409,11 @@ leaner module 0x1::vector where
   ) -> Element := do
     let last_idx := self.length
     assert!(i < last_idx, EINDEX_OUT_OF_BOUNDS)
-    return if USE_MOVE_RANGE then mem::replace(&mut self[i], val)
+    if USE_MOVE_RANGE then mem::replace(&mut self[i], val)
     else
       *self := core.prim.pushVector(*self, val)
       self.swap(i, last_idx)
-      return self.pop_back()
+      self.pop_back()
 
   /--
   rotate(&mut [1, 2, 3, 4, 5], 2) -> [3, 4, 5, 1, 2] in place, returns the split point
@@ -424,7 +423,7 @@ leaner module 0x1::vector where
     self : &mut Vector<Element>, rot : u64
   ) -> u64 := do
     let len := self.length
-    return self.rotate_slice(0, rot, len)
+    self.rotate_slice(0, rot, len)
 
   spec rotate where
     pragma intrinsic
@@ -439,7 +438,7 @@ leaner module 0x1::vector where
     self.reverse_slice(left, rot)
     self.reverse_slice(rot, right)
     self.reverse_slice(left, right)
-    return left + (right - rot)
+    left + (right - rot)
 
   spec rotate_slice where
     pragma intrinsic
@@ -455,7 +454,7 @@ leaner module 0x1::vector where
     while start < end do
       vec := core.prim.pushVector(vec, start)
       start := start + step
-    return vec
+    vec
 
   public fun slice {Element has Copy}(
     self : &Vector<Element>, start : u64, end : u64
@@ -465,7 +464,7 @@ leaner module 0x1::vector where
     while start < end do
       vec := core.prim.pushVector(vec, self[start])
       start := start + 1
-    return vec
+    vec
 
   -- =================================================================
   -- Module Specification

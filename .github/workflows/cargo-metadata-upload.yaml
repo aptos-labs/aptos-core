@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - "main"
+      # PR test selection compares against the actual base branch.
+      - "aptos-release-v*"
+      - "aptos-node-v*"
   pull_request:
     paths:
       - ".github/workflows/cargo-metadata-upload.yaml"

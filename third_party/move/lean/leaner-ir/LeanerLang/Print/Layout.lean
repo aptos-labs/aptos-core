@@ -242,6 +242,8 @@ private def primitiveText : Primitive → String
   | .destroyEmptyVector => "destroyEmptyVector"
   | .containsVector => "containsVector"
   | .indexOfVector => "indexOfVector"
+  | .compare => "compare"
+  | .signerAddress => "signerAddress"
   | .checkVectorIndex failure => s!"checkVectorIndex[{throwText failure}]"
   | .length => "length"
   | .index => "index"
@@ -435,6 +437,13 @@ private def operatorInfoForExpr? : Expr → Option OperatorInfo
 private def expressionPrecedence (expression : Expr) : Nat :=
   if let some info := operatorInfoForExpr? expression then info.precedence
   else match expression with
+    -- The short-circuit shapes print as the operators they lower from, so
+    -- they bind as those operators: classifying them as an `if` would wrap a
+    -- nested conjunction in parentheses the source never had.
+    | .ifElse _ _ (some (.bool false _)) _ =>
+        (Operators.info? .logicalAnd).map (·.precedence) |>.getD 0
+    | .ifElse _ (.bool true _) (some _) _ =>
+        (Operators.info? .logicalOr).map (·.precedence) |>.getD 0
     | .quantifier .. | .specBlock .. | .block .. | .ifElse .. | .match_ .. |
         .forRange .. | .loop .. | .break_ .. | .continue_ .. | .assign .. |
         .assignExpression .. | .assignPattern .. |
@@ -1019,10 +1028,9 @@ mutual
       | some (.return_ (.block nestedStatements nestedResult _) _) =>
           blockEntriesDoc nestedStatements nestedResult
       | some result =>
-          if isKnownUnitExpression result || isAbruptExpression result then
-            pure #[← expressionDoc result]
-          else
-            pure #[text "return " ++ (← expressionDoc result)]
+          -- A block's value is its final bare expression; an explicit
+          -- `return` node prints itself and means leaving the function.
+          pure #[← expressionDoc result]
     let entries ← statementDocs statements
     pure (entries ++ trailing)
 end
@@ -1263,6 +1271,9 @@ private def itemDocs : Item → Except String (Array Doc)
       let signature := hangingDelimited (text signatureHead) "(" ")"
         (declaration.parameters.map parameterDoc)
         (text s!" : {typeText declaration.result.value}")
+      let signature ← match declaration.decreases with
+        | some measure => pure (signature ++ text " decreases " ++ (← expressionDoc measure))
+        | none => pure signature
       let declarationDoc ← match declaration.body with
         | none => pure signature
         | some body =>

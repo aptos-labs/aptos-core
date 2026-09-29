@@ -583,6 +583,13 @@ def sliceVector? (arguments : Array RuntimeValue) :
       else some (.ok (.vector (elements.extract start.toNat stop.toNat)))
   | _ => none
 
+/-- The declaration position of a variant, from a namespace's view of the
+unit's declarations. -/
+def variantRank (orders : Array (Array (Array String))) (source : StructHandle)
+    (variant : String) : Nat :=
+  ((orders[source.namespaceId.index]?.bind (·[source.structId]?)).bind
+    (·.findIdx? (· == variant))).getD 0
+
 /-- Deterministic meaning of the shared Move/Rust pure primitive vocabulary. -/
 def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
     (operation : PrimitiveOperation) (arguments : Array RuntimeValue)
@@ -607,6 +614,10 @@ def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
   | .swapVector => swapVector? arguments
   | .reverseSliceVector => reverseSliceVector? arguments
   | .containsVector => containsVector? arguments
+  | .compare => match arguments.toList with
+      | [left, right] => some (.ok (.integer
+          (orderValue (RuntimeValue.order (variantRank ns.variantOrders) left right))))
+      | _ => none
   | .checkVectorIndex failure => checkVectorIndex? failure arguments
   | .indexOfVector =>
       let .tuple elements := resultType | none
@@ -615,6 +626,9 @@ def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
         resolveTargetIntegerType? targetPointerWidth
       indexOfVector? indexType arguments
   | .destroyEmptyVector => destroyEmptyVector? arguments
+  | .signerAddress => match arguments.toList with
+      | [.signer value] => some (.ok (.address value))
+      | _ => none
   | .length =>
       let lengthValue (length : Nat) := match resultType with
         | .integer .unbounded _ => some (.integer (Int.ofNat length))
@@ -3985,11 +3999,8 @@ def dereferenceBorrow? (arguments : Array RuntimeValue)
 def freezeBorrow? (resultType : ReferenceType) (arguments : Array RuntimeValue)
     (frame : RuntimeFrame) (state : RuntimeState) :
     Option (RuntimeFrame × RuntimeState × RuntimeValue) := do
-  let #[.borrow loan current] := arguments | none
+  let #[.borrow _ current] := arguments | none
   if resultType.kind != .shared then none else
-  let (frame, state) := applyWriteBack frame state loan current
-  let frame := { frame with
-    activeLoans := frame.activeLoans.filter (·.2 != loan) }
   some (frame, state, current)
 
 def mutateBorrow? (arguments : Array RuntimeValue)
@@ -4439,8 +4450,9 @@ def evaluatePlaceOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       dereferenceBorrow? arguments frame state
   | .reference (.freeze _) =>
       -- A shared-source freeze is erased at preparation. Freezing a
-      -- mutable borrow consumes it: its loan ends here with the current
-      -- value, and the result is the bare shared observation.
+      -- mutable borrow is a shared reborrow: the result is the bare
+      -- observation of the current value, and the loan stays live until
+      -- its holder's death ends it.
       let .reference resultReference ← ns.tables.types[resultType.index]? | none
       freezeBorrow? resultReference arguments frame state
   | .reference (.endLoan loans) =>

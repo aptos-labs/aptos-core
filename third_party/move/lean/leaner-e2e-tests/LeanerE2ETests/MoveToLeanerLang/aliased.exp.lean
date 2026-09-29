@@ -21,7 +21,7 @@ leaner module 0x1::counter where
     let mut c := fresh()
     c.bump()
     c.bump()
-    return c.value()
+    c.value()
 
   spec bumped_twice where
     ensures result == 2

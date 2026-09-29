@@ -19,3 +19,8 @@ register_simp_attr lir_denote
 encodings, runtime accessors, and injectivity.  Precomputed here so that a
 normalization names only the per-target constants. -/
 register_simp_attr lir_denote_norm
+
+/-- Ground evaluation: literal arithmetic, comparisons, casts, string
+equality, and decided conditionals, so a normalization settles the guards
+of an operation at literal arguments. -/
+register_simp_attr lir_denote_eval

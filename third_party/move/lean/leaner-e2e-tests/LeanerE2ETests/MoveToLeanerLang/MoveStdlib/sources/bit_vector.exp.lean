@@ -42,7 +42,7 @@ leaner module 0x1::bit_vector where
     spec do
       assert counter == length
       assert bit_field.length == length
-    return new BitVector { length, bit_field }
+    new BitVector { length, bit_field }
 
   spec new where
     aborts_if length <= 0 with ELENGTH
@@ -121,7 +121,7 @@ leaner module 0x1::bit_vector where
   -/
   public fun is_index_set(self : &BitVector, bit_index : u64) -> Bool := do
     assert!(self.bit_field.length > bit_index, EINDEX)
-    return self.bit_field[bit_index]
+    self.bit_field[bit_index]
 
   spec is_index_set where
     aborts_if bit_index >= self.length() with EINDEX
@@ -160,7 +160,7 @@ leaner module 0x1::bit_vector where
       invariant index == start_index || self.bit_field.length > index - 1
       invariant ∀ (j in start_index .. index), self.is_index_set(j)
       invariant ∀ (j in start_index .. index), self.bit_field.length > j
-    return index - start_index
+    index - start_index
 
   spec longest_set_sequence_starting_at where
     aborts_if self.length <= start_index

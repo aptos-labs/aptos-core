@@ -57,6 +57,23 @@ impl MemoryRegion {
         region
     }
 
+    /// A fresh region for VM scratch memory: an interpreter stack, a session
+    /// heap, a GC to-space. Contents are unspecified and must be written
+    /// before they are read.
+    ///
+    /// Release builds zero the region, so a slot read before it is written
+    /// holds a defined value instead of an undefined one. Debug builds poison
+    /// and Miri gets genuinely uninitialized memory, so both still catch a
+    /// read before write.
+    pub fn new_scratch(size: usize) -> Self {
+        if cfg!(miri) {
+            return Self::new_uninit(size);
+        }
+        let mut region = Self::new_zeroed(size);
+        region.recycle();
+        region
+    }
+
     /// Hands a region to a new owner. Whatever bytes are already there carry
     /// over, so the new owner still owes [`Self::new_uninit`]'s
     /// write-before-read contract.

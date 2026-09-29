@@ -4,7 +4,7 @@
 
 This document is the first design of the profile-aware Leaner source language
 for the shared Leaner IR. It generalizes the Move-profile language described in
-[`../move/Move/leaner-move.md`](../v0/move/Move/leaner-move.md) to the complete
+[`v0/move/Move/leaner-move.md`](../v0/move/Move/leaner-move.md) to the complete
 semantic union represented by
 [`LeanerIR.Syntax`](../leaner-ir/LeanerIR/Syntax.lean).
 
@@ -423,13 +423,13 @@ Leaner exposes all four LIR binder sorts:
 ```
 
 The braces denote explicit generic binders, not implicit Lean arguments. Every
-unannotated binder is a type binder, so canonical source omits the redundant
-`: type`; the other binder sorts remain explicit.
+unannotated binder is a type binder; `: type` is written only for a phantom
+parameter (`{T : phantom type}`). The other binder sorts remain explicit.
 
 Type binders may carry the four core abilities:
 
 ```lean
-{T : type has Copy, Drop, Store}
+{T has Copy, Drop, Store}
 ```
 
 Other constraints use a `where` block:
@@ -1048,6 +1048,11 @@ move_from<Resource>(address)
 move_to<Resource>(signer, value)
 ```
 
+`move_to` publishes under the address its signer holds. That address is
+`signer.address` (the primitive `core.prim.signerAddress(&signer)`, Move's
+`signer::address_of`), for a `Signer` or a `&Signer`, in code and in
+specifications alike: `ensures global<Counter>(account.address).value == amount`.
+
 The first generic instantiation identifies the stored resource family. The
 profile owns key and storage rules. Move requires an address key and a resource
 with `Key`; a Rust or extension profile may define different checked rules.
@@ -1133,11 +1138,14 @@ fun increment (value : u64) -> u64 := value + 1
 
 spec increment where
   ensures result = value + 1
-  aborts_if value + 1 > spec.maxValue[64]
+  aborts_if value + 1 > MAX_U64
 ```
 
 Inside both clauses, `value`, `result`, `1`, and the fixed-width maximum
-participate in `Int` arithmetic. The source types on the attached executable
+participate in `Int` arithmetic. A specification names the fixed-width bounds
+`MAX_U8` … `MAX_U256`, `MIN_I8` … `MIN_I256`, and `MAX_I8` … `MAX_I256` (a
+local or module constant of the same name takes precedence); canonical source
+prints the 64-bit and wider bounds by name and smaller ones as numerals. The source types on the attached executable
 function remain bounded; the specification elaborator inserts the logical
 projections at the boundary. This widening is a specification interpretation,
 not an executable `cast`, and it cannot abort.
@@ -1357,7 +1365,7 @@ The canonical `spec.*` vocabulary maps one-to-one to `SpecOperation`:
 |---|---|
 | Calls and results | `functionCall`, `result` |
 | Domains | `typeValue`, `typeDomain`, `resourceDomain`, `stateDomain` |
-| State and frames | `global`, `canModify`, `old`, `saveStateAnchor`, `withStateAnchor`, `foldsCaptureAnchor`, `inlineCallSummary` |
+| State and frames | `global`, `canModify`, `old`, `final`, `saveStateAnchor`, `withStateAnchor`, `foldsCaptureAnchor`, `inlineCallSummary` |
 | Function behavior | `requiresOf`, `abortsOf`, `ensuresOf`, `resultOf`, `unchangedOf`, `foldsOf`, `writeOf(index)` |
 | Tracing | `traceUser`, `traceAutomatic`, `traceSubAutomatic` |
 | Logical resources | `publish`, `remove`, `update` |
@@ -1392,6 +1400,13 @@ backend receives them. Interpretation of the complete logical vocabulary is
 still an implementation milestone; surface representability does not claim
 that every well-typed specification can already be proved.
 
+
+`final(result)` names the final value of a returned mutable reference: the
+value its lender holds once the caller's writes through the reference end.
+A contract that reads it relates those writes to the lender (`ensures
+cell.value == final(result)`), and callers use such a contract instead of
+the callee's body. Without `final`, a returned reference reads as its
+current value.
 ## Intrinsics
 
 An intrinsic declaration attaches a profile-owned model and two explicit role
@@ -1524,9 +1539,9 @@ The intended source coverage is summarized below.
 
 ## Further reading
 
-- [`../move/Move/leaner-move.md`](../v0/move/Move/leaner-move.md) — implemented
+- [`v0/move/Move/leaner-move.md`](../v0/move/Move/leaner-move.md) — implemented
   Move-profile language.
-- [`../move/Move/int-widening-design.md`](../v0/move/Move/int-widening-design.md) —
+- [`v0/move/Move/int-widening-design.md`](../v0/move/Move/int-widening-design.md) —
   conversion-free `Int` arithmetic at the specification boundary.
 - [`lir-design.md`](lir-design.md) — shared IR architecture,
   profiles, frontend/backend contracts, and round-trip laws.

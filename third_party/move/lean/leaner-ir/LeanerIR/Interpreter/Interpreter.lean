@@ -89,6 +89,13 @@ mutual
         if arguments.size != declaration.signature.parameters.size then
           failAt handle.namespaceId declaration.loc
             (.argumentArity declaration.signature.parameters.size arguments.size)
+        if declaration.body = .absent then
+          -- A function without a body runs as the runtime implements it.
+          let some (finalState, outcome) :=
+              BigStep.nativeCall executable handle typeInstantiation state arguments
+            | failAt handle.namespaceId declaration.loc (.functionHasNoBody handle)
+          return { state := finalState, outcome := {
+            value := outcome, primary := runtimeLocation handle.namespaceId declaration.loc } }
         let some frame := initialFrame? declaration arguments typeInstantiation
           | failAt handle.namespaceId declaration.loc .unsupportedPreparedNode
         let .structured root := declaration.body

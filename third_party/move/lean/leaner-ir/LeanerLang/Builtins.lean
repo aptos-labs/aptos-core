@@ -106,4 +106,21 @@ def standardCallInferredTypes? (tables : Tables) (profile : Option Profile)
   else
     none
 
+/-- The integer bounds a specification names, with their values:
+`MAX_U8` … `MAX_U256`, `MAX_I8` … `MAX_I256`, and `MIN_I8` … `MIN_I256`. -/
+def specificationBounds : List (String × Nat × Int) :=
+  [8, 16, 32, 64, 128, 256].flatMap fun (width : Nat) =>
+    [(s!"MAX_U{width}", width, 2 ^ width - 1),
+     (s!"MAX_I{width}", width, 2 ^ (width - 1) - 1),
+     (s!"MIN_I{width}", width, -(2 ^ (width - 1)))]
+
+/-- The value of an integer bound a specification names. -/
+def specificationBound? (name : String) : Option Int :=
+  (specificationBounds.find? (·.1 == name)).map (·.2.2)
+
+/-- The bound a specification literal prints as. Only the bounds of 64 bits
+and wider are named: a smaller value such as `255` reads as itself. -/
+def specificationBoundName? (value : Int) : Option String :=
+  (specificationBounds.find? fun (_, width, bound) => width ≥ 64 && bound == value).map (·.1)
+
 end LeanerLang

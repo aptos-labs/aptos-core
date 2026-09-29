@@ -155,7 +155,6 @@ leaner module 0x42::enum_payload_reborrow where
   spec replace where
     ensures self == new Slot::Filled { value } && result == old(self).value
     aborts_if !(self is Filled) with 7
-  verify replace
 
 -- A shared field name need not have one type across enum variants. Preserve
 -- the typed pattern instead of replacing it with an ambiguous projection.
@@ -220,10 +219,12 @@ run_cmd do
     throwError "mutation printing is not a fixed point:\n{printed}\nsecond:\n{formatted}"
 
 leaner module 0x42::math where
+  -- A frontend fixture: its contracts are not verified.
+  pragma verify = false
   const ZERO : UInt<64> := 0
   const GREETING : string := "hello"
   const HEADER : Bytes := b[0, 127, 255]
-  struct Pair {T : type has Copy, Drop} has Copy, Drop where
+  struct Pair {T has Copy, Drop} has Copy, Drop where
     first : T
     second : T
   struct Holder where
@@ -240,7 +241,7 @@ leaner module 0x42::math where
     ensures core.prim.equal(result, core.prim.add(value, 1));
 
 leaner namespace examples::rust_identity using rust where
-  fun identity {T : type} (value : T) -> T := value
+  fun identity {T} (value : T) -> T := value
 
 leaner namespace examples::rust_implicit_copy using rust where
   fun tuple_first(pair : (u32, Bool)) -> u32 := pair[0u32]
@@ -274,7 +275,7 @@ leaner module 0x42::constant_references where
       | false => ABORT_CODE
 
 leaner module 0x42::specification_declarations where
-  opaque spec fun choose {T : type} (value : T) : T
+  opaque spec fun choose {T} (value : T) : T
   spec fun positive (value : Int) : Bool := core.prim.greater(value, 0)
   spec fun nonnegative (value : Int) : Bool := positive(value)
 
@@ -333,10 +334,10 @@ leaner module 0x42::behavior_generic_inference where
         aborts_of<f>(values[end_ - 1]))
 
 leaner module 0x42::contract_surface where
-  opaque spec fun serialize {T : type} (value : T) : Vector<UInt<8> >
-  public native fun maybe_size {T : type} () -> examples::option::Option::<UInt<64> >
-  public native fun size {T : type} (value : &T) -> UInt<64>
-  public native fun apply {T : type} (callback : Fn(T) -> T, value : T) -> T
+  opaque spec fun serialize {T} (value : T) : Vector<UInt<8> >
+  public native fun maybe_size {T} () -> examples::option::Option::<UInt<64> >
+  public native fun size {T} (value : &T) -> UInt<64>
+  public native fun apply {T} (callback : Fn(T) -> T, value : T) -> T
   spec size where
     aborts_if [abstract] false;
     ensures core.prim.equal(result, core.prim.length(serialize(value)));
@@ -368,7 +369,7 @@ leaner module 0x42::nominal_contracts where
   fun let_value (value : UInt<64>) -> UInt<64> := do
     let doubled : UInt<64> := core.prim.add(value, value);
     return doubled
-  fun same {T : type} (value : T) -> T := value
+  fun same {T} (value : T) -> T := value
   fun same_u64 (value : UInt<64>) -> UInt<64> := core.call same::<UInt<64> >(value)
   fun widen (value : UInt<64>) -> UInt<128> := value as UInt<128>
   fun borrow_bounded (value : Bounded) -> &Bounded := core.borrow(immutable, value)
@@ -383,9 +384,9 @@ leaner module 0x42::nominal_contracts where
   fun destructure (bounded : Bounded) -> UInt<64> := do
     let Bounded { value := field } : Bounded := bounded;
     return field
-  fun element_at {T : type} (values : Vector<T>, index : UInt<64>) -> T :=
+  fun element_at {T} (values : Vector<T>, index : UInt<64>) -> T :=
     core.prim.index(values, index)
-  fun subvector {T : type} (values : Vector<T>, start : UInt<64>, stop : UInt<64>) -> Vector<T> :=
+  fun subvector {T} (values : Vector<T>, start : UInt<64>, stop : UInt<64>) -> Vector<T> :=
     core.prim.slice(values, start, stop)
   fun destructure_pair (pair : (UInt<64>, Bool)) -> UInt<64> := do
     let (first, _) : (UInt<64>, Bool) := pair;
@@ -419,35 +420,35 @@ leaner module 0x42::nominal_contracts where
 
 leaner module 0x42::logical_range where
   spec fun interval (start : Int, stop : Int) : Range := core.prim.range(start, stop)
-  spec fun contains {T : type} (values : Vector<T>, needle : T) : Bool :=
+  spec fun contains {T} (values : Vector<T>, needle : T) : Bool :=
     ∃ (value in values), value == needle
-  spec fun empty {T : type} () : Vector<T> := spec.emptyVector::<T>()
-  spec fun singleton {T : type} (value : T) : Vector<T> :=
+  spec fun empty {T} () : Vector<T> := spec.emptyVector::<T>()
+  spec fun singleton {T} (value : T) : Vector<T> :=
     spec.singletonVector::<T>(value)
-  spec fun update {T : type} (values : Vector<T>, index : Int, value : T) : Vector<T> :=
+  spec fun update {T} (values : Vector<T>, index : Int, value : T) : Vector<T> :=
     spec.updateVector::<T>(values, index, value)
-  spec fun concat {T : type} (left : Vector<T>, right : Vector<T>) : Vector<T> :=
+  spec fun concat {T} (left : Vector<T>, right : Vector<T>) : Vector<T> :=
     spec.concatVector::<T>(left, right)
-  spec fun index_of {T : type} (values : Vector<T>, value : T) : Int :=
+  spec fun index_of {T} (values : Vector<T>, value : T) : Int :=
     spec.indexOfVector::<T>(values, value)
-  spec fun contains_value {T : type} (values : Vector<T>, value : T) : Bool :=
+  spec fun contains_value {T} (values : Vector<T>, value : T) : Bool :=
     spec.containsVector::<T>(values, value)
-  spec fun size {T : type} (values : Vector<T>) : Int :=
+  spec fun size {T} (values : Vector<T>) : Int :=
     spec.lengthVector::<T>(values)
-  spec fun get {T : type} (values : Vector<T>, index : Int) : T :=
+  spec fun get {T} (values : Vector<T>, index : Int) : T :=
     spec.indexVector::<T>(values, index)
-  spec fun slice {T : type} (values : Vector<T>, bounds : Range) : Vector<T> :=
+  spec fun slice {T} (values : Vector<T>, bounds : Range) : Vector<T> :=
     spec.sliceVector::<T>(values, bounds)
   spec fun logical_int (value : UInt<64>) : Int := spec.bitVectorToInt(value)
-  spec fun in_bounds {T : type} (values : Vector<T>, index : Int) : Bool :=
+  spec fun in_bounds {T} (values : Vector<T>, index : Int) : Bool :=
     spec.inVectorRange::<T>(values, index)
-  spec fun indices {T : type} (values : Vector<T>) : Range :=
+  spec fun indices {T} (values : Vector<T>) : Range :=
     spec.vectorRange::<T>(values)
   spec fun range_contains (values : Range, index : Int) : Bool := spec.inRange(values, index)
 
 leaner module 0x42::vector_regressions where
-  public native fun native_length {T : type} (values : &Vector<T>) -> UInt<64>
-  fun call_length {T : type} (values : &Vector<T>) -> UInt<64> :=
+  public native fun native_length {T} (values : &Vector<T>) -> UInt<64>
+  fun call_length {T} (values : &Vector<T>) -> UInt<64> :=
     core.call native_length::<T>(values)
   fun pair_zero () -> (Bool, UInt<64>) := core.prim.tuple(false, 0)
   fun intrinsic_early_return (flag : Bool) -> Bool := do
@@ -455,9 +456,9 @@ leaner module 0x42::vector_regressions where
     return false
   spec intrinsic_early_return where
     pragma intrinsic;
-  fun external_identity {T : type} (value : T) -> T :=
+  fun external_identity {T} (value : T) -> T :=
     value
-  fun generic_or_abort {T : type} (value : T, available : Bool) -> T :=
+  fun generic_or_abort {T} (value : T, available : Bool) -> T :=
     if available then value else abort()
 
 leaner module 0x42::statement_order where
@@ -516,6 +517,95 @@ leaner module 0x42::module_invariants where
   spec module where
     invariant forall (address : Address),
       global<Debit>(address).value <= global<Credit>(address).value
+
+-- A bounds check on one vector followed by an unchecked element place of
+-- another is not the check index sugar implies; it stays spelled.
+leaner module 0x42::mismatched_index_check where
+  pragma verify = false
+  fun borrow_other(checked : &Vector<u64>, values : &mut Vector<u64>, index : u64) -> &mut u64 := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*checked, index)
+    core.borrowPlace(mut, values[index])
+
+-- A bounds check followed by an element access on only one branch is not
+-- the check index sugar implies: the other branch must still abort.
+leaner module 0x42::conditional_index_check where
+  pragma verify = false
+  fun write_if(flag : Bool, values : &mut Vector<u64>, index : u64) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
+    if flag then core.assignPlace(values[index], 0)
+
+-- A check of one vector that one access implies does not license index sugar
+-- for another vector's access at the same index.
+leaner module 0x42::mixed_index_check where
+  pragma verify = false
+  fun write_both(checked : &mut Vector<u64>, other : &mut Vector<u64>, index : u64) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*checked, index)
+    core.assignPlace(checked[index], 0)
+    core.assignPlace(other[index], 0)
+
+-- A bounds check whose matching access is a later operand is not the check
+-- index sugar implies: operands evaluate left to right, so an earlier one
+-- acts, or aborts, before the implied check would run.
+leaner module 0x42::operand_order_index_check where
+  pragma verify = false
+  fun counter() -> u64 := 0
+  fun observe_pair(value : u64, target : &mut u64) -> Unit := ()
+  fun borrow_second(values : &mut Vector<u64>, index : u64) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
+    observe_pair(counter(), core.borrowPlace(mut, values[index]))
+
+-- A bounds check before an assignment whose value can act is not the check
+-- index sugar implies: the assignment evaluates its value before it resolves
+-- the place, and the lowering checks the bounds after that value.
+leaner module 0x42::assigned_value_index_check where
+  pragma verify = false
+  fun counter() -> u64 := 0
+  fun assign_computed(values : &mut Vector<u64>, index : u64) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
+    core.assignPlace(values[index], counter())
+
+-- A field projection resolves against the value's active variant, so reading
+-- one can fail where the variant does not carry it. An assigned value that
+-- reads a field therefore does not keep the bounds check first.
+leaner module 0x42::variant_field_index_check where
+  pragma verify = false
+  enum Choice has Copy, Drop where
+    | Payload (value : u64)
+    | Nothing
+  fun assign_field(values : &mut Vector<u64>, index : u64, choice : &Choice) -> Unit := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*values, index)
+    core.assignPlace(values[index], core.read(choice.value))
+
+-- Nested indexing whose outer index is computed: the lowering binds the
+-- computed index between the two bounds checks.
+leaner module 0x42::nested_computed_index where
+  pragma verify = false
+  fun read_nested(values : &Vector<Vector<u64> >, i : u64, j : u64) -> u64 :=
+    values[i][j + 1]
+  fun borrow_nested(values : &mut Vector<Vector<u64> >, i : u64, j : u64) -> &mut u64 :=
+    &mut values[i][j + 1]
+
+-- The same nesting reached through a field: the inner check tests a field of
+-- the checked element, so the group has to be seen through the projection.
+leaner module 0x42::nested_field_index where
+  pragma verify = false
+  struct Holder has Store, Key where
+    values : Vector<u64>
+  fun borrow_field_nested(items : &mut Vector<Holder>, i : u64, j : u64) -> &mut u64 :=
+    &mut items[i].values[j + 1]
+
+-- A check of an unrelated vector between a check and its access is not part
+-- of that access's nested group: both checks can abort, so whichever runs
+-- first decides the error, and eliding the earlier one moves it after this
+-- one. The earlier check stays spelled.
+leaner module 0x42::independent_check_between where
+  pragma verify = false
+  fun borrow_after_other(
+    checked : &mut Vector<u64>, other : &Vector<u64>, index : u64
+  ) -> &mut u64 := do
+    let _ := core.prim.checkVectorIndex[moveVectorError](*checked, index)
+    let _ := core.prim.checkVectorIndex[moveVectorError](*other, index)
+    core.borrowPlace(mut, checked[index])
 
 leaner module 0x42::move2_index where
   struct Resource has Store, Key where
@@ -842,10 +932,10 @@ elab "#guard_leaner_frontend" : command => do
     "  fun observe(value : u64) -> Unit := ()\n\n" ++
     "  fun sequence(value : u64) -> u64 := do\n" ++
     "    observe(value)\n" ++
-    "    return value\n\n" ++
+    "    value\n\n" ++
     "  fun let_value(value : u64) -> u64 := do\n" ++
     "    let doubled := value + value\n" ++
-    "    return doubled\n\n" ++
+    "    doubled\n\n" ++
     "  fun same {T}(value : T) -> T := value\n\n" ++
     "  fun same_u64(value : u64) -> u64 := same(value)\n\n" ++
     "  fun widen(value : u64) -> u128 := value as u128\n\n" ++
@@ -858,13 +948,13 @@ elab "#guard_leaner_frontend" : command => do
     "    *target := value\n\n" ++
     "  fun destructure(bounded : Bounded) -> u64 := do\n" ++
     "    let Bounded { value := field } := bounded\n" ++
-    "    return field\n\n" ++
+    "    field\n\n" ++
     "  fun element_at {T}(values : Vector<T>, index : u64) -> T := values[index]\n\n" ++
     "  fun subvector {T}(values : Vector<T>, start : u64, stop : u64) -> Vector<T> :=\n" ++
     "    slice(values, start, stop)\n\n" ++
     "  fun destructure_pair(pair : (u64, Bool)) -> u64 := do\n" ++
     "    let (first, _) := pair\n" ++
-    "    return first\n\n" ++
+    "    first\n\n" ++
     "  fun singleton_tuple(value : u64) -> (u64) := (value,)\n\n" ++
     "  fun assume_true() -> Unit := spec assume true\n\n" ++
     "  fun capture_state() -> Unit := spec do\n" ++
@@ -881,7 +971,7 @@ elab "#guard_leaner_frontend" : command => do
     "    where\n" ++
     "      let bound := limit\n" ++
     "      invariant current <= bound\n" ++
-    "    return current\n\n" ++
+    "    current\n\n" ++
     "  fun keyword_parameter(end : u64) -> u64 := end\n\n" ++
     "  fun checked_equal(value : u64) -> Bool := value + 1 == value\n\n" ++
     "  fun assign_pair(left : u64, right : Bool, pair : (u64, Bool)) -> Unit :=\n" ++
@@ -899,7 +989,7 @@ elab "#guard_leaner_frontend" : command => do
       unless printed.contains
           "while i < len do\n      let mut target := elem\n      *target := false\n      i := i + 1" &&
           printed.contains
-            "if flag then\n      let next := value + 1\n      return next\n    else\n      value := value + 2\n      return value" &&
+            "if flag then\n      let next := value + 1\n      next\n    else\n      value := value + 2\n      value" &&
           !printed.contains "then do" && !printed.contains "else do" &&
           !printed.contains "while i < len do\n      do" &&
           printed.contains "fun discard_result(value : u64) -> Unit := do\n    value + 1" &&
@@ -990,9 +1080,12 @@ elab "#guard_leaner_frontend" : command => do
   | .error error => throwError "the Move 2 index-syntax fixture did not render: {error}"
   | .ok printed =>
       unless printed.contains "self.values[index]" &&
-          printed.contains "core.prim.checkVectorIndex[moveVectorError](self.values, index)" &&
-          printed.contains "core.borrowPlace(mut, self.values[index])" &&
-          printed.contains "core.assignPlace(self.values[index], value)" &&
+          -- An element access lowers to its bounds check and the element
+          -- place; the source keeps the sugar, which implies the check.
+          !printed.contains "checkVectorIndex" &&
+          printed.contains "&self.values[index]" &&
+          printed.contains "&mut self.values[index]" &&
+          printed.contains "self.values[index] := value" &&
           printed.contains "&Resource[address]" &&
           printed.contains "&mut Resource[address].value" &&
           printed.contains "Resource[address] := value" &&
@@ -1003,6 +1096,96 @@ elab "#guard_leaner_frontend" : command => do
       | .error error => throwError "the Move 2 index-syntax fixture did not re-import: {error}"
       | .ok formatted => unless formatted == printed do
           throwError "Move 2 index syntax is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
+  let some mismatchedCheck := LeanerLang.registeredUnit? env `«0x42».mismatched_index_check
+    | throwError "the mismatched index-check fixture was not registered"
+  match LeanerLang.Print.render env mismatchedCheck with
+  | .error error => throwError "the mismatched index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*checked, index)" &&
+          printed.contains "core.borrowPlace(mut, values[index])" do
+        throwError "a bounds check on another vector was elided:\n{printed}"
+      match LeanerLang.Print.formatSource env printed with
+      | .error error => throwError "the mismatched index-check fixture did not re-import: {error}"
+      | .ok formatted => unless formatted == printed do
+          throwError "the mismatched index check is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
+  -- The element places share the check's index node, as a lowering's do.
+  -- Such a unit comes from no surface source, so it is assembled directly.
+  let shareCheckedIndex (name : Name) :
+      Lean.Elab.Command.CommandElabM LeanerIR.Validation.ValidatedUnit := do
+    let some unit := LeanerLang.registeredUnit? env name
+      | throwError "the index-check fixture {name} was not registered"
+    let some ns := unit.namespaces[0]?
+      | throwError "the index-check fixture {name} has no namespace"
+    let some checkedIndex := ns.expressions.findSome? fun expression =>
+        match expression.kind with
+        | .operation (.primitive (.checkVectorIndex _)) _ #[_, index] _ => some index
+        | _ => none
+      | throwError "the index-check fixture {name} has no bounds check"
+    let places := ns.places.map fun
+      | .index base _ => .index base checkedIndex
+      | place => place
+    pure <| LeanerIR.Validation.Internal.mkValidatedUnit unit.tables unit.profiles
+      (unit.namespaces.set! 0 { ns with places }) unit.dependencies unit.evidence unit.indexes
+      unit.structurizationWitnesses unit.resolution unit.initializationCertificates
+      unit.borrowCertificates unit.borrowDiagnostics
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».conditional_index_check) with
+  | .error error => throwError "the conditional index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
+        throwError "a bounds check before a conditional access was elided:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».mixed_index_check) with
+  | .error error => throwError "the mixed index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "checked[index] := 0" &&
+          printed.contains "core.assignPlace(other[index], 0)" do
+        throwError "an unchecked access of another vector gained index sugar:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».operand_order_index_check) with
+  | .error error => throwError "the operand-order index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
+        throwError "a bounds check before a later operand's access was elided:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».assigned_value_index_check) with
+  | .error error => throwError "the assigned-value index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
+        throwError "a bounds check before an assignment of a computed value was elided:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».variant_field_index_check) with
+  | .error error => throwError "the variant-field index-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*values, index)" do
+        throwError "a bounds check before an assignment of a field read was elided:\n{printed}"
+  let some nestedComputed := LeanerLang.registeredUnit? env `«0x42».nested_computed_index
+    | throwError "the nested computed-index fixture was not registered"
+  match LeanerLang.Print.render env nestedComputed with
+  | .error error => throwError "the nested computed-index fixture did not render: {error}"
+  | .ok printed =>
+      -- The borrow is the load-bearing case: a value read lowers through the
+      -- `index` primitive and emits no check at all, so it cannot catch a
+      -- check that goes missing. The place form emits one check per index
+      -- level, and eliding is all-or-nothing, so a check that is elided into
+      -- a place that keeps its unsugared spelling is dropped outright.
+      unless printed.contains "&mut values[i][j + 1]" &&
+          !printed.contains "checkVectorIndex" && !printed.contains "borrowPlace" do
+        throwError "a nested place at a computed index lost a bounds check:\n{printed}"
+      match LeanerLang.Print.formatSource env printed with
+      | .error error =>
+          throwError "the nested computed-index fixture did not re-import: {error}"
+      | .ok formatted => unless formatted == printed do
+          throwError "nested indexing at a computed index is not a canonical fixed point\nprinted:\n{printed}\nformatted:\n{formatted}"
+  let some nestedField := LeanerLang.registeredUnit? env `«0x42».nested_field_index
+    | throwError "the nested field-index fixture was not registered"
+  match LeanerLang.Print.render env nestedField with
+  | .error error => throwError "the nested field-index fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "&mut items[i].values[j + 1]" &&
+          !printed.contains "checkVectorIndex" && !printed.contains "borrowPlace" do
+        throwError "a nested place through a field lost a bounds check:\n{printed}"
+  match LeanerLang.Print.render env (← shareCheckedIndex `«0x42».independent_check_between) with
+  | .error error => throwError "the independent-check fixture did not render: {error}"
+  | .ok printed =>
+      unless printed.contains "core.prim.checkVectorIndex[moveVectorError](*checked, index)" &&
+          printed.contains "core.prim.checkVectorIndex[moveVectorError](*other, index)" do
+        throwError "a bounds check was elided across an unrelated check:\n{printed}"
   let some surfaceRegressions := LeanerLang.registeredUnit? env `«0x42».surface_regressions
     | throwError "the surface-regression fixture was not registered"
   match LeanerLang.Print.render env surfaceRegressions with

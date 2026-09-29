@@ -49,7 +49,7 @@ misuses** and proves their absence — canonically **use-after-death**:
 access through a pointer whose allocation has died (freed heap memory, or
 a stack place whose owner was dropped or whose frame returned). Every
 misuse in scope must be a *located, failed proof obligation* under
-`#leaner_verify` and a *detected, located outcome* in the interpreter:
+`verify` and a *detected, located outcome* in the interpreter:
 
 | Misuse | Detected as |
 |---|---|
@@ -198,7 +198,7 @@ against `memory`, and its methods are ordinary code: `read p` is
   preconditions (liveness, bounds, initializedness) and its memory
   effects as postconditions: an unsafe `fn` is exactly a function whose
   contract carries safety preconditions its caller must discharge.
-- Misuse fixtures are negative tests in both modes: `#leaner_verify`
+- Misuse fixtures are negative tests in both modes: `verify`
   fails at the named premise and location, recorded in an
   expected-failure baseline with a trailing `// error: ...` marker, and
   the interpreter reports the located `undefined` outcome.
@@ -233,7 +233,7 @@ against `memory`, and its methods are ordinary code: `read p` is
   `undefined` outcomes, and a positive `swap_via_raw` fixture runs
   end-to-end from Rust source.
 - **UP2 — misuse-finding verification.** §6 wp arms, contracts, spec
-  predicates. Gate: `#leaner_verify` proves `swap_via_raw` sorry-free,
+  predicates. Gate: `verify` proves `swap_via_raw` sorry-free,
   and each misuse fixture fails at exactly its named premise and
   location, recorded in expected-failure baselines.
 - **UP3 — heap ownership and library models.** A `Box`-class model and

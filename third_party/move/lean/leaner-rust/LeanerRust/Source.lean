@@ -990,6 +990,9 @@ mutual
         -- source form to render here. The Rust frontend never produces this
         -- operation; a Move unit reaching the Rust backend is the real error.
         throw "validated vector push has no Rust source form"
+    | .signerAddress =>
+        -- A signer is a Move type; the Rust frontend never produces one.
+        throw "validated signer address has no Rust source form"
     | .add => method "wrapping_add"
     | .subtract => method "wrapping_sub"
     | .multiply => method "wrapping_mul"
@@ -1034,6 +1037,10 @@ mutual
         .checkedCast _ | .slice | .range | .implies | .equivalent |
         .containsVector | .indexOfVector | .checkVectorIndex _ =>
         throw s!"primitive {repr kind} requires source-level control reconstruction"
+    | .compare =>
+        -- Rust orders values through `Ord` implementations, not by structure;
+        -- the Rust frontend never produces this operation.
+        throw "the structural order `compare` has no Rust source form"
 
   private partial def callText (context : Context) (loops : List String)
       (kind : CallKind) (arguments : Array ExprId) (fuel : Nat) : Except String String := do

@@ -89,7 +89,9 @@ private structure BorrowFlow where
   normal : Option BorrowState := none
   breaks : Array (Nat × BorrowState) := #[]
   breakValueLoans : Array (Nat × Array LoanFact) := #[]
-  continues : Array (Nat × BorrowState) := #[]
+  /-- Each `continue`: its loop nesting, the state it reaches, and the
+  expression itself, before which loans scoped to the body die. -/
+  continues : Array (Nat × BorrowState × ExprId) := #[]
   returns : Array BorrowState := #[]
   valueLoans : Array LoanFact := #[]
   observed : Array LoanFact := #[]
@@ -611,6 +613,21 @@ private partial def patternVariables (ns : ValidatedNamespace) (patternId : Patt
   | _, some { kind := .wildcard, .. } | _, some { kind := .literal _, .. } |
       _, some { kind := .range .., .. } => #[]
 
+/-- The locals an expression declares, by `let` or a match arm. -/
+private partial def bodyDeclaredLocals (ns : ValidatedNamespace) (root : ExprId)
+    (found : Array LocalId := #[]) : Array LocalId :=
+  match ns.expressions[root.index]? with
+  | none => found
+  | some expression =>
+      let found := match expression.kind with
+        | ExprKind.letDecl pattern _ _ => appendUniqueLocals found (patternVariables ns pattern)
+        | ExprKind.match_ _ arms =>
+            arms.foldl (fun found arm => appendUniqueLocals found (patternVariables ns arm.pattern))
+              found
+        | _ => found
+      (expressionChildren expression.kind).foldl
+        (fun found child => bodyDeclaredLocals ns child found) found
+
 private def directLocalPlace? (ns : ValidatedNamespace) (placeId : PlaceId) : Option LocalId :=
   match ns.places[placeId.index]? with
   | some (.localVar localId) => some localId
@@ -645,7 +662,10 @@ private partial def typeMayContainReference (ns : ValidatedNamespace) (typeId : 
   | fuel + 1, some (.function arguments result _) =>
       arguments.any (typeMayContainReference ns · fuel) ||
         typeMayContainReference ns result fuel
-  | _, some (.nominal ..) | _, some (.typeParameter _) | _, some (.profile _) => true
+  -- Move type arguments are never references, and Move structs and enums
+  -- have no reference fields; other profiles may carry references in both.
+  | _, some (.nominal ..) | _, some (.typeParameter _) => ns.profile != some .move
+  | _, some (.profile _) => true
   | _, some (.typeDomain type) => typeMayContainReference ns type (fuel - 1)
   | _, some (.resourceDomain _ (some arguments)) =>
       arguments.any (typeMayContainReference ns · (fuel - 1))
@@ -1000,7 +1020,9 @@ private partial def updatePatternLoansFromExpression
   match fuel, ns.patterns[pattern.index]? with
   | 0, _ | _, none =>
       (patternVariables ns pattern).foldl updateFallback state
-  | _, some { kind := .variable holder, .. } =>
+  | _, some { kind := .variable holder, typeId, .. } =>
+      -- A holder whose type holds no reference holds no loan.
+      if !typeMayContainReference ns typeId then state else
       let selected := observed.filter (loanFlowsFromExpression ns · expression)
       if replace then
         bindObservedLoansFromExpressionAtProjection unit ns
@@ -1285,7 +1307,10 @@ mutual
                   | _ =>
                       let valueLoans := if typeMayContainReference ns expression.typeId then
                         argumentsFlow.observed else #[]
-                      (some afterArguments, valueLoans, #[], #[])
+                      -- A temporary borrow the result cannot carry ends with the
+                      -- operation, as it does at a call.
+                      (some (discardUncarriedTemporaries afterArguments argumentsFlow.observed
+                        valueLoans), valueLoans, #[], #[])
                 { argumentsFlow with
                   normal
                   valueLoans
@@ -1412,7 +1437,7 @@ mutual
               | some _ => valueFlow.breakValueLoans.push (nest, valueFlow.valueLoans)
               | none => valueFlow.breakValueLoans
             { valueFlow with normal := none, breaks, breakValueLoans, valueLoans := #[] }
-        | .continue_ nest => { continues := #[(nest, state)] }
+        | .continue_ nest => { continues := #[(nest, state, exprId)] }
         | .return_ values =>
             let state := retainLoansUsedBy ns values.toList state preserved
             let valuesFlow := analyzeExprList unit ns values.toList state preserved
@@ -1557,28 +1582,42 @@ mutual
   private partial def analyzeLoop (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (body : ExprId)
       (initial entry : BorrowState) (fuel : Nat)
-      (preserved : Array ExprId := #[]) : BorrowFlow :=
+      (preserved : Array ExprId := #[]) (declared? : Option (Array LocalId) := none) :
+      BorrowFlow :=
     let bodyFlow := analyzeExpr unit ns body entry preserved
     let valueLoans := bodyFlow.breakValueLoans.foldl (init := #[]) fun loans pair =>
       if pair.1 == 0 then appendUniqueLoans loans pair.2 else loans
     let outerBreakValueLoans := bodyFlow.breakValueLoans.filterMap fun (nest, loans) =>
       match nest with | 0 => none | nest + 1 => some (nest, loans)
+    -- A `continue` of this loop ends the loans its body's locals hold: the
+    -- body declares them afresh before any use on re-entry.
+    let declared := match declared? with
+      | some declared => declared
+      | none => bodyDeclaredLocals ns body
+    let bodyScoped (loan : LoanFact) : Bool :=
+      !loan.holders.isEmpty && loan.holders.all declared.contains
+    let continueDeaths := bodyFlow.continues.foldl (init := #[]) fun deaths (nest, state, anchor) =>
+      if nest == 0 then
+        pushDeaths deaths (state.active.filter fun loan => loan.kind == .mutable && bodyScoped loan)
+          { anchor, before := true }
+      else deaths
     let reentries :=
       (match bodyFlow.normal with | some state => #[state] | none => #[]) ++
-        (bodyFlow.continues.filterMap fun (nest, state) => if nest == 0 then some state else none)
+        (bodyFlow.continues.filterMap fun (nest, state, _) =>
+          if nest == 0 then some { active := state.active.filter (!bodyScoped ·) } else none)
     -- Widen from the current entry rather than re-seeding from `initial`:
     -- the iterate then only grows, so the equality test converges within the
     -- finite loan lattice instead of oscillating through loan kills until the
     -- fuel is exhausted on every (possibly nested) loop.
     let nextEntry := reentries.foldl mergeState entry
     if fuel > 0 && nextEntry != entry then
-      let next := analyzeLoop unit ns body initial nextEntry (fuel - 1) preserved
+      let next := analyzeLoop unit ns body initial nextEntry (fuel - 1) preserved (some declared)
       { next with
         valueLoans := appendUniqueLoans valueLoans next.valueLoans
         breakValueLoans := outerBreakValueLoans ++ next.breakValueLoans
         returns := bodyFlow.returns ++ next.returns
         observed := appendUniqueLoans bodyFlow.observed next.observed
-        deaths := appendUniqueDeaths bodyFlow.deaths next.deaths
+        deaths := appendUniqueDeaths (appendUniqueDeaths bodyFlow.deaths continueDeaths) next.deaths
         diagnostics := bodyFlow.diagnostics ++ next.diagnostics }
     else
       let exits := bodyFlow.breaks.filterMap fun (nest, state) =>
@@ -1586,12 +1625,12 @@ mutual
       let normal := exits.foldl (fun result state => mergeNormal result (some state)) none
       let outerBreaks := bodyFlow.breaks.filterMap fun (nest, state) =>
         match nest with | 0 => none | nest + 1 => some (nest, state)
-      let outerContinues := bodyFlow.continues.filterMap fun (nest, state) =>
-        match nest with | 0 => none | nest + 1 => some (nest, state)
+      let outerContinues := bodyFlow.continues.filterMap fun (nest, state, anchor) =>
+        match nest with | 0 => none | nest + 1 => some (nest, state, anchor)
       { normal, breaks := outerBreaks, breakValueLoans := outerBreakValueLoans
         continues := outerContinues, valueLoans
         returns := bodyFlow.returns
-        observed := bodyFlow.observed, deaths := bodyFlow.deaths
+        observed := bodyFlow.observed, deaths := appendUniqueDeaths bodyFlow.deaths continueDeaths
         diagnostics := bodyFlow.diagnostics }
 end
 
@@ -1891,28 +1930,30 @@ private def borrowAnalysis (unit : ValidatedUnit) (ns : ValidatedNamespace)
               normal := some returned
               deaths := pushDeaths flow.deaths died { anchor := root } }
       -- A loan taken through a dereference of a reference parameter reborrows
-      -- caller-owned storage and escapes with the parameter's lifetime; only
-      -- loans of frame-owned storage must not outlive the frame. Move's VM
-      -- also roots global resources in the invocation frame: references to
-      -- those resources may not escape, even through another local holder.
-      -- Reborrows through local reference variables stay conservative.
+      -- caller-owned storage and escapes with the parameter's lifetime, and
+      -- so does a loan through a local holding such a reborrow; only loans
+      -- of frame-owned storage must not outlive the frame. Move's VM also
+      -- roots global resources in the invocation frame: references to those
+      -- resources may not escape, even through another local holder.
       let parameters := referenceParameters ns function
       let escapingRoot (root : LoanRoot) : Bool :=
         match root with
         | .external => true
         | .global _ => ns.profile != some .move
         | _ => false
+      let rec callerRooted (state : BorrowState) (loan : LoanFact) : Nat → Bool
+        | 0 => false
+        | fuel + 1 =>
+            escapingRoot loan.place.root ||
+              (loan.place.projections[0]? == some .dereference &&
+                loan.place.root.local?.any fun rootLocal =>
+                  parameters.any (·.localId == rootLocal) ||
+                    state.active.any fun parent =>
+                      parent.expression != loan.expression &&
+                        parent.holders.contains rootLocal &&
+                        callerRooted state parent fuel)
       let frameOwned (state : BorrowState) (loan : LoanFact) : Bool :=
-        let rootedInEscapingReference :=
-          loan.place.projections[0]? == some .dereference &&
-            loan.place.root.local?.any fun rootLocal =>
-              parameters.any (·.localId == rootLocal) ||
-                state.active.any fun parent =>
-                  parent.expression != loan.expression &&
-                    parent.holders.contains rootLocal &&
-                    escapingRoot parent.place.root
-        !(rootedInEscapingReference ||
-          escapingRoot loan.place.root)
+        !callerRooted state loan (state.active.size + 1)
       let normalEscapes := match flow.normal with
         | some state => state.active.any (frameOwned state)
         | none => false

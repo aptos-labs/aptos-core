@@ -34,22 +34,21 @@ leaner module 0x42::denote_cache where
   spec valid where
     ensures result == value
     aborts_if false
-  verify valid
 
   fun forged(value : u64) -> u64 := value
   spec forged where
+    pragma verify = false
     ensures result == value
     aborts_if false
 
 -- Genuine certificates remain reusable, including inside a Lean namespace.
-#leaner_verify 0x42::denote_cache::valid
-#leaner_require_native 0x42::denote_cache::valid
+verify 0x42::denote_cache::valid
 
 theorem «0x42».denote_cache.forged.typedVerified : True := True.intro
 
 /-- error: `forged` was verified by a retired route -/
 #guard_msgs in
-#leaner_verify 0x42::denote_cache::forged
+verify 0x42::denote_cache::forged
 
 open Lean Elab Command in
 run_cmd do
@@ -76,7 +75,7 @@ theorem «0x42».forged_cache.direct.compiled_eq : True := True.intro
 
 /-- error: artifact `«0x42».forged_cache.direct.typedVerified` depends on unapproved axiom `«0x42».forged_cache.direct.typedVerified` -/
 #guard_msgs in
-#leaner_verify 0x42::forged_cache::direct
+verify 0x42::forged_cache::direct
 
 axiom UntrustedCache.proof : @Term.denote = @Term.denote
 theorem «0x42».forged_cache.indirect.typedVerified : @Term.denote = @Term.denote :=
@@ -86,7 +85,7 @@ theorem «0x42».forged_cache.indirect.compiled_eq : True := True.intro
 
 /-- error: artifact `«0x42».forged_cache.indirect.typedVerified` depends on unapproved axiom `UntrustedCache.proof` -/
 #guard_msgs in
-#leaner_verify 0x42::forged_cache::indirect
+verify 0x42::forged_cache::indirect
 
 -- Even an axiom-free look-alike is not a generated contract proof.
 theorem «0x42».forged_cache.lookalike.typedVerified : @Term.denote = @Term.denote := rfl
@@ -95,7 +94,7 @@ theorem «0x42».forged_cache.lookalike.compiled_eq : True := True.intro
 
 /-- error: `lookalike` has no completed denotation verification -/
 #guard_msgs in
-#leaner_verify 0x42::forged_cache::lookalike
+verify 0x42::forged_cache::lookalike
 
 -- A private extension is not a security boundary for source metaprograms.
 theorem «0x42».forged_cache.lookalike.verified : True := True.intro
@@ -111,8 +110,4 @@ run_cmd do
 
 /-- error: `lookalike` has an invalid public verification certificate -/
 #guard_msgs in
-#leaner_verify 0x42::forged_cache::lookalike
-
-/-- error: `lookalike` has an invalid public verification certificate -/
-#guard_msgs in
-#leaner_require_native 0x42::forged_cache::lookalike
+verify 0x42::forged_cache::lookalike

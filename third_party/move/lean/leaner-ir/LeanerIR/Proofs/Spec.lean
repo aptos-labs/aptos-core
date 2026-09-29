@@ -12,12 +12,13 @@ are relations. The deployed execution semantics is the LIR interpreter; the
 two are connected where a function's relational meaning is derived from its
 big-step judgment.
 
-The model is the frozen reference stack's `Move.Semantics.Spec` generalized
-over the failure vocabulary: LIR throws carry a kind and arguments, not a
+The model is generalized over the failure vocabulary: LIR throws carry a kind and arguments, not a
 bare abort code, so the failure component is a type parameter `ε`.
 -/
 
 namespace LeanerIR.Proofs
+
+universe u
 
 /-- A relational state-and-failure computation. The failure relation mentions
 only the initial state because transaction effects are rolled back. -/
@@ -65,6 +66,12 @@ theorem trans {first second third : Spec σ ε α}
 
 end Equiv
 
+/-- Every outcome of `left` is an outcome of `right`. -/
+structure Refines (left right : Spec σ ε α) : Prop where
+  ok : ∀ initial result final, left.ok initial result final → right.ok initial result final
+  aborts : ∀ initial error, left.aborts initial error → right.aborts initial error
+  undefined : ∀ initial, left.undefined initial → right.undefined initial
+
 /-- The computation with no terminating execution.  This is the zeroth
 finite approximation used to interpret recursive functions. -/
 def bottom : Spec σ ε α where
@@ -102,6 +109,18 @@ def modify (f : σ → σ) : Spec σ ε Unit where
   ok := fun initial result final => result = () ∧ final = f initial
   aborts := fun _ _ => False
 
+/-- Any value, the state unchanged: the choice of a prophecy, the value a
+mutable reference will hold when it dies. -/
+def choose : Spec σ ε α where
+  ok := fun initial _ final => final = initial
+  aborts := fun _ _ => False
+
+/-- Continue only where a proposition holds: the resolution of a prophecy.
+Executions in which it fails do not exist; nothing is owed. -/
+def assume (proposition : Prop) : Spec σ ε Unit where
+  ok := fun initial result final => proposition ∧ result = () ∧ final = initial
+  aborts := fun _ _ => False
+
 /-- Execute a recursive specification with at most `fuel` unfoldings.
 
 This fuel is semantic proof machinery, not a source or runtime bound.  The
@@ -136,7 +155,7 @@ def withInvariant (body : (Args → Spec σ ε Result) → Args → Spec σ ε R
 /-- One heterogeneous family of mutually recursive functions.  The index
 selects both the argument and result type, so an SCC is not forced to give
 every member the same signature. -/
-abbrev Family (σ ε : Type) (Index : Type) (Args Result : Index → Type) :=
+abbrev Family (σ ε : Type) (Index : Type u) (Args Result : Index → Type) :=
   (index : Index) → Args index → Spec σ ε (Result index)
 
 /-- The finite approximants of a mutually recursive family advance every

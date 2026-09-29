@@ -18,10 +18,10 @@ use std::{any::Any, fmt};
 
 pub type VMResult<T> = Result<T, VMInternalError>;
 
-/// Where the interpreter attributed a VM error.
+/// Where a VM error was attributed.
 ///
-/// Subsystem errors remain location-independent. The interpreter attaches a
-/// location when it knows the executing frame.
+/// The interpreter attaches the executing frame's location when known. The
+/// loader uses [`ErrorLocation::Script`] for script deserialization failures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorLocation {
     /// A Move instruction: its module, defining function, and offset in that
@@ -39,6 +39,20 @@ pub enum ErrorLocation {
     Script,
 }
 
+/// A stack trace entry: a calling function and the original bytecode offset
+/// of its in-progress call.
+///
+/// Stack traces list the most recent caller first and exclude the frame where
+/// execution stopped. Failures in the root frame or outside Move code have
+/// no caller frames.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallFrame {
+    /// [`None`] for a script frame.
+    pub module: Option<ModuleId>,
+    pub function: FunctionDefinitionIndex,
+    pub offset: BytecodeOffset,
+}
+
 pub struct VMInternalError(Box<ErrorData>);
 
 /// Boxed error data that keeps [`VMInternalError`] one word wide. Every VM
@@ -48,6 +62,8 @@ struct ErrorData {
     error: Box<dyn IntoExecutionError>,
     /// [`None`] for an error raised outside Move code.
     location: Option<ErrorLocation>,
+    /// The stack trace, empty until one is attached. See [`CallFrame`].
+    stack_trace: Vec<CallFrame>,
 }
 
 const _: () = assert!(std::mem::size_of::<VMInternalError>() == 8);
@@ -57,6 +73,7 @@ impl VMInternalError {
         VMInternalError(Box::new(ErrorData {
             error: Box::new(err),
             location: None,
+            stack_trace: Vec::new(),
         }))
     }
 
@@ -77,6 +94,17 @@ impl VMInternalError {
     /// Returns the attached location, or [`None`] if none was attached.
     pub fn location(&self) -> Option<&ErrorLocation> {
         self.0.location.as_ref()
+    }
+
+    /// Attaches `stack_trace`, replacing any previously attached trace.
+    pub fn with_stack_trace(mut self, stack_trace: Vec<CallFrame>) -> Self {
+        self.0.stack_trace = stack_trace;
+        self
+    }
+
+    /// The attached stack trace, empty if none was attached. See [`CallFrame`].
+    pub fn stack_trace(&self) -> &[CallFrame] {
+        &self.0.stack_trace
     }
 }
 

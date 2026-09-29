@@ -6,6 +6,12 @@ name: "mono-move-tests-parity"
 #
 # See third_party/move/mono-move/aptos-tests-parity/README.md.
 on:
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+
   # `pull_request`, never `pull_request_target`: this runs untrusted PR code on a
   # self-hosted runner, and `pull_request_target` would hand that code a writable
   # token in the base-repo context.
@@ -14,8 +20,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: mono-move-tests-parity-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-mono-move-tests-parity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -38,6 +44,8 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
 
       # Install Move Prover tools, matching the rust-unit-tests job.
       - name: Run dev_setup.sh
@@ -114,6 +122,8 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
       - name: Build aptos-node
         run: cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
       - name: Save aptos-node binary to cache
@@ -132,6 +142,8 @@ jobs:
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
       - name: Build smoke test archive and helper binaries
         run: |
           cargo build --locked --release --package aptos --package aptos-debugger
@@ -157,6 +169,8 @@ jobs:
         partition: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
 
       - name: Run postgres database
         run: docker run --detach -p 5432:5432 cimg/postgres:14.2
@@ -233,6 +247,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}
       - name: Download every partition's results
         uses: actions/download-artifact@v4
         with:

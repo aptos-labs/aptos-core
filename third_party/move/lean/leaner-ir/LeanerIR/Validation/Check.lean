@@ -1512,8 +1512,11 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
     rawUnit.namespaces.size structuredNamespaces
   if resolutionDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics resolutionDiagnostics)
+  let variantOrders := structuredNamespaces.map fun ns => ns.structs.map fun declaration =>
+    declaration.variants.map fun variant =>
+      ((rawUnit.tables.names[variant.name.index]?).map (·.name)).getD ""
   let namespaces := structurized.map fun s =>
-    ({ toNamespace := s.ns, tables := rawUnit.tables } : ValidatedNamespace)
+    ({ toNamespace := s.ns, tables := rawUnit.tables, variantOrders } : ValidatedNamespace)
   let unit := Internal.mkValidatedUnit rawUnit.tables rawUnit.profiles namespaces
     (rawUnit.dependencies.map fun dep => {
       namespaceId := dep.namespaceId

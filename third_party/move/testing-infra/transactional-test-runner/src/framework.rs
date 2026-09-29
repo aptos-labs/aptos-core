@@ -88,6 +88,13 @@ impl CompiledState<'_> {
         }
     }
 
+    pub fn resolve_signers(&self, signers: Vec<ParsedAddress>) -> Vec<AccountAddress> {
+        signers
+            .into_iter()
+            .map(|signer| self.resolve_address(&signer))
+            .collect()
+    }
+
     pub fn resolve_args<Extra: ParsableValue>(
         &self,
         args: Vec<ParsedValue<Extra>>,
@@ -1191,8 +1198,7 @@ fn handle_cross_compiled_output(
             test_path.display()
         ),
     );
-    let _ = fs::create_dir_all(path.parent().expect("parent path"));
-    fs::write(&path, &text)?;
+    write_creating_parent(&path, &text)?;
     Ok(path)
 }
 
@@ -1221,7 +1227,8 @@ impl UpdatePolicy {
     fn cannot_create_hint(self) -> &'static str {
         match self {
             UpdatePolicy::Forbidden => {
-                "\nThis baseline is owned by another test suite and cannot be updated from here."
+                "\nThis baseline is owned by another test suite and cannot be created from here; \
+                 add the test to the owning suite first."
             },
             UpdatePolicy::ExistingOnly => {
                 "\nThis baseline overrides another suite's, so it must be declared in the \
@@ -1285,6 +1292,16 @@ impl BaselineTarget {
     }
 }
 
+/// Writes `text` to `path`, creating parent directories as needed for
+/// override baselines and cross-compiled outputs.
+fn write_creating_parent(path: &Path, text: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, text)?;
+    Ok(())
+}
+
 /// Compares `output` with `target`, or updates the baseline when requested and
 /// permitted. Passing `update_requested` explicitly keeps policy behavior
 /// testable without changing the process environment.
@@ -1299,13 +1316,13 @@ fn handle_expected_output(
     let exp_path = target.path(test_path);
 
     if update_requested && target.update_policy.may_write(exp_path.exists()) {
-        std::fs::write(&exp_path, output)?;
+        write_creating_parent(&exp_path, output)?;
         return Ok(());
     }
 
     if !exp_path.exists() {
         match target.update_policy {
-            UpdatePolicy::CreateOrUpdate => std::fs::write(&exp_path, "")?,
+            UpdatePolicy::CreateOrUpdate => write_creating_parent(&exp_path, "")?,
             UpdatePolicy::Forbidden | UpdatePolicy::ExistingOnly => anyhow::bail!(
                 "missing baseline `{}` for `{}`{}",
                 exp_path.display(),
@@ -1328,7 +1345,10 @@ fn handle_expected_output(
                 anyhow::bail!(add_update_baseline_fix(msg))
             },
             UpdatePolicy::Forbidden => anyhow::bail!(
-                "{msg}\nThis baseline is owned by another test suite and cannot be updated from here."
+                "{msg}\nThis baseline is owned by another test suite, so the output above is a \
+                 divergence between the two suites' implementations. Either make this suite \
+                 produce the recorded output, or record the divergence in this suite's own \
+                 override baseline; the shared baseline cannot be updated from here."
             ),
         }
     } else {
@@ -1460,6 +1480,14 @@ mod baseline_tests {
         let error = check(&fresh, "output", UpdatePolicy::CreateOrUpdate, false).unwrap_err();
         assert!(error.to_string().contains("UB=1"));
         assert_eq!(std::fs::read_to_string(&fresh).unwrap(), "");
+    }
+
+    #[test]
+    fn a_created_baseline_gets_its_directory() {
+        let dir = TempDir::new().unwrap();
+        let exp = dir.path().join("corpus/nested/test.exp");
+        check(&exp, "output", UpdatePolicy::CreateOrUpdate, true).unwrap();
+        assert_eq!(std::fs::read_to_string(&exp).unwrap(), "output");
     }
 
     #[test]

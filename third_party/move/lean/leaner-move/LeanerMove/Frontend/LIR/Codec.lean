@@ -174,6 +174,7 @@ def specXastOperation : LeanerIR.SpecOperation → Except String Xast.Operation
   | .global label => pure (.global label)
   | .canModify => pure .canModify
   | .old => pure .old
+  | .final => .error "`final` has no Move specification form"
   | .saveStateAnchor label => pure (.saveStateAnchor label)
   | .withStateAnchor label => pure (.withStateAnchor label)
   | .foldsCaptureAnchor label => pure (.foldsCaptureAnchor label)

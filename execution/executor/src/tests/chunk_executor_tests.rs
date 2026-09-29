@@ -165,6 +165,8 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
 #[test]
 fn test_finished_executor_rejects_chunks_without_panicking() {
     let batch_size: u64 = 10;
+    // A single chunk of versions, not a list of versions.
+    #[allow(clippy::single_range_in_vec_init)]
     let (chunks, ledger_info) = create_transaction_chunks(vec![1..=batch_size]);
 
     let TestExecutor {

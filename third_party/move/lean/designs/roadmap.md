@@ -1,6 +1,6 @@
 # Cross-design roadmap
 
-Status: priority ordering agreed 2026-08-27, progress noted at the 2026-09-08 checkpoint.
+Status: priority ordering agreed 2026-08-27, progress noted at the 2026-09-21 checkpoint.
 This document orders the work across the current designs; each linked design stays authoritative for its
 own scope, gates, and deferred-work register. Update the ordering here when a
 design's status section changes.
@@ -45,7 +45,7 @@ compiler-correctness claims) they re-emerge inside the designs below.
    the interpreter, the big-step relation, and the verifier; its
    milestones P1–P5 are complete (they replaced the M5 reference bullets
    and the former concrete-to-prophecy refinement obligation), including
-   generated reference contracts and the `#leaner_verify` command.
+   generated reference contracts and the `verify` command.
    M4 gate met 2026-08-29: calculation rules cover every expression kind,
    generated contracts read the Move abort discipline (codes and the two
    abort pragmas), obligations carry authored clause ranges and failures
@@ -58,10 +58,11 @@ compiler-correctness claims) they re-emerge inside the designs below.
    2026-09-08): one `denote` of validated LIR into `Spec` and one agreement
    theorem against `BigStep`, executing V5 of
    [`historical/verification-v2.md`](historical/verification-v2.md).
-   Checkpoint 2026-09-08: D0 and D1 done (agreement assumed as a named
-   axiom by the user's decision), D2 references and storage carried, 35 of
+   Checkpoint 2026-09-21: D0 and D1 done (agreement assumed as a named
+   axiom by the user's decision), D2 references, storage, resource
+   invariants, vectors, and unspecified callees carried, 45 of
    61 Check files exact per [`test-organization.md`](test-organization.md);
-   next are resource invariants, vectors, recursion, returned references,
+   next are the remaining vector primitives, recursion, returned references,
    generics (D3), and the retirement of the previous routes (D4). T2 (the
    produced LeanerLang verifies) is not started.
 

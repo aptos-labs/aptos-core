@@ -5,9 +5,10 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    types::InternedType, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
-    FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
-    SortedSafePointEntries, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    types::{InternedType, EMPTY_TYPE_LIST},
+    Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo, FrameOffset as FO,
+    Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp, SortedSafePointEntries,
+    ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 mod common;
 
@@ -49,6 +50,8 @@ fn minimal_func() -> Function {
         entry_gas: 0,
         param_slots: vec![],
         param_tys: vec![],
+        return_slots: vec![],
+        return_tys: EMPTY_TYPE_LIST,
         param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,
@@ -205,16 +208,16 @@ fn frame_bounds_extended_frame_too_small() {
 }
 
 #[test]
-fn origins_table_must_be_empty_or_parallel_to_code() {
+fn origins_table_must_be_empty_or_match_code_length() {
     // Two-entry origins table against one-op code.
     let mut func = minimal_func();
     func.code = Code::with_origins(vec![MicroOp::Return], vec![0, 0]);
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(errors
         .iter()
-        .any(|error| error.message.contains("origins table")));
+        .any(|error| error.message.contains("number of origins")));
 
-    // Parallel table passes.
+    // A table with one entry per micro-op passes.
     func.code = Code::with_origins(vec![MicroOp::Return], vec![0]);
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
@@ -450,9 +453,9 @@ fn zero_frame_size() {
 // Static arithmetic constraints (imm-form ops)
 // ---------------------------------------------------------------------------
 //
-// Some imm-form ops would always abort at runtime for a particular imm
-// value (`Div`/`Mod` with `0`, shifts with `>= 64`). The verifier rejects
-// these statically.
+// Unchecked u64 division, remainder, and shift ops require nonzero divisors
+// and shift amounts below 64. The verifier rejects violations of these
+// lowering invariants.
 
 fn func_with_single_op(op: MicroOp) -> Function {
     Function {

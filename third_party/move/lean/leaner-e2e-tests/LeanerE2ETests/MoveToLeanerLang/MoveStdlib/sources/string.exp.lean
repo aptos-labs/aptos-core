@@ -31,7 +31,7 @@ leaner module 0x1::«string» where
   -/
   public fun utf8(bytes : Vector<u8>) -> String := do
     assert!(internal_check_utf8(&bytes), EINVALID_UTF8)
-    return new String { bytes }
+    new String { bytes }
 
   spec utf8 where
     pragma opaque
@@ -55,7 +55,7 @@ leaner module 0x1::«string» where
   -/
   public fun into_bytes(self : String) -> Vector<u8> := do
     let String { bytes := bytes } := self
-    return bytes
+    bytes
 
   /--
   Checks whether this string is empty.
@@ -109,7 +109,7 @@ leaner module 0x1::«string» where
         && internal_is_char_boundary(bytes, j),
       EINVALID_INDEX
     )
-    return new String { bytes := internal_sub_string(bytes, i, j) }
+    new String { bytes := internal_sub_string(bytes, i, j) }
 
   /--
   Computes the index of the first occurrence of a string. Returns `length(s)` if no occurrence found.

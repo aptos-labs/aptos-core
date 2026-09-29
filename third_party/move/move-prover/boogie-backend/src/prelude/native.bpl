@@ -76,27 +76,27 @@ function {:inline} $EmptyVec{{S}}(): Vec ({{T}}) {
     EmptyVec()
 }
 
-procedure {:inline 1} $1_vector_empty{{S}}() returns (v: Vec ({{T}})) {
+procedure {:inline 1} $1.vector.empty{{S}}() returns (v: Vec ({{T}})) {
     v := EmptyVec();
 }
 
-function {:inline} $1_vector_$empty{{S}}(): Vec ({{T}}) {
+function {:inline} $1.vector.$empty{{S}}(): Vec ({{T}}) {
     EmptyVec()
 }
 
-procedure {:inline 1} $1_vector_is_empty{{S}}(v: Vec ({{T}})) returns (b: bool) {
+procedure {:inline 1} $1.vector.is_empty{{S}}(v: Vec ({{T}})) returns (b: bool) {
     b := IsEmptyVec(v);
 }
 
-procedure {:inline 1} $1_vector_push_back{{S}}(m: $Mutation (Vec ({{T}})), val: {{T}}) returns (m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.push_back{{S}}(m: $Mutation (Vec ({{T}})), val: {{T}}) returns (m': $Mutation (Vec ({{T}}))) {
     m' := $UpdateMutation(m, ExtendVec($Dereference(m), val));
 }
 
-function {:inline} $1_vector_$push_back{{S}}(v: Vec ({{T}}), val: {{T}}): Vec ({{T}}) {
+function {:inline} $1.vector.$push_back{{S}}(v: Vec ({{T}}), val: {{T}}): Vec ({{T}}) {
     ExtendVec(v, val)
 }
 
-procedure {:inline 1} $1_vector_pop_back{{S}}(m: $Mutation (Vec ({{T}}))) returns (e: {{T}}, m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.pop_back{{S}}(m: $Mutation (Vec ({{T}}))) returns (e: {{T}}, m': $Mutation (Vec ({{T}}))) {
     var v: Vec ({{T}});
     var len: int;
     v := $Dereference(m);
@@ -109,19 +109,19 @@ procedure {:inline 1} $1_vector_pop_back{{S}}(m: $Mutation (Vec ({{T}}))) return
     m' := $UpdateMutation(m, RemoveVec(v));
 }
 
-procedure {:inline 1} $1_vector_append{{S}}(m: $Mutation (Vec ({{T}})), other: Vec ({{T}})) returns (m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.append{{S}}(m: $Mutation (Vec ({{T}})), other: Vec ({{T}})) returns (m': $Mutation (Vec ({{T}}))) {
     m' := $UpdateMutation(m, ConcatVec($Dereference(m), other));
 }
 
-procedure {:inline 1} $1_vector_reverse{{S}}(m: $Mutation (Vec ({{T}}))) returns (m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.reverse{{S}}(m: $Mutation (Vec ({{T}}))) returns (m': $Mutation (Vec ({{T}}))) {
     m' := $UpdateMutation(m, ReverseVec($Dereference(m)));
 }
 
-procedure {:inline 1} $1_vector_reverse_append{{S}}(m: $Mutation (Vec ({{T}})), other: Vec ({{T}})) returns (m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.reverse_append{{S}}(m: $Mutation (Vec ({{T}})), other: Vec ({{T}})) returns (m': $Mutation (Vec ({{T}}))) {
     m' := $UpdateMutation(m, ConcatVec($Dereference(m), ReverseVec(other)));
 }
 
-procedure {:inline 1} $1_vector_trim_reverse{{S}}(m: $Mutation (Vec ({{T}})), new_len: int) returns (v: (Vec ({{T}})), m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.trim_reverse{{S}}(m: $Mutation (Vec ({{T}})), new_len: int) returns (v: (Vec ({{T}})), m': $Mutation (Vec ({{T}}))) {
     var len: int;
     v := $Dereference(m);
     if (LenVec(v) < new_len) {
@@ -133,7 +133,7 @@ procedure {:inline 1} $1_vector_trim_reverse{{S}}(m: $Mutation (Vec ({{T}})), ne
     m' := $UpdateMutation(m, SliceVec($Dereference(m), 0, new_len));
 }
 
-procedure {:inline 1} $1_vector_trim{{S}}(m: $Mutation (Vec ({{T}})), new_len: int) returns (v: (Vec ({{T}})), m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.trim{{S}}(m: $Mutation (Vec ({{T}})), new_len: int) returns (v: (Vec ({{T}})), m': $Mutation (Vec ({{T}}))) {
     var len: int;
     v := $Dereference(m);
     if (LenVec(v) < new_len) {
@@ -144,7 +144,7 @@ procedure {:inline 1} $1_vector_trim{{S}}(m: $Mutation (Vec ({{T}})), new_len: i
     m' := $UpdateMutation(m, SliceVec($Dereference(m), 0, new_len));
 }
 
-procedure {:inline 1} $1_vector_reverse_slice{{S}}(m: $Mutation (Vec ({{T}})), left: int, right: int) returns (m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.reverse_slice{{S}}(m: $Mutation (Vec ({{T}})), left: int, right: int) returns (m': $Mutation (Vec ({{T}}))) {
     var left_vec: Vec ({{T}});
     var mid_vec: Vec ({{T}});
     var right_vec: Vec ({{T}});
@@ -170,7 +170,7 @@ procedure {:inline 1} $1_vector_reverse_slice{{S}}(m: $Mutation (Vec ({{T}})), l
     m' := $UpdateMutation(m, ConcatVec(left_vec, ConcatVec(mid_vec, right_vec)));
 }
 
-procedure {:inline 1} $1_vector_rotate{{S}}(m: $Mutation (Vec ({{T}})), rot: int) returns (n: int, m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.rotate{{S}}(m: $Mutation (Vec ({{T}})), rot: int) returns (n: int, m': $Mutation (Vec ({{T}}))) {
     var v: Vec ({{T}});
     var len: int;
     var left_vec: Vec ({{T}});
@@ -186,7 +186,7 @@ procedure {:inline 1} $1_vector_rotate{{S}}(m: $Mutation (Vec ({{T}})), rot: int
     n := LenVec(v) - rot;
 }
 
-procedure {:inline 1} $1_vector_rotate_slice{{S}}(m: $Mutation (Vec ({{T}})), left: int, rot: int, right: int) returns (n: int, m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.rotate_slice{{S}}(m: $Mutation (Vec ({{T}})), left: int, rot: int, right: int) returns (n: int, m': $Mutation (Vec ({{T}}))) {
     var left_vec: Vec ({{T}});
     var mid_vec: Vec ({{T}});
     var right_vec: Vec ({{T}});
@@ -218,7 +218,7 @@ procedure {:inline 1} $1_vector_rotate_slice{{S}}(m: $Mutation (Vec ({{T}})), le
     n := left + (right - rot);
 }
 
-procedure {:inline 1} $1_vector_insert{{S}}(m: $Mutation (Vec ({{T}})), i: int, e: {{T}}) returns (m': $Mutation (Vec ({{T}}))) {
+procedure {:inline 1} $1.vector.insert{{S}}(m: $Mutation (Vec ({{T}})), i: int, e: {{T}}) returns (m': $Mutation (Vec ({{T}}))) {
     var left_vec: Vec ({{T}});
     var right_vec: Vec ({{T}});
     var v: Vec ({{T}});
@@ -240,7 +240,7 @@ procedure {:inline 1} $1_vector_insert{{S}}(m: $Mutation (Vec ({{T}})), i: int, 
 // half-open range `[removal_position, removal_position+length)` from `from` and splices it
 // into `to` at `insert_position`, shifting `to[insert_position..]` to the right. Move enforces
 // that `from` and `to` are distinct (no aliasing of mutable references).
-procedure {:inline 1} $1_vector_move_range{{S}}(
+procedure {:inline 1} $1.vector.move_range{{S}}(
     from: $Mutation (Vec ({{T}})),
     removal_position: int,
     length: int,
@@ -255,7 +255,7 @@ procedure {:inline 1} $1_vector_move_range{{S}}(
     to_v := $Dereference(to);
     // The `< 0` checks are defensive — Move's u64 arguments are non-negative by typing,
     // but Boogie ints can be arbitrary so we guard explicitly. Matches the convention
-    // used in `$1_vector_insert` above.
+    // used in `$1.vector.insert` above.
     if (removal_position < 0
         || length < 0
         || removal_position + length > LenVec(from_v)
@@ -273,15 +273,15 @@ procedure {:inline 1} $1_vector_move_range{{S}}(
                   ConcatVec(middle, SliceVec(to_v, insert_position, LenVec(to_v)))));
 }
 
-procedure {:inline 1} $1_vector_length{{S}}(v: Vec ({{T}})) returns (l: int) {
+procedure {:inline 1} $1.vector.length{{S}}(v: Vec ({{T}})) returns (l: int) {
     l := LenVec(v);
 }
 
-function {:inline} $1_vector_$length{{S}}(v: Vec ({{T}})): int {
+function {:inline} $1.vector.$length{{S}}(v: Vec ({{T}})): int {
     LenVec(v)
 }
 
-procedure {:inline 1} $1_vector_borrow{{S}}(v: Vec ({{T}}), i: int) returns (dst: {{T}}) {
+procedure {:inline 1} $1.vector.borrow{{S}}(v: Vec ({{T}}), i: int) returns (dst: {{T}}) {
     if (!InRangeVec(v, i)) {
         call $ExecFailureAbort();
         return;
@@ -289,11 +289,11 @@ procedure {:inline 1} $1_vector_borrow{{S}}(v: Vec ({{T}}), i: int) returns (dst
     dst := ReadVec(v, i);
 }
 
-function {:inline} $1_vector_$borrow{{S}}(v: Vec ({{T}}), i: int): {{T}} {
+function {:inline} $1.vector.$borrow{{S}}(v: Vec ({{T}}), i: int): {{T}} {
     ReadVec(v, i)
 }
 
-procedure {:inline 1} $1_vector_borrow_mut{{S}}(m: $Mutation (Vec ({{T}})), index: int)
+procedure {:inline 1} $1.vector.borrow_mut{{S}}(m: $Mutation (Vec ({{T}})), index: int)
 returns (dst: $Mutation ({{T}}), m': $Mutation (Vec ({{T}})))
 {
     var v: Vec ({{T}});
@@ -306,17 +306,17 @@ returns (dst: $Mutation ({{T}}), m': $Mutation (Vec ({{T}})))
     m' := m;
 }
 
-function {:inline} $1_vector_$borrow_mut{{S}}(v: Vec ({{T}}), i: int): {{T}} {
+function {:inline} $1.vector.$borrow_mut{{S}}(v: Vec ({{T}}), i: int): {{T}} {
     ReadVec(v, i)
 }
 
-procedure {:inline 1} $1_vector_destroy_empty{{S}}(v: Vec ({{T}})) {
+procedure {:inline 1} $1.vector.destroy_empty{{S}}(v: Vec ({{T}})) {
     if (!IsEmptyVec(v)) {
       call $ExecFailureAbort();
     }
 }
 
-procedure {:inline 1} $1_vector_swap{{S}}(m: $Mutation (Vec ({{T}})), i: int, j: int) returns (m': $Mutation (Vec ({{T}})))
+procedure {:inline 1} $1.vector.swap{{S}}(m: $Mutation (Vec ({{T}})), i: int, j: int) returns (m': $Mutation (Vec ({{T}})))
 {
     var v: Vec ({{T}});
     v := $Dereference(m);
@@ -327,11 +327,11 @@ procedure {:inline 1} $1_vector_swap{{S}}(m: $Mutation (Vec ({{T}})), i: int, j:
     m' := $UpdateMutation(m, SwapVec(v, i, j));
 }
 
-function {:inline} $1_vector_$swap{{S}}(v: Vec ({{T}}), i: int, j: int): Vec ({{T}}) {
+function {:inline} $1.vector.$swap{{S}}(v: Vec ({{T}}), i: int, j: int): Vec ({{T}}) {
     SwapVec(v, i, j)
 }
 
-procedure {:inline 1} $1_vector_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) returns (e: {{T}}, m': $Mutation (Vec ({{T}})))
+procedure {:inline 1} $1.vector.remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) returns (e: {{T}}, m': $Mutation (Vec ({{T}})))
 {
     var v: Vec ({{T}});
 
@@ -345,7 +345,7 @@ procedure {:inline 1} $1_vector_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) 
     m' := $UpdateMutation(m, RemoveAtVec(v, i));
 }
 
-procedure {:inline 1} $1_vector_remove_value{{S}}(m: $Mutation (Vec ({{T}})), e: {{T}})
+procedure {:inline 1} $1.vector.remove_value{{S}}(m: $Mutation (Vec ({{T}})), e: {{T}})
 returns (removed: Vec ({{T}}), m': $Mutation (Vec ({{T}})))
 {
     var i: int;
@@ -362,7 +362,7 @@ returns (removed: Vec ({{T}}), m': $Mutation (Vec ({{T}})))
     }
 }
 
-procedure {:inline 1} $1_vector_swap_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) returns (e: {{T}}, m': $Mutation (Vec ({{T}})))
+procedure {:inline 1} $1.vector.swap_remove{{S}}(m: $Mutation (Vec ({{T}})), i: int) returns (e: {{T}}, m': $Mutation (Vec ({{T}})))
 {
     var len: int;
     var v: Vec ({{T}});
@@ -377,12 +377,12 @@ procedure {:inline 1} $1_vector_swap_remove{{S}}(m: $Mutation (Vec ({{T}})), i: 
     m' := $UpdateMutation(m, RemoveVec(SwapVec(v, i, len-1)));
 }
 
-procedure {:inline 1} $1_vector_contains{{S}}(v: Vec ({{T}}), e: {{T}}) returns (res: bool)  {
+procedure {:inline 1} $1.vector.contains{{S}}(v: Vec ({{T}}), e: {{T}}) returns (res: bool)  {
     res := $ContainsVec{{S}}(v, e);
 }
 
 procedure {:inline 1}
-$1_vector_index_of{{S}}(v: Vec ({{T}}), e: {{T}}) returns (res1: bool, res2: int) {
+$1.vector.index_of{{S}}(v: Vec ({{T}}), e: {{T}}) returns (res1: bool, res2: int) {
     res2 := $IndexOfVec{{S}}(v, e);
     if (res2 >= 0) {
         res1 := true;
@@ -557,7 +557,7 @@ procedure {:inline 2} {{impl.fun_has_key}}{{S}}(t: ({{Self}}), k: {{K}}) returns
 {%- endif %}
 
 {# Emission gates used by the templates below (documented once here):
-   - `cmp_available`: `$1_cmp_$compare'K'` only exists in the prelude when K appears
+   - `cmp_available`: `$1.cmp.$compare'K'` only exists in the prelude when K appears
      in a cmp instantiation; ordering templates must not reference it otherwise.
    - `not instance.1.is_bv`: skips the speculative bit-vector twin instances
      (`add_prelude` duplicates every numeric-valued map instance with a bv value
@@ -569,13 +569,13 @@ procedure {:inline 2} {{impl.fun_has_key}}{{S}}(t: ({{Self}}), k: {{K}}) returns
 {%- if impl.fun_get != "" and not instance.1.is_bv %}
 // Read-only lookup. Returns `Some(value)` when `k` is in the map, `None` otherwise.
 // Never aborts.
-procedure {:inline 2} {{impl.fun_get}}{{S}}(t: ({{Self}}), k: {{K}}) returns (result: $1_option_Option{{SV}}) {
+procedure {:inline 2} {{impl.fun_get}}{{S}}(t: ({{Self}}), k: {{K}}) returns (result: $1.option.Option{{SV}}) {
     var enc_k: int;
     enc_k := {{ENC}}(k);
     if (ContainsTable(t{{U}}, enc_k)) {
-        result := $1_option_Option{{SV}}_Some(GetTable(t{{U}}, enc_k));
+        result := $1.option.Option{{SV}}.Some(GetTable(t{{U}}, enc_k));
     } else {
-        result := $1_option_Option{{SV}}_None();
+        result := $1.option.Option{{SV}}.None();
     }
 }
 {%- endif %}
@@ -594,7 +594,7 @@ procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+            $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Less());
 {%- if HAS_ENUM %}
     assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == 0;
 {%- endif %}
@@ -615,7 +615,7 @@ procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+            $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Greater());
 {%- if HAS_ENUM %}
     assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == LenTable(t{{U}}) - 1;
 {%- endif %}
@@ -634,7 +634,7 @@ procedure {:inline 2} {{impl.fun_front_key}}{{S}}(t: {{Self}}) returns (k: {{K}}
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+            $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Less());
 {%- if HAS_ENUM %}
     assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == 0;
 {%- endif %}
@@ -653,7 +653,7 @@ procedure {:inline 2} {{impl.fun_back_key}}{{S}}(t: {{Self}}) returns (k: {{K}})
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+            $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Greater());
 {%- if HAS_ENUM %}
     assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == LenTable(t{{U}}) - 1;
 {%- endif %}
@@ -677,7 +677,7 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+            $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Less());
 {%- if HAS_ENUM %}
     assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == 0;
 {%- endif %}
@@ -702,7 +702,7 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+            $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Greater());
 {%- if HAS_ENUM %}
     assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == LenTable(t{{U}}) - 1;
 {%- endif %}
@@ -713,34 +713,34 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
 {%- if impl.fun_prev_key != "" and impl.fun_spec_has_key != "" and not instance.0.is_bv and instance.0.cmp_available %}
 // Largest key strictly less than `key` under `cmp::compare`, wrapped in `Option<K>`
 // (None when no such key exists). Never aborts.
-procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: $1_option_Option{{SK}}) {
+procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: $1.option.Option{{SK}}) {
     var k: {{K}};
     if ((exists k_p: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k_p)} $IsValid'{{instance.0.suffix}}'(k_p)
             && {{impl.fun_spec_has_key}}{{S}}(t, k_p)
-            && $1_cmp_$compare'{{instance.0.suffix}}'(k_p, key) == $1_cmp_Ordering_Less())) {
+            && $1.cmp.$compare'{{instance.0.suffix}}'(k_p, key) == $1.cmp.Ordering.Less())) {
         assume $IsValid'{{instance.0.suffix}}'(k);
         assume {{impl.fun_spec_has_key}}{{S}}(t, k);
-        assume $1_cmp_$compare'{{instance.0.suffix}}'(k, key) == $1_cmp_Ordering_Less();
+        assume $1.cmp.$compare'{{instance.0.suffix}}'(k, key) == $1.cmp.Ordering.Less();
         // k is the *largest* such predecessor: any other in-map k_p that is also
         // < key must satisfy k > k_p.
         assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
             !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
             {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(other, key) == $1_cmp_Ordering_Less() ==>
-                $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+            $1.cmp.$compare'{{instance.0.suffix}}'(other, key) == $1.cmp.Ordering.Less() ==>
+                $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Greater());
 {%- if HAS_ENUM %}
         // The predecessor of a contained key sits one position earlier.
         assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
             {{ERK}}(t{{U}}, {{ENC}}(k)) == {{ERK}}(t{{U}}, {{ENC}}(key)) - 1;
 {%- endif %}
-        result := $1_option_Option{{SK}}_Some(k);
+        result := $1.option.Option{{SK}}.Some(k);
     } else {
 {%- if HAS_ENUM %}
         // No predecessor means `key` occupies the first position.
         assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
             {{ERK}}(t{{U}}, {{ENC}}(key)) == 0;
 {%- endif %}
-        result := $1_option_Option{{SK}}_None();
+        result := $1.option.Option{{SK}}.None();
     }
 }
 {%- endif %}
@@ -748,21 +748,21 @@ procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}}) return
 {%- if impl.fun_next_key != "" and impl.fun_spec_has_key != "" and not instance.0.is_bv and instance.0.cmp_available %}
 // Smallest key strictly greater than `key` under `cmp::compare`, wrapped in `Option<K>`
 // (None when no such key exists). Never aborts.
-procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: $1_option_Option{{SK}}) {
+procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) returns (result: $1.option.Option{{SK}}) {
     var k: {{K}};
     if ((exists k_p: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k_p)} $IsValid'{{instance.0.suffix}}'(k_p)
             && {{impl.fun_spec_has_key}}{{S}}(t, k_p)
-            && $1_cmp_$compare'{{instance.0.suffix}}'(k_p, key) == $1_cmp_Ordering_Greater())) {
+            && $1.cmp.$compare'{{instance.0.suffix}}'(k_p, key) == $1.cmp.Ordering.Greater())) {
         assume $IsValid'{{instance.0.suffix}}'(k);
         assume {{impl.fun_spec_has_key}}{{S}}(t, k);
-        assume $1_cmp_$compare'{{instance.0.suffix}}'(k, key) == $1_cmp_Ordering_Greater();
+        assume $1.cmp.$compare'{{instance.0.suffix}}'(k, key) == $1.cmp.Ordering.Greater();
         // k is the *smallest* such successor: any other in-map k_p that is also
         // > key must satisfy k < k_p.
         assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
             !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
             {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
-            $1_cmp_$compare'{{instance.0.suffix}}'(other, key) == $1_cmp_Ordering_Greater() ==>
-                $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+            $1.cmp.$compare'{{instance.0.suffix}}'(other, key) == $1.cmp.Ordering.Greater() ==>
+                $1.cmp.$compare'{{instance.0.suffix}}'(k, other) == $1.cmp.Ordering.Less());
 {%- if HAS_ENUM %}
         // The successor of a contained key sits one position later. Minimality
         // above is stated through `cmp::compare` and does not by itself reach
@@ -771,14 +771,14 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
         assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
             {{ERK}}(t{{U}}, {{ENC}}(k)) == {{ERK}}(t{{U}}, {{ENC}}(key)) + 1;
 {%- endif %}
-        result := $1_option_Option{{SK}}_Some(k);
+        result := $1.option.Option{{SK}}.Some(k);
     } else {
 {%- if HAS_ENUM %}
         // No successor means `key` occupies the last position.
         assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
             {{ERK}}(t{{U}}, {{ENC}}(key)) == LenTable(t{{U}}) - 1;
 {%- endif %}
-        result := $1_option_Option{{SK}}_None();
+        result := $1.option.Option{{SK}}.None();
     }
 }
 {%- endif %}
@@ -801,7 +801,7 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     // Keys are returned in ascending `cmp::compare` order.
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i < j ==>
-        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1_cmp_Ordering_Less());
+        $1.cmp.$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1.cmp.Ordering.Less());
 {%- endif %}
 {%- if HAS_ENUM %}
     // The returned vector and the enumeration agree position by position:
@@ -853,7 +853,7 @@ procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (resu
     // Keys are returned in ascending `cmp::compare` order.
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i < j ==>
-        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)) == $1_cmp_Ordering_Less());
+        $1.cmp.$compare'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)) == $1.cmp.Ordering.Less());
 {%- endif %}
 }
 {%- endif %}
@@ -1131,7 +1131,7 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
 // Insert (k, v) or update v if k already maps. Returns the previous value (if any) as
 // `Option<V>`. Never aborts.
 procedure {:inline 2} {{impl.fun_upsert}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, v: {{V}})
-returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
+returns (prev_v: $1.option.Option{{SV}}, m': $Mutation ({{Self}})) {
     var enc_k: int;
     var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
@@ -1139,10 +1139,10 @@ returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     if (ContainsTable(t{{U}}, enc_k)) {
         {#- Existing key: an in-place value replacement, not a structural
             mutation — ghosts (the validity slot) are preserved. -#}
-        prev_v := $1_option_Option{{SV}}_Some(GetTable(t{{U}}, enc_k));
+        prev_v := $1.option.Option{{SV}}.Some(GetTable(t{{U}}, enc_k));
         m' := $UpdateMutation(m, {{SW1}}UpdateTable(t{{U}}, enc_k, v){{SW2}});
     } else {
-        prev_v := $1_option_Option{{SV}}_None();
+        prev_v := $1.option.Option{{SV}}.None();
 {%- if HAS_ENUM %}
         // Insertion keeps the table cardinality-consistent. Stated here rather
         // than as a preservation axiom because an axiom triggered on
@@ -1175,16 +1175,16 @@ returns (v: {{V}}, m': $Mutation({{Self}})) {
 // Remove the entry at `k` if present. Returns `Some(prev_value)` on hit, `None` on miss.
 // Never aborts.
 procedure {:inline 2} {{impl.fun_remove_or_none}}{{S}}(m: $Mutation ({{Self}}), k: {{K}})
-returns (result: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
+returns (result: $1.option.Option{{SV}}, m': $Mutation ({{Self}})) {
     var enc_k: int;
     var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (ContainsTable(t{{U}}, enc_k)) {
-        result := $1_option_Option{{SV}}_Some(GetTable(t{{U}}, enc_k));
+        result := $1.option.Option{{SV}}.Some(GetTable(t{{U}}, enc_k));
         {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, enc_k){{W2}});
     } else {
-        result := $1_option_Option{{SV}}_None();
+        result := $1.option.Option{{SV}}.None();
         m' := m;
     }
 }
@@ -1295,7 +1295,7 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
 {#- A position-based iterator names no key, so the key comes from the
     enumeration: position i holds key_at(t, i). Aborts on the end iterator or
     an out-of-range position, which is what a stale iterator degrades to. -#}
-    if (!(self is {{ITER}}_{{impl.iter_variant}})
+    if (!(self is {{ITER}}.{{impl.iter_variant}})
         || self->{{impl.iter_key_sel}} < 0
         || self->{{impl.iter_key_sel}} >= LenTable(t{{U}})) {
         call $ExecFailureAbort();
@@ -1315,7 +1315,7 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
 {%- else %}
 {#- A keyed iterator carries its key; aborts on the end iterator or an absent
     key (stale iterator). -#}
-    if (!(self is {{ITER}}_{{impl.iter_variant}})) {
+    if (!(self is {{ITER}}.{{impl.iter_variant}})) {
         call $ExecFailureAbort();
     } else {
         enc_k := {{ENC}}(self->{{impl.iter_key_sel}});
@@ -1428,7 +1428,7 @@ axiom (forall t: {{Table}}, i: int :: {{"{"}}{{EKA}}(t, i)}
 // instantiation for the key type exists in this run.
 axiom (forall t: {{Table}}, i: int, j: int :: {{"{"}}{{EKA}}(t, i), {{EKA}}(t, j)}
     {{EWF}}(t) && 0 <= i && i < j && j < LenTable(t) ==>
-        $1_cmp_$compare'{{instance.0.suffix}}'({{EKA}}(t, i), {{EKA}}(t, j)) == $1_cmp_Ordering_Less());
+        $1.cmp.$compare'{{instance.0.suffix}}'({{EKA}}(t, i), {{EKA}}(t, j)) == $1.cmp.Ordering.Less());
 {%- endif %}
 // A contained key's rank is in range and key_at inverts it (up to $IsEqual).
 axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}{{ERK}}(t, {{ENC}}(k))}
@@ -1500,7 +1500,7 @@ function {:inline} {{impl.fun_spec_aborts_borrow}}{{S}}(t: {{Self}}, k: {{K}}): 
     when position-based. -#}
 {%- if impl.fun_spec_aborts_iter_borrow_mut != "" and impl.fun_iter_borrow_mut != "" %}
 function {:inline} {{impl.fun_spec_aborts_iter_borrow_mut}}{{S}}(self: {{ITER}}, t: {{Self}}): bool {
-    !(self is {{ITER}}_{{impl.iter_variant}})
+    !(self is {{ITER}}.{{impl.iter_variant}})
 {%- if impl.iter_is_index %}
         || self->{{impl.iter_key_sel}} < 0
         || self->{{impl.iter_key_sel}} >= LenTable(t{{U}})
@@ -1553,34 +1553,34 @@ function {{impl.fun_spec_leaf_offset}}{{S}}(it: {{impl.leaf_offset_prefix}}{% if
 // Serialize is modeled as an uninterpreted function, with an additional
 // axiom to say it's an injection.
 
-function $1_bcs_serialize{{S}}(v: {{T}}): Vec int;
+function $1.bcs.serialize{{S}}(v: {{T}}): Vec int;
 
-axiom (forall v1, v2: {{T}} :: {$1_bcs_serialize{{S}}(v1), $1_bcs_serialize{{S}}(v2)}
-   $IsEqual{{S}}(v1, v2) <==> $IsEqual'vec'u8''($1_bcs_serialize{{S}}(v1), $1_bcs_serialize{{S}}(v2)));
+axiom (forall v1, v2: {{T}} :: {$1.bcs.serialize{{S}}(v1), $1.bcs.serialize{{S}}(v2)}
+   $IsEqual{{S}}(v1, v2) <==> $IsEqual'vec'u8''($1.bcs.serialize{{S}}(v1), $1.bcs.serialize{{S}}(v2)));
 
 // This says that serialize returns a non-empty vec<u8>
 {% if options.serialize_bound == 0 %}
-axiom (forall v: {{T}} :: {$1_bcs_serialize{{S}}(v)}
-     ( var r := $1_bcs_serialize{{S}}(v); $IsValid'vec'u8''(r) && LenVec(r) > 0 ));
+axiom (forall v: {{T}} :: {$1.bcs.serialize{{S}}(v)}
+     ( var r := $1.bcs.serialize{{S}}(v); $IsValid'vec'u8''(r) && LenVec(r) > 0 ));
 {% else %}
-axiom (forall v: {{T}} :: {$1_bcs_serialize{{S}}(v)}
-     ( var r := $1_bcs_serialize{{S}}(v); $IsValid'vec'u8''(r) && LenVec(r) > 0 &&
+axiom (forall v: {{T}} :: {$1.bcs.serialize{{S}}(v)}
+     ( var r := $1.bcs.serialize{{S}}(v); $IsValid'vec'u8''(r) && LenVec(r) > 0 &&
                             LenVec(r) <= {{options.serialize_bound}} ));
 {% endif %}
 
-procedure $1_bcs_to_bytes{{S}}(v: {{T}}) returns (res: Vec int);
-ensures res == $1_bcs_serialize{{S}}(v);
+procedure $1.bcs.to_bytes{{S}}(v: {{T}}) returns (res: Vec int);
+ensures res == $1.bcs.serialize{{S}}(v);
 
-function {:inline} $1_bcs_$to_bytes{{S}}(v: {{T}}): Vec int {
-    $1_bcs_serialize{{S}}(v)
+function {:inline} $1.bcs.$to_bytes{{S}}(v: {{T}}): Vec int {
+    $1.bcs.serialize{{S}}(v)
 }
 
 {% if S == "'address'" -%}
 // Serialized addresses should have the same length.
 const $serialized_address_len: int;
 // Serialized addresses should have the same length
-axiom (forall v: int :: {$1_bcs_serialize'address'(v)}
-     ( var r := $1_bcs_serialize'address'(v); LenVec(r) == $serialized_address_len));
+axiom (forall v: int :: {$1.bcs.serialize'address'(v)}
+     ( var r := $1.bcs.serialize'address'(v); LenVec(r) == $serialized_address_len));
 {% endif %}
 {% endmacro hash_module %}
 
@@ -1593,11 +1593,11 @@ axiom (forall v: int :: {$1_bcs_serialize'address'(v)}
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 {%- set T = instance.name -%}
 
-procedure $1_from_bcs_from_bytes{{S}}(v: Vec int) returns (res: {{T}});
+procedure $1.from_bcs.from_bytes{{S}}(v: Vec int) returns (res: {{T}});
 
-function $1_from_bcs_$from_bytes{{S}}(v: Vec int): {{T}};
-axiom (forall v: Vec int :: {$1_from_bcs_deserialize{{S}}(v)}
-     ( var r := $1_from_bcs_$from_bytes{{S}}(v); r == $1_from_bcs_deserialize{{S}}(v) ));
+function $1.from_bcs.$from_bytes{{S}}(v: Vec int): {{T}};
+axiom (forall v: Vec int :: {$1.from_bcs.deserialize{{S}}(v)}
+     ( var r := $1.from_bcs.$from_bytes{{S}}(v); r == $1.from_bcs.deserialize{{S}}(v) ));
 
 {% endmacro from_bcs_module %}
 
@@ -1611,13 +1611,13 @@ axiom (forall v: Vec int :: {$1_from_bcs_deserialize{{S}}(v)}
 {%- set T = instance.name -%}
 
 // Map type specific handle to universal one.
-type $1_event_EventHandle{{S}} = $1_event_EventHandle;
+type $1.event.EventHandle{{S}} = $1.event.EventHandle;
 
-function {:inline} $IsEqual'$1_event_EventHandle{{S}}'(a: $1_event_EventHandle{{S}}, b: $1_event_EventHandle{{S}}): bool {
+function {:inline} $IsEqual'$1.event.EventHandle{{S}}'(a: $1.event.EventHandle{{S}}, b: $1.event.EventHandle{{S}}): bool {
     a == b
 }
 
-function $IsValid'$1_event_EventHandle{{S}}'(h: $1_event_EventHandle{{S}}): bool {
+function $IsValid'$1.event.EventHandle{{S}}'(h: $1.event.EventHandle{{S}}): bool {
     true
 }
 
@@ -1629,45 +1629,45 @@ axiom (forall v1, v2: {{T}} :: {$ToEventRep{{S}}(v1), $ToEventRep{{S}}(v2)}
 // Creates a new event handle. This ensures each time it is called that a unique new abstract event handler is
 // returned.
 // TODO: we should check (and abort with the right code) if no generator exists for the signer.
-procedure {:inline 1} $1_event_new_event_handle{{S}}(signer: $signer) returns (res: $1_event_EventHandle{{S}}) {
-    assume $1_event_EventHandles[res] == false;
-    $1_event_EventHandles := $1_event_EventHandles[res := true];
+procedure {:inline 1} $1.event.new_event_handle{{S}}(signer: $signer) returns (res: $1.event.EventHandle{{S}}) {
+    assume $1.event.EventHandles[res] == false;
+    $1.event.EventHandles := $1.event.EventHandles[res := true];
 }
 
 // This boogie procedure is the model of `emit_event`. This model abstracts away the `counter` behavior, thus not
 // mutating (or increasing) `counter`.
-procedure {:inline 1} $1_event_emit_event{{S}}(handle_mut: $Mutation $1_event_EventHandle{{S}}, msg: {{T}})
-returns (res: $Mutation $1_event_EventHandle{{S}}) {
-    var handle: $1_event_EventHandle{{S}};
+procedure {:inline 1} $1.event.emit_event{{S}}(handle_mut: $Mutation $1.event.EventHandle{{S}}, msg: {{T}})
+returns (res: $Mutation $1.event.EventHandle{{S}}) {
+    var handle: $1.event.EventHandle{{S}};
     handle := $Dereference(handle_mut);
     $es := $ExtendEventStore{{S}}($es, handle, msg);
     res := handle_mut;
 }
 
-procedure {:inline 1} $1_event_guid{{S}}(handle_ref: $1_event_EventHandle{{S}})
+procedure {:inline 1} $1.event.guid{{S}}(handle_ref: $1.event.EventHandle{{S}})
 returns (res: int) {
     // TODO: temporarily mocked. The return type needs to be fixed.
     res := 0;
 }
 
-procedure {:inline 1} $1_event_counter{{S}}(handle_ref: $1_event_EventHandle{{S}})
+procedure {:inline 1} $1.event.counter{{S}}(handle_ref: $1.event.EventHandle{{S}})
 returns (res: int) {
     // TODO: temporarily mocked.
     res := 0;
 }
 
-procedure {:inline 1} $1_event_destroy_handle{{S}}(handle: $1_event_EventHandle{{S}}) {
+procedure {:inline 1} $1.event.destroy_handle{{S}}(handle: $1.event.EventHandle{{S}}) {
 }
 
 function {:inline} $ExtendEventStore{{S}}(
-        es: $EventStore, handle: $1_event_EventHandle{{S}}, msg: {{T}}): $EventStore {
+        es: $EventStore, handle: $1.event.EventHandle{{S}}, msg: {{T}}): $EventStore {
     (var stream := es->streams[handle];
     (var stream_new := ExtendMultiset(stream, $ToEventRep{{S}}(msg));
     $EventStore(es->counter+1, es->streams[handle := stream_new])))
 }
 
 function {:inline} $CondExtendEventStore{{S}}(
-        es: $EventStore, handle: $1_event_EventHandle{{S}}, msg: {{T}}, cond: bool): $EventStore {
+        es: $EventStore, handle: $1.event.EventHandle{{S}}, msg: {{T}}, cond: bool): $EventStore {
     if cond then
         $ExtendEventStore{{S}}(es, handle, msg)
     else

@@ -9,7 +9,6 @@ namespace LeanerLang.Tests.DenoteCache
 
 set_option Elab.async false
 
-#leaner_verify 0x42::denote_cache::valid
-#leaner_require_native 0x42::denote_cache::valid
+verify 0x42::denote_cache::valid
 
 end LeanerLang.Tests.DenoteCache

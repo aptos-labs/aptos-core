@@ -37,6 +37,9 @@ structure BuildState where
   /-- Whether the encoder is inside specification content, where local
   occurrences arrive projected and may name executable locals. -/
   logical : Bool := false
+  /-- Hidden temporaries the encoder introduced, named `$t<n>` like the
+  LeanerLang lowering's, so the two lowerings of one element access agree. -/
+  temporaryLocals : Nat := 0
 
 abbrev BuildM := StateT BuildState (Except String)
 
@@ -107,6 +110,19 @@ private def addInferredLifetime (loc : LeanerIR.LocId) : BuildM LeanerIR.Lifetim
   let state ← get
   let id : LeanerIR.LifetimeId := ⟨state.lifetimes.size⟩
   set { state with lifetimes := state.lifetimes.push { kind := .inference, loc } }
+  return id
+
+/-- LIR's unit type, which the validator expects of unit-valued operations
+such as an index check. Move spells unit as the empty tuple, which `addType`
+keeps as a tuple; the entry here is keyed under a source spelling no XAST
+type produces, so the two tables stay aligned without a lookup hit. -/
+private def unitTypeId : BuildM LeanerIR.TypeId := do
+  let state ← get
+  if let some index := state.types.findIdx? (· == .unit) then return ⟨index⟩
+  let id : LeanerIR.TypeId := ⟨state.types.size⟩
+  set { state with
+    sourceTypes := state.sourceTypes.push (.typeDomain (.tuple []))
+    types := state.types.push .unit }
   return id
 
 private partial def addType (loc : LeanerIR.LocId) (source : Xast.Ty) : BuildM LeanerIR.TypeId := do
@@ -325,6 +341,14 @@ private def vectorNative? (name : Xast.QualifiedName) : Option String :=
   else
     none
 
+/-- `std::signer::address_of` is LIR's signer-address primitive, which takes
+the signer by reference as the native does. A specification applies it
+through its specification version, `$address_of`, with the same meaning. -/
+private def isSignerAddressOf (name : Xast.QualifiedName) : Bool :=
+  name.module.name == "signer" &&
+    (name.module.address == "0x1" || name.module.addressAlias == some "std") &&
+    (name.name == "address_of" || name.name == "$address_of")
+
 private def lirOperation : Xast.Operation → BuildM LeanerIR.Operation
   | .moveFunction name => return .call (.function (← addQualifiedRef name))
   | .pack name variant => return .call (.constructor (← addQualifiedRef name) variant)
@@ -527,11 +551,12 @@ mutual
                           | pure none
                         let some index := arguments[1]?
                           | throw s!"`vector::{native}` has no index operand"
-                        let elementPlace ← addPlaceNode (.index place index)
                         let kind := if native == "borrow_mut" then LeanerIR.BorrowKind.mutable
                           else .immutable
-                        pure <| some <| .operation (.borrow kind elementPlace) #[] #[]
-                          (surfaceSyntax surface)
+                        let collection ← vectorOperand
+                        some <$> checkedElementAccess loc collection index typeId fun index => do
+                          let elementPlace ← addPlaceNode (.index place index)
+                          pure <| .operation (.borrow kind elementPlace) #[] #[] (surfaceSyntax surface)
                     | other => throw s!"unhandled vector native `{other}`"
               -- A borrow whose operand names a storage path is a place
               -- borrow, which is the executable form; the value borrow is
@@ -553,11 +578,36 @@ mutual
                       pure <| .operation (.reference (.borrow (lirBorrowKind kind)))
                         instantiations arguments (surfaceSyntax surface)
               | .moveFunction name =>
-                  match ← vectorNativeNode (vectorNative? name) with
-                  | some node => pure node
-                  | none =>
-                      pure <| .operation (← lirOperation operation) instantiations arguments
-                        (surfaceSyntax surface)
+                  if isSignerAddressOf name then
+                    pure <| .operation (.primitive .signerAddress) #[] arguments
+                      (surfaceSyntax surface)
+                  else match ← vectorNativeNode (vectorNative? name) with
+                    | some node => pure node
+                    | none =>
+                        pure <| .operation (← lirOperation operation) instantiations arguments
+                          (surfaceSyntax surface)
+              | .specFunction name _ =>
+                  if isSignerAddressOf name then
+                    pure <| .operation (.primitive .signerAddress) #[] arguments
+                      (surfaceSyntax surface)
+                  else
+                    pure <| .operation (← lirOperation operation) instantiations arguments
+                      (surfaceSyntax surface)
+              | .and | .or =>
+                  -- Move's `&&` and `||` short-circuit. In executable code
+                  -- they are the conditional the LeanerLang lowering also
+                  -- produces, so the two lowerings of one source agree and
+                  -- the right operand's effects and aborts stay guarded;
+                  -- a specification keeps the logical primitive.
+                  if (← get).logical then
+                    pure <| .operation (← lirOperation operation) instantiations arguments
+                      (surfaceSyntax surface)
+                  else
+                    let some left := arguments[0]? | throw "a logical operator has no left operand"
+                    let some right := arguments[1]? | throw "a logical operator has no right operand"
+                    let constant ← addExprNode loc typeId (.value (.bool (operation matches .or)))
+                    pure <| if operation matches .and then .ifElse left right (some constant)
+                      else .ifElse left constant (some right)
               | operation =>
                   pure <| .operation (← lirOperation operation) instantiations arguments
                     (surfaceSyntax surface)
@@ -602,6 +652,53 @@ mutual
               let triggers ← triggers.toArray.mapM fun trigger => trigger.toArray.mapM addExpr
               pure <| .quantifier kind binders triggers (← condition.mapM addExpr) (← addExpr body)
         addExprNode loc typeId kind
+
+  /-- A hidden temporary holding a computed element index, named like the
+  LeanerLang lowering's `$t<n>`. -/
+  private partial def temporaryLocal (typeId : LeanerIR.TypeId) (loc : LeanerIR.LocId) :
+      BuildM LeanerIR.LocalId := do
+    let state ← get
+    let id : LeanerIR.LocalId := ⟨state.locals.size⟩
+    set { state with
+      temporaryLocals := state.temporaryLocals + 1
+      locals := state.locals.push
+        { id, name := s!"$t{state.temporaryLocals}", type := { typeId, loc }, loc } }
+    return id
+
+  /-- An element access in the checked form the LeanerLang lowering
+  produces: a computed index is evaluated once into a temporary, the index
+  is checked against the vector (`checkVectorIndex`, aborting with Move's
+  vector error), and only then is the element place formed. Out-of-range
+  resolution of an LIR index place is undefined, so the check is the
+  semantic carrier of the abort; without it every Move element access was
+  undefined past the end. `access` receives the checked index expression
+  and builds the access node, whose type the whole binding takes. -/
+  private partial def checkedElementAccess (loc : LeanerIR.LocId) (collection : LeanerIR.ExprId)
+      (index : LeanerIR.ExprId) (accessType : LeanerIR.TypeId)
+      (access : LeanerIR.ExprId → BuildM LeanerIR.ExprKind) : BuildM LeanerIR.ExprKind := do
+    let state ← get
+    let some indexNode := state.expressions[index.index]?
+      | throw "an element index is out of range"
+    let simple := match indexNode.kind with
+      | .value .. | .localVar .. => true
+      | _ => false
+    let checkLoc ← addGeneratedLocation loc
+    let unitType ← unitTypeId
+    let (indexId, temporary?) ← if simple then pure (index, none) else do
+      let slot ← temporaryLocal indexNode.typeId checkLoc
+      let pattern ← addPatternNode checkLoc indexNode.typeId (.variable slot)
+      let read ← addExprNode checkLoc indexNode.typeId (.localVar slot)
+      pure (read, some (pattern, index))
+    let check ← addExprNode checkLoc unitType <| .operation
+      (.primitive (.checkVectorIndex (.profile { profile := .move, tag := "runtime.vector_error" })))
+      #[] #[collection, indexId]
+    let wildcard ← addPatternNode checkLoc unitType .wildcard
+    let body ← addExprNode loc accessType (← access indexId)
+    match temporary? with
+    | none => pure (.letDecl wildcard (some check) body)
+    | some (pattern, value) =>
+        let checked ← addExprNode loc accessType (.letDecl wildcard (some check) body)
+        pure (.letDecl pattern (some value) checked)
 
   /-- The storage path an expression denotes, when it denotes one.
 

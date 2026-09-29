@@ -9,7 +9,7 @@ namespace LeanerE2ETests.CheckSupport
 
 open Lean Elab Command LeanerIR
 
-/-- Interpreter assertions retained from the v0 language corpus. These are
+/-- Interpreter assertions over source functions. These are
 execution checks, independent of the separately generated contract proofs. -/
 structure RunCase where
   function : String
@@ -25,25 +25,34 @@ structure StateRunCase where
   initial : RuntimeState := {}
   final : RuntimeState := {}
 
-/-- Build a one-resource state from registered module metadata, without
-hard-coding the nominal's type-table index in individual source ports. -/
-def singleResourceState (namespace_ : Name) (resource : String) (address : String)
-    (fields : Array RuntimeValue) (nextLoan : Nat := 0) : CommandElabM RuntimeState := do
+/-- Build a state holding the given resources, each a (resource, address,
+fields) triple, from registered module metadata, without hard-coding the
+nominals' type-table indexes in individual source ports. -/
+def resourceState (namespace_ : Name) (resources : Array (String × String × Array RuntimeValue))
+    (nextLoan : Nat := 0) : CommandElabM RuntimeState := do
   let some unit := LeanerLang.registeredUnit? (← getEnv) namespace_
     | throwError "missing source module {namespace_}"
   let some ns := unit.namespaces[0]?
     | throwError "source module {namespace_} has no namespace"
-  let some structIndex := ns.structs.findIdx? fun declaration =>
-      (ns.tables.names[declaration.name.index]?.map (·.name) == some resource)
-    | throwError "missing source resource {resource}"
-  let declaration := ns.structs[structIndex]!
-  let some typeIndex := ns.tables.types.findIdx? fun
-      | .nominal name arguments => name == declaration.name && arguments.isEmpty
-      | _ => false
-    | throwError "missing concrete source resource type {resource}"
-  let handle : StructHandle := { namespaceId := ⟨0⟩, structId := structIndex }
-  let key : GlobalKey := ⟨⟨0⟩, ⟨typeIndex⟩, .address address⟩
-  return { globals := ({} : GlobalMap).insert key (.nominal handle none fields), nextLoan }
+  let mut globals : GlobalMap := {}
+  for (resource, address, fields) in resources do
+    let some structIndex := ns.structs.findIdx? fun declaration =>
+        (ns.tables.names[declaration.name.index]?.map (·.name) == some resource)
+      | throwError "missing source resource {resource}"
+    let declaration := ns.structs[structIndex]!
+    let some typeIndex := ns.tables.types.findIdx? fun
+        | .nominal name arguments => name == declaration.name && arguments.isEmpty
+        | _ => false
+      | throwError "missing concrete source resource type {resource}"
+    let handle : StructHandle := { namespaceId := ⟨0⟩, structId := structIndex }
+    let key : GlobalKey := ⟨⟨0⟩, ⟨typeIndex⟩, .address address⟩
+    globals := globals.insert key (.nominal handle none fields)
+  return { globals, nextLoan }
+
+/-- Build a one-resource state; see `resourceState`. -/
+def singleResourceState (namespace_ : Name) (resource : String) (address : String)
+    (fields : Array RuntimeValue) (nextLoan : Nat := 0) : CommandElabM RuntimeState :=
+  resourceState namespace_ #[(resource, address, fields)] nextLoan
 
 def assertRuns (namespace_ : Name) (cases : Array RunCase) : CommandElabM Unit := do
   let some unit := LeanerLang.registeredUnit? (← getEnv) namespace_
