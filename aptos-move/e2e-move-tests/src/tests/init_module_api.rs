@@ -8,7 +8,7 @@ use aptos_framework::{natives::code::UpgradePolicy, BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
-    account_address::AccountAddress, object_address::create_object_code_deployment_address,
+    account_address::AccountAddress, error, object_address::create_object_code_deployment_address,
     on_chain_config::FeatureFlag, transaction::TransactionStatus,
 };
 use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
@@ -26,13 +26,9 @@ struct Counter {
     value: u64,
 }
 
-// The abort code for error::permission_denied(EOWNER_CHANGED_SINCE_DEPLOY) where the
-// constant is 0x2: (PERMISSION_DENIED=5 << 16) | 2 = 0x50002.
-const EOWNER_CHANGED_SINCE_DEPLOY: u64 = 0x50002;
+const EOWNER_CHANGED_SINCE_DEPLOY: u64 = error::permission_denied(2);
 
-// The abort code for error::invalid_state(ELAZY_MODULE_INITIALIZATION_NOT_ENABLED) where the
-// constant is 0x3: (INVALID_STATE=3 << 16) | 3 = 0x30003.
-const ELAZY_MODULE_INITIALIZATION_NOT_ENABLED: u64 = 0x30003;
+const ELAZY_MODULE_INITIALIZATION_NOT_ENABLED: u64 = error::invalid_state(3);
 
 fn make_module(only_once: bool, extra: &str) -> String {
     format!(
@@ -125,6 +121,72 @@ fn init_maybe_initialize_reruns_after_upgrade() {
 
     // Upgrade reset the initialization state, so the initializer ran again.
     assert_eq!(counter(&h, *acc.address()), 2);
+}
+
+#[test]
+fn init_maybe_initialize_upgrade_while_disabled() {
+    for only_once in [false, true] {
+        let mut h = new_harness();
+        let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
+        publish(&mut h, &acc, &make_module(only_once, ""));
+        run(&mut h, &acc);
+        assert_eq!(counter(&h, *acc.address()), 1);
+
+        h.enable_features(vec![], vec![FeatureFlag::LAZY_MODULE_INITIALIZATION]);
+        publish(&mut h, &acc, &make_module(only_once, "public fun v2() {}"));
+        h.enable_features(vec![FeatureFlag::LAZY_MODULE_INITIALIZATION], vec![]);
+
+        run(&mut h, &acc);
+        assert_eq!(counter(&h, *acc.address()), if only_once { 1 } else { 2 });
+        run(&mut h, &acc);
+        assert_eq!(counter(&h, *acc.address()), if only_once { 1 } else { 2 });
+    }
+}
+
+#[test]
+fn init_maybe_initialize_mixed_bundle_resets_before_legacy_init() {
+    for previously_initialized in [false, true] {
+        let mut h = new_harness();
+        let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
+        publish(&mut h, &acc, &make_module(false, ""));
+        if previously_initialized {
+            run(&mut h, &acc);
+        }
+
+        let mut builder = PackageBuilder::new("TestPack").with_policy(UpgradePolicy::compat());
+        builder.add_local_dep(
+            "AptosFramework",
+            &common::framework_dir_path("aptos-framework").to_string_lossy(),
+        );
+        builder.add_source("test.move", &make_module(false, "public fun v2() {}"));
+        builder.add_source(
+            "sibling.move",
+            "module 0xcafe::sibling { fun init_module(s: &signer) { 0xcafe::test::run(s); } }",
+        );
+        let path = builder.write_to_temp().unwrap();
+        let txn = h.create_publish_package(&acc, path.path(), Some(BuildOptions::move_2()), |_| {});
+        assert_success!(h.run(txn));
+
+        let expected = if previously_initialized { 2 } else { 1 };
+        assert_eq!(counter(&h, *acc.address()), expected);
+        run(&mut h, &acc);
+        assert_eq!(counter(&h, *acc.address()), expected);
+    }
+}
+
+#[test]
+fn init_module_remains_supported_with_lazy_initialization() {
+    let mut h = new_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
+    publish(
+        &mut h,
+        &acc,
+        "module 0xcafe::test {
+            struct Counter has key { value: u64 }
+            fun init_module(s: &signer) { move_to(s, Counter { value: 1 }); }
+        }",
+    );
+    assert_eq!(counter(&h, *acc.address()), 1);
 }
 
 #[test]

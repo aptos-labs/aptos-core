@@ -197,6 +197,11 @@ module aptos_framework::code {
         // Update registry
         let policy = pack.upgrade_policy;
         if (index < len) {
+            // With lazy initialization disabled, old code cannot consume this reset. Preserve
+            // it for a later re-enable; the VM only performs the deferred reset while enabled.
+            if (!features::is_lazy_module_initialization_enabled()) {
+                init::reset_initialized(addr, module_names.map_ref(|name| *name.bytes()));
+            };
             *packages.borrow_mut(index) = pack
         } else {
             packages.push_back(pack)
@@ -260,7 +265,7 @@ module aptos_framework::code {
     /// currently own that object. The ownership is recorded for the package's modules so that they
     /// can lazily self-initialize (see `init`); modules published to an object via
     /// `publish_package` alone cannot.
-    public fun publish_package_to_object(
+    package fun publish_package_to_object(
         owner: &signer,
         code_object: &signer,
         metadata_serialized: vector<u8>,

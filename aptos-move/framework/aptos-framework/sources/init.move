@@ -114,9 +114,10 @@ module aptos_framework::init {
     /// Requests re-run of initialization for the named modules after an upgrade. Skipped for modules
     /// that used `only_once = true` when first initialized. Keeps the recorded deploy owner.
     ///
-    /// Called by the VM once the upgraded code is live, after the publishing transaction's Move
-    /// execution; resetting earlier would let the old code consume the reset.
-    fun reset_initialized(addr: address, module_names: vector<vector<u8>>) {
+    /// While enabled, called by the VM once the upgraded code is live, before new modules run
+    /// their legacy initializers; resetting earlier would let the old code consume the reset.
+    /// While disabled, called by `code::publish_package`, since initialization cannot run then.
+    package fun reset_initialized(addr: address, module_names: vector<vector<u8>>) {
         if (exists<InitializationState>(addr)) {
             let modules = &mut InitializationState[addr].modules;
             module_names.for_each_ref(|name| {
