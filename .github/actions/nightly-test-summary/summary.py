@@ -14,6 +14,8 @@ HISTORY_NIGHTS = 7
 GREEN, YELLOW, RED, GREY = "\U0001f7e9", "\U0001f7e8", "\U0001f7e5", "\u2b1c"
 CANCELLED = "\u274c"
 FAILED = ("failure", "timed_out", "cancelled")
+# The workflow job that runs only when the run was cancelled; not a suite.
+CANCELLATION_JOB = "cancellation"
 
 
 def square(conclusion, retried=False, run_cancelled=False):
@@ -87,8 +89,9 @@ def build_summary(
     previous_runs=None,
     attempt=1,
     first_attempt_jobs=None,
-    cancelled=False,
 ):
+    needs = dict(needs)
+    cancelled = needs.pop(CANCELLATION_JOB, {}).get("result") == "success"
     incomplete = sorted(
         f"{name}: {job['result']}"
         for name, job in needs.items()
@@ -203,7 +206,6 @@ def main():
         nights,
         attempt,
         run_jobs(run_id, 1) if attempt > 1 else None,
-        os.environ.get("RUN_CANCELLED") == "true",
     )
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"failed={str(failed).lower()}\n")

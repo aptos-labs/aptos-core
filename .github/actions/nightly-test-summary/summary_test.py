@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import shlex
 import unittest
-from summary import CANCELLED, GREEN, GREY, RED, YELLOW, build_history, build_summary
+from summary import CANCELLATION_JOB, CANCELLED, GREEN, GREY, RED, YELLOW, build_history, build_summary
 
 
 class NightlySummaryTest(unittest.TestCase):
@@ -124,8 +124,15 @@ class NightlySummaryTest(unittest.TestCase):
             "!cancelled() && needs.result.result != 'success' && github.run_attempt == '1'",
             retry,
         )
+        cancellation = re.search(
+            r"^  cancellation:\n(.*?)(?=^  [a-z-]+:$)", nightly, re.M | re.S
+        ).group(1)
         result = re.search(r"^  result:\n(.*?)(?=^  [a-z-]+:$)", nightly, re.M | re.S).group(1)
-        self.assertIn("if: cancelled()\n        run: echo RUN_CANCELLED=true", result)
+        # Job level, not step level: only there does cancelled() see the cancelled run.
+        self.assertIn("\n    if: cancelled()\n", cancellation)
+        self.assertNotIn("cancelled()", result)
+        suites = re.search(r"needs: \[(.*?)\]", cancellation).group(1)
+        self.assertIn(f"needs: [{suites}, {CANCELLATION_JOB}]", result)
         self.assertIn("gh workflow run nightly-full-suite-retry.yaml", retry)
         self.assertIn("needs.retry.result != 'success'", notify)
         self.assertIn("errors: true", notify)
@@ -158,10 +165,9 @@ class NightlySummaryTest(unittest.TestCase):
         # The cancelled night crosses out; the timed-out job of a failed night is red.
         self.assertIn(f"{CANCELLED}{RED}{RED}  forge", payload["text"])
         _, payload = self.summary(
-            {"forge": {"result": "cancelled"}},
+            {"forge": {"result": "cancelled"}, CANCELLATION_JOB: {"result": "success"}},
             previous_runs=previous,
             jobs=[{"name": "forge", "conclusion": "cancelled", "steps": []}],
-            cancelled=True,
         )
         self.assertIn("Nightly full-suite CANCELLED", payload["text"])
         self.assertIn(f"|{CANCELLED}>\nBranch:", payload["text"])
@@ -170,6 +176,12 @@ class NightlySummaryTest(unittest.TestCase):
     def test_green_run_is_not_failed(self):
         failed, _ = self.summary({"workspace": {"result": "success"}})
         self.assertFalse(failed)
+        # The cancellation job is skipped on every uncancelled night; it is not a suite.
+        failed, payload = self.summary(
+            {"workspace": {"result": "success"}, CANCELLATION_JOB: {"result": "skipped"}}
+        )
+        self.assertFalse(failed)
+        self.assertIn("Nightly full-suite passed", payload["text"])
 
     def test_failure_outside_move_alerts_with_context(self):
         failed, payload = self.summary(
