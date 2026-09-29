@@ -10,13 +10,11 @@ use aptos_types::{
     },
     transaction::{
         validation::{
-            EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID,
-            ECANT_PAY_GAS_DEPOSIT, EDELEGATION_POOL_NOT_FOUND, EGAS_PAYER_ACCOUNT_MISSING,
-            EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT, EINSUFFICIENT_STAKE, EINVALID_MULTIPLIER,
-            EMULTIPLIER_NOT_AVAILABLE, ENONCE_ALREADY_USED, ENOT_DELEGATED_VOTER,
-            ENOT_STAKE_POOL_OWNER, EPOOL_NOT_IN_VALIDATOR_SET,
-            ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH, ESEQUENCE_NUMBER_TOO_BIG,
-            ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD, ESTAKE_POOL_NOT_FOUND,
+            transaction_limits_abort_status, EACCOUNT_DOES_NOT_EXIST,
+            EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID, ECANT_PAY_GAS_DEPOSIT,
+            EGAS_PAYER_ACCOUNT_MISSING, EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT,
+            ENONCE_ALREADY_USED, ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH,
+            ESEQUENCE_NUMBER_TOO_BIG, ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD,
             ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE, ETRANSACTION_EXPIRED,
         },
         TransactionStatus,
@@ -55,22 +53,10 @@ pub fn convert_prologue_error(
             code,
             message,
         } if APTOS_TRANSACTION_VALIDATION.is_transaction_limits_module_abort(&location) => {
-            let new_major_status = match split_canonical(code) {
-                (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
-                (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
-                (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
-                (PERMISSION_DENIED, EPOOL_NOT_IN_VALIDATOR_SET) => {
-                    StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET
-                },
-                (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
-                (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
-                (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => {
-                    StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER
-                },
-                (INVALID_ARGUMENT, EMULTIPLIER_NOT_AVAILABLE) => {
-                    StatusCode::MULTIPLIER_NOT_AVAILABLE
-                },
-                (category, reason) => {
+            let new_major_status = match transaction_limits_abort_status(code) {
+                Some(status) => status,
+                None => {
+                    let (category, reason) = split_canonical(code);
                     let mut err_msg = format!(
                         "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                         location, code, category, reason

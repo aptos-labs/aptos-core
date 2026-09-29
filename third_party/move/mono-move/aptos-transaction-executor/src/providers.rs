@@ -4,15 +4,16 @@
 use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
 use bytes::Bytes;
 use mono_move_core::{
-    intern_type_tag,
-    storage::resource_provider::{InMemoryStorageKey, ResourceProvider, ResourceProviderError},
+    storage::resource_provider::{ResourceProvider, ResourceProviderError},
+    types::InternedType,
 };
 use mono_move_global_context::ExecutionGuard;
-use move_core_types::language_storage::{StructTag, TypeTag};
+use mono_move_runtime::{serialize, InterpreterContext};
+use move_core_types::language_storage::StructTag;
 use std::collections::{BTreeMap, HashMap};
 
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
-/// handle resource groups and byte-level reads.
+/// handle resource groups.
 pub trait AptosDataProvider: ResourceProvider {
     /// The stored members of the group behind `group_key`, as execution read
     /// them, or `None` if no group is stored there.
@@ -20,33 +21,31 @@ pub trait AptosDataProvider: ResourceProvider {
         &self,
         group_key: &StateKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError>;
-
-    /// The stored bytes of the plain resource at `key`, as execution would
-    /// read them, or `None` if none is stored there.
-    fn resource_bytes(
-        &self,
-        key: &InMemoryStorageKey,
-    ) -> Result<Option<Bytes>, ResourceProviderError>;
 }
 
-/// Reads the on-chain config `T` as execution would see it.
+/// Reads the on-chain config `T`, whose interned type is `ty` (see
+/// `FrameworkSymbols`), through `interp`, so the read is recorded like one
+/// made by Move code.
 //
 // TODO(perf): the value goes through BCS; decode the flat value directly.
-// TODO(perf): the config's type is interned on every call; intern it once.
 pub(crate) fn read_config<T: OnChainConfig>(
+    interp: &mut InterpreterContext<'_>,
     guard: &ExecutionGuard<'_>,
-    provider: &dyn AptosDataProvider,
+    ty: InternedType,
 ) -> Result<Option<T>, ResourceProviderError> {
-    let ty = intern_type_tag(&TypeTag::Struct(Box::new(T::struct_tag())), guard)
-        .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:#}")))?;
-    let key = InMemoryStorageKey::resource(*T::address(), ty);
-    provider
-        .resource_bytes(&key)?
-        .map(|bytes| {
-            T::deserialize_into_config(&bytes)
-                .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:#}")))
-        })
-        .transpose()
+    let Some(ptr) = interp
+        .read_resource(*T::address(), ty)
+        .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))?
+    else {
+        return Ok(None);
+    };
+    // SAFETY: the read-write set pins `ptr` for as long as `interp` lives, and
+    // `read_resource` published the layout of `ty`.
+    let bytes = unsafe { serialize(guard, ptr.as_ptr(), ty) }
+        .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))?;
+    T::deserialize_into_config(&bytes)
+        .map(Some)
+        .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:#}")))
 }
 
 /// A resource group's members and their stored bytes.

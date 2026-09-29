@@ -1001,68 +1001,8 @@ name = "e2e-move-tests::e2e_move_tests$tests::transaction_context::test_transact
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_approved_gov_script_with_txn_limits_request_rejected"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_insufficient_stake"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_not_found"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_not_in_validator_set"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_zero_stake"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_feature_disabled"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_high_limit_txn_gas_price_too_low"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_invalid_multiplier_1x"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_invalid_multiplier_larger_than_100x"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_multiplier_not_available"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_not_delegated_voter"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_not_stake_pool_owner"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_sender_stake_ignored_for_fee_payer_txn"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_stake_pool_owner_not_enough_stake"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_stake_pool_owner_not_enough_stake_for_io"
-note = "MonoMove does not support transaction limits."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_stake_pool_owner_not_in_validator_set"
-note = "MonoMove does not support transaction limits."
+note = "MonoMove does not support disabling features."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::type_too_large::type_too_large"

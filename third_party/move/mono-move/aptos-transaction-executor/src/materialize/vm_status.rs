@@ -8,19 +8,14 @@ use crate::errors::{
     MoveExecutionFailure, PreExecutionCheckFailure, ScriptRejection,
 };
 use aptos_types::{
-    error::{
-        split_canonical, INVALID_ARGUMENT, INVALID_STATE, NOT_FOUND, OUT_OF_RANGE,
-        PERMISSION_DENIED,
-    },
+    error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
     transaction::validation::{
-        transaction_limits_module_id, transaction_validation_module_id, EACCOUNT_DOES_NOT_EXIST,
-        EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID, ECANT_PAY_GAS_DEPOSIT,
-        EDELEGATION_POOL_NOT_FOUND, EGAS_PAYER_ACCOUNT_MISSING,
-        EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT, EINSUFFICIENT_STAKE, EINVALID_MULTIPLIER,
-        EMULTIPLIER_NOT_AVAILABLE, ENONCE_ALREADY_USED, ENOT_DELEGATED_VOTER,
-        ENOT_STAKE_POOL_OWNER, EPOOL_NOT_IN_VALIDATOR_SET,
+        transaction_limits_abort_status, transaction_limits_module_id,
+        transaction_validation_module_id, EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY,
+        EBAD_CHAIN_ID, ECANT_PAY_GAS_DEPOSIT, EGAS_PAYER_ACCOUNT_MISSING,
+        EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT, ENONCE_ALREADY_USED,
         ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH, ESEQUENCE_NUMBER_TOO_BIG,
-        ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD, ESTAKE_POOL_NOT_FOUND,
+        ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD,
         ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE, ETRANSACTION_EXPIRED,
     },
 };
@@ -305,20 +300,10 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
 
 /// Converts a rejected request for raised limits into its discard code.
 fn limits_abort_to_status(code: u64, message: Option<String>, location: AbortLocation) -> VMStatus {
-    let new_major_status = match split_canonical(code) {
-        (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
-        (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
-        (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
-        (PERMISSION_DENIED, EPOOL_NOT_IN_VALIDATOR_SET) => {
-            StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET
-        },
-        (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
-        (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
-        (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
-        (INVALID_ARGUMENT, EMULTIPLIER_NOT_AVAILABLE) => StatusCode::MULTIPLIER_NOT_AVAILABLE,
-        _ => return unexpected_prologue_abort(code, message, location),
-    };
-    VMStatus::error(new_major_status, None)
+    match transaction_limits_abort_status(code) {
+        Some(status) => VMStatus::error(status, None),
+        None => unexpected_prologue_abort(code, message, location),
+    }
 }
 
 fn unexpected_prologue_abort(

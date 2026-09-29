@@ -11,10 +11,13 @@
 //! never edit an existing one.
 
 use crate::{
+    error::{split_canonical, INVALID_ARGUMENT, NOT_FOUND, PERMISSION_DENIED},
     fee_statement::FeeStatement,
     transaction::{ReplayProtector, UserTxnLimitsRequest},
 };
-use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::StatusCode,
+};
 use move_value_view_derive::MoveValueView;
 use serde::Serialize;
 
@@ -113,3 +116,26 @@ pub const EINVALID_MULTIPLIER: u64 = 7;
 pub const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
 // Stake pool is not in the current-epoch validator set.
 pub const EPOOL_NOT_IN_VALIDATOR_SET: u64 = 9;
+
+/// The range a requested limits multiplier must fall in, in percent, where 100
+/// is 1x. Must match the Move constants in `0x1::transaction_limits`.
+pub const MIN_MULTIPLIER_PERCENT: u64 = 100;
+pub const MAX_MULTIPLIER_PERCENT: u64 = 10_000;
+
+/// The validation status a `transaction_limits` abort code translates to, or
+/// `None` if the code is not one the prologue is expected to raise.
+pub fn transaction_limits_abort_status(code: u64) -> Option<StatusCode> {
+    Some(match split_canonical(code) {
+        (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
+        (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
+        (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
+        (PERMISSION_DENIED, EPOOL_NOT_IN_VALIDATOR_SET) => {
+            StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET
+        },
+        (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
+        (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
+        (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+        (INVALID_ARGUMENT, EMULTIPLIER_NOT_AVAILABLE) => StatusCode::MULTIPLIER_NOT_AVAILABLE,
+        _ => return None,
+    })
+}

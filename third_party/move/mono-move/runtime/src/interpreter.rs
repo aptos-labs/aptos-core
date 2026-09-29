@@ -739,6 +739,24 @@ impl<'guard> InterpreterContext<'guard> {
         }
     }
 
+    /// The resource of type `ty` stored at `address`, or `None` if there is
+    /// none. The read is recorded like one made by Move code, and the modules
+    /// defining `ty` are loaded and charged.
+    pub fn read_resource(
+        &mut self,
+        address: AccountAddress,
+        ty: InternedType,
+    ) -> VMResult<Option<NonNull<u8>>> {
+        self.loader
+            .publish_resource_type(&mut self.read_set, &mut self.gas_meter, ty)?;
+        let group = self.resource_group_of(ty)?;
+        Ok(self.read_write_set.read(
+            self.resource_provider,
+            &InMemoryStorageKey::resource(address, ty),
+            group,
+        )?)
+    }
+
     /// A module some loaded function came from. Loading the function loaded
     /// its module into the read set, so a miss is an invariant violation.
     fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {

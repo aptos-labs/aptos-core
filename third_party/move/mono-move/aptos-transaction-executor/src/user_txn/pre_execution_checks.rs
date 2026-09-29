@@ -17,12 +17,10 @@ use aptos_gas_schedule::{
     },
     AptosGasParameters, TransactionGasParameters, VMGasParameters,
 };
-use aptos_types::on_chain_config::ApprovedExecutionHashes;
-
-/// The range a requested limits multiplier must fall in, in percent, where 100
-/// is 1x. Must match the Move constants in `0x1::transaction_limits`.
-const MIN_MULTIPLIER_PERCENT: u64 = 100;
-const MAX_MULTIPLIER_PERCENT: u64 = 10_000;
+use aptos_types::{
+    on_chain_config::ApprovedExecutionHashes,
+    transaction::validation::{MAX_MULTIPLIER_PERCENT, MIN_MULTIPLIER_PERCENT},
+};
 
 pub(crate) struct PreExecutionChecker<'a> {
     gas_params: &'a AptosGasParameters,
@@ -39,11 +37,8 @@ impl<'a> PreExecutionChecker<'a> {
         approved_gov_scripts: Option<&ApprovedExecutionHashes>,
         txn_data: &'a TxnMetadata,
     ) -> Self {
-        // The hash is empty for everything but a script, so an entry function
-        // can never match one.
-        let is_approved_gov_script = !txn_data.script_hash.is_empty()
-            && approved_gov_scripts
-                .is_some_and(|approved| approved.contains_script_hash(&txn_data.script_hash));
+        let is_approved_gov_script = approved_gov_scripts
+            .is_some_and(|approved| approved.contains_script_hash(&txn_data.script_hash));
         Self {
             gas_params,
             gas_feature_version,
@@ -100,10 +95,12 @@ impl<'a> PreExecutionChecker<'a> {
     /// - Each multiplier must be above 1x and at most the cap.
     /// The staking behind the request is checked by the prologue.
     //
-    // The prologue also checks the range, but the gas meter is built from the
-    // multipliers before the prologue runs, so they must be sane by then. The
-    // governance rule exists only here: the framework does not know which
-    // scripts are approved.
+    // The prologue also checks the range. Checking here as well keeps V1's
+    // order of discard reasons, and once the gas meter applies the multipliers
+    // it must never start with a nonsensical limit. The governance rule exists
+    // only here: the framework does not know which scripts are approved.
+    //
+    // TODO(metering): apply the validated multipliers to the gas meter.
     fn check_limits_multipliers(&self) -> Result<(), PreExecutionCheckFailure> {
         let Some(request) = &self.txn_data.txn_limits_request else {
             return Ok(());
