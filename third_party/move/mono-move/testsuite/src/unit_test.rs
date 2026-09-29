@@ -19,7 +19,7 @@ use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
 use mono_move_output::v1_error::{self, V1Equivalent};
 use mono_move_runtime::{
-    InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
+    CompletedCall, InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
 };
 use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
@@ -174,7 +174,7 @@ fn execute(
                 call.arg(arg)?;
             }
         }
-        call.run()
+        call.run().map(CompletedCall::into_status)
     })();
 
     match outcome {

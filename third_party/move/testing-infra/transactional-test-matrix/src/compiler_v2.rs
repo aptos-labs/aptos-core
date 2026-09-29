@@ -303,13 +303,8 @@ const SEPARATE_BASELINE: &[&str] = &[
 /// runs against an override baseline, except under the configs it excepts.
 const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     MonoMoveDivergence::unsupported(
-        "tests/misc/struct_assign_swap.move",
-        "multiple return values",
-    ),
-    MonoMoveDivergence::unsupported("tests/misc/tuple_swap.move", "multiple return values"),
-    MonoMoveDivergence::unsupported(
         "tests/more-v1/parser/return_not_binary.move",
-        "reference arguments",
+        "reference parameters, which no production path accepts",
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/calculator.move",
@@ -398,10 +393,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     MonoMoveDivergence::semantic(
         "tests/no-v1-comparison/inlining_optimization/unlocked_caller_locked_helper.move",
         "no reentrancy checks",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/structs_visibility/public_struct_assign_swap.move",
-        "multiple return values",
     ),
     // The six `signed-int` scripts: under `opt-extra`, inlining removes the
     // called frame, so V1 prints no stack trace either.

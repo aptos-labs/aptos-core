@@ -38,9 +38,9 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    native::NativeExtensions, Code, FrameLayoutInfo, FrameOffset as FO, Function,
-    FunctionDefinitionIndex, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    MicroOp, ShiftOperand, SizedSlot, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, FrameLayoutInfo, FrameOffset as FO,
+    Function, FunctionDefinitionIndex, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp,
+    IntTy, MicroOp, ShiftOperand, SizedSlot, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use num::BigInt;
@@ -225,6 +225,8 @@ fn make_func(op: MicroOp, lhs_width: usize, rhs_width: usize) -> Function {
         entry_gas: 0,
         param_slots,
         param_tys,
+        return_slots: vec![],
+        return_tys: EMPTY_TYPE_LIST,
         param_region_size: FRAME_SIZE as usize,
         param_and_local_sizes_sum: FRAME_SIZE as usize,
         extended_frame_size: FRAME_SIZE as usize + FRAME_METADATA_SIZE,

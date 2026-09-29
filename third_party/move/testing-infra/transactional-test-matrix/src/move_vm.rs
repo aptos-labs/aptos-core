@@ -183,17 +183,16 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "returned enums have no layout, function values",
     ),
     MonoMoveDivergence::unsupported(
-        "tests/entry_points/generic_return_values.move",
-        "multiple return values",
+        "tests/entry_points/modify_mutable_ref_inputs.masm",
+        "reference parameters, which no production path accepts",
     ),
     MonoMoveDivergence::unsupported(
-        "tests/entry_points/modify_mutable_ref_inputs.masm",
-        "reference parameters",
+        "tests/entry_points/ref_inputs.masm",
+        "reference parameters, which no production path accepts",
     ),
-    MonoMoveDivergence::unsupported("tests/entry_points/ref_inputs.masm", "reference parameters"),
     MonoMoveDivergence::unsupported(
         "tests/entry_points/return_values.masm",
-        "reference parameters",
+        "reference parameters, which no production path accepts",
     ),
     MonoMoveDivergence::unsupported(
         "tests/entry_points/script_too_few_type_args.masm",
@@ -221,11 +220,11 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::unsupported(
         "tests/entry_points/struct_arguments.masm",
-        "reference parameters",
+        "reference parameters, which no production path accepts",
     ),
     MonoMoveDivergence::unsupported(
         "tests/function_values_safety/closure_assign_return.masm",
-        "multiple return values",
+        "function value serialization",
     ),
     MonoMoveDivergence::rendering(
         "tests/function_values_safety/dep_compatibility.masm",

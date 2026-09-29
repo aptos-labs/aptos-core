@@ -76,7 +76,7 @@ fn run_to_failure_without(
         function_name,
         NativeExtensions::new(),
         None,
-        |runner| runner.run(&[], |call, index| call.arg(&args[index]), |_| ()),
+        |runner| runner.run(&[], |call, index| call.arg(&args[index]), |_| Ok(())),
     )
     .expect("the entry function loads");
 

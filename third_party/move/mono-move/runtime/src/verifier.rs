@@ -18,10 +18,12 @@
 //! 4. For instructions with more than 1 destination, they must be disjoint.
 
 use mono_move_core::{
-    captured_values_size, native::NativeABI, types::InternedType, CallClosureOp, ClosureFuncRef,
-    CodeOffset, DescriptorId, DescriptorProvider, FrameOffset, Function, IntBinaryOp,
-    LayoutProvider, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
-    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    captured_values_size,
+    native::NativeABI,
+    types::{view_type_list, InternedType},
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
+    Function, IntBinaryOp, LayoutProvider, MicroOp, ObjectDescriptorInner, PackClosureOp,
+    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -115,6 +117,32 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 ),
             );
         }
+        // There is one return slot per return type, and every slot stays within
+        // the frame's data region.
+        let num_return_tys = view_type_list(self.func.return_tys).len();
+        if self.func.return_slots.len() != num_return_tys {
+            self.err(
+                None,
+                format!(
+                    "number of return slots ({}) must equal number of return types ({})",
+                    self.func.return_slots.len(),
+                    num_return_tys
+                ),
+            );
+        }
+        for slot in &self.func.return_slots {
+            // Two `u32`s widened to `usize` cannot overflow on a 64-bit target.
+            let end = slot.offset.0 as usize + slot.size as usize;
+            if end > self.func.param_and_local_sizes_sum {
+                self.err(
+                    None,
+                    format!(
+                        "return slot [{}, {}) exceeds param_and_local_sizes_sum ({})",
+                        slot.offset.0, end, self.func.param_and_local_sizes_sum
+                    ),
+                );
+            }
+        }
         // param_region_size must fit within the data region.
         if self.func.param_region_size > self.func.param_and_local_sizes_sum {
             self.err(
@@ -140,7 +168,7 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
             );
         }
 
-        // Origins: bytecode provenance parallel to the code.
+        // Origins: bytecode provenance of each micro-op.
         // Either absent (hand-built functions with no bytecode ancestry) or
         // one entry per micro-op; a partial table would attribute errors to
         // wrong bytecode offsets.
@@ -149,7 +177,7 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
             self.err(
                 None,
                 format!(
-                    "origins table has {} entries for {} micro-ops (must be empty or parallel)",
+                    "number of origins ({}) must be zero or equal number of micro-ops ({})",
                     origins.len(),
                     code.len()
                 ),
