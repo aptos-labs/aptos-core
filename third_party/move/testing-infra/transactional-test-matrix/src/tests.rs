@@ -5,6 +5,7 @@
 //! invariants. Consuming suites separately exercise source selection.
 
 use super::*;
+use std::collections::BTreeSet;
 
 /// The named config of `corpus`; tests refer to configs by name.
 fn config<'c, P>(corpus: &'c Corpus<P>, name: &str) -> &'c MatrixConfig<P> {
@@ -75,6 +76,15 @@ fn an_override_is_namespaced_by_corpus_and_qualified_by_config() {
     assert_ne!(override_for("baseline"), override_for("optimize"));
 }
 
+#[test]
+fn an_excepted_config_has_no_divergence() {
+    let identity = "tests/signed-int/arithmetic_i8.move";
+    let divergence_under =
+        |name| COMPILER_V2.mono_move_divergence(identity, config(&COMPILER_V2, name));
+    assert!(divergence_under("baseline").is_some());
+    assert!(divergence_under("opt-extra").is_none());
+}
+
 // ---------------------------------------------------------------------------
 // Matrix invariants
 // ---------------------------------------------------------------------------
@@ -103,28 +113,81 @@ fn every_non_applicable_config_records_a_reason() {
     }
 }
 
-fn assert_every_divergence_names_a_source<P>(corpus: &Corpus<P>) {
+fn assert_every_divergence_is_well_formed<P: Clone>(corpus: &Corpus<P>) {
     let sources = corpus.sources(&workspace_root().join(corpus.root));
+    let mut seen = BTreeSet::new();
     for divergence in corpus.mono_move_divergences {
+        let source = divergence.source;
         assert!(
-            sources.iter().any(|identity| identity == divergence.source),
-            "{}: divergence `{}` is not in the corpus",
-            corpus.name,
-            divergence.source
+            seen.insert(source),
+            "{}: divergence `{source}` is listed twice",
+            corpus.name
+        );
+        assert!(
+            sources.iter().any(|identity| identity == source),
+            "{}: divergence `{source}` is not in the corpus",
+            corpus.name
         );
         assert!(
             !divergence.reason.trim().is_empty(),
-            "{}: divergence `{}` has an empty reason",
-            corpus.name,
-            divergence.source
+            "{}: divergence `{source}` has an empty reason",
+            corpus.name
+        );
+        // The harness's condition for an active trial of `source`.
+        let runs_on_mono_move = |config: &MatrixConfig<P>| {
+            corpus
+                .resolve(config, source, VmBackend::MonoMove)
+                .is_some_and(|resolution| resolution.applicability == Applicability::Applicable)
+        };
+        for name in divergence.except {
+            let excepted = corpus
+                .configs
+                .iter()
+                .find(|config| config.name == *name)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{}: divergence `{source}` excepts unknown config `{name}`",
+                        corpus.name
+                    )
+                });
+            assert!(
+                runs_on_mono_move(excepted),
+                "{}: divergence `{source}` excepts `{name}`, which never runs it on MonoMove",
+                corpus.name
+            );
+        }
+        assert!(
+            corpus.configs.iter().any(
+                |config| !divergence.except.contains(&config.name) && runs_on_mono_move(config)
+            ),
+            "{}: divergence `{source}` has no config left to verify it",
+            corpus.name
         );
     }
 }
 
 #[test]
-fn every_divergence_names_a_source_and_records_a_reason() {
-    assert_every_divergence_names_a_source(&COMPILER_V2);
-    assert_every_divergence_names_a_source(&MOVE_VM);
+fn every_divergence_is_well_formed() {
+    assert_every_divergence_is_well_formed(&COMPILER_V2);
+    assert_every_divergence_is_well_formed(&MOVE_VM);
+}
+
+fn assert_config_names_are_unique<P>(corpus: &Corpus<P>) {
+    let mut seen = BTreeSet::new();
+    for config in corpus.configs {
+        assert!(
+            seen.insert(config.name),
+            "{}: config `{}` is listed twice",
+            corpus.name,
+            config.name
+        );
+    }
+}
+
+#[test]
+fn config_names_are_unique() {
+    assert_config_names_are_unique(&COMPILER_V2);
+    assert_config_names_are_unique(&MOVE_VM);
 }
 
 fn assert_every_separate_baseline_fragment_matches_a_source<P>(corpus: &Corpus<P>) {
