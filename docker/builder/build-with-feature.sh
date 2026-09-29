@@ -18,7 +18,7 @@ fi
 
 if [ -n "$FEATURES" ]; then
     echo "Building aptos-node with features ${FEATURES}"
-    cargo build --profile=$PROFILE --features=$FEATURES "${PERF_FLAGS[@]}" -p aptos-node "$@"
+    cargo build --locked --profile=$PROFILE --features=$FEATURES "${PERF_FLAGS[@]}" -p aptos-node "$@"
     cargo build --locked --profile=$PROFILE "${PERF_FLAGS[@]}" -p aptos-debugger "$@"
 else
     cargo build --locked --profile=$PROFILE "${PERF_FLAGS[@]}" \

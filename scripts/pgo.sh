@@ -54,7 +54,7 @@ case "$CMD" in
         # Should switch to something more comprehensive once we have it.
         env RUST_BACKTRACE=1 RUST_MIN_STACK=104857600 \
             RUSTFLAGS="$RUSTFLAGS -C profile-generate=$TMPDIR" \
-            cargo build --profile release -p aptos-vm-profiling --bin run-aptos-p2p
+            cargo build --locked --profile release -p aptos-vm-profiling --bin run-aptos-p2p
 
         # Run the test binary
         #
@@ -84,7 +84,7 @@ case "$CMD" in
 
         env RUST_BACKTRACE=1 RUST_MIN_STACK=104857600 \
             RUSTFLAGS="$RUSTFLAGS -C profile-use=$PROFILE_DATA_PATH" \
-            cargo build --profile release "$@"
+            cargo build --locked --profile release "$@"
         ;;
     run)
         PROFILE_DATA_PATH="$1"

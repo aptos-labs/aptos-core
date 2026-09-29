@@ -148,8 +148,8 @@ That's why explicit configuration is needed.
 
 1. **Develop your crate**
    ```bash
-   cargo build
-   cargo test
+   cargo build --locked
+   cargo test --locked
    ```
 
 2. **Add binstall metadata to Cargo.toml**
