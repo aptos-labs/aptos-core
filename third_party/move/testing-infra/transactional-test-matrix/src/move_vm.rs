@@ -174,10 +174,6 @@ const SEPARATE_BASELINE: &[&str] = &[
 
 /// Sources whose MonoMove output differs from the canonical baseline.
 const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
-    MonoMoveDivergence::rendering(
-        "tests/builtins/get_missing_struct.masm",
-        "no stack trace in exec_state",
-    ),
     MonoMoveDivergence::unsupported(
         "tests/display/print_values.move",
         "returned enums have no layout, function values",
@@ -228,7 +224,7 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::rendering(
         "tests/function_values_safety/dep_compatibility.masm",
-        "invariant violation message, sub-status, and location for a stale closure",
+        "invariant violation message, sub-status, location, and exec_state for a stale closure",
     ),
     MonoMoveDivergence::unsupported(
         "tests/instructions/closure_equality.masm",

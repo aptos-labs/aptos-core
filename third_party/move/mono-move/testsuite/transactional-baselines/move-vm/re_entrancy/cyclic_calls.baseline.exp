@@ -12,7 +12,7 @@ Error: Function execution failed with VMError: {
     location: 0x66::a,
     indices: [],
     offsets: [(FunctionDefinitionIndex(1), 0)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: None,
 }
 task 6 lines 69-69:  run 0x66::a::func_a_borrow_a --args @0x66 --verbose
 Error: Function execution failed with VMError: {
@@ -22,5 +22,5 @@ Error: Function execution failed with VMError: {
     location: 0x66::a,
     indices: [],
     offsets: [(FunctionDefinitionIndex(2), 4)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: None,
 }

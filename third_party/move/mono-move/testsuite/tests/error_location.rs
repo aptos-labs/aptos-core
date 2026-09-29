@@ -21,7 +21,8 @@ use mono_move_core::{
 };
 use mono_move_global_context::GlobalContext;
 use mono_move_testsuite::{
-    function_def_index, with_mono_function, InMemoryModuleProvider, RunResult,
+    find_module, function_def_index, sole_bytecode_offset, with_mono_function,
+    InMemoryModuleProvider, RunResult,
 };
 use move_binary_format::{access::ModuleAccess, file_format::Bytecode, CompiledModule};
 use move_core_types::{
@@ -92,11 +93,8 @@ fn run_to_failure_without(
 /// Returns the definition index of `name` in the compiled module named
 /// `module_name`.
 fn def_idx(modules: &[CompiledModule], module_name: &str, name: &str) -> FunctionDefinitionIndex {
-    let module = modules
-        .iter()
-        .find(|module| module.self_name().as_str() == module_name)
-        .expect("module is in the compiled output");
-    function_def_index(module, name).expect("function is defined in the module")
+    function_def_index(find_module(modules, module_name), name)
+        .expect("function is defined in the module")
 }
 
 /// The bytecode offset of the only instruction in the function at `def_idx`
@@ -108,22 +106,12 @@ fn sole_offset_of(
     def_idx: FunctionDefinitionIndex,
     matches: impl Fn(&Bytecode) -> bool,
 ) -> BytecodeOffset {
-    let module = modules
-        .iter()
-        .find(|module| module.self_name().as_str() == module_name)
-        .expect("module is in the compiled output");
-    let code = &module.function_defs()[def_idx.0 as usize]
+    let body = find_module(modules, module_name)
+        .function_def_at(def_idx)
         .code
         .as_ref()
-        .expect("function has a body")
-        .code;
-    let mut found = code
-        .iter()
-        .enumerate()
-        .filter(|(_, instruction)| matches(instruction));
-    let (offset, _) = found.next().expect("no instruction matched");
-    assert!(found.next().is_none(), "more than one instruction matched");
-    offset as BytecodeOffset
+        .expect("function has a body");
+    sole_bytecode_offset(&body.code, matches)
 }
 
 fn module_id(name: &str) -> ModuleId {

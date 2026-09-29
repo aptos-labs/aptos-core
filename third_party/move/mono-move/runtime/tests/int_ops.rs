@@ -246,9 +246,9 @@ fn run_wide(
     dst_size: usize,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let func = make_func(op, lhs_bytes.len(), rhs_bytes.len());
-    common::with_test_interpreter(&func, u64::MAX, NativeExtensions::new(), |ctx| {
+    common::with_test_interpreter(&func, u64::MAX, NativeExtensions::new(), |ctx, entry| {
         let mut call = ctx
-            .build_call(&func)
+            .build_call(entry)
             .map_err(|e| anyhow::anyhow!("{}", e))?;
         for bytes in [lhs_bytes, rhs_bytes] {
             if !bytes.is_empty() {

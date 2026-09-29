@@ -56,7 +56,11 @@ module 0x1::test {
         .build_call(fib)
         .expect("the root frame fits on the stack");
     call.arg(&10u64).expect("argument placement succeeds");
-    let err = call.run().map(CompletedCall::into_status).unwrap_err();
+    let err = call
+        .run()
+        .map(CompletedCall::into_status)
+        .unwrap_err()
+        .into_error();
     assert!(err.downcast_ref::<GasExhaustedError>().is_some(),);
 }
 

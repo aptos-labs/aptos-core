@@ -76,13 +76,13 @@ fn an_override_is_namespaced_by_corpus_and_qualified_by_config() {
     assert_ne!(override_for("baseline"), override_for("optimize"));
 }
 
+/// Configs listed in `except` are exempt from the recorded divergence.
 #[test]
-fn an_excepted_config_has_no_divergence() {
-    let identity = "tests/signed-int/arithmetic_i8.move";
-    let divergence_under =
-        |name| COMPILER_V2.mono_move_divergence(identity, config(&COMPILER_V2, name));
-    assert!(divergence_under("baseline").is_some());
-    assert!(divergence_under("opt-extra").is_none());
+fn an_excepted_entry_applies_only_outside_its_exceptions() {
+    let divergence =
+        MonoMoveDivergence::semantic("tests/fixture.move", "fixture").except(&["opt-extra"]);
+    assert!(divergence.applies_under("baseline"));
+    assert!(!divergence.applies_under("opt-extra"));
 }
 
 // ---------------------------------------------------------------------------
@@ -157,9 +157,10 @@ fn assert_every_divergence_is_well_formed<P: Clone>(corpus: &Corpus<P>) {
             );
         }
         assert!(
-            corpus.configs.iter().any(
-                |config| !divergence.except.contains(&config.name) && runs_on_mono_move(config)
-            ),
+            corpus
+                .configs
+                .iter()
+                .any(|config| divergence.applies_under(config.name) && runs_on_mono_move(config)),
             "{}: divergence `{source}` has no config left to verify it",
             corpus.name
         );

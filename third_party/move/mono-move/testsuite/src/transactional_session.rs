@@ -14,7 +14,8 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     type_tag_of,
     types::{is_signer_or_signer_immut_ref, InternedType},
-    BytecodeOffset, Function, FunctionDefinitionIndex, GasMeter, Interner, VMInternalError,
+    BytecodeOffset, CallFrame, Function, FunctionDefinitionIndex, GasMeter, Interner,
+    VMInternalError,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -91,6 +92,8 @@ pub enum RunOutcome {
         message: Option<String>,
         location: AbortLocation,
         offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
+        /// The abort's stack trace. See [`CallFrame`].
+        stack_trace: Vec<CallFrame>,
     },
 }
 
@@ -381,6 +384,7 @@ fn execute(
             message,
             location,
             offset,
+            stack_trace: call.stack_trace()?,
         }),
     }
 }
@@ -428,11 +432,12 @@ fn placements(
         .collect()
 }
 
-/// Places the arguments and runs the call. A `&signer` parameter borrows its
-/// address from `placements`, so they must outlive the completed call.
+/// Places the arguments and runs the call, attaching a VM error's stack trace.
+/// A `&signer` parameter borrows its address from `placements`, so they must
+/// outlive the completed call.
 fn run_call<'a, 'guard>(
     interp: &'a mut InterpreterContext<'guard>,
-    func: &'a Function,
+    func: &'guard Function,
     placements: &'a [Placement],
 ) -> Result<CompletedCall<'a, 'guard>, RunError> {
     let mut call = interp.build_call(func)?;
@@ -451,7 +456,13 @@ fn run_call<'a, 'guard>(
             })?,
         }
     }
-    call.run().map_err(RunError::from)
+    match call.run() {
+        Ok(call) => Ok(call),
+        Err(err) => {
+            let stack_trace = err.stack_trace()?;
+            Err(err.into_error().with_stack_trace(stack_trace).into())
+        },
+    }
 }
 
 /// Encodes a signer as V1's single-variant enum containing its address.
