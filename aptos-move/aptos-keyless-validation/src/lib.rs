@@ -31,18 +31,18 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum KeylessValidationError {
     /// The authenticator uses a keyless mode that is not enabled.
-    #[error("the keyless mode is not enabled")]
+    #[error("The keyless mode is not enabled")]
     FeatureDisabled,
 
     /// The on-chain time could not be read.
-    #[error("could not fetch CurrentTimeMicroseconds on-chain config")]
+    #[error("Could not fetch CurrentTimeMicroseconds on-chain config")]
     CurrentTimeUnavailable,
     /// The identity providers' keys could not be read.
-    #[error("could not deserialize PatchedJWKs")]
+    #[error("Could not deserialize PatchedJWKs")]
     JwksUnavailable,
     /// The keyless configuration is not set on chain.
     #[error(
-        "get_resource failed on {}::{}::{}",
+        "Could not fetch {}::{}::{}",
         CORE_CODE_ADDRESS.to_hex_literal(),
         Configuration::struct_tag().module,
         Configuration::struct_tag().name
@@ -66,7 +66,7 @@ pub enum KeylessValidationError {
     ExpiryHorizonTooLong,
     /// The `aud` override is not allow-listed.
     #[error(
-        "override aud is not allow-listed in 0x1::{}",
+        "Override aud is not allow-listed in 0x1::{}",
         KEYLESS_ACCOUNT_MODULE_NAME
     )]
     OverrideAudNotAllowed,
