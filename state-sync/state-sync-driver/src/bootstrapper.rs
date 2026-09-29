@@ -8,6 +8,7 @@ use crate::{
     metadata_storage::MetadataStorageInterface,
     metrics,
     metrics::ExecutingComponent,
+    snapshot_kind::SnapshotKind,
     storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
     utils,
     utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
@@ -560,7 +561,7 @@ impl<
             // known ledger info. (All snapshot kinds sync to the same target.)
             let target = match self
                 .metadata_storage
-                .previous_snapshot_sync_target(StateKind::MainState)?
+                .previous_snapshot_sync_target(SnapshotKind::MainState)?
             {
                 Some(target) => target,
                 None => highest_known_ledger_info,
@@ -726,7 +727,7 @@ impl<
             // Thus, on each stream reset, we overlap every chunk by a single item.
             self
                 .metadata_storage
-                .get_last_persisted_index(&target_ledger_info, kind)
+                .get_last_persisted_index(&target_ledger_info, kind.into())
                 .map_err(|error| {
                     Error::StorageError(format!(
                         "Failed to get the last persisted {:?} value index at version {:?}! Error: {:?}",
@@ -1193,12 +1194,15 @@ impl<
             if !self.snapshot_kind_applies_to_target(kind)? {
                 continue;
             }
-            match self.metadata_storage.previous_snapshot_sync_target(kind)? {
+            match self
+                .metadata_storage
+                .previous_snapshot_sync_target(kind.into())?
+            {
                 Some(previous_target) if previous_target == target_ledger_info => {
                     // This kind has started syncing to the target.
                     if self
                         .metadata_storage
-                        .is_snapshot_sync_complete(&target_ledger_info, kind)?
+                        .is_snapshot_sync_complete(&target_ledger_info, kind.into())?
                     {
                         continue; // Already written; move on to the next kind.
                     }
@@ -1698,7 +1702,7 @@ impl<
                 &target_ledger_info,
                 0,
                 true,
-                kind,
+                kind.into(),
             )?;
             Ok(())
         } else {
