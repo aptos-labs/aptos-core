@@ -280,3 +280,5 @@ jobs:
           webhook: ${{ secrets.NIGHTLY_SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: ${{ steps.payload.outputs.json }}
+          # A rejected post must fail this job visibly instead of passing silently.
+          errors: true

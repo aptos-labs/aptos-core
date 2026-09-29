@@ -119,6 +119,7 @@ class NightlySummaryTest(unittest.TestCase):
         self.assertIn("needs.result.result != 'success' && github.run_attempt == '1'", retry)
         self.assertIn("gh workflow run nightly-full-suite-retry.yaml", retry)
         self.assertIn("needs.retry.result != 'success'", notify)
+        self.assertIn("errors: true", notify)
         rerun = (root / ".github/workflows/nightly-full-suite-retry.yaml").read_text()
         self.assertIn(".github/workflows/nightly-full-suite.yaml", rerun)
         self.assertIn('--jq .run_attempt)" = 1', rerun)
