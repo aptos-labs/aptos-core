@@ -179,7 +179,7 @@ impl BasicApi {
         // is running and must not be restarted. Note that this is specifically
         // the not-bootstrapped case: if the node has data and reading it fails,
         // the error propagates so the liveness check does fail.
-        let ledger_info = if context.is_bootstrapped() {
+        let ledger_info = if context.is_bootstrapped()? {
             api_spawn_blocking(move || context.get_latest_ledger_info()).await?
         } else {
             LedgerInfo::not_bootstrapped(&context.chain_id())

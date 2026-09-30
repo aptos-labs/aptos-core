@@ -7,7 +7,7 @@ use aptos_backup_service::start_backup_service;
 use aptos_config::{config::NodeConfig, utils::get_genesis_txn};
 use aptos_db::AptosDB;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
-use aptos_executor::db_bootstrapper::{calculate_genesis, maybe_bootstrap};
+use aptos_executor::db_bootstrapper::{calculate_genesis, maybe_bootstrap, GenesisCommitter};
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_logger::{debug, info};
 use aptos_state_sync_driver::LocalGenesis;
@@ -123,23 +123,17 @@ pub(crate) fn start_backup_service_for(node_config: &NodeConfig, db: Arc<AptosDB
     )
 }
 
-/// Executes genesis and persists only the resulting epoch-0 ledger info.
+/// Executes genesis and verifies it against the configured genesis waypoint.
 ///
-/// State sync needs that ledger info as its trust root: its `next_epoch_state`
-/// is what verifies the epoch-ending ledger infos fetched from peers, which in
-/// turn verify the configured waypoint. The genesis state itself is discarded,
-/// since fast sync is about to replace it wholesale.
-fn commit_genesis_ledger_info_only(
+/// Returns `None` when the node has no genesis blob, which is only workable if
+/// it expects to get everything, genesis included, from its peers.
+fn calculate_verified_genesis(
     node_config: &NodeConfig,
-    db: &Arc<AptosDB>,
     db_rw: &DbReaderWriter,
-) -> Result<()> {
-    if db.get_latest_ledger_info_option()?.is_some() {
-        return Ok(()); // Already recorded on an earlier run
-    }
+) -> Result<Option<GenesisCommitter>> {
     let Some(genesis_txn) = get_genesis_txn(node_config) else {
         info!("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");
-        return Ok(());
+        return Ok(None);
     };
 
     let ledger_summary = db_rw.reader.get_pre_committed_ledger_summary()?;
@@ -159,6 +153,27 @@ fn commit_genesis_ledger_info_only(
         committer.waypoint(),
     );
 
+    Ok(Some(committer))
+}
+
+/// Executes genesis and persists only the resulting epoch-0 ledger info.
+///
+/// State sync needs that ledger info as its trust root: its `next_epoch_state`
+/// is what verifies the epoch-ending ledger infos fetched from peers, which in
+/// turn verify the configured waypoint. The genesis state itself is discarded,
+/// since fast sync is about to replace it wholesale.
+fn commit_genesis_ledger_info_only(
+    node_config: &NodeConfig,
+    db: &Arc<AptosDB>,
+    db_rw: &DbReaderWriter,
+) -> Result<()> {
+    if db.get_latest_ledger_info_option()?.is_some() {
+        return Ok(()); // Already recorded on an earlier run
+    }
+    let Some(committer) = calculate_verified_genesis(node_config, db_rw)? else {
+        return Ok(());
+    };
+
     let genesis_li = committer
         .ledger_info()
         .ok_or_else(|| anyhow!("Genesis execution produced no ledger info!"))?;
@@ -167,6 +182,27 @@ fn commit_genesis_ledger_info_only(
     // `committer` is dropped without committing, so the genesis state never
     // reaches disk.
     Ok(())
+}
+
+/// Commits genesis in full, for a node whose peers turned out to have nothing
+/// beyond it.
+///
+/// The epoch-0 ledger info is already durable, recorded by
+/// `commit_genesis_ledger_info_only` before the fast-sync target was known, so
+/// only the transaction and state are written here. Committing the ledger info
+/// again would be rejected as a gap in epoch history, since it is already the
+/// latest.
+fn commit_local_genesis(node_config: &NodeConfig, db_rw: &DbReaderWriter) -> Result<()> {
+    if db_rw.reader.get_pre_committed_version()?.is_some() {
+        return Ok(()); // Already committed on an earlier run
+    }
+    let Some(committer) = calculate_verified_genesis(node_config, db_rw)? else {
+        return Ok(());
+    };
+
+    committer
+        .commit_without_ledger_info()
+        .map_err(|err| anyhow!("Failed to commit genesis: {}", err))
 }
 
 /// Bundles up what a fast syncing node can still get out of its genesis blob:
@@ -181,10 +217,7 @@ fn build_local_genesis(node_config: &NodeConfig, db_rw: &DbReaderWriter) -> Opti
     let commit_db_rw = db_rw.clone();
     Some(LocalGenesis {
         state_reader,
-        commit: Arc::new(move || {
-            maybe_apply_genesis(&commit_db_rw, &commit_node_config)?;
-            Ok(())
-        }),
+        commit: Arc::new(move || commit_local_genesis(&commit_node_config, &commit_db_rw)),
     })
 }
 
