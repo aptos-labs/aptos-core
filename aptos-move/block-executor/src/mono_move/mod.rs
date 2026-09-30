@@ -467,7 +467,11 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             &self.environment,
             usage,
         )
-        .map_err(|e| code_invariant_error(format!("MonoMove: {e}")))?
+        .map_err(|e| {
+            code_invariant_error(format!(
+                "MonoMove: failed to create Aptos transaction executor: {e}"
+            ))
+        })?
         .without_metering()
         .execute_transaction(inner_txn, auxiliary_info);
 
