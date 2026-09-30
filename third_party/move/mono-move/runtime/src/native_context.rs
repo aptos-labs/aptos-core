@@ -113,9 +113,9 @@ pub struct ProductionNativeContext<'a> {
     /// Loader and module read-set access, for natives whose behaviour depends
     /// on a module's declarations.
     loader: &'a dyn LoaderAccess,
-    /// Per-transaction native extensions, shared across native calls. Accessed
-    /// sharedly — each extension's own [`RefCell`](std::cell::RefCell) provides
-    /// the interior mutability.
+    /// Per-transaction native extensions, shared across native calls. Only ever
+    /// borrowed shared — each extension's own [`RefCell`](std::cell::RefCell)
+    /// provides the interior mutability.
     extensions: &'a NativeExtensions,
     /// GC roots backing the references and heap objects the native holds.
     pool: RootPool,
@@ -931,7 +931,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     fn return_type(&self, i: usize) -> VMResult<InternedType> {
         self.abi.return_type(i).ok_or_else(|| {
             native_invariant_violation(format!(
-                "return index {} out of bounds (num_returns={})",
+                "Return index {} out of bounds (num_returns={})",
                 i,
                 self.abi.returns().len(),
             ))
@@ -949,10 +949,6 @@ impl NativeContext for ProductionNativeContext<'_> {
         func_name: &IdentStr,
         expected_ty: InternedType,
     ) -> VMResult<Result<Boxed<'a, Opaque>, FunctionResolutionError>> {
-        // TODO(security): the module id is interned before the load can fail,
-        // so a resolution that resolves nothing still grows the process-global
-        // interner. Same class as the `TODO(metering)` on
-        // `ExecutionGuard::intern_identifier_internal`; gas is the real fix.
         let module_id = self.guard.module_id_of(&address, module_name);
 
         // SAFETY: `gas` is reborrowed exclusively here; the callee borrows the

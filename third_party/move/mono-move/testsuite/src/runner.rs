@@ -335,7 +335,6 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
         storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
         module_provider.add_module(module);
     }
-    // V2 seeds the same resource inside `with_mono_function`.
     storage.publish_or_overwrite_resource(
         AccountAddress::ONE,
         Features::struct_tag(),

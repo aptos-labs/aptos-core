@@ -79,9 +79,25 @@ module 0x42::m {
         ).unwrap_err().error_code()
     }
 
+    public fun missing_module_twice(): u64 {
+        let first = reflect::resolve<|u64, u64|u64 has copy + drop>(
+            @0x42, &utf8(b"missing"), &utf8(b"add")
+        ).unwrap_err().error_code();
+        let second = reflect::resolve<|u64, u64|u64 has copy + drop>(
+            @0x42, &utf8(b"missing"), &utf8(b"add")
+        ).unwrap_err().error_code();
+        first + second
+    }
+
     public fun forbidden_event_emit(): u64 {
         reflect::resolve<|u64|>(
             @0x1, &utf8(b"event"), &utf8(b"emit")
+        ).unwrap_err().error_code()
+    }
+
+    public fun forbidden_init(): u64 {
+        reflect::resolve<|u64|>(
+            @0x1, &utf8(b"init"), &utf8(b"internal_maybe_initialize")
         ).unwrap_err().error_code()
     }
 
@@ -128,10 +144,16 @@ module 0x42::m {
 // RUN: execute 0x42::m::missing_function
 // CHECK: results: 1
 
+// RUN: execute 0x42::m::missing_module_twice
+// CHECK: results: 2
+
 // RUN: execute 0x42::m::private_function
 // CHECK: results: 2
 
 // RUN: execute 0x42::m::forbidden_event_emit
+// CHECK: results: 2
+
+// RUN: execute 0x42::m::forbidden_init
 // CHECK: results: 2
 
 // RUN: execute 0x42::m::wrong_arity
