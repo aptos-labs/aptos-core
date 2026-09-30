@@ -34,6 +34,6 @@ url = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["testing"] }
-aptos-netcore = { workspace = true, features = ["fuzzing"] }
 aptos-temppath = { workspace = true }
+aptos-types = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }

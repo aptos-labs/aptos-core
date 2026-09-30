@@ -42,7 +42,6 @@ tokio-stream = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-aptos-channels = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-executor = { workspace = true }

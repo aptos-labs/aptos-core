@@ -20,7 +20,6 @@ default = []
 
 [dependencies]
 anyhow = { workspace = true }
-codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true }
 move-compiler-v2 = { workspace = true }
@@ -29,6 +28,7 @@ move-stackless-bytecode = { workspace = true }
 num = { workspace = true }
 
 [dev-dependencies]
+codespan-reporting = { workspace = true }
 datatest-stable = { workspace = true }
 move-prover-test-utils = { workspace = true }
 

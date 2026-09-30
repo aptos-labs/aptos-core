@@ -19,7 +19,7 @@ bench = false
 
 [features]
 fuzzing = ["aptos-types/fuzzing", "proptest"]
-bench = ["proptest", "criterion"]
+bench = ["proptest"]
 
 [dependencies]
 aptos-crypto = { workspace = true }
@@ -29,9 +29,7 @@ aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bitvec = { workspace = true }
-criterion = { workspace = true, optional = true }
 dashmap = { workspace = true }
-itertools = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rayon = { workspace = true }
@@ -40,6 +38,8 @@ thiserror = { workspace = true }
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
 bitvec = { workspace = true }
+criterion = { workspace = true }
+itertools = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
