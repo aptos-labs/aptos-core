@@ -33,6 +33,8 @@ LEAN_DIR = Path(__file__).resolve().parent.parent
 REPO = LEAN_DIR.parents[2]
 MANIFEST = LEAN_DIR / "bench" / "problems.toml"
 PACKAGE = LEAN_DIR / "leaner-e2e-tests"
+# Where a local run's page goes (git-ignored).
+LOCAL_PAGE = LEAN_DIR / "local_benchmark.html"
 SCHEMA = "leaner-bench"
 VERSION = 1
 WORKFLOW = "leaner-bench.yaml"
@@ -265,6 +267,10 @@ def run(args):
     }
     Path(args.out).write_text(json.dumps(results, indent=2) + "\n")
     print(f"leaner-bench: wrote {args.out}", file=sys.stderr)
+    # A local run renders its page against the CI history; in CI the report
+    # job does.
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        report(parser().parse_args(["report", "--local", args.out]))
 
 
 # --------------------------------------------------------------------------
@@ -866,14 +872,16 @@ def report(args):
         points = points + [local]
     if not points:
         fail("nothing to report: no history and no local run")
-    if args.html:
-        Path(args.html).write_text(page(points, local_html(base, rows)))
+    html_path = args.html or (LOCAL_PAGE if args.local else None)
+    if html_path:
+        Path(html_path).write_text(page(points, local_html(base, rows)))
+        print(f"leaner-bench: wrote {html_path}", file=sys.stderr)
     if args.markdown:
         Path(args.markdown).write_text(markdown(points, args.threshold, args.page_url))
     if args.slack:
         Path(args.slack).write_text(json.dumps(
             slack(points, args.threshold, args.heartbeat_threshold, args.page_url)) + "\n")
-    if not (args.html or args.markdown or args.slack):
+    if not (html_path or args.markdown or args.slack):
         print(markdown(points, args.threshold))
     if base:
         print(local_text(base, rows))
@@ -899,7 +907,7 @@ def compare(args):
           f"{percent(change(suite[1], suite[0])):>9}")
 
 
-def main():
+def parser():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -932,7 +940,9 @@ def main():
                                help="report the local run alone")
     report_parser.add_argument("--base-ref", default="upstream/main",
                                help="the ref whose merge base picks the CI run to compare with")
-    report_parser.add_argument("--html")
+    report_parser.add_argument("--html",
+                               help=f"the page to write; with --local, {LOCAL_PAGE.name} "
+                                    "in the Lean tree by default")
     report_parser.add_argument("--markdown")
     report_parser.add_argument("--slack")
     report_parser.add_argument("--page-url", help="where the HTML report is published")
@@ -946,8 +956,11 @@ def main():
     compare_parser.add_argument("before")
     compare_parser.add_argument("after")
     compare_parser.set_defaults(action=compare)
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = parser().parse_args()
     args.action(args)
 
 

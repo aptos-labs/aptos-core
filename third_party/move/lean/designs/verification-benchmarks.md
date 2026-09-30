@@ -401,9 +401,11 @@ stay well within the hour the set is trimmed to.
 cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
 (cd third_party/move/lean/leaner-e2e-tests && lake build leaner-bench)
 python3 third_party/move/lean/scripts/leaner-bench.py run --out /tmp/local.json
-python3 third_party/move/lean/scripts/leaner-bench.py report \
-  --local /tmp/local.json --html /tmp/bench.html
 ```
+
+A local `run` writes its page, the run appended to the CI history, to
+`third_party/move/lean/local_benchmark.html`, which git ignores;
+`report --local /tmp/local.json` renders it there again, or to `--html`.
 
 `run --package <dir>` takes the executable from another build of
 `leaner-e2e-tests`, such as a copy on a native disk.
