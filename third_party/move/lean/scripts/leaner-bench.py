@@ -12,10 +12,10 @@
 Wall time is the main measure; heartbeats compare across machines. Uses only
 the standard library and the `gh` CLI (for the history).
 
-A series of local runs on a branch: rebuild `leaner-bench`, then
-`run --only <names>` after each change, keeping the names; `compare` gives
-the last change (@-2 against @-1), `history --local` the series, and
-`compare @-N @-1` the change since run @-N.
+A series of local runs on a branch: `run --only <names>` after each change,
+keeping the names. It builds `leaner-bench`, measures, records the run, and
+compares it with the previous one. `compare` only reads recorded runs:
+`history --local` lists them, `compare @-N @-1` the change since run @-N.
 """
 
 import argparse
@@ -252,10 +252,14 @@ def run(args):
             fail(f"no such problem: {', '.join(sorted(unknown))}")
         problems = [problem for problem in problems if problem["name"] in wanted]
     package = Path(args.package).resolve()
+    # A run measures the executable, so it is built from the current sources
+    # first; up to date, the build is a no-op.
+    build = subprocess.run(["lake", "--dir", str(package), "build", "leaner-bench"],
+                           cwd=LEAN_DIR, capture_output=True, text=True)
+    if build.returncode != 0:
+        fail(f"building leaner-bench in {package} failed:\n{build.stdout[-3000:]}"
+             f"{build.stderr[-3000:]}")
     executable = package / ".lake" / "build" / "bin" / "leaner-bench"
-    if not executable.is_file():
-        fail(f"no benchmark executable at {executable}; "
-             f"build it with `cd {package} && lake build leaner-bench`")
     if in_ci() and not args.out:
         fail("a CI run names its results file with --out")
     env = bench_environment(package, args.threads)
@@ -302,6 +306,9 @@ def run(args):
     if not in_ci():
         record_local(results)
         report(parser().parse_args(["report", "--local-runs"]))
+        if len(local_runs(results["branch"])) > 1:
+            print()
+            compare(parser().parse_args(["compare"]))
 
 
 # --------------------------------------------------------------------------

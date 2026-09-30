@@ -98,10 +98,10 @@ first waits for a certificate. Use all four instruments below.
    option at the end of that step; a residual printed by `certifyDebug` is
    the leaf's state before its deciders, not after.
 7. **The benchmark problems.** `scripts/leaner-bench.py run [--only …]`
-   measures the standard problems natively, by phase, and records the run
-   in the local history; `compare` then gives each problem's change in
-   wall time and heartbeats against the previous local run of the branch
-   (`verification-benchmarks.md`, "Local use").
+   builds `leaner-bench`, measures the standard problems natively, by
+   phase, records the run in the local history, and prints each problem's
+   change in wall time and heartbeats against the previous local run of the
+   branch (`verification-benchmarks.md`, "Local use").
 
 `perf record` on `lean` works if a statically linked Lean binary exposes
 the kernel symbols. It showed the same hot spots as the instruments above,

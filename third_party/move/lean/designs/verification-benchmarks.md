@@ -404,9 +404,7 @@ stay well within the hour the set is trimmed to.
 
 ```bash
 cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
-(cd third_party/move/lean/leaner-e2e-tests && lake build leaner-bench)
 python3 third_party/move/lean/scripts/leaner-bench.py run [--only math128,ordered_map]
-python3 third_party/move/lean/scripts/leaner-bench.py compare
 ```
 
 A local run is recorded in the local history, and the files of local runs
@@ -418,28 +416,24 @@ stay in `third_party/move/lean`, ignored by git:
   the CI history, rewritten by every local run (`report --local-runs`);
 - `local_benchmark_logs/`: the problems' logs of the latest local run.
 
-A series of changes on a branch, one run after each:
+A series of changes on a branch, one command after each (commit first):
 
 ```bash
-B=third_party/move/lean/scripts/leaner-bench.py
-python3 $B run --only math128,ordered_map     # the baseline
-# change, commit, then:
-(cd third_party/move/lean/leaner-e2e-tests && lake build leaner-bench)
-python3 $B run --only math128,ordered_map
-python3 $B compare                            # the last change: @-2 against @-1
-python3 $B history --local                    # the series, @-N … @-1
-python3 $B compare @-4 @-1                    # the baseline against the latest
+python3 third_party/move/lean/scripts/leaner-bench.py run --only math128,ordered_map
 ```
 
-Rebuild `leaner-bench` before each run: a run measures the executable,
-not the sources. Keep the same `--only` set through a series, and commit
-each change, since a run is labeled by its commit (`+` when the tree was
-dirty). Heartbeats tell whether the elaborator's work changed, wall time
-whether the change shows; an agent follows its own optimizations this
-way. The suite total compares full runs only.
+`run` builds `leaner-bench` from the current sources, measures, records the
+run, rewrites the page, and prints its comparison with the previous run on
+the branch. `compare` only reads recorded runs: `history --local` lists the
+series (`@-N … @-1`), and `compare @-4 @-1` gives the change since `@-4`.
+Keep the same `--only` set through a series and commit each change, since a
+run is labeled by its commit (`+` when the tree was dirty). Heartbeats tell
+whether the elaborator's work changed, wall time whether the change shows;
+an agent follows its own optimizations this way. The suite total compares
+full runs only.
 
-`run --package <dir>` takes the executable from another build of
-`leaner-e2e-tests`, such as a copy on a native disk.
+`run --package <dir>` builds and runs `leaner-bench` of another copy of
+`leaner-e2e-tests`, such as one on a native disk.
 
 The page fetches the CI history with the user's `gh` login. Its comparison
 table measures the latest local run against the latest CI run at or before
