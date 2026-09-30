@@ -437,11 +437,13 @@ def latest_changes(points, name):
     }
 
 
-def markdown(points, threshold):
+def markdown(points, threshold, page_url=None):
     latest = points[-1]
     names = problem_names(points)
     suite = [suite_value(point, "wall_ms") for point in points]
     lines = [f"### Leaner verification benchmark: {label_of(latest)}", ""]
+    if page_url:
+        lines += [f"Charts: {page_url}", ""]
     counts = {status: sum(problem["status"] == status for problem in latest["problems"])
               for status in ("verified", "failed", "timeout", "crashed")}
     lines.append(
@@ -467,7 +469,7 @@ def markdown(points, threshold):
     return "\n".join(lines) + "\n"
 
 
-def slack(points, threshold, heartbeat_threshold):
+def slack(points, threshold, heartbeat_threshold, page_url=None):
     latest = points[-1]
     suite = [suite_value(point, "wall_ms") for point in points]
     counts = {status: sum(problem["status"] == status for problem in latest["problems"])
@@ -496,9 +498,11 @@ def slack(points, threshold, heartbeat_threshold):
             detail += notes
             notable.append(f"• `{name}` {', '.join(detail)} `{changes['trend']}`")
     lines += (["Changes:"] + notable) if notable else ["No problem moved beyond the thresholds."]
-    url = run_url()
-    if url:
-        lines.append(f"<{url}|Run and report> (artifact `leaner-bench-report`)")
+    links = [f"<{page_url}|Charts>"] if page_url else []
+    if run_url():
+        links.append(f"<{run_url()}|Run>")
+    if links:
+        lines.append(" · ".join(links))
     return {"text": "\n".join(lines)}
 
 
@@ -855,10 +859,10 @@ def report(args):
     if args.html:
         Path(args.html).write_text(page(points, local_html(base, rows)))
     if args.markdown:
-        Path(args.markdown).write_text(markdown(points, args.threshold))
+        Path(args.markdown).write_text(markdown(points, args.threshold, args.page_url))
     if args.slack:
         Path(args.slack).write_text(json.dumps(
-            slack(points, args.threshold, args.heartbeat_threshold)) + "\n")
+            slack(points, args.threshold, args.heartbeat_threshold, args.page_url)) + "\n")
     if not (args.html or args.markdown or args.slack):
         print(markdown(points, args.threshold))
     if base:
@@ -921,6 +925,7 @@ def main():
     report_parser.add_argument("--html")
     report_parser.add_argument("--markdown")
     report_parser.add_argument("--slack")
+    report_parser.add_argument("--page-url", help="where the HTML report is published")
     report_parser.add_argument("--threshold", type=float, default=10.0,
                                help="wall-time change against the median worth flagging, in percent")
     report_parser.add_argument("--heartbeat-threshold", type=float, default=5.0,
