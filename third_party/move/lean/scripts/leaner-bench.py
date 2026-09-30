@@ -359,19 +359,26 @@ def cache_dir():
                 or Path.home() / ".cache" / "leaner-bench")
 
 
+def gh(*args):
+    """A `gh` command's outcome, or none without the `gh` CLI: the history
+    is optional, and a local run renders without it."""
+    try:
+        return subprocess.run(["gh", *args], capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+
+
 def fetch_history(args):
     """The results of the last `window` CI runs on the branch that produced
     results, oldest first, from a cache keyed by run id. A run counts by its
     results artifact, not its conclusion: a run whose report or publication
     failed after the benchmark finished still measured."""
-    listing = subprocess.run(
-        ["gh", "run", "list", "--workflow", WORKFLOW, "--branch", args.branch,
-         "--status", "completed", "--limit", str(min(3 * args.window, 300)),
-         "--json", "databaseId,headSha,createdAt,url", *repo_args(args)],
-        capture_output=True, text=True,
-    )
-    if listing.returncode != 0:
-        print(f"leaner-bench: no history: {listing.stderr.strip()}", file=sys.stderr)
+    listing = gh("run", "list", "--workflow", WORKFLOW, "--branch", args.branch,
+                 "--status", "completed", "--limit", str(min(3 * args.window, 300)),
+                 "--json", "databaseId,headSha,createdAt,url", *repo_args(args))
+    if listing is None or listing.returncode != 0:
+        reason = "the gh CLI is not installed" if listing is None else listing.stderr.strip()
+        print(f"leaner-bench: no history: {reason}", file=sys.stderr)
         return []
     history = []
     for entry in json.loads(listing.stdout):
@@ -380,12 +387,9 @@ def fetch_history(args):
         target = cache_dir() / str(entry["databaseId"])
         results = target / "results.json"
         if not results.exists():
-            download = subprocess.run(
-                ["gh", "run", "download", str(entry["databaseId"]), "--name", ARTIFACT,
-                 "--dir", str(target), *repo_args(args)],
-                capture_output=True, text=True,
-            )
-            if download.returncode != 0 or not results.exists():
+            download = gh("run", "download", str(entry["databaseId"]), "--name", ARTIFACT,
+                          "--dir", str(target), *repo_args(args))
+            if download is None or download.returncode != 0 or not results.exists():
                 continue
         data = json.loads(results.read_text())
         if data.get("schema") != SCHEMA or data.get("version") != VERSION:
