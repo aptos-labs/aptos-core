@@ -499,7 +499,8 @@ mod streaming_service_tests {
         error::Error,
         streaming_client::{
             DataStreamingClient, GetAllStatesRequest, NotificationAndFeedback,
-            NotificationFeedback, StreamRequest, StreamRequestMessage, TerminateStreamRequest,
+            NotificationFeedback, SnapshotKind, StreamRequest, StreamRequestMessage,
+            TerminateStreamRequest,
         },
         streaming_service::StreamUpdateNotification,
         tests,
@@ -809,7 +810,7 @@ mod streaming_service_tests {
         let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version: MIN_ADVERTISED_STATES,
             start_index: 0,
-            state_kind: StateKind::MainState,
+            snapshot_kind: SnapshotKind::State(StateKind::MainState),
         });
         create_request_message_and_receiver(stream_request)
     }

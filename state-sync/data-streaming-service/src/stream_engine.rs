@@ -5,16 +5,16 @@ use crate::{
     data_notification::{
         DataClientRequest,
         DataClientRequest::{
-            EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
-            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfStates,
-            StateValuesWithProof, SubscribeTransactionOutputsWithProof,
+            EpochEndingLedgerInfos, HotStateValuesWithProof, NewTransactionOutputsWithProof,
+            NewTransactionsOrOutputsWithProof, NewTransactionsWithProof, NumberOfHotStates,
+            NumberOfStates, StateValuesWithProof, SubscribeTransactionOutputsWithProof,
             SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
             TransactionOutputsWithProof, TransactionsOrOutputsWithProof, TransactionsWithProof,
         },
         DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
-        NewTransactionsWithProofRequest, NumberOfStatesRequest, StateValuesWithProofRequest,
-        SubscribeTransactionOutputsWithProofRequest,
+        HotStateValuesWithProofRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        StateValuesWithProofRequest, SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
         TransactionsWithProofRequest,
@@ -23,7 +23,8 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
     streaming_client::{
-        Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
+        Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, SnapshotKind,
+        StreamRequest,
     },
 };
 use aptos_config::config::DataStreamingServiceConfig;
@@ -33,7 +34,6 @@ use aptos_data_client::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
-use aptos_storage_interface::StateKind;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
 use std::{cmp, cmp::min, sync::Arc};
@@ -164,56 +164,6 @@ impl StreamEngine {
     }
 }
 
-/// The snapshot streamed by a `SnapshotStreamCursor`, which determines the
-/// requests the cursor creates.
-#[derive(Clone, Copy, Debug)]
-enum SnapshotKind {
-    State(StateKind),
-}
-
-impl SnapshotKind {
-    /// Describes the snapshot in logs and errors.
-    fn label(self) -> &'static str {
-        match self {
-            Self::State(StateKind::MainState) => "state",
-            Self::State(StateKind::Position) => "position state",
-        }
-    }
-
-    fn can_be_empty(self) -> bool {
-        match self {
-            // Main state at a real snapshot is never empty
-            Self::State(StateKind::MainState) => false,
-            Self::State(StateKind::Position) => true,
-        }
-    }
-
-    fn count_request(self, version: Version) -> DataClientRequest {
-        match self {
-            Self::State(state_kind) => NumberOfStates(NumberOfStatesRequest {
-                version,
-                state_kind,
-            }),
-        }
-    }
-
-    fn chunk_request(
-        self,
-        version: Version,
-        start_index: u64,
-        end_index: u64,
-    ) -> DataClientRequest {
-        match self {
-            Self::State(state_kind) => StateValuesWithProof(StateValuesWithProofRequest {
-                version,
-                start_index,
-                end_index,
-                state_kind,
-            }),
-        }
-    }
-}
-
 /// Index and count tracking shared by the snapshot stream engines (state values
 /// and hot state). Both stream a flat, index-addressed snapshot at a single
 /// version: the item count is fetched first, then chunks are requested in order.
@@ -275,7 +225,7 @@ impl SnapshotStreamCursor {
                     .event(LogEvent::Pending)
                     .message(&format!(
                         "Requested the number of {} values at version: {:?}",
-                        self.kind.label(),
+                        self.kind.get_label(),
                         self.version
                     )))
             );
@@ -323,7 +273,7 @@ impl SnapshotStreamCursor {
                 .event(LogEvent::Success)
                 .message(&format!(
                     "Received the number of {} values at version: {:?}. Total: {:?}",
-                    self.kind.label(),
+                    self.kind.get_label(),
                     self.version,
                     number_of_items
                 )))
@@ -337,14 +287,14 @@ impl SnapshotStreamCursor {
         if number_of_items == 0 && !self.kind.can_be_empty() {
             return Err(Error::AptosDataClientResponseIsInvalid(format!(
                 "Received a {} count of 0, but the snapshot can't be empty!",
-                self.kind.label()
+                self.kind.get_label()
             )));
         }
         if number_of_items < self.next_request_index {
             return Err(Error::NoDataToFetch(format!(
                 "The next {} index to fetch is higher than the total number of \
                 items. Next index: {:?}, total items: {:?}",
-                self.kind.label(),
+                self.kind.get_label(),
                 self.next_request_index,
                 number_of_items
             )));
@@ -375,7 +325,7 @@ impl SnapshotStreamCursor {
         if num_items == 0 {
             return Err(Error::AptosDataClientResponseIsInvalid(format!(
                 "Received an empty {} values response! Request indices: [{}, {}]",
-                self.kind.label(),
+                self.kind.get_label(),
                 start_index,
                 end_index
             )));
@@ -408,9 +358,6 @@ pub struct StateStreamEngine {
     // The original states request made by the client
     pub request: GetAllStatesRequest,
 
-    // Which snapshot store this engine streams
-    pub kind: StateKind,
-
     // Tracks the item count and the requested/streamed indices
     pub cursor: SnapshotStreamCursor,
 }
@@ -419,9 +366,8 @@ impl StateStreamEngine {
     fn new(request: &GetAllStatesRequest) -> Result<Self, Error> {
         Ok(StateStreamEngine {
             request: request.clone(),
-            kind: request.state_kind,
             cursor: SnapshotStreamCursor::new(
-                SnapshotKind::State(request.state_kind),
+                request.snapshot_kind,
                 request.version,
                 request.start_index,
             ),
@@ -447,6 +393,8 @@ impl DataStreamEngine for StateStreamEngine {
     }
 
     fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
+        // TODO(HotState): peers don't advertise hot state separately, so this
+        // assumes they retain hot snapshots as long as the main ones.
         Ok(AdvertisedData::contains_range(
             self.request.version,
             self.request.version,
@@ -469,21 +417,30 @@ impl DataStreamEngine for StateStreamEngine {
 
         // Handle and transform the response
         match client_request {
-            StateValuesWithProof(request) => {
+            StateValuesWithProof(StateValuesWithProofRequest {
+                start_index,
+                end_index,
+                ..
+            })
+            | HotStateValuesWithProof(HotStateValuesWithProofRequest {
+                start_index,
+                end_index,
+                ..
+            }) => {
                 // Update the stream cursor with the received chunk
                 let (num_values, last_index) = match &client_response_payload {
                     ResponsePayload::StateValuesWithProof(state_values_with_proof) => (
                         state_values_with_proof.raw_values.len(),
                         state_values_with_proof.last_index,
                     ),
+                    ResponsePayload::HotStateValuesWithProof(hot_state_values_with_proof) => (
+                        hot_state_values_with_proof.raw_values.len(),
+                        hot_state_values_with_proof.last_index,
+                    ),
                     _ => invalid_response_type!(client_response_payload),
                 };
-                self.cursor.accept_chunk(
-                    request.start_index,
-                    request.end_index,
-                    num_values,
-                    last_index,
-                )?;
+                self.cursor
+                    .accept_chunk(*start_index, *end_index, num_values, last_index)?;
 
                 // Create a new data notification
                 let data_notification = create_data_notification(
@@ -494,7 +451,8 @@ impl DataStreamEngine for StateStreamEngine {
                 )?;
                 return Ok(Some(data_notification));
             },
-            NumberOfStates(_) => {
+            // The hot state count shares the `NumberOfStates` payload
+            NumberOfStates(_) | NumberOfHotStates(_) => {
                 if let ResponsePayload::NumberOfStates(number_of_states) = client_response_payload {
                     self.cursor.record_number_of_items(number_of_states)?;
                 }
@@ -2328,17 +2286,29 @@ fn create_data_notification(
     let client_response_type = client_response.get_label();
     let data_payload = match client_response {
         ResponsePayload::StateValuesWithProof(states_chunk) => match &stream_engine {
-            StreamEngine::StateStreamEngine(engine) => {
-                DataPayload::StateValuesWithProof(engine.kind, states_chunk)
-            },
+            StreamEngine::StateStreamEngine(StateStreamEngine {
+                request:
+                    GetAllStatesRequest {
+                        snapshot_kind: SnapshotKind::State(state_kind),
+                        ..
+                    },
+                ..
+            }) => DataPayload::StateValuesWithProof(*state_kind, states_chunk),
             _ => invalid_response_type!(client_response_type),
         },
         // The number of states is consumed internally by the engine for chunk
         // planning; it is never surfaced to the consumer as a notification.
         ResponsePayload::NumberOfStates(_) => invalid_response_type!(client_response_type),
-        // TODO(HotState): hot state values are not streamed yet.
-        ResponsePayload::HotStateValuesWithProof(_) => {
-            invalid_response_type!(client_response_type)
+        ResponsePayload::HotStateValuesWithProof(hot_states_chunk) => match &stream_engine {
+            StreamEngine::StateStreamEngine(StateStreamEngine {
+                request:
+                    GetAllStatesRequest {
+                        snapshot_kind: SnapshotKind::HotState,
+                        ..
+                    },
+                ..
+            }) => DataPayload::HotStateValuesWithProof(hot_states_chunk),
+            _ => invalid_response_type!(client_response_type),
         },
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)

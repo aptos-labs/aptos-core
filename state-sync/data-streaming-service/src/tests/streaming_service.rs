@@ -7,7 +7,7 @@ use crate::{
     error::Error,
     streaming_client::{
         new_streaming_service_client_listener_pair, DataStreamingClient, NotificationAndFeedback,
-        NotificationFeedback, StreamingServiceClient,
+        NotificationFeedback, SnapshotKind, StreamingServiceClient,
     },
     streaming_service::DataStreamingService,
     tests::utils::{
@@ -40,7 +40,11 @@ async fn test_notifications_state_values() {
 
     // Request a state value stream and get a data stream listener
     let mut stream_listener = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await
         .unwrap();
 
@@ -55,7 +59,11 @@ async fn test_notifications_state_values_limited_chunks() {
 
     // Request a new state value stream starting at the next expected index
     let mut stream_listener = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES, Some(0), StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES,
+            Some(0),
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await
         .unwrap();
 
@@ -74,7 +82,7 @@ async fn test_notifications_state_values_multiple_streams() {
         .get_all_state_values(
             MAX_ADVERTISED_STATES,
             Some(next_expected_index),
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .await
         .unwrap();
@@ -109,7 +117,7 @@ async fn test_notifications_state_values_multiple_streams() {
                         .get_all_state_values(
                             MAX_ADVERTISED_STATES,
                             Some(next_expected_index),
-                            StateKind::MainState,
+                            SnapshotKind::State(StateKind::MainState),
                         )
                         .await
                         .unwrap();
@@ -1255,19 +1263,31 @@ async fn test_stream_states() {
 
     // Request a state value stream and verify we get a data stream listener
     let result = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES - 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES - 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await;
     assert_ok!(result);
 
     // Request a stream where states are missing (we are lower than advertised)
     let result = streaming_client
-        .get_all_state_values(MIN_ADVERTISED_STATES - 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MIN_ADVERTISED_STATES - 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 
     // Request a stream where states are missing (we are higher than advertised)
     let result = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_EPOCH_END + 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_EPOCH_END + 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 }
@@ -1566,7 +1586,11 @@ async fn test_terminate_stream() {
 
     // Request a state value stream
     let mut stream_listener = streaming_client
-        .get_all_state_values(MAX_ADVERTISED_STATES - 1, None, StateKind::MainState)
+        .get_all_state_values(
+            MAX_ADVERTISED_STATES - 1,
+            None,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .await
         .unwrap();
 
