@@ -21,6 +21,7 @@ import json
 import math
 import os
 import platform
+import shutil
 import signal
 import statistics
 import subprocess
@@ -33,8 +34,12 @@ LEAN_DIR = Path(__file__).resolve().parent.parent
 REPO = LEAN_DIR.parents[2]
 MANIFEST = LEAN_DIR / "bench" / "problems.toml"
 PACKAGE = LEAN_DIR / "leaner-e2e-tests"
-# Where a local run's page goes (git-ignored).
+# A local run's page, the history of local runs, and the problems' logs of
+# the latest local run, all git-ignored.
 LOCAL_PAGE = LEAN_DIR / "local_benchmark.html"
+LOCAL_HISTORY = LEAN_DIR / "local_benchmark_history.jsonl"
+LOCAL_LOGS = LEAN_DIR / "local_benchmark_logs"
+LOCAL_KEEP = 100
 SCHEMA = "leaner-bench"
 VERSION = 1
 WORKFLOW = "leaner-bench.yaml"
@@ -56,6 +61,17 @@ def git(*args):
     return subprocess.run(
         ["git", *args], cwd=REPO, capture_output=True, text=True, check=True
     ).stdout.strip()
+
+
+def in_ci():
+    return os.environ.get("GITHUB_ACTIONS") == "true"
+
+
+def current_branch():
+    """The branch measured: the pull request's or the ref's in CI, the
+    checked-out one locally."""
+    return (os.environ.get("GITHUB_HEAD_REF") or os.environ.get("GITHUB_REF_NAME")
+            or git("rev-parse", "--abbrev-ref", "HEAD"))
 
 
 # --------------------------------------------------------------------------
@@ -235,8 +251,14 @@ def run(args):
     if not executable.is_file():
         fail(f"no benchmark executable at {executable}; "
              f"build it with `cd {package} && lake build leaner-bench`")
+    if in_ci() and not args.out:
+        fail("a CI run names its results file with --out")
     env = bench_environment(package, args.threads)
-    workdir = Path(args.out).resolve().parent / (Path(args.out).stem + ".work")
+    if args.out:
+        workdir = Path(args.out).resolve().parent / (Path(args.out).stem + ".work")
+    else:
+        workdir = LOCAL_LOGS
+        shutil.rmtree(workdir, ignore_errors=True)
     workdir.mkdir(parents=True, exist_ok=True)
     # Load the environment once untimed, so the first problem does not pay
     # for a cold file cache.
@@ -263,14 +285,53 @@ def run(args):
         "runner": os.environ.get("RUNNER_NAME") or platform.node(),
         "cpu": cpu_model(),
         "threads": args.threads,
+        "branch": current_branch(),
+        "subset": bool(args.only),
         "problems": measured,
     }
-    Path(args.out).write_text(json.dumps(results, indent=2) + "\n")
-    print(f"leaner-bench: wrote {args.out}", file=sys.stderr)
-    # A local run renders its page against the CI history; in CI the report
-    # job does.
-    if os.environ.get("GITHUB_ACTIONS") != "true":
-        report(parser().parse_args(["report", "--local", args.out]))
+    if args.out:
+        Path(args.out).write_text(json.dumps(results, indent=2) + "\n")
+        print(f"leaner-bench: wrote {args.out}", file=sys.stderr)
+    # A local run joins the local history and renders the branch's local runs
+    # against the CI history; in CI the report job renders.
+    if not in_ci():
+        record_local(results)
+        report(parser().parse_args(["report", "--local-runs"]))
+
+
+# --------------------------------------------------------------------------
+# Local history
+
+
+def local_runs(branch=None):
+    """The recorded local runs, oldest first; those of `branch` when given."""
+    if not LOCAL_HISTORY.exists():
+        return []
+    runs = [json.loads(line) for line in LOCAL_HISTORY.read_text().splitlines() if line.strip()]
+    return [run for run in runs
+            if run.get("schema") == SCHEMA and run.get("version") == VERSION
+            and (branch is None or run.get("branch") == branch)]
+
+
+def record_local(results):
+    """Append a local run to the history, which keeps the latest runs."""
+    runs = local_runs() + [results]
+    LOCAL_HISTORY.write_text("".join(json.dumps(run) + "\n" for run in runs[-LOCAL_KEEP:]))
+    print(f"leaner-bench: recorded in {LOCAL_HISTORY} "
+          f"(@-1 of {len(local_runs(results['branch']))} on {results['branch']})", file=sys.stderr)
+
+
+def run_at(reference):
+    """A run named by a results file, or by `@N`: the N-th local run of the
+    current branch, negative indices counting back from the latest."""
+    if not reference.startswith("@"):
+        return json.loads(Path(reference).read_text())
+    branch = current_branch()
+    runs = local_runs(branch)
+    try:
+        return runs[int(reference[1:])]
+    except (ValueError, IndexError):
+        fail(f"no local run {reference} on {branch}: {len(runs)} recorded")
 
 
 # --------------------------------------------------------------------------
@@ -324,6 +385,15 @@ def fetch_history(args):
 
 
 def history(args):
+    if args.local:
+        runs = local_runs(current_branch())
+        for index, data in enumerate(runs):
+            verified = sum(problem["status"] == "verified" for problem in data["problems"])
+            suite = suite_value(data, "wall_ms")
+            print(f"@{index - len(runs)}  {label_of(data)}  "
+                  f"{verified}/{len(data['problems'])} verified  "
+                  + ("subset" if data.get("subset") else f"suite {seconds(suite)} s"))
+        return
     for data in fetch_history(args):
         verified = sum(problem["status"] == "verified" for problem in data["problems"])
         print(f"{data['run']['id']}  {data['date']}  {data['commit'][:10]}  "
@@ -359,9 +429,17 @@ def result_of(point, name):
 
 
 def suite_value(point, measure):
-    """The overall total of the problems a run verified completely."""
+    """The overall total of the problems a run verified completely; none for
+    a run of a subset, whose total compares with no other."""
+    if point.get("subset"):
+        return None
     return sum(problem[measure]["total"] for problem in point["problems"]
                if problem["status"] == "verified")
+
+
+def median(values):
+    present = [value for value in values if value is not None]
+    return statistics.median(present) if present else None
 
 
 def change(new, old):
@@ -395,7 +473,8 @@ def sparkline(values):
 def label_of(point):
     if point.get("run"):
         return f"{point['date'][:10]} {point['commit'][:7]}"
-    return f"local {point['commit'][:7]}" + ("+" if point.get("dirty") else "")
+    return (f"local {point['date'][5:16].replace('T', ' ')} {point['commit'][:7]}"
+            + ("+" if point.get("dirty") else ""))
 
 
 def annotations(points, name):
@@ -464,7 +543,7 @@ def markdown(points, threshold, page_url=None):
               for status in ("verified", "failed", "timeout", "crashed")}
     lines.append(
         f"Suite overall **{seconds(suite[-1])} s** ({percent(change(suite[-1], suite[-2] if len(suite) > 1 else None))} "
-        f"vs previous, {percent(change(suite[-1], statistics.median(suite[:-1]) if len(suite) > 1 else None))} "
+        f"vs previous, {percent(change(suite[-1], median(suite[:-1])))} "
         f"vs median of {len(suite) - 1} runs); "
         + ", ".join(f"{count} {status}" for status, count in counts.items() if count)
         + f". Runner `{latest.get('runner')}`, {latest.get('threads')} threads.")
@@ -494,7 +573,7 @@ def slack(points, threshold, heartbeat_threshold, page_url=None):
         f"*Leaner verification benchmark* · `{latest['commit'][:10]}` · {latest['date'][:10]}",
         f"Suite overall *{seconds(suite[-1])} s* "
         f"({percent(change(suite[-1], suite[-2] if len(suite) > 1 else None))} vs previous, "
-        f"{percent(change(suite[-1], statistics.median(suite[:-1]) if len(suite) > 1 else None))} "
+        f"{percent(change(suite[-1], median(suite[:-1])))} "
         f"vs {len(suite) - 1}-run median) · "
         + ", ".join(f"{count} {status}" for status, count in counts.items() if count),
     ]
@@ -763,10 +842,14 @@ def problem_section(points, name):
 
 def suite_section(points):
     labels = [label_of(point) for point in points]
-    wall = [suite_value(point, "wall_ms") / 1000 for point in points]
-    beats = [suite_value(point, "heartbeats") / 1e6 for point in points]
+    def scaled(measure, unit):
+        return [None if value is None else value / unit
+                for value in (suite_value(point, measure) for point in points)]
+    wall = scaled("wall_ms", 1000)
+    beats = scaled("heartbeats", 1e6)
     return (
-        '<section><h2>Suite<span class="status">problems verified completely</span></h2>'
+        '<section><h2>Suite<span class="status">problems verified completely, '
+        'full runs</span></h2>'
         '<div class="charts">'
         f'{chart("Suite: seconds", "s", labels, [("Overall", wall)], {})}'
         f'{chart("Suite: heartbeats", "M", labels, [("Overall", beats)], {})}'
@@ -863,16 +946,18 @@ def report(args):
         current["run"] = {"id": os.environ.get("GITHUB_RUN_ID", "current"), "url": run_url()}
         points = [point for point in points if point["run"]["id"] != current["run"]["id"]]
         points.append(current)
-    local = json.loads(Path(args.local).read_text()) if args.local else None
+    locals_ = [json.loads(Path(args.local).read_text())] if args.local else []
+    if args.local_runs:
+        locals_ += local_runs(current_branch())
     base, rows = None, []
-    if local:
+    if locals_:
         base = comparison_base(points, args.base_ref) if points else None
         if base:
-            rows = local_comparison(base, local)
-        points = points + [local]
+            rows = local_comparison(base, locals_[-1])
+        points = points + locals_
     if not points:
         fail("nothing to report: no history and no local run")
-    html_path = args.html or (LOCAL_PAGE if args.local else None)
+    html_path = args.html or (LOCAL_PAGE if locals_ else None)
     if html_path:
         Path(html_path).write_text(page(points, local_html(base, rows)))
         print(f"leaner-bench: wrote {html_path}", file=sys.stderr)
@@ -888,23 +973,30 @@ def report(args):
 
 
 def compare(args):
-    before = json.loads(Path(args.before).read_text())
-    after = json.loads(Path(args.after).read_text())
+    before, after = run_at(args.before), run_at(args.after)
+    print(f"before: {label_of(before)}\nafter:  {label_of(after)}\n")
     names = problem_names([before, after])
     print(f"{'problem':<24} {'status':>20} {'seconds':>16} {'change':>9} "
           f"{'heartbeats':>16} {'change':>9}")
+    common = []
     for name in names:
         old, new = result_of(before, name), result_of(after, name)
         status = f"{(old or {}).get('status', '–')} → {(new or {}).get('status', '–')}"
         wall = [result["wall_ms"]["total"] if result else None for result in (old, new)]
         beats = [result.get("heartbeats", {}).get("total") if result else None
                  for result in (old, new)]
+        if old and new and old["status"] == new["status"] == "verified":
+            common.append((wall, beats))
         print(f"{name:<24} {status:>20} {seconds(wall[0]):>7} → {seconds(wall[1]):>6} "
               f"{percent(change(wall[1], wall[0])):>9} {millions(beats[0]):>7} → "
               f"{millions(beats[1]):>6} {percent(change(beats[1], beats[0])):>9}")
-    suite = [suite_value(point, "wall_ms") for point in (before, after)]
-    print(f"{'suite (verified)':<24} {'':>20} {seconds(suite[0]):>7} → {seconds(suite[1]):>6} "
-          f"{percent(change(suite[1], suite[0])):>9}")
+    # The problems both runs verified completely, so subsets compare too.
+    wall = [sum(pair[0][side] for pair in common) for side in (0, 1)]
+    beats = [sum(pair[1][side] for pair in common) for side in (0, 1)]
+    print(f"{f'verified in both ({len(common)})':<24} {'':>20} {seconds(wall[0]):>7} → "
+          f"{seconds(wall[1]):>6} {percent(change(wall[1], wall[0])):>9} "
+          f"{millions(beats[0]):>7} → {millions(beats[1]):>6} "
+          f"{percent(change(beats[1], beats[0])):>9}")
 
 
 def parser():
@@ -913,7 +1005,8 @@ def parser():
     commands = parser.add_subparsers(dest="command", required=True)
 
     run_parser = commands.add_parser("run", help="measure the problems")
-    run_parser.add_argument("--out", required=True, help="the results file to write")
+    run_parser.add_argument("--out", help="a results file to write; a local run is also "
+                            f"recorded in {LOCAL_HISTORY.name}")
     run_parser.add_argument("--only", help="comma-separated problem names")
     run_parser.add_argument("--manifest", default=MANIFEST)
     run_parser.add_argument("--package", default=PACKAGE,
@@ -930,12 +1023,16 @@ def parser():
 
     history_parser = commands.add_parser("history", help="fetch the results of recent CI runs")
     history_options(history_parser)
+    history_parser.add_argument("--local", action="store_true",
+                                help="list the local runs of the current branch instead")
     history_parser.set_defaults(action=history)
 
     report_parser = commands.add_parser("report", help="render the history")
     history_options(report_parser)
     report_parser.add_argument("--current", help="the results of the running CI run")
     report_parser.add_argument("--local", help="a local results file to append")
+    report_parser.add_argument("--local-runs", action="store_true",
+                               help="append the recorded local runs of the current branch")
     report_parser.add_argument("--no-history", action="store_true",
                                help="report the local run alone")
     report_parser.add_argument("--base-ref", default="upstream/main",
@@ -952,9 +1049,11 @@ def parser():
                                help="heartbeat change worth flagging, in percent")
     report_parser.set_defaults(action=report)
 
-    compare_parser = commands.add_parser("compare", help="compare two runs of one machine")
-    compare_parser.add_argument("before")
-    compare_parser.add_argument("after")
+    compare_parser = commands.add_parser(
+        "compare", help="compare two runs of one machine: results files, or @N for the "
+                        "N-th local run of the current branch (@-1 the latest)")
+    compare_parser.add_argument("before", nargs="?", default="@-2")
+    compare_parser.add_argument("after", nargs="?", default="@-1")
     compare_parser.set_defaults(action=compare)
     return parser
 
