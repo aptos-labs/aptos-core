@@ -29,7 +29,7 @@ echo "$dependencies"
 for i in $dependencies; do
     echo "testing removal of $i"
     cargo rm "$i";
-    cargo check --all-targets --all-features
+    cargo check --locked --all-targets --all-features
     if (( $? == 0 )); then
         echo "removal succeeded, committing"
         git commit --no-gpg-sign -m "Removing $i from $(basename `pwd`)" --all;
