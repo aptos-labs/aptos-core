@@ -13,7 +13,7 @@ class ForgeLookupUnitTestsWorkflowTests < Minitest::Test
   PATH = ".github/workflows/#{FILE}"
   CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
   SETUP_PYTHON_PIN = "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
-  INSTALL = "python -m pip install --disable-pip-version-check click==8.3.3 psutil==5.9.8"
+  INSTALL = "python -m pip install --disable-pip-version-check click==8.3.3 psutil==5.9.8 PyYAML==6.0.2"
 
   def workflow
     @workflow ||= load_workflow(FILE)
@@ -33,6 +33,7 @@ class ForgeLookupUnitTestsWorkflowTests < Minitest::Test
             "testsuite/find_latest_image.py",
             "testsuite/forge.py",
             "testsuite/forge_test.py",
+            "testsuite/forge-test-runner-template.yaml",
             "testsuite/test_framework/**",
           ],
         },

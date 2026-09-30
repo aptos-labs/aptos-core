@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use super::protected_images::{ProtectedImages, TOOLS_REPO, VALIDATOR_TESTING_REPO};
 use super::GENESIS_HELM_RELEASE_NAME;
 use crate::{
     get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck,
@@ -686,7 +687,7 @@ pub fn construct_node_helm_values_from_input(
     value["chain"]["era"] = era.into();
     value["haproxy"]["enabled"] = enable_haproxy.into();
     value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
-    value["labels"]["forge-image-tag"] = make_k8s_label(image_tag).into();
+    value["labels"]["forge-image-tag"] = make_k8s_label(image_tag.clone()).into();
 
     // if present, tag the node with the test suite name and username
     let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
@@ -697,7 +698,25 @@ pub fn construct_node_helm_values_from_input(
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
+    let protected_images = ProtectedImages::from_env()?;
+    apply_node_image_overrides(&mut value, &image_tag, &protected_images)?;
     Ok(value)
+}
+
+fn apply_node_image_overrides(
+    value: &mut serde_yaml::Value,
+    image_tag: &str,
+    protected_images: &ProtectedImages,
+) -> Result<()> {
+    if let Some(tag) = protected_images.chart_tag(VALIDATOR_TESTING_REPO, &image_tag)? {
+        value["validator"]["image"]["repo"] = VALIDATOR_TESTING_REPO.into();
+        value["validator"]["image"]["tag"] = tag.into();
+    }
+    if let Some(tag) = protected_images.chart_tag(TOOLS_REPO, &image_tag)? {
+        value["tools"]["image"]["repo"] = TOOLS_REPO.into();
+        value["tools"]["image"]["tag"] = tag.into();
+    }
+    Ok(())
 }
 
 pub fn construct_genesis_helm_values_from_input(
@@ -727,7 +746,7 @@ pub fn construct_genesis_helm_values_from_input(
     value["genesis"]["validator"]["key_seed"] = FORGE_KEY_SEED.into();
     value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
     value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
-    value["labels"]["forge-image-tag"] = make_k8s_label(genesis_image_tag).into();
+    value["labels"]["forge-image-tag"] = make_k8s_label(genesis_image_tag.clone()).into();
 
     // if present, tag the node with the test suite name and username
     let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
@@ -739,7 +758,21 @@ pub fn construct_genesis_helm_values_from_input(
         (config_fn)(&mut value);
     }
 
+    let protected_images = ProtectedImages::from_env()?;
+    apply_genesis_image_override(&mut value, &genesis_image_tag, &protected_images)?;
     Ok(value)
+}
+
+fn apply_genesis_image_override(
+    value: &mut serde_yaml::Value,
+    image_tag: &str,
+    protected_images: &ProtectedImages,
+) -> Result<()> {
+    if let Some(tag) = protected_images.chart_tag(TOOLS_REPO, image_tag)? {
+        value["genesis"]["image"]["repo"] = TOOLS_REPO.into();
+        value["genesis"]["image"]["tag"] = tag.into();
+    }
+    Ok(())
 }
 
 /// Collect the running nodes in the network into K8sNodes
@@ -1134,10 +1167,14 @@ fn check_namespace_for_cleanup(
     false
 }
 
-/// Ensures that the label is at most 64 characters to meet k8s
-/// label length requirements.
+/// Limits a label to 63 characters and removes invalid trailing punctuation.
 pub fn make_k8s_label(value: String) -> String {
-    value.get(..63).unwrap_or(&value).to_string()
+    value
+        .chars()
+        .take(63)
+        .collect::<String>()
+        .trim_end_matches(|character: char| !character.is_ascii_alphanumeric())
+        .to_string()
 }
 
 #[cfg(test)]
@@ -1223,6 +1260,57 @@ labels:
 ";
         assert_eq!(genesis_helm_values_str, expected_helm_values);
         println!("{}", genesis_helm_values_str);
+    }
+
+    #[test]
+    fn protected_helm_overrides_keep_bare_image_tag() {
+        let validator_digest = format!("sha256:{}", "a".repeat(64));
+        let tools_digest = format!("sha256:{}", "b".repeat(64));
+        let digests = serde_json::to_string(&BTreeMap::from([
+            (VALIDATOR_TESTING_REPO, validator_digest.as_str()),
+            (TOOLS_REPO, tools_digest.as_str()),
+        ]))
+        .unwrap();
+        let images = ProtectedImages::from_values(Some("approved"), Some(&digests)).unwrap();
+        let mut node = serde_yaml::from_str::<serde_yaml::Value>("imageTag: approved").unwrap();
+        apply_node_image_overrides(&mut node, "approved", &images).unwrap();
+        assert_eq!(node["imageTag"].as_str(), Some("approved"));
+        assert_eq!(
+            node["validator"]["image"]["repo"].as_str(),
+            Some(VALIDATOR_TESTING_REPO)
+        );
+        assert_eq!(
+            node["validator"]["image"]["tag"].as_str(),
+            Some(format!("approved@{validator_digest}").as_str())
+        );
+        assert_eq!(node["tools"]["image"]["repo"].as_str(), Some(TOOLS_REPO));
+        assert_eq!(
+            node["tools"]["image"]["tag"].as_str(),
+            Some(format!("approved@{tools_digest}").as_str())
+        );
+
+        let mut genesis = serde_yaml::from_str::<serde_yaml::Value>("imageTag: approved").unwrap();
+        apply_genesis_image_override(&mut genesis, "approved", &images).unwrap();
+        assert_eq!(genesis["imageTag"].as_str(), Some("approved"));
+        assert_eq!(
+            genesis["genesis"]["image"]["repo"].as_str(),
+            Some(TOOLS_REPO)
+        );
+        assert_eq!(
+            genesis["genesis"]["image"]["tag"].as_str(),
+            Some(format!("approved@{tools_digest}").as_str())
+        );
+
+        let mut baseline = serde_yaml::from_str::<serde_yaml::Value>("imageTag: baseline").unwrap();
+        apply_node_image_overrides(&mut baseline, "baseline", &images).unwrap();
+        assert!(baseline["validator"].is_null());
+        assert!(baseline["tools"].is_null());
+    }
+
+    #[test]
+    fn long_image_tag_label_ends_with_alphanumeric_character() {
+        let tag = format!("{}_approved", "a".repeat(62));
+        assert_eq!(make_k8s_label(tag), "a".repeat(62));
     }
 
     #[tokio::test]

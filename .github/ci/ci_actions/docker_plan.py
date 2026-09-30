@@ -62,6 +62,8 @@ class Marker:
 class Workload:
     id: str
     docs_sensitive: bool
+    image_variant: str
+    additional_testing_images: bool
     checks: tuple[str, ...]
     marker: Marker | None
 
@@ -141,10 +143,14 @@ def _loads(text: str, what: str) -> Any:
         raise ActionError(f"{what} must be valid JSON: {error}") from None
 
 
-def _parse_workload(value: Any, where: str) -> Workload:
-    _object(value, {"id", "docs_sensitive", "checks"}, {"marker"}, where)
+def _parse_workload(value: Any, where: str, known_variant: Callable[[str], bool]) -> Workload:
+    _object(value, {"id", "docs_sensitive", "image_variant", "additional_testing_images", "checks"}, {"marker"}, where)
     if not isinstance(value["docs_sensitive"], bool):
         raise ActionError(f"{where}.docs_sensitive must be boolean")
+    if not isinstance(value["image_variant"], str) or not known_variant(value["image_variant"]):
+        raise ActionError(f"{where}.image_variant contains an unknown or invalid ID")
+    if not isinstance(value["additional_testing_images"], bool):
+        raise ActionError(f"{where}.additional_testing_images must be boolean")
     marker = None
     if "marker" in value:
         raw = _object(value["marker"], {"id", "comment_header", "title"}, set(), f"{where}.marker")
@@ -156,6 +162,8 @@ def _parse_workload(value: Any, where: str) -> Workload:
     return Workload(
         id=_string(value["id"], _NAME, f"{where}.id"),
         docs_sensitive=value["docs_sensitive"],
+        image_variant=value["image_variant"],
+        additional_testing_images=value["additional_testing_images"],
         checks=_names(value["checks"], _NAME.fullmatch, f"{where}.checks", non_empty=True),
         marker=marker,
     )
@@ -205,7 +213,7 @@ def parse_manifest(text: str) -> Manifest:
             local=local,
             publish=publish,
             workloads=tuple(
-                _parse_workload(workload, f"{where}.workloads[{position}]")
+                _parse_workload(workload, f"{where}.workloads[{position}]", known_variant)
                 for position, workload in enumerate(raw["workloads"])
             ),
         ))
@@ -264,6 +272,7 @@ def build_plan(manifest: Manifest, approvals: Mapping[str, Authorization], docs_
         raise ActionError("docs_only must be boolean")
     local_ids: set[str] = set()
     publish_ids: set[str] = set()
+    testing_images: dict[str, bool] = {}
     approval_values = {}
     workloads = {}
     markers = []
@@ -281,10 +290,18 @@ def build_plan(manifest: Manifest, approvals: Mapping[str, Authorization], docs_
         for workload in capability.workloads:
             active = approval.approved and not (workload.docs_sensitive and docs_only)
             workloads[workload.id] = active
+            if active:
+                publish_ids.add(workload.image_variant)
+                testing_images[workload.image_variant] = (
+                    testing_images.get(workload.image_variant, False) or workload.additional_testing_images
+                )
             if active and workload.marker is not None:
                 markers.append({"marker": workload.marker.id, "workload": workload.id})
     local = [dict(variant) for variant in manifest.variants if variant["id"] in local_ids]
-    publish = [dict(variant) for variant in manifest.variants if variant["id"] in publish_ids]
+    publish = [
+        {**variant, "additional_testing_images": testing_images.get(variant["id"], False)}
+        for variant in manifest.variants if variant["id"] in publish_ids
+    ]
     return {
         "docs_only": docs_only,
         "approvals": approval_values,
@@ -412,6 +429,7 @@ def evaluate_statuses(manifest: Manifest, needs: Any) -> dict[str, bool]:
     for check in manifest.workload_checks():
         statuses[check] = all(
             _expected(plan["workloads"][workload.id], results[workload.id])
+            and (not plan["workloads"][workload.id] or results[PUBLISH_JOB] == "success")
             for workload in workloads
             if check in workload.checks
         )

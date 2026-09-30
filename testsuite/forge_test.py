@@ -4,6 +4,7 @@ import os
 import textwrap
 import unittest
 import tempfile
+import yaml
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import (
@@ -40,10 +41,12 @@ from forge import (
     get_humio_link_for_test_runner_logs,
     get_humio_link_for_node_logs,
     get_testsuite_images,
+    image_exists,
     main,
     sanitize_forge_resource_name,
     validate_forge_config,
     GAR_REPO_NAME,
+    protected_image_ref,
 )
 
 from click.testing import CliRunner, Result
@@ -78,6 +81,93 @@ def get_cwd() -> Path:
 
 def get_fixture_path(fixture_name: str) -> Path:
     return get_cwd() / "fixtures" / fixture_name
+
+
+class ProtectedImageTest(unittest.TestCase):
+    def test_approved_tag_uses_repository_digest(self) -> None:
+        digest = "sha256:" + "a" * 64
+        with patch.dict(os.environ, {
+            "PROTECTED_IMAGE_TAG": "approved",
+            "PROTECTED_IMAGE_DIGESTS": json.dumps({f"{GAR_REPO_NAME}/forge": digest}),
+        }):
+            self.assertEqual(
+                protected_image_ref(f"{GAR_REPO_NAME}/forge", "approved"),
+                f"{GAR_REPO_NAME}/forge@{digest}",
+            )
+            self.assertEqual(
+                protected_image_ref(f"{GAR_REPO_NAME}/forge", "baseline"),
+                f"{GAR_REPO_NAME}/forge:baseline",
+            )
+
+    def test_approved_tag_rejects_missing_or_invalid_digest(self) -> None:
+        for mapping in ({}, {f"{GAR_REPO_NAME}/forge": "sha256:bad"}):
+            with self.subTest(mapping=mapping), patch.dict(os.environ, {
+                "PROTECTED_IMAGE_TAG": "approved",
+                "PROTECTED_IMAGE_DIGESTS": json.dumps(mapping),
+            }):
+                with self.assertRaises(ValueError):
+                    protected_image_ref(f"{GAR_REPO_NAME}/forge", "approved")
+
+    def test_incomplete_protected_configuration_fails_closed(self) -> None:
+        with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": "approved"}, clear=True):
+            with self.assertRaises(ValueError):
+                protected_image_ref(f"{GAR_REPO_NAME}/forge", "approved")
+
+    def test_approved_tag_is_not_rewritten_for_performance_profile(self) -> None:
+        tag = "pr-42_performance_r123-a1_" + "a" * 40
+        with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": tag}):
+            self.assertEqual(
+                ensure_provided_image_tags_has_profile_or_features(
+                    tag, "baseline", enable_failpoints=False, enable_performance_profile=True
+                ),
+                (tag, "performance_baseline"),
+            )
+
+    def test_image_exists_checks_approved_digest(self) -> None:
+        digest = "sha256:" + "a" * 64
+        shell = SpyShell([
+            FakeCommand(
+                f"crane manifest {GAR_REPO_NAME}/validator-testing@{digest}",
+                RunResult(0, b""),
+            ),
+        ])
+        with patch.dict(os.environ, {
+            "PROTECTED_IMAGE_TAG": "approved",
+            "PROTECTED_IMAGE_DIGESTS": json.dumps({f"{GAR_REPO_NAME}/validator-testing": digest}),
+        }):
+            self.assertTrue(image_exists(shell, "validator-testing", "approved", Cloud.GCP))
+        shell.assert_commands(self)
+
+    def test_k8s_runner_pod_uses_digest_and_passes_map(self) -> None:
+        class SuccessfulPodShell(FakeShell):
+            def run(self, command, stream_output=False):
+                if any("status.phase" in part for part in command):
+                    return RunResult(0, b"Succeeded")
+                return RunResult(0, b"")
+
+        tag = "a" * 62 + "_approved"
+        digest = "sha256:" + "b" * 64
+        repository = f"{GAR_REPO_NAME}/forge"
+        mapping = json.dumps({repository: digest})
+        template = (get_cwd() / "forge-test-runner-template.yaml").read_bytes()
+        filesystem = SpyFilesystem({}, {"forge-test-runner-template.yaml": template})
+        context = fake_context(SuccessfulPodShell(), filesystem, mode="k8s")
+        context.cloud = Cloud.GCP
+        context.forge_image_tag = tag
+        with patch.dict(os.environ, {
+            "PROTECTED_IMAGE_TAG": tag,
+            "PROTECTED_IMAGE_DIGESTS": mapping,
+        }):
+            result = K8sForgeRunner().run(context)
+        self.assertEqual(result.state, ForgeState.PASS)
+        pod = yaml.safe_load(filesystem.get_write("temp1"))
+        self.assertEqual(pod["spec"]["containers"][0]["image"], f"{repository}@{digest}")
+        label = pod["metadata"]["labels"]["forge-image-tag"]
+        self.assertLessEqual(len(label), 63)
+        self.assertEqual(label, "a" * 62)
+        env = {item["name"]: item.get("value") for item in pod["spec"]["containers"][0]["env"]}
+        self.assertEqual(env["PROTECTED_IMAGE_TAG"], tag)
+        self.assertEqual(json.loads(env["PROTECTED_IMAGE_DIGESTS"]), {repository: digest})
 
 
 class AssertFixtureMixin:
@@ -161,6 +251,7 @@ def fake_context(
         ),
         aws_account_num="123",
         aws_region="banana-east-1",
+        forge_image_name="forge",
         forge_image_tag="forge_asdf",
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",

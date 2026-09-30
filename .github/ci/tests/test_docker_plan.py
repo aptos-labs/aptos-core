@@ -69,6 +69,34 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual("rust-images", MANIFEST.checks()[0])
         self.assertEqual(len(MANIFEST.checks()), len(set(MANIFEST.checks())))
 
+    def test_repository_workloads_declare_their_image_requirements(self):
+        self.assertEqual({
+            "pr-node-cli-faucet-tests": ("release", True),
+            "pr-forge-e2e": ("release", False),
+            "pr-forge-compat": ("release", False),
+            "pr-forge-performance": ("performance", False),
+            "pr-forge-framework-upgrade": ("release", False),
+            "pr-forge-consensus-only": ("consensus", False),
+            "pr-forge-multiregion": ("release", False),
+        }, {
+            workload.id: (workload.image_variant, workload.additional_testing_images)
+            for workload in MANIFEST.workloads()
+        })
+
+    def test_workload_image_requirements_are_required_and_validated(self):
+        def first_workload(value):
+            return capability(value, "run_e2e")["workloads"][0]
+
+        cases = [
+            (lambda v: first_workload(v).pop("image_variant"), "missing field 'image_variant'"),
+            (lambda v: first_workload(v).pop("additional_testing_images"), "missing field 'additional_testing_images'"),
+            (lambda v: first_workload(v).update(image_variant="unknown"), "image_variant.*unknown"),
+            (lambda v: first_workload(v).update(additional_testing_images="true"), "additional_testing_images must be boolean"),
+        ]
+        for mutator, error in cases:
+            with self.subTest(error=error), self.assertRaisesRegex(ActionError, error):
+                parse_manifest(mutated(mutator))
+
     def test_unknown_fields_are_rejected_at_every_level(self):
         cases = [
             lambda v: v.update(unknown=True),
@@ -157,8 +185,21 @@ class PlanTests(unittest.TestCase):
                 plan = build_plan(MANIFEST, approvals(approved), docs_only)
                 local = {v for c in MANIFEST.capabilities if c.id in approved for v in c.local}
                 publish = {v for c in MANIFEST.capabilities if c.id in approved for v in c.publish}
+                publish.update(
+                    w.image_variant for c in MANIFEST.capabilities if c.id in approved
+                    for w in c.workloads if not (w.docs_sensitive and docs_only)
+                )
                 self.assertEqual([i for i in order if i in local], [v["id"] for v in plan["local"]["include"]])
                 self.assertEqual([i for i in order if i in publish], [v["id"] for v in plan["publish"]["include"]])
+                for variant in plan["publish"]["include"]:
+                    self.assertIs(
+                        any(
+                            w.image_variant == variant["id"] and w.additional_testing_images
+                            for c in MANIFEST.capabilities if c.id in approved
+                            for w in c.workloads if not (w.docs_sensitive and docs_only)
+                        ),
+                        variant["additional_testing_images"],
+                    )
                 self.assertEqual(bool(local), plan["local"]["enabled"])
                 self.assertEqual(bool(publish), plan["publish"]["enabled"])
                 expected_markers = []
@@ -179,6 +220,28 @@ class PlanTests(unittest.TestCase):
         self.assertEqual([m.id for m in MANIFEST.markers()], [m["marker"] for m in plan["markers"]["include"]])
         self.assertEqual({"id", "profile", "features", "build_target"}, set(plan["local"]["include"][0]))
         self.assertNotIn("\n", serialize_plan(plan))
+
+    def test_workload_publication_deduplicates_variants_and_combines_testing_images(self):
+        cases = [
+            ({"run_e2e"}, False, [("release", True)]),
+            ({"run_framework_upgrade"}, False, [("release", False)]),
+            ({"run_forge_performance"}, False, [("performance", False)]),
+            ({"run_consensus"}, False, [("consensus", False)]),
+            ({"run_e2e", "run_framework_upgrade", "build_images"}, False, [("release", True)]),
+            ({"run_e2e", "build_failpoints"}, False, [("release", True), ("failpoints", False)]),
+            ({"run_e2e"}, True, []),
+            ({"run_e2e", "build_images"}, True, [("release", False)]),
+        ]
+        for approved, docs_only, expected in cases:
+            with self.subTest(approved=approved, docs_only=docs_only):
+                plan = build_plan(MANIFEST, approvals(approved), docs_only)
+                self.assertEqual(expected, [
+                    (variant["id"], variant["additional_testing_images"])
+                    for variant in plan["publish"]["include"]
+                ])
+                self.assertEqual(bool(expected), plan["publish"]["enabled"])
+                if approved == {"run_e2e"} and docs_only:
+                    self.assertEqual(["release"], [variant["id"] for variant in plan["local"]["include"]])
 
     def test_manifest_relationship_mutations_change_activation(self):
         manifest = parse_manifest(mutated(lambda v: capability(v, "build_failpoints").update(publish=[])))
@@ -349,6 +412,16 @@ class StatusTests(unittest.TestCase):
         needs = needs_for({"build_images"}, pr_publish_rust_images="skipped")
         self.assertEqual(all_checks(True, rust_images=False), evaluate_statuses(MANIFEST, needs))
 
+    def test_enabled_workloads_fail_when_protected_publication_does_not_succeed(self):
+        for result in ("failure", "cancelled", "skipped"):
+            with self.subTest(result=result):
+                needs = needs_for({"run_e2e"}, pr_publish_rust_images=result)
+                self.assertEqual(
+                    all_checks(True, rust_images=False, node_api_compatibility_tests=False,
+                               cli_e2e_tests=False, faucet_tests_main=False,
+                               forge_e2e_test=False, forge_compat_test=False),
+                    evaluate_statuses(MANIFEST, needs),
+                )
     def test_workload_failure_fails_every_dependent_check(self):
         needs = needs_for({"run_e2e", "run_forge_performance"},
                           pr_node_cli_faucet_tests="failure", pr_forge_performance="cancelled")

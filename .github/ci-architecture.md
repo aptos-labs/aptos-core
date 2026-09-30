@@ -38,6 +38,24 @@ flowchart LR
 
 Manual and trusted push workflows remain separate from PR-controlled execution. For example, [trusted Docker builds](workflows/docker-build-test-trusted.yaml) handle push and manual runs, while [Ad-hoc Forge](workflows/adhoc-forge.yaml) runs on manual dispatch.
 
+## Protected image builds and test runners
+
+The Docker capability plan takes the union of explicit image publication requests and the image variants needed by active tests. Each variant is built once in the protected publication matrix, after secretless validation. Forge and E2E wait for publication to succeed. They do not compile images.
+
+| Protected work | RunsOn Fleet | Pilot size | Concurrency ceiling |
+| --- | --- | --- | --- |
+| Image compilation and publication | `aptos-protected-build` | 32 vCPU / 128 GiB; compare with 64 / 256 | 4 |
+| Forge Kubernetes controller | `aptos-protected-forge` | 4 vCPU / 16 GiB | 6 |
+| API, CLI and faucet tests | `aptos-protected-e2e` | 8 vCPU / 32 GiB; compare with 4 / 16 | 2 |
+
+These fleets use the `protected` RunsOn environment and the `aptos-core-protected` GitHub runner group. The group permits only the three protected reusable workflows at the trusted default-branch ref. Each runner has a fresh VM and disk for one job, with zero standby capacity. Small GitHub-hosted lookup and dispatch jobs retain their current runners. Indexer generation retains its separate build-capable runner.
+
+The publication job records registry digests in a bounded JSON manifest. Its identity includes the PR source repository, full SHA, variant, registry, workflow run and build attempt. Tags also include the run and attempt. Each matrix leg exposes a distinct artifact-ID output. Consumers download that ID, validate the manifest with trusted-base code, and execute digest-pinned images. Test-only reruns may reuse an earlier successful build from the same run. Missing artifacts, mismatched identities, and failed or skipped publication prevent successful test checks.
+
+Common source checkout and registry authentication live in `privileged-pr-runtime-setup`. The build-only `privileged-pr-setup` adds an isolated Buildx builder. No developer label or environment approval semantics change. Each protected job still requires approval for its available credentials.
+
+Protected jobs require the repository variable `PROTECTED_RUNNERS_ENABLED` to equal `true`. It must remain unset until the Fleet deployment, workflow access restrictions, runner lifecycle, AMI compatibility and sizing checks pass. There is no fallback to the shared benchmark runner. Infrastructure and the operational rollout procedure live in `internal-ops/infra/core/runs-on-fleet`.
+
 ## Coverage and deployment boundary
 
 The policy manifest covers the first migration wave. Other legacy `pull_request_target` workflows and older target branches can have different protections. A successful policy check does not prove that the live environment, merge rules, cloud IAM, runner isolation, or registry permissions match this design. Those controls must be checked in their respective services before protected PR work is enabled.

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use super::protected_images::{ProtectedImages, VALIDATOR_TESTING_REPO};
 use crate::{create_k8s_client, k8s_wait_nodes_strategy, K8sApi, ReadWrite, Result, KUBECTL_BIN};
 use again::RetryPolicy;
 use anyhow::bail;
@@ -29,7 +30,7 @@ pub struct KubeImage {
 }
 
 pub fn get_stateful_set_image(stateful_set: &StatefulSet) -> Result<KubeImage> {
-    let s = stateful_set
+    let image = stateful_set
         .spec
         .as_ref()
         .expect("Failed to get StatefulSet spec")
@@ -40,14 +41,42 @@ pub fn get_stateful_set_image(stateful_set: &StatefulSet) -> Result<KubeImage> {
         .containers[0]
         .image
         .as_ref()
-        .expect("Failed to get StatefulSet image")
-        .split(':')
-        .collect::<Vec<&str>>();
+        .expect("Failed to get StatefulSet image");
+    parse_image_ref(image)
+}
 
+fn parse_image_ref(image: &str) -> Result<KubeImage> {
+    let without_digest = image.split_once('@').map_or(image, |(name, _)| name);
+    let (name, tag) = without_digest
+        .rsplit_once(':')
+        .ok_or_else(|| anyhow::anyhow!("StatefulSet image has no tag: {image}"))?;
+    if name.is_empty() || tag.is_empty() {
+        bail!("Invalid StatefulSet image: {image}");
+    }
     Ok(KubeImage {
-        name: s[0].to_string(),
-        tag: s[1].to_string(),
+        name: name.to_string(),
+        tag: tag.to_string(),
     })
+}
+
+#[cfg(test)]
+mod protected_image_tests {
+    use super::*;
+
+    #[test]
+    fn parses_digest_pinned_and_baseline_images() {
+        let repo = "us-docker.pkg.dev/aptos-registry/docker/validator-testing";
+        let digest = format!("sha256:{}", "a".repeat(64));
+        let pinned = parse_image_ref(&format!("{repo}:approved@{digest}")).unwrap();
+        assert_eq!(pinned.name, repo);
+        assert_eq!(pinned.tag, "approved");
+        let baseline = parse_image_ref(&format!("{repo}:baseline")).unwrap();
+        assert_eq!(baseline.name, repo);
+        assert_eq!(baseline.tag, "baseline");
+        let local = parse_image_ref("validator:baseline").unwrap();
+        assert_eq!(local.name, "validator");
+        assert_eq!(local.tag, "baseline");
+    }
 }
 
 /// Waits for a single K8s StatefulSet to be ready
@@ -191,7 +220,13 @@ pub async fn set_stateful_set_image_tag(
     let image_repo = get_stateful_set_image(&sts)?.name;
 
     // replace the image tag
-    let new_image = format!("{}:{}", image_repo, image_tag);
+    let protected_images = ProtectedImages::from_env()?;
+    let new_image =
+        if let Some(tag) = protected_images.chart_tag(VALIDATOR_TESTING_REPO, &image_tag)? {
+            format!("{VALIDATOR_TESTING_REPO}:{tag}")
+        } else {
+            format!("{}:{}", image_repo, image_tag)
+        };
 
     // set the image using kubectl
     // patching the node spec may not work

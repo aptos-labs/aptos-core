@@ -18,10 +18,10 @@
       "local": ["release"],
       "publish": [],
       "workloads": [
-        {"id": "pr-node-cli-faucet-tests", "docs_sensitive": true, "checks": ["node-api-compatibility-tests", "cli-e2e-tests", "faucet-tests-main"]},
-        {"id": "pr-forge-e2e", "docs_sensitive": true, "checks": ["forge-e2e-test"],
+        {"id": "pr-node-cli-faucet-tests", "docs_sensitive": true, "image_variant": "release", "additional_testing_images": true, "checks": ["node-api-compatibility-tests", "cli-e2e-tests", "faucet-tests-main"]},
+        {"id": "pr-forge-e2e", "docs_sensitive": true, "image_variant": "release", "additional_testing_images": false, "checks": ["forge-e2e-test"],
          "marker": {"id": "forge-report-source-e2e", "comment_header": "forge-e2e", "title": "Protected Forge E2E result"}},
-        {"id": "pr-forge-compat", "docs_sensitive": true, "checks": ["forge-compat-test"],
+        {"id": "pr-forge-compat", "docs_sensitive": true, "image_variant": "release", "additional_testing_images": false, "checks": ["forge-compat-test"],
          "marker": {"id": "forge-report-source-compat", "comment_header": "forge-compat", "title": "Protected Forge compatibility result"}}
       ]
     },
@@ -31,7 +31,7 @@
       "local": ["release", "performance"],
       "publish": [],
       "workloads": [
-        {"id": "pr-forge-performance", "docs_sensitive": false, "checks": ["forge-e2e-test"],
+        {"id": "pr-forge-performance", "docs_sensitive": false, "image_variant": "performance", "additional_testing_images": false, "checks": ["forge-e2e-test"],
          "marker": {"id": "forge-report-source-performance", "comment_header": "forge-e2e-performance", "title": "Protected Forge performance result"}}
       ]
     },
@@ -41,7 +41,7 @@
       "local": ["release"],
       "publish": [],
       "workloads": [
-        {"id": "pr-forge-framework-upgrade", "docs_sensitive": false, "checks": ["forge-framework-upgrade-test"],
+        {"id": "pr-forge-framework-upgrade", "docs_sensitive": false, "image_variant": "release", "additional_testing_images": false, "checks": ["forge-framework-upgrade-test"],
          "marker": {"id": "forge-report-source-framework", "comment_header": "forge-framework-upgrade", "title": "Protected Forge framework upgrade result"}}
       ]
     },
@@ -51,7 +51,7 @@
       "local": ["release", "consensus"],
       "publish": [],
       "workloads": [
-        {"id": "pr-forge-consensus-only", "docs_sensitive": false, "checks": ["forge-consensus-only-perf-test"],
+        {"id": "pr-forge-consensus-only", "docs_sensitive": false, "image_variant": "consensus", "additional_testing_images": false, "checks": ["forge-consensus-only-perf-test"],
          "marker": {"id": "forge-report-source-consensus", "comment_header": "consensus-only-realistic-env-max-tps", "title": "Protected Forge consensus-only result"}}
       ]
     },
@@ -61,7 +61,7 @@
       "local": ["release"],
       "publish": [],
       "workloads": [
-        {"id": "pr-forge-multiregion", "docs_sensitive": false, "checks": ["forge-multiregion-test"],
+        {"id": "pr-forge-multiregion", "docs_sensitive": false, "image_variant": "release", "additional_testing_images": false, "checks": ["forge-multiregion-test"],
          "marker": {"id": "forge-report-source-multiregion", "comment_header": "forge-multiregion-test", "title": "Protected Forge multiregion result"}}
       ]
     }

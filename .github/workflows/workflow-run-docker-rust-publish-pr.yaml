@@ -3,6 +3,13 @@ name: "*rebuild and publish protected PR Docker images"
 on:
   workflow_call:
     inputs:
+      VARIANT:
+        required: true
+        type: string
+      ADDITIONAL_TESTING_IMAGES:
+        required: false
+        default: false
+        type: boolean
       SOURCE_REPOSITORY:
         required: true
         type: string
@@ -28,16 +35,36 @@ on:
         default: all
         type: string
 
+    outputs:
+      release_manifest:
+        description: Protected release manifest artifact ID
+        value: ${{ jobs.publish-images.outputs.release_manifest }}
+      failpoints_manifest:
+        description: Protected failpoints manifest artifact ID
+        value: ${{ jobs.publish-images.outputs.failpoints_manifest }}
+      performance_manifest:
+        description: Protected performance manifest artifact ID
+        value: ${{ jobs.publish-images.outputs.performance_manifest }}
+      consensus_manifest:
+        description: Protected consensus manifest artifact ID
+        value: ${{ jobs.publish-images.outputs.consensus_manifest }}
+
 permissions:
   contents: read
 
 jobs:
   publish-images:
+    if: vars.PROTECTED_RUNNERS_ENABLED == 'true'
     environment: privileged-pr-ci
-    runs-on: benchmark-c3d-60-pr
+    runs-on: runs-on/fleet=aptos-protected-build/env=protected
     permissions:
       contents: read
       id-token: write
+    outputs:
+      release_manifest: ${{ inputs.VARIANT == 'release' && steps.manifest-upload.outputs.artifact-id || '' }}
+      failpoints_manifest: ${{ inputs.VARIANT == 'failpoints' && steps.manifest-upload.outputs.artifact-id || '' }}
+      performance_manifest: ${{ inputs.VARIANT == 'performance' && steps.manifest-upload.outputs.artifact-id || '' }}
+      consensus_manifest: ${{ inputs.VARIANT == 'consensus' && steps.manifest-upload.outputs.artifact-id || '' }}
     steps:
       - name: Record the protected deployment approval scope
         env:
@@ -79,7 +106,7 @@ jobs:
           BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
           PROFILE: ${{ inputs.PROFILE }}
           FEATURES: ${{ inputs.FEATURES }}
-          BUILD_ADDL_TESTING_IMAGES: "true"
+          BUILD_ADDL_TESTING_IMAGES: ${{ inputs.ADDITIONAL_TESTING_IMAGES }}
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
           TARGET_REGISTRY: gcp
@@ -88,6 +115,46 @@ jobs:
         run: |
           set -euo pipefail
           CI=true docker/builder/docker-bake-rust-all.sh "$BUILD_TARGET"
+
+      # Restore trusted helper code after the PR-controlled build has finished.
+      - name: Refresh exact trusted base for image collection
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.BASE_SHA }}
+          path: trusted-refresh
+          persist-credentials: false
+
+      - name: Refresh registry access for image collection
+        uses: ./trusted-refresh/.github/actions/gcp-registry-auth
+        with:
+          create_credentials_file: false
+          access_token_lifetime: 5400
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Collect protected image digests from the registry
+        uses: ./trusted-refresh/.github/actions/protected-image-manifest
+        with:
+          mode: collect
+          manifest_path: ${{ runner.temp }}/protected-image-output/manifest.json
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          variant: ${{ inputs.VARIANT }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
+      - name: Upload the protected image manifest
+        id: manifest-upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: protected-images-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.VARIANT }}
+          path: ${{ runner.temp }}/protected-image-output/manifest.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 7
 
       - name: Record the protected exact-SHA publication
         env:
@@ -100,5 +167,5 @@ jobs:
             echo "Repository: \`$SOURCE_REPOSITORY\`"
             echo "PR: \`$PR_NUMBER\`"
             echo "Exact source SHA: \`$SOURCE_SHA\`"
-            echo "Only immutable PR-and-full-SHA image tags were published."
+            echo "Recorded image digests are bound to this PR, full SHA and workflow attempt."
           } >> "$GITHUB_STEP_SUMMARY"

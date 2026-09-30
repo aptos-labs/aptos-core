@@ -17,12 +17,13 @@ class SharedPrivilegedControlTests < Minitest::Test
   GCP_REGISTRY_ACTION = "./trusted-base/.github/actions/gcp-registry-auth"
   REFRESHED_GCP_REGISTRY_ACTION = "./trusted-refresh/.github/actions/gcp-registry-auth"
   SETUP_ACTION = "./trusted-base/.github/actions/privileged-pr-setup"
+  RUNTIME_SETUP_ACTION = "./trusted-base/.github/actions/privileged-pr-runtime-setup"
   REGISTRIES = ["us-docker.pkg.dev", "us-west1-docker.pkg.dev"].freeze
   # file => [job, first step that runs PR code]
   PRIVILEGED_WORKFLOWS = {
     "workflow-run-docker-rust-publish-pr.yaml" => ["publish-images", "Rebuild and publish immutable PR images"],
-    "workflow-run-pr-e2e-tests.yaml" => ["e2e-tests", "Rebuild and publish exact-SHA test images"],
-    "workflow-run-forge-pr.yaml" => ["forge", "Rebuild and publish exact-SHA Forge images"],
+    "workflow-run-pr-e2e-tests.yaml" => ["e2e-tests", "Verify checked-in API specifications"],
+    "workflow-run-forge-pr.yaml" => ["forge", "Run pre-Forge checks with explicit image tags"],
   }.freeze
 
   def test_exact_source_action_fixes_checkout_controls
@@ -123,20 +124,18 @@ class SharedPrivilegedControlTests < Minitest::Test
   end
 
   def test_privileged_setup_runs_every_pre_execution_control_in_order
-    action = load_action("privileged-pr-setup")
-    assert_required_source_inputs(action)
-    assert_equal "composite", action.dig("runs", "using")
-    action_steps = action.dig("runs", "steps")
-    assert_equal 5, action_steps.length
-    prerequisites, source, buildx, auth, tags = action_steps
+    runtime = load_action("privileged-pr-runtime-setup")
+    assert_required_source_inputs(runtime)
+    assert_equal "composite", runtime.dig("runs", "using")
+    action_steps = runtime.dig("runs", "steps")
+    assert_equal 4, action_steps.length
+    prerequisites, source, auth, tags = action_steps
     %w[GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT_EMAIL GCP_DOCKER_ARTIFACT_REPO].each do |name|
       assert_includes prerequisites.fetch("run"), "test -n \"$#{name}\"", name
     end
     assert_equal EXACT_SOURCE_ACTION, source.fetch("uses")
     assert_equal({"source_repository" => "${{ inputs.source_repository }}", "source_sha" => "${{ inputs.source_sha }}"},
                  source.fetch("with"))
-    assert_equal BUILDX_PIN, buildx.fetch("uses")
-    assert_equal false, buildx.dig("with", "keep-state")
     assert_equal GCP_REGISTRY_ACTION, auth.fetch("uses")
     assert_equal(
       {
@@ -149,7 +148,19 @@ class SharedPrivilegedControlTests < Minitest::Test
     )
     assert_equal "tags", tags.fetch("id")
     action_steps.filter_map { |step| step["run"] }.each { |script| refute_includes script, "${{" }
+    build = load_action("privileged-pr-setup")
+    assert_required_source_inputs(build)
+    assert_equal "composite", build.dig("runs", "using")
+    runtime_step, buildx = build.dig("runs", "steps")
+    assert_equal 2, build.dig("runs", "steps").length
+    assert_equal RUNTIME_SETUP_ACTION, runtime_step.fetch("uses")
+    assert_equal "runtime", runtime_step.fetch("id")
+    assert_equal BUILDX_PIN, buildx.fetch("uses")
+    assert_equal false, buildx.dig("with", "keep-state")
+    assert_equal true, buildx.dig("with", "cleanup")
+    assert_equal false, buildx.dig("with", "cache-binary")
     assert_includes policy_manifest.fetch("protected_runtime_prefixes"), ".github/actions/privileged-pr-setup/"
+    assert_includes policy_manifest.fetch("protected_runtime_prefixes"), ".github/actions/privileged-pr-runtime-setup/"
     assert_includes policy_manifest.fetch("protected_runtime_prefixes"), "docker/builder/image-tag-prefix.sh"
   end
 
@@ -160,11 +171,13 @@ class SharedPrivilegedControlTests < Minitest::Test
     variants = docker_manifest.fetch("variants").map { |variant| [variant.fetch("profile"), variant.fetch("features")] }
     (variants + [["ci", "a,b"]]).each do |profile, features|
       Dir.mktmpdir("image-tag") do |dir|
-        env = {"PR_NUMBER" => "42", "SOURCE_SHA" => sha, "PROFILE" => profile, "FEATURES" => features}
+        env = {"PR_NUMBER" => "42", "SOURCE_SHA" => sha, "PROFILE" => profile, "FEATURES" => features,
+               "GITHUB_RUN_ID" => "24680", "GITHUB_RUN_ATTEMPT" => "2"}
         outputs, github_env = run_tag_step(dir, env)
         expected_prefix = "pr-42_"
         expected_prefix += "#{profile}_" unless profile == "release"
         expected_prefix += "#{features.gsub(/[^a-zA-Z0-9]/, "_")}_" unless features.empty?
+        expected_prefix += "r24680-a2_"
         assert_equal expected_prefix, outputs.fetch("image_tag_prefix"), "#{profile}:#{features}"
         assert_equal "#{expected_prefix}#{sha}", outputs.fetch("image_tag"), "#{profile}:#{features}"
         assert_equal ["PR_IMAGE_TAG=#{outputs.fetch("image_tag")}"], github_env
@@ -191,7 +204,8 @@ class SharedPrivilegedControlTests < Minitest::Test
   def test_privileged_setup_rejects_values_that_could_inject_environment_lines
     [{"PR_NUMBER" => "1\nX=1"}, {"PROFILE" => "release\nX=1"}, {"FEATURES" => "failpoints\nX=1"}].each do |override|
       Dir.mktmpdir("image-tag") do |dir|
-        env = {"PR_NUMBER" => "42", "SOURCE_SHA" => "a" * 40, "PROFILE" => "release", "FEATURES" => ""}.merge(override)
+        env = {"PR_NUMBER" => "42", "SOURCE_SHA" => "a" * 40, "PROFILE" => "release", "FEATURES" => "",
+               "GITHUB_RUN_ID" => "24680", "GITHUB_RUN_ATTEMPT" => "2"}.merge(override)
         assert_nil run_tag_step(dir, env, expect_success: false), override.keys.first
       end
     end
@@ -201,7 +215,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     docker_manifest.fetch("variants").each do |variant|
       Dir.mktmpdir("image-tag") do |dir|
         env = {"PR_NUMBER" => "42", "SOURCE_SHA" => "a" * 40, "PROFILE" => variant.fetch("profile"),
-               "FEATURES" => variant.fetch("features")}
+               "FEATURES" => variant.fetch("features"), "GITHUB_RUN_ID" => "24680", "GITHUB_RUN_ATTEMPT" => "2"}
         run_tag_step(dir, env)
       end
     end
@@ -231,7 +245,8 @@ class SharedPrivilegedControlTests < Minitest::Test
       job = jobs(load_workflow(file)).fetch(job_name)
       job_steps = steps(job)
       trusted_index = assert_trusted_checkout(job)
-      setups = job_steps.select { |step| step["uses"] == SETUP_ACTION }
+      expected_setup = file == "workflow-run-docker-rust-publish-pr.yaml" ? SETUP_ACTION : RUNTIME_SETUP_ACTION
+      setups = job_steps.select { |step| step["uses"] == expected_setup }
       assert_equal 1, setups.length, file
       setup = setups.first
       assert_equal "setup", setup.fetch("id"), file
@@ -240,32 +255,33 @@ class SharedPrivilegedControlTests < Minitest::Test
       end
       assert_nil exact_source_step(job), file
       registry_refreshes = job_steps.select { |step| step["uses"] == REFRESHED_GCP_REGISTRY_ACTION }
-      assert_equal(file == "workflow-run-forge-pr.yaml" ? 1 : 0, registry_refreshes.length, file)
+      assert_equal(file == "workflow-run-pr-e2e-tests.yaml" ? 0 : 1, registry_refreshes.length, file)
 
       execution = job_steps.find { |step| step["name"] == first_source_step }
       assert_operator trusted_index, :<, job_steps.index(setup), file
       assert_operator job_steps.index(setup), :<, job_steps.index(execution), file
-      registry_refreshes.each { |step| assert_operator job_steps.index(execution), :<, job_steps.index(step), file }
       assert_equal "pr-source", execution.fetch("working-directory"), file
-      assert_equal "${{ steps.setup.outputs.image_tag_prefix }}", execution.dig("env", "IMAGE_TAG_PREFIX"), file
-      refute execution.dig("env").key?("CUSTOM_IMAGE_TAG_PREFIX"), file
+      if file == "workflow-run-docker-rust-publish-pr.yaml"
+        assert_equal "${{ steps.setup.outputs.image_tag_prefix }}", execution.dig("env", "IMAGE_TAG_PREFIX"), file
+        assert_operator job_steps.index(execution), :<, job_steps.index(registry_refreshes.first), file
+      else
+        refute job_steps.any? { |step| step["run"].to_s.include?("docker-bake-rust-all.sh") }, file
+        registry_refreshes.each { |step| assert_operator job_steps.index(step), :<, job_steps.index(execution), file }
+      end
+      refute execution.fetch("env", {}).key?("CUSTOM_IMAGE_TAG_PREFIX"), file
       # No step may load PR-owned action code: the job mints registry credentials
       # before PR code runs, so a "./pr-source/..." step would hand it those credentials.
       refute job_steps.any? { |step| step["uses"].to_s.start_with?("./pr-source/") }, file
-      # Before PR code runs, every local action must come from the trusted checkout.
+      # Before PR code runs, local actions must come from an exact trusted checkout.
       before_execution = job_steps.take(job_steps.index(execution))
       before_execution.select { |step| step["uses"].to_s.start_with?("./") }.each do |step|
-        assert step.fetch("uses").start_with?("./trusted-base/"), "#{file}: #{step["name"]}"
+        assert_match %r{\A\./trusted-(?:base|refresh)/}, step.fetch("uses"), "#{file}: #{step["name"]}"
       end
-      # Forge obtains a fresh base checkout before loading the registry action.
-      later = job_steps.drop(job_steps.index(execution) + 1)
-      local_later = later.select { |step| step["uses"].to_s.start_with?("./") }
-      assert_equal registry_refreshes, local_later, file
     end
   end
 
-  # Forge runs only the images that this job rebuilt from the exact SHA. It must not
-  # discover recent images, wait for images from other runs, or post PR comments.
+  # Forge consumes the protected producer manifest. It must not discover recent
+  # images, wait for images from other runs, or post PR comments.
   def test_forge_uses_only_its_own_protected_images
     source = load_workflow("workflow-run-forge-pr.yaml").to_s
     %w[find_recent_images wait-images-ci sticky-pull-request-comment].each { |text| refute_includes source, text }
@@ -281,7 +297,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     end
   end
 
-  def test_forge_refresh_reuses_the_registry_action_after_build
+  def test_forge_refresh_reuses_the_registry_action_before_pr_scripts
     job_steps = steps(jobs(load_workflow("workflow-run-forge-pr.yaml")).fetch("forge"))
     auth = job_steps.find { |step| step["id"] == "gcp-forge-auth" }
     assert_equal REFRESHED_GCP_REGISTRY_ACTION, auth.fetch("uses")
@@ -293,11 +309,11 @@ class SharedPrivilegedControlTests < Minitest::Test
     assert_equal "${{ steps.auth-duration.outputs.value }}", auth.dig("with", "access_token_lifetime")
     assert_equal "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}", auth.dig("with", "workload_identity_provider")
     assert_equal "${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}", auth.dig("with", "service_account")
-    build_index = job_steps.index { |step| step["name"] == "Rebuild and publish exact-SHA Forge images" }
+    setup_index = job_steps.index { |step| step["uses"] == RUNTIME_SETUP_ACTION }
     auth_index = job_steps.index(auth)
-    forge_index = job_steps.index { |step| step["name"] == "Run Forge with protected exact-SHA images" }
-    assert_operator build_index, :<, auth_index
-    assert_operator build_index, :<, job_steps.index(refreshed)
+    forge_index = job_steps.index { |step| step["name"] == "Run pre-Forge checks with explicit image tags" }
+    assert_operator setup_index, :<, auth_index
+    assert_operator setup_index, :<, job_steps.index(refreshed)
     assert_operator job_steps.index(refreshed), :<, auth_index
     assert_operator auth_index, :<, forge_index
     assert_empty job_steps.select { |step| step["uses"].to_s.start_with?("docker/login-action@") }
@@ -339,13 +355,13 @@ class SharedPrivilegedControlTests < Minitest::Test
     stdout
   end
 
-  # Runs the tag step of privileged-pr-setup. Returns [outputs, GITHUB_ENV lines], or nil on failure.
+  # Runs the shared runtime tag step. Returns [outputs, GITHUB_ENV lines], or nil on failure.
   def run_tag_step(dir, env, expect_success: true)
-    tags = load_action("privileged-pr-setup").dig("runs", "steps").find { |step| step["id"] == "tags" }
+    tags = load_action("privileged-pr-runtime-setup").dig("runs", "steps").find { |step| step["id"] == "tags" }
     output = File.join(dir, "output")
     github_env = File.join(dir, "env")
     full_env = env.merge("PATH" => ENV.fetch("PATH"), "GITHUB_OUTPUT" => output, "GITHUB_ENV" => github_env,
-                         "GITHUB_ACTION_PATH" => File.join(ROOT, ".github", "actions", "privileged-pr-setup"))
+                         "GITHUB_ACTION_PATH" => File.join(ROOT, ".github", "actions", "privileged-pr-runtime-setup"))
     _stdout, stderr, status = Open3.capture3(full_env, "bash", "-c", tags.fetch("run"))
     unless expect_success
       refute status.success?

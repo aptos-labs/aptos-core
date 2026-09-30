@@ -126,7 +126,7 @@ class DockerBuildOrchestrationTests < Minitest::Test
       id = workload.fetch("id")
       job = @jobs.fetch(id)
       assert_equal "fromJSON(#{PLAN}).workloads.#{id} == true", job.fetch("if"), id
-      assert_equal %w[compute-authorization pr-rust-images-local], job.fetch("needs"), id
+      assert_equal %w[compute-authorization pr-rust-images-local pr-publish-rust-images], job.fetch("needs"), id
     end
   end
 

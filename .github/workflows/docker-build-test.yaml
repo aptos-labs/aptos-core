@@ -64,6 +64,8 @@ jobs:
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-docker-rust-publish-pr.yaml
     with:
+      VARIANT: ${{ matrix.id }}
+      ADDITIONAL_TESTING_IMAGES: ${{ matrix.additional_testing_images }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -73,11 +75,13 @@ jobs:
       BUILD_TARGET: ${{ matrix.build_target }}
 
   pr-node-cli-faucet-tests:
-    needs: [compute-authorization, pr-rust-images-local]
+    needs: [compute-authorization, pr-rust-images-local, pr-publish-rust-images]
     if: fromJSON(needs.compute-authorization.outputs.plan).workloads.pr-node-cli-faucet-tests == true
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-pr-e2e-tests.yaml
     with:
+      VARIANT: release
+      IMAGE_MANIFEST_ID: ${{ needs.pr-publish-rust-images.outputs.release_manifest }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -85,11 +89,13 @@ jobs:
       RUN_FAUCET: ${{ contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests') }}
 
   pr-forge-e2e:
-    needs: [compute-authorization, pr-rust-images-local]
+    needs: [compute-authorization, pr-rust-images-local, pr-publish-rust-images]
     if: fromJSON(needs.compute-authorization.outputs.plan).workloads.pr-forge-e2e == true
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-forge-pr.yaml
     with:
+      VARIANT: release
+      IMAGE_MANIFEST_ID: ${{ needs.pr-publish-rust-images.outputs.release_manifest }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -100,11 +106,13 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 480
 
   pr-forge-compat:
-    needs: [compute-authorization, pr-rust-images-local]
+    needs: [compute-authorization, pr-rust-images-local, pr-publish-rust-images]
     if: fromJSON(needs.compute-authorization.outputs.plan).workloads.pr-forge-compat == true
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-forge-pr.yaml
     with:
+      VARIANT: release
+      IMAGE_MANIFEST_ID: ${{ needs.pr-publish-rust-images.outputs.release_manifest }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -116,11 +124,13 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300
 
   pr-forge-performance:
-    needs: [compute-authorization, pr-rust-images-local]
+    needs: [compute-authorization, pr-rust-images-local, pr-publish-rust-images]
     if: fromJSON(needs.compute-authorization.outputs.plan).workloads.pr-forge-performance == true
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-forge-pr.yaml
     with:
+      VARIANT: performance
+      IMAGE_MANIFEST_ID: ${{ needs.pr-publish-rust-images.outputs.performance_manifest }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -133,11 +143,13 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 480
 
   pr-forge-framework-upgrade:
-    needs: [compute-authorization, pr-rust-images-local]
+    needs: [compute-authorization, pr-rust-images-local, pr-publish-rust-images]
     if: fromJSON(needs.compute-authorization.outputs.plan).workloads.pr-forge-framework-upgrade == true
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-forge-pr.yaml
     with:
+      VARIANT: release
+      IMAGE_MANIFEST_ID: ${{ needs.pr-publish-rust-images.outputs.release_manifest }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -149,11 +161,13 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 3600
 
   pr-forge-consensus-only:
-    needs: [compute-authorization, pr-rust-images-local]
+    needs: [compute-authorization, pr-rust-images-local, pr-publish-rust-images]
     if: fromJSON(needs.compute-authorization.outputs.plan).workloads.pr-forge-consensus-only == true
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-forge-pr.yaml
     with:
+      VARIANT: consensus
+      IMAGE_MANIFEST_ID: ${{ needs.pr-publish-rust-images.outputs.consensus_manifest }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -165,11 +179,13 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300
 
   pr-forge-multiregion:
-    needs: [compute-authorization, pr-rust-images-local]
+    needs: [compute-authorization, pr-rust-images-local, pr-publish-rust-images]
     if: fromJSON(needs.compute-authorization.outputs.plan).workloads.pr-forge-multiregion == true
     permissions: {contents: read, id-token: write}
     uses: ./.github/workflows/workflow-run-forge-pr.yaml
     with:
+      VARIANT: release
+      IMAGE_MANIFEST_ID: ${{ needs.pr-publish-rust-images.outputs.release_manifest }}
       SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       PR_NUMBER: ${{ github.event.pull_request.number }}

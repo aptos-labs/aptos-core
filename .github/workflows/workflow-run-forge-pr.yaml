@@ -1,8 +1,14 @@
-name: "*rebuild and run protected PR Forge"
+name: "*run protected PR Forge"
 
 on:
   workflow_call:
     inputs:
+      VARIANT:
+        required: true
+        type: string
+      IMAGE_MANIFEST_ID:
+        required: true
+        type: string
       SOURCE_REPOSITORY:
         required: true
         type: string
@@ -58,8 +64,9 @@ permissions:
 
 jobs:
   forge:
+    if: vars.PROTECTED_RUNNERS_ENABLED == 'true'
     environment: privileged-pr-ci
-    runs-on: benchmark-c3d-60-pr
+    runs-on: runs-on/fleet=aptos-protected-forge/env=protected
     timeout-minutes: 360
     permissions:
       contents: read
@@ -96,7 +103,7 @@ jobs:
             echo "Exact source SHA: \`$SOURCE_SHA\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # privileged-pr-setup checks the GCP prerequisites after the trusted checkout.
+      # privileged-pr-runtime-setup checks the GCP prerequisites after the trusted checkout.
       - name: Check Forge deployment prerequisites
         run: |
           set -euo pipefail
@@ -135,9 +142,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prepare the protected build from trusted base code
+      - name: Prepare the protected runtime from trusted base code
         id: setup
-        uses: ./trusted-base/.github/actions/privileged-pr-setup
+        uses: ./trusted-base/.github/actions/privileged-pr-runtime-setup
         with:
           source_repository: ${{ inputs.SOURCE_REPOSITORY }}
           source_sha: ${{ inputs.SOURCE_SHA }}
@@ -146,6 +153,32 @@ jobs:
           features: ${{ inputs.FEATURES }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
+      - name: Require one artifact ID from the protected producer
+        env:
+          IMAGE_MANIFEST_ID: ${{ inputs.IMAGE_MANIFEST_ID }}
+        run: |
+          [[ "$IMAGE_MANIFEST_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Missing protected image artifact ID"; exit 1; }
+
+      - name: Download the protected producer manifest by ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ inputs.IMAGE_MANIFEST_ID }}
+          path: ${{ runner.temp }}/protected-image-input
+          merge-multiple: true
+
+      - name: Validate protected source and image digests
+        uses: ./trusted-base/.github/actions/protected-image-manifest
+        with:
+          mode: verify
+          manifest_path: ${{ runner.temp }}/protected-image-input/manifest.json
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          variant: ${{ inputs.VARIANT }}
           artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
 
       - name: Set up Python without a shared dependency cache
@@ -173,23 +206,6 @@ jobs:
           auth_duration=$(( FORGE_RUNNER_DURATION_SECS > 5400 ? FORGE_RUNNER_DURATION_SECS + 1800 : 5400 ))
           echo "value=$auth_duration" >> "$GITHUB_OUTPUT"
 
-      - name: Rebuild and publish exact-SHA Forge images
-        env:
-          PROFILE: ${{ inputs.PROFILE }}
-          FEATURES: ${{ inputs.FEATURES }}
-          BUILD_ADDL_TESTING_IMAGES: "true"
-          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
-          TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
-          TARGET_REGISTRY: gcp
-          IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.image_tag_prefix }}
-        working-directory: pr-source
-        run: |
-          set -euo pipefail
-          CI=true docker/builder/docker-bake-rust-all.sh forge-images
-
-      # The full image rebuild can consume most of the build token. Mint a new
-      # credential for baseline lookup and the actual Forge deployment. Reload
-      # the action from the exact base after PR code had access to trusted-base/.
       - name: Refresh exact trusted base actions
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

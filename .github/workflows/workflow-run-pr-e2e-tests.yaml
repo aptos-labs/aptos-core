@@ -1,8 +1,14 @@
-name: "*rebuild and run protected PR image tests"
+name: "*run protected PR image tests"
 
 on:
   workflow_call:
     inputs:
+      VARIANT:
+        required: true
+        type: string
+      IMAGE_MANIFEST_ID:
+        required: true
+        type: string
       SOURCE_REPOSITORY:
         required: true
         type: string
@@ -25,8 +31,9 @@ permissions:
 
 jobs:
   e2e-tests:
+    if: vars.PROTECTED_RUNNERS_ENABLED == 'true'
     environment: privileged-pr-ci
-    runs-on: benchmark-c3d-60-pr
+    runs-on: runs-on/fleet=aptos-protected-e2e/env=protected
     permissions:
       contents: read
       id-token: write
@@ -55,9 +62,9 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Prepare the protected build from trusted base code
+      - name: Prepare the protected runtime from trusted base code
         id: setup
-        uses: ./trusted-base/.github/actions/privileged-pr-setup
+        uses: ./trusted-base/.github/actions/privileged-pr-runtime-setup
         with:
           source_repository: ${{ inputs.SOURCE_REPOSITORY }}
           source_sha: ${{ inputs.SOURCE_SHA }}
@@ -66,25 +73,38 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
 
-      - name: Rebuild and publish exact-SHA test images
+      - name: Require one artifact ID from the protected producer
         env:
-          PROFILE: release
-          FEATURES: ""
-          BUILD_ADDL_TESTING_IMAGES: "true"
-          TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
-          TARGET_REGISTRY: gcp
-          IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.image_tag_prefix }}
-        working-directory: pr-source
+          IMAGE_MANIFEST_ID: ${{ inputs.IMAGE_MANIFEST_ID }}
         run: |
-          set -euo pipefail
-          CI=true docker/builder/docker-bake-rust-all.sh all
+          [[ "$IMAGE_MANIFEST_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Missing protected image artifact ID"; exit 1; }
+
+      - name: Download the protected producer manifest by ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ inputs.IMAGE_MANIFEST_ID }}
+          path: ${{ runner.temp }}/protected-image-input
+          merge-multiple: true
+
+      - name: Validate protected source and image digests
+        uses: ./trusted-base/.github/actions/protected-image-manifest
+        with:
+          mode: verify
+          manifest_path: ${{ runner.temp }}/protected-image-input/manifest.json
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          variant: ${{ inputs.VARIANT }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
 
       - name: Record protected test inputs
         env:
           SOURCE_REPOSITORY: ${{ inputs.SOURCE_REPOSITORY }}
           SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
           PR_NUMBER: ${{ inputs.PR_NUMBER }}
-          IMAGE_TAG: ${{ steps.setup.outputs.image_tag }}
+          IMAGE_TAG: ${{ env.PR_IMAGE_TAG }}
         run: |
           {
             echo "## Protected PR image tests"
@@ -94,8 +114,6 @@ jobs:
             echo "Immutable image tag: \`$IMAGE_TAG\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # A clean build can consume most of the initial 90-minute token. Refresh
-      # registry credentials before any test pulls the protected images.
       - name: Refresh Google Cloud authentication for protected tests
         id: gcp-test-auth
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
@@ -131,7 +149,7 @@ jobs:
           command: >-
             docker run --rm
             --mount=type=bind,source=$RUNNER_TEMP/specs,target=/specs
-            $GCP_DOCKER_ARTIFACT_REPO/tools:${PR_IMAGE_TAG}
+            ${PROTECTED_TOOLS_IMAGE}
             aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
 
       - name: Generate JSON API specification
@@ -142,7 +160,7 @@ jobs:
           command: >-
             docker run --rm
             --mount=type=bind,source=$RUNNER_TEMP/specs,target=/specs
-            $GCP_DOCKER_ARTIFACT_REPO/tools:${PR_IMAGE_TAG}
+            ${PROTECTED_TOOLS_IMAGE}
             aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       - name: Verify checked-in API specifications

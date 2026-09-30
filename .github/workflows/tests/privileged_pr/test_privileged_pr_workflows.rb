@@ -35,9 +35,26 @@ class PrivilegedPrWorkflowTests < Minitest::Test
       assert_equal "privileged-pr-ci", job.fetch("environment"), file
       assert_equal({"contents" => "read", "id-token" => "write"}, job.fetch("permissions"), file)
       source = File.read(File.join(ROOT, ".github", "workflows", file))
-      %w[GIT_CREDENTIALS download-artifact cache-from cache-to secrets:\ inherit @main].each do |token|
+      %w[GIT_CREDENTIALS cache-from cache-to secrets:\ inherit @main].each do |token|
         refute_includes source, token, file
       end
+    end
+  end
+
+  def test_image_downloads_use_only_producer_artifact_ids
+    %w[workflow-run-pr-e2e-tests.yaml workflow-run-forge-pr.yaml].each do |file|
+      job_steps = steps(jobs(load_workflow(file)).values.first)
+      downloads = job_steps.select { |step| step["uses"].to_s.start_with?("actions/download-artifact@") }
+      assert_equal 1, downloads.length
+      assert_equal "${{ inputs.IMAGE_MANIFEST_ID }}", downloads.first.dig("with", "artifact-ids")
+      refute downloads.first.fetch("with").key?("name")
+      id_check = job_steps.find { |step| step.dig("env", "IMAGE_MANIFEST_ID") }
+      assert_includes id_check.fetch("run"), "^[1-9][0-9]*$"
+      assert_operator job_steps.index(id_check), :<, job_steps.index(downloads.first)
+      verify = job_steps.find { |step| step.dig("with", "mode") == "verify" }
+      assert_equal "./trusted-base/.github/actions/protected-image-manifest", verify.fetch("uses")
+      assert_equal "${{ inputs.SOURCE_SHA }}", verify.dig("with", "source_sha")
+      assert_equal "${{ github.run_id }}", verify.dig("with", "run_id")
     end
   end
 

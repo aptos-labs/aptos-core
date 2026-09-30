@@ -19,6 +19,7 @@ COMMANDS: dict[str, str] = {
     "docker-capability-plan": "docker_plan:plan_main",
     "docker-status-plan": "docker_plan:status_main",
     "docker-forge-pr-report": "forge_report:main",
+    "protected-image-manifest": "protected_images:main",
 }
 
 

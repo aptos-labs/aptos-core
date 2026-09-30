@@ -32,31 +32,26 @@ inputs:
 outputs:
   image_tag_prefix:
     description: Trusted IMAGE_TAG_PREFIX for docker-bake-rust-all.sh
-    value: ${{ steps.tags.outputs.image_tag_prefix }}
+    value: ${{ steps.runtime.outputs.image_tag_prefix }}
   image_tag:
     description: Expected full tag for the approved source SHA
-    value: ${{ steps.tags.outputs.image_tag }}
+    value: ${{ steps.runtime.outputs.image_tag }}
 
 runs:
   using: composite
   steps:
-    - name: Check protected deployment prerequisites
-      shell: bash
-      env:
-        GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload_identity_provider }}
-        GCP_SERVICE_ACCOUNT_EMAIL: ${{ inputs.service_account }}
-        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.artifact_repo }}
-      run: |
-        set -euo pipefail
-        test -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" || { echo "::error::privileged-pr-ci lacks GCP_WORKLOAD_IDENTITY_PROVIDER"; exit 1; }
-        test -n "$GCP_SERVICE_ACCOUNT_EMAIL" || { echo "::error::privileged-pr-ci lacks GCP_SERVICE_ACCOUNT_EMAIL"; exit 1; }
-        test -n "$GCP_DOCKER_ARTIFACT_REPO" || { echo "::error::privileged-pr-ci lacks GCP_DOCKER_ARTIFACT_REPO"; exit 1; }
-
-    - name: Check out and verify the exact approved PR revision
-      uses: ./trusted-base/.github/actions/checkout-exact-pr-source
+    - name: Prepare exact source and registry authentication
+      id: runtime
+      uses: ./trusted-base/.github/actions/privileged-pr-runtime-setup
       with:
         source_repository: ${{ inputs.source_repository }}
         source_sha: ${{ inputs.source_sha }}
+        pr_number: ${{ inputs.pr_number }}
+        profile: ${{ inputs.profile }}
+        features: ${{ inputs.features }}
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+        artifact_repo: ${{ inputs.artifact_repo }}
 
     - name: Set up an isolated protected Docker builder
       uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
@@ -65,35 +60,3 @@ runs:
         keep-state: false
         cleanup: true
         cache-binary: false
-
-    - name: Authenticate to Google Cloud from the protected environment
-      uses: ./trusted-base/.github/actions/gcp-registry-auth
-      with:
-        create_credentials_file: false
-        access_token_lifetime: 5400
-        workload_identity_provider: ${{ inputs.workload_identity_provider }}
-        service_account: ${{ inputs.service_account }}
-
-    # docker-bake-rust-all.sh runs from the PR checkout, so trusted code derives
-    # the expected tag and passes its prefix to the build.
-    - name: Derive the protected image tag
-      id: tags
-      shell: bash
-      env:
-        PR_NUMBER: ${{ inputs.pr_number }}
-        SOURCE_SHA: ${{ inputs.source_sha }}
-        PROFILE: ${{ inputs.profile }}
-        FEATURES: ${{ inputs.features }}
-      run: |
-        set -euo pipefail
-        [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "::error::Invalid PR number"; exit 1; }
-        [[ "$PROFILE" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "::error::Invalid build profile"; exit 1; }
-        [[ "$FEATURES" =~ ^[a-z0-9,-]*$ ]] || { echo "::error::Invalid build features"; exit 1; }
-        source "$GITHUB_ACTION_PATH/../../../docker/builder/image-tag-prefix.sh"
-        image_tag_prefix="$(image_tag_prefix "$PR_NUMBER" "$PROFILE" "$FEATURES")"
-        image_tag="${image_tag_prefix}${SOURCE_SHA}"
-        {
-          echo "image_tag_prefix=$image_tag_prefix"
-          echo "image_tag=$image_tag"
-        } >> "$GITHUB_OUTPUT"
-        echo "PR_IMAGE_TAG=$image_tag" >> "$GITHUB_ENV"
