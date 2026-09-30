@@ -5,6 +5,7 @@ import LeanerLang.Print
 import LeanerLang.Options
 import LeanerLang.Perf
 import LeanerIR.Validation.Link
+import LeanerIR.Validation.RequiredTypes
 
 /-!
 # Modules that use modules
@@ -12,7 +13,9 @@ import LeanerIR.Validation.Link
 A namespace command naming registered modules is lowered against their
 interfaces, then links their registered namespaces into its unit in place of
 those interfaces, so its unit holds every namespace it reaches, with bodies.
-A linked namespace is relocated, not validated again.
+A linked namespace is relocated, not validated again. Further registered
+modules a caller names, those whose invariants concern the unit's memory,
+are linked with the modules they use.
 -/
 
 namespace LeanerLang
@@ -55,9 +58,11 @@ private def moduleClosure (environment : Environment) (own : Array String)
       (registeredModule? environment path).isSome
   return found
 
-@[command_elab leanerNamespaceCommand, command_elab leanerMoveModuleCommand,
-  command_elab leanerRustNamespaceCommand]
-def elaborateNamespace : CommandElab := fun stx => Perf.withPhase .lowering do
+/-- Elaborate a namespace command and register its unit, linking the
+registered modules at the paths `related` names for the unit the command's
+own uses give. -/
+def elaborateNamespaceWith (related : Environment → ValidatedUnit → Array (Array String))
+    (stx : Syntax) : CommandElabM Unit := Perf.withPhase .lowering do
   let (stx, unit) ← namespaceUnitOf stx
   let pathSyntax := (pathChildren stx)[0]!
   stageLog s!"{pathSyntax.reprint.getD ""}: unit"
@@ -81,9 +86,22 @@ def elaborateNamespace : CommandElab := fun stx => Perf.withPhase .lowering do
     match link validated (modules.map (·.2)) with
     | .ok linked => pure linked
     | .error message => throwErrorAt pathSyntax message
+  let extraPaths := (related env linked).filter fun path => !modules.any (·.1 == path)
+  let linked ← if extraPaths.isEmpty then pure linked else do
+    let extras ← match moduleClosure env sourceNs.path extraPaths with
+      | .ok extras => pure (extras.filter fun (path, _) => !modules.any (·.1 == path))
+      | .error message => throwErrorAt pathSyntax message
+    match link validated ((modules ++ extras).map (·.2)) with
+    | .ok linked => pure linked
+    | .error message => throwErrorAt pathSyntax message
   stageLog "linked"
-  match registerUnit (← getEnv) (pathName sourceNs.path) linked with
+  -- The unit holds every type its generic frames require.
+  match registerUnit (← getEnv) (pathName sourceNs.path) linked.internRequiredTypes with
   | .ok environment => setEnv environment
   | .error message => throwErrorAt pathSyntax message
+
+@[command_elab leanerNamespaceCommand, command_elab leanerMoveModuleCommand,
+  command_elab leanerRustNamespaceCommand]
+def elaborateNamespace : CommandElab := elaborateNamespaceWith fun _ _ => #[]
 
 end LeanerLang

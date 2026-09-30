@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/pragma.move:15:9: error: the specification clause `aborts_if _c` is not established
+tests/sources/functional/pragma.move:13:5: error: leaner verification failed: the automatic verification of `always_aborts_with_verify_incorrect` failed; provide a proof: `verify always_aborts_with_verify_incorrect by …` in `tests/sources/functional/pragma.proof.lean` (`verify always_aborts_with_verify_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/pragma.move:21:5: error: leaner verification failed: `always_aborts_with_verify_manual_incorrect` sets `pragma verify = manual`; provide a proof: `verify always_aborts_with_verify_manual_incorrect by …` in `tests/sources/functional/pragma.proof.lean` (`verify always_aborts_with_verify_manual_incorrect by skip` shows the obligations it leaves)

@@ -124,7 +124,7 @@ where
     | .vector elements => .vector (elements.map normalizeRuntimeValue)
     | .tuple elements => .unmodeled "tuple"
     | .nominal name variant _ => .unmodeled s!"nominal {repr name} {repr variant}"
-    | .closure _ _ => .unmodeled "closure"
+    | .closure .. => .unmodeled "closure"
     | .borrow _ _ => .unmodeled "reference"
     | .loanHole _ => .unmodeled "reference"
 

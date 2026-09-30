@@ -1,0 +1,6 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/signed_int/error.move:14:9: error: the specification clause `invariant x >= x << 1` is not established
+tests/sources/functional/signed_int/error.move:13:9: error: the specification clause `invariant x >= x & 1` is not established
+tests/sources/functional/signed_int/error.move:12:9: error: the specification clause `invariant x >= x | 1` is not established
+tests/sources/functional/signed_int/error.move:11:9: error: the specification clause `invariant x >= x ^ 1` is not established
+tests/sources/functional/signed_int/error.move:6:5: error: leaner verification failed: the automatic verification of `test` failed; provide a proof: `verify test by …` in `tests/sources/functional/signed_int/error.proof.lean` (`verify test by skip` shows the obligations it leaves)

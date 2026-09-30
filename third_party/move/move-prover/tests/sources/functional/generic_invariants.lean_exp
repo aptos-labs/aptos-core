@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/generic_invariants.move:39:5: error: generic module invariants are outside the current LeanerLang parser

@@ -1,0 +1,31 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/vector_hofs_fold.move:49:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_fold.move:49:5: error: leaner verification failed: the automatic verification of `sum_concrete` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_concrete by …` in `tests/sources/functional/closures/inline/vector_hofs_fold.proof.lean` (`verify sum_concrete by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_fold.move:61:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_fold.move:61:5: error: leaner verification failed: the automatic verification of `sum_inferred` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_inferred by …` in `tests/sources/functional/closures/inline/vector_hofs_fold.proof.lean` (`verify sum_inferred by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_fold.move:74:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_fold.move:74:5: error: leaner verification failed: the automatic verification of `sum_scaled` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_scaled by …` in `tests/sources/functional/closures/inline/vector_hofs_fold.proof.lean` (`verify sum_scaled by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_fold.move:87:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_fold.move:87:5: error: leaner verification failed: the automatic verification of `product_concrete` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify product_concrete by …` in `tests/sources/functional/closures/inline/vector_hofs_fold.proof.lean` (`verify product_concrete by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_fold.move:99:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_fold.move:99:5: error: leaner verification failed: the automatic verification of `count_even_concrete` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify count_even_concrete by …` in `tests/sources/functional/closures/inline/vector_hofs_fold.proof.lean` (`verify count_even_concrete by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

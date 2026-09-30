@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/mixed_callee_postcondition.move:7:1: error: specification operation LeanerIR.Operation.specification
+  (LeanerIR.SpecOperation.remove { pre := none, post := some 5 }) is not supported in generated contracts
+tests/sources/functional/state_labels/mixed_callee_postcondition.move:30:5: error: `caller` calls `replace`, which is not verified; verify the callee first
+tests/sources/functional/state_labels/mixed_callee_postcondition.move:40:5: error: `create_then_call` calls `replace`, which is not verified; verify the callee first

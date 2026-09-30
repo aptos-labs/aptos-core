@@ -42,19 +42,58 @@ private partial def expChildren : ExpNode → List Exp
   | .assign _ value => [value]
   | .mutate target value => [target, value]
 
+/-- The variables a pattern binds. -/
+private partial def patternNames (pattern : Pattern) : List String :=
+  match pattern.node with
+  | .var name => [name]
+  | .tuple elements | .struct _ _ _ elements => elements.flatMap patternNames
+  | .wildcard | .literal _ | .range .. => []
+
+/-- The variables an expression binds or assigns. -/
+private partial def boundNames (expression : Exp) : List String :=
+  let own := match expression.node with
+    | .block pattern .. | .assign pattern _ => patternNames pattern
+    | .«match» _ arms => arms.flatMap (patternNames ·.pattern)
+    | _ => []
+  own ++ (expChildren expression.node).flatMap boundNames
+
+/-- The function-typed parameters a body keeps: those without `modifies_of`,
+which keep global memory, the frame their callers establish
+(`KeepsMemoryAt`), and which the body neither rebinds nor assigns. -/
+def keptParameters (params : List Param) (accessOf : List AccessOf) (body : Exp) :
+    List String :=
+  let bound := boundNames body
+  params.filterMap fun param =>
+    let declared := accessOf.any fun access =>
+      access.name == param.name && (access.modifiesAll || !access.modifies.isEmpty)
+    if param.ty matches .function .. && !declared && !bound.contains param.name then
+      some param.name
+    else none
+
 /-- Whether evaluating an expression may write global memory, given which
-callees do. Invoking a function value may do anything. -/
-partial def writesGlobal (callee : QualifiedName → Bool) (expression : Exp) : Bool :=
+callees do. Invoking a function value may do anything, but for a `kept`
+parameter, among the function's `params`. -/
+partial def writesGlobal (callee : QualifiedName → Bool) (params kept : List String)
+    (expression : Exp) : Bool :=
   let own := match expression.node with
     | .call (.borrowGlobal .mutable) .. | .call .moveTo .. | .call .moveFrom .. => true
     | .call (.moveFunction name) .. => callee name
-    | .invoke .. => true
+    | .invoke function _ => match function.node with
+        | .«local» name => !kept.contains name
+        | .param index => !(params[index]?.any kept.contains)
+        | _ => true
     | _ => false
-  own || (expChildren expression.node).any (writesGlobal callee)
+  own || (expChildren expression.node).any (writesGlobal callee params kept)
+
+/-- Whether a specification declares modifications of global memory, which
+its callers see through its contract. -/
+def declaresWrites (spec : Spec) : Bool :=
+  spec.frame.any fun frame => !frame.modifies.isEmpty || frame.modifiesAll
 
 /-- The functions of a package that may write global memory: the least
-fixed point over the owned and dependency modules. A callee outside them is
-assumed to write; `std::vector` and natives do not touch global memory. -/
+fixed point over the owned and dependency modules, a function writing where
+its body or its declared frame does. A callee outside them is assumed to
+write; `std::vector` and natives do not touch global memory. -/
 def globalWriters (package : Package) : List QualifiedName :=
   let functions := (package.modules ++ package.dependencies).flatMap fun module =>
     module.functions.map fun function => ({ module := module.ref, name := function.name }, function)
@@ -63,9 +102,12 @@ def globalWriters (package : Package) : List QualifiedName :=
     functions.filterMap fun (name, function) =>
       let callee (target : QualifiedName) :=
         !isPrimitiveModule target.module && (writers.contains target || !known target)
-      let writes := match function.kind, function.body with
+      let writes : Bool := match function.kind, function.body with
         | .native, _ => false
-        | _, some body => writesGlobal callee body
+        | _, some body =>
+            declaresWrites function.spec ||
+              writesGlobal callee (function.params.map (·.name))
+                (keptParameters function.params function.spec.accessOf body) body
         | _, none => true
       if writes then some name else none
   let rec iterate (writers : List QualifiedName) : Nat → List QualifiedName

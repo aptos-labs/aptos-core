@@ -124,7 +124,9 @@ def signaturePatterns : MapRole → Array SignaturePattern
   | .delMustExist => #[
       signature #[mutOwner, refKey] value,
       signature #[mutOwner, key] value]
-  | .delReturnKey => #[signature #[mutOwner, refKey] (.tuple #[key, value])]
+  | .delReturnKey => #[
+      signature #[mutOwner, refKey] (.tuple #[key, value]),
+      signature #[mutOwner, key] (.tuple #[key, value])]
   | .destroyEmpty => #[signature #[owner] unit]
   | .get => #[signature #[refOwner, refKey] optionValue]
   | .hasKey => #[

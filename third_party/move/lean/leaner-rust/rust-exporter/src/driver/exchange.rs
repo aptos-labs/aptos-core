@@ -402,8 +402,10 @@ pub(super) enum CallKind {
         constructor: QualifiedRef,
         variant: Option<String>,
     },
+    /// Captures the parameters of `function` whose bit is set in `mask`.
     Closure {
         function: QualifiedRef,
+        mask: u64,
     },
     Invoke,
 }
@@ -648,6 +650,7 @@ pub(super) struct FunctionContract {
     pub loc: Option<LocId>,
     pub modifies: Vec<ExprId>,
     pub modifies_all: bool,
+    pub parameter_frames: Vec<UnsupportedNode>,
     pub pragmas: Vec<UnsupportedNode>,
     pub reads: Vec<TypeUse>,
     pub reads_all: bool,
@@ -721,6 +724,7 @@ pub(super) struct RawNamespace {
     pub imports: Vec<NamespaceId>,
     pub intrinsics: Vec<UnsupportedNode>,
     pub invariants: Vec<UnsupportedNode>,
+    pub lemmas: Vec<UnsupportedNode>,
     pub loc: LocId,
     pub patterns: Vec<UnsupportedNode>,
     pub places: Vec<Place>,

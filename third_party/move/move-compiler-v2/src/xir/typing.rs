@@ -282,6 +282,25 @@ impl FunctionTranslator<'_> {
             },
             Oper::Function(id) => self.call_rule(*id, &[], oper)?,
             Oper::FunctionInst(id, args) => self.call_rule(*id, args, oper)?,
+            Oper::Closure(id, mask) => self.closure_rule(*id, &[], *mask, dst(0)?, oper)?,
+            Oper::ClosureInst(id, mask, args) => {
+                self.closure_rule(*id, args, *mask, dst(0)?, oper)?
+            },
+            // The function value is the last operand.
+            Oper::Invoke => {
+                let last = srcs.len().checked_sub(1).ok_or(MissingOperand)?;
+                let function = src(last)?;
+                let Type::Fun(params, results, _) = &function else {
+                    bail!(
+                        "{oper:?}: operand {last} is not a function value, `{}`",
+                        self.show(&function)
+                    );
+                };
+                let mut operands = params.as_ref().clone().flatten();
+                let results = results.as_ref().clone().flatten();
+                operands.push(function);
+                (operands, results)
+            },
             Oper::BorrowLoc => {
                 let source = src(0)?;
                 ensure!(
@@ -526,6 +545,35 @@ impl FunctionTranslator<'_> {
             .map(|ty| ty.instantiate(&args))
             .collect();
         Ok((params, results))
+    }
+
+    /// A closure's operands are the parameters of its target the mask
+    /// captures, instantiated; its result is a function value over the other
+    /// parameters, with the target's results. Its abilities are the
+    /// destination's, which the bytecode verifier checks.
+    fn closure_rule(
+        &self,
+        id: usize,
+        given: &[Ty],
+        mask: u64,
+        result: Type,
+        oper: &Oper,
+    ) -> Result<(Vec<Type>, Vec<Type>)> {
+        let (params, results) = self.call_rule(id, given, oper)?;
+        let Type::Fun(_, _, abilities) = &result else {
+            bail!(
+                "{oper:?}: result 0 is not a function value, `{}`",
+                self.show(&result)
+            );
+        };
+        let mask = ClosureMask::new(mask);
+        let captured = mask.extract(&params, true).into_iter().cloned().collect();
+        let provided = mask.extract(&params, false).into_iter().cloned().collect();
+        Ok((captured, vec![Type::function(
+            Type::tuple(provided),
+            Type::tuple(results),
+            *abilities,
+        )]))
     }
 
     /// The field types of struct `sid`, or of one of its variants,
@@ -883,6 +931,10 @@ mod tests {
             m(Ty::Enum(3)),
             m(Ty::StructInst(5, vec![Ty::U64])),
             r(Ty::StructInst(2, vec![Ty::U64])),
+            // 33..
+            Ty::Function(vec![Ty::Bool], vec![Ty::U64], vec!["drop".to_owned()]),
+            Ty::Function(vec![Ty::U64, Ty::Bool], vec![Ty::U64], vec!["drop".to_owned()]),
+            Ty::Function(vec![Ty::U64], vec![Ty::U64], vec!["drop".to_owned()]),
         ];
         module.functions = vec![
             function("f", vec![], 0, locals, returns, instrs, term),
@@ -1116,6 +1168,28 @@ mod tests {
                 call(&[3], Oper::FunctionInst(2, vec![Ty::U64]), &[1]),
             ),
             (false, call(&[0], Oper::Function(2), &[1])),
+        ]);
+    }
+
+    #[test]
+    fn closures() {
+        check(vec![
+            // `callee` with its `u64` captured, and with nothing captured.
+            (true, call(&[33], Oper::Closure(1, 0b1), &[0])),
+            (false, call(&[33], Oper::Closure(1, 0b1), &[3])),
+            (false, call(&[34], Oper::Closure(1, 0b1), &[0])),
+            (true, call(&[34], Oper::Closure(1, 0), &[])),
+            (false, call(&[0], Oper::Closure(1, 0), &[])),
+            (true, call(&[35], Oper::ClosureInst(2, 0, vec![Ty::U64]), &[])),
+            (
+                false,
+                call(&[35], Oper::ClosureInst(2, 0, vec![Ty::Bool]), &[]),
+            ),
+            // The function value last.
+            (true, call(&[0], Oper::Invoke, &[3, 33])),
+            (false, call(&[0], Oper::Invoke, &[0, 33])),
+            (false, call(&[3], Oper::Invoke, &[3, 33])),
+            (false, call(&[0], Oper::Invoke, &[3, 0])),
         ]);
     }
 

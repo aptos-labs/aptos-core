@@ -23,87 +23,7 @@ namespace LeanerIR.Proofs.Denote
 
 open LeanerIR.Validation LeanerIR.SemanticOperations
 
-/-- A lookup of the type table entry a type identifier names, per namespace. -/
-abbrev TypeLookup := NamespaceId → TypeId → Option Ty
-
-/-- The type tables of a unit, read directly. -/
-def unitTypes (unit : ValidatedUnit) : TypeLookup := fun namespaceId typeId =>
-  (unit.namespaces[namespaceId.index]?).bind (·.tables.types[typeId.index]?)
-
-mutual
-/-- The native type an LIR type denotes.  A shared reference denotes its
-referent: certified exclusivity erases it at run time.  A nominal type
-denotes its declaration's rows, resolved in the declaring namespace; the
-fuel bounds the nesting of declarations. -/
-def ntyOfFuel (types : TypeLookup) (unit : ValidatedUnit) :
-    Nat → NamespaceId → TypeId → Option NTy
-  | 0, _, _ => none
-  | fuel + 1, namespaceId, typeId => do
-      let ns ← unit.namespaces[namespaceId.index]?
-      let ty ← types namespaceId typeId
-      match ty with
-      | .unit => some .unit
-      | .bool => some .bool
-      | .integer (.bits width) signed => if width == 0 then none else some (.int width signed)
-      | .address => some .address
-      | .signer => some .signer
-      | .string => some .string
-      | .bytes => some .bytes
-      | .reference reference =>
-          match reference.kind with
-          | .shared => ntyOfFuel types unit fuel namespaceId reference.referent
-          | .mutable => .ref <$> ntyOfFuel types unit fuel namespaceId reference.referent
-      | .tuple elements =>
-          (.tuple ∘ NRow.ofList) <$> elements.toList.mapM (ntyOfFuel types unit fuel namespaceId)
-      | .vector element none => .vector <$> ntyOfFuel types unit fuel namespaceId element
-      | .nominal name arguments => do
-          let handle ← resolveNominal? unit ns name
-          let generic ← structNTyFuel types unit fuel handle
-          if arguments.isEmpty then some generic else
-            let θ ← arguments.toList.mapM fun argument => match argument with
-              | .typeArg value => ntyOfFuel types unit fuel namespaceId value.typeId
-              | _ => none
-            some (generic.subst (NRow.ofList θ))
-      | .typeParameter index => some (.param index)
-      | _ => none
-
-/-- The native type of a nominal declaration: its field row, or its named
-variant rows. -/
-def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) : Nat → StructHandle → Option NTy
-  | 0, _ => none
-  | fuel + 1, handle => do
-      let targetNs ← unit.namespaces[handle.namespaceId.index]?
-      let declaration ← targetNs.structs[handle.structId]?
-      let row := fun (fields : Array FieldDecl) =>
-        NRow.ofList <$> fields.toList.mapM fun field =>
-          ntyOfFuel types unit fuel handle.namespaceId field.type.typeId
-      if declaration.variants.isEmpty then .struct handle <$> row declaration.fields
-      else
-        let names ← declaration.variants.toList.mapM fun variant =>
-          (targetNs.tables.names[variant.name.index]?).map (·.name)
-        let rows ← NRows.ofList <$> declaration.variants.toList.mapM fun variant =>
-          row variant.fields
-        if distinct : names.Nodup then some (.enum handle names rows distinct) else none
-end
-
-/-- The fuel that bounds the nesting of every type in a unit: two steps per
-type-table entry, since validated types are not recursive and a nominal
-type costs a step of its own. -/
-def typeFuel (unit : ValidatedUnit) : Nat :=
-  2 * unit.namespaces.foldl (fun total ns => total + ns.tables.types.size) 0 + 2
-
-/-- The fuel that bounds every body in a unit.  A term visits each node at
-most once and each node costs at most three steps of the mutual recursion,
-so three times the expression count suffices. -/
-def unitFuel (unit : ValidatedUnit) : Nat :=
-  3 * unit.namespaces.foldl (fun total ns => total + ns.expressions.size) 0 + 3
-
-def ntyOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : TypeId) : Option NTy :=
-  ntyOfFuel (unitTypes unit) unit (typeFuel unit) namespaceId typeId
-
-/-- The native type of a nominal declaration. -/
-def structNTy (unit : ValidatedUnit) (handle : StructHandle) : Option NTy :=
-  structNTyFuel (unitTypes unit) unit (typeFuel unit) handle
+variable {unit : ValidatedUnit}
 
 /-- The construct a node uses, for a rejection message. -/
 private def describeKind : ExprKind → String
@@ -164,14 +84,95 @@ structure CompileNamespace where
   places : IndexedArena Place
   patterns : IndexedArena Pattern
   types : IndexedArena Ty
-  /-- The unit's type and expression fuels, counted once. -/
+  /-- The loan deaths at each anchor, and the places dereferencing a shared
+  reference, as the borrow certificates record them. -/
+  deaths : KeyTree AnchorDeaths
+  shared : KeyTree Unit
+  /-- The unit's struct and enum declarations stating a data invariant or
+  holding an intrinsic map, keyed by `loopSite` of namespace and index. -/
+  invariants : KeyTree Unit
+  /-- The unit's type and expression fuels, and the namespace's place count,
+  counted once. -/
   typeFuel : Nat
   fuel : Nat
+  placeFuel : Nat
+
+/-- Whether a declaration of a namespace carries a data invariant: a stated
+one, or the order of an intrinsic map's keys. -/
+def declarationCarriesInvariant (ns : ValidatedNamespace) (declaration : StructDecl) : Bool :=
+  declaration.contract.conditions.any (·.kind == .structInvariant) ||
+    ns.intrinsics.any fun intrinsic =>
+      intrinsic.model == "map" && intrinsic.owner == declaration.name
+
+/-- The unit's struct and enum declarations stating a data invariant or
+holding an intrinsic map, keyed by `loopSite` of namespace and index: a
+value of a type carrying one is checked where it is constructed and where a
+mutation of it ends. -/
+def invariantIndex (unit : ValidatedUnit) : KeyTree Unit :=
+  let entries := unit.namespaces.toList.zipIdx.foldl (init := []) fun entries (ns, nsIndex) =>
+    ns.structs.toList.zipIdx.foldl (init := entries) fun entries (declaration, index) =>
+      if declarationCarriesInvariant ns declaration then (loopSite nsIndex index, ()) :: entries
+      else entries
+  KeyTree.ofSorted (sortByIndex entries)
+
+/-- Whether any declaration of a unit carries a data invariant. -/
+def unitCarriesInvariants (unit : ValidatedUnit) : Bool :=
+  unit.namespaces.any fun ns => ns.structs.any (declarationCarriesInvariant ns)
 
 def CompileNamespace.of (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (ns : ValidatedNamespace) : CompileNamespace :=
   ⟨ns, namespaceId, .ofArray ns.expressions, .ofArray ns.places, .ofArray ns.patterns,
-    .ofArray ns.tables.types, LeanerIR.Proofs.Denote.typeFuel unit, unitFuel unit⟩
+    .ofArray ns.tables.types, deathIndex unit namespaceId, sharedDereferenceIndex unit namespaceId,
+    invariantIndex unit, LeanerIR.Proofs.Denote.typeFuel unit, unitFuel unit, ns.places.size + 1⟩
+
+/-- Whether a value of a type carries a data invariant at any depth. -/
+def CompileNamespace.carriesInvariant (ns : CompileNamespace) (τ : NTy) : Bool :=
+  τ.carriesInvariant fun source =>
+    (ns.invariants.find? (loopSite source.namespaceId.index source.structId)).isSome
+
+/-- The local a place belongs to without a dereference: a write into the
+place mutates the local's value. -/
+def CompileNamespace.ownedRoot? (ns : CompileNamespace) : Nat → PlaceId → Option LocalId
+  | 0, _ => none
+  | fuel + 1, place =>
+      match ns.places.get? place.index with
+      | some (.localVar localId) => some localId
+      | some (.field base _ _) | some (.index base _) | some (.subslice base ..)
+      | some (.downcast base _) => ns.ownedRoot? fuel base
+      | _ => none
+
+/-- The local a loan borrows from without a dereference. -/
+def CompileNamespace.lender? (ns : CompileNamespace) (loan : CheckedLoanFact) : Option LocalId :=
+  match ns.expressions.get? loan.expression.index with
+  | some { kind := .operation (.borrow _ place) _ _ _, .. } => ns.ownedRoot? ns.placeFuel place
+  | _ => none
+
+/-- Whether a loan is a mutable borrow of global memory, whose death ends a
+write of it. -/
+def CompileNamespace.writesGlobal (ns : CompileNamespace) (loan : CheckedLoanFact) : Bool :=
+  match ns.expressions.get? loan.expression.index with
+  | some { kind := .operation (.global (.borrow .mutable)) _ _ _, .. } => true
+  | _ => false
+
+/-- A place as the semantics reads it: a dereference of a shared reference is
+its base, since the reference is the observed value itself. -/
+def CompileNamespace.placeFuel? (ns : CompileNamespace) : Nat → PlaceId → Option Place
+  | 0, _ => none
+  | fuel + 1, place =>
+      match ns.places.get? place.index with
+      | some (.deref base) =>
+          if (ns.shared.find? place.index).isSome then ns.placeFuel? fuel base
+          else some (.deref base)
+      | other => other
+
+def CompileNamespace.place? (ns : CompileNamespace) (place : PlaceId) : Option Place :=
+  ns.placeFuel? ns.placeFuel place
+
+/-- Whether an operand is a shared reference, by its recorded type. -/
+def CompileNamespace.sharedAt (ns : CompileNamespace) (operand : ExprId) : Bool :=
+  match ns.expressions.get? operand.index with
+  | some expression => isSharedReferenceType ns.source expression.typeId ns.types.get?
+  | none => false
 
 /-- The native type a type identifier denotes, read through the view's type
 table for its own namespace. -/
@@ -181,9 +182,24 @@ def CompileNamespace.nty (ns : CompileNamespace) (unit : ValidatedUnit)
       else unitTypes unit owner typeId)
     unit ns.typeFuel namespaceId typeId
 
+/-- The resource type a type identifier denotes, read through the view's
+type table: its native type and its declaration's type arguments. -/
+def CompileNamespace.resource (ns : CompileNamespace) (unit : ValidatedUnit)
+    (namespaceId : NamespaceId) (typeId : TypeId) : Option (NTy × NRow) := do
+  let ty ← if namespaceId == ns.namespaceId then ns.types.get? typeId.index
+    else unitTypes unit namespaceId typeId
+  match ty with
+  | .nominal _ arguments =>
+      let native ← ns.nty unit namespaceId typeId
+      let arguments ← arguments.toList.mapM fun argument => match argument with
+        | .typeArg value => ns.nty unit namespaceId value.typeId
+        | _ => none
+      some (native, NRow.ofList arguments)
+  | _ => none
+
 /-- The native type of a node, `none` for the `never` type of a node that
 transfers control. -/
-private def typeOf? (unit : ValidatedUnit) (ns : CompileNamespace) (namespaceId : NamespaceId)
+def typeOf? (unit : ValidatedUnit) (ns : CompileNamespace) (namespaceId : NamespaceId)
     (typeId : TypeId) : Except String (Option NTy) :=
   match ns.types.get? typeId.index with
   | some .never => .ok none
@@ -230,25 +246,25 @@ def Choices.ofList (names : List String) (rows : NRows) (τ : NTy) :
 
 /-- A compiled expression: a term at its declared type, or a term of every
 type, which is what a node of type `never` denotes. -/
-inductive Compiled (ρ : ResultShape) (Γ : NRow) : Type where
-  | at (τ : NTy) (term : Term ρ Γ τ)
-  | never (term : (τ : NTy) → Term ρ Γ τ)
+inductive Compiled (unit : ValidatedUnit) (ρ : ResultShape) (Γ : NRow) : Type where
+  | at (τ : NTy) (term : Term unit ρ Γ τ)
+  | never (term : (τ : NTy) → Term unit ρ Γ τ)
 
 /-- A compiled expression at an expected type. -/
 def Compiled.at? {ρ : ResultShape} {Γ : NRow} (τ : NTy) :
-    Compiled ρ Γ → Except String (Term ρ Γ τ)
+    Compiled unit ρ Γ → Except String (Term unit ρ Γ τ)
   | .at τ' term =>
       if equal : τ' = τ then .ok (equal ▸ term) else .error "an expression has an unexpected type"
   | .never term => .ok (term τ)
 
 /-- A compiled expression at its own type, taking unit for one of every type. -/
-def Compiled.some {ρ : ResultShape} {Γ : NRow} : Compiled ρ Γ → Σ τ : NTy, Term ρ Γ τ
+def Compiled.some {ρ : ResultShape} {Γ : NRow} : Compiled unit ρ Γ → Σ τ : NTy, Term unit ρ Γ τ
   | .at τ term => ⟨τ, term⟩
   | .never term => ⟨.unit, term .unit⟩
 
 /-- Wrap a compiled expression in a type-preserving context. -/
 def Compiled.map {ρ : ResultShape} {Γ : NRow}
-    (wrap : (τ : NTy) → Term ρ Γ τ → Term ρ Γ τ) : Compiled ρ Γ → Compiled ρ Γ
+    (wrap : (τ : NTy) → Term unit ρ Γ τ → Term unit ρ Γ τ) : Compiled unit ρ Γ → Compiled unit ρ Γ
   | .at τ term => .at τ (wrap τ term)
   | .never term => .never fun τ => wrap τ (term τ)
 
@@ -266,7 +282,7 @@ def literalValue : (τ : NTy) → ConstValue → Except String τ.groundCarrier
   | .tuple elements, .tuple values => literalRow elements values.toList
   | _, _ => notCarried "a literal of this type"
 
-def literalRow : (row : NRow) → List ConstValue → Except String (@HList Skolems.ground row)
+def literalRow : (row : NRow) → List ConstValue → Except String (@HList Carriers.ground row)
   | .nil, [] => .ok ()
   | .cons τ rest, value :: values => do
       let head ← literalValue τ value
@@ -290,12 +306,35 @@ def Proj.append : {τ σ υ : NTy} → Proj τ σ → Proj σ υ → Proj τ υ
   | _, _, _, .index position path, rest => .index position (path.append rest)
   | _, _, _, .variant choices path, rest => .variant choices (path.append rest)
 
+/-- The number of variants a selection chooses a field of. -/
+def Choices.length {names : List String} {rows : NRows} {τ : NTy} :
+    Choices names rows τ → Nat
+  | .nil => 0
+  | .cons _ _ rest => rest.length + 1
+
+/-- Whether a selection leaves a variant without a field to select. -/
+def Choices.partial {names : List String} {rows : NRows} {τ : NTy}
+    (choices : Choices names rows τ) : Bool :=
+  choices.length < names.length
+
+/-- Whether a path steps into a field some variant lacks. -/
+def Proj.mayMismatch : {τ σ : NTy} → Proj τ σ → Bool
+  | _, _, .nil => false
+  | _, _, .deref path | _, _, .field _ path | _, _, .index _ path => path.mayMismatch
+  | _, _, .variant choices path => choices.partial || path.mayMismatch
+
+/-- The throw an access along a path makes where a variant lacks the field:
+the profile's mismatch throw, for a path that may meet one. -/
+def CompileNamespace.mismatchOn (ns : CompileNamespace) {τ σ : NTy} (path : Proj τ σ) :
+    Option Failure :=
+  if path.mayMismatch then patternMismatchThrow? ns.source.profile else none
+
 /-- The typed place a place names. -/
 def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
     Nat → PlaceId → Except String (TypedPlace Γ)
   | 0, _ => .error "the compiler ran out of fuel"
   | fuel + 1, placeId => do
-      let some place := ns.places.get? placeId.index | .error "a place is out of range"
+      let some place := ns.place? placeId | .error "a place is out of range"
       match place with
       | .localVar localId =>
           let some ⟨τ, x⟩ := Var.ofIndex Γ localId.index | .error "a local is out of range"
@@ -306,9 +345,13 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
           | .ref referent, path => .ok ⟨root, referent, x, path.append (.deref .nil)⟩
           | _, _ => notCarried "a dereference of a place that is not a mutable reference"
       | .field base owner field =>
+          -- A field below a downcast is the named variant's.
+          let (base, variant?) := match ns.place? base with
+            | some (.downcast inner variant) => (inner, some variant)
+            | _ => (base, none)
           let ⟨root, component, x, path⟩ ← compilePlace unit Γ ns fuel base
           match component, path with
-          | .struct source fields, path =>
+          | .struct source _ fields, path =>
               let some handle := resolveStruct? unit ns.source.identity owner
                 | .error "a field place does not resolve"
               unless handle = source do .error "a field place's declaration differs from its type"
@@ -318,12 +361,21 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
               let some ⟨σ, position⟩ := Var.ofIndex fields index
                 | .error "a field place is out of range"
               .ok ⟨root, σ, x, path.append (.field position .nil)⟩
-          | .enum source names rows _, path =>
+          | .enum source _ names rows _, path =>
               let some handle := resolveStruct? unit ns.source.identity owner
                 | .error "a variant field place does not resolve"
               unless handle = source do .error "a variant field place's declaration differs from its type"
               let some name := sourceFieldName? ns.source field | .error "a variant field place has no name"
-              let some choices := variantFieldChoices? unit handle #[name]
+              -- A field place reads the field of whichever variant declares
+              -- it; below a downcast, of that variant.
+              let listed ← match variant? with
+                | none => .ok names
+                | some variant => do
+                    let some variantName := sourceFieldName? ns.source variant
+                      | .error "a downcast place has no variant name"
+                    .ok [variantName]
+              let some choices := variantFieldChoices? unit handle
+                  (listed.map (·, name)).toArray
                 | .error "a variant field place has no choices"
               let (firstVariant, firstIndex) :: _ := choices.toList
                 | .error "a variant field place names a field of no variant"
@@ -370,7 +422,7 @@ def ResultShape.lendable : ResultShape → Bool
   | .one τ => τ.lendable
 
 /-- The loan facts of a function's borrow certificate, looked up once per
-compiled function: the kernel evaluates the compilation, so a death marker
+compiled function: the kernel evaluates the compilation, so a loan death
 reads its loan from these rather than searching every certificate. -/
 def loanFactsOf (unit : ValidatedUnit) (handle : FunctionHandle) : Array CheckedLoanFact :=
   -- A list search: the kernel searches an array by reading each element
@@ -379,14 +431,57 @@ def loanFactsOf (unit : ValidatedUnit) (handle : FunctionHandle) : Array Checked
     certificate.namespaceId == handle.namespaceId &&
       certificate.functionId == handle.functionId).map (·.loans)).getD #[]
 
+/-- The effect of ending loans, `none` when it resolves nothing. A loan's
+death resolves the reference wherever it is held; a holder whose slot is
+empty passed it on, and a loan consumed by a call has no holder here, since
+the callee resolves it.  A holder without references observes the loan
+through an erased shared borrow and resolves nothing. -/
+def deathEffect (ns : CompileNamespace) (loanFacts : Array CheckedLoanFact) (ρ : ResultShape)
+    (Γ : NRow) (ended : Array LoanId) :
+    Except String (Option (Term unit ρ Γ .unit)) := do
+  -- Innermost first, as `settleLoans` ends them.
+  let deaths ← ended.toList.reverse.mapM fun loan => do
+    let some holders := (loanFacts[loan.index]?).map (·.holders)
+      | .error "a loan death names an unknown loan"
+    holders.toList.filterMapM fun holder => do
+      let some ⟨σ, x⟩ := Var.ofIndex Γ holder.index | .error "a local is out of range"
+      match σ, x with
+      | .ref _, x => .ok (some (Term.resolve (ρ := ρ) x))
+      | σ, _ => if σ.refFree then .ok none else notCarried "a loan held inside an aggregate"
+  -- Once resolved, a local a loan mutated owes its invariant: a mutation
+  -- ends where its loan dies. A borrow of global memory ends its write.
+  let checks ← ended.toList.reverse.filterMapM fun loan => do
+    let some fact := loanFacts[loan.index]? | .error "a loan death names an unknown loan"
+    let site := loopSite ns.namespaceId.index fact.expression.index
+    if ns.writesGlobal fact then return some (Term.memoryWritten (ρ := ρ) (Γ := Γ) site)
+    let some lender := ns.lender? fact | .ok none
+    let some ⟨σ, _⟩ := Var.ofIndex Γ lender.index | .error "a local is out of range"
+    if ns.carriesInvariant σ then .ok (some (Term.mutationEnd (ρ := ρ) (Γ := Γ) site))
+    else .ok none
+  let effects := deaths.flatten ++ checks
+  if effects.isEmpty then .ok none
+  else .ok (some (effects.foldr (fun effect rest => Term.drop effect rest) (.lit ())))
+
+/-- A node's term with the loan deaths anchored at it: those before it
+resolve first, those after it once it produced its value. -/
+def withDeaths (ns : CompileNamespace) (loanFacts : Array CheckedLoanFact) (id : ExprId)
+    (node : Compiled unit ρ Γ) : Except String (Compiled unit ρ Γ) := do
+  let some deaths := ns.deaths.find? id.index | .ok node
+  let node ← match ← deathEffect ns loanFacts ρ Γ deaths.after, node with
+    | some effect, .at τ term => .ok (.at τ (.seqAfter term effect))
+    | _, node => .ok node
+  match ← deathEffect ns loanFacts ρ Γ deaths.before with
+  | some effect => .ok (node.map fun _ term => .drop effect term)
+  | none => .ok node
+
 /-- The literal of a constant at its declared type. -/
 def compileLiteral {ρ : ResultShape} {Γ : NRow} (τ : NTy) (literal : ConstValue) :
-    Except String (Term ρ Γ τ) :=
+    Except String (Term unit ρ Γ τ) :=
   (.lit ·) <$> literalValue τ literal
 
 /-- The local a place names, when it is a bare local. -/
 def placeLocal? (ns : CompileNamespace) (place : PlaceId) : Except String LocalId :=
-  match ns.places.get? place.index with
+  match ns.place? place with
   | some (.localVar localId) => .ok localId
   | _ => notCarried "a place other than a local"
 
@@ -397,16 +492,84 @@ def heldLocal? (ns : CompileNamespace) (operand : ExprId) : Option LocalId :=
   | some { kind := .localVar localId, .. } => some localId
   | some { kind := .operation (.move place) _ #[] _, .. }
   | some { kind := .operation (.copy place) _ #[] _, .. } =>
-      match ns.places.get? place.index with
+      match ns.place? place with
       | some (.localVar localId) => some localId
       | _ => none
   | _ => none
 
 mutual
-  /-- The term of one expression. -/
+/-- The typed pattern of a validated one at the type of the value it matches. -/
+def compilePattern (Γ : NRow) (ns : CompileNamespace) :
+    Nat → PatternId → (σ : NTy) → Except String (Pat Γ σ)
+  | 0, _, _ => .error "the compiler ran out of fuel"
+  | fuel + 1, pattern, σ =>
+      match ns.patterns.get? pattern.index with
+      | none => .error "a pattern is out of range"
+      | some pattern =>
+        match pattern.kind, σ with
+        | .wildcard, _ => .ok .wildcard
+        | .variable localId, σ => .var <$> Var.at? Γ localId.index σ
+        | .literal value, σ => .literal <$> literalValue σ value
+        | .range lower upper inclusive, .int _ _ => do
+            let bound : Option ConstValue → Except String (Option Int)
+              | none => .ok none
+              | some (.integer value) => .ok (some value)
+              | some _ => .error "an integer range has a bound of another type"
+            .ok (.range (← bound lower) (← bound upper) inclusive)
+        | .tuple elements, .tuple σs => .tuple <$> compilePatterns Γ ns fuel elements.toList σs
+        | .constructor _ _ none fields, .struct _ _ σs =>
+            .struct <$> compilePatterns Γ ns fuel fields.toList σs
+        | .constructor _ _ (some variant) fields, .enum _ _ names rows _ =>
+            match Which.ofName names rows variant with
+            | some ⟨σs, choice⟩ => .variant choice <$> compilePatterns Γ ns fuel fields.toList σs
+            | none => .error "a pattern names an unknown variant"
+        | .range .., _ => notCarried "a range pattern over this type"
+        | _, _ => .error "a pattern's shape differs from its type's"
+
+/-- The typed patterns of a row of components. -/
+def compilePatterns (Γ : NRow) (ns : CompileNamespace) :
+    Nat → List PatternId → (σs : NRow) → Except String (Pats Γ σs)
+  | 0, _, _ => .error "the compiler ran out of fuel"
+  | _ + 1, [], .nil => .ok .nil
+  | fuel + 1, pattern :: patterns, .cons σ σs => do
+      let head ← compilePattern Γ ns fuel pattern σ
+      .ok (.cons head (← compilePatterns Γ ns fuel patterns σs))
+  | _ + 1, _, _ => .error "a pattern's arity differs from its declaration's"
+end
+
+/-- Match arms at a result type. -/
+def armsAt {ρ : ResultShape} {Γ : NRow} {σ : NTy} (mismatch : Option Failure) (τ : NTy) :
+    List (Pat Γ σ × Option (Term unit ρ Γ .bool) × Compiled unit ρ Γ) → Except String (Arms unit ρ Γ σ τ)
+  | [] => .ok (.nil mismatch)
+  | (pattern, guard, body) :: rest => do
+      let body ← body.at? τ
+      let rest ← armsAt mismatch τ rest
+      match guard with
+      | none => .ok (.cons pattern body rest)
+      | some guard => .ok (.guarded pattern guard body rest)
+
+/-- Match arms whose bodies never complete, at every result type. -/
+def neverArms {ρ : ResultShape} {Γ : NRow} {σ : NTy} (mismatch : Option Failure) :
+    List (Pat Γ σ × Option (Term unit ρ Γ .bool) × ((τ : NTy) → Term unit ρ Γ τ)) →
+      (τ : NTy) → Arms unit ρ Γ σ τ
+  | [], _ => .nil mismatch
+  | (pattern, none, body) :: rest, τ => .cons pattern (body τ) (neverArms mismatch rest τ)
+  | (pattern, some guard, body) :: rest, τ =>
+      .guarded pattern guard (body τ) (neverArms mismatch rest τ)
+
+mutual
+  /-- The term of one expression: its node's, with the loan deaths at it. -/
   def compileExpr (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → ExprId → Except String (Compiled ρ Γ)
+      Nat → ExprId → Except String (Compiled unit ρ Γ)
+    | 0, _ => .error "the compiler ran out of fuel"
+    | fuel + 1, id => do
+        withDeaths ns loanFacts id (← compileNode unit loanFacts ρ Γ ns namespaceId fuel id)
+
+  /-- The term of one node. -/
+  def compileNode (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
+      Nat → ExprId → Except String (Compiled unit ρ Γ)
     | 0, _ => .error "the compiler ran out of fuel"
     | fuel + 1, id => do
         let some expression := ns.expressions.get? id.index
@@ -461,7 +624,8 @@ mutual
             if instantiations.isEmpty then
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 parameters
-              let value : Term ρ Γ shape.bodyType := .call handle shape arguments
+              let value : Term unit ρ Γ shape.bodyType :=
+                .call (loopSite namespaceId.index id.index) handle shape arguments
               match τ? with
               | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
               | none => notCarried "a call of type never"
@@ -479,11 +643,104 @@ mutual
                 | notCarried "a type argument without values"
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 (NRow.subst θ.1 parameters)
-              let value : Term ρ Γ (shape.subst θ.1).bodyType :=
-                .callGeneric handle typeArgs.toArray θ shape arguments
+              let value : Term unit ρ Γ (shape.subst θ.1).bodyType :=
+                .callGeneric (loopSite namespaceId.index id.index) handle typeArgs.toArray θ shape
+                  arguments
               match τ? with
               | some τ => .ok (.at τ (← Compiled.at? τ (.at (shape.subst θ.1).bodyType value)))
               | none => notCarried "a call of type never"
+        | .operation (.call (.closure reference mask)) instantiations captures _ =>
+            let some τ := τ? | notCarried "a closure of type never"
+            let .function _ shared results := τ
+              | .error "a closure's type is not a function type"
+            let some handle := resolveFunction? unit namespaceId reference
+              | .error "a closure's target does not resolve"
+            let some targetNs := unit.namespaces[handle.namespaceId.index]?
+              | .error "a closure target's namespace is out of range"
+            let some target := targetNs.functions[handle.functionId.index]?
+              | .error "a closure's target is out of range"
+            let some targetParameters := target.signature.parameters.toList.mapM fun parameter =>
+                ns.nty unit handle.namespaceId parameter.typeUse.typeId
+              | notCarried "the type of a closure target's parameter"
+            let ⟨captured, supplied, weave⟩ := Weave.ofMask mask targetParameters
+            unless weave.mask == mask do notCarried "a mask beyond its target's parameters"
+            if instantiations.isEmpty then
+              unless captured.refFree do notCarried "a captured reference"
+              -- The node carries its target's rows, as the runtime family reads them.
+              if rows : closureRows? unit handle weave.mask = some (captured, supplied, results)
+              then
+                if sharing : closureShared unit handle weave.mask = shared then
+                if closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true
+                then
+                if faithful : closureFaithful unit handle #[] = true then
+                  let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
+                    captures.toList captured
+                  let value : Term unit ρ Γ (.function supplied shared results) :=
+                    .closure handle weave results shared rows sharing closed faithful captures
+                  .ok (.at τ (← Compiled.at? τ (.at (.function supplied shared results) value)))
+                else notCarried "a closure whose empty instantiation is not faithful to its target"
+                else notCarried "a closure without type arguments over type parameters"
+                else notCarried "a closure whose shared parameters are not its target's"
+              else notCarried "a closure whose rows are not its target's"
+            else
+              let some typeArgs := instantiations.toList.mapM fun argument => match argument with
+                  | .typeArg value => some value
+                  | _ => none
+                | notCarried "a generic argument that is not a type"
+              let some θ := typeArgs.mapM fun value => ns.nty unit namespaceId value.typeId
+                | notCarried "the type of a type argument"
+              let θ := NRow.ofList θ
+              unless θ.refFree do notCarried "a reference type argument"
+              let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
+                  some ⟨θ, inhabitable⟩ else none
+                | notCarried "a type argument without values"
+              let shape ← match target.signature.results.toList with
+                | [] => .ok ResultShape.none
+                | [result] => match ns.nty unit handle.namespaceId result.typeId with
+                    | some σ => .ok (ResultShape.one σ)
+                    | none => notCarried "the type of a closure target's result"
+                | _ => notCarried "a closure target with several results"
+              unless (NRow.subst θ.1 captured).refFree do notCarried "a captured reference"
+              -- The node carries its target's own rows; its frame's coherence is taken at
+              -- creation.
+              if rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row)
+              then
+                if sharing : closureShared unit handle weave.mask = shared then
+                if below : closureSignatureBelow unit handle = true then
+                  let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
+                    captures.toList (NRow.subst θ.1 captured)
+                  let value : Term unit ρ Γ
+                      (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row) :=
+                    .closureGeneric handle weave typeArgs.toArray θ shape shared rows sharing below
+                      captures
+                  .ok (.at τ (← Compiled.at? τ
+                    (.at (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
+                      value)))
+                else notCarried "a closure target whose signature names foreign type parameters"
+                else notCarried "a closure whose shared parameters are not its target's"
+              else notCarried "a closure whose rows are not its target's"
+        | .operation (.call .invoke) _ arguments _ =>
+            let callable :: arguments := arguments.toList
+              | .error "an invocation has no function value"
+            let some callableExpression := ns.expressions.get? callable.index
+              | .error "an invocation's function value is out of range"
+            let some (.function parameters shared results) :=
+                ns.nty unit namespaceId callableExpression.typeId
+              | notCarried "an invocation of a value that is not a function"
+            unless parameters.toList.all NTy.lendable do
+              notCarried "a reference inside an aggregate"
+            let shape ← match results.toList with
+              | [] => .ok ResultShape.none
+              | [result] => .ok (ResultShape.one result)
+              | _ => notCarried "a function value with several results"
+            unless shape.lendable do notCarried "a reference inside an aggregate"
+            let function ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel callable).at?
+              (.function parameters shared shape.row)
+            let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments parameters
+            let value : Term unit ρ Γ shape.bodyType := .invoke shape function arguments
+            match τ? with
+            | some τ => .ok (.at τ (← Compiled.at? τ (.at shape.bodyType value)))
+            | none => notCarried "an invocation of type never"
         | .operation (.borrow .mutable _) _ _ _ =>
             let some τ := τ? | notCarried "a borrow of type never"
             match expression.kind with
@@ -494,42 +751,57 @@ mutual
             let some τ := τ? | notCarried "a storage operation of type never"
             let #[.typeArg resource] := instantiations
               | notCarried "a storage operation without one resource type"
-            let family : Family := ⟨namespaceId, resource.typeId⟩
+            let some (native, typeArguments) := ns.resource unit namespaceId resource.typeId
+              | notCarried "a storage operation on a type without a native resource type"
             match kind, arguments.toList with
             | .contains, [key] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
-                .ok (.at .bool (.globalContains family key))
+                .ok (.at .bool (.globalContains native typeArguments key))
             | .borrow .immutable, [key] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
-                .ok (.at τ (.globalRead family key))
+                unless τ = native do .error "a global read's type differs from its resource type"
+                .ok (.at native (.globalRead typeArguments key))
             | .borrow .mutable, [key] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
-                match τ with
-                | .ref referent => .ok (.at (.ref referent) (.globalBorrow (τ := referent) family key))
-                | _ => .error "a mutable global borrow has a non-reference type"
+                unless τ = .ref native do
+                  .error "a mutable global borrow's type differs from its resource type"
+                .ok (.at (.ref native)
+                  (.globalBorrow (τ := native) (loopSite namespaceId.index id.index) typeArguments key))
             | .take, [key] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
-                .ok (.at τ (.globalTake family key))
+                unless τ = native do .error "a take's type differs from its resource type"
+                -- The write ends with the operation.
+                let site := loopSite namespaceId.index id.index
+                .ok (.at native (.seqAfter (.globalTake site typeArguments key) (.memoryWritten site)))
             | .publish, [key, value] => do
                 let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
-                let ⟨_, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
-                .ok (.at .unit (.globalPublish family key value))
+                let value ← Compiled.at? native
+                  (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value)
+                let site := loopSite namespaceId.index id.index
+                .ok (.at .unit (.seqAfter (.globalPublish site typeArguments key value)
+                  (.memoryWritten site)))
             | _, _ => notCarried "a storage operation of this kind or arity"
         | .operation (.call (.constructor reference variant)) _ arguments _ =>
             let some τ := τ? | notCarried "a constructor of type never"
             let some handle := resolveStruct? unit namespaceId reference
               | .error "a constructor does not resolve"
             match τ, variant with
-            | .struct source σs, none =>
+            | .struct source nominalArguments σs, none =>
                 unless handle = source do .error "a constructor's declaration differs from its type"
                 let fields ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList σs
-                .ok (.at (.struct source σs) (.pack source fields))
-            | .enum source names rows distinct, some name =>
+                let packed := Term.pack source nominalArguments fields
+                .ok (.at (.struct source nominalArguments σs)
+                  (if ns.carriesInvariant (.struct source nominalArguments σs) then
+                    .constructed (loopSite namespaceId.index id.index) packed else packed))
+            | .enum source nominalArguments names rows distinct, some name =>
                 unless handle = source do .error "a constructor's declaration differs from its type"
                 let some ⟨σs, choice⟩ := Which.ofName names rows name
                   | .error "a constructor names an unknown variant"
                 let fields ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList σs
-                .ok (.at (.enum source names rows distinct) (.variant source distinct choice fields))
+                let packed := Term.variant source nominalArguments distinct choice fields
+                .ok (.at (.enum source nominalArguments names rows distinct)
+                  (if ns.carriesInvariant (.enum source nominalArguments names rows distinct) then
+                    .constructed (loopSite namespaceId.index id.index) packed else packed))
             | _, _ => .error "a constructor's type is not its declaration's"
         | .operation operation _ arguments _ =>
             let some τ := τ? | notCarried "an operation of type never"
@@ -544,25 +816,38 @@ mutual
             if let .never term := compiledValue then return .never term
             let ⟨σ, value⟩ := compiledValue.some
             let body ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel body
-            let some pattern := ns.patterns.get? pattern.index | .error "a pattern is out of range"
-            match pattern.kind with
-            | .variable localId => do
-                let x ← Var.at? Γ localId.index σ
-                .ok (body.map fun _ body => .let_ x value body)
-            | .wildcard => .ok (body.map fun _ body => .drop value body)
-            | .tuple elements =>
-                match σ, value with
-                | .tuple σs, value => do
-                    let targets ← compileTargets Γ ns fuel elements.toList σs
-                    .ok (body.map fun _ body => .letRow targets value body)
-                | _, _ => .error "a tuple pattern binds a non-tuple"
-            | .constructor _ _ none fields =>
-                match σ, value with
-                | .struct _ σs, value => do
-                    let targets ← compileTargets Γ ns fuel fields.toList σs
-                    .ok (body.map fun _ body => .letFields targets value body)
-                | _, _ => .error "a struct pattern binds a non-struct"
-            | _ => notCarried "a destructuring let over this pattern"
+            compileBinding Γ ns fuel pattern σ value body
+        -- A pattern assignment binds its value as a `let` does, to a unit.
+        | .assignPattern pattern value => do
+            let compiledValue ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value
+            if let .never term := compiledValue then return .never term
+            let ⟨σ, value⟩ := compiledValue.some
+            compileBinding Γ ns fuel pattern σ value (.at .unit (.lit ()))
+        | .match_ scrutinee arms => do
+            let compiledScrutinee ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel scrutinee
+            if let .never term := compiledScrutinee then return .never term
+            let ⟨σ, scrutinee⟩ := compiledScrutinee.some
+            let arms ← arms.toList.mapM fun arm => do
+              let pattern ← compilePattern Γ ns fuel arm.pattern σ
+              let guard ← arm.guard.mapM fun guard => do
+                (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel guard).at? .bool
+              let body ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel arm.body
+              .ok (pattern, guard, body)
+            -- A match of type never may still have arms that complete.
+            let resultType? := τ?.orElse fun _ => arms.findSome? fun (_, _, body) =>
+              match body with
+              | .at τ _ => some τ
+              | .never _ => none
+            match resultType? with
+            | some τ => .ok (.at τ (.caseOf scrutinee
+                (← armsAt (patternMismatchThrow? ns.source.profile) τ arms)))
+            | none =>
+                let some arms := arms.mapM fun (pattern, guard, body) => match body with
+                    | .never body => some (pattern, guard, body)
+                    | .at .. => none
+                  | .error "internal: a match of type never has an arm with a type"
+                .ok (.never fun τ =>
+                  .caseOf scrutinee (neverArms (patternMismatchThrow? ns.source.profile) arms τ))
         | .ifElse condition thenBranch elseBranch => do
             let condition ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel condition).at? .bool
             let thenBranch ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel thenBranch
@@ -601,7 +886,7 @@ mutual
                 .ok (.never fun _ => .return_ value)
             | _ => notCarried "a return of several values"
         | .assign place value =>
-            match ns.places.get? place.index with
+            match ns.place? place with
             | some (.localVar localId) => do
                 let some ⟨σ, x⟩ := Var.ofIndex Γ localId.index | .error "a local is out of range"
                 let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? σ
@@ -609,22 +894,66 @@ mutual
             | _ => do
                 let ⟨_, σ, x, path⟩ ← compilePlace unit Γ ns fuel place
                 let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? σ
-                .ok (.at .unit (.writePlace x path value))
+                -- A write into a local whose type carries a data invariant
+                -- ends a mutation of it.
+                let owner := (ns.ownedRoot? ns.placeFuel place).bind fun root =>
+                  (Var.ofIndex Γ root.index).map (·.1)
+                if owner.any ns.carriesInvariant then
+                  .ok (.at .unit (.seqAfter (.writePlace (ns.mismatchOn path) x path value)
+                    (.mutationEnd (loopSite namespaceId.index id.index))))
+                else .ok (.at .unit (.writePlace (ns.mismatchOn path) x path value))
         | .loop _ body => do
             let body ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel body).at? .unit
             .ok (.at .unit (.loop (loopSite namespaceId.index id.index) body))
         | .break_ nest none => .ok (.never fun _ => .break_ nest)
         | .continue_ nest => .ok (.never fun _ => .continue_ nest)
-        | .spec _ => .ok (.at .unit (.lit ()))
+        -- An anchor records the state a later assertion reads, and the
+        -- block's assumptions and its assertions are each one step at the
+        -- block's site, in the order the block states them; the rest is no
+        -- step.
+        | .spec block =>
+            let site := loopSite namespaceId.index id.index
+            let isSave := fun (condition : Condition) =>
+              condition.kind matches .assumption &&
+                (ns.expressions.get? condition.expression.index).any
+                  (·.kind matches .operation (.specification (.saveStateAnchor _)) _ _ _)
+            -- A marker of the state or of a derivation is not assumed.
+            let isMarker := fun (condition : Condition) =>
+              (ns.expressions.get? condition.expression.index).any fun expression =>
+                expression.kind matches .operation (.specification (.saveStateAnchor _)) _ _ _ ||
+                  expression.kind matches
+                    .operation (.specification (.foldsCaptureAnchor _)) _ _ _ ||
+                  expression.kind matches .operation (.specification .inlineCallSummary) _ _ _
+            let isAssumption := fun (condition : Condition) =>
+              condition.kind matches .assumption && !isMarker condition
+            -- A proof step is a site as an assertion is: what it owes is
+            -- proved there and what it gives assumed after.
+            let isAssertion := fun (condition : Condition) =>
+              condition.kind matches .assertion | .apply | .split
+            let conditions := block.conditions.toList
+            let assumedAfter := (conditions.dropWhile (!isAssertion ·)).any isAssumption
+            let assertedAfter := (conditions.dropWhile (!isAssumption ·)).any isAssertion
+            if assumedAfter && assertedAfter then
+              notCarried "a specification block interleaving assumptions and assertions"
+            else
+              let assumption : List (Term unit ρ Γ .unit) :=
+                if conditions.any isAssumption then [.assume site] else []
+              let assertion : List (Term unit ρ Γ .unit) :=
+                if conditions.any isAssertion then [.assertion site] else []
+              let steps := (if conditions.any isSave then [.anchor site] else []) ++
+                if assumedAfter then assertion ++ assumption else assumption ++ assertion
+              match steps with
+              | [] => .ok (.at .unit (.lit ()))
+              | first :: rest => .ok (.at .unit (rest.foldl .seqAfter first))
         | kind => notCarried (describeKind kind)
 
   /-- A read of a place at its declared type; `consume` moves a mutable
   reference out of its local. -/
   def compileRead (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) (consume : Bool) :
-      Nat → NTy → PlaceId → Except String (Compiled ρ Γ)
+      Nat → NTy → PlaceId → Except String (Compiled unit ρ Γ)
     | 0, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, τ, place =>
-        match ns.places.get? place.index with
+        match ns.place? place with
         | some (.localVar localId) => do
             let x ← Var.at? Γ localId.index τ
             match consume, τ with
@@ -632,13 +961,13 @@ mutual
             | _, _ => .ok (.at τ (.var x))
         | _ => do
             let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns fuel place
-            if equal : component = τ then .ok (.at τ (.readPlace x (equal ▸ path)))
+            if equal : component = τ then .ok (.at τ (.readPlace (ns.mismatchOn path) x (equal ▸ path)))
             else .error "a place read has an unexpected type"
 
   /-- An argument row at the expected types. -/
   def compileArgs (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → List ExprId → (σs : NRow) → Except String (Args ρ Γ σs)
+      Nat → List ExprId → (σs : NRow) → Except String (Args unit ρ Γ σs)
     | 0, _, _ => .error "the compiler ran out of fuel"
     | _ + 1, [], .nil => .ok .nil
     | fuel + 1, argument :: arguments, .cons σ σs => do
@@ -646,6 +975,43 @@ mutual
         let tail ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments σs
         .ok (.cons head tail)
     | _ + 1, _, _ => .error "an argument row's arity differs from its declaration's"
+
+  /-- Bind a value to a pattern around a body. -/
+  def compileBinding {unit : ValidatedUnit} {ρ : ResultShape} (Γ : NRow) (ns : CompileNamespace) :
+      Nat → PatternId → (σ : NTy) → Term unit ρ Γ σ → Compiled unit ρ Γ → Except String (Compiled unit ρ Γ)
+    | 0, _, _, _, _ => .error "the compiler ran out of fuel"
+    | fuel + 1, patternId, σ, value, body => do
+        let some pattern := ns.patterns.get? patternId.index | .error "a pattern is out of range"
+        -- A row of binders destructures directly; any other pattern is a
+        -- match of one arm.
+        let flat (children : Array PatternId) := children.all fun child =>
+          match ns.patterns.get? child.index with
+          | some { kind := .wildcard, .. } | some { kind := .variable _, .. } => true
+          | _ => false
+        let general : Except String (Compiled unit ρ Γ) := do
+          let typed ← compilePattern Γ ns fuel patternId σ
+          .ok (body.map fun _ body =>
+            .caseOf value (.cons typed body (.nil (patternMismatchThrow? ns.source.profile))))
+        match pattern.kind with
+        | .variable localId => do
+            let x ← Var.at? Γ localId.index σ
+            .ok (body.map fun _ body => .let_ x value body)
+        | .wildcard => .ok (body.map fun _ body => .drop value body)
+        | .tuple elements =>
+            if !flat elements then general else
+            match σ, value with
+            | .tuple σs, value => do
+                let targets ← compileTargets Γ ns fuel elements.toList σs
+                .ok (body.map fun _ body => .letRow targets value body)
+            | _, _ => .error "a tuple pattern binds a non-tuple"
+        | .constructor _ _ none fields =>
+            if !flat fields then general else
+            match σ, value with
+            | .struct _ _ σs, value => do
+                let targets ← compileTargets Γ ns fuel fields.toList σs
+                .ok (body.map fun _ body => .letFields targets value body)
+            | _, _ => .error "a struct pattern binds a non-struct"
+        | _ => general
 
   /-- The slots a row of variable or wildcard patterns binds. -/
   def compileTargets (Γ : NRow) (ns : CompileNamespace) :
@@ -665,7 +1031,7 @@ mutual
   /-- The statements of a block, then its result. -/
   def compileBlock (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → List ExprId → Option ExprId → Except String (Compiled ρ Γ)
+      Nat → List ExprId → Option ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _ => .error "the compiler ran out of fuel"
     | _ + 1, [], none => .ok (.at .unit (.lit ()))
     | fuel + 1, [], some result => compileExpr unit loanFacts ρ Γ ns namespaceId fuel result
@@ -677,7 +1043,7 @@ mutual
   /-- An operation at its declared result type. -/
   def compileOperation (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → NTy → Operation → List ExprId → Except String (Compiled ρ Γ)
+      Nat → NTy → Operation → List ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, τ, .primitive primitive, arguments =>
         compilePrimitive unit loanFacts ρ Γ ns namespaceId fuel τ primitive arguments
@@ -687,9 +1053,13 @@ mutual
     | fuel + 1, τ, .borrow .immutable place, [] => compileRead unit Γ ns false fuel τ place
     | fuel + 1, .ref referent, .borrow .mutable place, [] => do
         let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns fuel place
-        if equal : component = referent then .ok (.at (.ref referent) (.borrowPlace x (equal ▸ path)))
+        if equal : component = referent then
+          .ok (.at (.ref referent) (.borrowPlace (ns.mismatchOn path) x (equal ▸ path)))
         else .error "a mutable borrow has an unexpected type"
     | fuel + 1, τ, .reference .dereference, [operand] => do
+        -- A shared reference is the observed value itself.
+        if ns.sharedAt operand then
+          return .at τ (← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ)
         -- Reading through a local reference leaves it in place.
         if let some { kind := .localVar localId, .. } := ns.expressions.get? operand.index then
           let x ← Var.at? Γ localId.index (.ref τ)
@@ -706,9 +1076,13 @@ mutual
         -- denotes the place's read.
         let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ
         .ok (.at τ value)
-    | _ + 1, τ, .reference (.freeze _), [operand] => do
-        -- A freeze is a shared reborrow: the result is the current value,
-        -- and the loan's death, not the freeze, resolves its prophecy.
+    | fuel + 1, τ, .reference (.freeze _), [operand] => do
+        -- Freezing a shared reference reads it.
+        if ns.sharedAt operand then
+          return .at τ (← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ)
+        -- A freeze of a mutable reference is a shared reborrow: the result
+        -- is the current value, and the loan's death, not the freeze,
+        -- resolves its prophecy.
         let some localId := heldLocal? ns operand
           | notCarried "a freeze of a reference that no local holds"
         let x ← Var.at? Γ localId.index (.ref τ)
@@ -722,34 +1096,10 @@ mutual
             let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? referent
             .ok (.at .unit (.mutate x value))
         | _, _ => notCarried "a mutation of a non-reference local"
-    | fuel + 1, τ, .reference (.endLoan loans), arguments => do
-        let anchor ← match arguments with
-          | [] => .ok (Compiled.at (ρ := ρ) (Γ := Γ) .unit (.lit ()))
-          | [anchor] => compileExpr unit loanFacts ρ Γ ns namespaceId fuel anchor
-          | _ => notCarried "a loan death marker with several operands"
-        let anchor ← anchor.at? τ
-        -- A loan's death resolves the reference wherever it is held; a
-        -- holder whose slot is empty passed it on, and a loan consumed by a
-        -- call has no holder here, since the callee resolves it.  A holder
-        -- without references observes the loan through an erased shared
-        -- borrow and resolves nothing.
-        let deaths ← loans.toList.reverse.mapM fun loan => do
-          let some holders := (loanFacts[loan.index]?).map (·.holders)
-            | .error "a loan death names an unknown loan"
-          holders.toList.filterMapM fun holder => do
-            let some ⟨σ, x⟩ := Var.ofIndex Γ holder.index | .error "a local is out of range"
-            match σ, x with
-            | .ref _, x => .ok (some (Term.resolve (ρ := ρ) x))
-            | σ, _ =>
-                if σ.refFree then .ok none else notCarried "a loan held inside an aggregate"
-        let effects := deaths.flatten
-        if effects.isEmpty then .ok (.at τ anchor) else
-        let effect := effects.foldr (fun effect rest => Term.drop effect rest) (.lit ())
-        .ok (.at τ (.seqAfter anchor effect))
     | fuel + 1, τ, .data (.select reference field), [operand] => do
         let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
-        | .struct _ σs, operand => do
+        | .struct _ _ σs, operand => do
             let some index := referencedFieldIndex? unit namespaceId reference none field
               | .error "a field selection does not resolve"
             let x ← Var.at? σs index τ
@@ -758,26 +1108,27 @@ mutual
     | fuel + 1, .bool, .data (.testVariants _ variants), [operand] => do
         let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
-        | .enum _ _ _ _, operand => .ok (.at .bool (.isVariant variants.toList operand))
+        | .enum _ _ _ _ _, operand => .ok (.at .bool (.isVariant variants.toList operand))
         | _, _ => notCarried "a variant test on a non-enum"
     | fuel + 1, τ, .data (.selectVariants reference fields), [operand] => do
         let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
-        | .enum source names rows _, operand => do
+        | .enum source _ names rows _, operand => do
             let some handle := resolveStruct? unit namespaceId reference
               | .error "a variant field selection does not resolve"
             unless handle = source do .error "a variant field selection's declaration differs"
             let some choices := variantFieldChoices? unit handle fields
               | .error "a variant field selection has no choices"
             let choices ← Choices.ofList names rows τ choices.toList
-            .ok (.at τ (.payload choices operand))
+            let mismatch := if choices.partial then patternMismatchThrow? ns.source.profile else none
+            .ok (.at τ (.payload mismatch choices operand))
         | _, _ => notCarried "a variant field selection on a non-enum"
     | _ + 1, _, operation, _ => notCarried (describeKind (.operation operation #[] #[] none))
 
   /-- A pure primitive at its declared result type. -/
   def compilePrimitive (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → NTy → PrimitiveOperation → List ExprId → Except String (Compiled ρ Γ)
+      Nat → NTy → PrimitiveOperation → List ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, τ, .copyValue, [operand] => do
         let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ
@@ -798,6 +1149,13 @@ mutual
         compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .add failure left right
     | fuel + 1, τ, .checkedSubtract failure, [left, right] =>
         compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .subtract failure left right
+    -- A checked negation fails exactly where the checked subtraction from
+    -- zero does, with the same result.
+    | fuel + 1, .int width signed, .checkedNegate failure, [operand] => do
+        let zero ← compileLiteral (.int width signed) (.integer 0)
+        let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at?
+          (.int width signed)
+        .ok (.at (.int width signed) (.checked .subtract failure zero operand))
     | fuel + 1, τ, .checkedMultiply failure, [left, right] =>
         compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .multiply failure left right
     | fuel + 1, τ, .checkedDivide failure, [left, right] =>
@@ -992,12 +1350,12 @@ mutual
         -- record, so the order of a value holding one is not carried.
         unless σ.refFree do notCarried "a structural order of a value holding a reference"
         let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? σ
-        .ok (.at (.int 8 true) (.order ns.source.variantOrders left right))
+        .ok (.at (.int 8 true) (.order ns.source.orders left right))
     | _ + 1, _, primitive, _ => notCarried s!"primitive {repr primitive} at this type or arity"
 
   def compileChecked (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → NTy → CheckedOp → ThrowKind → ExprId → ExprId → Except String (Compiled ρ Γ)
+      Nat → NTy → CheckedOp → ThrowKind → ExprId → ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .int width signed, op, failure, left, right => do
         let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
@@ -1007,7 +1365,7 @@ mutual
 
   def compileModular (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → NTy → ModularOp → ExprId → ExprId → Except String (Compiled ρ Γ)
+      Nat → NTy → ModularOp → ExprId → ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .int width signed, op, left, right => do
         let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
@@ -1017,7 +1375,7 @@ mutual
 
   def compileCompare (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → NTy → CompareOp → ExprId → ExprId → Except String (Compiled ρ Γ)
+      Nat → NTy → CompareOp → ExprId → ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .bool, op, left, right => do
         let ⟨σ, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
@@ -1030,7 +1388,7 @@ mutual
 
   def compileShift (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
       (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
-      Nat → NTy → Bool → ThrowKind → ExprId → ExprId → Except String (Compiled ρ Γ)
+      Nat → NTy → Bool → ThrowKind → ExprId → ExprId → Except String (Compiled unit ρ Γ)
     | 0, _, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .int width false, left, failure, value, distance => do
         let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? (.int width false)
@@ -1048,7 +1406,7 @@ def compileNamespaceAt? (unit : ValidatedUnit) (namespaceId : NamespaceId) :
     Option CompileNamespace :=
   (unit.namespaces[namespaceId.index]?).map (CompileNamespace.of unit namespaceId)
 
-/-- The mutable-reference slots among the first `count` slots from `index`. -/
+/-- The mutable-reference slots among the `count` slots from `index`. -/
 def mutableSlots (Γ : NRow) : Nat → Nat → Except String (Mutables Γ)
   | _, 0 => .ok .nil
   | index, count + 1 => do
@@ -1069,7 +1427,7 @@ def logicalOnly (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : Typ
 /-- The compiled function a handle names in its namespace's view, or the
 construct that stops it. -/
 def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle : FunctionHandle) :
-    Except String Function := do
+    Except String (Function unit) := do
   let some declaration := view.source.functions[handle.functionId.index]?
     | .error "a function is out of range"
   let .structured root := declaration.body | notCarried "a function without a body"
@@ -1100,11 +1458,14 @@ def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle :
     view handle.namespaceId
     view.fuel root
   let body ← body.at? result.bodyType
-  let mutables ← mutableSlots (params ++ locals) 0 paramCount
+  -- A parameter's reference resolves where the function leaves it: in its
+  -- own slot or in a local it was moved into.
+  let mutables ← mutableSlots (params ++ locals) 0 allLocals.length
   .ok { params, locals, result, body, mutables }
 
 /-- The compiled function a handle names, or the construct that stops it. -/
-def compileFunction (unit : ValidatedUnit) (handle : FunctionHandle) : Except String Function :=
+def compileFunction (unit : ValidatedUnit)
+    (handle : FunctionHandle) : Except String (Function unit) :=
   match compileNamespaceAt? unit handle.namespaceId with
   | none => .error "a namespace is out of range"
   | some view => compileFunctionIn unit view handle

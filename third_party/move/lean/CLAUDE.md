@@ -67,7 +67,7 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Leaner printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and LIR adapter were ported to `leaner-move`. |
 | [`leaner-e2e-tests/`](leaner-e2e-tests/) | Discoverable Move-to-LeanerLang and Rust-to-LeanerLang source/result baselines. Assertion-style legacy tests remain with their owning packages. |
 | [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `designs/perf-notes.md`. The verification benchmark driver (`leaner-bench.py`); see `designs/verification-benchmarks.md`. |
-| [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit. |
+| [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit, and a Move package of problems written for it (`package/`). |
 | [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing links them and they are not built in CI. |
 
 Within each package, the root `Foo.lean` is the public import, source modules
@@ -122,10 +122,30 @@ older source-specific work those packages own.
 - [`designs/source-verification.md`](designs/source-verification.md): the
   `leaner-move verify` / `leaner-rust verify` commands, Rust `.spec.lean`
   files, Move frames, and how messages map back to the original sources.
+- [`designs/lemmas.md`](designs/lemmas.md): Move `spec lemma`s and `proof`
+  blocks translated: LIR lemmas and proof steps (`apply`, `split`), lemma
+  theorems by well-founded recursion, and `apply` sites in the closer.
+- [`designs/prover-test-problems.md`](designs/prover-test-problems.md): the
+  registry of problems the Move Prover's unit tests show under Leaner
+  (`MVP_TEST_FEATURE=lean`), each with its message and tests.
+- [`designs/static-memory.md`](designs/static-memory.md): the
+  denotation's global memory as one typed memory per resource type,
+  related to runtime globals once in the agreement; milestones S1–S5.
+- [`designs/static-typing.md`](designs/static-typing.md): semantic types,
+  a proved-sound static type checker run at preparation, and the phases
+  toward preservation of runtime typing for the big-step semantics.
 - [`designs/monovm-link-design.md`](designs/monovm-link-design.md): linking
   MonoVM into Lean test executables for differential execution testing.
+- [`designs/higher-order-functions.md`](designs/higher-order-functions.md):
+  function values: closure masks and instantiations in LIR, closures as
+  runtime values in the denotation, behavioral predicates defined from a
+  closure's meaning, state labels, and milestones H1–H5.
 - [`designs/unsafe-pointers.md`](designs/unsafe-pointers.md): proposal for
   the Rust unsafe profile over the prophetic model, scheduled as Rust M5.
+- [`designs/state-labels.md`](designs/state-labels.md): state labels of
+  Move specifications (`..S |~ …`, `exists S in *`) as memory variables,
+  defined by state-change predicates or quantified; exchange, LIR,
+  LeanerLang, contracts, closer witnesses; milestones S1–S4.
 - [`leaner-rust/rust-exporter/README.md`](leaner-rust/rust-exporter/README.md):
   exact exporter scope, supported MIR fixtures, commands, and known boundaries.
 

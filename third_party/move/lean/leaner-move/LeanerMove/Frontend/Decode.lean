@@ -340,6 +340,10 @@ def decodeTraceKind (j : Json) : Dec TraceKind := ctx "trace kind" do
 def decodeMemoryRange (j : Json) : Dec MemoryRange := ctx "memory range" do
   return { pre := ← optFieldWith j "pre" nat, post := ← optFieldWith j "post" nat }
 
+/-- A field of an enum variant, as `(variant, field)`. -/
+def decodeVariantField (j : Json) : Dec (String × String) := ctx "variant field" do
+  return (← strField j "variant", ← strField j "field")
+
 def decodeBehaviorKind (j : Json) : Dec BehaviorKind := ctx "behavior kind" do
   let (tag, payload) ← tagged j
   match tag with
@@ -359,6 +363,8 @@ def decodeOperation (j : Json) : Dec Operation := ctx "operation" do
   let (tag, payload) ← tagged j
   match tag with
   | "move_function" => .moveFunction <$> decodeQualifiedName payload
+  | "closure" =>
+    return .closure (← fieldWith payload "name" decodeQualifiedName) (← natField payload "mask")
   | "pack" =>
     return .pack (← fieldWith payload "name" decodeQualifiedName)
       (← optFieldWith payload "variant" str)
@@ -367,7 +373,7 @@ def decodeOperation (j : Json) : Dec Operation := ctx "operation" do
     return .select (← fieldWith payload "name" decodeQualifiedName) (← strField payload "field")
   | "select_variants" =>
     return .selectVariants (← fieldWith payload "name" decodeQualifiedName)
-      (← listField payload "fields" str)
+      (← listField payload "fields" decodeVariantField)
   | "test_variants" =>
     return .testVariants (← fieldWith payload "name" decodeQualifiedName)
       (← listField payload "variants" str)
@@ -545,6 +551,7 @@ mutual
 
   partial def decodeQuantRange (j : Json) : Dec QuantRange := ctx "quantifier range" do
     return .mk (← fieldWith j "pattern" decodePattern) (← fieldWith j "domain" decodeExp)
+      (← optNat (j.getObjValD "label"))
 
   partial def decodePattern (j : Json) : Dec Pattern := ctx "pattern" do
     let ty ← fieldWith j "ty" decodeTy
@@ -568,6 +575,34 @@ mutual
   partial def decodeSpec (j : Json) : Dec Spec := ctx "spec" do
     return .mk (← optFieldWith j "loc" decodeLoc) (← listField j "pragmas" decodePragma)
       (← listField j "conditions" decodeCondition) (← optFieldWith j "frame" decodeFrame)
+      (← listField j "access_of" decodeAccessOf) (← optFieldWith j "proof" decodeProof)
+
+  partial def decodeProof (j : Json) : Dec Proof := ctx "proof" do
+    let loc ← fieldWith j "loc" decodeLoc
+    let kind ← strField j "kind"
+    ctx s!"`{kind}` statement" do
+      match kind with
+      | "let" => return .let loc (← strField j "name") (← fieldWith j "exp" decodeExp)
+      | "if" =>
+        return .ite loc (← fieldWith j "cond" decodeExp) (← fieldWith j "then_proof" decodeProof)
+          (← optFieldWith j "else_proof" decodeProof)
+      | "block" => .block loc <$> listField j "proofs" decodeProof
+      | "assert" => .assert loc <$> fieldWith j "exp" decodeExp
+      | "assume" => .assume loc <$> fieldWith j "exp" decodeExp
+      | "apply" => .apply loc <$> fieldWith j "application" decodeLemmaApplication
+      | "forall_apply" =>
+        return .forallApply loc (← listField j "binders" decodeParam)
+          (← listField j "triggers" fun v => list v decodeExp)
+          (← optFieldWith j "weight" nat) (← fieldWith j "application" decodeLemmaApplication)
+      | "calc" => .calc loc <$> listField j "steps" decodeExp
+      | "post" => .post loc <$> fieldWith j "proof" decodeProof
+      | "split" => .split loc <$> fieldWith j "exp" decodeExp
+      | s => fail s!"unknown proof statement kind `{s}`"
+
+  partial def decodeLemmaApplication (j : Json) : Dec LemmaApplication :=
+    ctx "lemma application" do
+      return .mk (← fieldWith j "lemma" decodeQualifiedName) (← listField j "inst" decodeTy)
+        (← listField j "args" decodeExp)
 
   partial def decodeCondition (j : Json) : Dec Condition := ctx "condition" do
     return .mk (← fieldWith j "kind" decodeConditionKind) (← fieldWith j "loc" decodeLoc)
@@ -579,6 +614,11 @@ mutual
   partial def decodeFrame (j : Json) : Dec Frame := ctx "frame" do
     return .mk (← listField j "modifies" decodeExp) (← listField j "reads" decodeTy)
       (← boolField j "modifies_all") (← boolField j "reads_all")
+
+  partial def decodeAccessOf (j : Json) : Dec AccessOf := ctx "access_of" do
+    return .mk (← fieldWith j "loc" decodeLoc) (← strField j "name")
+      (← listField j "formals" decodeParam) (← listField j "modifies" decodeExp)
+      (← listField j "reads" decodeTy) (← boolField j "modifies_all") (← boolField j "reads_all")
 end
 
 -- -------------------------------------------------------------------------------------------------
@@ -592,6 +632,9 @@ def decodeConstant (j : Json) : Dec Constant := ctx "constant" do
     ty := ← fieldWith j "ty" decodeTy
     value := ← fieldWith j "value" decodeValue
   }
+
+def decodeStateLabel (j : Json) : Dec StateLabel := ctx "state label" do
+  return { id := ← natField j "id", name := ← strField j "name" }
 
 def decodeIntrinsicBinding (j : Json) : Dec IntrinsicBinding := ctx "intrinsic binding" do
   return {
@@ -673,6 +716,17 @@ def decodeInvariant (j : Json) : Dec Invariant := ctx "invariant" do
     exp := ← fieldWith j "exp" decodeExp
   }
 
+def decodeLemma (j : Json) : Dec Lemma := ctx "lemma" do
+  return {
+    name := ← strField j "name"
+    loc := ← fieldWith j "loc" decodeLoc
+    typeParams := ← listField j "type_params" decodeTypeParam
+    params := ← listField j "params" decodeParam
+    conditions := ← listField j "conditions" decodeCondition
+    decreases := ← optFieldWith j "decreases" fun v => list v decodeExp
+    proof := ← optFieldWith j "proof" decodeProof
+  }
+
 /-- Decodes the interned tables of a document, in dependency order: locations,
 module references, qualified names (over modules), types (over names and
 earlier types). -/
@@ -692,7 +746,8 @@ def decodeTables (j : Json) : Except String Tables := do
 
 /-- The module over its tables. -/
 def decodeSkipped (j : Json) : Dec Skipped := ctx "skipped declaration" do
-  return { name := ← strField j "name", reason := ← strField j "reason" }
+  return { name := ← strField j "name", reason := ← strField j "reason"
+           inline := ← fieldWith j "inline" bool }
 
 def decodeModuleBody (j : Json) : Dec Module := ctx "module" do
   return {
@@ -710,6 +765,8 @@ def decodeModuleBody (j : Json) : Dec Module := ctx "module" do
     specFuns := ← listField j "spec_funs" decodeSpecFun
     specVars := ← listField j "spec_vars" decodeSpecVar
     invariants := ← listField j "invariants" decodeInvariant
+    lemmas := ← listField j "lemmas" decodeLemma
+    labels := ← listField j "labels" decodeStateLabel
     skipped := ← (if (j.getObjVal? "skipped").toOption.isSome then listField j "skipped" decodeSkipped
       else pure [])
     sources := ← listField j "sources" str

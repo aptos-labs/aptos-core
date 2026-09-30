@@ -1141,7 +1141,7 @@ leaner module std::features where
     features : &mut Vector<u8>, enable : Vector<u64>, disable : Vector<u64>
   ) -> Unit := do
     let mut self := enable
-    self.reverse()
+    self := core.prim.reverseSliceVector(self, 0, self.length)
     let mut self := self
     spec assume folds_capture_anchor!(34)
     let len := self.length
@@ -1165,7 +1165,7 @@ leaner module std::features where
       invariant true
     core.prim.destroyEmptyVector(self)
     let mut self := disable
-    self.reverse()
+    self := core.prim.reverseSliceVector(self, 0, self.length)
     let mut self := self
     spec assume folds_capture_anchor!(39)
     let len := self.length
@@ -1204,6 +1204,9 @@ leaner module std::features where
     framework : &Signer, enable : Vector<u64>, disable : Vector<u64>
   ) -> Unit := do
     change_feature_flags_internal(framework, enable, disable)
+
+  spec change_feature_flags_for_verification where
+    modifies *
 
   -- TODO(#12011)
   -- TODO(tengzhang): add functional spec

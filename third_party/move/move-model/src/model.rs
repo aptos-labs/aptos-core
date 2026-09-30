@@ -5401,9 +5401,10 @@ impl FunctionData {
 
     /// Constructs the runtime-facing part of a function declaration.
     ///
-    /// `called_funs` is `None` when a later binary attachment will recover the
-    /// call graph. Source-independent IR loaders pass `Some`, including the
-    /// empty set, because no AST or compiled module exists to derive it from.
+    /// `used_funs` and `called_funs` are `None` when a later binary attachment
+    /// will recover the call graph. Source-independent IR loaders pass `Some`,
+    /// including the empty set, because no AST or compiled module exists to
+    /// derive it from.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_runtime(
         name: Symbol,
@@ -5417,6 +5418,7 @@ impl FunctionData {
         result_type: Type,
         access_specifiers: Option<Vec<AccessSpecifier>>,
         acquired_structs: Option<BTreeSet<StructId>>,
+        used_funs: Option<BTreeSet<QualifiedId<FunId>>>,
         called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
     ) -> Self {
         Self {
@@ -5429,7 +5431,7 @@ impl FunctionData {
             result_type,
             access_specifiers,
             acquired_structs,
-            used_funs: called_funs.clone(),
+            used_funs,
             called_funs,
             ..Self::new(name, loc)
         }

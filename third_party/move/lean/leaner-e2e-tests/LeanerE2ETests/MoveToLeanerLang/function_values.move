@@ -16,14 +16,13 @@ module 0x42::function_values {
         f(value)
     }
 
-    /// Construct a function value: the export leaves the function out.
+    /// Construct a function value and invoke it.
     public fun add_one(value: u64): u64 {
         let f = |x: u64| x + 1;
         f(value)
     }
 
-    /// A function whose expanded inline helper constructs a function value
-    /// is left out as well.
+    /// Invoke function values that expanded inline helpers construct.
     public fun add_two(value: u64): u64 {
         increment(increment(value))
     }

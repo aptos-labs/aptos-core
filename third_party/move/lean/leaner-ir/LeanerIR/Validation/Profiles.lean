@@ -30,6 +30,9 @@ structure ProfileSchema where
   checkProperty : ProfileValue → Array Diagnostic := fun _ => #[]
   checkIntrinsic : RawUnit → RawNamespace → IntrinsicDecl → Array Diagnostic :=
     fun _ _ _ => #[]
+  /-- Whether a function with these profile properties and attributes may be
+  the target of a closure with `store`. -/
+  storableTarget : Array ProfileValue → Array Attribute → Bool := fun _ _ => true
 
 abbrev ProfileRegistry := Array ProfileSchema
 

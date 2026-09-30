@@ -3,6 +3,7 @@
 
 import LeanerLang.Ast
 import LeanerLang.AddressAlias
+import LeanerLang.Bounds
 import LeanerLang.Addresses
 import LeanerLang.Operators
 import LeanerLang.Diagnostic

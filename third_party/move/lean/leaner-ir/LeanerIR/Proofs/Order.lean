@@ -7,7 +7,7 @@ import LeanerIR.Semantics.Runtime
 # Laws of the structural order
 
 `RuntimeValue.order` is a total order for every assignment of variant
-positions: it is oriented (swapping the operands swaps the result), a tie
+and function positions: it is oriented (swapping the operands swaps the result), a tie
 is equality, and it is transitive. Generic code comparing values of a type
 it does not know relies on exactly these laws.
 -/
@@ -27,7 +27,7 @@ theorem compareAddress_swap (a b : String) : compareAddress a b = (compareAddres
   unfold compareAddress
   rw [Ordering.swap_then, ← compare_swap, ← compare_swap]
 
-theorem compareVariant_swap (rank : StructHandle → String → Nat) (ls rs : StructHandle)
+theorem compareVariant_swap (rank : ValueRanks) (ls rs : StructHandle)
     (lv rv : Option String) :
     compareVariant rank ls rs lv rv = (compareVariant rank rs ls rv lv).swap := by
   cases lv <;> cases rv <;> simp only [compareVariant] <;>
@@ -35,14 +35,47 @@ theorem compareVariant_swap (rank : StructHandle → String → Nat) (ls rs : St
     | rfl
     | rw [Ordering.swap_then, ← compare_swap, ← compare_swap]
 
+theorem compareInstantiation_swap (a b : Array (TypeId × TypeId)) :
+    compareInstantiation a b = (compareInstantiation b a).swap := by
+  unfold compareInstantiation
+  exact compare_swap _ _
+
+theorem instantiationKey_injective {a b : Array (TypeId × TypeId)}
+    (h : instantiationKey a = instantiationKey b) : a = b := by
+  obtain ⟨a⟩ := a
+  obtain ⟨b⟩ := b
+  simp only [instantiationKey] at h
+  congr
+  induction a generalizing b with
+  | nil => cases b with
+    | nil => rfl
+    | cons _ _ => simp at h
+  | cons head rest ih => cases b with
+    | nil => simp at h
+    | cons head' rest' =>
+        obtain ⟨⟨source⟩, ⟨target⟩⟩ := head
+        obtain ⟨⟨source'⟩, ⟨target'⟩⟩ := head'
+        simp only [List.flatMap_cons, List.cons_append, List.nil_append, List.cons.injEq] at h
+        obtain ⟨rfl, rfl, h⟩ := h
+        rw [ih _ h]
+
+theorem eq_of_compareInstantiation {a b : Array (TypeId × TypeId)}
+    (h : compareInstantiation a b = .eq) : a = b :=
+  instantiationKey_injective (Std.LawfulEqCmp.eq_of_compare h)
+
+theorem compareInstantiation_isLE_trans {a b c : Array (TypeId × TypeId)}
+    (left : (compareInstantiation a b).isLE) (right : (compareInstantiation b c).isLE) :
+    (compareInstantiation a c).isLE :=
+  Std.TransCmp.isLE_trans (cmp := (compare : List Nat → List Nat → Ordering)) left right
+
 mutual
-theorem RuntimeValue.order_swap (rank : StructHandle → String → Nat) (a b : RuntimeValue) :
+theorem RuntimeValue.order_swap (rank : ValueRanks) (a b : RuntimeValue) :
     RuntimeValue.order rank a b = (RuntimeValue.order rank b a).swap := by
   rw [RuntimeValue.order, RuntimeValue.order, Ordering.swap_then,
     RuntimeValue.orderPayload_swap rank a b, ← compare_swap]
 termination_by sizeOf a + sizeOf b + 1
 
-theorem RuntimeValue.orderPayload_swap (rank : StructHandle → String → Nat) (a b : RuntimeValue) :
+theorem RuntimeValue.orderPayload_swap (rank : ValueRanks) (a b : RuntimeValue) :
     RuntimeValue.orderPayload rank a b = (RuntimeValue.orderPayload rank b a).swap := by
   cases a <;> cases b <;> simp only [RuntimeValue.orderPayload] <;>
     first
@@ -56,10 +89,12 @@ theorem RuntimeValue.orderPayload_swap (rank : StructHandle → String → Nat) 
         ← RuntimeValue.orderList_swap])
     | (rw [Ordering.swap_then, ← compare_swap, ← RuntimeValue.order_swap])
     | exact RuntimeValue.orderList_swap rank _ _
+    | (simp only [Ordering.swap_then, ← compare_swap, ← compareInstantiation_swap]
+       rw [← RuntimeValue.orderList_swap])
 termination_by sizeOf a + sizeOf b
 decreasing_by all_goals (simp_wf; (try simp only [sizeOf_array]); omega)
 
-theorem RuntimeValue.orderList_swap (rank : StructHandle → String → Nat) (as bs : List RuntimeValue) :
+theorem RuntimeValue.orderList_swap (rank : ValueRanks) (as bs : List RuntimeValue) :
     RuntimeValue.orderList rank as bs = (RuntimeValue.orderList rank bs as).swap := by
   cases as <;> cases bs <;> simp only [RuntimeValue.orderList] <;>
     first
@@ -77,7 +112,7 @@ theorem eq_of_compareAddress {a b : String} (h : compareAddress a b = .eq) : a =
   rw [compareAddress, Ordering.then_eq_eq] at h
   exact eq_of_compare h.2
 
-theorem eq_of_compareVariant {rank : StructHandle → String → Nat} {ls rs : StructHandle}
+theorem eq_of_compareVariant {rank : ValueRanks} {ls rs : StructHandle}
     {lv rv : Option String} (h : compareVariant rank ls rs lv rv = .eq) : lv = rv := by
   cases lv <;> cases rv <;> simp only [compareVariant, reduceCtorEq] at h
   · rfl
@@ -86,13 +121,13 @@ theorem eq_of_compareVariant {rank : StructHandle → String → Nat} {ls rs : S
 
 
 mutual
-theorem RuntimeValue.eq_of_order {rank : StructHandle → String → Nat} {a b : RuntimeValue}
+theorem RuntimeValue.eq_of_order {rank : ValueRanks} {a b : RuntimeValue}
     (h : RuntimeValue.order rank a b = .eq) : a = b := by
   rw [RuntimeValue.order, Ordering.then_eq_eq] at h
   exact RuntimeValue.eq_of_orderPayload a b (eq_of_compare h.1) h.2
 termination_by sizeOf a + sizeOf b + 1
 
-theorem RuntimeValue.eq_of_orderPayload {rank : StructHandle → String → Nat} (a b : RuntimeValue) :
+theorem RuntimeValue.eq_of_orderPayload {rank : ValueRanks} (a b : RuntimeValue) :
     a.kindRank = b.kindRank → RuntimeValue.orderPayload rank a b = .eq → a = b := by
   cases a <;> cases b <;> intro kinds h <;> simp only [RuntimeValue.kindRank] at kinds <;>
     (try omega) <;> simp only [RuntimeValue.orderPayload, Ordering.then_eq_eq] at h
@@ -119,22 +154,24 @@ theorem RuntimeValue.eq_of_orderPayload {rank : StructHandle → String → Nat}
     simp only at namespaceEq structEq
     subst namespaceEq structEq
     rw [eq_of_compareVariant variants, Array.toList_inj.mp (RuntimeValue.eq_of_orderList fields)]
-  case closure.closure leftFunction leftCaptures rightFunction rightCaptures =>
-    obtain ⟨⟨namespaces, functions⟩, captures⟩ := h
+  case closure.closure leftFunction leftMask leftInstantiation leftCaptures rightFunction
+      rightMask rightInstantiation rightCaptures =>
+    obtain ⟨⟨_, namespaces, functions⟩, instantiations, masks, captures⟩ := h
     obtain ⟨⟨leftNamespace⟩, ⟨leftFunction⟩⟩ := leftFunction
     obtain ⟨⟨rightNamespace⟩, ⟨rightFunction⟩⟩ := rightFunction
     have namespaceEq := eq_of_compare namespaces
     have functionEq := eq_of_compare functions
     simp only at namespaceEq functionEq
     subst namespaceEq functionEq
-    rw [Array.toList_inj.mp (RuntimeValue.eq_of_orderList captures)]
+    rw [eq_of_compareInstantiation instantiations, eq_of_compare masks,
+      Array.toList_inj.mp (RuntimeValue.eq_of_orderList captures)]
   case borrow.borrow leftLoan leftCurrent rightLoan rightCurrent =>
     rw [eq_of_compare h.1, RuntimeValue.eq_of_order h.2]
   case loanHole.loanHole => rw [eq_of_compare h]
 termination_by sizeOf a + sizeOf b
 decreasing_by all_goals (simp_wf; (try simp only [sizeOf_array]); omega)
 
-theorem RuntimeValue.eq_of_orderList {rank : StructHandle → String → Nat} {as bs : List RuntimeValue}
+theorem RuntimeValue.eq_of_orderList {rank : ValueRanks} {as bs : List RuntimeValue}
     (h : RuntimeValue.orderList rank as bs = .eq) : as = bs := by
   cases as <;> cases bs <;> simp only [RuntimeValue.orderList, reduceCtorEq] at h
   · rfl
@@ -183,7 +220,7 @@ theorem compareAddress_isLE_trans {a b c : String} (left : (compareAddress a b).
     (right : (compareAddress b c).isLE) : (compareAddress a c).isLE :=
   lex_isLE_trans_of (fun _ _ => Std.TransCmp.isLE_trans) left right
 
-theorem compareVariant_isLE_trans {rank : StructHandle → String → Nat} {ls ms rs : StructHandle}
+theorem compareVariant_isLE_trans {rank : ValueRanks} {ls ms rs : StructHandle}
     {lv mv rv : Option String} (left : (compareVariant rank ls ms lv mv).isLE)
     (right : (compareVariant rank ms rs mv rv).isLE) : (compareVariant rank ls rs lv rv).isLE := by
   cases lv <;> cases mv <;> cases rv <;> simp only [compareVariant] at left right ⊢ <;>
@@ -220,7 +257,7 @@ theorem lex_isLE_trans_laws {α : Type} (cmp : α → α → Ordering)
     exact eq_of_self_swap (swap a a)
 
 mutual
-theorem RuntimeValue.order_isLE_trans (rank : StructHandle → String → Nat) (a b c : RuntimeValue) :
+theorem RuntimeValue.order_isLE_trans (rank : ValueRanks) (a b c : RuntimeValue) :
     (RuntimeValue.order rank a b).isLE → (RuntimeValue.order rank b c).isLE →
       (RuntimeValue.order rank a c).isLE := by
   intro left right
@@ -230,7 +267,7 @@ theorem RuntimeValue.order_isLE_trans (rank : StructHandle → String → Nat) (
 termination_by 2 * sizeOf a + 1
 decreasing_by all_goals (simp_wf <;> omega)
 
-theorem RuntimeValue.orderPayload_isLE_trans (rank : StructHandle → String → Nat)
+theorem RuntimeValue.orderPayload_isLE_trans (rank : ValueRanks)
     (a b c : RuntimeValue) :
     a.kindRank = b.kindRank → b.kindRank = c.kindRank →
       (RuntimeValue.orderPayload rank a b).isLE → (RuntimeValue.orderPayload rank b c).isLE →
@@ -266,8 +303,13 @@ theorem RuntimeValue.orderPayload_isLE_trans (rank : StructHandle → String →
       eq_of_compareVariant compareVariant_isLE_trans
       (fun _ _ left right => RuntimeValue.orderList_isLE_trans rank _ _ _ left right) left right
   case closure.closure.closure =>
-    rw [Ordering.then_assoc] at left right ⊢
+    simp only [Ordering.then_assoc] at left right ⊢
     refine lex_isLE_trans_of (fun _ _ left right => ?_) left right
+    refine lex_isLE_trans_of (fun _ _ left right => ?_) left right
+    refine lex_isLE_trans_of (fun _ _ left right => ?_) left right
+    refine lex_isLE_trans_laws compareInstantiation compareInstantiation_swap
+      eq_of_compareInstantiation compareInstantiation_isLE_trans
+      (fun _ _ left right => ?_) left right
     exact lex_isLE_trans_of
       (fun _ _ left right => RuntimeValue.orderList_isLE_trans rank _ _ _ left right) left right
   case borrow.borrow.borrow =>
@@ -277,7 +319,7 @@ theorem RuntimeValue.orderPayload_isLE_trans (rank : StructHandle → String →
 termination_by 2 * sizeOf a
 decreasing_by all_goals (simp_wf; (try simp only [sizeOf_array]); omega)
 
-theorem RuntimeValue.orderList_isLE_trans (rank : StructHandle → String → Nat)
+theorem RuntimeValue.orderList_isLE_trans (rank : ValueRanks)
     (as bs cs : List RuntimeValue) :
     (RuntimeValue.orderList rank as bs).isLE → (RuntimeValue.orderList rank bs cs).isLE →
       (RuntimeValue.orderList rank as cs).isLE := by
@@ -314,32 +356,65 @@ ordering itself, and on primitive values the order is the natural one. -/
 @[simp] theorem orderValue_eq_one (o : Ordering) : orderValue o = 1 ↔ o = .gt := by
   cases o <;> decide
 
-@[simp] theorem RuntimeValue.order_integer (rank : StructHandle → String → Nat) (a b : Int) :
+@[simp] theorem RuntimeValue.order_integer (rank : ValueRanks) (a b : Int) :
     RuntimeValue.order rank (.integer a) (.integer b) = compare a b := by
   simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
 
-@[simp] theorem RuntimeValue.order_bool (rank : StructHandle → String → Nat) (a b : Bool) :
+@[simp] theorem RuntimeValue.order_bool (rank : ValueRanks) (a b : Bool) :
     RuntimeValue.order rank (.bool a) (.bool b) = compare a b := by
   simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
 
+@[simp] theorem RuntimeValue.order_vector (rank : ValueRanks) (a b : Array RuntimeValue) :
+    RuntimeValue.order rank (.vector a) (.vector b) =
+      RuntimeValue.orderList rank a.toList b.toList := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.order_nominal (rank : ValueRanks) (left right : StructHandle)
+    (leftVariant rightVariant : Option String) (leftFields rightFields : Array RuntimeValue) :
+    RuntimeValue.order rank (.nominal left leftVariant leftFields)
+        (.nominal right rightVariant rightFields) =
+      ((compare left.namespaceId.index right.namespaceId.index).then
+        (compare left.structId right.structId)).then
+      ((compareVariant rank left right leftVariant rightVariant).then
+        (RuntimeValue.orderList rank leftFields.toList rightFields.toList)) := by
+  simp [RuntimeValue.order, RuntimeValue.orderPayload, RuntimeValue.kindRank]
+
+@[simp] theorem RuntimeValue.orderList_nil_nil (rank : ValueRanks) :
+    RuntimeValue.orderList rank [] [] = .eq := by
+  simp [RuntimeValue.orderList]
+
+@[simp] theorem RuntimeValue.orderList_nil_cons (rank : ValueRanks) (right : RuntimeValue)
+    (rights : List RuntimeValue) : RuntimeValue.orderList rank [] (right :: rights) = .lt := by
+  simp [RuntimeValue.orderList]
+
+@[simp] theorem RuntimeValue.orderList_cons_nil (rank : ValueRanks) (left : RuntimeValue)
+    (lefts : List RuntimeValue) : RuntimeValue.orderList rank (left :: lefts) [] = .gt := by
+  simp [RuntimeValue.orderList]
+
+@[simp] theorem RuntimeValue.orderList_cons_cons (rank : ValueRanks) (left right : RuntimeValue)
+    (lefts rights : List RuntimeValue) :
+    RuntimeValue.orderList rank (left :: lefts) (right :: rights) =
+      (RuntimeValue.order rank left right).then (RuntimeValue.orderList rank lefts rights) := by
+  simp [RuntimeValue.orderList]
+
 /-! ## Instances -/
 
-instance RuntimeValue.order_oriented (rank : StructHandle → String → Nat) :
+instance RuntimeValue.order_oriented (rank : ValueRanks) :
     Std.OrientedCmp (RuntimeValue.order rank) :=
   ⟨fun {a b} => RuntimeValue.order_swap rank a b⟩
 
-instance RuntimeValue.order_trans (rank : StructHandle → String → Nat) :
+instance RuntimeValue.order_trans (rank : ValueRanks) :
     Std.TransCmp (RuntimeValue.order rank) :=
   { isLE_trans := fun {a b c} => RuntimeValue.order_isLE_trans rank a b c }
 
-instance RuntimeValue.order_lawfulEq (rank : StructHandle → String → Nat) :
+instance RuntimeValue.order_lawfulEq (rank : ValueRanks) :
     Std.LawfulEqCmp (RuntimeValue.order rank) where
   compare_self := fun {a} => eq_of_self_swap (RuntimeValue.order_swap rank a a)
   eq_of_compare := RuntimeValue.eq_of_order
 
 
 /-- The structural order is reflexive. -/
-@[simp] theorem RuntimeValue.order_self (rank : StructHandle → String → Nat) (a : RuntimeValue) :
+@[simp] theorem RuntimeValue.order_self (rank : ValueRanks) (a : RuntimeValue) :
     RuntimeValue.order rank a a = .eq :=
   eq_of_self_swap (RuntimeValue.order_swap rank a a)
 

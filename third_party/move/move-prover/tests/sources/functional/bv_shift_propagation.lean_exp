@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/bv_shift_propagation.move:22:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/bv_shift_propagation.move:19:5: error: leaner verification failed: the automatic verification of `set_bit` failed; provide a proof: `verify set_bit by …` in `tests/sources/functional/bv_shift_propagation.proof.lean` (`verify set_bit by skip` shows the obligations it leaves)
+tests/sources/functional/bv_shift_propagation.move:32:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/bv_shift_propagation.move:30:5: error: leaner verification failed: the automatic verification of `test_bit` failed; provide a proof: `verify test_bit by …` in `tests/sources/functional/bv_shift_propagation.proof.lean` (`verify test_bit by skip` shows the obligations it leaves)
+tests/sources/functional/bv_shift_propagation.move:44:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/bv_shift_propagation.move:45:9: error: the specification clause `ensures result.bits
+        == f.bits | (1 << width) % 18446744073709551616 - 1 << bit_pos` is not established
+tests/sources/functional/bv_shift_propagation.move:41:5: error: leaner verification failed: the automatic verification of `apply_mask` failed; provide a proof: `verify apply_mask by …` in `tests/sources/functional/bv_shift_propagation.proof.lean` (`verify apply_mask by skip` shows the obligations it leaves)

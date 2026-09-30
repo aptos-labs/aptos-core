@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/lemma_shortcut.move:31:9
+   │
+31 │         assume [trusted] true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/sources/functional/proof/lemma_shortcut.move:58:9: error: the specification clause `ensures x + 1 == x` is not established
+tests/sources/functional/proof/lemma_shortcut.move:57:10: error: leaner verification failed: the lemma `false_identity` is not established

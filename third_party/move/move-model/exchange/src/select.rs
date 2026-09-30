@@ -6,7 +6,7 @@
 
 use anyhow::{bail, Result};
 use move_model::{
-    ast::ExpData,
+    ast::{collect_proof_exps, ExpData, Proof},
     model::{GlobalEnv, ModuleId},
 };
 use std::collections::BTreeSet;
@@ -73,6 +73,15 @@ fn dependencies(env: &GlobalEnv, module: ModuleId) -> BTreeSet<ModuleId> {
             }
         }
     };
+    // A proof reads its expressions and the lemmas it applies.
+    let use_proof = |usage: &mut BTreeSet<ModuleId>, proof: &Proof| {
+        let mut exps = vec![];
+        collect_proof_exps(proof, &mut exps);
+        for exp in exps {
+            use_exp(usage, exp);
+        }
+        applied_lemma_modules(proof, usage);
+    };
     for function in module_env.get_functions() {
         for parameter in function.get_parameters() {
             parameter.1.module_usage(&mut usage);
@@ -80,6 +89,20 @@ fn dependencies(env: &GlobalEnv, module: ModuleId) -> BTreeSet<ModuleId> {
         function.get_result_type().module_usage(&mut usage);
         if let Some(body) = function.get_def() {
             use_exp(&mut usage, body);
+        }
+        if let Some(proof) = &function.get_spec().proof {
+            use_proof(&mut usage, proof);
+        }
+    }
+    for (_, decl) in module_env.get_lemmas() {
+        for parameter in &decl.params {
+            parameter.1.module_usage(&mut usage);
+        }
+        for condition in &decl.conditions {
+            use_exp(&mut usage, &condition.exp);
+        }
+        if let Some(proof) = &decl.proof {
+            use_proof(&mut usage, proof);
         }
     }
     for struct_env in module_env.get_structs() {
@@ -98,6 +121,32 @@ fn dependencies(env: &GlobalEnv, module: ModuleId) -> BTreeSet<ModuleId> {
     }
     usage.remove(&module);
     usage
+}
+
+/// The modules of the lemmas a proof applies.
+fn applied_lemma_modules(proof: &Proof, usage: &mut BTreeSet<ModuleId>) {
+    match proof {
+        Proof::Apply(_, lemma, _) | Proof::ForallApply(_, _, _, lemma, _, _) => {
+            usage.insert(lemma.module_id);
+        },
+        Proof::IfElse(_, _, then_proof, else_proof) => {
+            applied_lemma_modules(then_proof, usage);
+            if let Some(proof) = else_proof {
+                applied_lemma_modules(proof, usage);
+            }
+        },
+        Proof::Block(_, proofs) => {
+            for proof in proofs {
+                applied_lemma_modules(proof, usage);
+            }
+        },
+        Proof::Post(_, proof) => applied_lemma_modules(proof, usage),
+        Proof::Let(..)
+        | Proof::Assert(..)
+        | Proof::Assume(..)
+        | Proof::Calc(..)
+        | Proof::Split(..) => {},
+    }
 }
 
 /// Whether a global invariant of `module` reads memory declared in `modules`.

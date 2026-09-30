@@ -28,71 +28,98 @@ private def statementsResult : Internal.StatementsEvaluation → StatementsResul
   | .control state frame control => .control state frame control.value
 
 /-- Completeness statement for one expression judgment. -/
-private def ExprComplete (unit : ExecutableUnit) (namespaceId : LeanerIR.NamespaceId)
+private def ExprComplete {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (namespaceId : LeanerIR.NamespaceId)
     (frame : LeanerIR.RuntimeFrame) (state : LeanerIR.RuntimeState)
     (exprId : LeanerIR.ExprId) (finalFrame : LeanerIR.RuntimeFrame)
     (finalState : LeanerIR.RuntimeState) (control : LeanerIR.Control) : Prop :=
   ∃ fuel result,
-    Internal.evalExpr fuel unit namespaceId frame state exprId = .ok result ∧
+    Internal.evalExpr fuel executable namespaceId frame state exprId = .ok result ∧
       result.frame = finalFrame ∧ result.state = finalState ∧
       result.control.value = control
 
-private def FunctionComplete (unit : ExecutableUnit) (handle : LeanerIR.FunctionHandle)
+/-- Completeness statement for one node judgment. -/
+private def NodeComplete {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (namespaceId : LeanerIR.NamespaceId)
+    (frame : LeanerIR.RuntimeFrame) (state : LeanerIR.RuntimeState)
+    (exprId : LeanerIR.ExprId) (finalFrame : LeanerIR.RuntimeFrame)
+    (finalState : LeanerIR.RuntimeState) (control : LeanerIR.Control) : Prop :=
+  ∃ fuel result,
+    Internal.evalNode fuel executable namespaceId frame state exprId = .ok result ∧
+      result.frame = finalFrame ∧ result.state = finalState ∧
+      result.control.value = control
+
+private def FunctionComplete {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (handle : LeanerIR.FunctionHandle)
     (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
     (state : LeanerIR.RuntimeState) (arguments : Array LeanerIR.RuntimeValue)
     (finalState : LeanerIR.RuntimeState) (outcome : LeanerIR.Outcome) : Prop :=
   ∃ fuel result,
-    Internal.evalFunction fuel unit handle typeInstantiation state arguments = .ok result ∧
+    Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result ∧
       result.state = finalState ∧ result.outcome.value = outcome
 
-private def ValuesComplete (unit : ExecutableUnit) (namespaceId : LeanerIR.NamespaceId)
+private def ValuesComplete {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (namespaceId : LeanerIR.NamespaceId)
     (frame : LeanerIR.RuntimeFrame) (state : LeanerIR.RuntimeState)
     (expressions : List LeanerIR.ExprId) (expected : ValuesResult) : Prop :=
   ∃ fuel result,
-    Internal.evalValues fuel unit namespaceId frame state expressions = .ok result ∧
+    Internal.evalValues fuel executable namespaceId frame state expressions = .ok result ∧
       valuesResult result = expected
 
-private def StatementsComplete (unit : ExecutableUnit) (namespaceId : LeanerIR.NamespaceId)
+private def StatementsComplete {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (namespaceId : LeanerIR.NamespaceId)
     (frame : LeanerIR.RuntimeFrame) (state : LeanerIR.RuntimeState)
     (statements : List LeanerIR.ExprId) (expected : StatementsResult) : Prop :=
   ∃ fuel result,
-    Internal.evalStatements fuel unit namespaceId frame state statements = .ok result ∧
+    Internal.evalStatements fuel executable namespaceId frame state statements = .ok result ∧
       statementsResult result = expected
 
-private def ArmsComplete (unit : ExecutableUnit) (namespaceId : LeanerIR.NamespaceId)
+private def ArmsComplete {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (namespaceId : LeanerIR.NamespaceId)
     (ns : ValidatedNamespace) (frame : LeanerIR.RuntimeFrame)
     (state : LeanerIR.RuntimeState) (value : LeanerIR.RuntimeValue)
     (arms : List LeanerIR.MatchArm) (finalFrame : LeanerIR.RuntimeFrame)
     (finalState : LeanerIR.RuntimeState) (control : LeanerIR.Control) : Prop :=
   ∀ ownerLoc, ∃ fuel result,
-    Internal.evalArms fuel unit namespaceId ns ownerLoc frame state value arms
+    Internal.evalArms fuel executable namespaceId ns ownerLoc frame state value arms
         = .ok result ∧
       result.frame = finalFrame ∧ result.state = finalState ∧
       result.control.value = control
 
-private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state exprId
+private theorem completeExpr {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {namespaceId frame state exprId
     finalFrame finalState control}
-    (h : EvalExpr unit namespaceId frame state exprId finalFrame finalState control) :
-    ExprComplete unit namespaceId frame state exprId finalFrame finalState control := by
+    (h : EvalExpr executable namespaceId frame state exprId finalFrame finalState control) :
+    ExprComplete executable namespaceId frame state exprId finalFrame finalState control := by
   apply BigStep.EvalFunction.rec_1
     (motive_1 := fun handle typeInstantiation state arguments finalState outcome _ =>
-      FunctionComplete unit handle typeInstantiation state arguments finalState outcome)
+      FunctionComplete executable handle typeInstantiation state arguments finalState outcome)
     (motive_2 := fun namespaceId frame state exprId finalFrame finalState control _ =>
-      ExprComplete unit namespaceId frame state exprId finalFrame finalState control)
-    (motive_3 := fun namespaceId frame state expressions expected _ =>
-      ValuesComplete unit namespaceId frame state expressions expected)
-    (motive_4 := fun namespaceId frame state statements expected _ =>
-      StatementsComplete unit namespaceId frame state statements expected)
-    (motive_5 := fun namespaceId ns frame state value arms finalFrame finalState
+      ExprComplete executable namespaceId frame state exprId finalFrame finalState control)
+    (motive_3 := fun namespaceId frame state exprId finalFrame finalState control _ =>
+      NodeComplete executable namespaceId frame state exprId finalFrame finalState control)
+    (motive_4 := fun namespaceId frame state expressions expected _ =>
+      ValuesComplete executable namespaceId frame state expressions expected)
+    (motive_5 := fun namespaceId frame state statements expected _ =>
+      StatementsComplete executable namespaceId frame state statements expected)
+    (motive_6 := fun namespaceId ns frame state value arms finalFrame finalState
         control _ =>
-      ArmsComplete unit namespaceId ns frame state value arms finalFrame finalState
+      ArmsComplete executable namespaceId ns frame state value arms finalFrame finalState
         control)
     (t := h)
+  case node =>
+    intro namespaceId frame state exprId startFrame startState nodeFrame nodeState control
+      finalFrame finalState before_eq node_step after_eq ih
+    obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
+    refine ⟨f₀ + 1, ?_⟩
+    rw [Internal.evalExpr.eq_2]
+    simp only [before_eq, e₀, bind, Except.bind, pure, Except.pure]
+    refine ⟨_, rfl, ?_, ?_, rc⟩ <;> simp only [rf, rs, rc, after_eq]
   case value =>
     intro namespaceId frame state exprId ns expression literal source runtimeValue
       namespace_eq expression_eq kind_eq value_eq
     refine ⟨1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, value_eq, bind, Except.bind]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case constantValue =>
@@ -101,7 +128,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       resolve_eq target_namespace_eq declaration_eq initializer ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, resolve_eq, target_namespace_eq,
       declaration_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rfl, rs, rfl⟩
@@ -111,7 +138,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       resolve_eq target_namespace_eq declaration_eq initializer abrupt ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, resolve_eq, target_namespace_eq,
       declaration_eq, e₀, bind, Except.bind]
     cases abrupt <;> simp only [rc] <;>
@@ -120,7 +147,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     intro namespaceId frame state exprId ns expression localId runtimeValue
       namespace_eq expression_eq kind_eq local_eq
     refine ⟨1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, local_eq, bind, Except.bind]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case callArgumentsControl =>
@@ -129,7 +156,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -144,7 +171,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, er₁⟩ := ih_operands
     obtain ⟨f₂, r₂, e₂, rs₂, ro₂⟩ := ih_callee
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalValues_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind]
     cases r₁ with
@@ -164,7 +191,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, er₁⟩ := ih_operands
     obtain ⟨f₂, r₂, e₂, rs₂, ro₂⟩ := ih_callee
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalValues_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind]
     cases r₁ with
@@ -183,7 +210,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -197,7 +224,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands construct_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -212,7 +239,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -226,7 +253,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands destruct_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -236,12 +263,12 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
         simp only [es, ef, ev, destruct_eq, bind, Except.bind]
         exact ⟨_, rfl, rfl, rfl, rfl⟩
   case closureArgumentsControl =>
-    intro namespaceId frame state exprId ns expression reference
+    intro namespaceId frame state exprId ns expression reference mask
       instantiations captures surface finalState finalFrame control
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -250,12 +277,12 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
         obtain ⟨es, ef, ec⟩ := er₀
         exact ⟨_, rfl, ef, es, ec⟩
   case closureValue =>
-    intro namespaceId frame state exprId ns expression reference instantiations captures
+    intro namespaceId frame state exprId ns expression reference mask instantiations captures
       surface finalState finalFrame values handle
       namespace_eq expression_eq kind_eq operands resolve_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -270,7 +297,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -280,12 +307,13 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
         exact ⟨_, rfl, ef, es, ec⟩
   case invokeReturned =>
     intro namespaceId frame state exprId ns expression instantiations arguments surface
-      argumentState argumentFrame handle captures values finalState results
-      namespace_eq expression_eq kind_eq operands callee ih_operands ih_callee
+      argumentState argumentFrame handle mask typeInstantiation captures values composed
+      finalState results namespace_eq expression_eq kind_eq operands compose_eq callee
+      ih_operands ih_callee
     obtain ⟨f₁, r₁, e₁, er₁⟩ := ih_operands
     obtain ⟨f₂, r₂, e₂, rs₂, ro₂⟩ := ih_callee
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalValues_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind]
     cases r₁ with
@@ -293,19 +321,20 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     | values s f vs =>
         simp only [valuesResult, ValuesResult.values.injEq] at er₁
         obtain ⟨es, ef, ev⟩ := er₁
-        simp only [es, ef, ev,
+        simp only [es, ef, ev, compose_eq,
           evalFunction_mono (Nat.le_max_right f₁ f₂) e₂, bind, Except.bind,
           pure, Except.pure, Internal.callResult, ro₂]
         subst rs₂
         exact ⟨_, rfl, rfl, rfl, rfl⟩
   case invokeThrew =>
     intro namespaceId frame state exprId ns expression instantiations arguments surface
-      argumentState argumentFrame handle captures values finalState kind thrown
-      namespace_eq expression_eq kind_eq operands callee ih_operands ih_callee
+      argumentState argumentFrame handle mask typeInstantiation captures values composed
+      finalState kind thrown namespace_eq expression_eq kind_eq operands compose_eq callee
+      ih_operands ih_callee
     obtain ⟨f₁, r₁, e₁, er₁⟩ := ih_operands
     obtain ⟨f₂, r₂, e₂, rs₂, ro₂⟩ := ih_callee
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalValues_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind]
     cases r₁ with
@@ -313,7 +342,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     | values s f vs =>
         simp only [valuesResult, ValuesResult.values.injEq] at er₁
         obtain ⟨es, ef, ev⟩ := er₁
-        simp only [es, ef, ev,
+        simp only [es, ef, ev, compose_eq,
           evalFunction_mono (Nat.le_max_right f₁ f₂) e₂, bind, Except.bind,
           pure, Except.pure, Internal.callResult, ro₂]
         subst rs₂
@@ -324,7 +353,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -338,7 +367,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands evaluate_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -353,7 +382,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands evaluate_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -368,7 +397,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -382,7 +411,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands evaluate_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -397,7 +426,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands evaluate_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -412,7 +441,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -426,7 +455,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands evaluate_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -441,7 +470,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands evaluate_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -456,7 +485,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -470,7 +499,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -485,7 +514,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -500,7 +529,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       operands ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, bind, Except.bind]
     cases r₀ with
     | values s f vs =>
@@ -525,7 +554,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       runtimeValue namespace_eq expression_eq kind_eq operands evaluate_eq ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, bind, Except.bind]
     cases r₀ with
     | values s f vs =>
@@ -540,7 +569,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     -- way once it reduces.
         case data kind =>
             simp only [evaluatePlaceOperation?, bind, Option.bind] at evaluate_eq
-            cases data_eq : evaluateDataOperation? unit.unit ns.identity kind
+            cases data_eq : evaluateDataOperation? unit ns.identity kind
                 values.toArray with
             | none => simp [data_eq] at evaluate_eq
             | some value =>
@@ -567,12 +596,49 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
         cases operation <;> first
           | simp [valuesResult] at er₀
           | (rename_i kind; cases kind <;> simp [valuesResult] at er₀)
+  case operationMismatch =>
+    intro namespaceId frame state exprId ns expression operation instantiations
+      arguments surface argumentState argumentFrame values kind thrown
+      namespace_eq expression_eq kind_eq operands evaluate_eq mismatch mismatch_eq ih
+    obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
+    refine ⟨f₀ + 1, ?_⟩
+    rw [Internal.evalNode.eq_2]
+    simp only [namespace_eq, expression_eq, kind_eq, bind, Except.bind]
+    cases r₀ with
+    | values s f vs =>
+        simp only [valuesResult, ValuesResult.values.injEq] at er₀
+        obtain ⟨es, ef, ev⟩ := er₀
+        cases operation
+        case call kind => cases kind <;> simp [variantMismatch?] at mismatch
+        case profile value targets => simp [variantMismatch?] at mismatch
+        case primitive kind => simp [variantMismatch?] at mismatch
+        case global kind => simp [variantMismatch?] at mismatch
+        case assert => simp [variantMismatch?] at mismatch
+        case specification kind => simp [variantMismatch?] at mismatch
+        case reference kind => simp [variantMismatch?] at mismatch
+        case data kind =>
+            have data_eq : evaluateDataOperation? unit ns.identity kind values.toArray = none := by
+              cases data_eq : evaluateDataOperation? unit ns.identity kind values.toArray with
+              | none => rfl
+              | some value => simp [evaluatePlaceOperation?, data_eq] at evaluate_eq
+            dsimp only
+            simp only [e₀, bind, Except.bind, es, ef, ev, data_eq, mismatch, mismatch_eq]
+            exact ⟨_, rfl, rfl, rfl, rfl⟩
+        all_goals
+          dsimp only
+          simp only [e₀, bind, Except.bind, es, ef, ev, evaluate_eq, mismatch, mismatch_eq]
+          exact ⟨_, rfl, rfl, rfl, rfl⟩
+    | control s f c =>
+        exfalso
+        cases operation <;> first
+          | simp [valuesResult] at er₀
+          | (rename_i kind; cases kind <;> simp [valuesResult] at er₀)
   case blockControl =>
     intro namespaceId frame state exprId ns expression statements result
       finalState finalFrame control namespace_eq expression_eq kind_eq steps ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | done s f => simp [statementsResult] at er₀
@@ -585,7 +651,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq steps ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [statementsResult] at er₀
@@ -601,7 +667,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, er₁⟩ := ih_steps
     obtain ⟨f₂, r₂, e₂, rf₂, rs₂, rc₂⟩ := ih_result
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalStatements_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind]
     cases r₁ with
@@ -620,7 +686,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       finalFrame finalState control namespace_eq expression_eq kind_eq body_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases control <;> simp only [rc] <;>
       first
@@ -632,7 +698,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       initializer_step abrupt ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases abrupt <;> simp only [rc] <;> exact ⟨_, rfl, rf, rs, rc⟩
   case letValue =>
@@ -643,7 +709,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, rf₁, rs₁, rc₁⟩ := ih_initializer
     obtain ⟨f₂, r₂, e₂, rf₂, rs₂, rc₂⟩ := ih_body
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalExpr_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind, rc₁, rf₁, rs₁,
       bind_eq, evalExpr_mono (Nat.le_max_right f₁ f₂) e₂]
@@ -651,13 +717,23 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       first
       | exact ⟨_, rfl, rf₂, rs₂, rfl⟩
       | exact ⟨_, rfl, rf₂, rs₂, rc₂⟩
+  case letMismatch =>
+    intro namespaceId frame state exprId ns expression pattern initializer body
+      initializedFrame initializedState runtimeValue kind arguments namespace_eq expression_eq
+      kind_eq initializer_step bind_eq mismatch_eq ih
+    obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
+    refine ⟨f₀ + 1, ?_⟩
+    rw [Internal.evalNode.eq_2]
+    simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc, rf, rs,
+      bind_eq, mismatch_eq]
+    exact ⟨_, rfl, rfl, rfl, rfl⟩
   case ifControl =>
     intro namespaceId frame state exprId ns expression condition thenBranch elseBranch
       finalFrame finalState control namespace_eq expression_eq kind_eq
       condition_step abrupt ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases abrupt <;> simp only [rc] <;> exact ⟨_, rfl, rf, rs, rc⟩
   case ifTrue =>
@@ -668,7 +744,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, rf₁, rs₁, rc₁⟩ := ih_condition
     obtain ⟨f₂, r₂, e₂, rf₂, rs₂, rc₂⟩ := ih_branch
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalExpr_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind, rc₁, rf₁, rs₁,
       evalExpr_mono (Nat.le_max_right f₁ f₂) e₂]
@@ -682,7 +758,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       condition_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rf, rs, rfl⟩
   case ifFalse =>
@@ -693,7 +769,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, rf₁, rs₁, rc₁⟩ := ih_condition
     obtain ⟨f₂, r₂, e₂, rf₂, rs₂, rc₂⟩ := ih_branch
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalExpr_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind, rc₁, rf₁, rs₁,
       evalExpr_mono (Nat.le_max_right f₁ f₂) e₂]
@@ -707,7 +783,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       scrutinee_step abrupt ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases abrupt <;> simp only [rc] <;> exact ⟨_, rfl, rf, rs, rc⟩
   case matchValue =>
@@ -718,7 +794,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, rf₁, rs₁, rc₁⟩ := ih_scrutinee
     obtain ⟨f₂, r₂, e₂, rf₂, rs₂, rc₂⟩ := ih_arms expression.loc
     refine ⟨max f₁ f₂ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalExpr_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind, rc₁, rf₁, rs₁,
       evalArms_mono (Nat.le_max_right f₁ f₂) e₂]
@@ -733,10 +809,10 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, rf₁, rs₁, rc₁⟩ := ih_body
     obtain ⟨f₂, r₂, e₂, rf₂, rs₂, rc₂⟩ := ih_repeat
     refine ⟨max f₁ f₂ + 1, r₂, ?_, rf₂, rs₂, rc₂⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalExpr_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind, rc₁, rf₁, rs₁]
-    exact evalExpr_mono (Nat.le_max_right f₁ f₂) e₂
+    exact evalNode_mono (Nat.le_max_right f₁ f₂) e₂
   case loopRepeatContinue =>
     intro namespaceId frame state exprId ns expression label body
       bodyFrame bodyState finalFrame finalState control
@@ -744,16 +820,16 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     obtain ⟨f₁, r₁, e₁, rf₁, rs₁, rc₁⟩ := ih_body
     obtain ⟨f₂, r₂, e₂, rf₂, rs₂, rc₂⟩ := ih_repeat
     refine ⟨max f₁ f₂ + 1, r₂, ?_, rf₂, rs₂, rc₂⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq,
       evalExpr_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind, rc₁, rf₁, rs₁]
-    exact evalExpr_mono (Nat.le_max_right f₁ f₂) e₂
+    exact evalNode_mono (Nat.le_max_right f₁ f₂) e₂
   case loopBreak =>
     intro namespaceId frame state exprId ns expression label body
       finalFrame finalState value namespace_eq expression_eq kind_eq body_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rf, rs, rfl⟩
   case loopOuterBreak =>
@@ -761,7 +837,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       finalFrame finalState nest value namespace_eq expression_eq kind_eq body_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rf, rs, rfl⟩
   case loopOuterContinue =>
@@ -769,7 +845,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       finalFrame finalState nest namespace_eq expression_eq kind_eq body_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rf, rs, rfl⟩
   case loopReturn =>
@@ -777,7 +853,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       finalFrame finalState values namespace_eq expression_eq kind_eq body_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rf, rs, rc⟩
   case loopThrow =>
@@ -786,14 +862,14 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       body_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rf, rs, rc⟩
   case breakNone =>
     intro namespaceId frame state exprId ns expression nest
       namespace_eq expression_eq kind_eq
     refine ⟨1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, bind, Except.bind]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case breakControl =>
@@ -802,7 +878,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       child_step abrupt ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases abrupt <;> simp only [rc] <;> exact ⟨_, rfl, rf, rs, rc⟩
   case breakValue =>
@@ -811,14 +887,14 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       child_step ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc]
     exact ⟨_, rfl, rf, rs, rfl⟩
   case continue_ =>
     intro namespaceId frame state exprId ns expression nest
       namespace_eq expression_eq kind_eq
     refine ⟨1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, bind, Except.bind]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case returnValues =>
@@ -827,7 +903,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq values_step ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -842,7 +918,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq values_step ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -856,7 +932,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq values_step ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | control s f c => simp [valuesResult] at er₀
@@ -871,7 +947,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq values_step ih
     obtain ⟨f₀, r₀, e₀, er₀⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases r₀ with
     | values s f vs => simp [valuesResult] at er₀
@@ -885,7 +961,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       child_step abrupt ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases abrupt <;> simp only [rc] <;> exact ⟨_, rfl, rf, rs, rc⟩
   case assignValue =>
@@ -894,9 +970,19 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq child_step resolve_eq write_eq ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc, rf, rs,
       resolve_eq, write_eq]
+    exact ⟨_, rfl, rfl, rfl, rfl⟩
+  case assignMismatch =>
+    intro namespaceId frame state exprId ns expression place child
+      childFrame childState runtimeValue kind thrown
+      namespace_eq expression_eq kind_eq child_step resolve_eq mismatch mismatch_eq ih
+    obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
+    refine ⟨f₀ + 1, ?_⟩
+    rw [Internal.evalNode.eq_2]
+    simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc, rf, rs,
+      resolve_eq, mismatch, mismatch_eq]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case assignPatternControl =>
     intro namespaceId frame state exprId ns expression pattern child
@@ -904,7 +990,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       child_step abrupt ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind]
     cases abrupt <;> simp only [rc] <;> exact ⟨_, rfl, rf, rs, rc⟩
   case assignPatternValue =>
@@ -913,21 +999,31 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
       namespace_eq expression_eq kind_eq child_step bind_eq ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     refine ⟨f₀ + 1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc, rf, rs,
       bind_eq]
+    exact ⟨_, rfl, rfl, rfl, rfl⟩
+  case assignPatternMismatch =>
+    intro namespaceId frame state exprId ns expression pattern child
+      childFrame finalState runtimeValue kind arguments
+      namespace_eq expression_eq kind_eq child_step bind_eq mismatch_eq ih
+    obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
+    refine ⟨f₀ + 1, ?_⟩
+    rw [Internal.evalNode.eq_2]
+    simp only [namespace_eq, expression_eq, kind_eq, e₀, bind, Except.bind, rc, rf, rs,
+      bind_eq, mismatch_eq]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case spec =>
     intro namespaceId frame state exprId ns expression block
       namespace_eq expression_eq kind_eq
     refine ⟨1, ?_⟩
-    rw [Internal.evalExpr.eq_2]
+    rw [Internal.evalNode.eq_2]
     simp only [namespace_eq, expression_eq, kind_eq, bind, Except.bind]
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
       evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq
-      body_eq body_step outcome_eq finalize_eq ih
+      body_eq body_step outcome_eq hole_free finalize_eq ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
       cases hb : arguments.size != declaration.signature.parameters.size with
@@ -944,7 +1040,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
         | some values =>
             simp [finishControl?, unpack_eq] at outcome_eq
             subst outcome_eq
-            simp only [unpack_eq, rf, rs]
+            simp only [unpack_eq, rf, rs, hole_free, ↓reduceIte]
             exact ⟨_, rfl, finalize_eq, rfl⟩
     | «return_» values =>
         cases size_eq : values.size == declaration.signature.results.size with
@@ -952,7 +1048,7 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
         | true =>
             simp [finishControl?, size_eq] at outcome_eq
             subst outcome_eq
-            simp only [bne, size_eq, Bool.not_true, rf, rs]
+            simp only [bne, size_eq, Bool.not_true, rf, rs, hole_free, ↓reduceIte]
             exact ⟨_, rfl, finalize_eq, rfl⟩
     | «throw_» kind thrown =>
         simp [finishControl?] at outcome_eq
@@ -963,13 +1059,13 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     | continue_ nest => simp [finishControl?] at outcome_eq
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq body_eq native_eq
+      namespace_eq declaration_eq arity_eq body_eq native_eq hole_free
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
       simp [arity_eq]
     refine ⟨1, ?_⟩
     rw [Internal.evalFunction.eq_2]
     simp only [namespace_eq, declaration_eq, arity, body_eq, ↓reduceIte, native_eq,
-      bind, Except.bind, pure, Except.pure]
+      hole_free, bind, Except.bind, pure, Except.pure]
     exact ⟨_, rfl, rfl, rfl⟩
   case nil =>
     intro namespaceId frame state
@@ -1034,6 +1130,12 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
     rw [Internal.evalStatements.eq_3]
     simp only [evalExpr_mono (Nat.le_max_left f₁ f₂) e₁, bind, Except.bind, rc₁, rf₁, rs₁]
     exact ⟨r₂, evalStatements_mono (Nat.le_max_right f₁ f₂) e₂, er₂⟩
+  case exhausted =>
+    intro namespaceId ns frame state value kind arguments mismatch_eq ownerLoc
+    refine ⟨0, ?_⟩
+    rw [Internal.evalArms.eq_1]
+    simp only [mismatch_eq]
+    exact ⟨_, rfl, rfl, rfl, rfl⟩
   case reject =>
     intro namespaceId ns frame state value arm arms finalFrame finalState control
       bind_eq tail_step ih ownerLoc
@@ -1083,16 +1185,17 @@ private theorem completeExpr {unit : ExecutableUnit} {namespaceId frame state ex
 
 /-- Completeness up to fuel: every big-step function derivation is reproduced
 by the fuelled interpreter with sufficient fuel, up to erasing locations. -/
-theorem evalFunction_complete {unit : ExecutableUnit} {handle typeInstantiation state arguments
+theorem evalFunction_complete {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {handle typeInstantiation state arguments
     finalState outcome}
-    (h : EvalFunction unit handle typeInstantiation state arguments finalState outcome) :
+    (h : EvalFunction executable handle typeInstantiation state arguments finalState outcome) :
     ∃ fuel result,
-      Internal.evalFunction fuel unit handle typeInstantiation state arguments = .ok result ∧
+      Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result ∧
         result.state = finalState ∧ result.outcome.value = outcome := by
   cases h with
   | body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
       evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq
-      body_eq body_step outcome_eq finalize_eq =>
+      body_eq body_step outcome_eq hole_free finalize_eq =>
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := completeExpr body_step
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
       cases hb : arguments.size != declaration.signature.parameters.size with
@@ -1109,7 +1212,7 @@ theorem evalFunction_complete {unit : ExecutableUnit} {handle typeInstantiation 
         | some values =>
             simp [finishControl?, unpack_eq] at outcome_eq
             subst outcome_eq
-            simp only [unpack_eq, rf, rs]
+            simp only [unpack_eq, rf, rs, hole_free, ↓reduceIte]
             exact ⟨_, rfl, finalize_eq, rfl⟩
     | «return_» values =>
         cases size_eq : values.size == declaration.signature.results.size with
@@ -1117,7 +1220,7 @@ theorem evalFunction_complete {unit : ExecutableUnit} {handle typeInstantiation 
         | true =>
             simp [finishControl?, size_eq] at outcome_eq
             subst outcome_eq
-            simp only [bne, size_eq, Bool.not_true, rf, rs]
+            simp only [bne, size_eq, Bool.not_true, rf, rs, hole_free, ↓reduceIte]
             exact ⟨_, rfl, finalize_eq, rfl⟩
     | «throw_» kind thrown =>
         simp [finishControl?] at outcome_eq
@@ -1127,20 +1230,21 @@ theorem evalFunction_complete {unit : ExecutableUnit} {handle typeInstantiation 
     | break_ nest value => simp [finishControl?] at outcome_eq
     | continue_ nest => simp [finishControl?] at outcome_eq
   | native handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq body_eq native_eq =>
+      namespace_eq declaration_eq arity_eq body_eq native_eq hole_free =>
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
       simp [arity_eq]
     refine ⟨1, ?_⟩
     rw [Internal.evalFunction.eq_2]
     simp only [namespace_eq, declaration_eq, arity, body_eq, ↓reduceIte, native_eq,
-      bind, Except.bind, pure, Except.pure]
+      hole_free, bind, Except.bind, pure, Except.pure]
     exact ⟨_, rfl, rfl, rfl⟩
 
 /-- Completeness of `Interpreter.run` up to fuel and location erasure. -/
-theorem run_complete {unit : ExecutableUnit} {handle state arguments finalState outcome}
-    (h : EvalFunction unit handle #[] state arguments finalState outcome) :
+theorem run_complete {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {handle state arguments finalState outcome}
+    (h : EvalFunction executable handle #[] state arguments finalState outcome) :
     ∃ fuel finalOutcome,
-      Interpreter.run unit fuel handle arguments state = .ok (finalState, finalOutcome) ∧
+      Interpreter.run executable fuel handle arguments state = .ok (finalState, finalOutcome) ∧
         finalOutcome.value = outcome := by
   obtain ⟨fuel, result, eval, rs, ro⟩ := evalFunction_complete h
   refine ⟨fuel, result.outcome, ?_, ro⟩
@@ -1148,10 +1252,11 @@ theorem run_complete {unit : ExecutableUnit} {handle state arguments finalState 
 
 /-- The big-step function relation is deterministic: the interpreter is a
 function, and completeness maps both derivations onto it. -/
-theorem evalFunction_deterministic {unit : ExecutableUnit} {handle typeInstantiation state arguments
+theorem evalFunction_deterministic {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {handle typeInstantiation state arguments
     finalState₁ outcome₁ finalState₂ outcome₂}
-    (h₁ : EvalFunction unit handle typeInstantiation state arguments finalState₁ outcome₁)
-    (h₂ : EvalFunction unit handle typeInstantiation state arguments finalState₂ outcome₂) :
+    (h₁ : EvalFunction executable handle typeInstantiation state arguments finalState₁ outcome₁)
+    (h₂ : EvalFunction executable handle typeInstantiation state arguments finalState₂ outcome₂) :
     finalState₁ = finalState₂ ∧ outcome₁ = outcome₂ := by
   obtain ⟨f₁, r₁, e₁, rs₁, ro₁⟩ := evalFunction_complete h₁
   obtain ⟨f₂, r₂, e₂, rs₂, ro₂⟩ := evalFunction_complete h₂
@@ -1162,10 +1267,11 @@ theorem evalFunction_deterministic {unit : ExecutableUnit} {handle typeInstantia
   exact ⟨rs₁ ▸ rs₂, ro₁ ▸ ro₂⟩
 
 /-- Determinism restated over the canonical function meaning. -/
-theorem meaning_deterministic (unit : ExecutableUnit) (function : LeanerIR.FunctionHandle)
+theorem meaning_deterministic {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (function : LeanerIR.FunctionHandle)
     {state arguments finalState₁ outcome₁ finalState₂ outcome₂}
-    (h₁ : (BigStep.meaning unit function).relates state arguments finalState₁ outcome₁)
-    (h₂ : (BigStep.meaning unit function).relates state arguments finalState₂ outcome₂) :
+    (h₁ : (BigStep.meaning executable function).relates state arguments finalState₁ outcome₁)
+    (h₂ : (BigStep.meaning executable function).relates state arguments finalState₂ outcome₂) :
     finalState₁ = finalState₂ ∧ outcome₁ = outcome₂ :=
   evalFunction_deterministic h₁ h₂
 

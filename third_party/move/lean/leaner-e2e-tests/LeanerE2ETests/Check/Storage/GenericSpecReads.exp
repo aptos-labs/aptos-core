@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Storage/GenericSpecReads.lean:36:4: error: the specification clause `ensures increased::<EUR>(addr)` is not established
+LeanerE2ETests/Check/Storage/GenericSpecReads.lean:35:7: error: leaner verification failed: the automatic verification of `increment_usd_claim_eur` failed; provide a proof: `verify increment_usd_claim_eur by …` in the module (`verify increment_usd_claim_eur by skip` shows the obligations it leaves)

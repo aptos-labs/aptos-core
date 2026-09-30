@@ -1,0 +1,15 @@
+# Copyright © Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Problems of the verification benchmark written for it (bench/problems.toml).
+
+[package]
+name = "LeanerBench"
+version = "0.0.0"
+
+[addresses]
+std = "0x1"
+bench = "0xbe"
+
+[dependencies]
+MoveStdlib = { local = "../../../../../aptos-move/framework/move-stdlib" }

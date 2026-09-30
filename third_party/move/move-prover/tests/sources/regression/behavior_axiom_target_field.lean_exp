@@ -1,0 +1,37 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/behavior_axiom_target_field.move:24:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/behavior_axiom_target_field.move:24:5: error: leaner verification failed: the automatic verification of `f_lower` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f_lower by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify f_lower by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/behavior_axiom_target_field.move:32:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/behavior_axiom_target_field.move:32:5: error: leaner verification failed: the automatic verification of `g_upper` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify g_upper by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify g_upper by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/behavior_axiom_target_field.move:40:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/behavior_axiom_target_field.move:40:5: error: leaner verification failed: the automatic verification of `g_lower` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify g_lower by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify g_lower by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/behavior_axiom_target_field.move:48:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/behavior_axiom_target_field.move:48:5: error: leaner verification failed: the automatic verification of `f_upper` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f_upper by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify f_upper by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/behavior_axiom_target_field.move:67:9: error: the specification clause `ensures result >= 5` is not established
+tests/sources/regression/behavior_axiom_target_field.move:66:5: error: leaner verification failed: the automatic verification of `other_instantiation` failed; provide a proof: `verify other_instantiation by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify other_instantiation by skip` shows the obligations it leaves)
+tests/sources/regression/behavior_axiom_target_field.move:82:9: error: the specification clause `ensures result >= 5` is not established
+tests/sources/regression/behavior_axiom_target_field.move:81:5: error: leaner verification failed: the automatic verification of `own_field_generic` failed; provide a proof: `verify own_field_generic by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify own_field_generic by skip` shows the obligations it leaves)
+tests/sources/regression/behavior_axiom_target_field.move:98:9: error: the specification clause `ensures result >= 5` is not established
+tests/sources/regression/behavior_axiom_target_field.move:97:5: error: leaner verification failed: the automatic verification of `same_type_quantified` failed; provide a proof: `verify same_type_quantified by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify same_type_quantified by skip` shows the obligations it leaves)
+tests/sources/regression/behavior_axiom_target_field.move:117:9: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/behavior_axiom_target_field.move:116:5: error: leaner verification failed: the automatic verification of `fixed_value` failed; provide a proof: `verify fixed_value by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify fixed_value by skip` shows the obligations it leaves)
+tests/sources/regression/behavior_axiom_target_field.move:134:9: error: the specification clause `ensures result >= 5` is not established
+tests/sources/regression/behavior_axiom_target_field.move:133:5: error: leaner verification failed: the automatic verification of `enum_field` failed; provide a proof: `verify enum_field by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify enum_field by skip` shows the obligations it leaves)
+tests/sources/regression/behavior_axiom_target_field.move:152:9: error: the specification clause `ensures result >= 5` is not established
+tests/sources/regression/behavior_axiom_target_field.move:151:5: error: leaner verification failed: the automatic verification of `fun_inst` failed; provide a proof: `verify fun_inst by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify fun_inst by skip` shows the obligations it leaves)

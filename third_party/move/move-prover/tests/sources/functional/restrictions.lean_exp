@@ -1,0 +1,5 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/restrictions.move: LIR-SEMANTIC-TARGET: specification call target `f2` does not resolve to a declared function or specification function at [1426, 1430)
+LIR-SEMANTIC-TARGET: specification call target `f2` does not resolve to a declared function or specification function at [1434, 1438)
+LIR-SEMANTIC-TARGET: specification call target `f4` does not resolve to a declared function or specification function at [1456, 1460)
+LIR-SEMANTIC-TARGET: specification call target `f4` does not resolve to a declared function or specification function at [1464, 1468)

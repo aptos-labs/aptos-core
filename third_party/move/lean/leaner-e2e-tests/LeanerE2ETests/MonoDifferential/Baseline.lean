@@ -109,7 +109,7 @@ private def resolveStep (unit : Validation.ValidatedUnit) (step : ExecuteStep) :
   return (ns, declaration, index)
 
 /-- Runs one prepared step through a prepared executable unit. -/
-private def runLean (executable : Validation.ExecutableUnit)
+private def runLean {unit : Validation.ValidatedUnit} (executable : Validation.ExecutableUnit unit)
     (namespaceId : NamespaceId) (functionId : Nat) (prepared : Prepared) :
     Except LocatedInterpreterError (RuntimeState × LocatedOutcome) :=
   Interpreter.run executable prepared.step.fuel
@@ -167,13 +167,15 @@ private def testFixture (environment : Lean.Environment)
     let codes := diagnostics.foldl (init := #[]) fun codes diagnostic =>
       if codes.contains diagnostic.code then codes else codes.push diagnostic.code
     s!"the Move LIR is not executable: {String.intercalate ", " codes.qsort.toList}"
-  let executable? : Except String Validation.ExecutableUnit :=
+  let executable? : Except String (Validation.ExecutableUnit unit) :=
     (Validation.prepareExecution #[LeanerIR.Move.semantics] unit).mapError preparationError
-  let roundTripExecutable? : Except String Validation.ExecutableUnit :=
+  let roundTripExecutable? :
+      Except String ((roundTrip : Validation.ValidatedUnit) × Validation.ExecutableUnit roundTrip) :=
     match LeanerLang.Print.reimportUnit environment unit with
     | .error error => .error s!"the round trip did not re-import: {toString error}"
     | .ok roundTrip =>
-        (Validation.prepareExecution #[LeanerIR.Move.semantics] roundTrip).mapError
+        ((Validation.prepareExecution #[LeanerIR.Move.semantics] roundTrip).map
+          (⟨roundTrip, ·⟩)).mapError
           fun diagnostics => s!"round trip: {preparationError diagnostics}"
   -- Resolve every step in the original unit; the round-trip resolution
   -- reuses the original indices when that leg is skipped.
@@ -233,8 +235,8 @@ private def testFixture (environment : Lean.Environment)
       | .ok executable => normalizeLeanOutcome (runLean executable identity index p)
     let roundTrip ← match roundTripExecutable? with
       | .error reason => pure (.error reason)
-      | .ok roundTripExecutable =>
-          match resolveStep roundTripExecutable.unit p.step with
+      | .ok ⟨roundTripUnit, roundTripExecutable⟩ =>
+          match resolveStep roundTripUnit p.step with
           | .ok (roundTripNs, _, roundTripIndex) =>
               pure <| normalizeLeanOutcome
                 (runLean roundTripExecutable roundTripNs.identity roundTripIndex p)

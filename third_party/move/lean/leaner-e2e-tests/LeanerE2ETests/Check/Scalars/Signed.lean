@@ -37,6 +37,9 @@ leaner module 0x42::signed where
   fun negative_literal() -> i32 := -5
 
   fun negate_value(value : i64) -> i64 := -value
+  spec negate_value where
+    ensures result == -value
+    aborts_if value == MIN_I64
 
   fun below(left : i32, right : i32) -> Bool := left < right
 

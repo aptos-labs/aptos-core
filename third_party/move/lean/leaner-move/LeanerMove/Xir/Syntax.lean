@@ -14,7 +14,7 @@ external functions, and locals start with the parameters.
 namespace LeanerIR.Move.Xir
 
 /-- The XIR module wrapper version this backend writes. -/
-def version : Nat := 6
+def version : Nat := 8
 
 /-- A Move integer type, as width-annotated operations carry it. -/
 inductive IntType where
@@ -34,6 +34,7 @@ inductive Ty where
   | vector (element : Ty)
   | ref (referent : Ty)
   | mutRef (referent : Ty)
+  | function (parameters results : Array Ty) (abilities : Array String)
   deriving Repr, BEq, Inhabited
 
 /-- A declaration-scoped type parameter. -/
@@ -105,6 +106,11 @@ inductive Oper where
   | moveFrom (struct : Nat) (arguments : Array Ty)
   | «exists» (struct : Nat) (arguments : Array Ty)
   | function (function : Nat) (arguments : Array Ty)
+  /-- A function value of `function` over the captured operands; bit `i` of
+  `mask` marks parameter `i` as captured. -/
+  | closure (function : Nat) (mask : Nat) (arguments : Array Ty)
+  /-- Call the function value in the last operand with the preceding ones. -/
+  | invoke
   | borrowLoc
   | borrowField (field : Nat) (arguments : Array Ty)
   | borrowGlobal (struct : Nat) (arguments : Array Ty)

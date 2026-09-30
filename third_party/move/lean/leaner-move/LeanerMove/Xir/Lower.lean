@@ -118,6 +118,9 @@ private def stdFunction (module name : String) : M Nat := do
 
 /-! ## Types -/
 
+private def abilityName : Ability → String
+  | .copy => "copy" | .drop => "drop" | .store => "store" | .key => "key"
+
 private def intType? : IntWidth → Bool → Option IntType
   | .bits 8, false => some .u8 | .bits 16, false => some .u16 | .bits 32, false => some .u32
   | .bits 64, false => some .u64 | .bits 128, false => some .u128
@@ -162,6 +165,9 @@ mutual
           | _ => fail loc "Move type arguments are types"
         let (id, isEnum) ← structIdOf loc name
         pure <| if isEnum then .enum id arguments else .struct id arguments
+    | .function parameters result abilities =>
+        pure (.function (← parameters.mapM (xirType loc)) (← xirTypes loc result)
+          (abilities.map abilityName))
     | .unit | .never | .tuple _ => fail loc "a unit or tuple type is not a single Move value"
     | type => fail loc s!"the type `{(repr type).pretty}` has no Move bytecode form"
 end
@@ -174,10 +180,10 @@ partial def Ty.instantiate (arguments : Array Xir.Ty) : Xir.Ty → Xir.Ty
   | .vector element => .vector (element.instantiate arguments)
   | .ref referent => .ref (referent.instantiate arguments)
   | .mutRef referent => .mutRef (referent.instantiate arguments)
+  | .function parameters results abilities =>
+      .function (parameters.map (Ty.instantiate arguments))
+        (results.map (Ty.instantiate arguments)) abilities
   | type => type
-
-private def abilityName : Ability → String
-  | .copy => "copy" | .drop => "drop" | .store => "store" | .key => "key"
 
 private def typeParameters (loc : Option LocId) (generics : Array GenericBinder) :
     M (Array TypeParameter) :=
@@ -820,7 +826,17 @@ mutual
               pure #[]
             else call (.unpack typeArgs) #[value]
         | some variant => call (.unpackVariant (← variantIndexOf loc owner variant) typeArgs) #[value]
-    | .call _ => failHere "closures have no Move bytecode form yet"
+    | .call (.closure reference mask) => do
+        let function ← functionIdOf loc reference
+        let captures ← lowerOperands arguments
+        call (.closure function mask (← typeArguments)) captures.flatten
+    | .call .invoke => do
+        -- LIR passes the function value first, XIR last.
+        let operands ← lowerOperands arguments
+        let some callable := operands[0]?
+          | failHere "an invocation has no function value"
+        call .invoke (operands.extract 1 |>.flatten |>.append callable)
+    | .call (.extension ..) => failHere "a profile call has no Move bytecode form"
     | .borrow kind target => pure #[← borrowPlace target (kind == .mutable)]
     | .read target | .copy target | .move target => pure #[← readPlace target]
     | .write target => do
@@ -853,32 +869,33 @@ mutual
         let operands ← lowerOperands arguments
         emit (.call #[] .writeRef operands.flatten)
         pure #[]
-    | .reference (.endLoan _) => lowerExpr (← nth arguments 0 "the operation")
     | .data (.select owner field) => do
         let (base, byRef) ← accessBase
         let (_, typeArgs) ← nominalOf loc (← referent (← localType base))
         let (offset, fieldType) ← fieldOffset loc (← fieldsOf loc owner none typeArgs) field
         access fieldType byRef (.borrowField offset typeArgs) base
-    | .data (.selectVariants owner fieldNames) => do
+    | .data (.selectVariants owner selected) => do
         let (base, byRef) ← accessBase
         let (_, typeArgs) ← nominalOf loc (← referent (← localType base))
         let some declaration ← nominalDecl? owner.name
           | failHere s!"`{← nameOf owner.name}` has no declaration available"
-        let mut variants := #[]
-        let mut offsets := #[]
-        let mut fieldType := none
-        for (variant, index) in declaration.variants.zipIdx do
-          let fields ← fieldsOf loc owner (some (← nameOf variant.name)) typeArgs
-          for (field, fieldIndex) in fields.zipIdx do
-            if fieldNames.contains (← nameOf field.1) then
-              variants := variants.push index
-              offsets := offsets.push fieldIndex
-              fieldType := some field.2
-        let some selectedType := fieldType | failHere "no variant has the selected field"
-        let some offset := offsets[0]? | failHere "no variant has the selected field"
-        unless offsets.all (· == offset) do
+        -- Each listed pair resolves to its variant's index and the field's
+        -- offset and type.
+        let chosen : Array (Nat × Nat × Xir.Ty) ← selected.mapM
+            fun (variantName, fieldName) => do
+          let some (_, index) ← declaration.variants.zipIdx.findM? fun (variant, _) =>
+              return (← nameOf variant.name) == variantName
+            | failHere s!"variant `{variantName}` is not declared"
+          let fields ← fieldsOf loc owner (some variantName) typeArgs
+          let some (field, offset) ← fields.zipIdx.findM? fun (field, _) =>
+              return (← nameOf field.1) == fieldName
+            | failHere s!"variant `{variantName}` declares no field `{fieldName}`"
+          pure (index, offset, field.2)
+        let some (_, offset, selectedType) := chosen[0]?
+          | failHere "a variant field selection names no variant"
+        unless chosen.all (·.2.1 == offset) do
           failHere "Move bytecode selects a variant field at one offset in every variant"
-        access selectedType byRef (.borrowVariantField variants offset typeArgs) base
+        access selectedType byRef (.borrowVariantField (chosen.map (·.1)) offset typeArgs) base
     | .data (.testVariants owner variants) => do
         let (base, _) ← accessBase
         let base ← coerceRef base false

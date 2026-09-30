@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/closure_in_spec_expr.move:1:1: error: specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts

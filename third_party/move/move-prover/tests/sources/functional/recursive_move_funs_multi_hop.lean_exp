@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/recursive_move_funs_multi_hop.move:13:5: error: `foo_3` reaches itself through `foo_2`, which is unspecified; a function on a cycle of calls is used through its contract, so specify `foo_2`

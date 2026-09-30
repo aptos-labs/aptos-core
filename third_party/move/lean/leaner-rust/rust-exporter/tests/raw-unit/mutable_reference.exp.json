@@ -171,6 +171,7 @@
             "loc": null,
             "modifies": [],
             "modifiesAll": false,
+            "parameterFrames": [],
             "pragmas": [],
             "reads": [],
             "readsAll": false
@@ -293,6 +294,7 @@
       "imports": [],
       "intrinsics": [],
       "invariants": [],
+      "lemmas": [],
       "loc": {
         "index": 0
       },
@@ -551,6 +553,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 1
+    "minor": 5
   }
 }

@@ -1,0 +1,493 @@
+{
+  "schema": "move-xast-module",
+  "version": 9,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "access_of",
+  "doc": "",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [
+    {
+      "name": "Config",
+      "doc": "",
+      "loc": 1,
+      "abilities": [
+        "key"
+      ],
+      "type_params": [],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "active",
+          "doc": "",
+          "ty": 0
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    },
+    {
+      "name": "Counter",
+      "doc": "",
+      "loc": 2,
+      "abilities": [
+        "key"
+      ],
+      "type_params": [],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "value",
+          "doc": "",
+          "ty": 1
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    },
+    {
+      "name": "Holder",
+      "doc": "",
+      "loc": 3,
+      "abilities": [
+        "key"
+      ],
+      "type_params": [],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "f",
+          "doc": "",
+          "ty": 4
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": 7,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [
+          {
+            "loc": 6,
+            "name": "f",
+            "formals": [
+              {
+                "name": "a",
+                "ty": 2
+              }
+            ],
+            "modifies": [
+              {
+                "ty": 6,
+                "loc": 5,
+                "kind": "call",
+                "op": {
+                  "global": null
+                },
+                "inst": [
+                  5
+                ],
+                "args": [
+                  {
+                    "ty": 2,
+                    "loc": 4,
+                    "kind": "local",
+                    "name": "a"
+                  }
+                ],
+                "surface": "index_notation"
+              }
+            ],
+            "reads": [],
+            "modifies_all": false,
+            "reads_all": false
+          }
+        ],
+        "proof": null
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "apply",
+      "doc": "",
+      "loc": 15,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "f",
+          "ty": 7
+        },
+        {
+          "name": "x",
+          "ty": 2
+        }
+      ],
+      "result": 3,
+      "pragmas": [],
+      "spec": {
+        "loc": 14,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [
+          {
+            "loc": 13,
+            "name": "f",
+            "formals": [
+              {
+                "name": "a",
+                "ty": 2
+              }
+            ],
+            "modifies": [
+              {
+                "ty": 6,
+                "loc": 12,
+                "kind": "call",
+                "op": {
+                  "global": null
+                },
+                "inst": [
+                  5
+                ],
+                "args": [
+                  {
+                    "ty": 2,
+                    "loc": 11,
+                    "kind": "local",
+                    "name": "a"
+                  }
+                ],
+                "surface": "index_notation"
+              }
+            ],
+            "reads": [
+              8
+            ],
+            "modifies_all": false,
+            "reads_all": false
+          }
+        ],
+        "proof": null
+      },
+      "body": {
+        "ty": 3,
+        "loc": 10,
+        "kind": "invoke",
+        "function": {
+          "ty": 7,
+          "loc": 8,
+          "kind": "local",
+          "name": "f"
+        },
+        "args": [
+          {
+            "ty": 2,
+            "loc": 9,
+            "kind": "param",
+            "index": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "apply_any",
+      "doc": "",
+      "loc": 21,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "f",
+          "ty": 9
+        },
+        {
+          "name": "x",
+          "ty": 1
+        }
+      ],
+      "result": 1,
+      "pragmas": [],
+      "spec": {
+        "loc": 20,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [
+          {
+            "loc": 19,
+            "name": "f",
+            "formals": [],
+            "modifies": [],
+            "reads": [],
+            "modifies_all": true,
+            "reads_all": false
+          }
+        ],
+        "proof": null
+      },
+      "body": {
+        "ty": 1,
+        "loc": 18,
+        "kind": "invoke",
+        "function": {
+          "ty": 9,
+          "loc": 16,
+          "kind": "local",
+          "name": "f"
+        },
+        "args": [
+          {
+            "ty": 1,
+            "loc": 17,
+            "kind": "param",
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "spec_funs": [],
+  "spec_vars": [],
+  "invariants": [],
+  "lemmas": [],
+  "labels": [],
+  "skipped": [],
+  "comments": [],
+  "sources": [
+    "access_of.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 0,
+      "end": 543
+    },
+    {
+      "file": 0,
+      "start": 71,
+      "end": 109
+    },
+    {
+      "file": 0,
+      "start": 29,
+      "end": 66
+    },
+    {
+      "file": 0,
+      "start": 115,
+      "end": 190
+    },
+    {
+      "file": 0,
+      "start": 252,
+      "end": 253
+    },
+    {
+      "file": 0,
+      "start": 244,
+      "end": 254
+    },
+    {
+      "file": 0,
+      "start": 217,
+      "end": 255
+    },
+    {
+      "file": 0,
+      "start": 195,
+      "end": 261
+    },
+    {
+      "file": 0,
+      "start": 313,
+      "end": 314
+    },
+    {
+      "file": 0,
+      "start": 315,
+      "end": 316
+    },
+    {
+      "file": 0,
+      "start": 313,
+      "end": 317
+    },
+    {
+      "file": 0,
+      "start": 412,
+      "end": 413
+    },
+    {
+      "file": 0,
+      "start": 404,
+      "end": 414
+    },
+    {
+      "file": 0,
+      "start": 349,
+      "end": 368
+    },
+    {
+      "file": 0,
+      "start": 328,
+      "end": 421
+    },
+    {
+      "file": 0,
+      "start": 267,
+      "end": 323
+    },
+    {
+      "file": 0,
+      "start": 478,
+      "end": 479
+    },
+    {
+      "file": 0,
+      "start": 480,
+      "end": 481
+    },
+    {
+      "file": 0,
+      "start": 478,
+      "end": 482
+    },
+    {
+      "file": 0,
+      "start": 518,
+      "end": 535
+    },
+    {
+      "file": 0,
+      "start": 493,
+      "end": 541
+    },
+    {
+      "file": 0,
+      "start": 427,
+      "end": 488
+    }
+  ],
+  "types": [
+    "bool",
+    "u64",
+    "address",
+    {
+      "tuple": []
+    },
+    {
+      "function": {
+        "args": 2,
+        "result": 3,
+        "abilities": [
+          "copy",
+          "drop",
+          "store"
+        ]
+      }
+    },
+    {
+      "struct": {
+        "name": 0,
+        "args": []
+      }
+    },
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 5
+      }
+    },
+    {
+      "function": {
+        "args": 2,
+        "result": 3,
+        "abilities": []
+      }
+    },
+    {
+      "struct": {
+        "name": 1,
+        "args": []
+      }
+    },
+    {
+      "function": {
+        "args": 1,
+        "result": 1,
+        "abilities": []
+      }
+    }
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "access_of"
+    }
+  ],
+  "names": [
+    {
+      "module": 0,
+      "name": "Counter"
+    },
+    {
+      "module": 0,
+      "name": "Config"
+    }
+  ]
+}

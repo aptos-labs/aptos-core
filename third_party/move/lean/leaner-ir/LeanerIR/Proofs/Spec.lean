@@ -121,6 +121,20 @@ def assume (proposition : Prop) : Spec σ ε Unit where
   ok := fun initial result final => proposition ∧ result = () ∧ final = initial
   aborts := fun _ _ => False
 
+/-- Continue, with its proof, only where a proposition holds: executions in
+which it fails do not exist; nothing is owed. -/
+def given (proposition : Prop) (continuation : proposition → Spec σ ε α) : Spec σ ε α where
+  ok := fun initial result final => ∃ holds, (continuation holds).ok initial result final
+  aborts := fun initial error => ∃ holds, (continuation holds).aborts initial error
+  undefined := fun initial => ∃ holds, (continuation holds).undefined initial
+
+/-- Where the proposition holds, continuing only there is continuing. -/
+theorem given_of {proposition : Prop} (holds : proposition)
+    (continuation : proposition → Spec σ ε α) :
+    given proposition continuation = continuation holds := by
+  have same : ∀ other, continuation other = continuation holds := fun _ => rfl
+  simp only [given, same, exists_prop_of_true holds]
+
 /-- Execute a recursive specification with at most `fuel` unfoldings.
 
 This fuel is semantic proof machinery, not a source or runtime bound.  The

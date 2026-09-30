@@ -1,0 +1,20 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/ghost_field_intrinsic_map_full.move: LIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_del`
+LIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_get`
+LIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_has_key`
+LIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_set`
+LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_iter_borrow_mut` target has an incompatible physical signature
+LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_replace_key_inplace` target has an incompatible physical signature
+LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_to_ordered_map` target has an incompatible physical signature
+LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_spec_aborts_iter_borrow_mut` target has an incompatible physical signature
+LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_spec_iter_valid` target has an incompatible physical signature
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_back_key` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_borrow_back` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_borrow_front` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_front_key` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_keys` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_pop_back` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_pop_front` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_to_ordered_map` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_to_vec_pair` requires `map_spec_key_at`
+LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_values` requires `map_spec_key_at`

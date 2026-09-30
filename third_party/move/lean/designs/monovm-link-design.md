@@ -484,6 +484,24 @@ the register stays a triage record rather than a to-do list.
   either engine — and an argument for recording each engine's outcome rather
   than only a comparison, since the recorded `.exp` made the cause obvious.
 
+- **H2, 2026-09-30 — MonoVM does not compare function values.** *Open;
+  MonoVM.* `==` on two closures fails in MonoVM with "equality is not
+  supported for this operand type", while the LIR interpreter and MoveVM
+  (compiler-v2's `leaner/closures.lean`, through XIR) compare them
+  structurally: `adder(4) == adder(4)` holds and `adder(4) == adder(5)` does
+  not. `MonoDifferential/closures.move` records the divergence.
+
+- **H2, 2026-09-30 — a non-`Copy` local was read as a copy.** *Fixed.*
+  Both the Move frontend and LeanerLang lowered a by-value use of a local
+  whose type lacks `Copy` (`take(s)`, `s.v`, `f(x)` for a closure without
+  `copy`) to a plain local read, which requires `Copy`, so
+  `prepareExecution` rejected the unit (`LIR-SEMANTIC-ABILITY`); LeanerLang
+  moved only a type parameter without `Copy`. Validation now infers the
+  access from the checked types (a move, a `Copy` place load of a
+  selection, or a place read under an observer), for every frontend.
+  `MonoDifferential/moves.move` and the closures of
+  `MonoDifferential/closures.move` are the regression tests.
+
 ## Implementation plan
 
 Status: planned 2026-08-27; M0–M3 and M4a implemented on 2026-08-27, M4b

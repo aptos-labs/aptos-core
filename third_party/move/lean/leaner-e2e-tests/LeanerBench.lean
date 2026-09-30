@@ -14,7 +14,7 @@ heartbeats per phase, the verified targets with their wall time and
 heartbeats, and the errors reported.
 
 ```text
-leaner-bench move <package> --modules <a::m>,… --out <result.json>
+leaner-bench move <package> --modules <a::m>,… [--dev] --out <result.json>
 leaner-bench lean <file.lean> --out <result.json>
 leaner-bench rust <file.rs> [--spec <file.spec.lean>] --out <result.json>
 leaner-bench warmup
@@ -29,7 +29,7 @@ namespace LeanerBench
 open Lean LeanerLang
 
 private def usage : String :=
-  "usage: leaner-bench move <package> --modules <a::m>,... --out <result.json>\n       \
+  "usage: leaner-bench move <package> --modules <a::m>,... [--dev] --out <result.json>\n       \
    leaner-bench lean <file.lean> --out <result.json>\n       \
    leaner-bench rust <file.rs> [--spec <file.spec.lean>] --out <result.json>\n       \
    leaner-bench warmup"
@@ -38,6 +38,8 @@ private structure Request where
   kind : String
   source : System.FilePath
   modules : Array String := #[]
+  /-- The Move package is compiled in dev mode. -/
+  dev : Bool := false
   specFile : Option System.FilePath := none
   out : Option System.FilePath := none
 
@@ -45,6 +47,7 @@ private partial def parseOptions : List String → Request → Except String Req
   | [], request => .ok request
   | "--modules" :: names :: rest, request =>
       parseOptions rest { request with modules := (names.splitOn ",").toArray }
+  | "--dev" :: rest, request => parseOptions rest { request with dev := true }
   | "--spec" :: path :: rest, request =>
       parseOptions rest { request with specFile := some path }
   | "--out" :: path :: rest, request => parseOptions rest { request with out := some path }
@@ -83,7 +86,7 @@ private def verifySource (request : Request) : IO (Array Message) := do
       | "move" => do
           if request.modules.isEmpty then throw <| IO.userError "a move problem names --modules"
           LeanerMove.SourceVerify.verifySource environment request.source output
-            (modules := request.modules)
+            (modules := request.modules) (dev := request.dev)
       | _ =>
           LeanerIR.Rust.SourceVerify.verifyFile environment request.source request.specFile
             output

@@ -77,17 +77,38 @@ private def pair (generated original : LocId) : AlignM Unit :=
 private def nameOf? (ns : ValidatedNamespace) (id : NameId) : Option String :=
   ns.tables.names[id.index]?.map (·.name)
 
+/-- A block's statements followed by its result, as one sequence: a trailing
+statement may come back as the result. An empty unit result, which a
+rendering elides, is no item. -/
+private def blockItems (ns : ValidatedNamespace) (statements : Array ExprId)
+    (result : Option ExprId) : Array ExprId :=
+  match result.bind (ns.expressions[·.index]?) with
+  | some { kind := .value .unit _, .. }
+  | some { kind := .operation (.primitive .tuple) _ #[] _, .. }
+  | some { kind := .block #[] none, .. } => statements
+  | _ => statements ++ result.toArray
+
 mutual
 
 private partial def alignExpr (g o : ValidatedNamespace) (generated original : ExprId) : AlignM Unit := do
   let some ge := g.expressions[generated.index]? | return
   let some oe := o.expressions[original.index]? | return
   pair ge.loc oe.loc
+  -- A block of one item renders as the item.
+  match ge.kind, oe.kind with
+  | .block gStatements gResult, kind =>
+      if !(kind matches .block ..) then
+        if let #[item] := blockItems g gStatements gResult then
+          return ← alignExpr g o item original
+  | kind, .block oStatements oResult =>
+      if !(kind matches .block ..) then
+        if let #[item] := blockItems o oStatements oResult then
+          return ← alignExpr g o generated item
+  | _, _ => pure ()
   match ge.kind, oe.kind with
   | .operation _ _ gArgs _, .operation _ _ oArgs _ => alignExprs g o gArgs oArgs
   | .block gStatements gResult, .block oStatements oResult =>
-      alignExprs g o gStatements oStatements
-      alignOption g o gResult oResult
+      alignExprs g o (blockItems g gStatements gResult) (blockItems o oStatements oResult)
   | .letDecl gPattern gValue gBody, .letDecl oPattern oValue oBody =>
       alignPattern g o gPattern oPattern
       alignOption g o gValue oValue
@@ -112,6 +133,9 @@ private partial def alignExpr (g o : ValidatedNamespace) (generated original : E
       alignExpr g o gValue oValue
   | .assignPattern gPattern gValue, .assignPattern oPattern oValue =>
       alignPattern g o gPattern oPattern
+      alignExpr g o gValue oValue
+  -- An assignment to one variable renders as either form.
+  | .assign _ gValue, .assignPattern _ oValue | .assignPattern _ gValue, .assign _ oValue =>
       alignExpr g o gValue oValue
   | .quantifier _ gBinders _ gCondition gBody, .quantifier _ oBinders _ oCondition oBody =>
       if gBinders.size == oBinders.size then
@@ -208,6 +232,11 @@ private def alignNamespace (g o : ValidatedNamespace) : AlignM Unit := do
     pair gDecl.loc oDecl.loc
     alignOption g o gDecl.body oDecl.body
     alignContract g o gDecl.contract oDecl.contract
+  for gDecl in g.lemmas do
+    let some oDecl := counterpart? g o o.lemmas (·.name) gDecl | continue
+    pair gDecl.loc oDecl.loc
+    alignContract g o gDecl.contract oDecl.contract
+    alignConditions g o gDecl.proof oDecl.proof
   if g.invariants.size == o.invariants.size then
     for (gDecl, oDecl) in g.invariants.zip o.invariants do
       pair gDecl.loc oDecl.loc
@@ -336,6 +365,30 @@ private def pathKey (ns : ValidatedNamespace) : Option (String × String) := do
   let segments ← ns.tables.namespaces[ns.identity.index]? |>.map (·.segments)
   return (← segments[0]?, ← segments.back?)
 
+/-- The options `LEANER_OPTIONS` sets beside a request's, for debugging a
+verification the CLI or the benchmark runs: `name=value` assignments
+separated by commas, each value read at the type its registered option
+declares, as `lean -D` reads one. -/
+private def environmentOptions (options : Options) : IO Options := do
+  let some assignments ← IO.getEnv "LEANER_OPTIONS" | return options
+  let declarations ← getOptionDecls
+  (assignments.splitOn ",").foldlM (init := options) fun options assignment => do
+    let [name, value] := assignment.splitOn "="
+      | throw <| IO.userError s!"LEANER_OPTIONS: `{assignment}` is not `name=value`"
+    let name := name.toName
+    let some declaration := declarations.find? name
+      | throw <| IO.userError s!"LEANER_OPTIONS: `{name}` is not a registered option"
+    match declaration.defValue with
+    | .ofBool _ => match value with
+      | "true" => return options.setBool name true
+      | "false" => return options.setBool name false
+      | _ => throw <| IO.userError s!"LEANER_OPTIONS: `{name}` takes `true` or `false`"
+    | .ofNat _ => match value.toNat? with
+      | some number => return options.set name number
+      | none => throw <| IO.userError s!"LEANER_OPTIONS: `{name}` takes a numeral"
+    | .ofString _ => return options.set name value
+    | _ => throw <| IO.userError s!"LEANER_OPTIONS: `{name}` is not a Bool, Nat, or String option"
+
 /-- Render, write, and elaborate a unit, and report every message in the
 coordinates of its source. -/
 def run (environment : Environment) (request : Request) : IO (Array Report) := do
@@ -367,6 +420,7 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
   let options := match request.heartbeats with
     | some heartbeats => leaner.verifyHeartbeats.set {} (heartbeats * 1000)
     | none => {}
+  let options ← environmentOptions options
   let (elaborated, messages) ← elaborate environment generated generatedName options
   -- Each elaborated namespace aligns with the source namespace at its path.
   let entries := (moduleUnits elaborated).toArray.flatMap fun (_, unit) =>

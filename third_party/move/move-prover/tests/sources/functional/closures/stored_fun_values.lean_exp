@@ -1,0 +1,68 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/stored_fun_values.move:56:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/stored_fun_values.move:56:5: error: leaner verification failed: the automatic verification of `use_transformer` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify use_transformer by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_transformer by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/stored_fun_values.move:103:9: error: the specification clause `aborts_if !exists<Monotone>(addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:101:5: error: leaner verification failed: the automatic verification of `use_monotone` failed; provide a proof: `verify use_monotone by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_monotone by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:188:9: error: the specification clause `aborts_if !exists<Reader>(reader_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:186:5: error: leaner verification failed: the automatic verification of `use_reader` failed; provide a proof: `verify use_reader by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_reader by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:208:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/stored_fun_values.move:208:5: error: leaner verification failed: the automatic verification of `increment_counter` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify increment_counter by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify increment_counter by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/stored_fun_values.move:230:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/stored_fun_values.move:230:5: error: leaner verification failed: the automatic verification of `safe_increment` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify safe_increment by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify safe_increment by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/stored_fun_values.move:252:9: error: the specification clause `aborts_if !exists<Modifier>(modifier_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:250:5: error: leaner verification failed: the automatic verification of `use_modifier` failed; provide a proof: `verify use_modifier by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_modifier by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:294:9: error: the specification clause `aborts_if !exists<SafeOp>(addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:292:5: error: leaner verification failed: the automatic verification of `use_safe_op` failed; provide a proof: `verify use_safe_op by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_safe_op by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:327:9: error: the specification clause `aborts_if !exists<CounterReader>(reader_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:325:5: error: leaner verification failed: the automatic verification of `use_counter_reader` failed; provide a proof: `verify use_counter_reader by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_counter_reader by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:359:9: error: the specification clause `aborts_if !exists<CounterModifier>(modifier_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:357:5: error: leaner verification failed: the automatic verification of `use_counter_modifier` failed; provide a proof: `verify use_counter_modifier by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_counter_modifier by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:387:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/stored_fun_values.move:387:5: error: leaner verification failed: the automatic verification of `config_aware_increment` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify config_aware_increment by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify config_aware_increment by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/stored_fun_values.move:405:9: error: the specification clause `aborts_if !exists<ConfigAwareModifier>(modifier_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:403:5: error: leaner verification failed: the automatic verification of `use_config_aware_modifier` failed; provide a proof: `verify use_config_aware_modifier by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_config_aware_modifier by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:421:9: error: the specification clause `aborts_if !exists<CounterModifier>(modifier_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:419:5: error: leaner verification failed: the automatic verification of `use_counter_modifier_wrong` failed; provide a proof: `verify use_counter_modifier_wrong by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_counter_modifier_wrong by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:470:9: error: the specification clause `aborts_if !exists<AnyReader>(reader_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:468:5: error: leaner verification failed: the automatic verification of `use_any_reader` failed; provide a proof: `verify use_any_reader by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_any_reader by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:506:9: error: the specification clause `aborts_if !exists<AnyModifier>(modifier_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:504:5: error: leaner verification failed: the automatic verification of `use_any_modifier` failed; provide a proof: `verify use_any_modifier by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_any_modifier by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:516:9: error: the specification clause `aborts_if !exists<AnyModifier>(modifier_addr)` is not established
+tests/sources/functional/closures/stored_fun_values.move:514:5: error: leaner verification failed: the automatic verification of `use_any_modifier_wrong` failed; provide a proof: `verify use_any_modifier_wrong by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_any_modifier_wrong by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:542:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/stored_fun_values.move:542:5: error: leaner verification failed: the automatic verification of `use_action` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify use_action by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_action by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/stored_fun_values.move:20:9: error: the data invariant `invariant ∀ (x : u64), !aborts_of<f>(x)` does not hold where a value is constructed
+tests/sources/functional/closures/stored_fun_values.move:47:5: error: leaner verification failed: the automatic verification of `create_invalid` failed; provide a proof: `verify create_invalid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:73:9: error: the data invariant `invariant ∀ (x : u64; r : u64), ensures_of<f>(x, r) ==> r >= x` does not hold where a value is constructed
+tests/sources/functional/closures/stored_fun_values.move:92:5: error: leaner verification failed: the automatic verification of `create_monotone_invalid` failed; provide a proof: `verify create_monotone_invalid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_monotone_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:116:9: error: the data invariant `invariant ∀ (x : u64), result_of<f>(x) == 2 * x` does not hold where a value is constructed
+tests/sources/functional/closures/stored_fun_values.move:115:9: error: the data invariant `invariant ∀ (x : u64), !aborts_of<f>(x)` does not hold where a value is constructed
+tests/sources/functional/closures/stored_fun_values.move:128:5: error: leaner verification failed: the automatic verification of `create_doubler_unsafe` failed; provide a proof: `verify create_doubler_unsafe by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_doubler_unsafe by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:145:9: error: the data invariant `invariant ∀ (a : Address), !aborts_of<f>(a)` does not hold where a value is constructed
+tests/sources/functional/closures/stored_fun_values.move:160:5: error: leaner verification failed: the automatic verification of `create_reader_invalid` failed; provide a proof: `verify create_reader_invalid by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify create_reader_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/closures/stored_fun_values.move:218:5: error: `create_modifier_invalid` calls `increment_counter`, which is not verified; verify the callee first
+tests/sources/functional/closures/stored_fun_values.move:241:5: error: `create_modifier_valid` calls `safe_increment`, which is not verified; verify the callee first
+tests/sources/functional/closures/stored_fun_values.move:347:5: error: `create_counter_modifier` calls `safe_increment`, which is not verified; verify the callee first
+tests/sources/functional/closures/stored_fun_values.move:394:5: error: `create_config_aware_modifier` calls `config_aware_increment`, which is not verified; verify the callee first
+tests/sources/functional/closures/stored_fun_values.move:489:5: error: `create_any_modifier` calls `safe_increment`, which is not verified; verify the callee first
+tests/sources/functional/closures/stored_fun_values.move:495:5: error: `create_any_modifier_multi` calls `config_aware_increment`, which is not verified; verify the callee first

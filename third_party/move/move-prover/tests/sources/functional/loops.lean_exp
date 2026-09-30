@@ -1,0 +1,84 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/loops.move:3:1: error: verification failed with a residual obligation:
+case step.some.right
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : LeanerIR.Proofs.Denote.HList params
+assumed permitted : True
+leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil)
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
+      (fun failure => LeanerIR.Proofs.Obligation "loops.lean" 1463 1477 True) state
+leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil)
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+          (LeanerIR.Proofs.Denote.Term.lit ()) env)
+        leanerContinuation✝² (fun failure => LeanerIR.Proofs.Obligation "loops.lean" 1463 1477 True)
+        state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝² (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝² (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝² (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil)
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  leanerContinuation✝¹
+recursive✝ :
+  LeanerIR.Proofs.Denote.HEnv
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil) →
+    LeanerIR.Proofs.Denote.Comp unit
+      (LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil)
+        Unit)
+state✝ : LeanerIR.Proofs.Denote.Memory unit
+snd✝ : LeanerIR.Proofs.Denote.HEnv LeanerIR.Proofs.Denote.NRow.nil
+i : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+left✝ : i.val ≤ 11
+loopHypothesis✝ :
+  ∀
+    (env :
+      LeanerIR.Proofs.Denote.HEnv
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil))
+    (state : LeanerIR.Proofs.Denote.Memory unit),
+    (env.fst.elim False fun i => LeanerIR.Proofs.Obligation "loops.lean" 1411 1418 (i.val ≤ 11)) →
+      state = state✝ →
+        LeanerIR.Proofs.wp (recursive✝ env) leanerContinuation✝
+          (fun failure => LeanerIR.Proofs.Obligation "loops.lean" 1463 1477 True) state
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil)
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.Flow.iterate recursive✝ value) leanerContinuation✝
+      (fun failure => LeanerIR.Proofs.Obligation "loops.lean" 1463 1477 True) state
+a✝ : 10 < i.val
+⊢ False
+tests/sources/functional/loops.move:57:5: error: leaner verification failed: the automatic verification of `iter10_no_abort_incorrect` failed; provide a proof: `verify iter10_no_abort_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify iter10_no_abort_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/loops.move:88:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/loops.move:86:5: error: leaner verification failed: the automatic verification of `iter10_abort_incorrect` failed; provide a proof: `verify iter10_abort_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify iter10_abort_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/loops.move:119:17: error: the loop invariant `x != y` is not preserved by an iteration
+tests/sources/functional/loops.move:134:5: error: leaner verification failed: the automatic verification of `nested_loop_outer_invariant_incorrect` failed; provide a proof: `verify nested_loop_outer_invariant_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify nested_loop_outer_invariant_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/loops.move:145:21: error: the loop invariant `x != y` is not established at entry
+tests/sources/functional/loops.move:145:21: error: the loop invariant `x != y` is not preserved by an iteration
+tests/sources/functional/loops.move:159:5: error: leaner verification failed: the automatic verification of `nested_loop_inner_invariant_incorrect` failed; provide a proof: `verify nested_loop_inner_invariant_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify nested_loop_inner_invariant_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/loops.move:189:17: error: the loop invariant `x < y` is not preserved by an iteration
+tests/sources/functional/loops.move:202:5: error: leaner verification failed: the automatic verification of `loop_with_two_back_edges_incorrect` failed; provide a proof: `verify loop_with_two_back_edges_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify loop_with_two_back_edges_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/loops.move:234:9: error: the assertion `i <= 11` does not hold
+tests/sources/functional/loops.move:242:5: error: leaner verification failed: the automatic verification of `iter10_assert_instead_of_invariant` failed; provide a proof: `verify iter10_assert_instead_of_invariant by …` in `tests/sources/functional/loops.proof.lean` (`verify iter10_assert_instead_of_invariant by skip` shows the obligations it leaves)
+tests/sources/functional/loops.move:210:17: error: the loop invariant `x != 0` is not established at entry
+tests/sources/functional/loops.move:206:5: error: leaner verification failed: the automatic verification of `loop_invariant_base_invalid` failed; provide a proof: `verify loop_invariant_base_invalid by …` in `tests/sources/functional/loops.proof.lean` (`verify loop_invariant_base_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/loops.move:223:17: error: the loop invariant `x == 0` is not preserved by an iteration
+tests/sources/functional/loops.move:219:5: error: leaner verification failed: the automatic verification of `loop_invariant_induction_invalid` failed; provide a proof: `verify loop_invariant_induction_invalid by …` in `tests/sources/functional/loops.proof.lean` (`verify loop_invariant_induction_invalid by skip` shows the obligations it leaves)

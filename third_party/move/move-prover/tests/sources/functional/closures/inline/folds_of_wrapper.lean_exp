@@ -1,0 +1,44 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/folds_of_wrapper.move:65:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper.move:65:5: error: leaner verification failed: the automatic verification of `sum_values` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_values by …` in `tests/sources/functional/closures/inline/folds_of_wrapper.proof.lean` (`verify sum_values by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_wrapper.move:76:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper.move:76:5: error: leaner verification failed: the automatic verification of `sum_kv` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_kv by …` in `tests/sources/functional/closures/inline/folds_of_wrapper.proof.lean` (`verify sum_kv by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_wrapper.move:93:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper.move:93:5: error: leaner verification failed: the automatic verification of `collect_keys` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify collect_keys by …` in `tests/sources/functional/closures/inline/folds_of_wrapper.proof.lean` (`verify collect_keys by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_wrapper.move:114:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper.move:114:5: error: leaner verification failed: the automatic verification of `sum_values_three_levels` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_values_three_levels by …` in `tests/sources/functional/closures/inline/folds_of_wrapper.proof.lean` (`verify sum_values_three_levels by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_wrapper.move:129:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper.move:129:5: error: leaner verification failed: the automatic verification of `sum_values_both` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_values_both by …` in `tests/sources/functional/closures/inline/folds_of_wrapper.proof.lean` (`verify sum_values_both by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_wrapper.move:147:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper.move:147:5: error: leaner verification failed: the automatic verification of `sum_values_through_inline` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_values_through_inline by …` in `tests/sources/functional/closures/inline/folds_of_wrapper.proof.lean` (`verify sum_values_through_inline by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_wrapper.move:162:9: error: the specification clause `ensures result == «spec_fold_idx$lambda$0»(0, entries.length, entries) + 1` is not established
+tests/sources/functional/closures/inline/folds_of_wrapper.move:159:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_wrapper.move:159:5: error: leaner verification failed: the automatic verification of `sum_values_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_values_wrong by …` in `tests/sources/functional/closures/inline/folds_of_wrapper.proof.lean` (`verify sum_values_wrong by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

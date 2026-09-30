@@ -1,0 +1,4 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/behavioral_predicate_inline_fun.move: LIR-SEMANTIC-TARGET: call target `increment` does not resolve to a declared function at [147, 159)
+LIR-SEMANTIC-TARGET: closure target `increment` does not resolve to a declared function at [420, 429)
+LIR-SEMANTIC-TARGET: closure target `increment` does not resolve to a declared function at [471, 480)

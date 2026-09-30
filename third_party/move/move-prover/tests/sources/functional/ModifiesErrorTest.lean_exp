@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/ModifiesErrorTest.move:29:1: error: the continuation after `0x0::A::read_at` is not established
+tests/sources/functional/ModifiesErrorTest.move:45:5: error: leaner verification failed: the automatic verification of `mutate_at_test_incorrect` failed; provide a proof: `verify mutate_at_test_incorrect by …` in the module (`verify mutate_at_test_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/ModifiesErrorTest.move:29:1: error: the continuation after `0x0::A::read_at` is not established
+tests/sources/functional/ModifiesErrorTest.move:58:5: error: leaner verification failed: the automatic verification of `move_to_test_incorrect` failed; provide a proof: `verify move_to_test_incorrect by …` in the module (`verify move_to_test_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/ModifiesErrorTest.move:29:1: error: the continuation after `0x0::A::read_at` is not established
+tests/sources/functional/ModifiesErrorTest.move:72:5: error: leaner verification failed: the automatic verification of `move_from_test_incorrect` failed; provide a proof: `verify move_from_test_incorrect by …` in the module (`verify move_from_test_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/ModifiesErrorTest.move:29:1: error: the continuation after `0x0::A::read_at` is not established
+tests/sources/functional/ModifiesErrorTest.move:85:5: error: leaner verification failed: the automatic verification of `mutate_S_test1_incorrect` failed; provide a proof: `verify mutate_S_test1_incorrect by …` in the module (`verify mutate_S_test1_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/ModifiesErrorTest.move:95:13: error: the assertion `x0 == x1` does not hold
+tests/sources/functional/ModifiesErrorTest.move:98:5: error: leaner verification failed: the automatic verification of `mutate_S_test2_incorrect` failed; provide a proof: `verify mutate_S_test2_incorrect by …` in the module (`verify mutate_S_test2_incorrect by skip` shows the obligations it leaves)

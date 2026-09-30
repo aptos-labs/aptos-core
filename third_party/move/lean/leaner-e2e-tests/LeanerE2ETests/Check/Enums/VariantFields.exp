@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Enums/VariantFields.lean:28:4: error: the specification clause `aborts_if false` is not established
+LeanerE2ETests/Check/Enums/VariantFields.lean:27:7: error: leaner verification failed: the automatic verification of `select_z_incorrect` failed; provide a proof: `verify select_z_incorrect by …` in the module (`verify select_z_incorrect by skip` shows the obligations it leaves)

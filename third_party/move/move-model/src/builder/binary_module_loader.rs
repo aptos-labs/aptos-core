@@ -544,6 +544,7 @@ impl<'a> BinaryModuleLoader<'a> {
                     access_specifiers.clone(),
                     None,
                     None,
+                    None,
                 )
             });
 

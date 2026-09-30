@@ -1,0 +1,277 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/ModifiesSchemaTest.move:2:1: error: verification failed with a residual obligation:
+case h_2.continues.left.isTrue
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+addr1 addr2 : LeanerIR.Proofs.Denote.NTy.address.carrier
+snd✝² : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed permitted : True
+leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+      (LeanerIR.Proofs.Denote.NRow.cons
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil)).ref
+        LeanerIR.Proofs.Denote.NRow.nil))
+    LeanerIR.Proofs.Denote.ResultShape.none.bodyType.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp
+      (LeanerIR.Proofs.Denote.ResultShape.finish
+        (LeanerIR.Proofs.Denote.Mutables.cons LeanerIR.Proofs.Denote.Var.here.there LeanerIR.Proofs.Denote.Mutables.nil)
+        LeanerIR.Proofs.Denote.ResultShape.none value)
+      (fun value state =>
+        LeanerIR.Proofs.wp
+          (LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Spec.bind
+              (LeanerIR.Proofs.Denote.callAt 464
+                (LeanerIR.Proofs.Denote.propheticMeaning executable✝ #[]
+                  { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address LeanerIR.Proofs.Denote.NRow.nil)
+                  LeanerIR.Proofs.Denote.ResultShape.none (addr2, ())))
+              fun result =>
+              LeanerIR.Proofs.Spec.pure
+                (LeanerIR.Proofs.Denote.Flow.value (LeanerIR.Proofs.Denote.ResultShape.none.toBody result)
+                  (some addr1, some addr2, ())))
+            fun x env =>
+            LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+              (LeanerIR.Proofs.Denote.Term.lit ()) env)
+          (fun value state =>
+            LeanerIR.Proofs.wp
+              (match value with
+              | LeanerIR.Proofs.Denote.Flow.value value env => LeanerIR.Proofs.Spec.pure ()
+              | LeanerIR.Proofs.Denote.Flow.return_ result env => LeanerIR.Proofs.Spec.pure result
+              | LeanerIR.Proofs.Denote.Flow.break_ nest env => LeanerIR.Proofs.Spec.bottom
+              | LeanerIR.Proofs.Denote.Flow.continue_ nest env => LeanerIR.Proofs.Spec.bottom)
+              (fun result final =>
+                (∀ (key : LeanerIR.StorageKey),
+                    ¬key = LeanerIR.StorageKey.address addr1 →
+                      final
+                          {
+                            type :=
+                              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                LeanerIR.Proofs.Denote.NRow.nil
+                                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                                  LeanerIR.Proofs.Denote.NRow.nil),
+                            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                          key =
+                        initialState✝
+                          {
+                            type :=
+                              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                LeanerIR.Proofs.Denote.NRow.nil
+                                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                                  LeanerIR.Proofs.Denote.NRow.nil),
+                            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                          key) ∧
+                  ∀ (resource : LeanerIR.Proofs.Denote.ResourceType),
+                    ¬resource =
+                          {
+                            type :=
+                              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                LeanerIR.Proofs.Denote.NRow.nil
+                                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                                  LeanerIR.Proofs.Denote.NRow.nil),
+                            arguments := LeanerIR.Proofs.Denote.NRow.nil } →
+                      final resource = initialState✝ resource)
+              (fun failure => True) state)
+          (fun failure => True) state)
+      (fun failure => True) state
+leanerAnchor✝ : LeanerIR.Proofs.Denote.AnchorSaved 2 (some addr1, none, ()) initialState✝
+leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+      (LeanerIR.Proofs.Denote.NRow.cons
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil)).ref
+        LeanerIR.Proofs.Denote.NRow.nil))
+    (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } LeanerIR.Proofs.Denote.NRow.nil
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+            LeanerIR.Proofs.Denote.NRow.nil)).ref.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Flow.bind
+          (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+            ((LeanerIR.Proofs.Denote.Term.writePlace none LeanerIR.Proofs.Denote.Var.here.there
+                  (LeanerIR.Proofs.Denote.Proj.field LeanerIR.Proofs.Denote.Var.here
+                      LeanerIR.Proofs.Denote.Proj.nil).deref
+                  (LeanerIR.Proofs.Denote.Term.lit { val := 2, fits := ⋯ })).drop
+              (LeanerIR.Proofs.Denote.Term.lit ()))
+            (LeanerIR.Proofs.Denote.Var.here.there.set value env))
+          fun v env =>
+          LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+              ((LeanerIR.Proofs.Denote.Term.resolve LeanerIR.Proofs.Denote.Var.here.there).drop
+                ((LeanerIR.Proofs.Denote.Term.memoryWritten 2).drop (LeanerIR.Proofs.Denote.Term.lit ())))
+              env)
+            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value v env))
+        leanerContinuation✝² (fun failure => True) state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝² (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝² (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝² (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+x✝² :
+  Option
+    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
+      (LeanerIR.Proofs.Denote.Skolems.resource
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          LeanerIR.Proofs.Denote.NRow.nil
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil))
+        LeanerIR.Proofs.Denote.NRow.nil))
+invariantHolds✝¹ : True
+fst✝¹ : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝¹ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+heq✝¹ :
+  initialState✝
+      {
+        type :=
+          LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil),
+        arguments := LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address addr1) =
+    some (fst✝¹, snd✝¹)
+leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+      (LeanerIR.Proofs.Denote.NRow.cons
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil)).ref
+        LeanerIR.Proofs.Denote.NRow.nil))
+    LeanerIR.Proofs.Denote.ResultShape.none.bodyType.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp
+      (LeanerIR.Proofs.Denote.ResultShape.finish
+        (LeanerIR.Proofs.Denote.Mutables.cons LeanerIR.Proofs.Denote.Var.here.there LeanerIR.Proofs.Denote.Mutables.nil)
+        LeanerIR.Proofs.Denote.ResultShape.none value)
+      (fun result final =>
+        (∀ (key : LeanerIR.StorageKey),
+            ¬key = LeanerIR.StorageKey.address addr1 →
+              final
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                        LeanerIR.Proofs.Denote.NRow.nil
+                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                          LeanerIR.Proofs.Denote.NRow.nil),
+                    arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                  key =
+                initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                        LeanerIR.Proofs.Denote.NRow.nil
+                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                          LeanerIR.Proofs.Denote.NRow.nil),
+                    arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                  key) ∧
+          ∀ (resource : LeanerIR.Proofs.Denote.ResourceType),
+            ¬resource =
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                        LeanerIR.Proofs.Denote.NRow.nil
+                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                          LeanerIR.Proofs.Denote.NRow.nil),
+                    arguments := LeanerIR.Proofs.Denote.NRow.nil } →
+              final resource = initialState✝ resource)
+      (fun failure => True) state
+leanerAnchor :
+  LeanerIR.Proofs.Denote.AnchorSaved 2 (some addr2, none, ())
+    (initialState✝.set
+      {
+        type :=
+          LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil),
+        arguments := LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address addr1) (some ({ val := 2, fits := ⋯ }, snd✝¹)))
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+      (LeanerIR.Proofs.Denote.NRow.cons
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil)).ref
+        LeanerIR.Proofs.Denote.NRow.nil))
+    (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } LeanerIR.Proofs.Denote.NRow.nil
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+            LeanerIR.Proofs.Denote.NRow.nil)).ref.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Flow.bind
+          (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+            ((LeanerIR.Proofs.Denote.Term.writePlace none LeanerIR.Proofs.Denote.Var.here.there
+                  (LeanerIR.Proofs.Denote.Proj.field LeanerIR.Proofs.Denote.Var.here
+                      LeanerIR.Proofs.Denote.Proj.nil).deref
+                  (LeanerIR.Proofs.Denote.Term.lit { val := 2, fits := ⋯ })).drop
+              (LeanerIR.Proofs.Denote.Term.lit ()))
+            (LeanerIR.Proofs.Denote.Var.here.there.set value env))
+          fun v env =>
+          LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+              ((LeanerIR.Proofs.Denote.Term.resolve LeanerIR.Proofs.Denote.Var.here.there).drop
+                ((LeanerIR.Proofs.Denote.Term.memoryWritten 2).drop (LeanerIR.Proofs.Denote.Term.lit ())))
+              env)
+            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value v env))
+        leanerContinuation✝ (fun failure => True) state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+x✝¹ :
+  Option
+    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
+      (LeanerIR.Proofs.Denote.Skolems.resource
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          LeanerIR.Proofs.Denote.NRow.nil
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil))
+        LeanerIR.Proofs.Denote.NRow.nil))
+invariantHolds✝ : True
+fst✝ : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+heq✝ :
+  (if addr2 = addr1 then some ({ val := 2, fits := ⋯ }, snd✝¹)
+    else
+      initialState✝
+        {
+          type :=
+            LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              LeanerIR.Proofs.Denote.NRow.nil
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                LeanerIR.Proofs.Denote.NRow.nil),
+          arguments := LeanerIR.Proofs.Denote.NRow.nil }
+        (LeanerIR.StorageKey.address addr2)) =
+    some (fst✝, snd✝)
+key : LeanerIR.StorageKey
+x✝ : ¬key = LeanerIR.StorageKey.address addr1
+h✝ : key = LeanerIR.StorageKey.address addr2
+⊢ some ({ val := 2, fits := ⋯ }, snd✝) =
+    initialState✝
+      {
+        type :=
+          LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil),
+        arguments := LeanerIR.Proofs.Denote.NRow.nil }
+      key
+tests/sources/functional/ModifiesSchemaTest.move:33:5: error: leaner verification failed: the automatic verification of `mutate_at_wrapper2` failed; provide a proof: `verify mutate_at_wrapper2 by …` in `tests/sources/functional/ModifiesSchemaTest.proof.lean` (`verify mutate_at_wrapper2 by skip` shows the obligations it leaves)

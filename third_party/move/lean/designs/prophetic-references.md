@@ -37,7 +37,9 @@ Everything downstream of validation runs on this one model:
 
 The borrow analysis remains the trust boundary: its certificate is what
 *licenses* the elimination of pointers. A program the analysis cannot
-certify never reaches the prophetic model.
+certify never reaches the prophetic model: preparation refuses a unit with
+a rejected function, and verification refuses to state theorems about it,
+which would be vacuous (`ensureUnitDefinition`).
 
 ### Options considered
 
@@ -206,7 +208,16 @@ validation stage consumes it:
    > the loan it projects, so that order settles a hole before the value
    > holding it moves.
 
-   When non-lexical loan death lands, only the placement of these markers
+   > Since 2026-09-30 no markers are materialized: the semantics ends the
+   > recorded loans at their anchors (`loanDeathsAt`). `EvalExprWith`
+   > settles the loans dying before a node, evaluates the node
+   > (`EvalNodeWith`, which a loop repeats), and settles the loans dying
+   > after it once it produced a value; compilation wraps the node's term
+   > the same way. `endLoan` left the syntax. Printers, the runtime, and
+   > verification read one unit with one numbering, so no certificate has
+   > to relate a prepared unit to the validated one.
+
+   When non-lexical loan death lands, only the placement of these deaths
    moves; the semantics does not change.
 3. **Reject what cannot be eliminated.** Two-phase borrows, interior
    mutability, raw-pointer escapes, shared-of-mutable overlaps beyond the
@@ -407,6 +418,13 @@ needed.
   totalized on the way. Deferred: a dereference place whose base type
   cannot be recovered is left unrewritten and reports stuck at run time
   rather than guessing a kind.
+
+  > Since 2026-09-30 the erasure is decided in place rather than by a
+  > preparation pass: a dereference or freeze reads a shared operand by
+  > its recorded type (`sharedOperandAt`), and validation records each
+  > function's places that dereference a shared reference in its borrow
+  > certificate (`sharedDereferences`), which place resolution and
+  > compilation read as their bases.
 
 - **DONE — P7: Native returned-reference transfer and explicit lifetimes.**
   2026-09-01. Borrow analysis records deaths at ordinary fallthrough and

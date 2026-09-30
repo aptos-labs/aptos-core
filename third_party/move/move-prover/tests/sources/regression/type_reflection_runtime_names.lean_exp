@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/type_reflection_runtime_names.move:35:5: error: `instantiations_differ` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:43:5: error: `struct_name_without_args` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:51:5: error: `struct_name_with_args` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:59:5: error: `struct_name_with_struct_arg` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:67:5: error: `distinct_concrete_control` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:77:5: error: `nested_type_param` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:89:5: error: `function_type_arg` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:99:5: error: `type_info_name` calls the native `0x2::type_info::type_name`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:109:5: error: `std_name_padded` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/type_reflection_runtime_names.move:117:5: error: `std_name_runtime_form` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it

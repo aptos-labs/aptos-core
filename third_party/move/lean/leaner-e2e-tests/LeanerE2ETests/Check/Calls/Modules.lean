@@ -52,4 +52,25 @@ leaner module 0x46::top where
   spec wrong where
     ensures result == x -- error: the callee adds one
 
+leaner module 0x46::holders where
+  struct Holder {T} has Copy, Drop where
+    value : T
+
+  public fun hold {T has Copy, Drop}(value : T) -> Holder<T> := new Holder<T> { value := value }
+
+-- A generic function calling one of its module with its own type
+-- parameters, where the type the calls share is also written in the module
+-- they link: linked, the unit holds that type once.
+leaner module 0x46::rehold where
+  use 0x46::holders
+  use 0x46::holders::Holder
+
+  fun wrap {T has Copy, Drop}(value : T) -> Holder<T> := holders::hold(value)
+
+  public fun wrap_twice {T has Copy, Drop}(value : T) -> Holder<T> := do
+    let first := wrap(value)
+    wrap(first.value)
+  spec wrap_twice where
+    ensures result.value == value
+
 end LeanerLang.Tests.Check.Calls.Modules

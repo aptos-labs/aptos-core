@@ -32,6 +32,7 @@ contract rejects the file.
 | `enum_patterns.lean` | Nested matches over enum payloads, multiple payloads, and wildcard fallbacks |
 | `enum_payloads.lean` | Duplicate and positional field names, single variants, vector payloads, vectors of enums, wildcards, and calls carrying enums |
 | `generics.lean` | True generic structs, resources, enums, functions, nested instantiated calls, vectors, and distinct storage identities for two instantiations through compiler v2 and the VM |
+| `closures.lean` | Function values with leading and trailing captures, a generic target, closures returned, held in a struct field, passed to a higher-order function, aborting in their target, and stored in a resource (`Store` through a public target) |
 | `ordered_map.lean` | Generic sorted-vector map, binary search as a loop, key ordering through `std::cmp`, implicit freezing, borrowed lookup, vector insertion/removal, Boolean keys, and duplicate/missing-key aborts on MoveVM |
 | `reject_recursive_enum.lean` | Recursive enum declarations are rejected explicitly |
 | `reject_continue_outside_loop.lean` | `continue` outside a loop is rejected at the source boundary |

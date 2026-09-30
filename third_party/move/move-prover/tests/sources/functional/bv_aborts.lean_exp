@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/bv_aborts.move:1:1: error: specification function call namespace is out of range

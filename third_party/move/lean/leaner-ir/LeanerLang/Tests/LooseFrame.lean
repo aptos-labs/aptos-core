@@ -50,4 +50,24 @@ run_cmd do
   unless formatted == printed do
     throwError "loose-frame printing is not a fixed point: {formatted}"
 
+-- A fully open frame ending a module leaves the next command alone: a
+-- dereference's operand does not start at the command's column.
+leaner module 0x42::open_frame_last where
+  pragma verify = false
+  fun open_frame() -> Unit := ()
+  spec open_frame where
+    modifies *
+
+leaner module 0x42::after_open_frame where
+  fun one() -> u64 := 1
+
+run_cmd do
+  let env ← Lean.getEnv
+  let some registered := LeanerLang.registeredUnit? env `«0x42».open_frame_last
+    | throwError "the module ending in an open frame was not registered"
+  unless registered.namespaces[0]!.functions[0]!.contract.modifiesAll do
+    throwError "the open frame ending a module was lost"
+  unless (LeanerLang.registeredUnit? env `«0x42».after_open_frame).isSome do
+    throwError "the module after an open frame was not registered"
+
 end LeanerLang.Tests.LooseFrame

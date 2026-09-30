@@ -6,10 +6,9 @@ import LeanerLang
 /-!
 # Generated typed-twin tests
 
-`#leaner_unit` materializes one typed twin per supported struct declaration
-and keyed accessors per storable family.  These assertions pin the generated
-vocabulary: the erasure/decoding roundtrip, certified field bounds, the
-defaults, and the agreement of the family accessors with the runtime map.
+`#leaner_unit` materializes one typed twin per supported struct
+declaration.  These assertions pin the generated vocabulary: the
+erasure/decoding roundtrip, certified field bounds, and the defaults.
 -/
 
 namespace LeanerLang.Tests.SpecTypes
@@ -41,11 +40,6 @@ one `simp` through the tagged codec lemmas. -/
 example (coin : twins.Coin) :
     twins.Coin.decode? (twins.Coin.erase coin) = some coin := by simp
 
-/-- Decoding through the erasure recovers typed contents wholesale. -/
-example (contents : Option twins.Coin) :
-    (contents.map twins.Coin.erase).bind twins.Coin.decode? = contents := by
-  simp
-
 /-- Vector fields retain their element's native representation, including
 nested vectors and nominal elements, and roundtrip through their codecs. -/
 example (buffer : twins.Buffer) :
@@ -68,24 +62,6 @@ example : (default : twins.Coin).amount.value.val = 0 := rfl
 example (amount : twins.Amount) : amount.value.val ≤ 18446744073709551615 := by
   have bounds := amount.value.unsigned_bounds
   omega
-
-/-- The existence test is the raw runtime lookup — the same term a program's
-`exists<Coin>` evaluates, with nothing between them. -/
-example (globals : GlobalMap) (key : RuntimeValue) :
-    twins.Coin.contains globals key
-      = (globals.lookup (twins.Coin.key key)).isSome := rfl
-
-/-- The typed read decodes the same lookup. -/
-example (globals : GlobalMap) (key : RuntimeValue) :
-    twins.Coin.read globals key
-      = (globals.lookup (twins.Coin.key key)).bind twins.Coin.decode? := rfl
-
-/-- Publishing an erasure is read back as its typed value. -/
-example (globals : GlobalMap) (coin : twins.Coin) (key : RuntimeValue) :
-    twins.Coin.read
-      (globals.insert (twins.Coin.key key) (twins.Coin.erase coin)) key
-      = some coin := by
-  simp [twins.Coin.read, twins.Coin.readAt, twins.Coin.key]
 
 end LeanerLang.Tests.SpecTypes
 
@@ -166,12 +142,6 @@ example {α β : Type} (left : Proofs.Codec α RuntimeValue)
 
 set_option maxHeartbeats 1000 in
 example {α β : Type} (left : Proofs.Codec α RuntimeValue)
-    (right : Proofs.Codec β RuntimeValue) (contents : Option (Choice α β)) :
-    (contents.map (Choice.erase left right)).bind (Choice.decode? left right) = contents := by
-  simp
-
-set_option maxHeartbeats 1000 in
-example {α β : Type} (left : Proofs.Codec α RuntimeValue)
     (right : Proofs.Codec β RuntimeValue) (value : RuntimeValue) :
     Choice.decode? left right (.nominal ⟨⟨0⟩, 0⟩ (some "Second") #[value]) =
       (right.decode? value).map Choice.Second := by
@@ -188,7 +158,7 @@ example : Choice.decode? Proofs.Codec.bool Proofs.Codec.bool
 
 open Lean Elab Command in
 run_cmd do
-  for name in [``Choice.decode?_erase, ``Choice.decode?_map_erase,
+  for name in [``Choice.decode?_erase,
       ``Choice.decode?_First_literal, ``Choice.decode?_Second_literal,
       ``Choice.decode?_Batch_literal] do
     if (← collectAxioms name).contains ``sorryAx then

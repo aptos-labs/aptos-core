@@ -21,20 +21,33 @@ use move_binary_format::file_format::Visibility;
 use move_core_types::ability::AbilitySet;
 use move_model::{
     ast::{
-        AbortKind, Address, Attribute, AttributeValue, BehaviorKind, Condition, ConditionKind,
-        ExpData, FriendDecl, GlobalInvariant, MemoryRange, Operation, Pattern, PropertyBag,
-        PropertyValue, QuantKind, Spec, SpecFunDecl, SpecVarDecl, TraceKind, Value,
+        AbortKind, Address, Attribute, AttributeValue, BehaviorKind, Condition, ConditionKind, Exp,
+        ExpData, FriendDecl, FunParamAccessOf, LemmaDecl, LemmaId, MemoryLabel, MemoryRange,
+        Operation, Pattern,
+        Proof, PropertyBag, PropertyValue, QuantKind, Spec, SpecFunDecl, SpecVarDecl, TraceKind,
+        Value,
     },
     model::{
         FieldEnv, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NamedConstantEnv, NodeId,
-        Parameter, StructEnv, SurfaceSyntax, TypeParameter,
+        Parameter, QualifiedId, StructEnv, SurfaceSyntax, TypeParameter,
     },
     symbol::Symbol,
-    ty::{PrimitiveType, ReferenceKind, Type},
+    ty::{PrimitiveType, ReferenceKind, Type, BOOL_TYPE},
 };
 use std::{cell::RefCell, collections::BTreeMap};
 
 /// Dumps the module `module_id` of `env` as an XAST document.
+/// The named state labels of the program, by number.
+fn state_labels(env: &GlobalEnv) -> Vec<xast::StateLabel> {
+    env.get_memory_label_names()
+        .into_iter()
+        .map(|(label, name)| xast::StateLabel {
+            id: label.as_usize() as u64,
+            name: name.display(env.symbol_pool()).to_string(),
+        })
+        .collect()
+}
+
 pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::XastModule> {
     let module_env = env.get_module(module_id);
     let constants: BTreeMap<String, Value> = module_env
@@ -99,10 +112,7 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
         structs.push(ctx.struct_decl(&struct_env)?);
     }
     // Unsupported function-value construction is left out, by name and
-    // reason, instead of failing the module. An inline function, and the
-    // specification function derived from it, is left out unrecorded:
-    // compiler-v2 has expanded it at its call sites, so the module loses no
-    // declaration.
+    // reason, instead of failing the module.
     let is_function_value_error =
         |e: &anyhow::Error| format!("{:#}", e).contains("function values are out of scope");
     let mut functions = vec![];
@@ -113,14 +123,11 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
         }
         match ctx.function(&fun_env) {
             Ok(function) => functions.push(function),
-            Err(e) if is_function_value_error(&e) => {
-                if !fun_env.is_inline() {
-                    skipped.push(xast::Skipped {
-                        name: fun_env.get_name_str().to_string(),
-                        reason: format!("{:#}", e),
-                    })
-                }
-            },
+            Err(e) if is_function_value_error(&e) => skipped.push(xast::Skipped {
+                name: fun_env.get_name_str().to_string(),
+                reason: format!("{:#}", e),
+                inline: fun_env.is_inline(),
+            }),
             Err(e) => return Err(e),
         }
     }
@@ -128,18 +135,14 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
     for (_, decl) in module_env.get_spec_funs() {
         match ctx.spec_fun(decl) {
             Ok(spec_fun) => spec_funs.push(spec_fun),
-            Err(e) if is_function_value_error(&e) => {
-                let expanded = decl.is_move_fun
+            Err(e) if is_function_value_error(&e) => skipped.push(xast::Skipped {
+                name: ctx.pool().string(decl.name).to_string(),
+                reason: format!("{:#}", e),
+                inline: decl.is_move_fun
                     && module_env
                         .find_function(decl.name)
-                        .is_some_and(|fun_env| fun_env.is_inline());
-                if !expanded {
-                    skipped.push(xast::Skipped {
-                        name: ctx.pool().string(decl.name).to_string(),
-                        reason: format!("{:#}", e),
-                    })
-                }
-            },
+                        .is_some_and(|function| function.is_inline()),
+            }),
             Err(e) => return Err(e),
         }
     }
@@ -152,7 +155,25 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
         let inv = env
             .get_global_invariant(id)
             .ok_or_else(|| anyhow!("dangling global invariant id"))?;
-        invariants.push(ctx.global_invariant(inv)?);
+        invariants.push(ctx.invariant(&inv.kind, &inv.loc, &inv.properties, &inv.cond)?);
+    }
+    // Axioms stay among the module specification's conditions.
+    for cond in &module_env.get_spec().conditions {
+        if matches!(cond.kind, ConditionKind::Axiom(..)) {
+            invariants.push(ctx.invariant(&cond.kind, &cond.loc, &cond.properties, &cond.exp)?);
+        }
+    }
+    let mut lemmas = vec![];
+    for (_, decl) in module_env.get_lemmas() {
+        match ctx.lemma(decl) {
+            Ok(lemma) => lemmas.push(lemma),
+            Err(e) if is_function_value_error(&e) => skipped.push(xast::Skipped {
+                name: ctx.pool().string(decl.name).to_string(),
+                reason: format!("{:#}", e),
+                inline: false,
+            }),
+            Err(e) => return Err(e),
+        }
     }
 
     // The file table is complete now; scan the sources for comments.
@@ -200,6 +221,8 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
         spec_funs,
         spec_vars,
         invariants,
+        lemmas,
+        labels: state_labels(env),
         skipped,
         comments,
         sources,
@@ -360,6 +383,49 @@ impl<'a> Ctx<'a> {
         self.env.symbol_pool()
     }
 
+    /// The label a state-domain binder binds: the one of its name among the
+    /// labels the quantifier's body, condition, and triggers read, as the
+    /// Boogie backend ties them.
+    fn state_label_of(
+        &self,
+        pat: &Pattern,
+        body: &Exp,
+        condition: &Option<Exp>,
+        triggers: &[Vec<Exp>],
+    ) -> Result<u64> {
+        let Pattern::Var(_, name) = pat else {
+            bail!("a state-domain binder is a single variable");
+        };
+        let names = self.env.get_memory_label_names();
+        let mut found: Option<MemoryLabel> = None;
+        let mut visit = |e: &ExpData| {
+            if let ExpData::Call(_, op, _) = e {
+                for label in op.memory_labels() {
+                    if names.get(&label) == Some(name) {
+                        found = Some(label);
+                    }
+                }
+            }
+            true
+        };
+        body.visit_pre_order(&mut visit);
+        if let Some(condition) = condition {
+            condition.visit_pre_order(&mut visit);
+        }
+        for trigger in triggers {
+            for exp in trigger {
+                exp.visit_pre_order(&mut visit);
+            }
+        }
+        let Some(label) = found else {
+            bail!(
+                "the state-domain binder `{}` is not used as a state label",
+                self.name(*name)
+            );
+        };
+        Ok(label.as_usize() as u64)
+    }
+
     fn name(&self, sym: Symbol) -> String {
         sym.display(self.pool()).to_string()
     }
@@ -490,6 +556,23 @@ impl<'a> Ctx<'a> {
     ) -> String {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
         self.name(struct_env.get_field(field_id).get_name())
+    }
+
+    fn variant_field(
+        &self,
+        module_id: ModuleId,
+        struct_id: move_model::model::StructId,
+        field_id: move_model::model::FieldId,
+    ) -> Result<xast::VariantField> {
+        let struct_env = self.env.get_module(module_id).into_struct(struct_id);
+        let variant = struct_env
+            .get_field(field_id)
+            .get_variant()
+            .ok_or_else(|| anyhow!("variant field selection of a field without a variant"))?;
+        Ok(xast::VariantField {
+            variant: self.name(variant),
+            field: self.field_name(module_id, struct_id, field_id),
+        })
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -789,7 +872,10 @@ impl<'a> Ctx<'a> {
             is_native: struct_env.is_native(),
             fields,
             variants,
-            spec: self.spec(&struct_env.get_spec())?,
+            spec: xast::Spec {
+                access_of: self.access_of(struct_env.get_field_access_of())?,
+                ..self.spec(&struct_env.get_spec())?
+            },
             intrinsic: self.intrinsic(struct_env),
         })
     }
@@ -823,7 +909,11 @@ impl<'a> Ctx<'a> {
                 })?),
                 None => None,
             };
-            Ok((body, self.spec(&fun_env.get_spec())?))
+            let spec = xast::Spec {
+                access_of: self.access_of(fun_env.get_fun_param_access_of())?,
+                ..self.spec(&fun_env.get_spec())?
+            };
+            Ok((body, spec))
         })?;
         Ok(xast::Function {
             name: self.name(fun_env.get_name()),
@@ -894,19 +984,26 @@ impl<'a> Ctx<'a> {
         })
     }
 
-    fn global_invariant(&self, inv: &GlobalInvariant) -> Result<xast::Invariant> {
-        let (kind, type_params) = match &inv.kind {
+    /// A module-level condition: a global invariant or an axiom.
+    fn invariant(
+        &self,
+        kind: &ConditionKind,
+        loc: &Loc,
+        properties: &PropertyBag,
+        exp: &Exp,
+    ) -> Result<xast::Invariant> {
+        let (kind, type_params) = match kind {
             ConditionKind::GlobalInvariant(tps) => (xast::InvariantKind::Global, tps),
             ConditionKind::GlobalInvariantUpdate(tps) => (xast::InvariantKind::GlobalUpdate, tps),
             ConditionKind::Axiom(tps) => (xast::InvariantKind::Axiom, tps),
-            kind => bail!("unexpected global invariant kind {:?}", kind),
+            kind => bail!("unexpected module condition kind {:?}", kind),
         };
         Ok(xast::Invariant {
             kind,
-            loc: self.loc(&inv.loc),
+            loc: self.loc(loc),
             type_params: type_params.iter().map(|(s, _)| self.name(*s)).collect(),
-            properties: self.pragmas(&inv.properties)?,
-            exp: self.exp(inv.cond.as_ref())?,
+            properties: self.pragmas(properties)?,
+            exp: self.exp(exp.as_ref())?,
         })
     }
 
@@ -952,7 +1049,227 @@ impl<'a> Ctx<'a> {
             pragmas: self.pragmas(&spec.properties)?,
             conditions,
             frame,
+            access_of: vec![],
+            proof: match &spec.proof {
+                Some(proof) => Some(Box::new(self.proof(proof)?)),
+                None => None,
+            },
         })
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Lemmas and proofs
+
+    fn lemma(&self, decl: &LemmaDecl) -> Result<xast::Lemma> {
+        // Lemma parameters are read as locals (by name) or as temporaries
+        // (by index).
+        let param_types = decl
+            .params
+            .iter()
+            .map(|Parameter(_, ty, _)| ty.clone())
+            .collect();
+        let param_vars = decl
+            .params
+            .iter()
+            .map(|Parameter(name, ty, _)| (*name, ty.clone()))
+            .collect();
+        let (conditions, decreases, proof) = self.with_params(param_types, || {
+            self.with_scope(param_vars, || {
+                let conditions = decl
+                    .conditions
+                    .iter()
+                    .map(|cond| self.condition(cond))
+                    .collect::<Result<Vec<_>>>()?;
+                let decreases = match &decl.decreases {
+                    Some(measure) => Some(self.exps(measure)?),
+                    None => None,
+                };
+                let proof = match &decl.proof {
+                    Some(proof) => Some(self.proof(proof)?),
+                    None => None,
+                };
+                Ok((conditions, decreases, proof))
+            })
+        })
+        .map_err(|e| anyhow!("in lemma `{}`: {:#}", self.name(decl.name), e))?;
+        Ok(xast::Lemma {
+            name: self.name(decl.name),
+            loc: self.loc(&decl.loc),
+            type_params: self.type_params(&decl.type_params),
+            params: self.params(&decl.params)?,
+            conditions,
+            decreases,
+            proof,
+        })
+    }
+
+    fn proof(&self, proof: &Proof) -> Result<xast::Proof> {
+        Ok(match proof {
+            Proof::Let(loc, name, exp) => xast::Proof::Let {
+                loc: self.loc(loc),
+                name: self.name(*name),
+                exp: self.exp(exp.as_ref())?,
+            },
+            Proof::IfElse(loc, cond, then_proof, else_proof) => xast::Proof::If {
+                loc: self.loc(loc),
+                cond: self.exp(cond.as_ref())?,
+                then_proof: Box::new(self.with_scope(vec![], || self.proof(then_proof))?),
+                else_proof: match else_proof {
+                    Some(proof) => Some(Box::new(self.with_scope(vec![], || self.proof(proof))?)),
+                    None => None,
+                },
+            },
+            // A `let` binds its name, at its value's type, for the statements
+            // after it.
+            Proof::Block(loc, proofs) => xast::Proof::Block {
+                loc: self.loc(loc),
+                proofs: self.with_scope(vec![], || {
+                    let mut out = Vec::with_capacity(proofs.len());
+                    for proof in proofs {
+                        out.push(self.proof(proof)?);
+                        if let Proof::Let(_, name, exp) = proof {
+                            let ty = self.env.get_node_type(exp.node_id());
+                            if let Some(frame) = self.scopes.borrow_mut().last_mut() {
+                                frame.push((*name, ty));
+                            }
+                        }
+                    }
+                    Ok(out)
+                })?,
+            },
+            Proof::Assert(loc, exp) => xast::Proof::Assert {
+                loc: self.loc(loc),
+                exp: self.exp(exp.as_ref())?,
+            },
+            Proof::Assume(loc, exp) => xast::Proof::Assume {
+                loc: self.loc(loc),
+                exp: self.exp(exp.as_ref())?,
+            },
+            Proof::Apply(loc, lemma, args) => xast::Proof::Apply {
+                loc: self.loc(loc),
+                application: self.lemma_application(*lemma, args)?,
+            },
+            Proof::ForallApply(loc, binders, triggers, lemma, args, weight) => {
+                let vars = binders.iter().map(|(name, ty)| (*name, ty.clone())).collect();
+                let (triggers, application) = self.with_scope(vars, || {
+                    let triggers = triggers
+                        .iter()
+                        .map(|group| self.exps(group))
+                        .collect::<Result<Vec<_>>>()?;
+                    Ok((triggers, self.lemma_application(*lemma, args)?))
+                })?;
+                xast::Proof::ForallApply {
+                    loc: self.loc(loc),
+                    binders: binders
+                        .iter()
+                        .map(|(name, ty)| {
+                            Ok(xast::Param {
+                                name: self.name(*name),
+                                ty: self.ty(ty)?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                    triggers,
+                    weight: *weight,
+                    application,
+                }
+            },
+            Proof::Calc(loc, steps) => xast::Proof::Calc {
+                loc: self.loc(loc),
+                steps: steps
+                    .iter()
+                    .map(|(lhs, op, rhs)| {
+                        Ok(xast::Exp {
+                            ty: self.ty(&BOOL_TYPE)?,
+                            loc: self.loc(loc),
+                            node: xast::ExpNode::Call {
+                                op: self.operation(op)?,
+                                inst: vec![],
+                                args: vec![self.exp(lhs.as_ref())?, self.exp(rhs.as_ref())?],
+                                surface: None,
+                            },
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+            },
+            Proof::Post(loc, proof) => xast::Proof::Post {
+                loc: self.loc(loc),
+                proof: Box::new(self.proof(proof)?),
+            },
+            Proof::Split(loc, exp) => xast::Proof::Split {
+                loc: self.loc(loc),
+                exp: self.exp(exp.as_ref())?,
+            },
+        })
+    }
+
+    /// A lemma applied to arguments, with its type arguments: the lemma's
+    /// parameter types matched against the arguments' types.
+    fn lemma_application(
+        &self,
+        lemma: QualifiedId<LemmaId>,
+        args: &[Exp],
+    ) -> Result<xast::LemmaApplication> {
+        let module_env = self.env.get_module(lemma.module_id);
+        let decl = module_env.get_lemma(lemma.id);
+        let mut inst: Vec<Option<Type>> = vec![None; decl.type_params.len()];
+        for (Parameter(_, ty, _), arg) in decl.params.iter().zip(args) {
+            match_type(ty, &self.env.get_node_type(arg.node_id()), &mut inst);
+        }
+        let inst = inst
+            .into_iter()
+            .enumerate()
+            .map(|(index, ty)| {
+                ty.ok_or_else(|| {
+                    anyhow!(
+                        "the type parameter {} of lemma `{}` is not determined by the arguments",
+                        index,
+                        self.name(decl.name)
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(xast::LemmaApplication {
+            lemma: self.qualified(lemma.module_id, decl.name),
+            inst: self.tys(&inst)?,
+            args: self.exps(args)?,
+        })
+    }
+
+    /// The access declarations of function-typed parameters or fields; the
+    /// `modifies_of` targets read its formals.
+    fn access_of(&self, decls: &[FunParamAccessOf]) -> Result<Vec<xast::AccessOf>> {
+        decls
+            .iter()
+            .map(|decl| {
+                let formals = decl
+                    .modifies_params
+                    .iter()
+                    .map(|Parameter(name, ty, _)| (*name, ty.clone()))
+                    .collect();
+                let modifies = self.with_scope(formals, || {
+                    decl.frame_spec
+                        .modifies_targets
+                        .iter()
+                        .map(|e| self.exp(e.as_ref()))
+                        .collect::<Result<Vec<_>>>()
+                })?;
+                Ok(xast::AccessOf {
+                    loc: self.loc(&decl.loc),
+                    name: self.name(decl.fun_param),
+                    formals: self.params(&decl.modifies_params)?,
+                    modifies,
+                    reads: decl
+                        .frame_spec
+                        .reads_targets
+                        .iter()
+                        .map(|q| self.ty(&Type::Struct(q.module_id, q.id, q.inst.clone())))
+                        .collect::<Result<Vec<_>>>()?,
+                    modifies_all: decl.frame_spec.modifies_all,
+                    reads_all: decl.frame_spec.reads_all,
+                })
+            })
+            .collect()
     }
 
     fn condition(&self, cond: &Condition) -> Result<xast::Condition> {
@@ -1103,9 +1420,16 @@ impl<'a> Ctx<'a> {
                 self.with_scope(vec![], || {
                     let mut xranges = Vec::with_capacity(ranges.len());
                     for (pat, domain) in ranges {
+                        let label =
+                            if matches!(self.env.get_node_type(pat.node_id()), Type::StateDomain) {
+                                Some(self.state_label_of(pat, body, condition, triggers)?)
+                            } else {
+                                None
+                            };
                         xranges.push(xast::QuantRange {
                             pattern: self.pattern(pat)?,
                             domain: self.exp(domain.as_ref())?,
+                            label,
                         });
                         // Match the model's sequential binding visibility: a
                         // pattern is in scope for later domains, not its own.
@@ -1277,8 +1601,9 @@ impl<'a> Ctx<'a> {
                 name: self.struct_name(*mid, *sid),
                 variant: variant.map(|v| self.name(v)),
             },
-            Operation::Closure(..) => {
-                bail!("closures are not supported by XAST (function values are out of scope)")
+            Operation::Closure(mid, fid, mask) => X::Closure {
+                name: self.function_name(*mid, *fid),
+                mask: mask.bits(),
             },
             Operation::Tuple => X::Tuple,
             Operation::Select(mid, sid, fid) => X::Select {
@@ -1289,8 +1614,8 @@ impl<'a> Ctx<'a> {
                 name: self.struct_name(*mid, *sid),
                 fields: fids
                     .iter()
-                    .map(|fid| self.field_name(*mid, *sid, *fid))
-                    .collect(),
+                    .map(|fid| self.variant_field(*mid, *sid, *fid))
+                    .collect::<Result<_>>()?,
             },
             Operation::TestVariants(mid, sid, variants) => X::TestVariants {
                 name: self.struct_name(*mid, *sid),
@@ -1683,5 +2008,37 @@ mod tests {
             "/* b /* c */ */",
             "/**/"
         ]);
+    }
+}
+
+/// Binds the type parameters of `pattern` to the corresponding components of
+/// `actual`, where they are not bound yet. References are transparent, as in
+/// specifications.
+fn match_type(pattern: &Type, actual: &Type, inst: &mut [Option<Type>]) {
+    match (pattern, actual.skip_reference()) {
+        (Type::TypeParameter(index), actual) => {
+            if let Some(slot @ None) = inst.get_mut(*index as usize) {
+                *slot = Some(actual.clone());
+            }
+        },
+        (Type::Reference(_, pattern), actual) => match_type(pattern, actual, inst),
+        (Type::Vector(pattern), Type::Vector(actual)) => match_type(pattern, actual, inst),
+        (Type::Struct(module, id, patterns), Type::Struct(module2, id2, actuals))
+            if module == module2 && id == id2 =>
+        {
+            for (pattern, actual) in patterns.iter().zip(actuals) {
+                match_type(pattern, actual, inst);
+            }
+        },
+        (Type::Tuple(patterns), Type::Tuple(actuals)) => {
+            for (pattern, actual) in patterns.iter().zip(actuals) {
+                match_type(pattern, actual, inst);
+            }
+        },
+        (Type::Fun(arguments, result, _), Type::Fun(arguments2, result2, _)) => {
+            match_type(arguments, arguments2, inst);
+            match_type(result, result2, inst);
+        },
+        _ => {},
     }
 }

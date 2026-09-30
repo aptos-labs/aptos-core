@@ -89,6 +89,7 @@ module 0x42::fold_symbolic {
         fold(v, 0, |acc, e| acc + *e)
     }
     spec sum_direct {
+        pragma heartbeats = 50;
         pragma aborts_if_is_partial;
         ensures result == spec_fold<u64, u64>(|acc, e| acc + e, v, 0, len(v));
     }

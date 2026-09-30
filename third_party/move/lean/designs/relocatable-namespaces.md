@@ -41,13 +41,20 @@ by relocation, as a linker relocates object code:
    Relocating into empty tables extracts a namespace from a unit;
    relocating into a unit's tables links it. The traversal is a `Remap`
    class whose instances are derived for every LIR type, so no ID field is
-   missed; a round trip (extract, link, print) is its check.
+   missed; a round trip (extract, link, print) is its check. Types are
+   interned up to the locations of their type arguments, as the type table
+   is location-free (`Ty.eraseLocs`): a type two namespaces write keeps the
+   location of the namespace relocated first, so a round trip is exact up
+   to those locations. Without it a call passing a function's own type
+   parameters would run in a frame mapping one copy of a type to another.
 3. **Linking without re-validation.** Move module dependencies form a DAG,
    so what validation established about a namespace does not depend on
    the units that include it. A unit links validated namespaces and checks
    only the boundary: each reference resolves to a namespace in the unit,
    and the declarations a namespace copied from another (the signatures it
-   was lowered against) equal that namespace's exports. The unit-wide
+   was lowered against) equal that namespace's exports. The interface a
+   linked namespace replaces is relocated beside it for that check only,
+   not into the unit's tables. The unit-wide
    parts of a validated unit (the resolution index, counts) are rebuilt,
    in time linear in the unit.
 4. **Downstream code unchanged.** Validation, the semantics, the printer,

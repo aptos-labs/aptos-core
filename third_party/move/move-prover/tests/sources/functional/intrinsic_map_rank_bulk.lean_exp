@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_rank_bulk.move:7:1: error: the intrinsic map role `map_spec_key_at` belongs to a map whose representation is not carried

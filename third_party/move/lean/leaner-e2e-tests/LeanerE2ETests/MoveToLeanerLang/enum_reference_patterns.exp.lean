@@ -34,10 +34,16 @@ leaner module 0x42::enum_reference_patterns where
     | Filled (value : T)
 
   fun borrow_or {T}(slot : &Slot<T>, fallback : &T) -> &T :=
-    if slot is Empty then fallback else slot.value
+    if slot is Empty then fallback
+    else
+      let value := &slot.value
+      value
 
   fun value_or {T has Copy, Drop}(slot : &Slot<T>, fallback : T) -> T :=
-    if slot is Empty then fallback else slot.value
+    if slot is Empty then fallback
+    else
+      let value := &slot.value
+      *value
 
   fun borrow_mut {T}(slot : &mut Slot<T>) -> &mut T :=
     if slot is Empty then abort(7)

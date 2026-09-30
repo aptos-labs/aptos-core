@@ -190,7 +190,7 @@ fn move_stdlib_prover_tests() {
 /// its messages against the `.exp` baseline next to `test_file`. Skips where
 /// the verifier is not built (`third_party/move/lean/leaner-move`).
 pub fn run_lean_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<String>) {
-    if !aptos_framework::leaner::verifier_available() {
+    if !move_prover::leaner::verifier_available() {
         eprintln!("skipping Leaner prover test: the Leaner Move verifier is not built");
         return;
     }

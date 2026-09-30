@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/emits.move:274:5: error: condition kind `LeanerIR.ConditionKind.emits` is outside the current LeanerLang parser

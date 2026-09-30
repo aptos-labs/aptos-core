@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/hash_model.move:48:9: error: the specification clause `ensures result.length > 0 ==> result[0] < MAX_U8` is not established
+tests/sources/functional/hash_model.move:45:5: error: leaner verification failed: the automatic verification of `hash_test1_incorrect` failed; provide a proof: `verify hash_test1_incorrect by …` in `tests/sources/functional/hash_model.proof.lean` (`verify hash_test1_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/hash_model.move:91:9: error: the specification clause `ensures result.length > 0 ==> result[0] < MAX_U8` is not established
+tests/sources/functional/hash_model.move:88:5: error: leaner verification failed: the automatic verification of `hash_test2_incorrect` failed; provide a proof: `verify hash_test2_incorrect by …` in `tests/sources/functional/hash_model.proof.lean` (`verify hash_test2_incorrect by skip` shows the obligations it leaves)

@@ -373,6 +373,12 @@ state does not affect whether a return, throw, break, or continue is abrupt. -/
 def expressionCanFallThrough (ns : ValidatedNamespace) (expression : ExprId) : Bool :=
   (analyzeExpr ns expression #[]).normal.isSome
 
+/-- Whether a loop body returns to the loop's head on no path: it neither
+completes normally nor continues the loop, so the loop runs it once. -/
+def loopBodyRunsOnce (ns : ValidatedNamespace) (body : ExprId) : Bool :=
+  let flow := analyzeExpr ns body #[]
+  flow.normal.isNone && !flow.continues.any (·.1 == 0)
+
 /-- Run definite-initialization once for one function: diagnose local reads
 which are not definitely initialized on every structured path reaching them,
 and construct the receipt exactly when the analysis accepts the body. Function

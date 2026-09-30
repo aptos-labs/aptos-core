@@ -386,9 +386,9 @@ private def fixture : RawUnit where
       origin := ⟨0⟩
       alignment := ⟨0⟩ }] }]
 
-private def executable? : Option ExecutableUnit := do
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] fixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 private def preparationHasDiagnosticAt (raw : RawUnit) (code : String) (loc : LocId) : Bool :=
   match validate #[schema] raw with
@@ -628,11 +628,11 @@ private def binaryPrimitiveFixture (operation : PrimitiveOperation)
       functions := #[{ ns.functions[0]! with body := .structured ⟨2⟩ }] }] }
 
 private def preparedBinary? (operation : PrimitiveOperation)
-    (left right : Int) : Option ExecutableUnit := do
+    (left right : Int) : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] (binaryPrimitiveFixture operation left right)).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
-private def shiftExecutable? : Option ExecutableUnit :=
+private def shiftExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) :=
   preparedBinary? (.checkedShiftLeft .panic) 1 1
 
 private def castFixture (operation : PrimitiveOperation) (value : Int) : RawUnit :=
@@ -649,60 +649,60 @@ private def castFixture (operation : PrimitiveOperation) (value : Int) : RawUnit
       functions := #[{ ns.functions[0]! with body := .structured ⟨1⟩ }] }] }
 
 private def preparedCast? (operation : PrimitiveOperation) (value : Int) :
-    Option ExecutableUnit := do
+    Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] (castFixture operation value)).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
-private def castExecutable? : Option ExecutableUnit :=
+private def castExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) :=
   preparedCast? (.checkedCast .abort) 255
 
 #guard match shiftExecutable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.integer 2], .. }) => true
       | _ => false
   | none => false
 
 #guard match preparedBinary? (.checkedShiftLeft .panic) 1 8 with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .threw .panic #[.integer 8], .. }) => true
       | _ => false
   | none => false
 
 #guard match preparedBinary? .shiftLeft 1 1 with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.integer 2], .. }) => true
       | _ => false
   | none => false
 
 #guard match castExecutable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.integer 255], .. }) => true
       | _ => false
   | none => false
 
 #guard match preparedCast? (.checkedCast .abort) 256 with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .threw .abort #[.integer 256], .. }) => true
       | _ => false
   | none => false
 
 #guard match preparedCast? .cast 256 with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.integer 0], .. }) => true
       | _ => false
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.integer 5], .. }) => true
       | _ => false
   | none => false
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
 
-private def shiftPrepared : ExecutableUnit := shiftExecutable?.get (by native_decide)
+private def shiftPrepared := (shiftExecutable?.get (by native_decide)).2
 
-private def castPrepared : ExecutableUnit := castExecutable?.get (by native_decide)
+private def castPrepared := (castExecutable?.get (by native_decide)).2
 
 private def integerTypingTables : Tables where
   types := #[.integer (.bits 8) false]

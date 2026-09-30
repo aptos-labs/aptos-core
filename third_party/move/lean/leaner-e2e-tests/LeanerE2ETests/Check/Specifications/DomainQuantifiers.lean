@@ -3,9 +3,10 @@
 
 import LeanerE2ETests.CheckSupport
 
-/-! Quantifiers over a range and over a vector. A range binds the integers
-from its lower bound below its upper bound; a vector, as in the Move Prover,
-binds the element at each index below its length. -/
+/-! Quantifiers over a range, over a vector, and over a type. A range binds
+the integers from its lower bound below its upper bound; a vector, as in the
+Move Prover, binds the element at each index below its length; an aggregate
+type binds its values, whose elements are bounded by their type. -/
 
 leaner module 0x49::quantifiers where
   fun below(n : u64) -> u64 := n
@@ -31,3 +32,11 @@ leaner module 0x49::quantifiers where
     aborts_if i >= v.length with 1
     ensures v[i] == 7
     ensures ∀ (k in 0 .. v.length), k != i ==> v[k] == old(v)[k]
+
+  fun any_vector() -> u64 := 1
+  spec any_vector where
+    ensures ∀ (w : Vector<u64>), w.length == 0 || w[0] <= MAX_U64
+
+  fun some_vector(v : Vector<u64>) -> u64 := 1
+  spec some_vector where
+    ensures ∃ (w : Vector<u64>), w == v

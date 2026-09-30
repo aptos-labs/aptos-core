@@ -1,0 +1,7 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/closures/inline/opaque_inline_loop_sum.move: LIR-SEMANTIC-TARGET: call target `sum` does not resolve to a declared function at [1229, 1236)
+LIR-SEMANTIC-TARGET: call target `sum` does not resolve to a declared function at [1358, 1364)
+LIR-SEMANTIC-TARGET: call target `sum_trusted` does not resolve to a declared function at [1692, 1706)
+LIR-SEMANTIC-TARGET: call target `sum` does not resolve to a declared function at [1523, 1529)
+LIR-SEMANTIC-TARGET: call target `sum` does not resolve to a declared function at [1532, 1538)
+LIR-SEMANTIC-TARGET: call target `sum` does not resolve to a declared function at [1864, 1870)

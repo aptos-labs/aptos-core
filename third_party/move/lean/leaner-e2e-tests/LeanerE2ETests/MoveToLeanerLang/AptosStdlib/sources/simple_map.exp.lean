@@ -171,8 +171,8 @@ leaner module aptos_std::simple_map where
     values : Vector<Value>
   ) -> Unit := do
     let mut (self', v2) := (keys, values)
-    self'.reverse()
-    v2.reverse()
+    self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
+    v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
     spec assume folds_capture_anchor!(69)
     let len := self'.length
@@ -341,7 +341,7 @@ leaner module aptos_std::simple_map where
     let mut values := vector<Value>[]
     let SimpleMap<«Key», Value> { data := data } := self
     let mut self := data
-    self.reverse()
+    self := core.prim.reverseSliceVector(self, 0, self.length)
     let mut self := self
     spec assume folds_capture_anchor!(84)
     spec assume folds_capture_anchor!(83)

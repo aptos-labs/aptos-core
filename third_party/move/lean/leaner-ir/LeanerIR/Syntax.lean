@@ -339,6 +339,18 @@ inductive Ty where
   | profile (value : ProfileValue)
   deriving Repr, DecidableEq, Inhabited
 
+/-- The type without the locations its type arguments were written at. The
+type table is location-free: two entries whose erasures agree are the same
+type. -/
+def Ty.eraseLocs : Ty → Ty
+  | .nominal name arguments => .nominal name ⟨arguments.toList.map GenericArgument.eraseLoc⟩
+  | type => type
+
+theorem Ty.eraseLocs_nominal (name : NameId) (arguments : Array GenericArgument) :
+    (Ty.nominal name arguments).eraseLocs = .nominal name (arguments.map GenericArgument.eraseLoc) := by
+  simp only [Ty.eraseLocs, Ty.nominal.injEq, true_and]
+  apply Array.ext' ; simp
+
 /-! Structural equality of generic arguments and types as plain comparisons,
 which the kernel evaluates by matching alone: what certificates over the
 type tables compare with. Each agrees with equality. -/
@@ -487,14 +499,90 @@ inductive ThrowKind where
   | profile (value : ProfileValue)
   deriving Repr, BEq, Inhabited
 
+/-- Move's abort code for a value no pattern matches: compiler-v2's
+`well_known::INCOMPLETE_MATCH_ABORT_CODE`, `0xCA26CBD9BE0B0001`. -/
+def moveIncompleteMatchAbortCode : Int := 14566554180833181697
+
+/-- The throw a pattern mismatch makes under a profile, with its integer
+arguments: a match without an arm for the value, a destructuring binding the
+value does not fit, or an access to a field its variant lacks. Move aborts
+with its incomplete-match code. A profile without one has no outcome there. -/
+def patternMismatch? : Option Profile → Option (ThrowKind × Array Int)
+  | some .move => some (.abort, #[moveIncompleteMatchAbortCode])
+  | some .rust | some (.extension _) | none => none
+
+/-! ## Addresses -/
+
+/-- The value of one hexadecimal digit. -/
+def hexDigitValue? (digit : Char) : Option Nat :=
+  if '0' ≤ digit ∧ digit ≤ '9' then some (digit.toNat - '0'.toNat)
+  else if 'a' ≤ digit ∧ digit ≤ 'f' then some (digit.toNat - 'a'.toNat + 10)
+  else if 'A' ≤ digit ∧ digit ≤ 'F' then some (digit.toNat - 'A'.toNat + 10)
+  else none
+
+/-- The number an address spells in hexadecimal, when it spells one. -/
+def addressNumber? (address : String) : Option Nat :=
+  match address.toList with
+  | '0' :: 'x' :: digit :: digits =>
+      (digit :: digits).foldl (fun number digit => do
+        pure (16 * (← number) + (← hexDigitValue? digit))) (some 0)
+  | _ => none
+
+/-- Addresses order by the number they spell, then by spelling. -/
+def compareAddress (left right : String) : Ordering :=
+  (compare (addressNumber? left) (addressNumber? right)).then (compare left right)
+
+/-! ## Closure masks
+
+A closure mask selects, by bit position, the parameters of a closure's target
+that the closure captures; the others are supplied at invocation. The
+operations are those of Move's `ClosureMask`. -/
+
+namespace ClosureMask
+
+/-- The mask capturing the first `count` parameters. -/
+def leading (count : Nat) : Nat := 2 ^ count - 1
+
+/-- The elements of a parameter row at captured positions (`captured`), or at
+the others. -/
+def extract (mask : Nat) (captured : Bool) : List α → List α
+  | [] => []
+  | value :: values =>
+      let rest := extract (mask / 2) captured values
+      if (mask % 2 == 1) == captured then value :: rest else rest
+
+/-- The target's argument row: the captures at the captured positions and the
+supplied arguments at the others, the supplied ones left over appended. `none`
+when either list runs short of the mask or a capture is left over. -/
+def compose (mask : Nat) (captures supplied : List α) : Option (List α) :=
+  go (captures.length + supplied.length) mask captures supplied
+where
+  go : Nat → Nat → List α → List α → Option (List α)
+    | _, 0, [], supplied => some supplied
+    | _, 0, _ :: _, _ => none
+    | 0, _ + 1, _, _ => none
+    | fuel + 1, mask@(_ + 1), captures, supplied =>
+        if mask % 2 == 1 then
+          match captures with
+          | capture :: captures => (capture :: ·) <$> go fuel (mask / 2) captures supplied
+          | [] => none
+        else
+          match supplied with
+          | value :: supplied => (value :: ·) <$> go fuel (mask / 2) captures supplied
+          | [] => none
+
+end ClosureMask
+
 /-- Closed call forms known to the Move/Rust semantic union. Operands of an
 `invoke` begin with the callable expression; operands of `closure` are its
-captures. `extension` is reserved for call forms outside this known union. -/
+captures, bound to the target's parameters whose bit is set in `mask`, in
+parameter order, as Move's `ClosureMask`. `extension` is reserved for call
+forms outside this known union. -/
 inductive CallKind where
   | function (callee : QualifiedRef)
   | constructor (constructor : QualifiedRef) (variant : Option String := none)
   | destructor (constructor : QualifiedRef) (variant : Option String := none)
-  | closure (function : QualifiedRef)
+  | closure (function : QualifiedRef) (mask : Nat)
   | invoke
   | extension (value : ProfileValue) (targets : Array QualifiedRef := #[])
   deriving Repr, BEq, Inhabited
@@ -616,23 +704,25 @@ inductive ReferenceOperation where
   | dereference
   | freeze (explicit : Bool := false)
   | mutate
-  /-- Validation-synthesized loan-death marker: the named loans die after
-  the wrapped operand. Frontends never emit it; the raw checker rejects
-  it. See `designs/prophetic-references.md`. -/
-  | endLoan (loans : Array LoanId)
   deriving Repr, BEq, Inhabited
 
 /-- Typed field and variant operations over nominal data. Qualified targets
 are strong references rather than profile payload strings. -/
 inductive DataOperation where
   | select (type : QualifiedRef) (field : String)
-  | selectVariants (type : QualifiedRef) (fields : Array String)
+  /-- The field of whichever listed variant the operand holds, as
+  `(variant, field)` pairs. -/
+  | selectVariants (type : QualifiedRef) (fields : Array (String × String))
   | testVariants (type : QualifiedRef) (variants : Array String)
   | discriminant (type : QualifiedRef)
   | updateField (type : QualifiedRef) (field : String)
   deriving Repr, BEq, Inhabited
 
-/-- Optional pre/post state indexes carried by specification operations. -/
+/-- The states a two-state specification operation reads: `pre` the one
+`old(…)` reads, `post` the current one; a missing one is the clause's
+default. A state label is a name (`NameId`) the specification refers to,
+bound by a quantifier over the state domain or defined by a state-change
+predicate. -/
 structure MemoryRange where
   pre : Option Nat := none
   post : Option Nat := none
@@ -666,6 +756,8 @@ M4 supplies their interpretation, but their identity and payload are fully
 typed and never dispatched through profile strings. -/
 inductive SpecOperation where
   | functionCall (function : QualifiedRef) (range : MemoryRange)
+  /-- An instance of a lemma at the arguments, in an `apply` condition. -/
+  | lemma (lemma : QualifiedRef) (range : MemoryRange)
   | behavior (kind : BehaviorKind) (range : MemoryRange)
   | result (index : Nat)
   | typeValue
@@ -673,6 +765,9 @@ inductive SpecOperation where
   | resourceDomain
   | stateDomain
   | global (label : Option Nat := none)
+  /-- `exists<R>(a)` read at a state label; without one, the executable
+  `global.contains` reads the current state. -/
+  | exists (label : Option Nat := none)
   | canModify
   | old
   /-- The final value of a returned mutable reference: its prophecy, which a
@@ -773,6 +868,10 @@ defines its finite, type, resource, or other profile-defined domain. -/
 structure QuantifierBinder where
   pattern : PatternId
   domain : ExprId
+  /-- The state label a binder over the state domain binds, which the memory
+  ranges of the body refer to, as the name (`NameId`) the label is; `none`
+  for every other domain. -/
+  label : Option Nat := none
   deriving Repr, BEq, Inhabited
 
 /-- Shared condition roles used by Move-style specifications for both Move and
@@ -798,6 +897,13 @@ inductive ConditionKind where
   | schemaInvariant
   | axiom_ (typeParameters : Array String := #[])
   | update
+  /-- A proof step applying lemmas: its expression is a formula over lemma
+  instances (`SpecOperation.lemma`) under implications and universal
+  quantifiers. An instance outside a quantifier owes the lemma's `requires`
+  and gives its `ensures`; one under a quantifier gives the implication. -/
+  | apply
+  /-- A proof step splitting cases on a Boolean or an enum's variant. -/
+  | split
   deriving Repr, BEq, Inhabited
 
 /-- One clause of a contract or in-body specification. `kind` has a shared
@@ -831,6 +937,14 @@ structure SpecBlock where
   conditions : Array Condition := #[]
   frame : Option Frame := none
   deriving Repr, BEq, Inhabited
+
+/-- The pragma of a specification block that is a step of its function's
+proof: verified with the function, and not run where a caller inlines it. -/
+def SpecBlock.proofPragma : Attribute := .assign "proof" (.constant (.bool true))
+
+/-- Whether a specification block is a step of its function's proof. -/
+def SpecBlock.isProof (block : SpecBlock) : Bool :=
+  block.pragmas.contains SpecBlock.proofPragma
 
 /-- Structured executable and specification expression language. Every child
 `ExprId`, `PatternId`, and `PlaceId` indexes an arena in the containing
@@ -938,6 +1052,19 @@ structure Signature where
   predicates : Array GenericPredicate := #[]
   deriving Repr, BEq, Inhabited
 
+/-- The declared footprint of a function-typed parameter (Move's
+`modifies_of<f>(a₁, …, aₙ) R[e]`): the global memory an invocation of the
+parameter may change. `formals` are locals of the function, bound to the
+invocation's arguments in `modifies`; `modifiesAll` leaves all of global
+memory open. A function-typed parameter without one keeps global memory. -/
+structure ParameterFrame where
+  loc : LocId
+  parameter : LocalId
+  formals : Array LocalId := #[]
+  modifies : Array ExprId := #[]
+  modifiesAll : Bool := false
+  deriving Repr, BEq, Inhabited
+
 /-- Complete declaration-level function contract. Conditions preserve clause
 order; frame presence is distinguished from an omitted frame, and wildcard
 read/write permissions are explicit rather than inferred. -/
@@ -950,6 +1077,7 @@ structure FunctionContract where
   modifiesAll : Bool := false
   readsAll : Bool := false
   pragmas : Array Attribute := #[]
+  parameterFrames : Array ParameterFrame := #[]
   deriving Repr, BEq, Inhabited
 
 /-- Named typed constant whose value is an expression-arena root. Profile data
@@ -1098,6 +1226,23 @@ structure SpecFunctionDecl where
   profileData : Array ProfileValue := #[]
   deriving Repr, BEq, Inhabited
 
+/-- A lemma: over its parameters, its `requires` conditions imply its
+`ensures` conditions. The contract holds those and an optional `decreases`
+measure; `proof` holds the steps establishing it, in order: assertions,
+assumptions, lemma applications, and case splits. -/
+structure LemmaDecl where
+  loc : LocId
+  name : NameId
+  doc : String := ""
+  profile : Profile
+  signature : Signature
+  origin : OriginId
+  locals : Array LocalDecl := #[]
+  contract : FunctionContract := {}
+  proof : Array Condition := #[]
+  profileData : Array ProfileValue := #[]
+  deriving Repr, BEq, Inhabited
+
 /-- Namespace-level specification state variable. Its optional initializer is
 an expression root and `locals` scopes any binders used by that expression. -/
 structure SpecVarDecl where
@@ -1166,6 +1311,7 @@ structure Namespace (Body : Type) where
   specVars : Array SpecVarDecl := #[]
   invariants : Array NamespaceInvariant := #[]
   intrinsics : Array IntrinsicDecl := #[]
+  lemmas : Array LemmaDecl := #[]
   comments : Array Comment := #[]
   deriving Repr, BEq, Inhabited
 
@@ -1212,6 +1358,7 @@ def Namespace.withStage {α β : Type} (ns : Namespace α) (expressions : Array 
   specVars := ns.specVars
   invariants := ns.invariants
   intrinsics := ns.intrinsics
+  lemmas := ns.lemmas
   comments := ns.comments
 
 end LeanerIR
