@@ -21,7 +21,6 @@ class SharedPrivilegedControlTests < Minitest::Test
   REGISTRIES = ["us-docker.pkg.dev", "us-west1-docker.pkg.dev"].freeze
   # file => [job, first step that runs PR code]
   PRIVILEGED_WORKFLOWS = {
-    "workflow-run-docker-rust-publish-pr.yaml" => ["publish-images", "Rebuild and publish immutable PR images"],
     "workflow-run-pr-e2e-tests.yaml" => ["e2e-tests", "Verify checked-in API specifications"],
     "workflow-run-forge-pr.yaml" => ["forge", "Run pre-Forge checks with explicit image tags"],
   }.freeze
@@ -241,12 +240,23 @@ class SharedPrivilegedControlTests < Minitest::Test
                  source.fetch("with"))
     assert_operator trusted_index, :<, steps(local_job).index(source)
 
+    published = jobs(load_workflow("workflow-run-docker-rust-publish-pr.yaml"))
+    build = published.fetch("build-images")
+    publisher = published.fetch("publish-images")
+    assert_equal({"contents" => "read"}, build.fetch("permissions"))
+    refute build.key?("environment")
+    assert_operator assert_trusted_checkout(build), :<, steps(build).index(exact_source_step(build))
+    assert steps(build).any? { |step| step.fetch("run", "").include?("CI=false docker/builder/docker-bake-rust-all.sh") }
+    assert_equal "privileged-pr-ci", publisher.fetch("environment")
+    assert_nil exact_source_step(publisher)
+    refute steps(publisher).any? { |step| step.to_s.include?("pr-source") }
+    assert_equal "build-images", publisher.fetch("needs")
+
     PRIVILEGED_WORKFLOWS.each do |file, (job_name, first_source_step)|
       job = jobs(load_workflow(file)).fetch(job_name)
       job_steps = steps(job)
       trusted_index = assert_trusted_checkout(job)
-      expected_setup = file == "workflow-run-docker-rust-publish-pr.yaml" ? SETUP_ACTION : RUNTIME_SETUP_ACTION
-      setups = job_steps.select { |step| step["uses"] == expected_setup }
+      setups = job_steps.select { |step| step["uses"] == RUNTIME_SETUP_ACTION }
       assert_equal 1, setups.length, file
       setup = setups.first
       assert_equal "setup", setup.fetch("id"), file
@@ -260,14 +270,14 @@ class SharedPrivilegedControlTests < Minitest::Test
       execution = job_steps.find { |step| step["name"] == first_source_step }
       assert_operator trusted_index, :<, job_steps.index(setup), file
       assert_operator job_steps.index(setup), :<, job_steps.index(execution), file
-      assert_equal "pr-source", execution.fetch("working-directory"), file
-      if file == "workflow-run-docker-rust-publish-pr.yaml"
-        assert_equal "${{ steps.setup.outputs.image_tag_prefix }}", execution.dig("env", "IMAGE_TAG_PREFIX"), file
-        assert_operator job_steps.index(execution), :<, job_steps.index(registry_refreshes.first), file
+      if file == "workflow-run-forge-pr.yaml"
+        assert_equal "trusted-base", execution.fetch("working-directory"), file
+        refute job_steps.any? { |step| step.to_s.include?("pr-source") }, file
       else
-        refute job_steps.any? { |step| step["run"].to_s.include?("docker-bake-rust-all.sh") }, file
-        registry_refreshes.each { |step| assert_operator job_steps.index(step), :<, job_steps.index(execution), file }
+        assert_equal "pr-source", execution.fetch("working-directory"), file
       end
+      refute job_steps.any? { |step| step["run"].to_s.include?("docker-bake-rust-all.sh") }, file
+      registry_refreshes.each { |step| assert_operator job_steps.index(step), :<, job_steps.index(execution), file }
       refute execution.fetch("env", {}).key?("CUSTOM_IMAGE_TAG_PREFIX"), file
       # No step may load PR-owned action code: the job mints registry credentials
       # before PR code runs, so a "./pr-source/..." step would hand it those credentials.
@@ -297,7 +307,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     end
   end
 
-  def test_forge_refresh_reuses_the_registry_action_before_pr_scripts
+  def test_forge_refresh_reuses_the_registry_action_before_trusted_scripts
     job_steps = steps(jobs(load_workflow("workflow-run-forge-pr.yaml")).fetch("forge"))
     auth = job_steps.find { |step| step["id"] == "gcp-forge-auth" }
     assert_equal REFRESHED_GCP_REGISTRY_ACTION, auth.fetch("uses")

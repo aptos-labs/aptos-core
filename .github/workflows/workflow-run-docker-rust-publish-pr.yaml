@@ -53,8 +53,98 @@ permissions:
   contents: read
 
 jobs:
+  build-images:
+    if: vars.PROTECTED_RUNNERS_ENABLED == 'true'
+    runs-on: runs-on/fleet=aptos-protected-build/env=protected
+    permissions:
+      contents: read
+    outputs:
+      archive_id: ${{ steps.archive-upload.outputs.artifact-id }}
+    steps:
+      - name: Check out the exact trusted event base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.BASE_SHA }}
+          path: trusted-base
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check build inputs against the trusted variant plan
+        env:
+          VARIANT: ${{ inputs.VARIANT }}
+          PROFILE: ${{ inputs.PROFILE }}
+          FEATURES: ${{ inputs.FEATURES }}
+          BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
+        run: |
+          python3 -I - <<'PY'
+          import os
+          import sys
+          sys.path.insert(0, "trusted-base/.github/ci")
+          from ci_actions.docker_plan import load_manifest
+          variants = {variant["id"]: variant for variant in load_manifest().variants}
+          variant = variants.get(os.environ["VARIANT"])
+          if variant is None or any(os.environ[name] != variant[field] for name, field in (
+              ("PROFILE", "profile"), ("FEATURES", "features"), ("BUILD_TARGET", "build_target"))):
+              raise SystemExit("Build inputs do not match trusted variant plan")
+          PY
+
+      - name: Check out the exact approved PR revision
+        uses: ./trusted-base/.github/actions/checkout-exact-pr-source
+        with:
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+
+      - name: Set up an isolated protected Docker builder
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          name: protected-pr-${{ github.run_id }}-${{ github.run_attempt }}
+          keep-state: false
+          cleanup: true
+          cache-binary: false
+
+      - name: Build exact PR images locally without registry credentials
+        env:
+          BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
+          PROFILE: ${{ inputs.PROFILE }}
+          FEATURES: ${{ inputs.FEATURES }}
+          BUILD_ADDL_TESTING_IMAGES: ${{ inputs.ADDITIONAL_TESTING_IMAGES }}
+          GCP_DOCKER_ARTIFACT_REPO: aptos-ci
+          TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
+          TARGET_REGISTRY: local
+          IMAGE_TAG_PREFIX: ''
+        working-directory: pr-source
+        run: |
+          set -euo pipefail
+          CI=false docker/builder/docker-bake-rust-all.sh "$BUILD_TARGET"
+
+      - name: Export the fixed Docker image archives
+        uses: ./trusted-base/.github/actions/image-archive
+        with:
+          mode: export-build
+          directory: ${{ runner.temp }}/protected-image-archives
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          base_sha: ${{ inputs.BASE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          variant: ${{ inputs.VARIANT }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
+      - name: Upload the fixed image archives
+        id: archive-upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: protected-image-archives-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.VARIANT }}
+          path: ${{ runner.temp }}/protected-image-archives/
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 7
+
   publish-images:
     if: vars.PROTECTED_RUNNERS_ENABLED == 'true'
+    needs: build-images
     environment: privileged-pr-ci
     runs-on: runs-on/fleet=aptos-protected-build/env=protected
     permissions:
@@ -88,58 +178,83 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Prepare the protected build from trusted base code
-        id: setup
-        uses: ./trusted-base/.github/actions/privileged-pr-setup
-        with:
-          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
-          source_sha: ${{ inputs.SOURCE_SHA }}
-          pr_number: ${{ inputs.PR_NUMBER }}
-          profile: ${{ inputs.PROFILE }}
-          features: ${{ inputs.FEATURES }}
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
-
-      - name: Rebuild and publish immutable PR images
+      - name: Require the exact build artifact ID
         env:
-          BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
-          PROFILE: ${{ inputs.PROFILE }}
-          FEATURES: ${{ inputs.FEATURES }}
-          BUILD_ADDL_TESTING_IMAGES: ${{ inputs.ADDITIONAL_TESTING_IMAGES }}
-          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
-          TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
-          TARGET_REGISTRY: gcp
-          IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.image_tag_prefix }}
-        working-directory: pr-source
+          ARCHIVE_ID: ${{ needs.build-images.outputs.archive_id }}
         run: |
-          set -euo pipefail
-          CI=true docker/builder/docker-bake-rust-all.sh "$BUILD_TARGET"
+          [[ "$ARCHIVE_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Missing protected build artifact ID"; exit 1; }
 
-      # Restore trusted helper code after the PR-controlled build has finished.
-      - name: Refresh exact trusted base for image collection
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Download the exact build artifact by ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          repository: ${{ github.repository }}
-          ref: ${{ inputs.BASE_SHA }}
-          path: trusted-refresh
-          persist-credentials: false
+          artifact-ids: ${{ needs.build-images.outputs.archive_id }}
+          path: ${{ runner.temp }}/protected-image-archives
+          merge-multiple: true
 
-      - name: Refresh registry access for image collection
-        uses: ./trusted-refresh/.github/actions/gcp-registry-auth
+      - name: Authenticate to the protected registry
+        uses: ./trusted-base/.github/actions/gcp-registry-auth
         with:
           create_credentials_file: false
           access_token_lifetime: 5400
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
+      - name: Install the archive to registry copy tool
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo
+
+      - name: Validate and publish the exact build archives
+        uses: ./trusted-base/.github/actions/image-archive
+        with:
+          mode: publish-build
+          directory: ${{ runner.temp }}/protected-image-archives
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          base_sha: ${{ inputs.BASE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          variant: ${{ inputs.VARIANT }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
+      - name: Select the exact trusted base commit for controller image tagging
+        env:
+          BASE_SHA: ${{ inputs.BASE_SHA }}
+          RUN_ID: ${{ github.run_id }}
+        working-directory: trusted-base
+        run: git checkout -B "protected-controller-$RUN_ID" "$BASE_SHA"
+
+      - name: Set up a trusted Docker builder for the controller image
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          name: protected-controller-${{ github.run_id }}-${{ github.run_attempt }}
+          keep-state: false
+          cleanup: true
+          cache-binary: false
+
+      - name: Build and publish the trusted controller image
+        env:
+          PROFILE: release
+          FEATURES: ''
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+          TARGET_CACHE_ID: controller-${{ inputs.BASE_SHA }}
+          TARGET_REGISTRY: gcp
+          IMAGE_TAG_PREFIX: controller-r${{ github.run_id }}-a${{ github.run_attempt }}_
+        working-directory: trusted-base
+        run: |
+          set -euo pipefail
+          CI=true docker/builder/docker-bake-rust-all.sh forge
+
       - name: Collect protected image digests from the registry
-        uses: ./trusted-refresh/.github/actions/protected-image-manifest
+        uses: ./trusted-base/.github/actions/protected-image-manifest
         with:
           mode: collect
           manifest_path: ${{ runner.temp }}/protected-image-output/manifest.json
           source_repository: ${{ inputs.SOURCE_REPOSITORY }}
           source_sha: ${{ inputs.SOURCE_SHA }}
+          base_sha: ${{ inputs.BASE_SHA }}
           pr_number: ${{ inputs.PR_NUMBER }}
           run_id: ${{ github.run_id }}
           run_attempt: ${{ github.run_attempt }}

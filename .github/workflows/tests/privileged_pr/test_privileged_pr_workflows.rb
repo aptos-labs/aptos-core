@@ -134,7 +134,8 @@ class PrivilegedPrWorkflowTests < Minitest::Test
   def test_published_tags_are_pr_scoped_and_include_the_full_sha
     publish = File.read(File.join(ROOT, ".github", "workflows", "workflow-run-docker-rust-publish-pr.yaml"))
     bake = File.read(File.join(ROOT, "docker", "builder", "docker-bake-rust-all.hcl"))
-    assert_includes publish, "TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}"
+    assert_includes publish, "mode: publish-build"
+    assert_includes publish, "source_sha: ${{ inputs.SOURCE_SHA }}"
     assert_includes bake, "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}"
     assert_includes bake, "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}"
   end

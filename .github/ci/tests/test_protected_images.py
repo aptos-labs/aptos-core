@@ -13,7 +13,7 @@ from ci_actions import protected_images as images
 
 class ProtectedImagesTests(unittest.TestCase):
     def setUp(self):
-        self.identity = dict(source_repository="contributor/aptos-core", source_sha="a" * 40,
+        self.identity = dict(source_repository="contributor/aptos-core", source_sha="a" * 40, base_sha="d" * 40,
                              pr_number="42", run_id="123", run_attempt="2", variant="release",
                              artifact_repo="us-docker.pkg.dev/aptos-registry/docker")
         self.digest = "sha256:" + "b" * 64
@@ -24,8 +24,9 @@ class ProtectedImagesTests(unittest.TestCase):
     def test_collect_resolves_every_required_image_and_scopes_tag_to_attempt(self):
         refs = []
         manifest = images.collect(self.identity, lambda ref: refs.append(ref) or self.digest)
-        self.assertEqual(len(images.IMAGE_NAMES), len(refs))
-        self.assertTrue(all(ref.endswith(":pr-42_r123-a2_" + "a" * 40) for ref in refs))
+        self.assertEqual(len(images.IMAGE_NAMES) + 1, len(refs))
+        self.assertTrue(all(ref.endswith(":pr-42_r123-a2_" + "a" * 40) for ref in refs[:-1]))
+        self.assertEqual(self.identity["artifact_repo"] + "/forge:controller-r123-a2_" + "d" * 40, refs[-1])
         self.assertEqual(set(images.IMAGE_NAMES), set(manifest["images"]))
 
     def test_validate_exports_digest_map_and_tools_reference(self):
@@ -33,6 +34,21 @@ class ProtectedImagesTests(unittest.TestCase):
         self.assertEqual(self.identity["artifact_repo"] + "/tools@" + self.digest, env["PROTECTED_TOOLS_IMAGE"])
         self.assertEqual(env["PR_IMAGE_TAG"], env["PROTECTED_IMAGE_TAG"])
         self.assertEqual(self.digest, json.loads(env["PROTECTED_IMAGE_DIGESTS"])[self.identity["artifact_repo"] + "/forge"])
+        self.assertEqual(self.identity["artifact_repo"] + "/forge@" + self.digest, env["PROTECTED_FORGE_IMAGE"])
+
+    def test_controller_is_separate_from_the_pr_forge_image(self):
+        manifest = self.manifest()
+        controller_digest = "sha256:" + "e" * 64
+        manifest["controller_digest"] = controller_digest
+        env = images.validate(json.dumps(manifest), self.identity)
+        self.assertEqual(self.identity["artifact_repo"] + "/forge@" + controller_digest, env["PROTECTED_FORGE_IMAGE"])
+        self.assertEqual(self.digest, json.loads(env["PROTECTED_IMAGE_DIGESTS"])[self.identity["artifact_repo"] + "/forge"])
+        for change in ({"base_sha": "e" * 40}, {"controller_digest": "latest"}, {"version": 1}):
+            with self.subTest(change=change), self.assertRaises(ActionError):
+                images.validate(json.dumps(dict(manifest, **change)), self.identity)
+        del manifest["controller_digest"]
+        with self.assertRaises(ActionError):
+            images.validate(json.dumps(manifest), self.identity)
 
     def test_successful_build_from_earlier_attempt_can_be_reused_on_test_rerun(self):
         manifest = self.manifest()
@@ -59,7 +75,7 @@ class ProtectedImagesTests(unittest.TestCase):
             mutate(candidate)
             with self.assertRaises(ActionError):
                 images.validate(json.dumps(candidate), self.identity)
-        raw = json.dumps(manifest).replace('"version": 1', '"version": 1, "version": 1')
+        raw = json.dumps(manifest).replace('"version": 2', '"version": 2, "version": 2')
         with self.assertRaises(ActionError):
             images.validate(raw, self.identity)
 

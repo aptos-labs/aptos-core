@@ -87,6 +87,23 @@ def protected_image_ref(repository: str, tag: str) -> str:
     return f"{repository}@{digest}"
 
 
+def protected_forge_image_ref(repository: str, tag: str) -> str:
+    """Keep the credentialed controller on the trusted base image."""
+    if not any(os.getenv(key) for key in (
+        "PROTECTED_IMAGE_TAG", "PROTECTED_IMAGE_DIGESTS", "PROTECTED_FORGE_IMAGE"
+    )):
+        return f"{repository}:{tag}"
+    reference = os.getenv("PROTECTED_FORGE_IMAGE", "")
+    prefix = f"{GAR_REPO_NAME}/forge@"
+    if (
+        repository != f"{GAR_REPO_NAME}/forge"
+        or not reference.startswith(prefix)
+        or not IMAGE_DIGEST_RE.fullmatch(reference[len(prefix):])
+    ):
+        raise ValueError("Missing or invalid trusted Forge controller digest")
+    return reference
+
+
 @dataclass
 class RunResult:
     exit_code: int
@@ -890,7 +907,7 @@ class K8sForgeRunner(ForgeRunner):
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
         elif context.cloud == Cloud.GCP:
             # the GCP project for images is separate from the cluster
-            forge_image_full = protected_image_ref(
+            forge_image_full = protected_forge_image_ref(
                 f"{GAR_REPO_NAME}/{context.forge_image_name}", context.forge_image_tag
             )
             validator_node_selector = ""  # no selector

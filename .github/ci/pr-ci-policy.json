@@ -41,6 +41,7 @@
     ".github/actions/docker-forge-pr-report/",
     ".github/actions/docker-status-plan/",
     ".github/actions/gcp-registry-auth/",
+    ".github/actions/image-archive/",
     ".github/actions/indexer-processor-dispatch/",
     ".github/actions/pr-ci-policy/",
     ".github/actions/pr-ci-report/",

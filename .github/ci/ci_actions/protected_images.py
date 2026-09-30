@@ -21,13 +21,14 @@ MAX_BYTES = 32 * 1024
 IMAGE_NAMES = ("validator", "tools", "faucet", "forge", "telemetry-service",
                "keyless-pepper-service", "indexer-grpc", "validator-testing", "nft-metadata-crawler")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
-IDENTITY_KEYS = {"source_repository", "source_sha", "pr_number", "run_id", "run_attempt", "variant", "artifact_repo"}
+IDENTITY_KEYS = {"source_repository", "source_sha", "base_sha", "pr_number", "run_id", "run_attempt", "variant", "artifact_repo"}
 
 
 def identity_checked(identity: dict) -> dict:
     patterns = {
         "source_repository": r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
         "source_sha": r"[0-9a-f]{40}",
+        "base_sha": r"[0-9a-f]{40}",
         "pr_number": r"[1-9][0-9]{0,9}",
         "run_id": r"[1-9][0-9]{0,19}",
         "run_attempt": r"[1-9][0-9]{0,5}",
@@ -61,6 +62,11 @@ def checked_digest(value: object) -> str:
     return value
 
 
+def controller_tag(identity: dict) -> str:
+    identity_checked(identity)
+    return f"controller-r{identity['run_id']}-a{identity['run_attempt']}_{identity['base_sha']}"
+
+
 def registry_digest(reference: str) -> str:
     result = subprocess.run(
         ["docker", "buildx", "imagetools", "inspect", reference, "--format", "{{json .Manifest}}"],
@@ -72,7 +78,8 @@ def registry_digest(reference: str) -> str:
 def collect(identity: dict, resolve: Callable[[str], str] = registry_digest) -> dict:
     tag = image_tag(identity)
     digests = {name: checked_digest(resolve(f"{identity['artifact_repo']}/{name}:{tag}")) for name in IMAGE_NAMES}
-    return {"version": 1, **identity, "image_tag": tag, "images": digests}
+    controller = checked_digest(resolve(f"{identity['artifact_repo']}/forge:{controller_tag(identity)}"))
+    return {"version": 2, **identity, "image_tag": tag, "images": digests, "controller_digest": controller}
 
 
 def unique_object(pairs: list) -> dict:
@@ -90,9 +97,9 @@ def validate(text: str, expected: dict) -> dict[str, str]:
         manifest = json.loads(text, object_pairs_hook=unique_object)
     except (ValueError, TypeError) as error:
         raise ActionError(f"Invalid protected image manifest: {error}") from None
-    if not isinstance(manifest, dict) or set(manifest) != IDENTITY_KEYS | {"version", "image_tag", "images"}:
+    if not isinstance(manifest, dict) or set(manifest) != IDENTITY_KEYS | {"version", "image_tag", "images", "controller_digest"}:
         raise ActionError("Invalid protected image manifest fields")
-    if type(manifest["version"]) is not int or manifest["version"] != 1:
+    if type(manifest["version"]) is not int or manifest["version"] != 2:
         raise ActionError("Invalid protected image manifest version")
     actual = {key: manifest[key] for key in IDENTITY_KEYS}
     identity_checked(actual)
@@ -111,6 +118,7 @@ def validate(text: str, expected: dict) -> dict[str, str]:
         "PROTECTED_IMAGE_TAG": manifest["image_tag"],
         "PROTECTED_IMAGE_DIGESTS": json.dumps(digests, separators=(",", ":"), sort_keys=True),
         "PROTECTED_TOOLS_IMAGE": f"{expected['artifact_repo']}/tools@{manifest['images']['tools']}",
+        "PROTECTED_FORGE_IMAGE": f"{expected['artifact_repo']}/forge@{checked_digest(manifest['controller_digest'])}",
     }
 
 

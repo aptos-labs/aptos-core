@@ -175,6 +175,7 @@ jobs:
           manifest_path: ${{ runner.temp }}/protected-image-input/manifest.json
           source_repository: ${{ inputs.SOURCE_REPOSITORY }}
           source_sha: ${{ inputs.SOURCE_SHA }}
+          base_sha: ${{ inputs.BASE_SHA }}
           pr_number: ${{ inputs.PR_NUMBER }}
           run_id: ${{ github.run_id }}
           run_attempt: ${{ github.run_attempt }}
@@ -288,11 +289,11 @@ jobs:
         run: gcloud config set project aptos-forge-gcp-0
 
       - name: Run pre-Forge checks with explicit image tags
-        working-directory: pr-source
+        working-directory: trusted-base
         env:
           FORGE_RUNNER_MODE: pre-forge
         run: testsuite/run_forge.sh
 
       - name: Run Forge with protected exact-SHA images
-        working-directory: pr-source
+        working-directory: trusted-base
         run: testsuite/run_forge.sh

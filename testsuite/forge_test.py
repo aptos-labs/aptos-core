@@ -47,6 +47,7 @@ from forge import (
     validate_forge_config,
     GAR_REPO_NAME,
     protected_image_ref,
+    protected_forge_image_ref,
 )
 
 from click.testing import CliRunner, Result
@@ -84,6 +85,15 @@ def get_fixture_path(fixture_name: str) -> Path:
 
 
 class ProtectedImageTest(unittest.TestCase):
+    def test_controller_rejects_missing_invalid_or_foreign_digest(self) -> None:
+        for reference in ("", "sha256:bad", "evil/forge@sha256:" + "c" * 64):
+            with self.subTest(reference=reference), patch.dict(os.environ, {
+                "PROTECTED_IMAGE_TAG": "approved",
+                "PROTECTED_FORGE_IMAGE": reference,
+            }, clear=True):
+                with self.assertRaises(ValueError):
+                    protected_forge_image_ref(f"{GAR_REPO_NAME}/forge", "approved")
+
     def test_approved_tag_uses_repository_digest(self) -> None:
         digest = "sha256:" + "a" * 64
         with patch.dict(os.environ, {
@@ -157,11 +167,12 @@ class ProtectedImageTest(unittest.TestCase):
         with patch.dict(os.environ, {
             "PROTECTED_IMAGE_TAG": tag,
             "PROTECTED_IMAGE_DIGESTS": mapping,
+            "PROTECTED_FORGE_IMAGE": f"{repository}@sha256:" + "c" * 64,
         }):
             result = K8sForgeRunner().run(context)
         self.assertEqual(result.state, ForgeState.PASS)
         pod = yaml.safe_load(filesystem.get_write("temp1"))
-        self.assertEqual(pod["spec"]["containers"][0]["image"], f"{repository}@{digest}")
+        self.assertEqual(pod["spec"]["containers"][0]["image"], f"{repository}@sha256:" + "c" * 64)
         label = pod["metadata"]["labels"]["forge-image-tag"]
         self.assertLessEqual(len(label), 63)
         self.assertEqual(label, "a" * 62)

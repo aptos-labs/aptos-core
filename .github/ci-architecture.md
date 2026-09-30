@@ -12,7 +12,9 @@ flowchart LR
     PR --> Auth[Base-owned compute authorization]
     Auth --> Safe[Secretless PR validation]
     Auth --> Gate[Protected environment approval]
-    Gate --> Priv[Privileged PR job]
+    Gate --> Priv[Trusted credentialed job]
+    Safe --> Images[Image archive]
+    Images --> Priv
     Safe --> Report[Validated report artifact]
     Priv --> Report
     Report --> Publisher[Trusted follow-up reporter]
@@ -21,9 +23,9 @@ flowchart LR
 
 - **Policy check.** [PR CI policy](workflows/pr-ci-policy.yaml) runs from `pull_request_target`. It reads proposed workflow files through the GitHub API as data; it does not execute them. Its [manifest](ci/pr-ci-policy.json) identifies protected workflows and policy runtime paths. A failing policy job blocks merge only when branch protection or a ruleset requires its `Validate workflow privilege changes` check.
 - **Compute authorization.** Expensive PR workflows use the [compute authorization action](actions/compute-authorized/action.yml). It checks that the required label is still present and that its latest application came from a collaborator with `write` or `admin` permission. The label remains effective across later pushes while it stays on the PR. It is permission to start eligible compute, not approval for a particular SHA to use credentials.
-- **Exact source.** Workflows pass the PR head repository and SHA to jobs that run PR code. The [checkout action](actions/checkout-exact-pr-source/action.yml) verifies that checkout. In privileged PR jobs, local actions are loaded from a separate trusted checkout before PR code runs. An exact SHA identifies the code being run; it does not make that code safe.
+- **Exact source.** Workflows pass the PR head repository and SHA to jobs that run PR code. The [checkout action](actions/checkout-exact-pr-source/action.yml) verifies that checkout. Credentialed image publication and Forge load code only from the trusted base checkout. An exact SHA identifies the code being run; it does not make that code safe.
 - **Secretless validation.** PR jobs that do not need protected capabilities run with read-only `GITHUB_TOKEN` permissions and without supplied privileged credentials. Examples include MonoMove benchmarks, execution performance, local Docker builds, indexer configuration checks, Forge lookup unit tests, module verification, and optional faucet and Rust SDK tests. These jobs still consume runner resources and can access capabilities available to their runner and Actions event.
-- **Privileged execution.** Jobs that need cloud authentication, secrets, OIDC, or repository writes use the fixed `privileged-pr-ci` environment. Examples include PR image publication, Forge runs, indexer generation and dispatch, and the live Forge image lookup. Environment approval authorizes a job with its available privileges for that run. PR code can use those privileges after approval. The environment must therefore have real protection rules, and the runner and publication targets must be isolated from trusted work.
+- **Privileged execution.** Jobs that need cloud authentication, secrets, OIDC, or repository writes use the fixed `privileged-pr-ci` environment. Examples include PR image publication, Forge runs, indexer generation and dispatch, and the live Forge image lookup. Environment approval authorizes a job with its available privileges for that run. For image publication and Forge, approval grants privileges only to trusted orchestration. PR image builds execute in a separate job without cloud credentials or OIDC permission. Other protected flows require their own execution-boundary review. The environment must therefore have real protection rules, and runners and publication targets must be isolated from trusted work.
 - **Trusted reporting.** PR producers write bounded report artifacts or job results. Separate [MonoMove](workflows/pr-ci-report.yaml) and [Docker/Forge](workflows/docker-forge-pr-report.yaml) reporters validate the originating run and source SHA before posting PR comments. The PR job does not receive comment write permission just to publish its result.
 
 ## Developer flow
@@ -40,7 +42,7 @@ Manual and trusted push workflows remain separate from PR-controlled execution. 
 
 ## Protected image builds and test runners
 
-The Docker capability plan takes the union of explicit image publication requests and the image variants needed by active tests. Each variant is built once in the protected publication matrix, after secretless validation. Forge and E2E wait for publication to succeed. They do not compile images.
+The Docker capability plan takes the union of explicit image publication requests and the image variants needed by active tests. Each variant is built once in a credential-free job in the publication matrix, after secretless validation. Forge and E2E wait for publication to succeed. They do not compile images.
 
 | Protected work | RunsOn Fleet | Pilot size | Concurrency ceiling |
 | --- | --- | --- | --- |
@@ -50,12 +52,16 @@ The Docker capability plan takes the union of explicit image publication request
 
 These fleets use the `protected` RunsOn environment and the `aptos-core-protected` GitHub runner group. The group permits only the three protected reusable workflows at the trusted default-branch ref. Each runner has a fresh VM and disk for one job, with zero standby capacity. Small GitHub-hosted lookup and dispatch jobs retain their current runners. Indexer generation retains its separate build-capable runner.
 
-The publication job records registry digests in a bounded JSON manifest. Its identity includes the PR source repository, full SHA, variant, registry, workflow run and build attempt. Tags also include the run and attempt. Each matrix leg exposes a distinct artifact-ID output. Consumers download that ID, validate the manifest with trusted-base code, and execute digest-pinned images. Test-only reruns may reuse an earlier successful build from the same run. Missing artifacts, mismatched identities, and failed or skipped publication prevent successful test checks.
+The PR build job executes the exact PR source with local Docker output and no cloud authentication. It exports fixed image archives. A fresh credentialed publication job checks the artifact identity, filenames, archive metadata, and hashes, then copies images to fixed registry targets with `skopeo`. It does not run PR scripts or load PR images into its Docker daemon. Archive hashes detect corruption; they do not make PR image contents trusted.
 
-Common source checkout and registry authentication live in `privileged-pr-runtime-setup`. The build-only `privileged-pr-setup` adds an isolated Buildx builder. No developer label or environment approval semantics change. Each protected job still requires approval for its available credentials.
+The publisher separately builds the Forge controller from the exact trusted base SHA. Its bounded JSON manifest binds both source SHAs, PR number, variant, registry, workflow run and build attempt to registry digests. Each matrix leg exposes a distinct artifact-ID output. Consumers download that immutable ID and validate the manifest with trusted-base code. Test-only reruns may reuse an earlier successful build from the same run. Missing artifacts, mismatched identities, and failed or skipped publication prevent successful test checks.
+
+Forge runs the base-owned `run_forge.sh`, Python dependencies, and digest-pinned base controller. The controller tests digest-pinned PR application images. Its AWS keys, GCP token, Kubernetes service account, multiregion kubeconfig, and Prometheus token are never deliberately passed to PR host scripts or the PR Forge controller image. Static AWS credentials remain confined to the trusted Forge job; replacing them with a short-lived role requires a separate IAM migration.
+
+Common source checkout and registry authentication live in `privileged-pr-runtime-setup`. The build-only `privileged-pr-setup` adds an isolated Buildx builder. No developer label or environment approval semantics change. Credential-free image builds do not receive environment secrets. Forge and E2E still require approval for their available credentials.
 
 Protected jobs require the repository variable `PROTECTED_RUNNERS_ENABLED` to equal `true`. It must remain unset until the Fleet deployment, workflow access restrictions, runner lifecycle, AMI compatibility and sizing checks pass. There is no fallback to the shared benchmark runner. Infrastructure and the operational rollout procedure live in `internal-ops/infra/core/runs-on-fleet`.
 
 ## Coverage and deployment boundary
 
-The policy manifest covers the first migration wave. Other legacy `pull_request_target` workflows and older target branches can have different protections. A successful policy check does not prove that the live environment, merge rules, cloud IAM, runner isolation, or registry permissions match this design. Those controls must be checked in their respective services before protected PR work is enabled.
+The policy manifest covers the first migration wave. Other legacy `pull_request_target` workflows and older target branches can have different protections. A successful policy check does not prove that the live environment, merge rules, cloud IAM, runner isolation, or registry permissions match this design. Those controls must be checked in their respective services before protected PR work is enabled. In particular, PR runners and application pods must not obtain cloud credentials through instance metadata, workload identity, mounted service-account tokens, or shared disks. The repository changes do not establish those live infrastructure controls.

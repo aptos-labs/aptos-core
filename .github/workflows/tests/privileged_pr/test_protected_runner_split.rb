@@ -15,6 +15,14 @@ class ProtectedRunnerSplitTests < Minitest::Test
       assert_equal "runs-on/fleet=aptos-protected-#{fleet}/env=protected", job.fetch("runs-on")
       assert_equal "privileged-pr-ci", job.fetch("environment")
     end
+    build = jobs(load_workflow("workflow-run-docker-rust-publish-pr.yaml")).fetch("build-images")
+    assert_equal "vars.PROTECTED_RUNNERS_ENABLED == 'true'", build.fetch("if")
+    assert_equal "runs-on/fleet=aptos-protected-build/env=protected", build.fetch("runs-on")
+    assert_equal({"contents" => "read"}, build.fetch("permissions"))
+    refute build.key?("environment")
+    refute steps(build).any? { |step| step["uses"].to_s.include?("gcp-registry-auth") }
+    assert_equal "build-images", jobs(load_workflow("workflow-run-docker-rust-publish-pr.yaml"))
+      .fetch("publish-images").fetch("needs")
   end
 
   def test_consumers_require_protected_build_and_select_its_artifact_id

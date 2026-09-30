@@ -93,6 +93,7 @@ jobs:
           manifest_path: ${{ runner.temp }}/protected-image-input/manifest.json
           source_repository: ${{ inputs.SOURCE_REPOSITORY }}
           source_sha: ${{ inputs.SOURCE_SHA }}
+          base_sha: ${{ inputs.BASE_SHA }}
           pr_number: ${{ inputs.PR_NUMBER }}
           run_id: ${{ github.run_id }}
           run_attempt: ${{ github.run_attempt }}
