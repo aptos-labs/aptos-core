@@ -265,7 +265,7 @@ def _check_approval(value: Any, capability_id: str) -> None:
 
 
 def build_plan(manifest: Manifest, approvals: Mapping[str, Authorization], docs_only: bool) -> dict:
-    """Return the plan. Every `active`/`enabled` value in it is final."""
+    """Every `active`/`enabled` value in the returned plan is final."""
     if set(approvals) != {capability.id for capability in manifest.capabilities}:
         raise ActionError("approval IDs must exactly match manifest capabilities")
     if not isinstance(docs_only, bool):
@@ -346,9 +346,8 @@ def parse_plan(manifest: Manifest, text: Any) -> dict:
 
 
 def pull_request_is_docs_only(client: GitHubClient, pr_number: int, *, pull_request: Any = None) -> bool:
-    """Port of the retired pr-target-determination rule: at least one changed
-    file, and every changed filename ends with `.md`. A renamed file must
-    also have a `previous_filename` that ends with `.md`."""
+    """At least one changed file, and every changed filename ends with `.md`.
+    A renamed file must also have a `previous_filename` that ends with `.md`."""
     if pull_request is None:
         pull_request = client.get_json(f"/pulls/{pr_number}")
     changed = pull_request.get("changed_files") if isinstance(pull_request, dict) else None

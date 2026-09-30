@@ -97,7 +97,6 @@ class ForgeStablePrSplitTests < Minitest::Test
     live = job("pr-lookup-live")
     live_steps = steps(live)
     lookup = named_step("pr-lookup-live", LOOKUP_STEP)
-    # The live lookup loads only trusted code.
     assert_equal live_steps.length - 1, live_steps.index(lookup)
 
     trusted = checkout_steps(live).first

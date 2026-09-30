@@ -8,9 +8,7 @@
 # workflow_call to wait for the image build to finish. Nightly still calls this
 # workflow with GIT_SHA so the backstop runs at that revision.
 #
-# The jobs run the exact PR head on pull_request with a read-only token and no
-# credentials. They pull the public aptoslabs images from Docker Hub. The
-# CICD:non-required-tests label only limits cost. It is not a trust boundary.
+# The CICD:non-required-tests label only limits cost. It is not a trust boundary.
 
 name: "Faucet Integration Tests: Prod"
 on:

@@ -10,7 +10,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// The result of comparing generated transactions with the checked-in baseline.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Comparison {
     pub diff_found: bool,

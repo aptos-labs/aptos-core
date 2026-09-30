@@ -47,7 +47,6 @@ module WorkflowTestHelper
     steps(job).select { |step| step["uses"].to_s.start_with?("actions/checkout@") }
   end
 
-  # The step that loads checkout-exact-pr-source from any trusted checkout path.
   def exact_source_step(job)
     steps(job).find { |step| step["uses"].to_s.end_with?("/.github/actions/checkout-exact-pr-source") }
   end

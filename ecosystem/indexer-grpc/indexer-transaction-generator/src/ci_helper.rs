@@ -7,10 +7,6 @@
 //! checked-in JSON baseline. CI builds this module from the trusted base revision.
 //! It parses the PR files with the generator's own config types, so CI checks exactly
 //! what the generator loads.
-//!
-//! `validate` checks the PR-controlled configuration. `materialize` writes the
-//! protected API keys into a private copy. `compare` compares generated
-//! transactions with the checked-in baseline.
 
 mod compare;
 mod materialize;
@@ -20,7 +16,6 @@ pub use compare::{compare, Comparison};
 pub use materialize::{materialize_config, write_private_file};
 pub use validate::validate_config_file;
 
-/// A network that CI imports transactions from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Network {
     Testnet,

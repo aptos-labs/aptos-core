@@ -2,9 +2,7 @@
 # testnet built from one of the production release branches. In other words, we run the
 # tests against a local devnet, testnet, and mainnet.
 #
-# The jobs run the exact PR head on pull_request with a read-only token and no
-# credentials. They pull the public aptoslabs images from Docker Hub. The
-# CICD:non-required-tests label only limits cost. It is not a trust boundary.
+# The CICD:non-required-tests label only limits cost. It is not a trust boundary.
 
 name: "Rust SDK Client Tests"
 on:

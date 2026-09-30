@@ -23,12 +23,10 @@ module PrCiPolicy
 
     module_function
 
-    # Tokens of a bare expression, such as a job `if:` without ${{ }}.
     def tokenize(text)
       scan(StringScanner.new(text), template: false)
     end
 
-    # Token lists of every ${{ ... }} in `text`, in order.
     def embedded(text)
       scanner = StringScanner.new(text)
       expressions = []
@@ -72,7 +70,6 @@ module PrCiPolicy
       !token.nil? && token.type == :symbol && token.value == value
     end
 
-    # Maps the index of each opening token to the index of its closing token.
     def matching_pairs(tokens, opening, closing)
       open = []
       pairs = {}
