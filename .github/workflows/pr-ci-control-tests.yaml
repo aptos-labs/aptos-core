@@ -1,0 +1,80 @@
+name: PR CI control tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python_contracts:
+    name: Python contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run Python contract tests
+        run: |
+          python3 -m unittest discover -s .github/ci/tests -t .github/ci
+          python3 third_party/move/mono-move/testsuite/benches/perf/test_pr_ci_report.py
+          python3 third_party/move/mono-move/testsuite/e2e-perf/test_pr_ci_report.py
+
+  rust_contracts:
+    name: Rust contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run trusted indexer helper contract tests
+        run: |
+          cargo test -p aptos-indexer-transaction-generator --lib ci_helper::
+          cargo test -p aptos-indexer-transaction-generator --test ci_helper
+
+  ruby_contracts:
+    name: Ruby policy and workflow contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run Ruby contract tests
+        run: |
+          mapfile -d '' tests < <(find .github/workflows/tests -type f -name 'test_*.rb' -print0 | sort -z)
+          test "${#tests[@]}" -gt 0
+          status=0
+          for test_file in "${tests[@]}"; do ruby "$test_file" || status=1; done
+          exit "$status"
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install pinned actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Lint hardened GitHub Actions workflows
+        shell: bash
+        run: |
+          actionlint_bin="$(go env GOPATH)/bin/actionlint"
+          ruby -rjson -e 'puts JSON.parse(File.read(".github/ci/pr-ci-policy.json")).fetch("hardened_workflows")' \
+            | xargs --no-run-if-empty "$actionlint_bin"
+
+  semgrep:
+    name: Semgrep rule contract test
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep:1.136.0@sha256:61a7ab31cdab865212ae8ed3ddefc0a51d61ef3b016a63e79848f56241d4586d
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify the pull request target checkout rule
+        run: |
+          semgrep --config .github/linters/semgrep/pull-request-target-code-checkout.yaml --json .github/workflows/tests/pr_ci_policy/fixtures/permission-check-bypass.yaml > semgrep-result.json
+          python3 -c 'import json; result = json.load(open("semgrep-result.json")); assert len(result["results"]) == 1; assert result["results"][0]["extra"]["severity"] == "INFO"'

@@ -1,31 +1,108 @@
 name: "execution-performance"
 on:
   workflow_dispatch:
-  pull_request:
-    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  pull_request_target:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
   # schedule: # NOTE: the schedule is dictated by PIES
+
 permissions:
   contents: read
+  pull-requests: read
+
+concurrency:
+  group: execution-performance-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
+  compute-authorization:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    outputs:
+      e2e_approved: ${{ steps.authorize_e2e.outputs.approved }}
+      all_e2e_approved: ${{ steps.authorize_all_e2e.outputs.approved }}
+      performance_approved: ${{ steps.authorize_performance.outputs.approved }}
+      full_approved: ${{ steps.authorize_full.outputs.approved }}
+    steps:
+      # pull_request_target resolves this checkout to base-owned code.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      - name: Authorize e2e compute
+        id: authorize_e2e
+        uses: ./.github/actions/compute-authorized
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          required_label: CICD:run-e2e-tests
+
+      - name: Authorize all-e2e compute
+        id: authorize_all_e2e
+        uses: ./.github/actions/compute-authorized
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          required_label: CICD:run-all-e2e-tests
+
+      - name: Authorize execution-performance compute
+        id: authorize_performance
+        uses: ./.github/actions/compute-authorized
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          required_label: CICD:run-execution-performance-test
+
+      - name: Authorize full execution-performance compute
+        id: authorize_full
+        uses: ./.github/actions/compute-authorized
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          required_label: CICD:run-execution-performance-full-test
+
   execution-performance:
-    if: | # Only run on each PR once an appropriate event occurs
+    needs: compute-authorization
+    if: |
+      github.event_name == 'pull_request_target' &&
       (
-        github.event_name == 'workflow_dispatch' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') ||
-        github.event.pull_request.auto_merge != null
+        needs.compute-authorization.outputs.e2e_approved == 'true' ||
+        needs.compute-authorization.outputs.all_e2e_approved == 'true' ||
+        needs.compute-authorization.outputs.performance_approved == 'true' ||
+        needs.compute-authorization.outputs.full_approved == 'true'
       )
+    permissions:
+      contents: read
     uses: ./.github/workflows/workflow-run-execution-performance.yaml
-    secrets: inherit
     with:
-      GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GIT_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      GIT_SHA: ${{ github.event.pull_request.head.sha }}
+      RUNNER_NAME: benchmark-c3d-60-pr
+      # The full-test label alone selects the highest-cost flow.
+      FLOW: ${{ needs.compute-authorization.outputs.full_approved == 'true' && 'CONTINUOUS' || 'LAND_BLOCKING' }}
+      # The performance labels bypass target determination only after their own authorization.
+      IGNORE_TARGET_DETERMINATION: ${{ needs.compute-authorization.outputs.all_e2e_approved == 'true' || needs.compute-authorization.outputs.performance_approved == 'true' || needs.compute-authorization.outputs.full_approved == 'true' }}
+
+  execution-performance-dispatch:
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/workflow-run-execution-performance.yaml
+    with:
+      GIT_REPOSITORY: ${{ github.repository }}
+      GIT_SHA: ${{ github.sha }}
       RUNNER_NAME: benchmark-c3d-60
-      # Run all tests only on the scheduled cadence, or explicitly requested
-      FLOW: ${{ (github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || 'LAND_BLOCKING' }}
-      # Ignore target determination if on the scheduled cadence, or explicitly requested
-      IGNORE_TARGET_DETERMINATION: ${{ contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}
-      # Notify Slack only on scheduled runs (PIES triggers workflow_dispatch), not on PRs
-      NOTIFY_SLACK: ${{ github.event_name == 'workflow_dispatch' }}
+      FLOW: CONTINUOUS
+      IGNORE_TARGET_DETERMINATION: true
+
+  # Wrapper dispatch always notifies Slack on failure. The reusable workflow
+  # retains a separate direct-dispatch opt-in notification interface.
+  notify-slack:
+    needs: execution-performance-dispatch
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && needs.execution-performance-dispatch.result == 'failure' }}
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post dispatch failure to Slack
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
+        with:
+          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: ":x: execution-performance failed (flow: `CONTINUOUS`, runner: `benchmark-c3d-60`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"

@@ -1,0 +1,14 @@
+name: dynamic-checkout
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ github.event.pull_request.base.sha }}

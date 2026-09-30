@@ -1,0 +1,53 @@
+# Secretless PR validation of the Forge image lookup code and its unit tests. It runs on
+# pull_request, so PR code gets a read-only token and a cache scope limited to
+# the PR ref. The credentialed live lookup is pr-lookup-live in
+# forge-stable.yaml, behind the privileged-pr-ci environment.
+name: Forge lookup unit tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/forge-lookup-unit-tests.yaml"
+      - "testsuite/determinator.py"
+      - "testsuite/find_latest_image.py"
+      - "testsuite/forge.py"
+      - "testsuite/forge_test.py"
+      - "testsuite/test_framework/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  forge-unit-tests:
+    name: Secretless Forge unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pin@v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up Python without a dependency cache
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.10"
+
+      # Versions match testsuite/poetry.lock. forge.py and forge_test.py import
+      # no other third-party package.
+      - name: Install the Forge test dependencies
+        run: python -m pip install --disable-pip-version-check click==8.3.3 psutil==5.9.8
+
+      - name: Run the Forge unit tests
+        working-directory: testsuite
+        run: python -m unittest forge_test
+
+      # forge_test.py does not import find_latest_image.py. --help imports every
+      # module the lookup loads and exits before any shell or git call.
+      - name: Check that the lookup script loads
+        working-directory: testsuite
+        run: python find_latest_image.py --help

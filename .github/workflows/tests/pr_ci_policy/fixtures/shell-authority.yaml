@@ -1,0 +1,15 @@
+name: unsafe-shell-authority
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: |
+          gcloud auth login
+          gcloud secrets versions access latest --secret=TOKEN
+          gh pr comment 1 --body unsafe

@@ -1,0 +1,21 @@
+name: approved-privileged
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: privileged-pr-ci
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      - uses: google-github-actions/get-secretmanager-secrets@v2

@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[[bin]]
+name = "indexer-ci-helper"
+path = "src/bin/indexer_ci_helper.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 # used for localnode.

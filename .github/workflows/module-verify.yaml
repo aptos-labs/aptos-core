@@ -67,7 +67,6 @@ jobs:
   test-verify-modules:
     if: ${{ github.event_name == 'pull_request' }}
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-module-verify.yaml@main
-    secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha }}
       BUCKET: aptos-testnet-backup-2223d95b

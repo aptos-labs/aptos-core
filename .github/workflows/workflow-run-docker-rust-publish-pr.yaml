@@ -1,0 +1,104 @@
+name: "*rebuild and publish protected PR Docker images"
+
+on:
+  workflow_call:
+    inputs:
+      SOURCE_REPOSITORY:
+        required: true
+        type: string
+      SOURCE_SHA:
+        required: true
+        type: string
+      PR_NUMBER:
+        required: true
+        type: string
+      BASE_SHA:
+        required: true
+        type: string
+      PROFILE:
+        required: false
+        default: release
+        type: string
+      FEATURES:
+        required: false
+        default: ""
+        type: string
+      BUILD_TARGET:
+        required: false
+        default: all
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish-images:
+    environment: privileged-pr-ci
+    runs-on: benchmark-c3d-60-pr
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Record the protected deployment approval scope
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.SOURCE_REPOSITORY }}
+          SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
+          PR_NUMBER: ${{ inputs.PR_NUMBER }}
+        run: |
+          {
+            echo "## Protected PR image publication request"
+            echo "Repository: \`$SOURCE_REPOSITORY\`"
+            echo "PR: \`$PR_NUMBER\`"
+            echo "Exact source SHA: \`$SOURCE_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check out the exact trusted event base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.BASE_SHA }}
+          path: trusted-base
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prepare the protected build from trusted base code
+        id: setup
+        uses: ./trusted-base/.github/actions/privileged-pr-setup
+        with:
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          profile: ${{ inputs.PROFILE }}
+          features: ${{ inputs.FEATURES }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
+      - name: Rebuild and publish immutable PR images
+        env:
+          BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
+          PROFILE: ${{ inputs.PROFILE }}
+          FEATURES: ${{ inputs.FEATURES }}
+          BUILD_ADDL_TESTING_IMAGES: "true"
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+          TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
+          TARGET_REGISTRY: gcp
+          CUSTOM_IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.custom_image_tag_prefix }}
+        working-directory: pr-source
+        run: |
+          set -euo pipefail
+          CI=true docker/builder/docker-bake-rust-all.sh "$BUILD_TARGET"
+
+      - name: Record the protected exact-SHA publication
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.SOURCE_REPOSITORY }}
+          SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
+          PR_NUMBER: ${{ inputs.PR_NUMBER }}
+        run: |
+          {
+            echo "## Protected PR image publication"
+            echo "Repository: \`$SOURCE_REPOSITORY\`"
+            echo "PR: \`$PR_NUMBER\`"
+            echo "Exact source SHA: \`$SOURCE_SHA\`"
+            echo "Only immutable PR-and-full-SHA image tags were published."
+          } >> "$GITHUB_STEP_SUMMARY"

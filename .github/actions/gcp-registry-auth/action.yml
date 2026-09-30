@@ -1,0 +1,49 @@
+name: Authenticate to fixed GCP registries
+description: Mint an access token and authenticate Docker to the approved registries
+
+inputs:
+  workload_identity_provider:
+    description: Google Cloud workload identity provider
+    required: true
+  service_account:
+    description: Google Cloud service account
+    required: true
+  access_token_lifetime:
+    description: Access token lifetime in seconds
+    required: true
+  create_credentials_file:
+    description: Whether to create a credentials file
+    required: false
+    default: "false"
+
+outputs:
+  access_token:
+    description: Minted Google Cloud access token
+    value: ${{ steps.auth.outputs.access_token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+      with:
+        create_credentials_file: ${{ inputs.create_credentials_file }}
+        token_format: access_token
+        access_token_lifetime: ${{ inputs.access_token_lifetime }}
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - name: Log in to the US multi-region registry
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+      with:
+        registry: us-docker.pkg.dev
+        username: oauth2accesstoken
+        password: ${{ steps.auth.outputs.access_token }}
+
+    - name: Log in to the us-west1 registry
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+      with:
+        registry: us-west1-docker.pkg.dev
+        username: oauth2accesstoken
+        password: ${{ steps.auth.outputs.access_token }}

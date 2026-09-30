@@ -1,9 +1,13 @@
 name: "*run execution-performance reusable workflow"
 
 on:
-  # This allows the workflow to be triggered from another workflow
+  # This allows the workflow to be triggered from another workflow.
   workflow_call:
     inputs:
+      GIT_REPOSITORY:
+        required: true
+        type: string
+        description: The repository containing the git SHA to test.
       GIT_SHA:
         required: true
         type: string
@@ -21,7 +25,7 @@ on:
         required: false
         default: false
         type: boolean
-        description: Ignore target determination and run the tests
+        description: Ignore target determination and run the tests.
       SKIP_MOVE_E2E:
         required: false
         default: false
@@ -35,13 +39,8 @@ on:
         required: false
         default: "32"
         type: string
-      NOTIFY_SLACK:
-        required: false
-        default: false
-        type: boolean
-        description: Whether to post to Slack on failure
-  # This allows the workflow to be triggered manually from the Github UI or CLI
-  # NOTE: because the "number" type is not supported, we default to 720 minute timeout
+  # This allows the workflow to be triggered manually from the Github UI or CLI.
+  # NOTE: because the "number" type is not supported, we default to 720 minute timeout.
   workflow_dispatch:
     inputs:
       GIT_SHA:
@@ -53,18 +52,18 @@ on:
         default: executor-benchmark-runner
         type: choice
         options:
-        - executor-benchmark-runner
-        - executor-benchmark-ext4
-        - executor-benchmark-xfs
-        - benchmark-t2d-32
-        - benchmark-t2d-60
-        - benchmark-c3d-30
-        - benchmark-c3d-60
-        - benchmark-c3d-180
-        - benchmark-n4-32
-        - benchmark-c4-32
-        - benchmark-c4-48
-        - benchmark-c4-96
+          - executor-benchmark-runner
+          - executor-benchmark-ext4
+          - executor-benchmark-xfs
+          - benchmark-t2d-32
+          - benchmark-t2d-60
+          - benchmark-c3d-30
+          - benchmark-c3d-60
+          - benchmark-c3d-180
+          - benchmark-n4-32
+          - benchmark-c4-32
+          - benchmark-c4-48
+          - benchmark-c4-96
         description: The name of the runner to use for the test. (which decides machine specs)
       NUMBER_OF_EXECUTION_THREADS:
         required: false
@@ -75,12 +74,12 @@ on:
         required: false
         default: LAND_BLOCKING
         options:
-        - LAND_BLOCKING
-        - CONTINUOUS
-        - MAINNET
-        - MAINNET_LARGE_DB
-        - EXECUTORS
-        - ORDER_BOOK
+          - LAND_BLOCKING
+          - CONTINUOUS
+          - MAINNET
+          - MAINNET_LARGE_DB
+          - EXECUTORS
+          - ORDER_BOOK
         type: choice
         description: Which set of tests to run. MAINNET/MAINNET_LARGE_DB are for performance validation of mainnet nodes.
       SKIP_MOVE_E2E:
@@ -92,19 +91,20 @@ on:
         required: false
         default: true
         type: boolean
-        description: Ignore target determination and run the tests
+        description: Ignore target determination and run the tests.
       SOURCE:
         required: false
         default: ADHOC
         options:
-        - ADHOC
+          - ADHOC
         type: choice
-        description: Test source (always adhoc from here)
+        description: Test source (always adhoc from here).
       NOTIFY_SLACK:
         required: false
         default: false
         type: boolean
-        description: Whether to post to Slack on failure
+        description: Whether to post to Slack on failure.
+
 permissions:
   contents: read
 
@@ -121,24 +121,35 @@ jobs:
   test-target-determinator:
     needs: e2e-selection
     if: ${{ !cancelled() && needs.e2e-selection.result != 'failure' }}
-    runs-on: 2cpu-gh-ubuntu24-x64
+    # Automatic PR source runs only on GitHub-hosted disposable capacity.
+    runs-on: ${{ (github.event_name == 'pull_request_target' || inputs.RUNNER_NAME == 'benchmark-c3d-60-pr') && 'ubuntu-latest' || '2cpu-gh-ubuntu24-x64' }}
     outputs:
       run_execution_performance_test: ${{ inputs.IGNORE_TARGET_DETERMINATION || github.event_name == 'workflow_dispatch' || (contains(fromJSON(needs.e2e-selection.outputs.selected_e2e_tests || '[]'), 'execution-performance') && steps.determine_test_targets.outputs.run_execution_performance_test == 'true') }}
     steps:
-      # The legacy dependency selector still needs the actual tested revision.
       - uses: actions/checkout@v4
         if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
         with:
+          repository: ${{ inputs.GIT_REPOSITORY || github.repository }}
           ref: ${{ inputs.GIT_SHA }}
           fetch-depth: 0
+          persist-credentials: false
+
+      # Fork checkouts point origin at the fork. Fetch the public base repository
+      # under a separate remote before exposing its main ref to cargo x.
+      - name: Fetch public base main
+        if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
+        shell: bash
+        run: |
+          git remote add public-base "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags public-base main:refs/remotes/public-base/main
+          git update-ref refs/remotes/origin/main refs/remotes/public-base/main
+
       - name: Run the test target determinator
         if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && github.event_name != 'workflow_dispatch' }}
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
-        with:
-          BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  # Run single node execution performance tests
+  # Run single node execution performance tests.
   single-node-performance:
     needs: test-target-determinator
     if: |
@@ -160,24 +171,40 @@ jobs:
         run: test "$SELECTION_RESULT" = success
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.GIT_REPOSITORY || github.repository }}
           ref: ${{ inputs.GIT_SHA }}
+          persist-credentials: false
         if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          # Isolate pull_request_target cache writes by exact untrusted SHA.
+          ADDITIONAL_KEY: ${{ github.event_name == 'pull_request_target' && format('untrusted-pr-{0}', inputs.GIT_SHA) || '' }}
         if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
-        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
-        if: ${{ (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
+        env:
+          FLOW: ${{ inputs.FLOW }}
+          SOURCE: ${{ inputs.SOURCE }}
+          RUNNER_NAME: ${{ inputs.RUNNER_NAME }}
+          SKIP_MOVE_E2E: ${{ inputs.SKIP_MOVE_E2E && '1' || '' }}
+          NUMBER_OF_EXECUTION_THREADS: ${{ inputs.NUMBER_OF_EXECUTION_THREADS }}
+        run: TABULATE_INSTALL=lib-only pip install tabulate && testsuite/single_node_performance.py
+        if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}
 
       - run: echo "Skipping single node execution performance! Unrelated changes detected."
         if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && needs.test-target-determinator.outputs.run_execution_performance_test != 'true' }}
 
-      - name: Post to Slack on failure
-        if: ${{ failure() && inputs.NOTIFY_SLACK }}
+  # Direct manual dispatch can opt in to Slack. workflow_call cannot pass a
+  # notification secret or enable this job for a PR event.
+  notify-slack:
+    needs: [test-target-determinator, single-node-performance]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.NOTIFY_SLACK && (needs.test-target-determinator.result == 'failure' || needs.single-node-performance.result == 'failure') }}
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post dispatch failure to Slack
         uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
         with:
           webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}

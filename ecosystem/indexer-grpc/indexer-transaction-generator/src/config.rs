@@ -115,64 +115,7 @@ impl IndexerCliArgs {
                     tokio::fs::create_dir_all(&script_transactions_output_folder).await?;
                 }
                 // 1. Validate.
-                // Scan all yaml files in the move folder path.
-                let mut script_transactions_vec: Vec<(String, ScriptTransactions)> = vec![];
-                let move_files = std::fs::read_dir(&move_folder_path)?;
-                let mut used_sender_addresses: HashSet<String> = HashSet::new();
-                for entry in move_files {
-                    let entry = entry?;
-                    // entry has to be a file.
-                    if !entry.file_type()?.is_file() {
-                        continue;
-                    }
-                    let path = entry.path();
-                    if path.extension().unwrap_or_default() == "yaml" {
-                        let file_name = path.file_name().unwrap().to_str().unwrap();
-                        let script_transactions_raw: String =
-                            tokio::fs::read_to_string(&path).await?;
-                        let script_transactions: ScriptTransactions =
-                            serde_yaml::from_str(&script_transactions_raw)?;
-
-                        let new_senders: HashSet<String> = script_transactions
-                            .transactions
-                            .iter()
-                            .map(|txn| txn.sender_address.clone())
-                            .collect();
-                        // Check if any new sender is already used
-                        if new_senders
-                            .iter()
-                            .any(|sender| used_sender_addresses.contains(sender))
-                        {
-                            return Err(anyhow::anyhow!(
-                                "[Script Transaction Generator] Sender address in file `{}` is already being used",
-                                file_name
-                            ));
-                        }
-                        used_sender_addresses.extend(new_senders);
-                        script_transactions_vec.push((file_name.to_string(), script_transactions));
-                    }
-                }
-                // Validate the configuration.
-                let mut output_script_transactions_set = HashSet::new();
-                for (file_name, script_transactions) in script_transactions_vec.iter() {
-                    if script_transactions.transactions.is_empty() {
-                        return Err(anyhow::anyhow!(
-                            "[Script Transaction Generator] No transactions found in file `{}`",
-                            file_name
-                        ));
-                    }
-                    for script_transaction in script_transactions.transactions.iter() {
-                        if let Some(output_name) = &script_transaction.output_name {
-                            if !output_script_transactions_set.insert(output_name.clone()) {
-                                return Err(anyhow::anyhow!(
-                                    "[Script Transaction Generator] Output file name `{}` is duplicated in file `{}`",
-                                    output_name.clone(),
-                                    file_name
-                                    ));
-                            }
-                        }
-                    }
-                }
+                let script_transactions_vec = load_script_transactions(&move_folder_path)?;
                 // Run each config.
                 let account_manager_file_path = testing_folder.join(ACCOUNT_MANAGER_FILE_NAME);
                 let mut account_manager = AccountManager::load(&account_manager_file_path).await?;
@@ -246,15 +189,16 @@ pub struct TransactionImporterConfig {
 }
 
 impl TransactionImporterConfig {
-    fn validate(&self) -> anyhow::Result<()> {
+    pub fn validate(&self) -> anyhow::Result<()> {
         // Validate the configuration. This is to make sure that no output file shares the same name.
         let mut output_files = HashSet::new();
         for network_config in self.configs.values() {
             for output_file in network_config.versions_to_import.values() {
-                if !output_files.insert(output_file) {
+                let canonical_name = canonical_output_name(output_file)?;
+                if !output_files.insert(canonical_name.clone()) {
                     return Err(anyhow::anyhow!(
-                        "[Transaction Importer] Output file name {} is duplicated",
-                        output_file
+                        "[Transaction Importer] Canonical output file name {} is duplicated",
+                        canonical_name.display()
                     ));
                 }
             }
@@ -337,6 +281,92 @@ pub struct ScriptTransaction {
     pub output_name: Option<String>,
     // Fund the address and execute the script with the account.
     pub sender_address: String,
+}
+
+/// Returns the file name that the generator writes for `output_name`.
+/// The name must be a plain file name, so a configuration cannot write outside the output folder.
+pub fn canonical_output_name(output_name: &str) -> anyhow::Result<PathBuf> {
+    let path = Path::new(output_name);
+    if output_name.contains(['\n', '\r', '/', '\\'])
+        || path
+            .file_name()
+            .is_none_or(|file_name| file_name != output_name)
+    {
+        return Err(anyhow::anyhow!(
+            "Output file name `{}` must be a plain file name",
+            output_name.escape_debug()
+        ));
+    }
+    Ok(path.with_extension("json"))
+}
+
+/// Reads every `*.yaml` file in `move_folder_path` and applies the script generator checks:
+/// no sender is shared between files, no file is empty, and canonical output names are unique.
+pub fn load_script_transactions(
+    move_folder_path: &Path,
+) -> anyhow::Result<Vec<(String, ScriptTransactions)>> {
+    let mut script_transactions_vec: Vec<(String, ScriptTransactions)> = vec![];
+    let mut used_sender_addresses: HashSet<String> = HashSet::new();
+    for entry in fs::read_dir(move_folder_path)? {
+        let entry = entry?;
+        // entry has to be a file.
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let path = entry.path();
+        if path.extension().unwrap_or_default() == "yaml" {
+            let file_name = path.file_name().unwrap().to_str().unwrap();
+            let script_transactions_raw: String = fs::read_to_string(&path)?;
+            let script_transactions: ScriptTransactions =
+                serde_yaml::from_str(&script_transactions_raw).with_context(|| {
+                    format!(
+                        "[Script Transaction Generator] File `{}` is invalid",
+                        file_name
+                    )
+                })?;
+
+            let new_senders: HashSet<String> = script_transactions
+                .transactions
+                .iter()
+                .map(|txn| txn.sender_address.clone())
+                .collect();
+            // Check if any new sender is already used
+            if new_senders
+                .iter()
+                .any(|sender| used_sender_addresses.contains(sender))
+            {
+                return Err(anyhow::anyhow!(
+                    "[Script Transaction Generator] Sender address in file `{}` is already being used",
+                    file_name
+                ));
+            }
+            used_sender_addresses.extend(new_senders);
+            script_transactions_vec.push((file_name.to_string(), script_transactions));
+        }
+    }
+    // Validate the configuration.
+    let mut output_script_transactions_set = HashSet::new();
+    for (file_name, script_transactions) in script_transactions_vec.iter() {
+        if script_transactions.transactions.is_empty() {
+            return Err(anyhow::anyhow!(
+                "[Script Transaction Generator] No transactions found in file `{}`",
+                file_name
+            ));
+        }
+        for script_transaction in script_transactions.transactions.iter() {
+            if let Some(output_name) = &script_transaction.output_name {
+                let canonical_name = canonical_output_name(output_name)?;
+                if !output_script_transactions_set.insert(canonical_name.clone()) {
+                    return Err(anyhow::anyhow!(
+                        "[Script Transaction Generator] Canonical output file name `{}` is duplicated in file `{}`",
+                        canonical_name.display(),
+                        file_name
+                    ));
+                }
+            }
+        }
+    }
+    Ok(script_transactions_vec)
 }
 
 /// Convert relative path to absolute path.

@@ -30,6 +30,7 @@ Images are built into GCP Artifact Registry (internal), then copied to GCP and D
 |---|---|
 | `default` | _(omitted)_ |
 | `failpoints` | `failpoints` |
+| `consensus-only-perf-test` | `consensus_only_perf_test` |
 
 Source: profile/feature prefix logic is implemented in [`docker/builder/docker-bake-rust-all.sh`](builder/docker-bake-rust-all.sh) and the `joinTagSegments` helper in [`docker/image-helpers.js`](image-helpers.js).
 
@@ -64,20 +65,22 @@ Examples:
 - `validator:abc123`  ← release profile, default feature
 - `validator:performance_abc123`  ← performance profile
 - `validator:failpoints_abc123`  ← release + failpoints
+- `validator:consensus_only_perf_test_abc123`  ← release + consensus-only performance
 
 Source: [`docker/builder/docker-bake-rust-all.hcl`](builder/docker-bake-rust-all.hcl) — the `generate_tags` function produces these tags for every image target.
 
 ## CI build workflows
 
-Images are built by [`workflow-run-docker-rust-build.yaml`](../.github/workflows/workflow-run-docker-rust-build.yaml), which accepts `PROFILE` and `FEATURES` inputs and invokes `docker/builder/docker-bake-rust-all.sh`. It is called from [`docker-build-test.yaml`](../.github/workflows/docker-build-test.yaml) as three parallel jobs:
+Pull requests and trusted branch builds use physically separate dispatchers:
 
-| Job | Profile | Features | Label to trigger on PRs |
-|---|---|---|---|
-| `rust-images` | `release` | — | always required |
-| `rust-images-performance` | `performance` | — | `CICD:build-performance-images` |
-| `rust-images-failpoints` | `release` | `failpoints` | `CICD:build-failpoints-images` |
+- [`docker-build-test.yaml`](../.github/workflows/docker-build-test.yaml) handles only `pull_request_target`. It computes one base-owned capability plan, then runs one non-fail-fast local-build matrix and one non-fail-fast protected-publication matrix. Repository identity, the exact source SHA, the base SHA, and the pull request number come directly from the event. Only the validated profile, feature, and build-target fields come from the matrix.
+- [`docker-build-test-trusted.yaml`](../.github/workflows/docker-build-test-trusted.yaml) handles only pushes and manual dispatches. It retains the trusted generic build and Forge workflows, secret inheritance, and cloud publication path.
 
 The reusable Docker build workflow forwards the requested profile/feature flags to the wait-images step and uses a separate build lock for each SHA/profile/feature combination.
+
+The authoritative PR capability labels, capability identifiers, supported variants, and profile/feature mappings are defined only in [`.github/ci/docker-capabilities.json`](../.github/ci/docker-capabilities.json). The dispatcher does not duplicate this mapping. The supported variants are release, failpoints, performance, and consensus-only performance.
+
+The nine stable branch-protection checks remain explicit jobs in the PR dispatcher. They consume only booleans from a base-owned status evaluator. The evaluator validates the complete plan against the authoritative manifest and fails closed if authorization, a required matrix, or an authorized workload does not succeed.
 
 ## Waiting for images
 

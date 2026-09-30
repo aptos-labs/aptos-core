@@ -37,11 +37,19 @@ import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT
 
 from tabulate import tabulate
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(SCRIPT_DIR.parent))
+
+from pr_ci_report import (
+    build_report as build_report_envelope,
+    write_report as write_pr_ci_report,
+)
 
 from calibrate_e2e_perf_test import (
     CALIBRATED_METRICS,
@@ -251,6 +259,7 @@ SELF_COMPARE = bool(os.environ.get("SELF_COMPARE"))
 RUN_SOURCE = os.environ.get("RUN_SOURCE", default="local")
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 REPORT_PATH = os.environ.get("REPORT_PATH")
+PR_CI_REPORT_PATH = os.environ.get("PR_CI_REPORT_PATH")
 HIDE_OUTPUT = bool(os.environ.get("HIDE_OUTPUT"))
 # How long a subprocess may print nothing before it is killed as hung. Silence,
 # not total runtime, is what separates a hang from a slow workload: the
@@ -937,6 +946,63 @@ def run_workload_with_retry(workload, db_dir, tmpdir, calibration):
     return run_workload(workload, db_dir, tmpdir, calibration)
 
 
+def build_pr_ci_report(
+    results, failures, *, pr_number, head_sha, run_id, status
+):
+    """Build the bounded, typed interface consumed by the trusted reporter."""
+    metrics = []
+    for result in results:
+        v1_tps, _ = summarize(result.v1_runs, "execution")
+        mono_tps, _ = summarize(result.mono_runs, "execution")
+        metrics.append(
+            {
+                "name": result.workload.name,
+                "verdict": result.verdict,
+                "v1_tps": v1_tps,
+                "mono_tps": mono_tps,
+                "execution_speedup": result.speedup["execution"],
+                "max_execution_spread": max(
+                    result.spread[metric] for metric in VERDICT_METRICS
+                ),
+            }
+        )
+    for name, _reason in failures:
+        metrics.append(
+            {
+                "name": name,
+                "verdict": "failed",
+                "v1_tps": None,
+                "mono_tps": None,
+                "execution_speedup": None,
+                "max_execution_spread": None,
+            }
+        )
+    return build_report_envelope(
+        producer="mono-move-e2e-perf",
+        run_id=run_id,
+        pr_number=pr_number,
+        head_sha=head_sha,
+        status=status,
+        metrics=metrics,
+    )
+
+
+def write_ci_report_if_requested(results, failures, status):
+    if not PR_CI_REPORT_PATH:
+        return
+    write_pr_ci_report(
+        PR_CI_REPORT_PATH,
+        build_pr_ci_report(
+            results,
+            failures,
+            pr_number=int(os.environ["PR_CI_PR_NUMBER"]),
+            head_sha=os.environ["PR_CI_HEAD_SHA"],
+            run_id=int(os.environ["PR_CI_RUN_ID"]),
+            status=status,
+        ),
+    )
+
+
 def main():
     selected = WORKLOADS
     if ONLY_WORKLOADS:
@@ -984,11 +1050,11 @@ def main():
             f.write(report)
         print(f"Report written to {REPORT_PATH}")
 
-    if failures:
-        return 1
-    if any(r.verdict == "regression" and r.workload.blocking for r in results):
-        return 1
-    return 0
+    failed = bool(failures) or any(
+        r.verdict == "regression" and r.workload.blocking for r in results
+    )
+    write_ci_report_if_requested(results, failures, "failed" if failed else "passed")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

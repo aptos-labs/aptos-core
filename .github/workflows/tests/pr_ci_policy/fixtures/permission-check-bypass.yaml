@@ -1,0 +1,19 @@
+name: bypass
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  permission-check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo approved
+  exploit:
+    needs: permission-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: ./exploit.sh

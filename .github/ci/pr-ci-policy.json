@@ -1,0 +1,50 @@
+{
+  "hardened_workflows": [
+    ".github/workflows/adhoc-forge.yaml",
+    ".github/workflows/cli-e2e-tests.yaml",
+    ".github/workflows/docker-build-test-trusted.yaml",
+    ".github/workflows/docker-build-test.yaml",
+    ".github/workflows/docker-forge-pr-report.yaml",
+    ".github/workflows/execution-performance.yaml",
+    ".github/workflows/faucet-tests-main.yaml",
+    ".github/workflows/faucet-tests-prod.yaml",
+    ".github/workflows/forge-continuous-land-blocking-test.yaml",
+    ".github/workflows/forge-framework-upgrade.yaml",
+    ".github/workflows/forge-lookup-unit-tests.yaml",
+    ".github/workflows/forge-stable.yaml",
+    ".github/workflows/indexer-processor-testing.yaml",
+    ".github/workflows/mono-move-e2e-perf.yaml",
+    ".github/workflows/mono-move-micro-bench.yaml",
+    ".github/workflows/module-verify.yaml",
+    ".github/workflows/node-api-compatibility-tests.yaml",
+    ".github/workflows/pr-ci-control-tests.yaml",
+    ".github/workflows/pr-ci-policy.yaml",
+    ".github/workflows/pr-ci-report.yaml",
+    ".github/workflows/rust-client-tests.yaml",
+    ".github/workflows/workflow-run-docker-rust-build-pr.yaml",
+    ".github/workflows/workflow-run-docker-rust-build.yaml",
+    ".github/workflows/workflow-run-docker-rust-publish-pr.yaml",
+    ".github/workflows/workflow-run-execution-performance.yaml",
+    ".github/workflows/workflow-run-forge-pr.yaml",
+    ".github/workflows/workflow-run-forge.yaml",
+    ".github/workflows/workflow-run-pr-e2e-tests.yaml"
+  ],
+  "approved_protected_reusables": [
+    ".github/workflows/workflow-run-docker-rust-publish-pr.yaml",
+    ".github/workflows/workflow-run-forge-pr.yaml",
+    ".github/workflows/workflow-run-pr-e2e-tests.yaml"
+  ],
+  "protected_runtime_prefixes": [
+    ".github/actions/checkout-exact-pr-source/",
+    ".github/actions/compute-authorized/",
+    ".github/actions/docker-capability-plan/",
+    ".github/actions/docker-forge-pr-report/",
+    ".github/actions/docker-status-plan/",
+    ".github/actions/gcp-registry-auth/",
+    ".github/actions/indexer-processor-dispatch/",
+    ".github/actions/pr-ci-policy/",
+    ".github/actions/pr-ci-report/",
+    ".github/actions/privileged-pr-setup/",
+    ".github/ci/"
+  ]
+}

@@ -1,0 +1,6 @@
+name: collision
+on: pull_request_target
+true: workflow_dispatch
+permissions:
+  contents: read
+jobs: {}

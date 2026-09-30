@@ -1,0 +1,32 @@
+name: raw shell PR sources
+on: pull_request_target
+permissions:
+  contents: write
+jobs:
+  head-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - run: git fetch origin "${GITHUB_HEAD_REF}"
+  pull-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - run: git fetch origin refs/pull/42/head:pr-head
+  gh-checkout:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr checkout 42
+  git-fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - run: git fetch origin pull/42/head:pr-head
+  api-fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          head_sha="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/42" --jq .head.sha)"
+          git fetch origin "$head_sha"
+          git checkout FETCH_HEAD
+  api-list:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh api "repos/${GITHUB_REPOSITORY}/pulls" --jq 'first.head.sha'

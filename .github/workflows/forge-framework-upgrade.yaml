@@ -131,9 +131,11 @@ jobs:
 
       - name: Write summary
         run: |
-          echo "## Framework upgrade test" >> $GITHUB_STEP_SUMMARY
-          echo "Upgrading FROM \`${{ steps.get-last-released-image-tag.outputs.IMAGE_TAG }}\` (branch \`${{ steps.get-last-released-image-tag.outputs.TARGET_BRANCH }}\`)" >> $GITHUB_STEP_SUMMARY
-          echo "Upgrading TO \`${{ steps.get-latest-image-tag.outputs.IMAGE_TAG }}\` (branch \`${{ steps.target.outputs.BRANCH }}\`)" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Framework upgrade test"
+            echo "Upgrading FROM \`${{ steps.get-last-released-image-tag.outputs.IMAGE_TAG }}\` (branch \`${{ steps.get-last-released-image-tag.outputs.TARGET_BRANCH }}\`)"
+            echo "Upgrading TO \`${{ steps.get-latest-image-tag.outputs.IMAGE_TAG }}\` (branch \`${{ steps.target.outputs.BRANCH }}\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
     outputs:
       IMAGE_TAG_NEW: ${{ steps.get-latest-image-tag.outputs.IMAGE_TAG }}

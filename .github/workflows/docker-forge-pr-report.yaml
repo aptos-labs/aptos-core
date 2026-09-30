@@ -1,0 +1,67 @@
+name: "trusted-docker-forge-pr-report"
+
+on:
+  workflow_run:
+    workflows: ["Build+Test Docker Images"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: trusted-docker-forge-pr-report-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  prepare_report:
+    if: ${{ github.event.workflow_run.event == 'pull_request_target' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      pr_number: ${{ steps.report.outputs.pr_number }}
+      head_sha: ${{ steps.report.outputs.head_sha }}
+      run_url: ${{ steps.report.outputs.run_url }}
+      report_matrix: ${{ steps.report.outputs.report_matrix }}
+    steps:
+      - name: Check out the trusted default-branch reporter
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate originating run and derive fixed Forge results
+        id: report
+        uses: ./.github/actions/docker-forge-pr-report
+        with:
+          run_id: ${{ github.event.workflow_run.id }}
+
+  publish_reports:
+    needs: [prepare_report]
+    if: ${{ needs.prepare_report.outputs.report_matrix != '{"include":[]}' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.prepare_report.outputs.report_matrix) }}
+    steps:
+      - name: Publish protected Forge result
+        uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443
+        with:
+          number: ${{ needs.prepare_report.outputs.pr_number }}
+          header: ${{ matrix.header }}
+          hide_and_recreate: true
+          hide_classify: OUTDATED
+          message: |
+            ### ${{ matrix.title }}
+            - Result: `${{ matrix.result }}`
+            - Exact PR SHA: `${{ needs.prepare_report.outputs.head_sha }}`
+            - Workflow run: ${{ needs.prepare_report.outputs.run_url }}

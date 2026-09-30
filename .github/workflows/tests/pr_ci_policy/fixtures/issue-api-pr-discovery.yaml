@@ -1,0 +1,13 @@
+name: indirect issue API PR discovery
+on: pull_request_target
+permissions:
+  contents: write
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          pr_url="$(gh api "repos/${GITHUB_REPOSITORY}/issues/42" --jq .pull_request.url)"
+          head_sha="$(curl -fsSL "$pr_url" | jq -r .head.sha)"
+          git fetch origin "$head_sha"
+          git checkout FETCH_HEAD

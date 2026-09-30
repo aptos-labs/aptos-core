@@ -1,8 +1,5 @@
 name: "Ad-hoc Forge Run"
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/adhoc-forge.yaml"
   workflow_dispatch:
     inputs:
       GIT_SHA:
@@ -58,9 +55,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
-  issues: write
-  pull-requests: write
 
 jobs:
   determine-forge-run-metadata:
@@ -94,6 +88,11 @@ jobs:
   adhoc-forge-test:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     needs: [determine-forge-run-metadata]
+    # The callee's forge job declares id-token and pull-requests write.
+    permissions:
+      contents: read
+      id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+      pull-requests: write
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-forge-run-metadata.outputs.gitSha }}

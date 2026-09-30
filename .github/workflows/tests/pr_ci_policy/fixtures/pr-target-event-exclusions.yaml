@@ -1,0 +1,57 @@
+name: PR target event exclusions
+on:
+  pull_request_target:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  safe-not-target:
+    if: github.event_name != 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./trusted.sh
+  safe-nested-other-or:
+    if: |
+      github.event_name != 'pull_request_target' &&
+      ((github.event_name == 'push' && github.ref_name != 'main') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./trusted.sh
+  safe-workflow-dispatch:
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./trusted.sh
+  unsafe-top-level-or:
+    if: github.event_name != 'pull_request_target' || github.actor == 'octocat'
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./maybe-untrusted.sh
+  unsafe-nested-or:
+    if: |
+      always() &&
+      (github.event_name != 'pull_request_target' || github.actor == 'octocat')
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./maybe-untrusted.sh
+  unsafe-unrelated-condition:
+    if: github.actor != 'octocat'
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./maybe-untrusted.sh
+  unsafe-double-quoted:
+    if: github.event_name != "pull_request_target"
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./maybe-untrusted.sh
+  unsafe-malformed-conjunct:
+    if: github.event_name != 'pull_request_target' && !!!
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./maybe-untrusted.sh
+  unsafe-mixed-template:
+    if: github.event_name != 'pull_request_target' && ${{ true }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./maybe-untrusted.sh

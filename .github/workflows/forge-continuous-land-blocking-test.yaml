@@ -129,9 +129,11 @@ jobs:
 
       - name: Add Image Tag to Step Summary
         run: |
-          echo "## Image Tag for compat tests" >> $GITHUB_STEP_SUMMARY
-          echo "IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
-          echo "TARGET_BRANCH: ${{ steps.get-docker-image-tag.outputs.TARGET_BRANCH }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Image Tag for compat tests"
+            echo "IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}"
+            echo "TARGET_BRANCH: ${{ steps.get-docker-image-tag.outputs.TARGET_BRANCH }}"
+          } >> "$GITHUB_STEP_SUMMARY"
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
 

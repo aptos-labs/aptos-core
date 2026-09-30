@@ -1,0 +1,288 @@
+name: "*rebuild and run protected PR Forge"
+
+on:
+  workflow_call:
+    inputs:
+      SOURCE_REPOSITORY:
+        required: true
+        type: string
+      SOURCE_SHA:
+        required: true
+        type: string
+      PR_NUMBER:
+        required: true
+        type: string
+      BASE_SHA:
+        required: true
+        type: string
+      BASE_REF:
+        required: true
+        type: string
+      FORGE_TEST_SUITE:
+        required: true
+        type: string
+      NAMESPACE_KIND:
+        required: true
+        type: string
+      PROFILE:
+        required: false
+        default: release
+        type: string
+      FEATURES:
+        required: false
+        default: ""
+        type: string
+      FORGE_ENABLE_PERFORMANCE:
+        required: false
+        default: false
+        type: boolean
+      FORGE_ENABLE_FAILPOINTS:
+        required: false
+        default: false
+        type: boolean
+      USE_BASELINE_IMAGE:
+        required: false
+        default: false
+        type: boolean
+      FORGE_CLUSTER_NAME:
+        required: false
+        default: ""
+        type: string
+      FORGE_RUNNER_DURATION_SECS:
+        required: false
+        default: 480
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  forge:
+    environment: privileged-pr-ci
+    runs-on: benchmark-c3d-60-pr
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: us-west-2
+      FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
+      FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
+      FORGE_OUTPUT: forge_output.txt
+      FORGE_REPORT: forge_report.json
+      FORGE_COMMENT: forge_comment.txt
+      FORGE_PRE_COMMENT: forge_pre_comment.txt
+      FORGE_RUNNER_MODE: k8s
+      FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
+      FORGE_ENABLE_FAILPOINTS: ${{ inputs.FORGE_ENABLE_FAILPOINTS }}
+      FORGE_ENABLE_PERFORMANCE: ${{ inputs.FORGE_ENABLE_PERFORMANCE }}
+      FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
+      POST_TO_SLACK: "false"
+      VERBOSE: "true"
+    steps:
+      - name: Record the protected deployment approval scope
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.SOURCE_REPOSITORY }}
+          SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
+          PR_NUMBER: ${{ inputs.PR_NUMBER }}
+        run: |
+          {
+            echo "## Protected PR Forge request"
+            echo "Repository: \`$SOURCE_REPOSITORY\`"
+            echo "PR: \`$PR_NUMBER\`"
+            echo "Exact source SHA: \`$SOURCE_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # privileged-pr-setup checks the GCP prerequisites after the trusted checkout.
+      - name: Check Forge deployment prerequisites
+        run: |
+          set -euo pipefail
+          test -n "$AWS_ACCOUNT_NUM" || { echo "::error::privileged-pr-ci lacks ENV_ECR_AWS_ACCOUNT_NUM"; exit 1; }
+          test -n "$FORGE_BLOCKING" || { echo "::error::privileged-pr-ci lacks FORGE_BLOCKING"; exit 1; }
+
+      - name: Validate fixed namespace inputs
+        env:
+          PR_NUMBER: ${{ inputs.PR_NUMBER }}
+          NAMESPACE_KIND: ${{ inputs.NAMESPACE_KIND }}
+          BASE_REF: ${{ inputs.BASE_REF }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "::error::Invalid PR number"; exit 1; }
+          [[ "$NAMESPACE_KIND" =~ ^[a-z][a-z0-9-]{0,14}$ ]] || { echo "::error::Invalid namespace kind"; exit 1; }
+          git check-ref-format --branch "$BASE_REF" >/dev/null || { echo "::error::Invalid base branch"; exit 1; }
+
+      - name: Derive a bounded PR-and-SHA-scoped namespace
+        env:
+          PR_NUMBER: ${{ inputs.PR_NUMBER }}
+          NAMESPACE_KIND: ${{ inputs.NAMESPACE_KIND }}
+          SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
+        run: |
+          set -euo pipefail
+          namespace_digest="$(printf '%s' "pr:${PR_NUMBER}:kind:${NAMESPACE_KIND}:sha:${SOURCE_SHA}" | sha256sum | cut -c1-16)"
+          namespace="pr${PR_NUMBER}-${NAMESPACE_KIND}-${namespace_digest}"
+          (( ${#namespace} <= 63 )) || { echo "::error::Derived Forge namespace exceeds 63 characters"; exit 1; }
+          echo "FORGE_NAMESPACE=$namespace" >> "$GITHUB_ENV"
+
+      - name: Check out the exact trusted event base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.BASE_SHA }}
+          path: trusted-base
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare the protected build from trusted base code
+        id: setup
+        uses: ./trusted-base/.github/actions/privileged-pr-setup
+        with:
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          profile: ${{ inputs.PROFILE }}
+          features: ${{ inputs.FEATURES }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
+      - name: Set up Python without a shared dependency cache
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: trusted-base/.python-version
+
+      - name: Install the trusted baseline helper dependency
+        if: inputs.USE_BASELINE_IMAGE
+        run: python -m pip install --disable-pip-version-check click==8.1.3
+
+      # Run the established target-branch algorithm from the exact trusted
+      # event base. Never load this helper from the PR checkout.
+      - name: Determine the trusted baseline branch
+        if: inputs.USE_BASELINE_IMAGE
+        id: baseline-target
+        env:
+          BASE_REF: ${{ inputs.BASE_REF }}
+        working-directory: trusted-base/testsuite
+        run: python determine_target_branch_to_fetch_last_released_image.py "$BASE_REF"
+
+      - name: Calculate protected cloud authentication duration
+        id: auth-duration
+        run: |
+          auth_duration=$(( FORGE_RUNNER_DURATION_SECS > 5400 ? FORGE_RUNNER_DURATION_SECS + 1800 : 5400 ))
+          echo "value=$auth_duration" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild and publish exact-SHA Forge images
+        env:
+          PROFILE: ${{ inputs.PROFILE }}
+          FEATURES: ${{ inputs.FEATURES }}
+          BUILD_ADDL_TESTING_IMAGES: "true"
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+          TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
+          TARGET_REGISTRY: gcp
+          CUSTOM_IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.custom_image_tag_prefix }}
+        working-directory: pr-source
+        run: |
+          set -euo pipefail
+          CI=true docker/builder/docker-bake-rust-all.sh forge-images
+
+      # The full image rebuild can consume most of the build token. Mint a new
+      # credential for baseline lookup and the actual Forge deployment.
+      - name: Refresh Google Cloud authentication for the Forge run
+        id: gcp-forge-auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        with:
+          create_credentials_file: true
+          token_format: access_token
+          access_token_lifetime: ${{ steps.auth-duration.outputs.value }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Refresh the US multi-region registry login for Forge
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: us-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-forge-auth.outputs.access_token }}
+
+      - name: Refresh the us-west1 registry login for Forge
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: us-west1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-forge-auth.outputs.access_token }}
+
+      - name: Resolve a trusted baseline without executing branch code
+        if: inputs.USE_BASELINE_IMAGE
+        id: baseline
+        env:
+          TARGET_BRANCH: ${{ steps.baseline-target.outputs.TARGET_BRANCH }}
+        run: |
+          set -euo pipefail
+          test -n "$TARGET_BRANCH" || { echo "::error::No trusted baseline branch was resolved"; exit 1; }
+          git check-ref-format --branch "$TARGET_BRANCH" >/dev/null
+          git -C trusted-base fetch --no-tags origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
+          baseline=""
+          while IFS= read -r revision; do
+            if docker manifest inspect "us-docker.pkg.dev/aptos-registry/docker/validator-testing:${revision}" >/dev/null 2>&1; then
+              baseline="$revision"
+              break
+            fi
+          done < <(git -C trusted-base rev-list --max-count=100 "refs/remotes/origin/${TARGET_BRANCH}")
+          test -n "$baseline" || { echo "::error::No baseline image exists in the last 100 trusted commits"; exit 1; }
+          echo "IMAGE_TAG=$baseline" >> "$GITHUB_OUTPUT"
+
+      - name: Pin all Forge image roles to explicit tags
+        env:
+          USE_BASELINE_IMAGE: ${{ inputs.USE_BASELINE_IMAGE }}
+          BASELINE_IMAGE_TAG: ${{ steps.baseline.outputs.IMAGE_TAG }}
+        run: |
+          set -euo pipefail
+          {
+            if [[ "$USE_BASELINE_IMAGE" == "true" ]]; then
+              test -n "$BASELINE_IMAGE_TAG" || { echo "::error::No trusted baseline image was resolved"; exit 1; }
+              echo "IMAGE_TAG=$BASELINE_IMAGE_TAG"
+            else
+              echo "IMAGE_TAG=$PR_IMAGE_TAG"
+            fi
+            echo "UPGRADE_IMAGE_TAG=$PR_IMAGE_TAG"
+            echo "FORGE_IMAGE_TAG=$PR_IMAGE_TAG"
+            echo "FORGE_IMAGE_NAME=forge"
+          } >> "$GITHUB_ENV"
+
+      - name: Record the protected exact-SHA Forge deployment
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.SOURCE_REPOSITORY }}
+          SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
+          PR_NUMBER: ${{ inputs.PR_NUMBER }}
+        run: |
+          {
+            echo "## Protected PR Forge run"
+            echo "Repository: \`$SOURCE_REPOSITORY\`"
+            echo "PR: \`$PR_NUMBER\`"
+            echo "Exact source SHA: \`$SOURCE_SHA\`"
+            echo "Protected image tag: \`$PR_IMAGE_TAG\`"
+            echo "Forge namespace: \`$FORGE_NAMESPACE\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Forge Python dependencies
+        run: pip3 install click==8.1.3 psutil==5.9.1
+
+      - name: Export the protected GCloud token
+        env:
+          ACCESS_TOKEN: ${{ steps.gcp-forge-auth.outputs.access_token }}
+        run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=$ACCESS_TOKEN" >> "$GITHUB_ENV"
+
+      - name: Select the Forge GCloud project
+        run: gcloud config set project aptos-forge-gcp-0
+
+      - name: Run pre-Forge checks with explicit image tags
+        working-directory: pr-source
+        env:
+          FORGE_RUNNER_MODE: pre-forge
+        run: testsuite/run_forge.sh
+
+      - name: Run Forge with protected exact-SHA images
+        working-directory: pr-source
+        run: testsuite/run_forge.sh

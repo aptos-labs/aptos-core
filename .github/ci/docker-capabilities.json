@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "image_check": "rust-images",
+  "variants": [
+    {"id": "release", "profile": "release", "features": "", "build_target": "all"},
+    {"id": "failpoints", "profile": "release", "features": "failpoints", "build_target": "all"},
+    {"id": "performance", "profile": "performance", "features": "", "build_target": "all"},
+    {"id": "consensus", "profile": "release", "features": "consensus-only-perf-test", "build_target": "all"}
+  ],
+  "capabilities": [
+    {"id": "build_images", "label": "CICD:build-images", "local": ["release"], "publish": ["release"], "workloads": []},
+    {"id": "build_failpoints", "label": "CICD:build-failpoints-images", "local": ["release", "failpoints"], "publish": ["failpoints"], "workloads": []},
+    {"id": "build_performance", "label": "CICD:build-performance-images", "local": ["release", "performance"], "publish": ["performance"], "workloads": []},
+    {"id": "build_consensus", "label": "CICD:build-consensus-only-image", "local": ["release", "consensus"], "publish": ["consensus"], "workloads": []},
+    {
+      "id": "run_e2e",
+      "label": "CICD:run-e2e-tests",
+      "local": ["release"],
+      "publish": [],
+      "workloads": [
+        {"id": "pr-node-cli-faucet-tests", "docs_sensitive": true, "checks": ["node-api-compatibility-tests", "cli-e2e-tests", "faucet-tests-main"]},
+        {"id": "pr-forge-e2e", "docs_sensitive": true, "checks": ["forge-e2e-test"],
+         "marker": {"id": "forge-report-source-e2e", "comment_header": "forge-e2e", "title": "Protected Forge E2E result"}},
+        {"id": "pr-forge-compat", "docs_sensitive": true, "checks": ["forge-compat-test"],
+         "marker": {"id": "forge-report-source-compat", "comment_header": "forge-compat", "title": "Protected Forge compatibility result"}}
+      ]
+    },
+    {
+      "id": "run_forge_performance",
+      "label": "CICD:run-forge-e2e-perf",
+      "local": ["release", "performance"],
+      "publish": [],
+      "workloads": [
+        {"id": "pr-forge-performance", "docs_sensitive": false, "checks": ["forge-e2e-test"],
+         "marker": {"id": "forge-report-source-performance", "comment_header": "forge-e2e-performance", "title": "Protected Forge performance result"}}
+      ]
+    },
+    {
+      "id": "run_framework_upgrade",
+      "label": "CICD:run-framework-upgrade-test",
+      "local": ["release"],
+      "publish": [],
+      "workloads": [
+        {"id": "pr-forge-framework-upgrade", "docs_sensitive": false, "checks": ["forge-framework-upgrade-test"],
+         "marker": {"id": "forge-report-source-framework", "comment_header": "forge-framework-upgrade", "title": "Protected Forge framework upgrade result"}}
+      ]
+    },
+    {
+      "id": "run_consensus",
+      "label": "CICD:run-consensus-only-perf-test",
+      "local": ["release", "consensus"],
+      "publish": [],
+      "workloads": [
+        {"id": "pr-forge-consensus-only", "docs_sensitive": false, "checks": ["forge-consensus-only-perf-test"],
+         "marker": {"id": "forge-report-source-consensus", "comment_header": "consensus-only-realistic-env-max-tps", "title": "Protected Forge consensus-only result"}}
+      ]
+    },
+    {
+      "id": "run_multiregion",
+      "label": "CICD:run-multiregion-test",
+      "local": ["release"],
+      "publish": [],
+      "workloads": [
+        {"id": "pr-forge-multiregion", "docs_sensitive": false, "checks": ["forge-multiregion-test"],
+         "marker": {"id": "forge-report-source-multiregion", "comment_header": "forge-multiregion-test", "title": "Protected Forge multiregion result"}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+name: trusted base only
+on: pull_request_target
+permissions:
+  contents: write
+jobs:
+  trusted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - run: git fetch origin main

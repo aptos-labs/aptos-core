@@ -1,0 +1,35 @@
+name: Check out exact PR source
+description: Validate and check out one exact untrusted PR commit
+
+inputs:
+  source_repository:
+    description: Repository that owns the PR commit
+    required: true
+  source_sha:
+    description: Full lowercase SHA of the PR commit
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate the exact source SHA
+      shell: bash
+      env:
+        SOURCE_SHA: ${{ inputs.source_sha }}
+      run: bash "$GITHUB_ACTION_PATH/verify-source.sh" validate "$SOURCE_SHA"
+
+    - name: Check out the exact approved PR revision
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: ${{ inputs.source_repository }}
+        ref: ${{ inputs.source_sha }}
+        path: pr-source
+        fetch-depth: 1
+        persist-credentials: false
+
+    - name: Verify the exact source revision
+      shell: bash
+      working-directory: pr-source
+      env:
+        SOURCE_SHA: ${{ inputs.source_sha }}
+      run: bash "$GITHUB_ACTION_PATH/verify-source.sh" verify "$SOURCE_SHA"

@@ -1,0 +1,74 @@
+name: Dispatch and poll indexer processor tests
+description: Dispatch an exact-source request and wait for its uniquely correlated downstream run
+
+inputs:
+  token:
+    description: Token that can dispatch to and read actions in the downstream repository
+    required: true
+  downstream_repository:
+    description: Owner and repository that receives the dispatch
+    required: false
+    default: aptos-labs/aptos-indexer-processors
+  downstream_branch:
+    description: Branch on which the downstream repository_dispatch workflow runs
+    required: false
+    default: main
+  event_type:
+    description: repository_dispatch event type
+    required: false
+    default: test-txn-json-change-detected
+  approved_sha:
+    description: Exact approved source commit SHA
+    required: true
+  pr_number:
+    description: Source pull request number, or zero for a manual default-branch dispatch
+    required: true
+  source_run_id:
+    description: Source workflow run ID
+    required: true
+  source_run_attempt:
+    description: Source workflow run attempt
+    required: true
+  discovery_attempts:
+    description: Maximum attempts to discover the correlated downstream run
+    required: false
+    default: "10"
+  completion_attempts:
+    description: Maximum attempts to wait for downstream completion
+    required: false
+    default: "60"
+  poll_interval_seconds:
+    description: Delay between API polls
+    required: false
+    default: "30"
+
+outputs:
+  correlation:
+    description: Fresh dispatch correlation UUID
+    value: ${{ steps.dispatch.outputs.correlation }}
+  downstream_run_id:
+    description: Correlated downstream workflow run ID
+    value: ${{ steps.dispatch.outputs.downstream_run_id }}
+  downstream_run_url:
+    description: Correlated downstream workflow run URL
+    value: ${{ steps.dispatch.outputs.downstream_run_url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Dispatch and wait for the correlated downstream run
+      id: dispatch
+      shell: bash
+      env:
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_DOWNSTREAM_REPOSITORY: ${{ inputs.downstream_repository }}
+        INPUT_DOWNSTREAM_BRANCH: ${{ inputs.downstream_branch }}
+        INPUT_EVENT_TYPE: ${{ inputs.event_type }}
+        INPUT_APPROVED_SHA: ${{ inputs.approved_sha }}
+        INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        INPUT_SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        INPUT_SOURCE_RUN_ATTEMPT: ${{ inputs.source_run_attempt }}
+        INPUT_DISCOVERY_ATTEMPTS: ${{ inputs.discovery_attempts }}
+        INPUT_COMPLETION_ATTEMPTS: ${{ inputs.completion_attempts }}
+        INPUT_POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" indexer-processor-dispatch

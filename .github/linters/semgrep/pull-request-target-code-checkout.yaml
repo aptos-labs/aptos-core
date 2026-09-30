@@ -2,11 +2,12 @@ rules:
   - id: pull-request-target-code-checkout
     languages:
       - yaml
-    message: This GitHub Actions workflow file uses `pull_request_target` and checks
-      out code from the incoming pull request. When using `pull_request_target`,
-      the Action runs in the context of the target repository, which includes
-      access to all repository secrets. Please ensure you have `permission-check`
-      enabled for the jobs that check out code. Please see
+    message: >-
+      This GitHub Actions workflow uses `pull_request_target` and a checkout.
+      A job named `permission-check`, or `needs: permission-check`, is not an
+      authorization boundary. Keep PR execution secretless or gate privileged
+      capabilities with the fixed protected `privileged-pr-ci` environment. The
+      base-owned PR CI policy guard is the structural authority. Please see
       https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
       for additional mitigations.
     metadata:
@@ -47,22 +48,12 @@ rules:
             ...
             $JOBNAME:
               ...
-      - pattern-not-inside: |
-          needs: [..., permission-check, ...]
-          ...
-      - pattern-not-inside: |
-          needs:
-            ...
-            - permission-check
-            ...
-          ...
-      - pattern-not-inside: |
-          needs: [permission-check]
-          ...
       - pattern: |
           ...
           uses: "$ACTION"
       - metavariable-regex:
           metavariable: $ACTION
           regex: actions/checkout@.*
-    severity: WARNING
+    # Advisory only. The base-owned PR CI policy guard performs the bounded,
+    # base/head structural comparison and is the blocking authority.
+    severity: INFO

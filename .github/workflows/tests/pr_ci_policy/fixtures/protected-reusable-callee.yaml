@@ -1,0 +1,25 @@
+name: protected-callee
+on:
+  workflow_call:
+    inputs:
+      SOURCE_REPOSITORY:
+        required: true
+        type: string
+      SOURCE_SHA:
+        required: true
+        type: string
+jobs:
+  publish:
+    environment: privileged-pr-ci
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: benchmark-c3d-60-pr
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.SOURCE_REPOSITORY }}
+          ref: ${{ inputs.SOURCE_SHA }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.PROVIDER }}

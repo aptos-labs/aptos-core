@@ -1,0 +1,16 @@
+name: unsafe-cloud
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/get-secretmanager-secrets@v2
