@@ -772,7 +772,7 @@ fn companion_local_qualification(env: &GlobalEnv, fun: &FunctionEnv) -> Companio
 /// Whether the given native function may appear as a callee of a
 /// companion-derived pure function: its `$`-spec version is defined in the
 /// Boogie prelude (`native.bpl` for the `std::vector` bytecode-instruction
-/// natives, `prelude.bpl` for `$1_signer_$borrow_address`).
+/// natives, `prelude.bpl` for `$1.signer.$borrow_address`).
 fn is_companion_safe_native(fun: &FunctionEnv) -> bool {
     if !fun.is_native() {
         return false;

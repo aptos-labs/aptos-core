@@ -261,6 +261,12 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         self.interpreter.get_stack_frames(count)
     }
 
+    /// Returns the module that directly called the Move function invoking this native.
+    /// Returns `None` for calls through function values, scripts, or an entry frame.
+    pub fn direct_caller_module(&self) -> Option<ModuleId> {
+        self.interpreter.get_direct_caller_module()
+    }
+
     pub fn legacy_gas_budget(&self) -> InternalGas {
         self.gas_meter.legacy_gas_budget_in_native_context()
     }

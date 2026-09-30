@@ -444,7 +444,7 @@ pub enum MicroOp {
         rhs: FrameOffset,
     },
 
-    /// `dst = src / imm` (u64). Aborts if `imm == 0`.
+    /// `dst = src / imm` (u64). Unchecked; lowering guarantees `imm != 0`.
     DivU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
@@ -459,7 +459,7 @@ pub enum MicroOp {
         rhs: FrameOffset,
     },
 
-    /// `dst = src % imm` (u64). Aborts if `imm == 0`.
+    /// `dst = src % imm` (u64). Unchecked; lowering guarantees `imm != 0`.
     ModU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
@@ -500,7 +500,7 @@ pub enum MicroOp {
         rhs: FrameOffset,
     },
 
-    /// `dst = src << imm` (u64). Aborts if `imm >= 64`.
+    /// `dst = src << imm` (u64). Unchecked; lowering guarantees `imm < 64`.
     ShlU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
@@ -515,7 +515,8 @@ pub enum MicroOp {
         rhs: FrameOffset,
     },
 
-    /// `dst = src >> imm` (u64, logical right shift). Aborts if `imm >= 64`.
+    /// `dst = src >> imm` (u64, logical right shift).
+    /// Unchecked; lowering guarantees `imm < 64`.
     ShrU64Imm {
         dst: FrameOffset,
         src: FrameOffset,

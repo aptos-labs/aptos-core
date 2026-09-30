@@ -32,6 +32,7 @@ mono-move-output = { workspace = true }
 mono-move-runtime = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }

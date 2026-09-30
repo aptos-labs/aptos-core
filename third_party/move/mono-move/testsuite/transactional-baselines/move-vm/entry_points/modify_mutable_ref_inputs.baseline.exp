@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 1-26:  publish [module 0x42::M]
+task 1 lines 30-45:  run --args 0 1 b"xyz" [script]
+Error: unsupported by MonoVM: reference parameters
+task 2 lines 49-49:  run 0x42::M::t --args 0 1 b"xyz"
+Error: unsupported by MonoVM: reference parameters

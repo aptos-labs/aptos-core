@@ -18,10 +18,12 @@
 //! 4. For instructions with more than 1 destination, they must be disjoint.
 
 use mono_move_core::{
-    captured_values_size, native::NativeABI, types::InternedType, CallClosureOp, ClosureFuncRef,
-    CodeOffset, DescriptorId, DescriptorProvider, FrameOffset, Function, IntBinaryOp,
-    LayoutProvider, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
-    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    captured_values_size,
+    native::NativeABI,
+    types::{view_type_list, InternedType},
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
+    Function, IntBinaryOp, LayoutProvider, MicroOp, ObjectDescriptorInner, PackClosureOp,
+    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -115,6 +117,32 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 ),
             );
         }
+        // There is one return slot per return type, and every slot stays within
+        // the frame's data region.
+        let num_return_tys = view_type_list(self.func.return_tys).len();
+        if self.func.return_slots.len() != num_return_tys {
+            self.err(
+                None,
+                format!(
+                    "number of return slots ({}) must equal number of return types ({})",
+                    self.func.return_slots.len(),
+                    num_return_tys
+                ),
+            );
+        }
+        for slot in &self.func.return_slots {
+            // Two `u32`s widened to `usize` cannot overflow on a 64-bit target.
+            let end = slot.offset.0 as usize + slot.size as usize;
+            if end > self.func.param_and_local_sizes_sum {
+                self.err(
+                    None,
+                    format!(
+                        "return slot [{}, {}) exceeds param_and_local_sizes_sum ({})",
+                        slot.offset.0, end, self.func.param_and_local_sizes_sum
+                    ),
+                );
+            }
+        }
         // param_region_size must fit within the data region.
         if self.func.param_region_size > self.func.param_and_local_sizes_sum {
             self.err(
@@ -140,7 +168,7 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
             );
         }
 
-        // Origins: bytecode provenance parallel to the code.
+        // Origins: bytecode provenance of each micro-op.
         // Either absent (hand-built functions with no bytecode ancestry) or
         // one entry per micro-op; a partial table would attribute errors to
         // wrong bytecode offsets.
@@ -149,7 +177,7 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
             self.err(
                 None,
                 format!(
-                    "origins table has {} entries for {} micro-ops (must be empty or parallel)",
+                    "number of origins ({}) must be zero or equal number of micro-ops ({})",
                     origins.len(),
                     code.len()
                 ),
@@ -288,19 +316,8 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, dst);
             },
 
-            // Div / Mod imm: reject `imm == 0` statically — at runtime it
-            // would always abort, so this is dead-code-with-a-bomb.
-            //
-            // TODO(cleanup): this changes the surface vs the old VM, which aborted
-            // at runtime with a `DIV_BY_ZERO` status code. The cleanest
-            // fix is probably for the specializer to detect `imm == 0` and
-            // emit an explicit `Abort(DIV_BY_ZERO)` instead of `*U64Imm`,
-            // so the verifier never sees the bad op. Open question: can
-            // the specializer report any error post-bytecode-verification,
-            // and if so should it fail the whole module or only the
-            // function (or only the basic block)? The branch containing
-            // `imm == 0` may not even be reachable at runtime. Revisit
-            // once the abort/error story is settled.
+            // These unchecked u64 ops require `imm != 0`. Lowering uses checked
+            // ops for zero divisors, so an invalid immediate here is a lowering bug.
             MicroOp::DivU64Imm { dst, src, imm } | MicroOp::ModU64Imm { dst, src, imm } => {
                 self.check_frame_access_8(pc, src);
                 self.check_frame_access_8(pc, dst);
@@ -309,8 +326,8 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 }
             },
 
-            // Shift imm: reject `imm >= 64` statically — same reason as
-            // div by zero (the runtime would always abort).
+            // These unchecked u64 ops require `imm < 64`. Lowering uses checked
+            // ops for out-of-range shifts, so an invalid immediate here is a lowering bug.
             MicroOp::ShlU64Imm { dst, src, imm } | MicroOp::ShrU64Imm { dst, src, imm } => {
                 self.check_frame_access_8(pc, src);
                 self.check_frame_access_8(pc, dst);
@@ -348,14 +365,8 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
             //   - `dst`, `lhs`, and (if `rhs` is a slot) `rhs` are all
             //     in-bounds slots of width `op.rhs.byte_width()`.
             //   - Bitwise ops reject signed operands.
-            //
-            // TODO(cleanup): also statically reject `IntDiv`/`IntMod` with an
-            // imm-zero rhs. Same for u64 variants (currently the u64
-            // variants statically error out) and shifts. Revisit once we
-            // have a clearer policy on what the specializer is allowed
-            // to reject statically — turning runtime aborts into
-            // verification errors makes the specializer's
-            // constant-folding observable in the error type.
+            // Zero immediate divisors are valid here: `IntDiv` and `IntMod`
+            // report division by zero only when executed.
             MicroOp::IntAdd(ref op)
             | MicroOp::IntSub(ref op)
             | MicroOp::IntMul(ref op)
@@ -370,31 +381,16 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 }
             },
 
-            // Shifts: `lhs` / `dst` are slots of width `op.ty.byte_width()`;
-            // `rhs` is either a 1-byte slot or an inline u8. The shift
-            // amount is statically range-checked for the imm form, and
-            // signedness of `ty` is checked at runtime via the dispatcher.
-            //
-            // TODO(cleanup): as noted above for div/mod, the static imm range check
-            // turns a runtime abort into a verification error — revisit.
+            // `lhs` and `dst` use `op.ty.byte_width()` bytes; `rhs` is a
+            // one-byte slot or an inline u8. Shift amounts and signedness are
+            // checked at runtime, so out-of-range immediates are valid here.
             MicroOp::IntShl(op) | MicroOp::IntShr(op) => {
                 let size = op.ty.byte_width() as u32;
                 self.check_frame_access(Some(pc), op.lhs, size);
                 self.check_frame_access(Some(pc), op.dst, size);
                 match op.rhs {
                     ShiftOperand::SlotU8(rhs) => self.check_frame_access_1(pc, rhs),
-                    ShiftOperand::ImmU8(imm) => {
-                        if (imm as usize) >= op.ty.bit_width() {
-                            self.err(
-                                Some(pc),
-                                format!(
-                                    "shift amount {} exceeds bit width {} (imm)",
-                                    imm,
-                                    op.ty.bit_width()
-                                ),
-                            );
-                        }
-                    },
+                    ShiftOperand::ImmU8(_) => {},
                 }
             },
 

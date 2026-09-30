@@ -18,8 +18,8 @@ use aptos_types::{
         ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE, ETRANSACTION_EXPIRED,
     },
 };
-use mono_move_core::{ExecutionErrorKind, VMInternalError};
-use mono_move_output::v1_error::{self, V1Equivalent};
+use mono_move_core::VMInternalError;
+use mono_move_output::v1_error::{self, V1Message};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
@@ -43,44 +43,23 @@ static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
 /// the transaction and preserve fee charging. It may differ from V1's status
 /// as an explicit choice, but must never cause a discard.
 fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
-    let (status_code, sub_status, message) = match v1_error::describe(err) {
-        V1Equivalent::Described(info) => (
-            info.status,
-            info.sub_status.known(),
-            // Mono's own text where V1 renders none. Not persisted: it surfaces
-            // in simulation responses and logs, and is the only report of
-            // allocation sizes and out-of-bounds indices.
-            info.message
-                .text()
-                .map_or_else(|| err.to_string(), str::to_owned),
-        ),
-
-        // V1 reports no failure, so there is no status to borrow. Charges
-        // anyway: this runs after the prologue, where the fee and sequence
-        // number are already committed, and a discarding code would drop them.
-        //
-        // TODO(correctness): reaching this means MonoMove cannot run an input V1
-        // runs. The replay benchmark reports it as a status mismatch, but
-        // production charges the sender and logs nothing.
-        V1Equivalent::NoV1Failure => (StatusCode::UNKNOWN_RUNTIME_STATUS, None, err.to_string()),
-
-        // Every code below commits and charges, including invariant violations,
-        // which V1 discards: the executor has already committed the fee, and a
-        // discarding code would drop it.
-        //
-        // TODO(correctness): four kinds collapse to `UNKNOWN_RUNTIME_STATUS`,
-        // which is persisted, so telling them apart later is a breaking change.
-        V1Equivalent::V1StatusUnknown => {
-            let code = match err.kind() {
-                ExecutionErrorKind::OutOfGas => StatusCode::OUT_OF_GAS,
-                ExecutionErrorKind::LinkingError => StatusCode::LINKER_ERROR,
-                ExecutionErrorKind::InvariantViolation
-                | ExecutionErrorKind::RuntimeLimitExceeded
-                | ExecutionErrorKind::InvalidOperation
-                | ExecutionErrorKind::Placeholder => StatusCode::UNKNOWN_RUNTIME_STATUS,
-            };
-            (code, None, err.to_string())
-        },
+    // The fallback statuses commit and charge, including for invariant
+    // violations, which V1 discards: this runs after the prologue, where the
+    // fee and sequence number are already committed, and a discarding code
+    // would drop them.
+    //
+    // TODO(correctness): reaching the fallback means MonoMove cannot run an
+    // input V1 runs. The replay benchmark reports it as a status mismatch, but
+    // production charges the sender and logs nothing.
+    let info = v1_error::describe_or_fallback(err);
+    let status_code = info.status;
+    let sub_status = info.sub_status.known();
+    let message = match info.message {
+        V1Message::Verbatim(text) | V1Message::MonoText(text) => text,
+        // Mono's own text where V1 renders none. Not persisted: it surfaces in
+        // simulation responses and logs, and is the only report of allocation
+        // sizes and out-of-bounds indices.
+        V1Message::Absent => err.to_string(),
     };
     // Only execution statuses can become `ExecutionFailure`; construct all
     // others directly. This also avoids `PartialVMError::new`, which captures

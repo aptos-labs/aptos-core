@@ -40,19 +40,14 @@ fn native_get_caller_address_and_module_id(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(INIT_GET_CALLER_ADDRESS_AND_MODULE_ID_BASE)?;
 
-    // stack_frames(1) returns one frame: the direct Move caller of the function
-    // that invoked this native (i.e. the caller of `init::internal_maybe_initialize`).
-    let frames = context.stack_frames(1);
-    let caller_module_id = frames
-        .stack_trace()
-        .first()
-        .and_then(|(module_id_opt, _, _)| module_id_opt.as_ref())
-        .ok_or_else(|| {
-            SafeNativeError::abort_with_message(
-                EINVALID_INITIALIZE_CALLER,
-                "caller has no associated module (e.g. a script)",
-            )
-        })?;
+    // Check the runtime call site as well as publication: old bytecode and stored closures can
+    // predate the verifier's restriction on function values over `internal_maybe_initialize`.
+    let caller_module_id = context.direct_caller_module().ok_or_else(|| {
+        SafeNativeError::abort_with_message(
+            EINVALID_INITIALIZE_CALLER,
+            "initializer must be invoked by a direct module call",
+        )
+    })?;
 
     let name_bytes = caller_module_id.name().as_bytes();
     context.charge(

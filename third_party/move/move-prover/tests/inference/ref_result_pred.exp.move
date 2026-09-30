@@ -32,7 +32,7 @@ module 0x42::ref_result_pred {
     spec caller(self: &mut Data): u64 {
         pragma opaque = true;
         ensures [inferred] result == result_of<peek>(old(self));
-        ensures [inferred] ensures_of<peek>(self, result, self);
+        ensures [inferred] ensures_of<peek>(old(self), result, self);
         aborts_if [inferred] false;
     }
 

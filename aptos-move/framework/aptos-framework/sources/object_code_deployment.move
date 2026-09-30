@@ -86,7 +86,7 @@ module aptos_framework::object_code_deployment {
         let object_seed = object_seed(publisher_address);
         let constructor_ref = &object::create_named_object(publisher, object_seed);
         let code_signer = &constructor_ref.generate_signer();
-        code::publish_package_txn(code_signer, metadata_serialized, code);
+        code::publish_package_to_object(publisher, code_signer, metadata_serialized, code);
 
         event::emit(Publish { object_address: signer::address_of(code_signer), });
 
@@ -127,7 +127,7 @@ module aptos_framework::object_code_deployment {
 
         let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
         let code_signer = &extend_ref.generate_signer_for_extending();
-        code::publish_package_txn(code_signer, metadata_serialized, code);
+        code::publish_package_to_object(publisher, code_signer, metadata_serialized, code);
 
         event::emit(Upgrade { object_address: signer::address_of(code_signer), });
     }

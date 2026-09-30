@@ -37,7 +37,7 @@ use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
-    language_storage::TypeTag,
+    language_storage::{ModuleId, TypeTag},
     vm_status::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
@@ -126,6 +126,7 @@ pub(crate) struct Interpreter;
 
 pub(crate) trait InterpreterDebugInterface {
     fn get_stack_frames(&self, count: usize) -> ExecutionState;
+    fn get_direct_caller_module(&self) -> Option<ModuleId>;
     fn debug_print_stack_trace(
         &self,
         buf: &mut String,
@@ -1906,6 +1907,19 @@ where
             })
             .collect();
         ExecutionState::new(stack_trace)
+    }
+
+    fn get_direct_caller_module(&self) -> Option<ModuleId> {
+        let caller = self.call_stack.0.last()?;
+        // Suspended frames retain the PC of their call instruction until the callee returns.
+        if matches!(
+            caller.function.code().get(usize::from(caller.pc)),
+            Some(Instruction::Call(_) | Instruction::CallGeneric(_))
+        ) {
+            caller.function.module_id().cloned()
+        } else {
+            None
+        }
     }
 }
 

@@ -1,0 +1,68 @@
+name: E2E Test Determinator
+description: Select named E2E tests while retaining legacy workflow gates
+inputs:
+  GIT_SHA:
+    description: Revision to analyze after building the trusted planner (empty uses the current checkout)
+    default: ""
+  ARTIFACT_NAME:
+    description: Unique planner name within this workflow run
+    default: e2e
+  DETERMINATOR_MODE:
+    description: legacy, compare, or subsystem
+    default: legacy
+  BASE_REF:
+    description: Base revision for dependency comparison
+    default: origin/main
+outputs:
+  selected_e2e_tests:
+    description: JSON list of selected E2E names
+    value: ${{ steps.select.outputs.selected_e2e_tests }}
+runs:
+  using: composite
+  steps:
+    - name: Set up Rust toolchain
+      if: inputs.DETERMINATOR_MODE != 'legacy'
+      uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # pin@v1
+    - name: Restore Cargo registry cache
+      if: inputs.DETERMINATOR_MODE != 'legacy'
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
+      with:
+        cache-bin: false
+        cache-targets: false
+        save-if: false
+    - name: Build and preserve trusted planner
+      if: inputs.GIT_SHA != '' && inputs.DETERMINATOR_MODE != 'legacy'
+      shell: bash
+      run: |
+        cargo build --locked -p aptos-cargo-cli
+        mkdir -p "$RUNNER_TEMP/trusted-e2e-planner"
+        cp target/debug/aptos-cargo-cli "$RUNNER_TEMP/trusted-e2e-planner/"
+        cp "$GITHUB_ACTION_PATH/select_tests.py" "$GITHUB_ACTION_PATH/registry.json" "$RUNNER_TEMP/trusted-e2e-planner/"
+    - uses: actions/checkout@v4
+      if: inputs.GIT_SHA != '' && inputs.DETERMINATOR_MODE != 'legacy'
+      with:
+        ref: ${{ inputs.GIT_SHA }}
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Select named E2E tests
+      id: select
+      shell: bash
+      env:
+        SELECTION_MODE: ${{ inputs.DETERMINATOR_MODE }}
+        SELECTION_BASE: ${{ inputs.BASE_REF }}
+        SELECTION_SHA: ${{ inputs.GIT_SHA }}
+      run: |
+        consumer="$GITHUB_ACTION_PATH/select_tests.py"
+        planner=()
+        if [[ -n "$SELECTION_SHA" && "$SELECTION_MODE" != legacy ]]; then
+          consumer="$RUNNER_TEMP/trusted-e2e-planner/select_tests.py"
+          planner=(--planner-bin "$RUNNER_TEMP/trusted-e2e-planner/aptos-cargo-cli")
+        fi
+        python3 "$consumer" "${planner[@]}" --mode "$SELECTION_MODE" --base "$SELECTION_BASE" --plan-file "$RUNNER_TEMP/e2e-test-plan.json"
+    - name: Preserve test plan
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-test-plan-${{ inputs.ARTIFACT_NAME }}-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/e2e-test-plan.json
+        if-no-files-found: warn

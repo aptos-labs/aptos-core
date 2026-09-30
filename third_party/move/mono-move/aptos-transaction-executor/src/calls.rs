@@ -45,6 +45,6 @@ pub(crate) fn call_system_function_unmetered<'a>(
             call.signer(signer)?;
         }
         place(&mut call)?;
-        call.run()
+        Ok(call.run()?.into_status())
     })
 }
