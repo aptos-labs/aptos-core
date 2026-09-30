@@ -25,12 +25,14 @@ use aptos_vm_types::{
     module_write_set::ModuleWriteSet, storage::change_set_configs::ChangeSetConfigs,
 };
 use derive_more::{Deref, DerefMut};
-use move_binary_format::{compatibility::Compatibility, errors::Location, CompiledModule};
+use move_binary_format::{
+    access::ModuleAccess, compatibility::Compatibility, errors::Location, CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     value::{serialize_values, MoveValue},
-    vm_status::VMStatus,
+    vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{
     dispatch_loader, execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext,
@@ -161,6 +163,21 @@ impl<'r> UserSession<'r> {
                 && verifier::framework_call_validation::uses_lazy_initialization(module)
             {
                 continue;
+            }
+            if features.is_enabled(FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION)
+                && module.function_defs.iter().any(|def| {
+                    module.identifier_at(module.function_handle_at(def.function).name)
+                        == init_func_name
+                })
+            {
+                return Err(VMStatus::error(
+                    StatusCode::INVALID_INIT_MODULE,
+                    Some(format!(
+                        "Eager module initialization is disabled for {}. Use a newer compiler \
+                         version with lazy initialization support for init_module.",
+                        module.self_id().short_str_lossless(),
+                    )),
+                ));
             }
             self.session.execute(|session| {
                 dispatch_loader!(&staging_module_storage, loader, {

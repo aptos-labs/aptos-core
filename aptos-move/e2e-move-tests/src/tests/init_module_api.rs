@@ -4,13 +4,18 @@
 //! Tests for `aptos_framework::init::internal_maybe_initialize`.
 
 use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_framework::{natives::code::UpgradePolicy, BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
-    account_address::AccountAddress, error, object_address::create_object_code_deployment_address,
-    on_chain_config::FeatureFlag, transaction::TransactionStatus,
+    account_address::AccountAddress,
+    error,
+    object_address::create_object_code_deployment_address,
+    on_chain_config::FeatureFlag,
+    transaction::{SignedTransaction, TransactionStatus},
 };
+use aptos_vm::AptosSimulationVM;
 use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +69,8 @@ fn publish(h: &mut MoveHarness, acc: &aptos_language_e2e_tests::account::Account
     builder.add_source("test.move", source);
     let path = builder.write_to_temp().unwrap();
     let txn = h.create_publish_package(acc, path.path(), Some(BuildOptions::move_2()), |_| {});
-    assert_success!(h.run(txn));
+    // MonoVM does not support publishing yet; use the same fallback as MoveHarness.
+    assert_success!(h.without_mono_move(|h| h.run(txn)));
 }
 
 fn run(h: &mut MoveHarness, acc: &aptos_language_e2e_tests::account::Account) {
@@ -191,9 +197,25 @@ fn init_module_remains_supported_with_lazy_initialization() {
     assert_eq!(counter(&h, *acc.address()), 1);
 }
 
-#[test]
-fn init_module_not_run_at_publish_with_lazy_initialization() {
+#[test_case::test_case(false, false; "legacy_eager_allowed")]
+#[test_case::test_case(false, true; "legacy_eager_disabled")]
+#[test_case::test_case(true, false; "mono_eager_allowed")]
+#[test_case::test_case(true, true; "mono_eager_disabled")]
+fn init_module_not_run_at_publish_with_lazy_initialization(mono_vm: bool, disable_eager: bool) {
     let mut h = new_harness();
+    for (flag, enabled) in [
+        (FeatureFlag::ENABLE_MONO_MOVE, mono_vm),
+        (
+            FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION,
+            disable_eager,
+        ),
+    ] {
+        if enabled {
+            h.enable_features(vec![flag], vec![]);
+        } else {
+            h.enable_features(vec![], vec![flag]);
+        }
+    }
     let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
     publish(
         &mut h,
@@ -225,6 +247,96 @@ fn init_module_not_run_at_publish_with_lazy_initialization() {
     assert_eq!(counter(&h, *acc.address()), 1);
     run(&mut h, &acc);
     assert_eq!(counter(&h, *acc.address()), 1);
+}
+
+#[test_case::test_case(false; "lazy_disabled")]
+#[test_case::test_case(true; "lazy_enabled")]
+fn init_module_eager_initialization_disabled(lazy_enabled: bool) {
+    let mut h = new_harness();
+    h.enable_features(
+        vec![FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION],
+        vec![FeatureFlag::ENABLE_MONO_MOVE],
+    );
+    if !lazy_enabled {
+        h.enable_features(vec![], vec![FeatureFlag::LAZY_MODULE_INITIALIZATION]);
+    }
+    let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
+    let mut builder = PackageBuilder::new("TestPack").with_policy(UpgradePolicy::compat());
+    builder.add_source(
+        "test.move",
+        "module 0xcafe::test {
+            struct Counter has key { value: u64 }
+            fun init_module(s: &signer) { move_to(s, Counter { value: 1 }); }
+        }",
+    );
+    let path = builder.write_to_temp().unwrap();
+    let package = BuiltPackage::build(path.path().to_owned(), BuildOptions::move_2()).unwrap();
+    let txn = h.create_publish_built_package(&acc, &package, |_| {});
+    // Simulation exposes the full VM error message returned to clients.
+    let simulation_txn = SignedTransaction::new(
+        txn.clone().into_raw_transaction(),
+        acc.pubkey.as_ed25519().unwrap(),
+        Ed25519Signature::dummy_signature(),
+    );
+    let (error, _) = AptosSimulationVM::create_vm_and_simulate_signed_transaction(
+        &simulation_txn,
+        h.executor.get_state_view(),
+    );
+    assert_eq!(error.status_code(), StatusCode::INVALID_INIT_MODULE);
+    assert_eq!(
+        error.message().map(String::as_str),
+        Some(
+            "Eager module initialization is disabled for 0xcafe::test. Use a newer compiler \
+             version with lazy initialization support for init_module."
+        ),
+    );
+    assert_vm_status!(h.run(txn), StatusCode::INVALID_INIT_MODULE);
+    assert!(h
+        .read_resource::<Counter>(
+            acc.address(),
+            parse_struct_tag("0xcafe::test::Counter").unwrap()
+        )
+        .is_none());
+
+    // Disabling the flag restores eager initialization. A successful retry also proves
+    // that the rejected publish did not leave the module or package behind.
+    h.enable_features(vec![], vec![
+        FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION,
+    ]);
+    let txn = h.create_publish_built_package(&acc, &package, |_| {});
+    assert_success!(h.run(txn));
+    assert_eq!(counter(&h, *acc.address()), 1);
+
+    // Upgrading an existing legacy module does not run eager initialization and remains allowed.
+    h.enable_features(
+        vec![FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION],
+        vec![],
+    );
+    let txn = h.create_publish_built_package(&acc, &package, |_| {});
+    assert_success!(h.run(txn));
+    assert_eq!(counter(&h, *acc.address()), 1);
+}
+
+#[test_case::test_case(false; "legacy")]
+#[test_case::test_case(true; "mono")]
+fn init_module_eager_disabled_allows_module_without_initializer(mono_vm: bool) {
+    let mut h = new_harness();
+    h.enable_features(
+        vec![FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION],
+        vec![],
+    );
+    if mono_vm {
+        h.enable_features(vec![FeatureFlag::ENABLE_MONO_MOVE], vec![]);
+    } else {
+        h.enable_features(vec![], vec![FeatureFlag::ENABLE_MONO_MOVE]);
+    }
+    let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
+    publish(
+        &mut h,
+        &acc,
+        "module 0xcafe::test { public entry fun run(_s: &signer) {} }",
+    );
+    run(&mut h, &acc);
 }
 
 #[test]
