@@ -192,9 +192,9 @@ impl Hash for StructKeyRef<'_> {
 /// of them, which is well above any realistic working set. So in practice the cache is never full
 /// and never flushed.
 ///
-/// It is not sized to stop an adversary from filling the cache, which is not achievable at any
-/// reasonable amount of memory. If they do, the cache is flushed and has to be rebuilt, which is
-/// fine: it cannot change the result of executing a transaction.
+/// The limit exists to bound memory, and an adversary with enough memory can always reach it. In
+/// that case the cache is flushed and rebuilt, which only costs the time to construct the tags
+/// again: the result of executing a transaction stays the same.
 const MAX_TOTAL_PSEUDO_GAS_COST: u64 = 256 * 1024 * 1024;
 
 /// An entry in [TypeTagCache] that also stores a "cost" of the tag. The cost is proportional to
@@ -331,7 +331,7 @@ impl TypeTagCache {
 
         // Flush before inserting, so that the tag that has just been built survives. See the
         // maximum above for why this is rare enough not to matter.
-        let total_pseudo_gas_cost = self.total_pseudo_gas_cost.load(Ordering::Relaxed);
+        let total_pseudo_gas_cost = self.total_pseudo_gas_cost();
         if total_pseudo_gas_cost.saturating_add(pseudo_gas_cost) > self.max_total_pseudo_gas_cost {
             self.flush_locked(&mut cache);
         }
