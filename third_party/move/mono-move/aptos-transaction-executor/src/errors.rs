@@ -13,6 +13,15 @@ use mono_move_runtime::{
 use move_core_types::vm_status::AbortLocation;
 use thiserror::Error;
 
+/// Why an executor could not be created.
+#[derive(Debug, Error)]
+pub enum ExecutorCreationError {
+    /// The global context was not prepared for this executor: see
+    /// `AptosTransactionExecutor::preinstall`.
+    #[error("the framework symbols are not preinstalled into the global context")]
+    ContextNotPrepared,
+}
+
 /// Every reason a transaction's effects could not be rendered into a
 /// `TransactionOutput`. Always an executor bug; the reasons are diagnostics.
 #[derive(Debug, Error)]

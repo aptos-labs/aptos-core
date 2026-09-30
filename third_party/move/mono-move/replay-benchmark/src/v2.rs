@@ -25,7 +25,8 @@ use mono_move_global_context::GlobalContext;
 pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun> {
     let state_view = input.state.as_ref();
 
-    let ctx = GlobalContext::with_num_execution_workers(1);
+    let mut ctx = GlobalContext::with_num_execution_workers(1);
+    AptosTransactionExecutor::preinstall(&mut ctx);
     let guard = ctx
         .try_execution_context(0)
         .ok_or_else(|| anyhow!("failed to acquire MonoMove execution guard"))?;
@@ -43,7 +44,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         &data_provider,
         &env,
         usage,
-    )
+    )?
     .without_metering();
 
     let aux_info = AuxiliaryInfo::new(input.aux_info, None);

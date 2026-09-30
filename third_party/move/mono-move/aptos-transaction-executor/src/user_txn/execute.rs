@@ -150,13 +150,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         executable: &Executable<'_>,
         ty_args: InternedTypeList,
     ) -> Result<(ExecutionStatus, FeeStatement), DiscardReason> {
-        let guard = self.guard;
         let max_gas = txn_data.max_gas_amount;
         let signers = ValidationSigners::new(txn_data);
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
-        run_prologue(interp, guard, &signers, txn_data).map_err(|failure| {
+        run_prologue(interp, self.symbols, &signers, txn_data).map_err(|failure| {
             DiscardReason::Failure {
                 stage: ExecutionStage::Prologue,
                 failure,
@@ -198,7 +197,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(
                 interp,
-                guard,
+                self.symbols,
                 &signers,
                 txn_data,
                 fee_statement,
