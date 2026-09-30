@@ -66,7 +66,8 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Leaner Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified LIR. |
 | [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Leaner printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and LIR adapter were ported to `leaner-move`. |
 | [`leaner-e2e-tests/`](leaner-e2e-tests/) | Discoverable Move-to-LeanerLang and Rust-to-LeanerLang source/result baselines. Assertion-style legacy tests remain with their owning packages. |
-| [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `designs/perf-notes.md`. |
+| [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `designs/perf-notes.md`. The verification benchmark driver (`leaner-bench.py`); see `designs/verification-benchmarks.md`. |
+| [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit. |
 | [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing links them and they are not built in CI. |
 
 Within each package, the root `Foo.lean` is the public import, source modules
@@ -102,6 +103,9 @@ older source-specific work those packages own.
   performance (stage logs, heartbeat stages, profiler categories, kernel
   unfold diagnostics), what verification, elaboration, and the kernel pay
   for, rejected experiments, and the open leads.
+- [`designs/verification-benchmarks.md`](designs/verification-benchmarks.md):
+  the nightly benchmark of standard problems, heartbeats per phase, history
+  from recent CI runs, curves, Slack reports, and local comparison.
 - [`designs/leaner-lang.md`](designs/leaner-lang.md): the profile-aware Leaner
   source language over the shared IR, generalizing the Move-profile surface.
 - [`designs/prophetic-references.md`](designs/prophetic-references.md):

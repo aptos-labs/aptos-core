@@ -9,9 +9,10 @@
 use anyhow::{anyhow, bail, Result};
 use log::info;
 use move_core_types::diag_writer::DiagWriter;
-use move_model::model::GlobalEnv;
-use move_model_exchange::dump_ast_module;
+use move_model::model::{GlobalEnv, ModuleId};
+use move_model_exchange::{dump_ast_module, module_closure};
 use std::{
+    collections::BTreeSet,
     io::Write,
     path::{Path, PathBuf},
     process::Command,
@@ -152,11 +153,39 @@ pub fn verifier_available() -> bool {
         .unwrap_or(false)
 }
 
+/// The modules of the package at `package_path` whose source file name
+/// contains `filter`.
+fn filtered_modules(
+    model: &GlobalEnv,
+    package_path: &Path,
+    filter: &str,
+) -> Result<BTreeSet<ModuleId>> {
+    let sources = std::fs::canonicalize(package_path.join("sources"))?;
+    let selected: BTreeSet<ModuleId> = model
+        .get_modules()
+        .filter(|module| {
+            let path = Path::new(module.get_source_path());
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().contains(filter))
+                && std::fs::canonicalize(path).is_ok_and(|path| path.starts_with(&sources))
+        })
+        .map(|module| module.get_id())
+        .collect();
+    if selected.is_empty() {
+        bail!(
+            "no module of the package {} matches the filter",
+            package_path.display()
+        );
+    }
+    Ok(selected)
+}
+
 /// Verifies the package's modules of `model` with the Leaner verifier: every
-/// module with source is exported in the typed-AST exchange format, the
-/// verifier reads the export, verifies the modules under the package's
-/// sources whose file name contains `filter` (all of them without one) with
-/// the others linked as dependencies, each function within `heartbeats`
+/// module with source (with `filter`, those the filtered modules read) is
+/// exported in the typed-AST exchange format, the verifier reads the export,
+/// verifies the modules under the package's sources whose file name
+/// contains `filter` (all of them without one) with the others linked as
+/// dependencies, each function within `heartbeats`
 /// unless its `pragma heartbeats` says otherwise, writes the package's
 /// LeanerLang rendering to `output`, and reports its messages, one per line
 /// in the Move sources' coordinates, to `writer`. Fails when the verifier
@@ -175,9 +204,22 @@ pub fn verify(
     let now = Instant::now();
     let runner = runner(package_path)?;
     let export = tempfile::tempdir()?;
+    // With a filter, the export carries the filtered modules and what
+    // verifying them reads.
+    let selection = match filter {
+        Some(filter) => Some(module_closure(
+            model,
+            &filtered_modules(model, package_path, filter)?,
+        )),
+        None => None,
+    };
     for module in model.get_modules() {
         // A bytecode-only dependency has no AST to export.
-        if module.get_source_path().is_empty() {
+        if module.get_source_path().is_empty()
+            || selection
+                .as_ref()
+                .is_some_and(|selection| !selection.contains(&module.get_id()))
+        {
             continue;
         }
         let dumped = dump_ast_module(model, module.get_id())?;

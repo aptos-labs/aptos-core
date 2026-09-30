@@ -43,12 +43,14 @@ use move_model::{
     pragmas::ABORTS_IF_IS_STRICT_PRAGMA,
 };
 use move_model_exchange as exchange;
-pub use move_model_exchange::dump_ast_module;
+pub use move_model_exchange::{dump_ast_module, module_closure, select_modules};
 use move_stackless_bytecode::{
     function_target_pipeline::{FunctionTargetsHolder, FunctionVariant},
     graph::{DomRelation, Graph},
     stackless_bytecode::{AttrId, Bytecode, Constant, Label, Operation, PropKind},
 };
+#[cfg(test)]
+pub(crate) use source::single_file_options;
 pub use source::{move_file_to_ast, move_file_to_module, move_source_to_module};
 use std::collections::{BTreeMap, BTreeSet};
 

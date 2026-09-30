@@ -3,6 +3,7 @@
 
 use crate::exchange;
 use serde_json::json;
+use std::{collections::BTreeSet, io::Write};
 
 #[test]
 fn count_down() {
@@ -440,4 +441,49 @@ module 0x42::count_down {
         json!([{"binop": ["le", {"local": 0},
                          {"value": {"num": "18446744073709551615"}}]}])
     );
+}
+
+#[test]
+fn module_selection_reads_code_types_and_invariants() {
+    // `a` calls `b` by its qualified name, without a `use`; mentions `c`'s
+    // struct in a signature; `d` constrains `c`'s memory by a global
+    // invariant; nothing reaches `unrelated`.
+    let source = r#"
+module 0x42::b {
+    public fun f(): u64 { 1 }
+}
+module 0x42::c {
+    struct R has key { x: u64 }
+}
+module 0x42::d {
+    spec module {
+        invariant forall addr: address: exists<0x42::c::R>(addr) ==> exists<0x42::c::R>(@0x42);
+    }
+}
+module 0x42::a {
+    public fun g(): u64 { 0x42::b::f() }
+    public fun h(_r: &0x42::c::R) {}
+}
+module 0x42::unrelated {
+    public fun k(): u64 { 2 }
+}
+"#;
+    let mut file = tempfile::Builder::new().suffix(".move").tempfile().unwrap();
+    file.write_all(source.as_bytes()).unwrap();
+    let env = move_compiler_v2::run_checker_and_rewriters(
+        exchange::single_file_options(file.path()).unwrap(),
+    )
+    .unwrap();
+    assert!(!env.has_errors());
+    let selected = exchange::select_modules(&env, &["0x42::a".to_string()]).unwrap();
+    let closure: BTreeSet<String> = exchange::module_closure(&env, &selected)
+        .into_iter()
+        .map(|id| env.get_module(id).get_full_name_str())
+        .collect();
+    let expected: BTreeSet<String> = ["0x42::a", "0x42::b", "0x42::c", "0x42::d"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    assert_eq!(closure, expected);
+    assert!(exchange::select_modules(&env, &["0x42::missing".to_string()]).is_err());
 }

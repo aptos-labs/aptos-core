@@ -93,10 +93,13 @@ the LeanerLang rendering to `output`. With `exported`, the package is read
 from that existing `move exchange --format ast` export instead of being
 exported here, as the Move CLI's `prove --lean` hands it over; `filter`
 narrows the verified modules to those whose source file name contains it;
-`heartbeats` is the budget of a function without `pragma heartbeats`. -/
+`heartbeats` is the budget of a function without `pragma heartbeats`. With
+`modules`, a package directory is exported with only the named modules and
+what verifying them reads, and the named modules are verified. -/
 def verifySource (environment : Lean.Environment) (source output : System.FilePath)
     (exported : Option System.FilePath := none) (filter : Option String := none)
-    (renderOnly : Bool := false) (heartbeats : Option Nat := none) :
+    (renderOnly : Bool := false) (heartbeats : Option Nat := none)
+    (modules : Array String := #[]) :
     IO (Array Report) := do
   let (unit, companions, omitted) ← LeanerLang.Perf.withPhase .frontend do
     let package ← match exported with
@@ -104,7 +107,11 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
           LeanerMove.Frontend.Cli.readExportDir exported
             (if ← source.isDir then some source else none) filter
       | none =>
-          if ← source.isDir then LeanerMove.Frontend.Cli.exportPackage source
+          if ← source.isDir then
+            if modules.isEmpty then
+              pure (LeanerMove.Frontend.Cli.filterTargets
+                (← LeanerMove.Frontend.Cli.exportPackage source) filter)
+            else LeanerMove.Frontend.Cli.exportModules source modules
           else LeanerMove.Frontend.Cli.exportMoveFiles [source]
     let package ← withProofFiles package
     match LeanerMove.Frontend.LIR.Backend.fromXast package with
