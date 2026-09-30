@@ -78,6 +78,8 @@ class ReportSchemaTests(unittest.TestCase):
         report["metrics"][0]["verdict"] = []
         with self.assertRaises(ValueError):
             self.validate(report)
+        with self.assertRaisesRegex(ValueError, "positive safe integer"):
+            self.validate(e2e_report(run_id=2**53), {**BINDING, "run_id": 2**53})
 
     def test_rejects_extreme_finite_metric_magnitudes(self):
         for field, value in [("v1_tps", -1.0), ("mono_tps", 1e308), ("execution_speedup", 1e308),

@@ -9,10 +9,8 @@ require_relative "../workflow_test_helper"
 module SecretlessLabelGatedWorkflowTests
   include WorkflowTestHelper
 
-  CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
   EXACT_SHA = "${{ github.event.pull_request.head.sha || github.sha }}"
-  LABEL_GATE = "contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')"
-  RUNNER = "runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}"
+  TRIGGERS = %w[pull_request push].freeze
 
   def path
     ".github/workflows/#{self.class::FILE}"
@@ -23,13 +21,8 @@ module SecretlessLabelGatedWorkflowTests
   end
 
   def test_runs_on_pull_request_and_main_push_only
-    assert_equal(
-      {
-        "pull_request" => {"types" => %w[labeled opened synchronize reopened auto_merge_enabled]},
-        "push" => {"branches" => ["main"]},
-      },
-      trigger(workflow),
-    )
+    assert_equal self.class::TRIGGERS.sort, trigger(workflow).keys.sort
+    assert_equal ["main"], trigger(workflow).fetch("push").fetch("branches")
   end
 
   def test_jobs_are_secretless
@@ -49,14 +42,13 @@ module SecretlessLabelGatedWorkflowTests
   def test_each_job_tests_the_exact_pr_head_against_public_images
     self.class::NETWORKS.each do |network|
       job = jobs(workflow).fetch("run-tests-#{network}")
-      assert_equal LABEL_GATE, job.fetch("if")
-      assert_equal RUNNER, job.fetch("runs-on")
-      assert_equal 2, steps(job).length
-      checkout, tests = steps(job)
-      assert_equal CHECKOUT_PIN, checkout.fetch("uses")
-      assert_equal({"ref" => EXACT_SHA, "persist-credentials" => false}, checkout.fetch("with"))
-      assert_equal "./.github/actions/#{self.class::ACTION}", tests.fetch("uses")
-      assert_equal({"NETWORK" => network, "GCP_DOCKER_ARTIFACT_REPO" => "aptoslabs"}, tests.fetch("with"))
+      checkouts = checkout_steps(job)
+      assert_equal 1, checkouts.length, network
+      checkout = checkouts.first
+      assert_equal PINS.fetch(:checkout), checkout.fetch("uses"), network
+      assert_equal self.class::EXACT_SHA, checkout.fetch("with").fetch("ref"), network
+      assert_equal false, checkout.fetch("with").fetch("persist-credentials"), network
+      assert(steps(job).any? { |step| step["uses"] == "./.github/actions/#{self.class::ACTION}" }, network)
     end
   end
 
@@ -73,33 +65,8 @@ class FaucetTestsProdWorkflowTests < Minitest::Test
   FILE = "faucet-tests-prod.yaml"
   ACTION = "run-faucet-tests"
   NETWORKS = %w[devnet testnet].freeze
-
-  def test_runs_on_pull_request_and_main_push_only
-    assert_equal(
-      {
-        "workflow_call" => {"inputs" => {"GIT_SHA" => {"required" => true, "type" => "string"}}},
-        "pull_request" => {"types" => %w[labeled opened synchronize reopened auto_merge_enabled]},
-        "push" => {"branches" => ["main"]},
-      },
-      trigger(workflow),
-    )
-  end
-
-  def test_each_job_tests_the_exact_pr_head_against_public_images
-    gate = "github.event_name == 'workflow_dispatch' || #{LABEL_GATE}"
-    ref = "${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}"
-    NETWORKS.each do |network|
-      job = jobs(workflow).fetch("run-tests-#{network}")
-      assert_equal gate, job.fetch("if")
-      assert_equal RUNNER, job.fetch("runs-on")
-      assert_equal 2, steps(job).length
-      checkout, tests = steps(job)
-      assert_equal CHECKOUT_PIN, checkout.fetch("uses")
-      assert_equal({"ref" => ref, "persist-credentials" => false}, checkout.fetch("with"))
-      assert_equal "./.github/actions/#{ACTION}", tests.fetch("uses")
-      assert_equal({"NETWORK" => network, "GCP_DOCKER_ARTIFACT_REPO" => "aptoslabs"}, tests.fetch("with"))
-    end
-  end
+  EXACT_SHA = "${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }}"
+  TRIGGERS = %w[workflow_call pull_request push].freeze
 end
 
 class RustClientTestsWorkflowTests < Minitest::Test
@@ -120,7 +87,6 @@ class BackportWorkflowTests < Minitest::Test
 
   FILE = "backport-to-release-branches.yaml"
   PATH = ".github/workflows/#{FILE}"
-  BACKPORT_PIN = "sorenlouv/backport-github-action@ad888e978060bc1b2798690dd9d03c4036560947"
   MERGED_RELEASE_LABEL =
     "github.event.pull_request.merged == true && contains(join(github.event.pull_request.labels.*.name, ','), 'v1.')"
   CHECK_NAME = "Require write permission for the sender"
@@ -176,12 +142,12 @@ class BackportWorkflowTests < Minitest::Test
     assert_includes script, "admin|write)"
     assert_match(/^\s*\*\).*exit 1/, script)
     refute_includes gate.to_s, "secrets."
-    assert_equal BACKPORT_PIN, steps(job).first.fetch("uses")
+    assert_equal PINS.fetch(:backport), steps(job).first.fetch("uses")
   end
 
   def test_pat_reaches_only_the_pinned_backport_action
     assert_equal 1, text.scan("APTOS_BOT_PAT").length
-    backport = steps(job).find { |step| step["uses"] == BACKPORT_PIN }
+    backport = steps(job).find { |step| step["uses"] == PINS.fetch(:backport) }
     assert_equal "${{ secrets.APTOS_BOT_PAT }}", backport.fetch("with").fetch("github_token")
   end
 

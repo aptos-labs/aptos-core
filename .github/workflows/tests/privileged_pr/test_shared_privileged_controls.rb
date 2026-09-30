@@ -9,10 +9,6 @@ require_relative "../workflow_test_helper"
 class SharedPrivilegedControlTests < Minitest::Test
   include WorkflowTestHelper
 
-  CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
-  GCP_AUTH_PIN = "google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed"
-  DOCKER_LOGIN_PIN = "docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9"
-  BUILDX_PIN = "docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f"
   EXACT_SOURCE_ACTION = "./trusted-base/.github/actions/checkout-exact-pr-source"
   GCP_REGISTRY_ACTION = "./trusted-base/.github/actions/gcp-registry-auth"
   REFRESHED_GCP_REGISTRY_ACTION = "./trusted-refresh/.github/actions/gcp-registry-auth"
@@ -31,7 +27,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     checkouts = action_steps.select { |step| step["uses"].to_s.start_with?("actions/checkout@") }
     assert_equal 1, checkouts.length
     checkout = checkouts.first
-    assert_equal CHECKOUT_PIN, checkout.fetch("uses")
+    assert_equal PINS.fetch(:checkout), checkout.fetch("uses")
     assert_equal "pr-source", action.fetch("inputs").fetch("path").fetch("default")
     assert_equal "1", action.fetch("inputs").fetch("fetch-depth").fetch("default")
     assert_equal(
@@ -44,12 +40,16 @@ class SharedPrivilegedControlTests < Minitest::Test
       },
       checkout.fetch("with"),
     )
-    index = action_steps.index(checkout)
-    assert_match(/verify-source\.sh" validate/, action_steps.first.fetch("run"))
-    assert_operator action_steps.length, :>=, 4
-    assert_includes action_steps.fetch(index - 1).fetch("run"), "RUNNER_TEMP"
-    assert_equal "${{ inputs.path }}", action_steps.fetch(index + 1).fetch("working-directory")
-    assert_includes action_steps.fetch(index + 1).fetch("run"), "steps.stage-verifier.outputs.path"
+    # The verifier is copied out of the checkout path before the PR checkout, so PR
+    # files cannot replace it, and it runs after the checkout.
+    validate = action_steps.index { |step| step["run"].to_s.include?('verify-source.sh" validate') }
+    stage = action_steps.index { |step| step["id"] == "stage-verifier" }
+    verify = action_steps.index { |step| step["run"].to_s.include?("steps.stage-verifier.outputs.path") }
+    order = [validate, stage, action_steps.index(checkout), verify]
+    refute_includes order, nil
+    assert_equal order.sort, order
+    assert_includes action_steps.fetch(stage).fetch("run"), "RUNNER_TEMP"
+    assert_equal "${{ inputs.path }}", action_steps.fetch(verify).fetch("working-directory")
   end
 
   def test_exact_source_verifier_rejects_bad_shas_and_pins_branch_to_head
@@ -116,7 +116,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     assert_equal "false", action.fetch("inputs").fetch("create_credentials_file").fetch("default")
     action_steps = action.dig("runs", "steps")
     auth = action_steps.find { |step| step["id"] == "auth" }
-    assert_equal GCP_AUTH_PIN, auth.fetch("uses")
+    assert_equal PINS.fetch(:gcp_auth), auth.fetch("uses")
     assert_equal "access_token", auth.fetch("with").fetch("token_format")
     assert_registry_logins(action_steps, "auth")
   end
@@ -151,7 +151,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     assert_equal 2, build.dig("runs", "steps").length
     assert_equal RUNTIME_SETUP_ACTION, runtime_step.fetch("uses")
     assert_equal "runtime", runtime_step.fetch("id")
-    assert_equal BUILDX_PIN, buildx.fetch("uses")
+    assert_equal PINS.fetch(:buildx), buildx.fetch("uses")
     assert_equal false, buildx.dig("with", "keep-state")
     assert_equal true, buildx.dig("with", "cleanup")
     assert_equal false, buildx.dig("with", "cache-binary")
@@ -315,7 +315,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     auth = job_steps.find { |step| step["id"] == "gcp-forge-auth" }
     assert_equal REFRESHED_GCP_REGISTRY_ACTION, auth.fetch("uses")
     refreshed = job_steps.find { |step| step["name"] == "Refresh exact trusted base actions" }
-    assert_equal CHECKOUT_PIN, refreshed.fetch("uses")
+    assert_equal PINS.fetch(:checkout), refreshed.fetch("uses")
     assert_equal "${{ inputs.BASE_SHA }}", refreshed.dig("with", "ref")
     assert_equal "trusted-refresh", refreshed.dig("with", "path")
     assert_equal true, auth.dig("with", "create_credentials_file")
@@ -390,7 +390,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     assert_equal REGISTRIES, logins.map { |step| step.dig("with", "registry") }
     auth_index = action_steps.index { |step| step["id"] == auth_id }
     logins.each do |login|
-      assert_equal DOCKER_LOGIN_PIN, login.fetch("uses")
+      assert_equal PINS.fetch(:docker_login), login.fetch("uses")
       assert_equal "oauth2accesstoken", login.dig("with", "username")
       assert_equal "${{ steps.#{auth_id}.outputs.access_token }}", login.dig("with", "password")
       assert_operator auth_index, :<, action_steps.index(login)
@@ -402,7 +402,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     checkouts = checkout_steps(job)
     assert_operator checkouts.length, :>=, 1
     trusted = checkouts.first
-    assert_equal CHECKOUT_PIN, trusted.fetch("uses")
+    assert_equal PINS.fetch(:checkout), trusted.fetch("uses")
     assert_equal "trusted-base", trusted.dig("with", "path")
     assert_equal "${{ github.repository }}", trusted.dig("with", "repository")
     assert_equal "${{ inputs.BASE_SHA }}", trusted.dig("with", "ref")

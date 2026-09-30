@@ -11,8 +11,6 @@ class ForgeLookupUnitTestsWorkflowTests < Minitest::Test
 
   FILE = "forge-lookup-unit-tests.yaml"
   PATH = ".github/workflows/#{FILE}"
-  CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
-  SETUP_PYTHON_PIN = "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
   INSTALL = "python -m pip install --disable-pip-version-check click==8.3.3 psutil==5.9.8 PyYAML==6.0.2"
 
   def workflow
@@ -56,12 +54,12 @@ class ForgeLookupUnitTestsWorkflowTests < Minitest::Test
 
   def test_runs_the_forge_unit_tests_from_the_exact_pr_head
     checkout = checkout_steps(job).first
-    assert_equal CHECKOUT_PIN, checkout.fetch("uses")
+    assert_equal PINS.fetch(:checkout), checkout.fetch("uses")
     assert_equal(
       {"ref" => "${{ github.event.pull_request.head.sha }}", "persist-credentials" => false},
       checkout.fetch("with"),
     )
-    assert_equal({"python-version" => "3.10"}, steps(job).find { |step| step["uses"] == SETUP_PYTHON_PIN }.fetch("with"))
+    assert_equal({"python-version" => "3.10"}, steps(job).find { |step| step["uses"] == PINS.fetch(:setup_python) }.fetch("with"))
     run_steps = steps(job).filter_map { |step| step["run"]&.strip }
     assert_includes run_steps, INSTALL
     tests = steps(job).find { |step| step["name"] == "Run the Forge unit tests" }

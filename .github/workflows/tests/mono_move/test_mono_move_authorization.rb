@@ -8,7 +8,6 @@ require_relative "../workflow_test_helper"
 class MonoMoveAuthorizationTests < Minitest::Test
   include WorkflowTestHelper
 
-  CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
   LABELS = WorkflowTestHelper.report_producers.to_h do |producer|
     [File.basename(producer.fetch("workflow_path")), producer.fetch("label")]
   end.freeze
@@ -25,7 +24,7 @@ class MonoMoveAuthorizationTests < Minitest::Test
                    job.fetch("outputs").fetch("approved"), file
       checkout, authorize = steps(job)
       assert_equal 2, steps(job).length, file
-      assert_equal CHECKOUT_PIN, checkout.fetch("uses"), file
+      assert_equal PINS.fetch(:checkout), checkout.fetch("uses"), file
       assert_equal({"ref" => "${{ github.sha }}", "persist-credentials" => false}, checkout.fetch("with"), file)
       assert_equal "./.github/actions/compute-authorized", authorize.fetch("uses"), file
       assert_equal "authorize", authorize.fetch("id"), file

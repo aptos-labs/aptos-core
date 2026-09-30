@@ -9,9 +9,6 @@ class ForgeStablePrSplitTests < Minitest::Test
 
   FILE = "forge-stable.yaml"
   PATH = ".github/workflows/#{FILE}"
-  CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
-  SETUP_PYTHON_PIN = "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
-  SETUP_CRANE_PIN = "imjasonh/setup-crane@00c9e93efa4e1138c9a7a5c594acd6c75a2fbf0c"
   DISPATCH_ONLY = "${{ github.event_name == 'workflow_dispatch' }}"
   PR_ONLY = "${{ github.event_name == 'pull_request_target' }}"
   BASE_SHA = "${{ github.event.pull_request.base.sha }}"
@@ -100,7 +97,7 @@ class ForgeStablePrSplitTests < Minitest::Test
     assert_equal live_steps.length - 1, live_steps.index(lookup)
 
     trusted = checkout_steps(live).first
-    assert_equal CHECKOUT_PIN, trusted.fetch("uses")
+    assert_equal PINS.fetch(:checkout), trusted.fetch("uses")
     assert_equal(
       {"ref" => BASE_SHA, "path" => "trusted-base", "fetch-depth" => 0, "persist-credentials" => false},
       trusted.fetch("with"),
@@ -113,9 +110,9 @@ class ForgeStablePrSplitTests < Minitest::Test
       assert step.fetch("uses").start_with?("./trusted-base/"), step["name"]
     end
     # An unpinned version installs whatever crane release is newest, with no checksum.
-    crane = live_steps.find { |step| step["uses"] == SETUP_CRANE_PIN }
+    crane = live_steps.find { |step| step["uses"] == PINS.fetch(:setup_crane) }
     assert_equal({"version" => "v0.15.2"}, crane.fetch("with"))
-    assert_equal({"python-version" => "3.10"}, live_steps.find { |step| step["uses"] == SETUP_PYTHON_PIN }.fetch("with"))
+    assert_equal({"python-version" => "3.10"}, live_steps.find { |step| step["uses"] == PINS.fetch(:setup_python) }.fetch("with"))
     assert_includes live_steps.filter_map { |step| step["run"]&.strip }, INSTALL
 
     auth = live_steps.find { |step| step["uses"] == "./trusted-base/.github/actions/gcp-registry-auth" }

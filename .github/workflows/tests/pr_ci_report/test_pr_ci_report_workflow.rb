@@ -47,7 +47,7 @@ class ProducerWorkflowTests < Minitest::Test
       assert_equal "compute-authorization", job.fetch("needs")
       assert_includes job.fetch("if"), "needs.compute-authorization.outputs.approved == 'true'"
       assert_equal "${{ needs.compute-authorization.outputs.runner }}", job.fetch("runs-on")
-      trusted = job.fetch("steps").find { |step| step["uses"] == "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" }
+      trusted = job.fetch("steps").find { |step| step["uses"] == PINS.fetch(:checkout) }
       assert_equal "trusted-base", trusted.dig("with", "path")
       assert_equal false, trusted.dig("with", "persist-credentials")
       checkout = job.fetch("steps").find { |step| step["uses"] == "./trusted-base/.github/actions/checkout-exact-pr-source" }

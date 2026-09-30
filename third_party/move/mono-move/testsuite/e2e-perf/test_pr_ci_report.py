@@ -117,19 +117,6 @@ class ProducerReportTests(unittest.TestCase):
                     verdict_metrics=("execution", "inner_block_executor"),
                 )
 
-    def test_trusted_validator_rejects_invalid_binding_status_and_row_count(self):
-        cases = [
-            ({"pr_number": 0}, {"pr_number": 0}),
-            ({"run_id": 2**53}, {"run_id": 2**53}),
-            ({"head_sha": "A" * 40}, {"head_sha": "A" * 40}),
-            ({"status": "unknown"}, {}),
-        ]
-        for override, binding in cases:
-            with self.subTest(override=override), self.assertRaises(ValueError):
-                validate_report(self.build([self.result()], **override), {**BINDING, **binding})
-        with self.assertRaisesRegex(ValueError, "at most 100"):
-            validate_report(self.build([self.result()] * 101), BINDING)
-
     def test_adapter_imports_without_a_runner_checkout(self):
         helper_path = MODULE_PATH.parent.parent / "pr_ci_report.py"
         with tempfile.TemporaryDirectory() as directory:

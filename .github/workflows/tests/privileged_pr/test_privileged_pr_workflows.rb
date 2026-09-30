@@ -116,7 +116,7 @@ class PrivilegedPrWorkflowTests < Minitest::Test
 
   def test_protected_e2e_retains_retry_and_failure_log_behavior
     e2e_steps = steps(jobs(load_workflow("workflow-run-pr-e2e-tests.yaml")).fetch("e2e-tests"))
-    retried = e2e_steps.select { |step| step["uses"] == "nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08" }
+    retried = e2e_steps.select { |step| step["uses"] == PINS.fetch(:retry) }
     assert_equal(
       {
         "Generate YAML API specification" => [3, 20],

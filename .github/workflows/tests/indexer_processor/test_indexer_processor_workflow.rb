@@ -6,7 +6,6 @@ require_relative "../workflow_test_helper"
 class IndexerProcessorWorkflowTest < Minitest::Test
   include WorkflowTestHelper
 
-  CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
   EXACT_SOURCE_ACTION = "./.github/actions/checkout-exact-pr-source"
   APPROVED_SHA = "${{ github.event.pull_request.head.sha || github.sha }}"
   SOURCE_REPOSITORY = "${{ github.event.pull_request.head.repo.full_name || github.repository }}"
@@ -30,7 +29,7 @@ class IndexerProcessorWorkflowTest < Minitest::Test
   def assert_trusted_checkout(job_name, path: nil)
     checkouts = checkout_steps(@jobs.fetch(job_name))
     assert_equal 1, checkouts.length, job_name
-    assert_equal CHECKOUT_PIN, checkouts.first.fetch("uses"), job_name
+    assert_equal PINS.fetch(:checkout), checkouts.first.fetch("uses"), job_name
     expected = {"repository" => "${{ github.repository }}", "ref" => TRUSTED_REF, "persist-credentials" => false}
     expected["path"] = path if path
     assert_equal expected, checkouts.first.fetch("with"), job_name
@@ -68,7 +67,7 @@ class IndexerProcessorWorkflowTest < Minitest::Test
     assert_equal "${{ github.event_name == 'workflow_dispatch' || steps.compute.outputs.approved == 'true' }}",
                  authorize.fetch("outputs").fetch("approved")
     checkout = job_steps("authorize").first
-    assert_equal CHECKOUT_PIN, checkout.fetch("uses")
+    assert_equal PINS.fetch(:checkout), checkout.fetch("uses")
     assert_equal TRUSTED_REF, checkout.dig("with", "ref")
     compute = job_steps("authorize").find { |step| step["id"] == "compute" }
     assert_equal "./.github/actions/compute-authorized", compute.fetch("uses")
@@ -124,8 +123,8 @@ class IndexerProcessorWorkflowTest < Minitest::Test
 
   def test_live_generation_pins_its_cloud_actions_and_passes_keys_only_through_env
     uses = job_steps("live_generation").filter_map { |step| step["uses"] }
-    assert_includes uses, "google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed"
-    assert_includes uses, "google-github-actions/get-secretmanager-secrets@2b5f97c5a4b9c105e64646762ad4fc3f5128e6f5"
+    assert_includes uses, PINS.fetch(:gcp_auth)
+    assert_includes uses, PINS.fetch(:get_secretmanager_secrets)
     uses.reject { |action| action.start_with?("./") }.each { |action| assert_match(/@[0-9a-f]{40}\z/, action) }
 
     materialize = job_steps("live_generation").find { |step| step.fetch("run", "").include?("materialize-config") }

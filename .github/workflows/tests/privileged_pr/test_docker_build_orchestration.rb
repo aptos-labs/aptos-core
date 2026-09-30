@@ -11,7 +11,6 @@ class DockerBuildOrchestrationTests < Minitest::Test
   PR_WORKFLOW = "docker-build-test.yaml"
   TRUSTED_WORKFLOW = "docker-build-test-trusted.yaml"
   PLAN = "needs.compute-authorization.outputs.plan"
-  CHECKOUT_PIN = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
   IMAGE_JOBS = {
     "pr-rust-images-local" => ["local", "./.github/workflows/workflow-run-docker-rust-build-pr.yaml"],
     "pr-publish-rust-images" => ["publish", "./.github/workflows/workflow-run-docker-rust-publish-pr.yaml"],
@@ -186,7 +185,7 @@ class DockerBuildOrchestrationTests < Minitest::Test
     assert_equal "always()", job.fetch("if")
     assert_equal({ "contents" => "read" }, job.fetch("permissions"))
     checkout = steps_using(job, "actions/checkout@").first
-    assert_equal CHECKOUT_PIN, checkout.fetch("uses")
+    assert_equal H::PINS.fetch(:checkout), checkout.fetch("uses")
     assert_equal "${{ github.event.pull_request.base.sha }}", checkout.dig("with", "ref")
     assert_equal false, checkout.dig("with", "persist-credentials")
     status = steps_using(job, "./.github/actions/docker-status-plan").first

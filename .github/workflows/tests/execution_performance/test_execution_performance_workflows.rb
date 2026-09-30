@@ -3,8 +3,6 @@
 require "minitest/autorun"
 require_relative "../workflow_test_helper"
 
-SLACK_ACTION = "slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95"
-
 module ExecutionPerformanceAssertions
   include WorkflowTestHelper
 
@@ -13,7 +11,7 @@ module ExecutionPerformanceAssertions
     slack = jobs(workflow).fetch("notify-slack")
     assert_includes slack.fetch("if"), "github.event_name == 'workflow_dispatch'"
     assert_equal({}, slack.fetch("permissions"))
-    assert_equal [SLACK_ACTION], steps(slack).map { |step| step["uses"] }
+    assert_equal [PINS.fetch(:slack)], steps(slack).map { |step| step["uses"] }
     refute steps(slack).any? { |step| step.key?("run") }
     refute_includes slack.to_s, "GIT_SHA"
 

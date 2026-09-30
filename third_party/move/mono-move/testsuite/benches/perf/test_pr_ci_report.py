@@ -15,7 +15,7 @@ SPEC.loader.exec_module(MODULE)
 
 # Tests may import the trusted validator; compare.py itself must not.
 sys.path.insert(0, str(MODULE_PATH.parents[6] / ".github" / "ci"))
-from ci_actions.report_schema import parse_and_validate_report, validate_report  # noqa: E402
+from ci_actions.report_schema import parse_and_validate_report  # noqa: E402
 
 SHA = "0123456789abcdef0123456789abcdef01234567"
 BINDING = {"producer": "mono-move-micro-bench", "run_id": 1234, "pr_number": 99, "head_sha": SHA}
@@ -58,19 +58,6 @@ class ProducerReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(ValueError):
                 MODULE.write_pr_ci_report(pathlib.Path(directory) / "report.json", self.build([result]))
-
-    def test_trusted_validator_rejects_invalid_binding_status_and_row_count(self):
-        cases = [
-            ({"pr_number": 0}, {"pr_number": 0}),
-            ({"run_id": 2**53}, {"run_id": 2**53}),
-            ({"head_sha": "A" * 40}, {"head_sha": "A" * 40}),
-            ({"status": "unknown"}, {}),
-        ]
-        for override, binding in cases:
-            with self.subTest(override=override), self.assertRaises(ValueError):
-                validate_report(self.build([self.result()], **override), {**BINDING, **binding})
-        with self.assertRaisesRegex(ValueError, "at most 100"):
-            validate_report(self.build([self.result()] * 101), BINDING)
 
     def test_actual_output_is_deterministic_and_accepted_by_trusted_validator(self):
         with tempfile.TemporaryDirectory() as directory:

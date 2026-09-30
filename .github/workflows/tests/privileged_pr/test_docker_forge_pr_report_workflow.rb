@@ -52,7 +52,7 @@ class DockerForgePrReportWorkflowTests < Minitest::Test
 
     assert_equal 1, @publish.fetch("steps").length
     step = @publish.fetch("steps").first
-    assert_equal "marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443", step.fetch("uses")
+    assert_equal H::PINS.fetch(:sticky_comment), step.fetch("uses")
     assert_equal({ "number" => "${{ needs.prepare_report.outputs.pr_number }}", "header" => "${{ matrix.header }}",
                    "hide_and_recreate" => true, "hide_classify" => "OUTDATED" },
                  step.fetch("with").slice("number", "header", "hide_and_recreate", "hide_classify"))
