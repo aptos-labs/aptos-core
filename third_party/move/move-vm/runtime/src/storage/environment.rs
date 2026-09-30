@@ -383,17 +383,6 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.checked_len()
     }
 
-    /// Flushes only the cache with struct tags, leaving all other caches intact. Safe to do on its
-    /// own because the tag cache is a leaf: it stores indices into the struct name cache, but no
-    /// other cache stores anything derived from it, and reads of it return clones. So the only
-    /// cost of flushing is that the tags have to be constructed again.
-    ///
-    /// Construction is metered identically whether the tag is cached or not, so flushing cannot
-    /// change the result of executing a transaction.
-    pub fn flush_ty_tag_cache(&self) {
-        self.ty_tag_cache.flush();
-    }
-
     /// Flushes the global caches with struct name indices and struct tags. Note that when calling
     /// this function, modules that still store indices into struct name cache must also be flushed.
     pub fn flush_all_caches(&self) {

@@ -485,22 +485,6 @@ pub static NUM_INTERNED_MODULE_IDS: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static TY_TAG_CACHE_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "ty_tag_cache_num_entries",
-        "Number of struct tags cached in execution environment"
-    )
-    .unwrap()
-});
-
-pub static TY_TAG_CACHE_TOTAL_COST: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "ty_tag_cache_total_cost",
-        "Total pseudo-gas cost of all struct tags cached in execution environment"
-    )
-    .unwrap()
-});
-
 /// Collection of counters for gathering statistics about the execution trace of the user
 /// transaction.
 static TRACE_COUNTERS: Lazy<IntGaugeVec> = Lazy::new(|| {

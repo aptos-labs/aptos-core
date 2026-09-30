@@ -26,9 +26,6 @@ pub struct BlockExecutorModuleCacheLocalConfig {
     pub max_layout_cache_size: usize,
     /// The maximum number of module IDs to intern.
     pub max_interned_module_ids: usize,
-    /// The maximum total pseudo-gas cost of all entries in the type tag cache. Bounds the cost
-    /// rather than the number of entries because entry sizes span a wide range.
-    pub max_ty_tag_cache_total_cost: u64,
 }
 
 impl Default for BlockExecutorModuleCacheLocalConfig {
@@ -47,10 +44,6 @@ impl Default for BlockExecutorModuleCacheLocalConfig {
             max_layout_cache_size: 4_000_000,
             // Maximum number of module IDs to intern.
             max_interned_module_ids: 100_000,
-            // A cached tag occupies roughly 3 bytes per unit of pseudo-gas cost, counting the key,
-            // the tag itself and the hash table overhead. This allows ~800 Mb of tags, which is
-            // ~900k typical entries, or ~54k of the largest entries the metering permits.
-            max_ty_tag_cache_total_cost: 256 * 1024 * 1024,
         }
     }
 }

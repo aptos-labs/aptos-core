@@ -182,6 +182,21 @@ impl Hash for StructKeyRef<'_> {
     }
 }
 
+/// The maximum sum of pseudo-gas costs of all entries in [TypeTagCache], past which the cache is
+/// flushed. A cached tag occupies roughly 3 bytes per unit of cost, counting the key, the tag
+/// itself and the hash table overhead, so this allows around 800 Mb of tags. That is of the same
+/// order as the limit on the size of the module cache.
+///
+/// The value is sized for normal traffic. A typical entry, such as the tag of
+/// `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`, costs around 300, so this fits around 900k
+/// of them, which is well above any realistic working set. So in practice the cache is never full
+/// and never flushed.
+///
+/// It is not sized to stop an adversary from filling the cache, which is not achievable at any
+/// reasonable amount of memory. If they do, the cache is flushed and has to be rebuilt, which is
+/// fine: it cannot change the result of executing a transaction.
+const MAX_TOTAL_PSEUDO_GAS_COST: u64 = 256 * 1024 * 1024;
+
 /// An entry in [TypeTagCache] that also stores a "cost" of the tag. The cost is proportional to
 /// the size of the tag, which includes the number of inner nodes and the sum of the sizes in bytes
 /// of addresses and identifiers.
@@ -218,29 +233,49 @@ pub(crate) struct PricedStructTag {
 /// fixed type parameters used by thread 3.
 pub struct TypeTagCache {
     cache: RwLock<HashMap<StructKey, PricedStructTag>>,
-    /// Sum of pseudo-gas costs of all cached entries, used to bound the size of the cache at block
-    /// boundaries. The pseudo-gas cost of a tag is proportional to the memory it occupies, so this
-    /// is a better proxy for the size of the cache than the number of entries: entries range from
-    /// a few hundred bytes to several kilobytes each.
+    /// Sum of pseudo-gas costs of all cached entries, used to bound the size of the cache. The
+    /// pseudo-gas cost of a tag is proportional to the memory it occupies, so this is a better
+    /// proxy for the size of the cache than the number of entries, which vary widely in size.
     ///
     /// Only ever modified while holding the write lock on `cache` above, which keeps the two in
     /// sync without any additional synchronization.
     total_pseudo_gas_cost: AtomicU64,
+    /// Value of `total_pseudo_gas_cost` past which the cache is flushed.
+    max_total_pseudo_gas_cost: u64,
 }
 
 impl TypeTagCache {
     /// Creates a new empty cache without any entries.
     pub(crate) fn empty() -> Self {
+        Self::new(MAX_TOTAL_PSEUDO_GAS_COST)
+    }
+
+    /// Creates a new empty cache that is flushed once the sum of the pseudo-gas costs of its
+    /// entries exceeds the specified maximum.
+    pub(crate) fn new(max_total_pseudo_gas_cost: u64) -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),
             total_pseudo_gas_cost: AtomicU64::new(0),
+            max_total_pseudo_gas_cost,
         }
     }
 
     /// Removes all entries from the cache.
+    ///
+    /// Safe to do at any point, including while other threads are executing. This cache is a leaf:
+    /// it stores indices into the struct name cache, but no other cache stores anything derived
+    /// from it, and reads of it return clones. So the only cost of flushing is that the tags have
+    /// to be constructed again. Construction is metered identically whether the tag is cached or
+    /// not, so flushing cannot change the result of executing a transaction.
     pub(crate) fn flush(&self) {
-        let mut cache = self.cache.write();
-        cache.clear();
+        self.flush_locked(&mut self.cache.write());
+    }
+
+    /// Same as [Self::flush], but for callers that already hold the write lock.
+    fn flush_locked(&self, cache: &mut HashMap<StructKey, PricedStructTag>) {
+        // Replace the map instead of clearing it: clearing drops the entries but keeps the table's
+        // allocated slots, which for a full cache is the larger part of the memory.
+        *cache = HashMap::new();
         self.total_pseudo_gas_cost.store(0, Ordering::Relaxed);
     }
 
@@ -249,9 +284,8 @@ impl TypeTagCache {
         self.cache.read().len()
     }
 
-    /// Returns the sum of pseudo-gas costs of all cached entries. Can be used to bound the size of
-    /// the cache at block boundaries.
-    pub fn total_pseudo_gas_cost(&self) -> u64 {
+    /// Returns the sum of pseudo-gas costs of all cached entries.
+    pub(crate) fn total_pseudo_gas_cost(&self) -> u64 {
         self.total_pseudo_gas_cost.load(Ordering::Relaxed)
     }
 
@@ -294,6 +328,14 @@ impl TypeTagCache {
         // Otherwise, we need to insert. We did the clones outside the lock, and also avoid the
         // double insertion.
         let mut cache = self.cache.write();
+
+        // Flush before inserting, so that the tag that has just been built survives. See the
+        // maximum above for why this is rare enough not to matter.
+        let total_pseudo_gas_cost = self.total_pseudo_gas_cost.load(Ordering::Relaxed);
+        if total_pseudo_gas_cost.saturating_add(pseudo_gas_cost) > self.max_total_pseudo_gas_cost {
+            self.flush_locked(&mut cache);
+        }
+
         if let Entry::Vacant(entry) = cache.entry(key) {
             entry.insert(priced_struct_tag);
             // The cost must be accounted here, and not next to the early return above: that check
@@ -596,6 +638,34 @@ mod tests {
     }
 
     #[test]
+    fn test_type_tag_cache_flushes_when_full() {
+        let cache = TypeTagCache::new(50);
+
+        let foo_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
+            pseudo_gas_cost: 30,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(0), &[], &foo_tag));
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.total_pseudo_gas_cost(), 30);
+
+        // Does not fit, so the cache is flushed first and only the new entry remains.
+        let bar_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Bar").unwrap(),
+            pseudo_gas_cost: 25,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(1), &[], &bar_tag));
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.total_pseudo_gas_cost(), 25);
+        assert!(cache
+            .get_struct_tag(&StructNameIndex::new(0), &[])
+            .is_none());
+        assert!(cache
+            .get_struct_tag(&StructNameIndex::new(1), &[])
+            .is_some());
+    }
+
+    #[test]
     fn test_ty_to_ty_tag() {
         let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
 
@@ -824,7 +894,7 @@ mod tests {
         assert_eq!(tag_on_hit, tag_on_miss);
 
         // The same holds after the cache has actually been flushed.
-        runtime_environment.flush_ty_tag_cache();
+        runtime_environment.ty_tag_cache().flush();
         assert_eq!(runtime_environment.ty_tag_cache().len(), 0);
         assert_eq!(
             runtime_environment.ty_tag_cache().total_pseudo_gas_cost(),

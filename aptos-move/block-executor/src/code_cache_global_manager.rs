@@ -6,8 +6,7 @@ use crate::{
     counters::{
         GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
         GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
-        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES, TY_TAG_CACHE_NUM_ENTRIES,
-        TY_TAG_CACHE_TOTAL_COST,
+        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -176,16 +175,6 @@ where
         GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(num_layout_entries as i64);
         if num_layout_entries > config.max_layout_cache_size {
             self.module_cache.flush_layout_cache();
-        }
-
-        // If the struct tags take up too much space: flush only them. Note that the cost is used
-        // here instead of the number of entries because tags vary a lot in size.
-        let ty_tag_cache = runtime_environment.ty_tag_cache();
-        let ty_tag_cache_total_cost = ty_tag_cache.total_pseudo_gas_cost();
-        TY_TAG_CACHE_NUM_ENTRIES.set(ty_tag_cache.len() as i64);
-        TY_TAG_CACHE_TOTAL_COST.set(ty_tag_cache_total_cost as i64);
-        if ty_tag_cache_total_cost > config.max_ty_tag_cache_total_cost {
-            runtime_environment.flush_ty_tag_cache();
         }
 
         Ok(())
@@ -623,7 +612,6 @@ mod test {
             max_interned_ty_vecs: 100,
             max_layout_cache_size: 10,
             max_interned_module_ids: 100,
-            max_ty_tag_cache_total_cost: 1_000_000,
         };
 
         // Populate the cache for testing.
@@ -917,53 +905,7 @@ mod test {
     }
 
     #[test]
-    fn test_too_large_ty_tag_cache_flushes_only_ty_tags() {
-        let (num_interned_tys_before, num_interned_ty_vecs_before, mut manager) =
-            cache_manager_for_test();
-        let state_view = MockStateView::empty();
-        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
-
-        let total_cost = manager
-            .environment
-            .as_ref()
-            .unwrap()
-            .runtime_environment()
-            .ty_tag_cache()
-            .total_pseudo_gas_cost();
-        assert!(total_cost > 0);
-
-        assert_ok!(manager.check_ready(
-            AptosEnvironment::new(&state_view),
-            &BlockExecutorModuleCacheLocalConfig {
-                prefetch_framework_code: false,
-                max_ty_tag_cache_total_cost: total_cost - 1,
-                ..Default::default()
-            },
-            metadata_2
-        ));
-
-        // Only the type tags are flushed, all other caches are left intact.
-        assert_eq!(manager.module_cache.num_modules(), 3);
-        let runtime_environment = manager.environment.as_ref().unwrap().runtime_environment();
-        assert_eq!(runtime_environment.ty_tag_cache().len(), 0);
-        assert_eq!(
-            runtime_environment.ty_tag_cache().total_pseudo_gas_cost(),
-            0
-        );
-        assert_eq!(runtime_environment.module_id_pool().len(), 3);
-        assert_eq!(runtime_environment.struct_name_index_map_size().unwrap(), 3);
-        assert_eq!(
-            runtime_environment.ty_pool().num_interned_tys(),
-            num_interned_tys_before + 3
-        );
-        assert_eq!(
-            runtime_environment.ty_pool().num_interned_ty_vecs(),
-            num_interned_ty_vecs_before + 3
-        );
-    }
-
-    #[test]
-    fn test_small_ty_tag_cache_is_not_flushed() {
+    fn test_check_ready_does_not_flush_ty_tag_cache() {
         let (_, _, mut manager) = cache_manager_for_test();
         let state_view = MockStateView::empty();
         let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
