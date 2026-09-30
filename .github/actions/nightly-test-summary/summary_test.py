@@ -233,6 +233,19 @@ class NightlySummaryTest(unittest.TestCase):
         # Without job details the incomplete suites are named instead.
         _, payload = self.summary({"storage": {"result": "failure"}})
         self.assertIn("Required suites: storage: failure", payload["text"])
+        # So they are when no job row accounts for the failure.
+        _, payload = self.summary(
+            {"storage": {"result": "failure"}},
+            jobs=[{"name": "storage", "conclusion": "action_required", "steps": []}],
+        )
+        self.assertIn("Required suites: storage: failure", payload["text"])
+        # A job that could not start is a failure like any other.
+        _, payload = self.summary(
+            {"storage": {"result": "failure"}},
+            jobs=[{"name": "storage", "conclusion": "startup_failure", "steps": []}],
+        )
+        self.assertIn(f"{RED}  storage", payload["text"])
+        self.assertNotIn("Required suites", payload["text"])
 
     def test_failed_jobs_show_their_seven_night_history(self):
         def night(day, jobs, first_attempt_jobs=None):

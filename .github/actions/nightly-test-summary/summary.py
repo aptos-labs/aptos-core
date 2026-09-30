@@ -13,7 +13,7 @@ import subprocess
 HISTORY_NIGHTS = 7
 GREEN, YELLOW, RED, GREY = "\U0001f7e9", "\U0001f7e8", "\U0001f7e5", "\u2b1c"
 CANCELLED = "\u274c"
-FAILED = ("failure", "timed_out", "cancelled")
+FAILED = ("failure", "timed_out", "cancelled", "startup_failure")
 # The workflow job that runs only when the run was cancelled; not a suite.
 CANCELLATION_JOB = "cancellation"
 
@@ -25,7 +25,7 @@ def square(conclusion, retried=False, run_cancelled=False):
     # A job that times out is also `cancelled`; only a cancelled run crosses out.
     if conclusion == "cancelled" and run_cancelled:
         return CANCELLED
-    if conclusion in (*FAILED, "startup_failure"):
+    if conclusion in FAILED:
         return RED
     return GREY
 
@@ -128,15 +128,16 @@ def build_summary(
         f"<{run_url}|Run, logs, and artifacts>",
     ]
     if incomplete:
-        if jobs is None:
-            # Without job details, name the incomplete suites themselves.
-            lines.append("Required suites: " + "; ".join(incomplete))
-        else:
-            lines.extend(job_rows(jobs, previous_runs, cancelled))
-            skipped = sorted(name for name, job in needs.items() if job["result"] == "skipped")
+        rows = [] if jobs is None else job_rows(jobs, previous_runs, cancelled)
+        skipped = sorted(name for name, job in needs.items() if job["result"] == "skipped")
+        if rows:
+            lines.extend(rows)
             # After a cancellation, skipped suites only restate it.
             if skipped and not cancelled:
                 lines.append("Skipped suites: " + ", ".join(skipped))
+        elif jobs is None or not cancelled:
+            # No job row accounts for the failure: name the incomplete suites.
+            lines.append("Required suites: " + "; ".join(incomplete))
     retried = retry_rows(jobs, first_attempt_jobs, previous_runs)
     if retried:
         lines.append("Passed on retry:")
