@@ -110,7 +110,8 @@ private def verifySource (options : VerifyOptions) : IO UInt32 := do
     options.rustcArgs
   for report in reports do IO.println report.render
   IO.println s!"leaner-rust: generated {output}"
-  IO.println s!"leaner-rust: {← LeanerLang.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
+  -- The wall time per phase is a report on the run, not one of its messages.
+  IO.eprintln s!"leaner-rust: {← LeanerLang.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
   pure <| if reports.any (·.severity == .error) then 1 else 0
 
 private def report (result : ImportResult) (output : System.FilePath) : IO UInt32 := do

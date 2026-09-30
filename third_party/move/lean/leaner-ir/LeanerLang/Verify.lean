@@ -1616,16 +1616,23 @@ private partial def axiomsOf (active : NameSet) (name : Name) :
     modifyEnv fun env => localAxiomsExt.modifyState env (·.insert name axioms.toArray)
   return (axioms, cyclic)
 
-/-- Whether an axiom is `bv_decide`'s: the native evaluation of its checker
-of a bit-vector certificate to `true`. -/
-private def isBitVectorCertificate (env : Environment) (name : Name) : Bool :=
-  (name.components.any (· == `_native)) && (name.components.any (· == `bv_decide)) &&
-    match env.find? name with
-    | some (.axiomInfo info) =>
-        info.type.isAppOfArity ``Eq 3 &&
-          (info.type.getArg! 1).isAppOf ``Std.Tactic.BVDecide.Reflect.verifyBVExpr &&
-          (info.type.getArg! 2).isConstOf ``Bool.true
-    | _ => false
+/-- Whether an axiom is a `bv_decide` certificate: that its checker of an
+UNSAT proof, evaluated natively, returns `true`. The checker is evaluated
+again, as `bv_decide` evaluated it: a name and a shape alone admit nothing. -/
+private def isBitVectorCertificate (name : Name) : CommandElabM Bool := do
+  unless name.components.contains `_native && name.components.contains `bv_decide do
+    return false
+  let some (.axiomInfo info) := (← getEnv).find? name | return false
+  let_expr Eq _ checked expected := info.type | return false
+  unless checked.isAppOf ``Std.Tactic.BVDecide.Reflect.verifyBVExpr &&
+      expected.isConstOf ``Bool.true && info.levelParams.isEmpty do
+    return false
+  liftTermElabM <| withoutModifyingEnv do
+    try
+      match ← Lean.Meta.nativeEqTrue `leaner_audit checked with
+      | .success _ => pure true
+      | .notTrue => pure false
+    catch _ => pure false
 
 /-- The no-fallback audit of one verified function, including the transitive
 axiom closure. The agreement axiom is the sole project-specific exception,
@@ -1642,9 +1649,13 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) : CommandElabM Unit
   unless env.contains (artifacts ++ `compiled_eq) do
     throwError m!"missing compilation certificate for `{function}`"
   let roots := #[base ++ `typedVerified, artifacts ++ `compiled_eq, artifacts ++ `compiled]
+  let mut certificates : NameSet := {}
   for root in roots ++ #[base ++ `verified] do
     for axiomName in (← axiomsOf {} root).1.toArray do
-      if bitVectors && isBitVectorCertificate env axiomName then continue
+      if bitVectors && certificates.contains axiomName then continue
+      if bitVectors && (← isBitVectorCertificate axiomName) then
+        certificates := certificates.insert axiomName
+        continue
       unless #[``propext, ``Classical.choice, ``Quot.sound,
           ``compileFunction_agrees, ``compileFunction_least_cycle].contains axiomName do
         throwError m!"artifact `{root}` depends on unapproved axiom `{axiomName}`"
@@ -1824,16 +1835,37 @@ private def nativeBinder (segments : Array String) (entry : FunctionHandle × St
           (@LeanerIR.Proofs.Denote.propheticMeaning Θ executable #[] $handleTerm $params $shape)
           (@$contract Θ)))
 
-/-- Whether a function's specification or its module sets
-`pragma verify = false` or marks it intrinsic: the function's pragmas merge
-both. -/
-private def automaticVerificationDisabled
+/-- The standard-library modules whose intrinsic functions the Move Prover's
+prelude implements. -/
+private def preludeIntrinsicModules : List String :=
+  ["vector", "event", "aggregator", "aggregator_v2"]
+
+/-- Whether a function is intrinsic, as the Move Prover reads the pragma: it
+declares `pragma intrinsic` and has a meaning other than its body (it is
+native, a map role, or in a module the prelude implements), or it is opaque,
+so that callers rely on its contract by the author's choice. Elsewhere the
+pragma leaves the body its meaning, verified as any other. -/
+private def isIntrinsic (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
-  declaration.pragmas.any fun
-    | .assign "verify" (.constant (.bool false)) _ => true
-    -- An intrinsic's meaning is its builtin model, not a specification.
+  let declared := declaration.pragmas.any fun
     | .assign "intrinsic" (.constant (.bool false)) _ => false
     | .assign "intrinsic" _ _ => true
+    | _ => false
+  let prelude := match (unit.tables.namespaces[namespaceId.index]?).map (·.segments) with
+    | some #["0x1", name] => preludeIntrinsicModules.contains name
+    | _ => false
+  declared && (declaration.body == .absent || prelude || isOpaque declaration ||
+    (Contract.mapRoleOf? unit namespaceId ns declaration).isSome)
+
+/-- Whether a function's specification or its module sets
+`pragma verify = false`, or the function is intrinsic: the function's
+pragmas merge both. -/
+private def automaticVerificationDisabled (unit : ValidatedUnit)
+    (namespaceId : LeanerIR.NamespaceId) (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
+  isIntrinsic unit namespaceId ns declaration || declaration.pragmas.any fun
+    | .assign "verify" (.constant (.bool false)) _ => true
     | _ => false
 
 /-- A member of a cycle of calls standing for the calls to it, and its
@@ -2040,7 +2072,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
         (← `(term| PProd.mk $handleTerm (PProd.mk $(Syntax.mkStrLit calleeKey)
           @$(mkIdent (Name.mkSimple s!"native_{calleeKey}")))))
     else if throughContract &&
-        (hasInterfaceView calleeDeclaration || automaticVerificationDisabled calleeDeclaration ||
+        (hasInterfaceView calleeDeclaration || automaticVerificationDisabled unit callee.namespaceId calleeNs calleeDeclaration ||
           (Contract.mapRoleOf? unit callee.namespaceId calleeNs calleeDeclaration).isSome) then
       -- Callers see such a callee through the interface its body is not
       -- proved against, or through the contract of a function whose
@@ -2742,7 +2774,7 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
         throwErrorAt reference m!"`{function}` reaches itself through `{name.name}`, which is \
           unspecified; a function on a cycle of calls is used through its contract, so specify \
           `{name.name}`"
-      if automaticVerificationDisabled memberDeclaration then
+      if automaticVerificationDisabled unit member.namespaceId memberNs memberDeclaration then
         throwErrorAt reference m!"`{function}` reaches itself through `{name.name}`, which sets \
           `pragma verify = false`; the members of a cycle of calls are verified together"
     members := members.push (member, name.name)
@@ -2853,8 +2885,8 @@ private partial def verifyInOrder (unit prepared : ValidatedUnit) (segments : Ar
       else
         -- A callee of another module used through its contract is verified
         -- in this unit too: a theorem about its own unit does not carry over.
-        let some (_, _, _, declaration) := findFunction? unit key | continue
-        unless automaticVerificationDisabled declaration do
+        let some (_, ns, _, declaration) := findFunction? unit key | continue
+        unless automaticVerificationDisabled unit callee.namespaceId ns declaration do
           verifyInOrder unit prepared segments targets visited covered
             ⟨key, target.reference, none⟩
   -- An authored proof sees the module's theorems by their short names.
@@ -2932,8 +2964,9 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
       let identifier ← item.getArgs.find? (·.isIdent)
       let function := identifier.getId.toString (escape := false)
       if explicit.contains function then none
-      let (_, _, _, declaration) ← findFunction? unit function
-      if declaration.body == .absent || automaticVerificationDisabled declaration then none
+      let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
+      if declaration.body == .absent ||
+          automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration then none
       some ⟨function, identifier, none⟩
   if targets.isEmpty then return
   let prepared := (LeanerIR.Validation.prepareSemantics unit).1

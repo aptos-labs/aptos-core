@@ -13,12 +13,12 @@ REVISION="${1:-HEAD}"
 cd "$(dirname "$0")/../leaner-e2e-tests"
 PREFIX="$(git rev-parse --show-prefix)"
 
-git diff --name-only "$REVISION" -- . | grep '\.exp' | while read -r path; do
+git diff --name-only "$REVISION" -- . | { grep '\.exp' || true; } | while read -r path; do
   file="${path#"$PREFIX"}"
   before="$(git show "$REVISION:$path" 2>/dev/null | grep -c error || true)"
   if [ -f "$file" ]; then after="$(grep -c error "$file" || true)"; else after=removed; fi
   if [ "$before" != "$after" ]; then echo "$file: $before -> $after"; fi
 done
-git ls-files --others --exclude-standard . | grep '\.exp' | while read -r file; do
+git ls-files --others --exclude-standard . | { grep '\.exp' || true; } | while read -r file; do
   echo "$file: new, $(grep -c error "$file" || true)"
 done

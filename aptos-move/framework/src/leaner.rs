@@ -223,6 +223,12 @@ pub fn verify(
     for line in stdout.lines() {
         writeln!(writer, "{}", line)?;
     }
+    // The verifier reports its wall time per phase on stderr.
+    if run.status.success() {
+        for line in stderr.lines() {
+            info!("{}", line);
+        }
+    }
     info!(
         "{:.2}s build, {:.2}s export, {:.2}s leaner-move, total {:.2}s",
         build_duration.as_secs_f64(),

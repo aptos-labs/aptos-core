@@ -55,8 +55,23 @@ def TypeParameter.toJson (parameter : TypeParameter) : Json :=
 def Field.toJson (field : Field) : Json :=
   Json.mkObj [("name", Json.str field.name), ("ty", field.ty.toJson)]
 
+partial def AttributeArg.toJson : AttributeArg → Json
+  | .name head args => Json.mkObj <| [("name", Json.str head)] ++
+      (if args.isEmpty then [] else [("args", Json.arr (args.map AttributeArg.toJson))])
+  | .num value => Json.mkObj [("num", Json.str (toString value))]
+  | .bool value => Json.mkObj [("bool", Json.bool value)]
+
+def Attribute.toJson (source : Attribute) : Json :=
+  Json.mkObj <| [("name", Json.str source.name)] ++
+    (if source.args.isEmpty then []
+      else [("args", Json.arr (source.args.map AttributeArg.toJson))])
+
+/-- The `attributes` field, which the schema omits when empty. -/
+private def attributesField (attributes : Array Attribute) : List (String × Json) :=
+  if attributes.isEmpty then [] else [("attributes", Json.arr (attributes.map Attribute.toJson))]
+
 def Struct.toJson (declaration : Struct) : Json :=
-  Json.mkObj [
+  Json.mkObj <| [
     ("name", Json.str declaration.name),
     ("abilities", Json.arr (declaration.abilities.map Json.str)),
     ("type_parameters", Json.arr (declaration.typeParameters.map TypeParameter.toJson)),
@@ -65,7 +80,8 @@ def Struct.toJson (declaration : Struct) : Json :=
       | none => Json.null
       | some variants => Json.arr <| variants.map fun variant =>
           Json.mkObj [("name", Json.str variant.name),
-            ("fields", Json.arr (variant.fields.map Field.toJson))])]
+            ("fields", Json.arr (variant.fields.map Field.toJson))])] ++
+    attributesField declaration.attributes
 
 partial def Value.toJson : Value → Json
   | .bool value => tagged "bool" (Json.bool value)
@@ -170,6 +186,7 @@ def Function.toJson (function : Function) : Json :=
     ("loops", Json.arr #[]),
     -- Contracts are not transported: verification runs over the source.
     ("spec", emptyContract)] ++
+    attributesField function.attributes ++
     (if function.localNames.isEmpty then []
       else [("local_names", Json.arr <| function.localNames.map fun
         | some name => Json.str name

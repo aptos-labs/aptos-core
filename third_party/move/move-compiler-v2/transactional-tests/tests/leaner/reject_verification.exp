@@ -1,7 +1,7 @@
 processed 1 task
 task 0 lines 3-11:  publish [import LeanerMove]
 Error: compilation errors:
- error: leaner verification failed
+ error: leaner verification failed: the automatic verification of `wrong_increment` failed; provide a proof: `verify wrong_increment by …` in the module (`verify wrong_increment by skip` shows the obligations it leaves)
   ┌─ TEMPFILE:7:8
   │
 7 │   spec wrong_increment where

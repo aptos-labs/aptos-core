@@ -73,6 +73,38 @@ run_cmd do
   unless (← function "pick").localNames[0]? == some (some "choice") do
     throwError "parameters keep their source names"
 
+-- Source attributes reach the bytecode: the VM takes the module lock of a
+-- `module_lock` function, for example.
+leaner module 0x42::xir_attributes where
+  @[event]
+  struct Emitted has Drop, Store where
+    value : u64
+
+  @[module_lock]
+  fun locked() -> u64 := 1
+
+  @[persistent]
+  public fun kept() -> u64 := 2
+
+open Lean Elab Command in
+run_cmd do
+  let some unit := LeanerLang.registeredUnit? (← getEnv) `«0x42».xir_attributes
+    | throwError "the module was not registered"
+  let module ← match lowerModule unit ⟨0⟩ with
+    | .ok module => pure module
+    | .error failure => throwError failure.message
+  let attributes (name : String) : CommandElabM (Array String) := do
+    let some function := module.functions.find? (·.name == name)
+      | throwError s!"no function `{name}`"
+    pure (function.attributes.map (·.name))
+  unless (← attributes "locked") == #["module_lock"] && (← attributes "kept") == #["persistent"] do
+    throwError "a function keeps its source attributes, and only those"
+  unless module.structs.map (·.attributes.map (·.name)) == #[#["event"]] do
+    throwError "a struct keeps its source attributes"
+  let some locked := module.functions.find? (·.name == "locked") | throwError "no `locked`"
+  unless locked.toJson.getObjValD "attributes" == Json.arr #[Json.mkObj [("name", "module_lock")]] do
+    throwError s!"unexpected attributes JSON {locked.toJson.getObjValD "attributes"}"
+
 leaner module 0x42::xir_unbounded where
   fun count(value : Nat) -> u64 := 1
 

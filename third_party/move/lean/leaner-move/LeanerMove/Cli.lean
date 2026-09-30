@@ -64,7 +64,8 @@ private def verifySource (source : System.FilePath) (options : VerifyOptions) : 
     options.exported options.filter options.renderOnly options.heartbeats
   for report in reports do IO.println report.render
   IO.println s!"leaner-move: generated {output}"
-  IO.println s!"leaner-move: {← LeanerLang.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
+  -- The wall time per phase is a report on the run, not one of its messages.
+  IO.eprintln s!"leaner-move: {← LeanerLang.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
   pure <| if reports.any (·.severity == .error) then 1 else 0
 
 def run (arguments : List String) : IO UInt32 := do

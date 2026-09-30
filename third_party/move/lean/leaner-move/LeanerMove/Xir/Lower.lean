@@ -977,6 +977,36 @@ end
 
 /-! ## Declarations -/
 
+/-- The modifiers XIR carries as fields, or that only Leaner reads. -/
+private def modifierAttribute : LeanerIR.Attribute → Bool
+  | .assign "visibility" .. | .call "entry" .. | .call "native" .. | .call "opaque" .. => true
+  | _ => false
+
+private def attributeValue (loc : Option LocId) (name : String) :
+    LeanerIR.AttributeValue → M Xir.AttributeArg
+  | .constant (.bool value) => pure (.bool value)
+  | .constant (.integer value) =>
+      if 0 ≤ value then pure (.num value.toNat)
+      else fail loc s!"the attribute `{name}` has a negative value, which Move bytecode cannot carry"
+  | .constant _ => fail loc s!"the attribute `{name}` has a value Move bytecode cannot carry"
+  | .name none value | .qualifiedName value => pure (.name value #[])
+  | .name (some namespaceId) value => do
+      let some ns := (← tables).namespaces[namespaceId.index]?
+        | fail loc s!"the attribute `{name}` names an unknown namespace"
+      pure (.name ("::".intercalate (ns.segments.push value).toList) #[])
+
+private partial def attributeArg (loc : Option LocId) : LeanerIR.Attribute → M Xir.AttributeArg
+  | .call name args _ => do pure (.name name (← args.mapM (attributeArg loc)))
+  | .assign name value _ => do pure (.name name #[← attributeValue loc name value])
+
+/-- The source attributes a declaration passes to its bytecode, such as
+`module_lock` or `persistent`. -/
+private def lowerAttributes (loc : Option LocId) (attributes : Array LeanerIR.Attribute) :
+    M (Array Xir.Attribute) :=
+  (attributes.filter (!modifierAttribute ·)).mapM fun
+    | .call name args _ => do pure { name, args := ← args.mapM (attributeArg loc) }
+    | .assign name value _ => do pure { name, args := #[← attributeValue loc name value] }
+
 private def lowerStruct (declaration : StructDecl) : M Xir.Struct := do
   let loc := some declaration.loc
   let name ← nameOf declaration.name
@@ -991,7 +1021,8 @@ private def lowerStruct (declaration : StructDecl) : M Xir.Struct := do
     else declaration.fields.mapM field
   pure {
     name := name, abilities := declaration.abilities.map abilityName,
-    typeParameters := typeParameters, fields := fields, variants := variants }
+    typeParameters := typeParameters, fields := fields, variants := variants,
+    attributes := ← lowerAttributes loc declaration.attributes }
 
 private def lowerFunction (declaration : FunctionDecl FunctionBody) : M Xir.Function := do
   let loc := some declaration.loc
@@ -1015,7 +1046,8 @@ private def lowerFunction (declaration : FunctionDecl FunctionBody) : M Xir.Func
   let base : Xir.Function := {
     name := name, typeParameters := typeParameters,
     visibility := visibility, isEntry := modifiers.isEntry, params := 0, locals := #[],
-    returns := returns, blocks := #[], span := span }
+    returns := returns, blocks := #[], span := span,
+    attributes := ← lowerAttributes loc declaration.attributes }
   match declaration.body with
   | .absent =>
       unless modifiers.isNative do

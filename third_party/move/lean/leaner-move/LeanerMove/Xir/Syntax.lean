@@ -53,6 +53,21 @@ structure Variant where
   fields : Array Field
   deriving Repr, BEq, Inhabited
 
+/-- An argument of a source attribute: a name applied to arguments, a `u64`
+constant, or a boolean. -/
+inductive AttributeArg where
+  | name (name : String) (args : Array AttributeArg)
+  | num (value : Nat)
+  | bool (value : Bool)
+  deriving Repr, BEq, Inhabited
+
+/-- A source attribute of a struct or function, such as `module_lock`, as the
+bytecode carries it. -/
+structure Attribute where
+  name : String
+  args : Array AttributeArg := #[]
+  deriving Repr, BEq, Inhabited
+
 /-- A struct, or an enum when `variants` is present. -/
 structure Struct where
   name : String
@@ -60,6 +75,7 @@ structure Struct where
   typeParameters : Array TypeParameter := #[]
   fields : Array Field := #[]
   variants : Option (Array Variant) := none
+  attributes : Array Attribute := #[]
   deriving Repr, BEq, Inhabited
 
 /-- A constant a `load` writes. -/
@@ -142,6 +158,7 @@ structure Function where
   returns : Array Ty
   blocks : Array Block
   span : Option Span := none
+  attributes : Array Attribute := #[]
   deriving Repr, BEq, Inhabited
 
 /-- A declaration of another module this module refers to. -/
