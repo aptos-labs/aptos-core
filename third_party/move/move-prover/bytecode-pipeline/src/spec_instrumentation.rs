@@ -40,7 +40,9 @@ use move_stackless_bytecode::{
         AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label,
         Operation, PropKind,
     },
-    usage_analysis, COMPILED_MODULE_AVAILABLE,
+    usage_analysis,
+    usage_analysis::UsageState,
+    COMPILED_MODULE_AVAILABLE,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -62,39 +64,28 @@ const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness
 // # Spec Instrumenter
 
 pub struct SpecInstrumentationProcessor {
-    opaque_callee_modifies:
-        Mutex<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>>,
+    /// Memory usage of every function, taken before instrumentation changes the code.
+    usage: Mutex<BTreeMap<QualifiedId<FunId>, UsageState>>,
 }
 
 impl SpecInstrumentationProcessor {
     pub fn new() -> Box<Self> {
         Box::new(Self {
-            opaque_callee_modifies: Mutex::new(BTreeMap::new()),
+            usage: Mutex::new(BTreeMap::new()),
         })
     }
 }
 
 impl FunctionTargetProcessor for SpecInstrumentationProcessor {
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
-        let effects = targets
+        let usage: BTreeMap<_, _> = targets
             .get_funs()
-            .filter_map(|qid| {
-                let fun = env.get_function(qid);
-                fun.is_opaque().then(|| {
-                    let target = targets.get_target(&fun, &FunctionVariant::Baseline);
-                    (
-                        qid,
-                        usage_analysis::get_memory_usage(&target)
-                            .modified
-                            .all
-                            .iter()
-                            .cloned()
-                            .collect(),
-                    )
-                })
+            .map(|qid| {
+                let fun_env = env.get_function(qid);
+                let target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
+                (qid, usage_analysis::get_memory_usage(&target).clone())
             })
             .collect();
-        *self.opaque_callee_modifies.lock().unwrap() = effects;
         // In inference mode the target's specification is intentionally absent
         // or incomplete until SpecInferenceProcessor runs later in the pipeline.
         // Checking caller/callee modifies relations here would therefore reject
@@ -102,7 +93,9 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
         // a frame declaration for memory the target modifies.
         if !ProverOptions::get(env).inference {
             check_modifies(env, targets);
+            check_fun_arg_frames(env, targets, &usage);
         }
+        *self.usage.lock().unwrap() = usage;
     }
 
     fn process(
@@ -122,7 +115,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             verification_analysis::get_info(&FunctionTarget::new(fun_env, &data));
         let is_verified = verification_info.verified;
         let is_inlined = verification_info.inlined;
-        let opaque_callee_modifies = self.opaque_callee_modifies.lock().unwrap().clone();
+        let usage = self.usage.lock().unwrap();
 
         if is_verified {
             // Create a clone of the function data, moving annotations
@@ -135,7 +128,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 fun_env,
                 verification_data,
                 scc_opt,
-                &opaque_callee_modifies,
+                &usage,
             );
             verification_data = instrumented;
 
@@ -166,14 +159,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
 
         // Instrument baseline variant only if it is inlined.
         if is_inlined {
-            let (data, _) = Instrumenter::run(
-                &options,
-                targets,
-                fun_env,
-                data,
-                scc_opt,
-                &opaque_callee_modifies,
-            );
+            let (data, _) = Instrumenter::run(&options, targets, fun_env, data, scc_opt, &usage);
             data
         } else {
             // Clear code but keep function data stub.
@@ -652,6 +638,8 @@ struct Instrumenter<'a> {
     memory_free_callees: BTreeSet<QualifiedId<FunId>>,
     /// Unframed memory possibly modified by opaque closures invoked in this function.
     opaque_closure_modifies: BTreeSet<QualifiedInstId<StructId>>,
+    /// Footprints of the closures bound to temporaries of this function.
+    closure_footprints: BTreeMap<TempIndex, ClosureFootprint>,
     /// Map from Nop AttrId to split expression and optional guard (for `split` proof items).
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
@@ -673,10 +661,7 @@ impl<'a> Instrumenter<'a> {
         fun_env: &FunctionEnv<'a>,
         data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
-        all_opaque_callee_modifies: &BTreeMap<
-            QualifiedId<FunId>,
-            BTreeSet<QualifiedInstId<StructId>>,
-        >,
+        usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
     ) -> (FunctionData, Vec<(AttrId, Exp, Option<Exp>)>) {
         // Pre-collect properties and opaque-callee effects from the original code.
         let memory_free_callees = data
@@ -721,12 +706,16 @@ impl<'a> Instrumenter<'a> {
                 Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => {
                     let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
                     callee.is_opaque().then(|| {
+                        let callee_usage = &usage[&mid.qualified(*fid)];
                         (
                             mid.qualified(*fid),
-                            all_opaque_callee_modifies
-                                .get(&mid.qualified(*fid))
+                            callee_usage
+                                .modified
+                                .all
+                                .iter()
+                                .chain(callee_usage.invoke_frame_other.iter())
                                 .cloned()
-                                .unwrap_or_default(),
+                                .collect(),
                         )
                     })
                 },
@@ -749,28 +738,28 @@ impl<'a> Instrumenter<'a> {
                 _ => None,
             })
             .collect();
-        let opaque_closure_modifies = data
-            .code
-            .iter()
-            .filter_map(|bc| match bc {
-                Bytecode::Call(_, _, Operation::Closure(mid, fid, targs, _), _, _) => {
-                    let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
-                    callee.is_opaque().then(|| (mid.qualified(*fid), targs))
-                },
-                _ => None,
-            })
-            .flat_map(|(callee_qid, targs)| {
-                let callee = fun_env.module_env.env.get_function(callee_qid);
-                let framed_memory = opaque_framed_memory(fun_env.module_env.env, &callee);
-                all_opaque_callee_modifies
-                    .get(&callee_qid)
-                    .into_iter()
-                    .flatten()
+        let mut opaque_closure_modifies: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
+        for bc in &data.code {
+            let Bytecode::Call(_, _, Operation::Closure(mid, fid, targs, _), _, _) = bc else {
+                continue;
+            };
+            let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
+            if !callee.is_opaque() {
+                continue;
+            }
+            let callee_usage = &usage[&mid.qualified(*fid)];
+            let framed_memory = opaque_framed_memory(fun_env.module_env.env, &callee);
+            opaque_closure_modifies.extend(
+                callee_usage
+                    .modified
+                    .all
+                    .iter()
+                    .chain(callee_usage.invoke_frame.all.iter())
                     .filter(|mem| !framed_memory.contains(mem))
-                    .map(|mem| mem.instantiate_ref(targs))
-                    .collect_vec()
-            })
-            .collect();
+                    .map(|mem| mem.instantiate_ref(targs)),
+            );
+        }
+        let closure_footprints = closure_footprints(usage, &data.code);
 
         let mut builder = FunctionDataBuilder::new(fun_env, data);
 
@@ -876,6 +865,7 @@ impl<'a> Instrumenter<'a> {
             opaque_callee_framed_memory,
             memory_free_callees,
             opaque_closure_modifies,
+            closure_footprints,
             split_points: vec![],
             self_is_bv_internal: fun_env.is_pragma_true(BV_INTERNAL_PRAGMA, || false),
             concrete_cond_locs: fun_env
@@ -1420,6 +1410,22 @@ impl<'a> Instrumenter<'a> {
                 .map(|mem| mem.instantiate_ref(targs))
                 .collect_vec();
             self.emit_global_havocs(unframed_memory);
+
+            // What a function-typed argument may modify: its footprint if it is a known
+            // closure, otherwise the frame the callee declares for the parameter.
+            let mut arg_writes = BTreeSet::new();
+            for (param, src) in callee_env.get_parameters().iter().zip(&srcs) {
+                if !param.1.skip_reference().is_function() {
+                    continue;
+                }
+                if let Some(footprint) = self.closure_footprints.get(src) {
+                    arg_writes.extend(footprint.writes.iter().cloned());
+                } else {
+                    let frame = DeclaredFrame::of_fun_param(&callee_env, param.0, targs);
+                    arg_writes.extend(frame.writes);
+                }
+            }
+            self.emit_global_havocs(arg_writes);
 
             // Havoc all &mut parameters, their post-value are to be determined by the post
             // conditions.
@@ -3099,6 +3105,159 @@ fn find_behavior_pre_label_for_callee(
 /// # Modifies Checker
 /// Check modifies annotations. This is depending on usage analysis and is therefore
 /// invoked here from the initialize trait function of this processor.
+/// Memory a closure may write and access, from the usage of its target function.
+struct ClosureFootprint {
+    /// Memory the closure may write, including through the function values it invokes.
+    writes: BTreeSet<QualifiedInstId<StructId>>,
+    /// Memory written by the code of the target and its callees.
+    code_writes: BTreeSet<QualifiedInstId<StructId>>,
+    /// Memory read or written by the code of the target and its callees.
+    code_accessed: BTreeSet<QualifiedInstId<StructId>>,
+}
+
+/// Footprints of the closures bound to temporaries that have no other definition.
+fn closure_footprints(
+    usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+    code: &[Bytecode],
+) -> BTreeMap<TempIndex, ClosureFootprint> {
+    let mut def_counts: BTreeMap<TempIndex, usize> = BTreeMap::new();
+    for bc in code {
+        for dest in bc.dests() {
+            *def_counts.entry(dest).or_default() += 1;
+        }
+    }
+    code.iter()
+        .filter_map(|bc| match bc {
+            Bytecode::Call(_, dests, Operation::Closure(mid, fid, targs, _), _, _)
+                if dests.len() == 1 && def_counts[&dests[0]] == 1 =>
+            {
+                let target_usage = &usage[&mid.qualified(*fid)];
+                let code_writes = target_usage.modified.get_all_inst(targs);
+                let mut writes = code_writes.clone();
+                writes.extend(target_usage.invoke_frame.get_all_inst(targs));
+                let code_accessed = target_usage
+                    .code_accessed
+                    .iter()
+                    .map(|mem| mem.instantiate_ref(targs))
+                    .collect();
+                Some((dests[0], ClosureFootprint {
+                    writes,
+                    code_writes,
+                    code_accessed,
+                }))
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `modifies_of`/`reads_of` frame a function declares for a function-typed parameter,
+/// instantiated at a call site. Without a declaration the parameter may access no memory.
+#[derive(Default)]
+struct DeclaredFrame {
+    writes: BTreeSet<QualifiedInstId<StructId>>,
+    accessed: BTreeSet<QualifiedInstId<StructId>>,
+    modifies_all: bool,
+    reads_all: bool,
+}
+
+impl DeclaredFrame {
+    fn of_fun_param(fun_env: &FunctionEnv, param: Symbol, targs: &[Type]) -> Self {
+        let param_access = fun_env.get_fun_param_access_of();
+        let Some(access) = param_access.iter().find(|a| a.fun_param == param) else {
+            return Self::default();
+        };
+        let inst = |mems: &BTreeSet<QualifiedInstId<StructId>>| {
+            mems.iter()
+                .map(|mem| mem.instantiate_ref(targs))
+                .collect::<BTreeSet<_>>()
+        };
+        Self {
+            writes: inst(&access.old_memory),
+            accessed: inst(&access.used_memory),
+            modifies_all: access.frame_spec.modifies_all,
+            reads_all: access.frame_spec.reads_all,
+        }
+    }
+}
+
+/// Checks that a closure passed to an opaque function stays within the frame the callee
+/// declares for the parameter. The callee is verified under that frame, and its callers
+/// assume the result. The closure is judged by what its code accesses; frames of function
+/// values it invokes are not included.
+fn check_fun_arg_frames(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+) {
+    for module_env in env.get_modules().filter(|m| m.is_target()) {
+        for fun_env in module_env.get_functions() {
+            if fun_env.is_not_prover_target()
+                || !fun_env.is_compiled()
+                || fun_env.is_native()
+                || fun_env.is_intrinsic()
+            {
+                continue;
+            }
+            let target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
+            let footprints = closure_footprints(usage, target.get_bytecode());
+            if footprints.is_empty() {
+                continue;
+            }
+            for bc in target.get_bytecode() {
+                let Bytecode::Call(id, _, Operation::Function(mid, fid, targs), srcs, _) = bc
+                else {
+                    continue;
+                };
+                let callee_env = env.get_module(*mid).into_function(*fid);
+                if !callee_env.is_opaque() {
+                    continue;
+                }
+                for (param, src) in callee_env.get_parameters().iter().zip(srcs) {
+                    let Some(footprint) = footprints.get(src) else {
+                        continue;
+                    };
+                    let frame = DeclaredFrame::of_fun_param(&callee_env, param.0, targs);
+                    if frame.modifies_all {
+                        continue;
+                    }
+                    let loc = target.get_bytecode_loc(*id);
+                    let param_name = param.0.display(env.symbol_pool());
+                    for mem in footprint.code_writes.difference(&frame.writes) {
+                        env.error(
+                            &loc,
+                            &format!(
+                                "function argument may modify resource `{}`, which is not \
+                                 declared in `modifies_of` for `{}`",
+                                env.display(mem),
+                                param_name
+                            ),
+                        );
+                    }
+                    if frame.reads_all {
+                        continue;
+                    }
+                    for mem in footprint
+                        .code_accessed
+                        .difference(&frame.accessed)
+                        .filter(|mem| !footprint.code_writes.contains(mem))
+                    {
+                        env.error(
+                            &loc,
+                            &format!(
+                                "function argument accesses resource `{}`, which is not \
+                                 declared in `modifies_of`/`reads_of` for `{}`",
+                                env.display(mem),
+                                param_name
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     let mut warned_coarse_callees = BTreeSet::new();
     for module_env in env.get_modules() {

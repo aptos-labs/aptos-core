@@ -1,0 +1,30 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `fun_arg_frame_check::R`, which is not declared in `modifies_of` for `fv`
+   ┌─ tests/sources/regression/fun_arg_frame_check.move:53:9
+   │
+53 │         apply_pure(bump, a)
+   │         ^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_arg_frame_check::R`, which is not declared in `modifies_of` for `fv`
+   ┌─ tests/sources/regression/fun_arg_frame_check.move:58:9
+   │
+58 │         apply_pure(|x| bump(x), a)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_arg_frame_check::R`, which is not declared in `modifies_of` for `fv`
+   ┌─ tests/sources/regression/fun_arg_frame_check.move:63:9
+   │
+63 │         apply_pure(|x| { R[x].value = R[x].value + 1; }, a)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `fun_arg_frame_check::R`, which is not declared in `modifies_of` for `fv`
+   ┌─ tests/sources/regression/fun_arg_frame_check.move:68:9
+   │
+68 │         apply_pure(bump_with_spec, a)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument accesses resource `fun_arg_frame_check::S`, which is not declared in `modifies_of`/`reads_of` for `fv`
+   ┌─ tests/sources/regression/fun_arg_frame_check.move:73:9
+   │
+73 │         apply_reads_r(read_s, a)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
