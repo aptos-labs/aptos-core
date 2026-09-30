@@ -5,13 +5,13 @@ title: Contributing to Aptos Core
 
 # Contributing
 
-Our goal is to make contributing to Aptos Core easy and transparent. See [Aptos Community](https://aptos.dev/community) for full details. This page describes [our development process](#our-development-process).
+Our goal is to make contributing to Aptos Core easy and transparent. See [Aptos Community](https://discord.gg/aptosnetwork) for full details. This page describes [our development process](#our-development-process).
 
 ## Aptos Core
 
 To contribute to the Aptos Core implementation, first start with the proper development copy.
 You may want to use the GitHub interface to fork [aptos-core](https://github.com/aptos-labs/aptos-core) and check out your fork.
-For development environment setup and first build, see [Building Aptos From Source](https://aptos.dev/guides/building-from-source)
+For development environment setup and first build, see [Building Aptos From Source](https://aptos.dev/network/nodes/building-from-source)
 
 ## Our Development Process
 
