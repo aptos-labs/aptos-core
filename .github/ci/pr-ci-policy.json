@@ -45,6 +45,7 @@
     ".github/actions/pr-ci-policy/",
     ".github/actions/pr-ci-report/",
     ".github/actions/privileged-pr-setup/",
-    ".github/ci/"
+    ".github/ci/",
+    "docker/builder/image-tag-prefix.sh"
   ]
 }

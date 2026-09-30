@@ -1,8 +1,11 @@
+import json
 import unittest
+from unittest import mock
 
+from ci_actions import authorization
 from ci_actions.authorization import DENIED, Authorization, authorize, main
 from ci_actions.github import ActionError, HttpResponse
-from tests.helpers import REPO_PATH, json_response, json_route, local_server, route_client, run_command, run_main
+from tests.helpers import REPO_PATH, action_env, json_response, json_route, local_server, read_outputs, route_client, run_command, run_main
 
 PULL = f"{REPO_PATH}/pulls/42"
 TIMELINE = f"{REPO_PATH}/issues/42/timeline?per_page=100&page=1"
@@ -145,6 +148,38 @@ class AuthorizeTests(unittest.TestCase):
             authorize(client, 42, "   ")
         self.assertEqual(transport.requests, [])
 
+    def test_batch_uses_one_pull_and_timeline_and_caches_shared_actor_permission(self):
+        table = routes(labels=("safe-to-test", "run-e2e"))
+        table[TIMELINE] = [event(303), event(304, name="run-e2e")]
+        client, transport = route_client(table)
+        results = authorization.authorize_labels(client, 42, ["safe-to-test", "run-e2e", "absent"])
+        self.assertEqual(results, {
+            "safe-to-test": approved("trusted-maintainer", 303),
+            "run-e2e": approved("trusted-maintainer", 304),
+            "absent": DENIED,
+        })
+        self.assertEqual(transport.urls(), [PULL, TIMELINE, PERMISSION])
+
+    def test_batch_keeps_each_label_lifecycle_independent(self):
+        table = routes(labels=("safe-to-test", "run-e2e"))
+        table[TIMELINE] = [event(303), event(304, name="run-e2e", event="unlabeled")]
+        client, transport = route_client(table)
+        self.assertEqual(
+            authorization.authorize_labels(client, 42, ["safe-to-test", "run-e2e"]),
+            {"safe-to-test": approved("trusted-maintainer", 303), "run-e2e": DENIED},
+        )
+        self.assertEqual(transport.urls(), [PULL, TIMELINE, PERMISSION])
+
+    def test_batch_fails_closed_for_duplicate_labels_and_missing_lifecycle(self):
+        client, transport = route_client(routes())
+        with self.assertRaisesRegex(ActionError, "duplicate"):
+            authorization.authorize_labels(client, 42, ["safe-to-test", "safe-to-test"])
+        self.assertEqual(transport.urls(), [])
+        table = routes(labels=("safe-to-test", "run-e2e"))
+        client, _ = route_client(table)
+        with self.assertRaisesRegex(ActionError, "run-e2e"):
+            authorization.authorize_labels(client, 42, ["safe-to-test", "run-e2e"])
+
 
 class ComputeAuthorizedCommandTests(unittest.TestCase):
     ENV = {"GITHUB_REPOSITORY": "aptos-labs/aptos-core", "GH_TOKEN": "test-token",
@@ -209,6 +244,43 @@ class ComputeAuthorizedCommandTests(unittest.TestCase):
                                                 {**self.ENV, "GITHUB_API_URL": f"{base}/api/v3"})
         self.assertEqual(code, 0, stderr)
         self.assertEqual(outputs["approved"], "true")
+
+    def test_batch_mode_writes_json_approvals_and_aggregate_approval(self):
+        table = routes(labels=("safe-to-test", "run-e2e"))
+        table[TIMELINE] = [event(303), event(304, name="run-e2e", event="unlabeled")]
+        client, transport = route_client(table)
+        with action_env(INPUT_REQUIRED_LABEL="", INPUT_REQUIRED_LABELS='["safe-to-test","run-e2e"]',
+                        INPUT_PR_NUMBER="42") as output, \
+                mock.patch.object(authorization.GitHubClient, "from_env", return_value=client):
+            main()
+            outputs = read_outputs(output)
+        self.assertEqual(outputs["approved"], "true")
+        self.assertEqual(json.loads(outputs["approvals"]), {
+            "safe-to-test": {"approved": "true", "approver": "trusted-maintainer", "approval_event_id": "303"},
+            "run-e2e": {"approved": "false", "approver": "", "approval_event_id": ""},
+        })
+        self.assertEqual(transport.urls(), [PULL, TIMELINE, PERMISSION])
+
+    def test_batch_mode_rejects_conflicting_inputs(self):
+        client, transport = route_client(routes())
+        with action_env(INPUT_PR_NUMBER="42", INPUT_REQUIRED_LABEL="safe-to-test",
+                        INPUT_REQUIRED_LABELS='["safe-to-test"]') as output, \
+                mock.patch.object(authorization.GitHubClient, "from_env", return_value=client):
+            with self.assertRaises(ActionError):
+                main()
+            self.assertEqual(read_outputs(output)["approved"], "false")
+        self.assertEqual(transport.requests, [])
+
+    def test_batch_mode_rejects_malformed_arrays(self):
+        for labels in ('[]', '["safe-to-test","safe-to-test"]', '{"x":1}'):
+            with self.subTest(labels=labels):
+                client, transport = route_client(routes())
+                with action_env(INPUT_PR_NUMBER="42", INPUT_REQUIRED_LABEL="", INPUT_REQUIRED_LABELS=labels) as output, \
+                        mock.patch.object(authorization.GitHubClient, "from_env", return_value=client):
+                    with self.assertRaises(ActionError):
+                        main()
+                    self.assertEqual(read_outputs(output)["approved"], "false")
+                self.assertEqual(transport.requests, [])
 
 
 if __name__ == "__main__":

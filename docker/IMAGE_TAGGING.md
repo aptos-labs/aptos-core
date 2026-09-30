@@ -32,7 +32,7 @@ Images are built into GCP Artifact Registry (internal), then copied to GCP and D
 | `failpoints` | `failpoints` |
 | `consensus-only-perf-test` | `consensus_only_perf_test` |
 
-Source: profile/feature prefix logic is implemented in [`docker/builder/docker-bake-rust-all.sh`](builder/docker-bake-rust-all.sh) and the `joinTagSegments` helper in [`docker/image-helpers.js`](image-helpers.js).
+Source: the bake script gets its profile/feature prefix from [`docker/builder/image-tag-prefix.sh`](builder/image-tag-prefix.sh). The `joinTagSegments` helper in [`docker/image-helpers.js`](image-helpers.js) formats other image tags.
 
 ## Examples
 

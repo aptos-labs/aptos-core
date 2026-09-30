@@ -278,18 +278,23 @@ class DocsOnlyTests(unittest.TestCase):
 
 class PlanMainTests(unittest.TestCase):
     def test_plan_main_authorizes_each_manifest_label_and_writes_plan(self):
-        approved = {"CICD:build-failpoints-images": granted(1), "CICD:run-e2e-tests": granted(4)}
-        calls = []
-
-        def fake_authorize(client_, pr_number, label):
-            calls.append((pr_number, label))
-            return approved.get(label, DENIED)
-
-        transport = RouteTransport(docs_routes(["README.md"]))
-        with action_env(INPUT_PR_NUMBER="42") as output, mock.patch.object(docker_plan, "authorize", fake_authorize):
+        labels = ("CICD:build-failpoints-images", "CICD:run-e2e-tests")
+        routes = docs_routes(["README.md"])
+        routes[PULL]["labels"] = [{"name": label} for label in labels]
+        routes[f"{REPO_PATH}/issues/42/timeline?per_page=100&page=1"] = [
+            {"id": index, "event": "labeled", "label": {"name": label},
+             "actor": {"login": "trusted-maintainer"}, "created_at": "2026-09-17T10:03:00Z"}
+            for index, label in enumerate(labels, 1)
+        ]
+        permission = f"{REPO_PATH}/collaborators/trusted-maintainer/permission"
+        routes[permission] = {"permission": "write"}
+        transport = RouteTransport(routes)
+        with action_env(INPUT_PR_NUMBER="42") as output:
             docker_plan.plan_main(transport=transport)
             outputs = read_outputs(output)
-        self.assertEqual([(42, c.label) for c in MANIFEST.capabilities], calls)
+        self.assertEqual(1, transport.urls().count(PULL))
+        self.assertEqual(1, transport.urls().count(permission))
+        self.assertEqual(4, len(transport.urls()))
         self.assertEqual(["plan"], list(outputs))
         plan = parse_plan(MANIFEST, outputs["plan"])
         self.assertTrue(plan["docs_only"])
@@ -299,17 +304,15 @@ class PlanMainTests(unittest.TestCase):
         self.assertFalse(plan["markers"]["enabled"])
 
     def test_plan_main_skips_the_file_listing_without_a_docs_sensitive_approval(self):
-        transport = RouteTransport({})
-        with action_env(INPUT_PR_NUMBER="42") as output, \
-                mock.patch.object(docker_plan, "authorize", lambda *_: DENIED):
+        transport = RouteTransport({PULL: {"labels": [], "changed_files": 1}})
+        with action_env(INPUT_PR_NUMBER="42") as output:
             docker_plan.plan_main(transport=transport)
             self.assertFalse(json.loads(read_outputs(output)["plan"])["docs_only"])
-        self.assertEqual([], transport.requests)
+        self.assertEqual([PULL], transport.urls())
 
     def test_plan_main_fails_closed_before_api_access_for_invalid_input(self):
         transport = RouteTransport({})
-        with action_env(INPUT_PR_NUMBER="0") as output, \
-                mock.patch.object(docker_plan, "authorize", side_effect=AssertionError("called")):
+        with action_env(INPUT_PR_NUMBER="0") as output:
             with self.assertRaises(ActionError):
                 docker_plan.plan_main(transport=transport)
             self.assertEqual("", output.read_text())

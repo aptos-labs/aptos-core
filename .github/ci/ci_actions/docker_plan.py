@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from ci_actions.authorization import Authorization, authorize
+from ci_actions.authorization import Authorization, authorize_labels
 from ci_actions.github import (
     ActionError,
     GitHubClient,
@@ -328,11 +328,12 @@ def parse_plan(manifest: Manifest, text: Any) -> dict:
     return expected
 
 
-def pull_request_is_docs_only(client: GitHubClient, pr_number: int) -> bool:
+def pull_request_is_docs_only(client: GitHubClient, pr_number: int, *, pull_request: Any = None) -> bool:
     """Port of the retired pr-target-determination rule: at least one changed
     file, and every changed filename ends with `.md`. A renamed file must
     also have a `previous_filename` that ends with `.md`."""
-    pull_request = client.get_json(f"/pulls/{pr_number}")
+    if pull_request is None:
+        pull_request = client.get_json(f"/pulls/{pr_number}")
     changed = pull_request.get("changed_files") if isinstance(pull_request, dict) else None
     if type(changed) is not int or changed < 0:
         raise ActionError("pull request changed_files is invalid")
@@ -368,10 +369,14 @@ def plan_main(transport: Transport | None = None) -> None:
     pr_number = parse_positive_int(require_env("INPUT_PR_NUMBER"), "pr_number")
     manifest = load_manifest()
     client = GitHubClient.from_env(user_agent="aptos-docker-capability-plan", transport=transport)
+    pull_request = client.get_json(f"/pulls/{pr_number}")
+    label_approvals = authorize_labels(
+        client, pr_number, [capability.label for capability in manifest.capabilities], pull_request=pull_request,
+    )
     plan = compute_plan(
         manifest,
-        lambda label: authorize(client, pr_number, label),
-        lambda: pull_request_is_docs_only(client, pr_number),
+        label_approvals.__getitem__,
+        lambda: pull_request_is_docs_only(client, pr_number, pull_request=pull_request),
     )
     write_outputs({"plan": serialize_plan(plan)})
 

@@ -6,8 +6,11 @@ inputs:
     description: Pull request number to authorize
     required: true
   required_label:
-    description: Label that grants compute authorization
-    required: true
+    description: One label that grants compute authorization
+    required: false
+  required_labels:
+    description: JSON array of labels to authorize in one request batch
+    required: false
 
 outputs:
   approved:
@@ -19,6 +22,9 @@ outputs:
   approval_event_id:
     description: Timeline event ID for the authorizing label application
     value: ${{ steps.authorize.outputs.approval_event_id }}
+  approvals:
+    description: JSON object keyed by label with approved, approver, and approval_event_id values
+    value: ${{ steps.authorize.outputs.approvals }}
 
 runs:
   using: composite
@@ -30,4 +36,5 @@ runs:
         GH_TOKEN: ${{ github.token }}
         INPUT_PR_NUMBER: ${{ inputs.pr_number }}
         INPUT_REQUIRED_LABEL: ${{ inputs.required_label }}
+        INPUT_REQUIRED_LABELS: ${{ inputs.required_labels }}
       run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" compute-authorized

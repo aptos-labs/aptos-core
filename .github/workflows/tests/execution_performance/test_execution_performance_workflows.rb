@@ -44,15 +44,16 @@ class ExecutionPerformanceOrchestratorTests < Minitest::Test
     assert_equal true, @workflow.fetch("concurrency").fetch("cancel-in-progress")
   end
 
-  def test_each_compute_capability_uses_its_own_verified_label_output
+  def test_compute_capabilities_share_one_verified_batch_and_keep_distinct_outputs
     compute = @jobs.fetch("compute-authorization")
     assert_equal "github.event_name == 'pull_request_target'", compute.fetch("if")
     assert_equal(
       {
-        "e2e_approved" => "${{ steps.authorize_e2e.outputs.approved }}",
-        "all_e2e_approved" => "${{ steps.authorize_all_e2e.outputs.approved }}",
-        "performance_approved" => "${{ steps.authorize_performance.outputs.approved }}",
-        "full_approved" => "${{ steps.authorize_full.outputs.approved }}",
+        "approved" => "${{ steps.authorize.outputs.approved }}",
+        "e2e_approved" => "${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-e2e-tests'].approved }}",
+        "all_e2e_approved" => "${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-all-e2e-tests'].approved }}",
+        "performance_approved" => "${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-execution-performance-test'].approved }}",
+        "full_approved" => "${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-execution-performance-full-test'].approved }}",
       },
       compute.fetch("outputs"),
     )
@@ -61,24 +62,18 @@ class ExecutionPerformanceOrchestratorTests < Minitest::Test
     assert_equal "${{ github.event.pull_request.base.sha }}", checkout.fetch("with").fetch("ref")
     assert_equal false, checkout.fetch("with").fetch("persist-credentials")
 
-    expected_labels = {
-      "authorize_e2e" => "CICD:run-e2e-tests",
-      "authorize_all_e2e" => "CICD:run-all-e2e-tests",
-      "authorize_performance" => "CICD:run-execution-performance-test",
-      "authorize_full" => "CICD:run-execution-performance-full-test",
-    }
+    expected_labels = %w[CICD:run-e2e-tests CICD:run-all-e2e-tests
+                         CICD:run-execution-performance-test CICD:run-execution-performance-full-test]
     authorization_steps = steps(compute).select { |step| step["uses"] == "./.github/actions/compute-authorized" }
-    assert_equal expected_labels.keys.sort, authorization_steps.map { |step| step.fetch("id") }.sort
-    authorization_steps.each do |step|
-      assert_equal "${{ github.event.pull_request.number }}", step.fetch("with").fetch("pr_number")
-      assert_equal expected_labels.fetch(step.fetch("id")), step.fetch("with").fetch("required_label")
-    end
+    assert_equal 1, authorization_steps.length
+    assert_equal "authorize", authorization_steps.first.fetch("id")
+    assert_equal "${{ github.event.pull_request.number }}", authorization_steps.first.fetch("with").fetch("pr_number")
+    assert_equal expected_labels, JSON.parse(authorization_steps.first.fetch("with").fetch("required_labels"))
 
     pr_job = @jobs.fetch("execution-performance")
     assert_equal "compute-authorization", pr_job.fetch("needs")
-    %w[e2e_approved all_e2e_approved performance_approved full_approved].each do |output|
-      assert_includes pr_job.fetch("if"), "needs.compute-authorization.outputs.#{output} == 'true'"
-    end
+    assert_equal "github.event_name == 'pull_request_target' && needs.compute-authorization.outputs.approved == 'true'",
+                 pr_job.fetch("if")
     inputs = pr_job.fetch("with")
     assert_equal "${{ needs.compute-authorization.outputs.full_approved == 'true' && 'CONTINUOUS' || 'LAND_BLOCKING' }}",
                  inputs.fetch("FLOW")

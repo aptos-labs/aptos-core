@@ -18,10 +18,11 @@ jobs:
     if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     outputs:
-      e2e_approved: ${{ steps.authorize_e2e.outputs.approved }}
-      all_e2e_approved: ${{ steps.authorize_all_e2e.outputs.approved }}
-      performance_approved: ${{ steps.authorize_performance.outputs.approved }}
-      full_approved: ${{ steps.authorize_full.outputs.approved }}
+      approved: ${{ steps.authorize.outputs.approved }}
+      e2e_approved: ${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-e2e-tests'].approved }}
+      all_e2e_approved: ${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-all-e2e-tests'].approved }}
+      performance_approved: ${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-execution-performance-test'].approved }}
+      full_approved: ${{ fromJSON(steps.authorize.outputs.approvals)['CICD:run-execution-performance-full-test'].approved }}
     steps:
       # pull_request_target resolves this checkout to base-owned code.
       - uses: actions/checkout@v4
@@ -29,44 +30,16 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
 
-      - name: Authorize e2e compute
-        id: authorize_e2e
-        uses: ./.github/actions/compute-authorized
-        with:
-          pr_number: ${{ github.event.pull_request.number }}
-          required_label: CICD:run-e2e-tests
-
-      - name: Authorize all-e2e compute
-        id: authorize_all_e2e
-        uses: ./.github/actions/compute-authorized
-        with:
-          pr_number: ${{ github.event.pull_request.number }}
-          required_label: CICD:run-all-e2e-tests
-
       - name: Authorize execution-performance compute
-        id: authorize_performance
+        id: authorize
         uses: ./.github/actions/compute-authorized
         with:
           pr_number: ${{ github.event.pull_request.number }}
-          required_label: CICD:run-execution-performance-test
-
-      - name: Authorize full execution-performance compute
-        id: authorize_full
-        uses: ./.github/actions/compute-authorized
-        with:
-          pr_number: ${{ github.event.pull_request.number }}
-          required_label: CICD:run-execution-performance-full-test
+          required_labels: '["CICD:run-e2e-tests","CICD:run-all-e2e-tests","CICD:run-execution-performance-test","CICD:run-execution-performance-full-test"]'
 
   execution-performance:
     needs: compute-authorization
-    if: |
-      github.event_name == 'pull_request_target' &&
-      (
-        needs.compute-authorization.outputs.e2e_approved == 'true' ||
-        needs.compute-authorization.outputs.all_e2e_approved == 'true' ||
-        needs.compute-authorization.outputs.performance_approved == 'true' ||
-        needs.compute-authorization.outputs.full_approved == 'true'
-      )
+    if: github.event_name == 'pull_request_target' && needs.compute-authorization.outputs.approved == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/workflow-run-execution-performance.yaml

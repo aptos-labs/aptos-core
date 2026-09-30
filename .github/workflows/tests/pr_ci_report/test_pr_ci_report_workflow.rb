@@ -47,10 +47,15 @@ class ProducerWorkflowTests < Minitest::Test
       assert_equal "compute-authorization", job.fetch("needs")
       assert_includes job.fetch("if"), "needs.compute-authorization.outputs.approved == 'true'"
       assert_equal "${{ needs.compute-authorization.outputs.runner }}", job.fetch("runs-on")
-      checkout = job.fetch("steps").find { |step| step["uses"] == "actions/checkout@v4" }
-      assert_equal "${{ needs.compute-authorization.outputs.source_repository }}", checkout.fetch("with").fetch("repository")
-      assert_equal "${{ needs.compute-authorization.outputs.source_sha }}", checkout.fetch("with").fetch("ref")
-      assert_equal false, checkout.fetch("with").fetch("persist-credentials")
+      trusted = job.fetch("steps").find { |step| step["uses"] == "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" }
+      assert_equal "trusted-base", trusted.dig("with", "path")
+      assert_equal false, trusted.dig("with", "persist-credentials")
+      checkout = job.fetch("steps").find { |step| step["uses"] == "./trusted-base/.github/actions/checkout-exact-pr-source" }
+      assert_equal "${{ needs.compute-authorization.outputs.source_repository }}", checkout.dig("with", "source_repository")
+      assert_equal "${{ needs.compute-authorization.outputs.source_sha }}", checkout.dig("with", "source_sha")
+      assert_equal ".", checkout.dig("with", "path")
+      assert_equal(filename == "mono-move-micro-bench.yaml" ? 0 : 1, checkout.dig("with", "fetch-depth").to_i)
+      assert_operator job.fetch("steps").index(trusted), :<, job.fetch("steps").index(checkout)
       rendered = job.to_s
       refute_includes rendered, "secrets."
       refute_includes rendered, "pull-requests: write"

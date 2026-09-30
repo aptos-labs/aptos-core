@@ -83,7 +83,7 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
           TARGET_REGISTRY: gcp
-          CUSTOM_IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.custom_image_tag_prefix }}
+          IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.image_tag_prefix }}
         working-directory: pr-source
         run: |
           set -euo pipefail

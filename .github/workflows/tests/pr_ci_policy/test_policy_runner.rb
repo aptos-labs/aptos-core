@@ -209,12 +209,19 @@ class PolicyRunnerTest < Minitest::Test
   end
 
   def test_rejects_new_files_under_every_manifest_prefix
-    PrCiPolicy::Manifest.read.protected_runtime_prefixes.each do |prefix|
+    PrCiPolicy::Manifest.read.protected_runtime_prefixes.select { |prefix| prefix.end_with?("/") }.each do |prefix|
       file = { "filename" => "#{prefix}added-by-pr.txt", "status" => "added" }
       result = PrCiPolicy::Runner.new(FakeApi.new(files_path => [file])).check(event)
 
       assert_equal [:protected_runtime], result.map(&:category), prefix
     end
+  end
+
+  def test_rejects_change_to_exact_protected_image_tag_helper
+    file = { "filename" => "docker/builder/image-tag-prefix.sh", "status" => "modified" }
+    result = PrCiPolicy::Runner.new(FakeApi.new(files_path => [file])).check(event)
+
+    assert_equal [:protected_runtime], result.map(&:category)
   end
 
   def test_protected_prefixes_match_whole_directory_names

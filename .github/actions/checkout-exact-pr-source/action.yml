@@ -8,6 +8,14 @@ inputs:
   source_sha:
     description: Full lowercase SHA of the PR commit
     required: true
+  path:
+    description: Checkout path relative to the workspace
+    required: false
+    default: pr-source
+  fetch-depth:
+    description: Number of commits to fetch; zero fetches complete history
+    required: false
+    default: "1"
 
 runs:
   using: composite
@@ -18,18 +26,27 @@ runs:
         SOURCE_SHA: ${{ inputs.source_sha }}
       run: bash "$GITHUB_ACTION_PATH/verify-source.sh" validate "$SOURCE_SHA"
 
+    - name: Stage the trusted verifier outside the checkout
+      id: stage-verifier
+      shell: bash
+      run: |
+        set -euo pipefail
+        verifier_dir="$(mktemp -d "$RUNNER_TEMP/exact-source-verify.XXXXXXXX")"
+        cp "$GITHUB_ACTION_PATH/verify-source.sh" "$verifier_dir/verify-source.sh"
+        echo "path=$verifier_dir/verify-source.sh" >> "$GITHUB_OUTPUT"
+
     - name: Check out the exact approved PR revision
       uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       with:
         repository: ${{ inputs.source_repository }}
         ref: ${{ inputs.source_sha }}
-        path: pr-source
-        fetch-depth: 1
+        path: ${{ inputs.path }}
+        fetch-depth: ${{ inputs.fetch-depth }}
         persist-credentials: false
 
     - name: Verify the exact source revision
       shell: bash
-      working-directory: pr-source
+      working-directory: ${{ inputs.path }}
       env:
         SOURCE_SHA: ${{ inputs.source_sha }}
-      run: bash "$GITHUB_ACTION_PATH/verify-source.sh" verify "$SOURCE_SHA"
+      run: bash "${{ steps.stage-verifier.outputs.path }}" verify "$SOURCE_SHA"

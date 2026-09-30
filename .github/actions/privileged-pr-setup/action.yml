@@ -30,11 +30,11 @@ inputs:
     required: true
 
 outputs:
-  custom_image_tag_prefix:
-    description: CUSTOM_IMAGE_TAG_PREFIX for docker-bake-rust-all.sh
-    value: ${{ steps.tags.outputs.custom_image_tag_prefix }}
+  image_tag_prefix:
+    description: Trusted IMAGE_TAG_PREFIX for docker-bake-rust-all.sh
+    value: ${{ steps.tags.outputs.image_tag_prefix }}
   image_tag:
-    description: Full tag of the images that docker-bake-rust-all.sh publishes
+    description: Expected full tag for the approved source SHA
     value: ${{ steps.tags.outputs.image_tag }}
 
 runs:
@@ -75,7 +75,7 @@ runs:
         service_account: ${{ inputs.service_account }}
 
     # docker-bake-rust-all.sh runs from the PR checkout, so trusted code derives
-    # the published tag itself. The prefix rules mirror that script.
+    # the expected tag and passes its prefix to the build.
     - name: Derive the protected image tag
       id: tags
       shell: bash
@@ -89,18 +89,11 @@ runs:
         [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "::error::Invalid PR number"; exit 1; }
         [[ "$PROFILE" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "::error::Invalid build profile"; exit 1; }
         [[ "$FEATURES" =~ ^[a-z0-9,-]*$ ]] || { echo "::error::Invalid build features"; exit 1; }
-        case "$PROFILE:$FEATURES" in
-          performance:) custom_prefix="performance_pr-${PR_NUMBER}" ;;
-          release:failpoints) custom_prefix="failpoints_pr-${PR_NUMBER}" ;;
-          *) custom_prefix="pr-${PR_NUMBER}" ;;
-        esac
-        profile_prefix=""
-        [[ "$PROFILE" == "release" ]] || profile_prefix="${PROFILE}_"
-        feature_prefix=""
-        [[ -z "$FEATURES" ]] || feature_prefix="$(printf '%s' "$FEATURES" | sed -e 's/[^a-zA-Z0-9]/_/g')_"
-        image_tag="${custom_prefix}_${profile_prefix}${feature_prefix}${SOURCE_SHA}"
+        source "$GITHUB_ACTION_PATH/../../../docker/builder/image-tag-prefix.sh"
+        image_tag_prefix="$(image_tag_prefix "$PR_NUMBER" "$PROFILE" "$FEATURES")"
+        image_tag="${image_tag_prefix}${SOURCE_SHA}"
         {
-          echo "custom_image_tag_prefix=$custom_prefix"
+          echo "image_tag_prefix=$image_tag_prefix"
           echo "image_tag=$image_tag"
         } >> "$GITHUB_OUTPUT"
         echo "PR_IMAGE_TAG=$image_tag" >> "$GITHUB_ENV"

@@ -8,20 +8,32 @@ require_relative "policy_test_helper"
 class PolicyModelTest < Minitest::Test
   include PolicyTestHelper
 
-  def test_manifest_lists_existing_workflows_and_directories
+  def test_manifest_lists_existing_workflows_directories_and_exact_files
     manifest = PrCiPolicy::Manifest.read
 
     (manifest.hardened_workflows + manifest.approved_protected_reusables).each do |path|
       assert File.file?(File.join(ROOT, path)), path
     end
     manifest.protected_runtime_prefixes.each do |prefix|
-      assert File.directory?(File.join(ROOT, prefix)), prefix
+      if prefix.end_with?("/")
+        assert File.directory?(File.join(ROOT, prefix)), prefix
+      else
+        assert File.file?(File.join(ROOT, prefix)), prefix
+      end
     end
     assert_includes manifest.protected_runtime_prefixes, ".github/ci/"
     assert_includes manifest.protected_runtime_prefixes, ".github/actions/pr-ci-policy/"
     assert_includes manifest.protected_runtime_prefixes, ".github/actions/checkout-exact-pr-source/"
     assert_includes manifest.protected_runtime_prefixes, ".github/actions/gcp-registry-auth/"
+    assert_includes manifest.protected_runtime_prefixes, "docker/builder/image-tag-prefix.sh"
     assert_includes manifest.hardened_workflows, POLICY_WORKFLOW_PATH
+  end
+
+  def test_exact_protected_runtime_file_does_not_protect_similarly_named_files
+    manifest = PrCiPolicy::Manifest.read
+    assert manifest.protected_runtime?("docker/builder/image-tag-prefix.sh")
+    refute manifest.protected_runtime?("docker/builder/image-tag-prefix.sh.bak")
+    refute manifest.protected_runtime?("docker/builder/image-tag-prefix.sh/child")
   end
 
   def test_checker_reads_hardened_and_approved_paths_from_the_manifest

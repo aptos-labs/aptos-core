@@ -49,12 +49,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out trusted source verification action
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: ${{ needs.compute-authorization.outputs.source_repository }}
-          ref: ${{ needs.compute-authorization.outputs.source_sha }}
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: trusted-base
           persist-credentials: false
+
+      - name: Check out exact benchmark source
+        uses: ./trusted-base/.github/actions/checkout-exact-pr-source
+        with:
+          source_repository: ${{ needs.compute-authorization.outputs.source_repository }}
+          source_sha: ${{ needs.compute-authorization.outputs.source_sha }}
+          path: .
+          fetch-depth: 0
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
 

@@ -12,7 +12,7 @@ module PrCiPolicy
     PATH = File.expand_path("../../../../ci/pr-ci-policy.json", __dir__)
     KEYS = %w[approved_protected_reusables hardened_workflows protected_runtime_prefixes].freeze
     WORKFLOW = %r{\A\.github/workflows/[^/]+\.ya?ml\z}
-    PREFIX = %r{\A\.github/(?:[^/]+/)+\z}
+    PREFIX = %r{\A(?:\.github/(?:[^/]+/)+|docker/builder/image-tag-prefix\.sh)\z}
 
     def self.read(path = PATH)
       data = JSON.parse(File.read(path), max_nesting: 3)
@@ -49,7 +49,9 @@ module PrCiPolicy
     end
 
     def protected_runtime?(path)
-      path.is_a?(String) && protected_runtime_prefixes.any? { |prefix| path.start_with?(prefix) }
+      path.is_a?(String) && protected_runtime_prefixes.any? do |prefix|
+        prefix.end_with?("/") ? path.start_with?(prefix) : path == prefix
+      end
     end
   end
 end

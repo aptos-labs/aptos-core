@@ -181,37 +181,31 @@ jobs:
           GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
           TARGET_CACHE_ID: pr-${{ inputs.PR_NUMBER }}-${{ inputs.SOURCE_SHA }}
           TARGET_REGISTRY: gcp
-          CUSTOM_IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.custom_image_tag_prefix }}
+          IMAGE_TAG_PREFIX: ${{ steps.setup.outputs.image_tag_prefix }}
         working-directory: pr-source
         run: |
           set -euo pipefail
           CI=true docker/builder/docker-bake-rust-all.sh forge-images
 
       # The full image rebuild can consume most of the build token. Mint a new
-      # credential for baseline lookup and the actual Forge deployment.
+      # credential for baseline lookup and the actual Forge deployment. Reload
+      # the action from the exact base after PR code had access to trusted-base/.
+      - name: Refresh exact trusted base actions
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.BASE_SHA }}
+          path: trusted-refresh
+          persist-credentials: false
+
       - name: Refresh Google Cloud authentication for the Forge run
         id: gcp-forge-auth
-        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        uses: ./trusted-refresh/.github/actions/gcp-registry-auth
         with:
           create_credentials_file: true
-          token_format: access_token
           access_token_lifetime: ${{ steps.auth-duration.outputs.value }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Refresh the US multi-region registry login for Forge
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
-        with:
-          registry: us-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.gcp-forge-auth.outputs.access_token }}
-
-      - name: Refresh the us-west1 registry login for Forge
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
-        with:
-          registry: us-west1-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.gcp-forge-auth.outputs.access_token }}
 
       - name: Resolve a trusted baseline without executing branch code
         if: inputs.USE_BASELINE_IMAGE
