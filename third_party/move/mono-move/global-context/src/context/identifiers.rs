@@ -67,26 +67,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // it because then the map would have been cleared).
         unsafe { self.arena_ref(ptr) }
     }
-
-    /// The canonical pointer for `identifier`, or [`None`] if it has never been
-    /// interned. Unlike [`Self::intern_identifier`], this never allocates, so a
-    /// caller holding an attacker-supplied name can probe without growing the
-    /// interner.
-    ///
-    /// Every identifier of a loaded module is interned when the module is
-    /// prepared, so a miss means no loaded module names it.
-    pub fn lookup_identifier<'guard>(
-        &'guard self,
-        identifier: &IdentStr,
-    ) -> Option<ArenaRef<'guard, str>>
-    where
-        'ctx: 'guard,
-    {
-        // SAFETY: as in `intern_identifier`, an entry in the map is valid until
-        // the next maintenance phase, which clears the map.
-        let entry = self.ctx.identifiers.get(identifier)?;
-        Some(unsafe { self.arena_ref(*entry.value()) })
-    }
 }
 
 //
