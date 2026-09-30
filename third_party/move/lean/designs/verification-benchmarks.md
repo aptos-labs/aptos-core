@@ -418,13 +418,25 @@ stay in `third_party/move/lean`, ignored by git:
   the CI history, rewritten by every local run (`report --local-runs`);
 - `local_benchmark_logs/`: the problems' logs of the latest local run.
 
-So a series of changes on a branch is measured by a run after each, and
-`compare` gives the last change's effect; `history --local` lists the
-runs to compare further back (`compare @-4 @-1`). This is the loop an
-agent uses to follow its own optimizations: heartbeats tell whether the
-elaborator's work changed, wall time whether the change shows. The suite
-total compares full runs only; the page and `compare` show a subset run's
-problems.
+A series of changes on a branch, one run after each:
+
+```bash
+B=third_party/move/lean/scripts/leaner-bench.py
+python3 $B run --only math128,ordered_map     # the baseline
+# change, commit, then:
+(cd third_party/move/lean/leaner-e2e-tests && lake build leaner-bench)
+python3 $B run --only math128,ordered_map
+python3 $B compare                            # the last change: @-2 against @-1
+python3 $B history --local                    # the series, @-N … @-1
+python3 $B compare @-4 @-1                    # the baseline against the latest
+```
+
+Rebuild `leaner-bench` before each run: a run measures the executable,
+not the sources. Keep the same `--only` set through a series, and commit
+each change, since a run is labeled by its commit (`+` when the tree was
+dirty). Heartbeats tell whether the elaborator's work changed, wall time
+whether the change shows; an agent follows its own optimizations this
+way. The suite total compares full runs only.
 
 `run --package <dir>` takes the executable from another build of
 `leaner-e2e-tests`, such as a copy on a native disk.

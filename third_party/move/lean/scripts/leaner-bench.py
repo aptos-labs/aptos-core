@@ -11,6 +11,11 @@
 
 Wall time is the main measure; heartbeats compare across machines. Uses only
 the standard library and the `gh` CLI (for the history).
+
+A series of local runs on a branch: rebuild `leaner-bench`, then
+`run --only <names>` after each change, keeping the names; `compare` gives
+the last change (@-2 against @-1), `history --local` the series, and
+`compare @-N @-1` the change since run @-N.
 """
 
 import argparse
