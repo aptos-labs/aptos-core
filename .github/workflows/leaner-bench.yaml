@@ -190,8 +190,7 @@ jobs:
           exit 1
 
       - name: Post to Slack
-        # Nightlies on main report; a delivery error does not fail the run,
-        # whose success the history reads.
+        # Nightlies on main report; a delivery error does not fail the run.
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         continue-on-error: true
         uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1

@@ -273,11 +273,13 @@ def cache_dir():
 
 
 def fetch_history(args):
-    """The results of the last successful CI runs on the branch, oldest
-    first, from a cache keyed by run id."""
+    """The results of the last `window` CI runs on the branch that produced
+    results, oldest first, from a cache keyed by run id. A run counts by its
+    results artifact, not its conclusion: a run whose report or publication
+    failed after the benchmark finished still measured."""
     listing = subprocess.run(
         ["gh", "run", "list", "--workflow", WORKFLOW, "--branch", args.branch,
-         "--status", "success", "--limit", str(args.window),
+         "--status", "completed", "--limit", str(min(3 * args.window, 300)),
          "--json", "databaseId,headSha,createdAt,url", *repo_args(args)],
         capture_output=True, text=True,
     )
@@ -286,6 +288,8 @@ def fetch_history(args):
         return []
     history = []
     for entry in json.loads(listing.stdout):
+        if len(history) == args.window:
+            break
         target = cache_dir() / str(entry["databaseId"])
         results = target / "results.json"
         if not results.exists():
@@ -295,8 +299,6 @@ def fetch_history(args):
                 capture_output=True, text=True,
             )
             if download.returncode != 0 or not results.exists():
-                print(f"leaner-bench: run {entry['databaseId']} has no results "
-                      f"({download.stderr.strip()})", file=sys.stderr)
                 continue
         data = json.loads(results.read_text())
         if data.get("schema") != SCHEMA or data.get("version") != VERSION:
@@ -842,7 +844,7 @@ def report(args):
     points = [] if args.no_history else fetch_history(args)
     if args.current:
         # This CI run's results, which the history lists only once the run
-        # has succeeded.
+        # has completed.
         current = json.loads(Path(args.current).read_text())
         current["run"] = {"id": os.environ.get("GITHUB_RUN_ID", "current"), "url": run_url()}
         points = [point for point in points if point["run"]["id"] != current["run"]["id"]]
@@ -910,7 +912,7 @@ def main():
         sub.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY",
                                                           "aptos-labs/aptos-core"))
 
-    history_parser = commands.add_parser("history", help="fetch recent CI results")
+    history_parser = commands.add_parser("history", help="fetch the results of recent CI runs")
     history_options(history_parser)
     history_parser.set_defaults(action=history)
 

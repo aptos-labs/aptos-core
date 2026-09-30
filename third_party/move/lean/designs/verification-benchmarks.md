@@ -288,8 +288,8 @@ the standard library and the `gh` CLI:
   gives it; the Move CLI is `APTOS_MOVE_CLI` or the checkout's
   `target/ci/move`.
 - `history [--window N] [--branch main]` fetches the results of the last
-  `N` successful CI runs (below) into a local cache keyed by run id; a
-  run's results never change.
+  `N` CI runs that produced results (below) into a local cache keyed by run
+  id; a run's results never change.
 - `report [--current results.json] [--local results.json] [--window N]
   [--html <file>] [--markdown <file>] [--slack <file>]` renders the
   history, with the running CI run's results (`--current`) or a local run
@@ -306,16 +306,17 @@ Every CI run uploads its `results.json` as the workflow artifact
 of the most recent runs:
 
 ```bash
-gh run list --workflow leaner-bench.yaml --branch main --status success \
-  --limit N --json databaseId,headSha,createdAt,url
+gh run list --workflow leaner-bench.yaml --branch main --status completed \
+  --limit 3N --json databaseId,headSha,createdAt,url
 gh run download <databaseId> --name leaner-bench-results
 ```
 
 The window defaults to 30 runs, a month of nightlies; retention bounds it
-at about 90. A run fails only when the benchmark itself could not produce
-results (a build failure, a missing manifest entry), not when a problem
-fails to verify, so a failed run is absent from the history rather than
-plotted.
+at about 90. A run counts by its results artifact, not by its conclusion:
+the benchmark fails only when it could not produce results (a build
+failure, a missing manifest entry), never because a problem fails to
+verify, and a run whose report or publication failed afterwards still
+measured, so its point is kept.
 
 Each point on a curve is annotated with what changed since the previous
 point: the problem's input, the Lean toolchain, or its status. A problem
@@ -375,7 +376,7 @@ The workflow `.github/workflows/leaner-bench.yaml`:
 - **Job `report`.** Needs `bench`, on a small runner, with `permissions:
   actions: read` and `GH_TOKEN: ${{ github.token }}` for the history. Runs
   `leaner-bench.py report --current` over the downloaded results of this
-  run, which the history lists only once the run has succeeded; appends
+  run, which the history lists only once the run has completed; appends
   the markdown to `$GITHUB_STEP_SUMMARY`; and uploads the page and the
   Slack message as `leaner-bench-report`.
 - **Job `publish`.** Needs `report`, with `permissions: contents: write`,
