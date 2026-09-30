@@ -40,9 +40,10 @@ def benchmark_job_disposition(jobs: list[Any], producer: str, run_id: int) -> st
     if len(matching) != 1:
         raise ActionError("expected exactly one benchmark job for the producer")
     job = matching[0]
-    if not is_positive_id(job.get("id")) or job.get("run_id") != run_id or job.get("status") != "completed":
+    if (not is_positive_id(job.get("id")) or not is_positive_id(job.get("run_id"))
+            or job.get("run_id") != run_id or job.get("status") != "completed"):
         raise ActionError("benchmark job metadata is invalid")
-    if job.get("conclusion") not in JOB_CONCLUSIONS:
+    if not isinstance(job.get("conclusion"), str) or job.get("conclusion") not in JOB_CONCLUSIONS:
         raise ActionError("benchmark job conclusion is invalid")
     if job["conclusion"] == "skipped":
         return "skip"
@@ -60,6 +61,7 @@ def benchmark_job_disposition(jobs: list[Any], producer: str, run_id: int) -> st
     if (
         not is_positive_id(step.get("number"))
         or step.get("status") != "completed"
+        or not isinstance(step.get("conclusion"), str)
         or step.get("conclusion") not in EXECUTED_STEP_CONCLUSIONS
         or started_at is None
         or completed_at is None
@@ -86,7 +88,8 @@ def select_report_artifact(artifacts: list[Any], run_id: int) -> Optional[dict[s
     if not is_positive_id(artifact.get("size_in_bytes")) or artifact["size_in_bytes"] > MAX_ARCHIVE_BYTES:
         raise ActionError("report artifact API archive size is invalid or too large")
     workflow_run = artifact.get("workflow_run")
-    if not isinstance(workflow_run, dict) or workflow_run.get("id") != run_id:
+    if (not isinstance(workflow_run, dict) or not is_positive_id(workflow_run.get("id"))
+            or workflow_run.get("id") != run_id):
         raise ActionError("report artifact is not bound to the originating run")
     return artifact
 

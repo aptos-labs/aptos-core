@@ -1,34 +1,20 @@
-import json
+import sys
 import unittest
-from unittest.mock import patch
+from pathlib import Path
 
-from common import build_image_name
+CI_DIR = next(parent / ".github" / "ci" for parent in Path(__file__).resolve().parents
+              if (parent / ".github" / "ci").is_dir())
+if str(CI_DIR) in sys.path:
+    sys.path.remove(str(CI_DIR))
+sys.path.insert(0, str(CI_DIR))
+from tests.harness_support import ToolsImageContract, load_common
+
+common = load_common("faucet_common_images_contract", Path(__file__).with_name("common.py"))
+build_image_name = common.build_image_name
 
 
-class ProtectedToolsImageTest(unittest.TestCase):
-    def test_approved_and_baseline_tags(self):
-        repository = "us-docker.pkg.dev/aptos-registry/docker/tools"
-        digest = "sha256:" + "a" * 64
-        with patch.dict("os.environ", {
-            "PROTECTED_IMAGE_TAG": "approved",
-            "PROTECTED_IMAGE_DIGESTS": json.dumps({repository: digest}),
-        }):
-            self.assertEqual(build_image_name(repository[:-5], "approved"), f"{repository}@{digest}")
-            self.assertEqual(build_image_name(repository[:-5], "baseline"), f"{repository}:baseline")
-
-    def test_without_protected_configuration_uses_tag(self):
-        with patch.dict("os.environ", {}, clear=True):
-            self.assertEqual(build_image_name("registry.example/repo", "baseline"), "registry.example/repo/tools:baseline")
-
-    def test_missing_or_invalid_digest_fails_closed(self):
-        repository = "us-docker.pkg.dev/aptos-registry/docker/tools"
-        for mapping in ({}, {repository: "sha256:bad"}):
-            with self.subTest(mapping=mapping), patch.dict("os.environ", {
-                "PROTECTED_IMAGE_TAG": "approved",
-                "PROTECTED_IMAGE_DIGESTS": json.dumps(mapping),
-            }):
-                with self.assertRaises(ValueError):
-                    build_image_name("us-docker.pkg.dev/aptos-registry/docker", "approved")
+class ProtectedToolsImageTest(ToolsImageContract, unittest.TestCase):
+    build_image = staticmethod(build_image_name)
 
 
 if __name__ == "__main__":

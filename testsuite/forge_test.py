@@ -1,10 +1,10 @@
 from contextlib import ExitStack
 import json
 import os
+import sys
 import textwrap
 import unittest
 import tempfile
-import yaml
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import (
@@ -13,6 +13,9 @@ from typing import (
     Protocol,
 )
 from unittest.mock import patch
+
+import yaml
+from hypothesis import given, strategies as st
 
 import forge
 from forge import (
@@ -82,6 +85,16 @@ def get_cwd() -> Path:
 
 def get_fixture_path(fixture_name: str) -> Path:
     return get_cwd() / "fixtures" / fixture_name
+
+
+CI_DIR = Path(__file__).resolve().parents[1] / ".github" / "ci"
+if str(CI_DIR) in sys.path:
+    sys.path.remove(str(CI_DIR))
+sys.path.insert(0, str(CI_DIR))
+from tests.harness_support import DIGESTS, TAGS, invalid_maps
+from tests.property_support import configure_profiles
+
+configure_profiles()
 
 
 class ProtectedImageTest(unittest.TestCase):
@@ -179,6 +192,79 @@ class ProtectedImageTest(unittest.TestCase):
         env = {item["name"]: item.get("value") for item in pod["spec"]["containers"][0]["env"]}
         self.assertEqual(env["PROTECTED_IMAGE_TAG"], tag)
         self.assertEqual(json.loads(env["PROTECTED_IMAGE_DIGESTS"]), {repository: digest})
+
+    @given(TAGS, DIGESTS)
+    def test_generated_forge_digest_and_trusted_controller_references(self, tag, digest):
+        repository = f"{GAR_REPO_NAME}/forge"
+        controller = "sha256:" + ("1" if digest[7] == "0" else "0") + digest[8:]
+        env = {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": json.dumps({repository: digest}),
+               "PROTECTED_FORGE_IMAGE": f"{repository}@{controller}"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(f"{repository}@{digest}", protected_image_ref(repository, tag))
+            self.assertEqual(f"{repository}:{tag}-baseline", protected_image_ref(repository, tag + "-baseline"))
+            # The controller stays on the trusted base for approved and baseline test tags.
+            for requested in (tag, tag + "-baseline"):
+                self.assertEqual(f"{repository}@{controller}", protected_forge_image_ref(repository, requested))
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(f"{repository}:{tag}", protected_image_ref(repository, tag))
+            self.assertEqual(f"{repository}:{tag}", protected_forge_image_ref(repository, tag))
+
+    @given(TAGS, DIGESTS)
+    def test_generated_forge_maps_and_controller_fail_closed(self, tag, digest):
+        repository = f"{GAR_REPO_NAME}/forge"
+        mapping = json.dumps({repository: digest})
+        for raw in invalid_maps(repository):
+            with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": raw}, clear=True):
+                with self.assertRaises(ValueError):
+                    protected_image_ref(repository, tag)
+        for env in ({"PROTECTED_IMAGE_TAG": tag}, {"PROTECTED_IMAGE_DIGESTS": mapping},
+                    {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": ""},
+                    {"PROTECTED_IMAGE_TAG": "", "PROTECTED_IMAGE_DIGESTS": mapping}):
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaises(ValueError):
+                    protected_image_ref(repository, tag)
+        for reference in ("", "latest", f"{repository}:baseline", "evil/forge@" + digest,
+                          f"{GAR_REPO_NAME}/validator@{digest}", f"{repository}@sha256:" + "A" * 64,
+                          f"{repository}@sha256:" + "a" * 63, f"{repository}@{digest}\n"):
+            with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_FORGE_IMAGE": reference}, clear=True):
+                with self.assertRaises(ValueError):
+                    protected_forge_image_ref(repository, tag)
+        with patch.dict(os.environ, {"PROTECTED_FORGE_IMAGE": f"{repository}@{digest}"}, clear=True):
+            for foreign in ("evil/forge", f"{GAR_REPO_NAME}/validator"):
+                with self.assertRaises(ValueError):
+                    protected_forge_image_ref(foreign, tag)
+
+    @given(st.text(alphabet="abcdefghijklmnopqrstuvwxyz0123456789-_.", min_size=1, max_size=180), DIGESTS)
+    def test_generated_k8s_pod_preserves_controller_environment_and_command(self, part, digest):
+        class SuccessfulPodShell(FakeShell):
+            def run(self, command, stream_output=False):
+                return RunResult(0, b"Succeeded" if any("status.phase" in arg for arg in command) else b"")
+        for tag in ("pr-" + part[:20] + "a", "pr-" + part + "a" + "z" * 70):
+            repository = f"{GAR_REPO_NAME}/forge"
+            controller = "sha256:" + ("1" if digest[7] == "0" else "0") + digest[8:]
+            mapping = json.dumps({repository: digest, f"{GAR_REPO_NAME}/validator-testing": digest})
+            template = (get_cwd() / "forge-test-runner-template.yaml").read_bytes()
+            filesystem = SpyFilesystem({}, {"forge-test-runner-template.yaml": template})
+            context = fake_context(SuccessfulPodShell(), filesystem, mode="k8s")
+            context.cloud = Cloud.GCP
+            context.forge_image_tag = tag
+            with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": mapping,
+                                        "PROTECTED_FORGE_IMAGE": f"{repository}@{controller}"}, clear=True):
+                result = K8sForgeRunner().run(context)
+            self.assertEqual(ForgeState.PASS, result.state)
+            pod = yaml.safe_load(filesystem.get_write("temp1"))
+            container = pod["spec"]["containers"][0]
+            self.assertEqual(f"{repository}@{controller}", container["image"])
+            self.assertEqual("Always", container["imagePullPolicy"])
+            label = pod["metadata"]["labels"]["forge-image-tag"]
+            self.assertEqual(tag[:63].rstrip("-_."), label)
+            self.assertLessEqual(len(label), 63)
+            self.assertRegex(label, r"^[a-z0-9](?:[a-z0-9_.-]*[a-z0-9])?$")
+            env = {item["name"]: item.get("value") for item in container["env"]}
+            self.assertEqual(tag, env["PROTECTED_IMAGE_TAG"])
+            self.assertEqual(mapping, env["PROTECTED_IMAGE_DIGESTS"])
+            self.assertEqual(["/bin/bash", "-c", "ulimit -n 1048576\n" + " ".join(context.forge_args) + "\n"],
+                             container["command"])
 
 
 class AssertFixtureMixin:
@@ -860,6 +946,11 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     RunResult(0, b""),
                 ),
                 FakeCommand(
+                    "kubectl --kubeconfig temp1 get pod -n default forge-perry-1659078000-1659078000-banana -o "
+                    "jsonpath={.status.containerStatuses[*].state.terminated.exitCode}",
+                    RunResult(0, b"1"),
+                ),
+                FakeCommand(
                     "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
                     RunResult(0, b""),
                 ),
@@ -1351,9 +1442,9 @@ class ForgeConfigTests(unittest.TestCase):
             self.assertEqual(result_helm_config_present_complete.exit_code, 0)
             self.assertIsNotNone(helm_after_complete.get("default_helm_values"))
             self.assertIsNotNone(helm_after_complete.get("default_helm_values").get("aptos-node"))  # type: ignore
-            # the output config is printed with an extra newline
+            # Forge logs the config to stderr with an extra newline.
             self.assertEqual(
-                result_helm_config_present_complete.stdout_bytes,
+                result_helm_config_present_complete.stderr_bytes,
                 f'{json.dumps(helm_after_complete.get("default_helm_values").get("aptos-node"), indent=2)}\n'.encode(),  # type: ignore
             )
 
@@ -1530,9 +1621,9 @@ class ForgeConfigTests(unittest.TestCase):
             filesystem.assert_writes(self)
             self.assertEqual(ret.exception, None)
             self.assertEqual(ret.exit_code, 0)
-            assert ret.stdout_bytes.decode("utf-8").strip()
+            self.assertTrue(ret.stderr_bytes.decode("utf-8").strip())
             self.assertEqual(
-                ret.stdout_bytes.decode("utf-8").strip(),
+                ret.stderr_bytes.decode("utf-8").strip(),
                 config_fixture_preview.read_bytes().decode("utf-8").strip(),
             )
 

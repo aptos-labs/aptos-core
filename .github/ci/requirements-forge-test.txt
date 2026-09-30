@@ -1,0 +1,14 @@
+# Test-only Forge overlay for CPython 3.12 on Linux x86_64 and macOS x86_64/arm64.
+# psutil 5.9.8 does not publish a Linux arm64 wheel. No source builds are allowed.
+# Wheel hashes from https://pypi.org/pypi/<package>/<version>/json.
+-r requirements-test.txt
+click==8.3.3 \
+    --hash=sha256:a2bf429bb3033c89fa4936ffb35d5cb471e3719e1f3c8a7c3fff0b8314305613
+psutil==5.9.8 \
+    --hash=sha256:aee678c8720623dc456fa20659af736241f575d79429a0e5e9cf88ae0605cc81 \
+    --hash=sha256:d06016f7f8625a1825ba3732081d77c94589dca78b7a3fc072194851e88461a4 \
+    --hash=sha256:d16bbddf0693323b8c6123dd804100241da461e41d6e332fb0ba6058f630f8c8
+PyYAML==6.0.2 \
+    --hash=sha256:c70c95198c015b85feafc136515252a261a84561b7b1d51e3384e0655ddf25ab \
+    --hash=sha256:ce826d6ef20b1bc864f0a68340c8b3287705cae2f8b4b1d932177dcc76721725 \
+    --hash=sha256:80bab7bfc629882493af4aa31a4cfa43a4c57c83813253626916b8c7ada83476

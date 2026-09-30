@@ -72,7 +72,8 @@ def check_origin(run: Any, workflow: Any, expected_repository: str, run_id: int,
         raise ActionError("originating run must be completed")
     if not is_positive_id(run.get("workflow_id")):
         raise ActionError("originating run workflow ID is invalid")
-    if not isinstance(workflow, dict) or workflow.get("id") != run["workflow_id"]:
+    if (not isinstance(workflow, dict) or not is_positive_id(workflow.get("id"))
+            or workflow.get("id") != run["workflow_id"]):
         raise ActionError("workflow ID does not match the originating run")
     matching = [producer for producer in producers if producer.workflow_path == workflow.get("path")]
     if len(matching) != 1:
@@ -101,7 +102,8 @@ def inspect_run(client: GitHubClient, run_id: int, producers: Iterable[Producer]
 
 
 def _exact_match(pull_request: Any, number: int, origin: RunOrigin, expected_repository: str) -> bool:
-    if not isinstance(pull_request, dict) or pull_request.get("number") != number:
+    if (not isinstance(pull_request, dict) or not is_positive_id(pull_request.get("number"))
+            or pull_request.get("number") != number):
         raise ActionError("GitHub API returned a mismatched pull request")
     if pull_request.get("state") not in ("open", "closed"):
         raise ActionError("GitHub API returned an invalid pull request state")

@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import time
+import urllib.parse
 import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
@@ -101,12 +102,23 @@ def _validate_run(run: Any, inputs: DispatchInputs, run_name: str) -> dict[str, 
         or run.get("display_title") != run_name
     ):
         raise ActionError("Downstream workflow run lost exact source correlation")
-    if run.get("status") not in RUN_STATUSES:
+    if not isinstance(run.get("status"), str) or run["status"] not in RUN_STATUSES:
         raise ActionError("Downstream workflow run status is malformed")
     if run["status"] == "completed" and not isinstance(run.get("conclusion"), str):
         raise ActionError("Completed downstream workflow run has no conclusion")
-    if "html_url" in run and not _single_line(run["html_url"], "downstream run URL").startswith("https://"):
-        raise ActionError("Downstream workflow run URL is malformed")
+    if "html_url" in run:
+        url = _single_line(run["html_url"], "downstream run URL")
+        try:
+            parts = urllib.parse.urlsplit(url)
+            parts.port  # Raises ValueError for malformed or out-of-range ports.
+        except ValueError as error:
+            raise ActionError("Downstream workflow run URL is malformed") from error
+        if (
+            not url.startswith("https://") or not parts.hostname
+            or parts.username is not None or parts.password is not None
+            or any(ord(character) <= 0x20 or ord(character) == 0x7F for character in url)
+        ):
+            raise ActionError("Downstream workflow run URL is malformed")
     return run
 
 
@@ -149,6 +161,8 @@ def _await_completion(
 ) -> dict[str, Any]:
     for _ in range(inputs.completion_attempts):
         run = _validate_run(client.get_json(f"/actions/runs/{run_id}"), inputs, run_name)
+        if run["id"] != run_id:
+            raise ActionError("Downstream workflow run ID changed after discovery")
         if run["status"] == "completed":
             if run["conclusion"] != "success":
                 raise ActionError(f"Downstream workflow run completed with conclusion {run['conclusion']}")

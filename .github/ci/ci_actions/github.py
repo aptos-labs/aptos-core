@@ -89,7 +89,7 @@ def parse_api_base(value: str, *, allow_loopback_http: bool = False) -> str:
     )
     if parts.scheme != "https" and not loopback_http:
         raise ActionError("GITHUB_API_URL must use HTTPS")
-    if parts.username or parts.password or parts.query or parts.fragment or "?" in value or "#" in value:
+    if parts.username is not None or parts.password is not None or parts.query or parts.fragment or "?" in value or "#" in value:
         raise ActionError("GITHUB_API_URL must not contain credentials, a query, or a fragment")
     return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/"), "", ""))
 

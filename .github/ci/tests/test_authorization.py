@@ -1,6 +1,13 @@
 import json
+from datetime import datetime, timedelta
 import unittest
 from unittest import mock
+
+from hypothesis import given, strategies as st
+
+from tests.property_support import SAFE_COMPONENT, configure_profiles
+
+configure_profiles()
 
 from ci_actions import authorization
 from ci_actions.authorization import DENIED, Authorization, authorize, main
@@ -75,6 +82,14 @@ class AuthorizeTests(unittest.TestCase):
                            event(601, event="unlabeled", created_at="2026-09-17T12:00:00Z")]
         self.assertEqual(self.authorize(table)[0], approved("trusted-maintainer", 602))
 
+    def test_equal_timestamp_order_is_independent_of_input_order(self):
+        older = event(601, event="unlabeled", created_at="2026-09-17T12:00:00Z")
+        newer = event(602, created_at="2026-09-17T12:00:00Z")
+        for timeline in ([older, newer], [newer, older]):
+            table = routes()
+            table[TIMELINE] = timeline
+            self.assertEqual(self.authorize(table)[0], approved("trusted-maintainer", 602))
+
     def test_compares_timestamps_as_instants(self):
         table = routes()
         table[TIMELINE] = [event(701, created_at="2026-09-17T12:00:00Z"),
@@ -102,8 +117,6 @@ class AuthorizeTests(unittest.TestCase):
         self.assertEqual(transport.urls(), [PULL, TIMELINE])
 
     def test_never_requests_a_server_supplied_pagination_url(self):
-        # Covers the JS cases for foreign-origin, switched-endpoint, /repositories/,
-        # non-page and duplicate next links: the next URL is always rebuilt locally.
         table = routes()
         table[TIMELINE] = json_response([], headers={
             "link": '<https://attacker.example/x?after=opaque>; rel="next", <https://attacker.example/y>; rel="next"'})
@@ -281,6 +294,149 @@ class ComputeAuthorizedCommandTests(unittest.TestCase):
                         main()
                     self.assertEqual(read_outputs(output)["approved"], "false")
                 self.assertEqual(transport.requests, [])
+
+
+class AuthorizationProperties(unittest.TestCase):
+    @given(data=st.data(), components=st.lists(SAFE_COMPONENT, min_size=1, max_size=4, unique=True),
+           supplied_pull=st.booleans())
+    def test_latest_lifecycle_batch_model(self, data, components, supplied_pull):
+        labels = ["label-" + component for component in components]
+        present = data.draw(st.sets(st.sampled_from(labels), max_size=len(labels)), label="present labels")
+        actors = ("User-A", "User-B", "github-actions[bot]", "with_underscore")
+        permissions = {actor: data.draw(st.sampled_from(("none", "read", "write", "admin")), label=actor + " permission")
+                       for actor in actors[:2]}
+        # Unique IDs avoid conflicting equal ordering keys; equal timestamps remain allowed.
+        records = data.draw(st.lists(st.tuples(st.sampled_from(labels + ["noise-label"]),
+                                               st.sampled_from(("labeled", "unlabeled")), st.sampled_from(actors),
+                                               st.integers(0, 5), st.sampled_from((-420, 0, 330))), max_size=16), label="events")
+        for name in labels:
+            if name in present and not any(record[0] == name for record in records):
+                records.append((name, "labeled", "User-A", 0, 0))
+        timeline = []
+        expected = {name: DENIED for name in labels}
+        selected = {}
+        for event_id, (name, lifecycle, actor, seconds, offset) in enumerate(records, 1):
+            utc = datetime(2026, 9, 17, 12) + timedelta(seconds=seconds)
+            local = utc + timedelta(minutes=offset)
+            zone = "Z" if offset == 0 else f"{'+' if offset >= 0 else '-'}{abs(offset)//60:02}:{abs(offset)%60:02}"
+            timeline.append(event(event_id, name=name, event=lifecycle, login=actor,
+                                  created_at=local.strftime("%Y-%m-%dT%H:%M:%S") + zone))
+            if name in present:
+                candidate = (seconds, event_id, lifecycle, actor)
+                if name not in selected or candidate[:2] > selected[name][:2]:
+                    selected[name] = candidate
+        expected_actors = []
+        for name in labels:
+            if name not in selected:
+                continue
+            _, event_id, lifecycle, actor = selected[name]
+            if lifecycle == "labeled" and actor in actors[:2]:
+                if actor not in expected_actors:
+                    expected_actors.append(actor)
+                if permissions[actor] in ("write", "admin"):
+                    expected[name] = approved(actor, event_id)
+        order = data.draw(st.permutations(tuple(range(len(timeline)))), label="timeline permutation")
+        shuffled = [timeline[index] for index in order]
+        page_count = data.draw(st.integers(1, 4), label="timeline pages")
+        pull = {"labels": [label(name) for name in present]}
+        for sequence in (timeline, shuffled):
+            table = {PULL: pull}
+            for index in range(page_count):
+                start, end = index * len(sequence) // page_count, (index + 1) * len(sequence) // page_count
+                headers = {"link": '<https://attacker.test/endpoint>; rel="next"'} if index < page_count - 1 else {}
+                table[f"{REPO_PATH}/issues/42/timeline?per_page=100&page={index + 1}"] = json_response(sequence[start:end], headers=headers)
+            for actor, permission in permissions.items():
+                table[f"{REPO_PATH}/collaborators/{actor}/permission"] = {"permission": permission, "role_name": "ignored"}
+            client, transport = route_client(table)
+            result = authorization.authorize_labels(client, 42, labels, pull_request=pull if supplied_pull else None)
+            self.assertEqual(result, expected)
+            expected_urls = [] if supplied_pull else [PULL]
+            if present:
+                expected_urls += [f"{REPO_PATH}/issues/42/timeline?per_page=100&page={index + 1}" for index in range(page_count)]
+                expected_urls += [f"{REPO_PATH}/collaborators/{actor}/permission" for actor in expected_actors]
+            self.assertEqual(transport.urls(), expected_urls)
+            serialized = authorization._batch_outputs(result)
+            self.assertEqual(serialized["approved"], "true" if any(value.approved for value in expected.values()) else "false")
+            self.assertEqual(json.loads(serialized["approvals"]), {
+                name: {"approved": "true" if value.approved else "false", "approver": value.approver or "",
+                       "approval_event_id": "" if value.approval_event_id is None else str(value.approval_event_id)}
+                for name, value in expected.items()})
+
+    @given(component=SAFE_COMPONENT)
+    def test_permission_categories(self, component):
+        for permission in ("none", "read", "write", "admin"):
+            table = routes(permission=permission)
+            table[PERMISSION]["role_name"] = component
+            client, transport = route_client(table)
+            self.assertEqual(authorize(client, 42, "safe-to-test"), approved("trusted-maintainer", 303)
+                             if permission in ("write", "admin") else DENIED)
+            self.assertEqual(transport.urls(), [PULL, TIMELINE, PERMISSION])
+        for bad in (None, [], {}, {"permission": None}, {"permission": True}, {"permission": "owner"},
+                    {"permission": "maintain"}, {"permission": "triage"}):
+            table = routes()
+            table[PERMISSION] = json_response(bad)
+            client, transport = route_client(table)
+            with self.assertRaises(ActionError):
+                authorize(client, 42, "safe-to-test")
+            self.assertEqual(transport.urls(), [PULL, TIMELINE, PERMISSION])
+
+    @given(component=SAFE_COMPONENT)
+    def test_required_label_categories_before_requests(self, component):
+        valid = " " + component + " "
+        self.assertEqual(authorization.parse_required_label(valid), valid)
+        for bad in (None, (), [], [None], [1], [""], [" \t"], [component, component]):
+            client, transport = route_client({})
+            with self.assertRaises(ActionError):
+                authorization.authorize_labels(client, 42, bad)
+            self.assertEqual(transport.requests, [])
+
+    @given(event_id=st.integers(1, 2**53 - 1))
+    def test_response_rejection_categories(self, event_id):
+        cases = [
+            (PULL, None, [PULL]), (PULL, {"labels": "safe-to-test"}, [PULL]),
+            (PULL, {"labels": [{}]}, [PULL]), (TIMELINE, {"events": []}, [PULL, TIMELINE]),
+            (TIMELINE, [{"id": event_id}], [PULL, TIMELINE]),
+            (TIMELINE, [{"event": "labeled", "id": event_id}], [PULL, TIMELINE]),
+            (TIMELINE, [event(event_id, name="different-label")], [PULL, TIMELINE]),
+        ]
+        for bad_id in (True, None, 0, -1, 2**53, "1", 1.0):
+            cases.append((TIMELINE, [event(bad_id)], [PULL, TIMELINE]))
+        for timestamp in (None, "yesterday", "2026-02-30T12:00:00Z"):
+            cases.append((TIMELINE, [event(event_id, created_at=timestamp)], [PULL, TIMELINE]))
+        for actor in (None, "", " trusted-maintainer", "trusted-maintainer\napproved=true", "trusted-maintainer\r"):
+            cases.append((TIMELINE, [event(event_id, login=actor)], [PULL, TIMELINE]))
+        for path, body, expected_urls in cases:
+            table = routes()
+            table[path] = json_response(body)
+            client, transport = route_client(table)
+            with self.assertRaises(ActionError):
+                authorize(client, 42, "safe-to-test")
+            self.assertEqual(transport.urls(), expected_urls)
+
+    @given(component=SAFE_COMPONENT)
+    def test_unrelated_record_validation_precedence(self, component):
+        ignored = [{"event": "commented", "id": None, "actor": None},
+                   {"event": "labeled", "label": {"name": "unrelated-" + component}, "id": None, "actor": None}]
+        table = routes()
+        table[TIMELINE] = ignored + [event(303)]
+        client, transport = route_client(table)
+        try:
+            result = authorize(client, 42, "safe-to-test")
+        except ActionError as error:
+            self.fail(f"Unrelated records must be filtered before ID/actor validation; requests {transport.urls()}: {error}")
+        self.assertEqual(result, approved("trusted-maintainer", 303))
+        self.assertEqual(transport.urls(), [PULL, TIMELINE, PERMISSION])
+        # Lifecycle label validation happens before filtering; event schema validation is unconditional.
+        for bad in ({"event": "labeled"}, {"event": None}, None):
+            table[TIMELINE] = [bad, event(303)]
+            client, transport = route_client(table)
+            with self.assertRaises(ActionError):
+                authorize(client, 42, "safe-to-test")
+            self.assertEqual(transport.urls(), [PULL, TIMELINE])
+        table[PULL] = {"labels": []}
+        client, transport = route_client(table)
+        self.assertEqual(authorize(client, 42, "safe-to-test"), DENIED)
+        self.assertEqual(transport.urls(), [PULL])
 
 
 if __name__ == "__main__":

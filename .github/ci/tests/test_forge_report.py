@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import unittest
+
+from hypothesis import given, strategies as st
 
 from ci_actions import forge_report
 from ci_actions.docker_plan import load_manifest
@@ -10,6 +13,12 @@ from ci_actions.forge_report import PRODUCER, report_comments, run_url
 from ci_actions.github import ActionError
 from ci_actions.run_binding import RunBinding
 from tests.helpers import REPO_PATH, REPOSITORY, SHA, RouteTransport, action_env, read_outputs
+from tests.property_support import POSITIVE_ID, REPOSITORY as REPO_STRATEGY, SAFE_COMPONENT, configure_profiles
+
+configure_profiles()
+
+RESULTS = ("action_required", "cancelled", "failure", "neutral", "skipped",
+           "stale", "startup_failure", "success", "timed_out")
 
 STALE_SHA = "fedcba9876543210fedcba9876543210fedcba98"
 RUN_ID = 1234
@@ -61,6 +70,29 @@ def run_main(transport: RouteTransport) -> dict[str, str]:
 
 
 class ReportCommentTests(unittest.TestCase):
+    def test_rejects_boolean_and_float_marker_run_ids(self):
+        binding = RunBinding(PRODUCER, 1, 99, SHA, "contributor/aptos-core", "feature/forge-report")
+        for value in (True, 1.0):
+            jobs = marker_jobs()
+            jobs[0]["run_id"] = value
+            with self.subTest(value=value), self.assertRaises(ActionError):
+                report_comments(MARKERS[:1], jobs[:1], binding)
+
+    def test_run_url_rejects_empty_userinfo(self):
+        for url in ("https://@github.com", "https://:@github.com"):
+            with self.subTest(url=url), self.assertRaises(ActionError):
+                run_url(url, REPOSITORY, RUN_ID)
+
+    def test_run_url_malformed_hosts_and_ports_raise_action_error(self):
+        for url in ("https://[github.com", "https://github.com:no", "https://github.com:65536",
+                    "https://github.com:-1", "https://github.com:\uff11"):
+            with self.subTest(url=url), self.assertRaises(ActionError):
+                run_url(url, REPOSITORY, RUN_ID)
+
+    def test_run_url_preserves_enterprise_path_and_valid_port(self):
+        self.assertEqual("https://git.example:8443/enterprise/owner/repo/actions/runs/1",
+                         run_url("https://git.example:8443/enterprise/", "owner/repo", 1))
+
     def test_duplicate_marker_fails_and_absent_marker_is_not_reported(self):
         jobs = marker_jobs()
         with self.assertRaisesRegex(ActionError, "at most one"):
@@ -125,6 +157,70 @@ class ReportMainTests(unittest.TestCase):
                           api(marker_jobs(), workflow_path=".github/workflows/other.yaml")):
             with self.subTest(transport=transport), self.assertRaises(ActionError):
                 run_main(transport)
+
+
+class ForgeReportProperties(unittest.TestCase):
+    @given(states=st.lists(st.one_of(st.none(), st.sampled_from(RESULTS)),
+                          min_size=len(MARKERS), max_size=len(MARKERS)),
+           run_id=POSITIVE_ID, job_id=POSITIVE_ID, unrelated=st.lists(SAFE_COMPONENT, max_size=8))
+    def test_marker_projection_uses_trusted_fields_and_order(self, states, run_id, job_id, unrelated):
+        binding = RunBinding(PRODUCER, run_id, 99, SHA, "contributor/aptos-core", "feature/report")
+        jobs = [
+            {"id": job_id + index, "run_id": run_id, "head_sha": SHA, "name": marker.id,
+             "status": "completed", "conclusion": state, "header": "@attacker", "title": "[untrusted]"}
+            for index, (marker, state) in enumerate(zip(MARKERS, states)) if state is not None
+        ]
+        jobs.extend([{"name": "unrelated-" + name, "conclusion": []} for name in unrelated])
+        jobs.extend([None, {}, {"name": "${{ matrix.marker }}", "conclusion": "skipped"}])
+        expected = [{"key": marker.id, "header": marker.comment_header, "title": marker.title, "result": state}
+                    for marker, state in zip(MARKERS, states) if state not in (None, "skipped")]
+        self.assertEqual(expected, report_comments(MARKERS, jobs, binding))
+        self.assertEqual(expected, report_comments(MARKERS, list(reversed(jobs)), binding))
+        self.assertEqual({"include": expected}, json.loads(json.dumps({"include": report_comments(MARKERS, jobs, binding)})))
+
+    def test_every_marker_rejection_category(self):
+        for conclusion in RESULTS:
+            jobs = marker_jobs()
+            jobs[0]["conclusion"] = conclusion
+            expected = [] if conclusion == "skipped" else [{
+                "key": MARKERS[0].id, "header": MARKERS[0].comment_header,
+                "title": MARKERS[0].title, "result": conclusion,
+            }]
+            self.assertEqual(expected, report_comments(MARKERS[:1], jobs[:1], BINDING))
+        for field, values in {
+            "id": (None, True, 0, -1, 1.0, "1", [], {}),
+            "run_id": (None, True, 0, -1, 1234.0, "1234", [], {}, 1235),
+            "head_sha": (None, [], "f" * 40),
+            "status": (None, [], "in_progress"),
+            "conclusion": (None, [], {}, True, 1, "", "unknown"),
+        }.items():
+            for value in values:
+                jobs = marker_jobs()
+                jobs[0][field] = value
+                with self.subTest(field=field, value=value), self.assertRaises(ActionError):
+                    report_comments(MARKERS[:1], jobs[:1], BINDING)
+        for marker_index in range(len(MARKERS)):
+            jobs = marker_jobs()
+            with self.subTest(marker=marker_index), self.assertRaisesRegex(ActionError, "at most one"):
+                report_comments(MARKERS, jobs + [jobs[marker_index]], BINDING)
+
+    @given(host=SAFE_COMPONENT, repository=REPO_STRATEGY, run_id=POSITIVE_ID,
+           port=st.integers(min_value=1, max_value=65535), path=st.lists(SAFE_COMPONENT, max_size=3),
+           trailing=st.integers(min_value=0, max_value=3))
+    def test_https_url_preserves_enterprise_prefix(self, host, repository, run_id, port, path, trailing):
+        server = f"https://{host}.example:{port}" + ("/" + "/".join(path) if path else "")
+        self.assertEqual(f"{server}/{repository}/actions/runs/{run_id}",
+                         run_url(server + "/" * trailing, repository, run_id))
+        for bad in (server.replace("https:", "http:", 1), server + "?x=1", server + "#x",
+                    server.replace("https://", "https://user:password@", 1),
+                    server.replace("https://", "https://@", 1)):
+            with self.assertRaises(ActionError):
+                run_url(bad, repository, run_id)
+
+    def test_url_missing_host_and_plain_scheme_rejection(self):
+        for server in ("", "github.com", "https://", "https:///path", "ftp://github.com"):
+            with self.subTest(server=server), self.assertRaises(ActionError):
+                run_url(server, REPOSITORY, RUN_ID)
 
 
 if __name__ == "__main__":

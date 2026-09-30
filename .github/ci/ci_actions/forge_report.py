@@ -52,6 +52,7 @@ def report_comments(markers: Iterable[Marker], jobs: list[Any], binding: RunBind
         if (
             type(job_id) is not int
             or job_id <= 0
+            or type(job.get("run_id")) is not int
             or job.get("run_id") != binding.run_id
             or job.get("head_sha") != binding.head_sha
             or job.get("status") != "completed"
@@ -72,12 +73,17 @@ def report_comments(markers: Iterable[Marker], jobs: list[Any], binding: RunBind
 
 
 def run_url(server_url: str, repository: str, run_id: int) -> str:
-    parts = urllib.parse.urlsplit(server_url)
+    try:
+        parts = urllib.parse.urlsplit(server_url)
+        # Accessing port validates its syntax and range, including Unicode digits.
+        parts.port
+    except ValueError as error:
+        raise ActionError("server URL contains a malformed host or port") from error
     if (
         parts.scheme != "https"
         or not parts.hostname
-        or parts.username
-        or parts.password
+        or parts.username is not None
+        or parts.password is not None
         or parts.query
         or parts.fragment
     ):

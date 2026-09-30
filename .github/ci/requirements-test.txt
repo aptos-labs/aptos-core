@@ -1,0 +1,9 @@
+# Test-only dependencies for CPython 3.12 on Linux and macOS (x86_64/arm64).
+# Wheel hashes from https://pypi.org/pypi/<package>/<version>/json.
+hypothesis==6.168.3 \
+    --hash=sha256:bff12e036b67abc5ded682f724f4d7afaff5223190270a0763695f218c079068 \
+    --hash=sha256:c73c6188056e6dc110260e39d141c69c3d02f23e3ba1d8610c7a8b6f2510ec96 \
+    --hash=sha256:bb1063cb794765097b8c0add598bd34a904f44dc15db81275dd1f0ed1ac567ed \
+    --hash=sha256:9b2d47f5d9060b049039bef0b267e88480f6468f95ee394e514e84a81ccdc5f5
+sortedcontainers==2.4.0 \
+    --hash=sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0

@@ -79,6 +79,26 @@ class PrCiControlTestsWorkflowTest < Minitest::Test
     assert_includes script, "cargo test -p aptos-indexer-transaction-generator --test ci_helper"
   end
 
+  def test_python_contracts_install_hashed_test_dependencies_in_an_isolated_environment
+    job = @jobs.fetch("python_contracts")
+    steps = job.fetch("steps")
+    setup = steps.find { |step| step["uses"].to_s.start_with?("actions/setup-python@") }
+    assert_equal "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065", setup.fetch("uses")
+    assert_equal "3.12", setup.fetch("with").fetch("python-version")
+    install = steps.find { |step| step["name"] == "Install Python test dependencies" }
+    run = steps.find { |step| step["name"] == "Run Python contract tests" }
+    assert_operator steps.index(install), :<, steps.index(run)
+    assert_includes install.fetch("run"), 'python3 -m venv "$RUNNER_TEMP/ci-contract-tests-venv"'
+    assert_includes install.fetch("run"), "--require-hashes --only-binary=:all: -r .github/ci/requirements-forge-test.txt"
+    assert_includes run.fetch("run"), 'source "$RUNNER_TEMP/ci-contract-tests-venv/bin/activate"'
+    assert_equal "ci", run.fetch("env").fetch("HYPOTHESIS_PROFILE")
+    assert_equal "python3 .github/ci/run_python_tests.py", run.fetch("run").lines.last.strip
+    runner = File.read(File.join(ROOT, ".github/ci/run_python_tests.py"))
+    %w[central micro-report e2e-report forge faucet-images e2e-images offline-images].each do |suite|
+      assert_includes runner, %Q{"#{suite}":}
+    end
+  end
+
   def test_ruby_contracts_discover_every_workflow_test_file
     script = @jobs.fetch("ruby_contracts").fetch("steps").map { |step| step["run"] }.compact.join("\n")
 

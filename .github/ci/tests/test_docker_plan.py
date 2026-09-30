@@ -8,6 +8,13 @@ import json
 import unittest
 from unittest import mock
 
+from hypothesis import given, strategies as st
+
+from tests.property_support import configure_profiles
+from tests.planning_support import expected_plan, expected_statuses, manifest_graphs
+
+configure_profiles()
+
 from ci_actions import docker_plan
 from ci_actions.authorization import Authorization
 from ci_actions.docker_plan import (
@@ -130,7 +137,9 @@ class ManifestTests(unittest.TestCase):
                 parse_manifest(mutated(mutator))
 
     def test_global_job_namespace_rejects_collisions(self):
-        workload = lambda v: capability(v, "run_e2e")["workloads"][1]  # noqa: E731
+        def workload(value):
+            return capability(value, "run_e2e")["workloads"][1]
+
         cases = [
             lambda v: workload(v).update(id="pr-rust-images-local"),
             lambda v: workload(v).update(id="pr-publish-rust-images"),
@@ -253,7 +262,9 @@ class PlanTests(unittest.TestCase):
         def move(v):
             capability(v, "run_multiregion")["workloads"].append(capability(v, "run_framework_upgrade")["workloads"].pop())
         manifest = parse_manifest(mutated(move))
-        only = lambda cid: {c.id: granted(0) if c.id == cid else DENIED for c in manifest.capabilities}  # noqa: E731
+        def only(cid):
+            return {c.id: granted(0) if c.id == cid else DENIED for c in manifest.capabilities}
+
         self.assertFalse(build_plan(manifest, only("run_framework_upgrade"), False)["workloads"]["pr-forge-framework-upgrade"])
         self.assertTrue(build_plan(manifest, only("run_multiregion"), False)["workloads"]["pr-forge-framework-upgrade"])
 
@@ -422,6 +433,7 @@ class StatusTests(unittest.TestCase):
                                forge_e2e_test=False, forge_compat_test=False),
                     evaluate_statuses(MANIFEST, needs),
                 )
+
     def test_workload_failure_fails_every_dependent_check(self):
         needs = needs_for({"run_e2e", "run_forge_performance"},
                           pr_node_cli_faucet_tests="failure", pr_forge_performance="cancelled")
@@ -479,6 +491,134 @@ class StatusTests(unittest.TestCase):
         for count in range(len(ids) + 1):
             for approved in itertools.combinations(ids, count):
                 self.assertEqual(all_checks(True), evaluate_statuses(MANIFEST, needs_for(set(approved))))
+
+
+class PlanningPropertyTests(unittest.TestCase):
+    @given(manifest_graphs())
+    def test_generated_graph_has_exact_plan_and_canonical_serialization(self, graph):
+        raw, approved, docs_only = graph
+        manifest = parse_manifest(json.dumps(raw))
+        auth = {cid: granted(i) if flag else DENIED for i, (cid, flag) in enumerate(approved.items())}
+        expected = expected_plan(raw, auth, docs_only)
+        actual = build_plan(manifest, auth, docs_only)
+        self.assertEqual(expected, actual)
+        canonical = json.dumps(expected, separators=(",", ":"), ensure_ascii=True)
+        self.assertEqual(canonical, serialize_plan(actual))
+        self.assertEqual(expected, parse_plan(manifest, canonical))
+        # Whitespace and key order are part of the handoff contract.
+        for altered in (json.dumps(expected, indent=2), json.dumps(expected, sort_keys=True)):
+            if altered != canonical:
+                with self.assertRaises(ActionError):
+                    parse_plan(manifest, altered)
+
+    @given(manifest_graphs())
+    def test_generated_manifest_and_approval_contracts_fail_closed(self, graph):
+        raw, approved, docs_only = graph
+        manifest = parse_manifest(json.dumps(raw))
+        auth = {cid: granted(i) if flag else DENIED for i, (cid, flag) in enumerate(approved.items())}
+        mutations = []
+        extra = copy.deepcopy(raw)
+        extra["unknown"] = True
+        mutations.append(extra)
+        for key in ("variants", "capabilities"):
+            duplicate = copy.deepcopy(raw)
+            duplicate[key].append(copy.deepcopy(duplicate[key][0]))
+            mutations.append(duplicate)
+        for change in ({"local": []}, {"local": ["unknown-variant"]}, {"publish": ["unknown-variant"]},
+                       {"label": "${{ injected }}"}):
+            candidate = copy.deepcopy(raw)
+            candidate["capabilities"][0].update(change)
+            mutations.append(candidate)
+        duplicate_local = copy.deepcopy(raw)
+        duplicate_local["capabilities"][0]["local"].append(duplicate_local["capabilities"][0]["local"][0])
+        mutations.append(duplicate_local)
+        if len(raw["variants"]) > 1:
+            outside_local = copy.deepcopy(raw)
+            outside_local["capabilities"][0].update(local=[raw["variants"][0]["id"]],
+                                                    publish=[raw["variants"][1]["id"]])
+            mutations.append(outside_local)
+        for candidate in mutations:
+            with self.assertRaises(ActionError):
+                parse_manifest(json.dumps(candidate))
+        cid = next(iter(auth))
+        for invalid in (Authorization("true", "maintainer", 1), Authorization(True, "", 1),
+                        Authorization(True, "bad login", 1), Authorization(True, "maintainer", True),
+                        Authorization(True, "maintainer", 0), Authorization(True, "maintainer", 2**53),
+                        Authorization(False, "maintainer", None), Authorization(False, None, 1)):
+            with self.assertRaises(ActionError):
+                build_plan(manifest, {**auth, cid: invalid}, docs_only)
+        for invalid in ({k: v for k, v in auth.items() if k != cid}, {**auth, "unknown": DENIED}):
+            with self.assertRaises(ActionError):
+                build_plan(manifest, invalid, docs_only)
+        for invalid in ("true", 1, None):
+            with self.assertRaises(ActionError):
+                build_plan(manifest, auth, invalid)
+
+    @given(manifest_graphs())
+    def test_generated_graph_queries_docs_only_for_sensitive_approved_workload(self, graph):
+        raw, approved, docs_only = graph
+        manifest = parse_manifest(json.dumps(raw))
+        auth = {cid: granted(i) if flag else DENIED for i, (cid, flag) in enumerate(approved.items())}
+        by_label = {c["label"]: auth[c["id"]] for c in raw["capabilities"]}
+        needs_docs = any(approved[c["id"]] and w["docs_sensitive"]
+                         for c in raw["capabilities"] for w in c["workloads"])
+        with mock.patch.object(docker_plan, "pull_request_is_docs_only") as unrelated:
+            docs = mock.Mock(return_value=docs_only)
+            authorize = mock.Mock(side_effect=by_label.__getitem__)
+            plan = docker_plan.compute_plan(manifest, authorize, docs)
+        self.assertEqual(expected_plan(raw, auth, docs_only if needs_docs else False), plan)
+        self.assertEqual([mock.call(c["label"]) for c in raw["capabilities"]], authorize.call_args_list)
+        self.assertEqual(int(needs_docs), docs.call_count)
+        unrelated.assert_not_called()
+
+    @given(manifest_graphs(), st.lists(st.sampled_from(["success", "failure", "cancelled", "skipped"]),
+                                      min_size=13, max_size=13))
+    def test_generated_statuses_aggregate_shared_checks_and_publication(self, graph, conclusions):
+        raw, approved, docs_only = graph
+        manifest = parse_manifest(json.dumps(raw))
+        auth = {cid: granted(i) if flag else DENIED for i, (cid, flag) in enumerate(approved.items())}
+        plan = expected_plan(raw, auth, docs_only)
+        jobs = [AUTHORIZATION_JOB, LOCAL_JOB, PUBLISH_JOB, *plan["workloads"]]
+        results = dict(zip(jobs, conclusions))
+        def verify(current):
+            needs = {job: {"result": result, "outputs": {}} for job, result in current.items()}
+            needs[AUTHORIZATION_JOB]["outputs"] = {"plan": serialize_plan(plan)}
+            self.assertEqual(expected_statuses(raw, plan, current), evaluate_statuses(manifest, needs))
+        verify(results)
+        matching = {AUTHORIZATION_JOB: "success",
+                    LOCAL_JOB: "success" if plan["local"]["enabled"] else "skipped",
+                    PUBLISH_JOB: "success" if plan["publish"]["enabled"] else "skipped",
+                    **{job: "success" if enabled else "skipped" for job, enabled in plan["workloads"].items()}}
+        for job in jobs:
+            for conclusion in ("success", "failure", "cancelled", "skipped"):
+                verify({**matching, job: conclusion})
+
+    @given(st.sampled_from([0, 1, 99, 100, 101, 199, 200, 201, 299]),
+           st.sampled_from([".md", ".rs", ".MD"]),
+           st.sampled_from([None, "old.md", "old.rs", "old.MD", 7]), st.integers(0, 298))
+    def test_docs_only_checks_complete_rename_paths_and_pagination(self, count, suffix, previous, index):
+        files = [{"filename": f"docs/file-{i}.md"} for i in range(count)]
+        if files:
+            entry = files[index % count]
+            entry["filename"] = "docs/changed" + suffix
+            if previous is not None:
+                entry["previous_filename"] = previous
+        routes = {PULL: {"changed_files": count}}
+        for page in range(1, count // 100 + 2):
+            routes[f"{FILES_PAGE}{page}"] = files[(page - 1) * 100:page * 100]
+        client, transport = route_client(routes)
+        expected = count > 0 and suffix == ".md" and (previous is None or previous == "old.md")
+        self.assertEqual(expected, pull_request_is_docs_only(client, 42))
+        pages = list(range(1, count // 100 + 2)) if count else []
+        self.assertEqual([PULL, *[f"{FILES_PAGE}{page}" for page in pages]], transport.urls())
+        if count:
+            for claimed in (max(1, count - 1), count + 1):
+                if claimed != count:
+                    mismatched = copy.deepcopy(routes)
+                    mismatched[PULL]["changed_files"] = claimed
+                    client, _ = route_client(mismatched)
+                    with self.assertRaises(ActionError):
+                        pull_request_is_docs_only(client, 42)
 
 
 if __name__ == "__main__":

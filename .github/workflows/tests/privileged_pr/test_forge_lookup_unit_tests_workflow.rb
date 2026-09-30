@@ -11,7 +11,7 @@ class ForgeLookupUnitTestsWorkflowTests < Minitest::Test
 
   FILE = "forge-lookup-unit-tests.yaml"
   PATH = ".github/workflows/#{FILE}"
-  INSTALL = "python -m pip install --disable-pip-version-check click==8.3.3 psutil==5.9.8 PyYAML==6.0.2"
+  INSTALL = '"$RUNNER_TEMP/forge-unit-tests-venv/bin/python" -m pip install --require-hashes --only-binary=:all: -r .github/ci/requirements-forge-test.txt'
 
   def workflow
     @workflow ||= load_workflow(FILE)
@@ -27,6 +27,11 @@ class ForgeLookupUnitTestsWorkflowTests < Minitest::Test
         "pull_request" => {
           "paths" => [
             ".github/workflows/#{FILE}",
+            ".github/ci/requirements-test.txt",
+            ".github/ci/requirements-forge-test.txt",
+            ".github/ci/run_python_tests.py",
+            ".github/ci/tests/property_support.py",
+            ".github/ci/tests/harness_support.py",
             "testsuite/determinator.py",
             "testsuite/find_latest_image.py",
             "testsuite/forge.py",
@@ -59,17 +64,21 @@ class ForgeLookupUnitTestsWorkflowTests < Minitest::Test
       {"ref" => "${{ github.event.pull_request.head.sha }}", "persist-credentials" => false},
       checkout.fetch("with"),
     )
-    assert_equal({"python-version" => "3.10"}, steps(job).find { |step| step["uses"] == PINS.fetch(:setup_python) }.fetch("with"))
+    assert_equal({"python-version" => "3.12"}, steps(job).find { |step| step["uses"] == PINS.fetch(:setup_python) }.fetch("with"))
     run_steps = steps(job).filter_map { |step| step["run"]&.strip }
-    assert_includes run_steps, INSTALL
+    install = steps(job).find { |step| step["name"] == "Install the Forge test dependencies" }
+    assert_includes install.fetch("run"), 'python -m venv "$RUNNER_TEMP/forge-unit-tests-venv"'
+    assert_includes install.fetch("run"), INSTALL
     tests = steps(job).find { |step| step["name"] == "Run the Forge unit tests" }
     assert_equal "testsuite", tests.fetch("working-directory")
-    assert_equal "python -m unittest forge_test", tests.fetch("run").strip
+    assert_equal '"$RUNNER_TEMP/forge-unit-tests-venv/bin/python" "$GITHUB_WORKSPACE/.github/ci/run_python_tests.py" --suite forge', tests.fetch("run").strip
+    assert_equal "ci", tests.fetch("env").fetch("HYPOTHESIS_PROFILE")
+    assert_operator steps(job).index(install), :<, steps(job).index(tests)
     run_steps.each { |script| refute_includes script, "${{" }
 
     smoke = steps(job).find { |step| step["name"] == "Check that the lookup script loads" }
     assert_equal "testsuite", smoke.fetch("working-directory")
-    assert_equal "python find_latest_image.py --help", smoke.fetch("run").strip
+    assert_equal '"$RUNNER_TEMP/forge-unit-tests-venv/bin/python" find_latest_image.py --help', smoke.fetch("run").strip
     assert_same steps(job).last, smoke
   end
 
