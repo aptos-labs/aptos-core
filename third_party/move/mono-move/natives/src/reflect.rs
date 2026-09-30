@@ -4,6 +4,10 @@
 //! Natives for the `reflect` module.
 
 use crate::{polymorphic_natives, NativeEntry};
+use aptos_types::move_stdlib::{
+    reflect::{is_forbidden_to_reflect, INVALID_IDENTIFIER},
+    result::{ERR_TAG as RESULT_ERR_TAG, OK_TAG as RESULT_OK_TAG},
+};
 use mono_move_core::{
     native::{
         native_invariant_violation, FunctionResolutionError, NativeContext, NativeContextFamily,
@@ -11,24 +15,7 @@ use mono_move_core::{
     },
     DescriptorId, VMResult, TRIVIAL_DESCRIPTOR_ID,
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-};
-
-// Variant tags of `std::result::Result`, in declaration order.
-const RESULT_OK_TAG: u64 = 0;
-const RESULT_ERR_TAG: u64 = 1;
-
-/// Code of `std::reflect::ReflectionError::InvalidIdentifier`. The remaining
-/// codes are the [`FunctionResolutionError`] discriminants.
-const INVALID_IDENTIFIER: u64 = 0;
-
-/// Functions reflection refuses to resolve, as `(module, function)` pairs at the
-/// framework address `0x1`. A function is forbidden when the bytecode verifier
-/// enforces its call-site rules, which a dynamically resolved function value
-/// cannot uphold.
-const FORBIDDEN_FRAMEWORK_FUNCTIONS: &[(&str, &str)] = &[("event", "emit")];
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 /// `0x1::reflect::native_resolve<FuncType>(addr: address, module_name: &String,
 /// func_name: &String): Result<FuncType, ReflectionError>`
@@ -47,10 +34,10 @@ pub fn native_resolve<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `address`.
     let address: AccountAddress = unsafe { ctx.arg(0)? };
     let (Some(module_name), Some(func_name)) = (read_name(ctx, 1)?, read_name(ctx, 2)?) else {
-        return err_result(ctx, INVALID_IDENTIFIER);
+        return err_result(ctx, INVALID_IDENTIFIER as u64);
     };
 
-    if is_forbidden_to_reflect(address, &module_name, &func_name) {
+    if is_forbidden_to_reflect(&address, &module_name, &func_name) {
         return err_result(ctx, FunctionResolutionError::FunctionNotAccessible as u64);
     }
 
@@ -59,9 +46,9 @@ pub fn native_resolve<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
         Err(err) => return err_result(ctx, err as u64),
     };
     // SAFETY: `func` has type `FuncType`, the `Ok` payload of return 0.
-    let out = unsafe { ctx.new_enum(result_descriptor(ctx)?, RESULT_OK_TAG, func)? };
+    let result = unsafe { ctx.new_enum(result_descriptor(ctx)?, RESULT_OK_TAG as u64, func)? };
     // SAFETY: return 0 is `Result<FuncType, ReflectionError>`.
-    unsafe { ctx.set_return(0, out)? };
+    unsafe { ctx.set_return(0, result)? };
     Ok(NativeStatus::Success)
 }
 
@@ -77,20 +64,6 @@ fn read_name<C: NativeContext>(ctx: &C, i: usize) -> VMResult<Option<Identifier>
     Ok(Identifier::from_utf8(bytes).ok())
 }
 
-/// Whether reflection refuses to resolve `address::module_name::func_name`.
-fn is_forbidden_to_reflect(
-    address: AccountAddress,
-    module_name: &IdentStr,
-    func_name: &IdentStr,
-) -> bool {
-    address == AccountAddress::ONE
-        && FORBIDDEN_FRAMEWORK_FUNCTIONS
-            .iter()
-            .any(|&(module, function)| {
-                module_name.as_str() == module && func_name.as_str() == function
-            })
-}
-
 /// Returns `Result::Err(code)` from the native.
 fn err_result<C: NativeContext>(ctx: &C, code: u64) -> VMResult<NativeStatus> {
     let descriptor = result_descriptor(ctx)?;
@@ -100,21 +73,19 @@ fn err_result<C: NativeContext>(ctx: &C, code: u64) -> VMResult<NativeStatus> {
     // SAFETY: the built value is a `ReflectionError`, the `Err` payload.
     let err = unsafe { ctx.new_enum(TRIVIAL_DESCRIPTOR_ID, code, ())? };
     // SAFETY: `err` is rooted, so the allocation below may collect.
-    let out = unsafe { ctx.new_enum(descriptor, RESULT_ERR_TAG, err)? };
+    let result = unsafe { ctx.new_enum(descriptor, RESULT_ERR_TAG as u64, err)? };
     // SAFETY: return 0 is `Result<FuncType, ReflectionError>`.
-    unsafe { ctx.set_return(0, out)? };
+    unsafe { ctx.set_return(0, result)? };
     Ok(NativeStatus::Success)
 }
 
 /// The object descriptor of the native's `Result<FuncType, ReflectionError>`
 /// return type, published when the call site was lowered.
 fn result_descriptor<C: NativeContext>(ctx: &C) -> VMResult<DescriptorId> {
-    let ty = ctx.return_type(0).ok_or_else(|| {
-        native_invariant_violation("reflect::native_resolve has no return type".to_string())
-    })?;
+    let ty = ctx.return_type(0)?;
     ctx.enum_descriptor(ty).ok_or_else(|| {
         native_invariant_violation(
-            "no object descriptor published for reflect::native_resolve's return type".to_string(),
+            "Descriptor ID for result type of `reflect::native_resolve` is not found".to_string(),
         )
     })
 }

@@ -6,7 +6,7 @@
 use crate::{
     compile::{compile, SourceKind},
     module_provider::InMemoryModuleProvider,
-    resource_provider::{features_storage, InMemoryResourceProvider},
+    resource_provider::{storage_with_default_features_for_test, InMemoryResourceProvider},
 };
 use anyhow::{anyhow, bail, Error, Result};
 use mono_move_core::{
@@ -210,7 +210,7 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     }
     // Framework code gates features on `exists<Features>(@std)`, so the
     // resource has to be there for those paths to run at all.
-    let storage = features_storage();
+    let storage = storage_with_default_features_for_test();
     let resource_provider = InMemoryResourceProvider::new(guard, &storage);
     let mut interp = InterpreterContext::new_with_options(
         loader,

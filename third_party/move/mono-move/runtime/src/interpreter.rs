@@ -106,26 +106,22 @@ pub(crate) unsafe fn write_closure_func_ref_and_mask(
     func_ref: &ClosureFuncRef,
     mask: u64,
 ) {
+    let (tag, payload) = match func_ref {
+        ClosureFuncRef::Resolved(func_ptr) => (
+            FUNC_REF_TAG_RESOLVED,
+            func_ptr.as_non_null().as_ptr() as *const u8,
+        ),
+        ClosureFuncRef::Unresolved(func_ref) => {
+            (FUNC_REF_TAG_UNRESOLVED, func_ref.as_raw_ptr() as *const u8)
+        },
+    };
     unsafe {
-        match func_ref {
-            ClosureFuncRef::Resolved(func_ptr) => {
-                *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = FUNC_REF_TAG_RESOLVED;
-                write_ptr(
-                    closure,
-                    CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
-                    func_ptr.as_non_null().as_ptr() as *const u8,
-                );
-            },
-            ClosureFuncRef::Unresolved(func_ref) => {
-                *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) =
-                    FUNC_REF_TAG_UNRESOLVED;
-                write_ptr(
-                    closure,
-                    CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
-                    func_ref.as_raw_ptr() as *const u8,
-                );
-            },
-        }
+        *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = tag;
+        write_ptr(
+            closure,
+            CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+            payload,
+        );
         write_u64(closure, CLOSURE_MASK_OFFSET, mask);
     }
 }
@@ -134,14 +130,16 @@ pub(crate) unsafe fn write_closure_func_ref_and_mask(
 /// a trait object. See [`LoaderAccess`].
 struct LoaderAdapter<'a, 'guard> {
     loader: &'a Loader<'guard, 'guard>,
-    /// Shared because [`LoaderAccess`] takes `&self`. As in
-    /// [`ProductionNativeContext`], at most one borrow is live at a time.
+    /// Held in an [`UnsafeCell`] because [`LoaderAccess`] takes `&self` but the
+    /// loader needs the read-set by `&mut`. As in [`ProductionNativeContext`],
+    /// at most one borrow is live at a time.
     read_set: UnsafeCell<&'a mut ModuleReadSet<'guard>>,
 }
 
 impl LoaderAccess for LoaderAdapter<'_, '_> {
     fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
-        // SAFETY: the read-set is borrowed sharedly and the borrow ends here.
+        // SAFETY: this is the only borrow of the read-set, and it does not
+        // outlive the call.
         let read_set = unsafe { &**self.read_set.get() };
         resolve_resource_group!(self.loader, read_set, ty)
     }
@@ -153,8 +151,8 @@ impl LoaderAccess for LoaderAdapter<'_, '_> {
         func_name: &IdentStr,
         expected_ty: InternedType,
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
-        // SAFETY: the read-set is reborrowed exclusively here; no other borrow
-        // is live.
+        // SAFETY: this is the only borrow of the read-set, and it does not
+        // outlive the call.
         let read_set = unsafe { &mut **self.read_set.get() };
         self.loader
             .resolve_function(read_set, gas_meter, module_id, func_name, expected_ty)
