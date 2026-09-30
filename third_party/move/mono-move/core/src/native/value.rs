@@ -177,20 +177,16 @@ impl<'a> VMValue<'a> for TableHandle {
 }
 
 impl Ref<'_, TableHandle> {
-    /// Borrows the referenced table handle.
-    pub fn get(&self) -> &TableHandle {
+    /// Reads the referenced table handle out by value.
+    pub fn get(&self) -> TableHandle {
         // SAFETY: `TableHandle` is `repr(transparent)` over the address bytes the
-        // reference points at, so the referent reinterprets as `&TableHandle`.
-        unsafe { &*(self.ptr() as *const TableHandle) }
+        // reference points at, and a frame slot is not guaranteed to be aligned.
+        TableHandle(unsafe { core::ptr::read_unaligned(self.ptr() as *const AccountAddress) })
     }
 }
 
 impl Ref<'_, AccountAddress> {
     /// Reads the referenced address out by value.
-    ///
-    /// Unlike [`Ref<TableHandle>::get`] this hands back no borrow: callers pass
-    /// the result into context methods that may collect, which would relocate
-    /// the referent.
     pub fn get(&self) -> AccountAddress {
         // SAFETY: the reference points at a live `address`, and a frame slot is
         // not guaranteed to be aligned.

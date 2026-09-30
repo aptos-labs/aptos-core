@@ -155,8 +155,7 @@ fn resource_types_for_native(
 
     if module_id == storage_slot
         && (func_name == interner.identifier_of(ident_str!("borrow_storage_slot_resource"))
-            || func_name
-                == interner.identifier_of(ident_str!("borrow_storage_slot_resource_mut")))
+            || func_name == interner.identifier_of(ident_str!("borrow_storage_slot_resource_mut")))
     {
         return callee_ty_args.get(1).copied().into_iter().collect();
     }

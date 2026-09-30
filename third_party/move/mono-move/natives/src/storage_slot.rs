@@ -10,7 +10,7 @@
 use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeStatus, Ref},
-    types::{view_type, Type},
+    types::is_resource_type,
     VMResult,
 };
 use move_core_types::account_address::AccountAddress;
@@ -28,7 +28,7 @@ fn borrow<C: NativeContext>(ctx: &C, mutable: bool) -> VMResult<NativeStatus> {
     let address = slot.get();
 
     let resource_ty = ctx.ty_arg(1)?;
-    if !matches!(view_type(resource_ty), Type::Nominal { .. }) {
+    if !is_resource_type(resource_ty) {
         return Ok(NativeStatus::Abort {
             code: NOT_A_RESOURCE_TYPE,
             message: Some("Storage slot resource type argument must be a struct type".to_string()),
