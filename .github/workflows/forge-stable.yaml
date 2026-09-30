@@ -272,12 +272,10 @@ jobs:
       SEND_RESULTS_TO_TRUNK: true
       FORGE_CONTINUOUS_TEST_MODE: true
 
-  # PR validation of find_latest_image.py against the registry. GAR refuses
-  # anonymous reads, so the lookup needs registry credentials and runs only
-  # after a privileged-pr-ci reviewer approves this exact SHA. The secretless
-  # unit tests run in forge-lookup-unit-tests.yaml on pull_request.
+  # Credentialed registry lookup uses only the trusted base implementation.
+  # PR lookup changes are tested without credentials in forge-lookup-unit-tests.yaml.
   pr-lookup-live:
-    name: Protected live image lookup
+    name: Trusted registry lookup health
     if: ${{ github.event_name == 'pull_request_target' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -293,7 +291,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           {
-            echo "## Protected Forge Stable image lookup"
+            echo "## Trusted Forge Stable registry health"
+            echo "This check runs the base implementation. PR lookup changes run in the secretless unit-test workflow."
             echo "Repository: \`$SOURCE_REPOSITORY\`"
             echo "PR: \`$PR_NUMBER\`"
             echo "Exact source SHA: \`$SOURCE_SHA\`"
@@ -307,12 +306,6 @@ jobs:
           path: trusted-base
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Check out and verify the exact PR source
-        uses: ./trusted-base/.github/actions/checkout-exact-pr-source
-        with:
-          source_repository: ${{ github.event.pull_request.head.repo.full_name }}
-          source_sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Python without a dependency cache
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
@@ -335,8 +328,6 @@ jobs:
           access_token_lifetime: 900
           create_credentials_file: false
 
-      # PR code runs here, inside trusted-base/, and can rewrite it. Keep this
-      # the last step so that no local action loads after it.
-      - name: Run the PR image lookup against trusted history
+      - name: Run the trusted image lookup against trusted history
         working-directory: trusted-base
-        run: python ../pr-source/testsuite/find_latest_image.py --variant failpoints
+        run: python testsuite/find_latest_image.py --variant failpoints

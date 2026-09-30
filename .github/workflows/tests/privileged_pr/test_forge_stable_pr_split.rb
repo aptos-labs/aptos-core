@@ -3,13 +3,7 @@
 require "minitest/autorun"
 require_relative "../workflow_test_helper"
 
-# Forge Stable's PR lookup is split by trust. The secretless unit tests run in
-# forge-lookup-unit-tests.yaml on pull_request, because under
-# pull_request_target unapproved PR code could write the base branch's Actions
-# cache. This workflow runs from the base branch (pull_request_target), and PR
-# code comes only from the exact head SHA in pr-source/. A privileged-pr-ci
-# job runs the PR's lookup against the registry, which refuses anonymous
-# reads. Credentialed jobs are dispatch-only.
+# PR unit tests are secretless; authenticated live lookup uses trusted base code.
 class ForgeStablePrSplitTests < Minitest::Test
   include WorkflowTestHelper
 
@@ -29,7 +23,7 @@ class ForgeStablePrSplitTests < Minitest::Test
     "source_sha" => "${{ github.event.pull_request.head.sha }}",
   }.freeze
   INSTALL = "python -m pip install --disable-pip-version-check click==8.3.3 psutil==5.9.8"
-  LOOKUP_STEP = "Run the PR image lookup against trusted history"
+  LOOKUP_STEP = "Run the trusted image lookup against trusted history"
 
   def workflow
     @workflow ||= load_workflow(FILE)
@@ -84,6 +78,7 @@ class ForgeStablePrSplitTests < Minitest::Test
 
   def test_live_lookup_job_is_gated_by_the_fixed_environment
     live = job("pr-lookup-live")
+    assert_equal "Trusted registry lookup health", live.fetch("name")
     assert_equal PR_ONLY, live.fetch("if")
     refute live.key?("needs")
     assert_equal 15, live.fetch("timeout-minutes")
@@ -102,7 +97,7 @@ class ForgeStablePrSplitTests < Minitest::Test
     live = job("pr-lookup-live")
     live_steps = steps(live)
     lookup = named_step("pr-lookup-live", LOOKUP_STEP)
-    # The lookup runs inside trusted-base/ and can rewrite it, so it must be last.
+    # The live lookup loads only trusted code.
     assert_equal live_steps.length - 1, live_steps.index(lookup)
 
     trusted = checkout_steps(live).first
@@ -111,10 +106,8 @@ class ForgeStablePrSplitTests < Minitest::Test
       {"ref" => BASE_SHA, "path" => "trusted-base", "fetch-depth" => 0, "persist-credentials" => false},
       trusted.fetch("with"),
     )
-    source = exact_source_step(live)
-    assert_equal "./trusted-base/.github/actions/checkout-exact-pr-source", source.fetch("uses")
-    assert_equal PR_SOURCE, source.fetch("with")
-    assert_operator live_steps.index(trusted), :<, live_steps.index(source)
+    refute live.to_s.include?("pr-source")
+    assert_equal 1, checkout_steps(live).length
 
     refute live_steps.any? { |step| step["uses"].to_s.start_with?("./pr-source/") }
     live_steps.select { |step| step["uses"].to_s.start_with?("./") }.each do |step|
@@ -138,7 +131,7 @@ class ForgeStablePrSplitTests < Minitest::Test
     )
 
     assert_equal "trusted-base", lookup.fetch("working-directory")
-    assert_equal "python ../pr-source/testsuite/find_latest_image.py --variant failpoints", lookup.fetch("run").strip
+    assert_equal "python testsuite/find_latest_image.py --variant failpoints", lookup.fetch("run").strip
   end
 
   def test_pr_job_shell_commands_read_values_only_from_env
