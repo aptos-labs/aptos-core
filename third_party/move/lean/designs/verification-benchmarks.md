@@ -284,7 +284,8 @@ the standard library and the `gh` CLI:
   Lean toolchain, the runner, the CPU model, the thread count (8 by
   default), and per problem the median result and its repeats. A problem
   that times out or crashes is recorded with that status, and the run
-  continues. The executable runs directly, in the environment `lake env`
+  continues. Messages name files relative to the repository root, as the
+  manifest does, so runs on different checkouts read alike. The executable runs directly, in the environment `lake env`
   gives it; the Move CLI is `APTOS_MOVE_CLI` or the checkout's
   `target/ci/move`.
 - `history [--window N] [--branch main]` fetches the results of the last

@@ -131,6 +131,12 @@ def command_of(problem, executable, out):
     return command
 
 
+def repository_relative(text):
+    """A message with the files it names relative to the repository root, as
+    the problems name them, so that runs on different checkouts read alike."""
+    return text.replace(f"{REPO}/", "")
+
+
 def attempt(problem, executable, env, workdir):
     """One run of a problem in its own process group, under its timeout;
     the result with the CPU time of the process tree added."""
@@ -169,9 +175,11 @@ def attempt(problem, executable, env, workdir):
     if process.returncode != 0 or not out.exists():
         tail = log.read_text(errors="replace").splitlines()[-20:]
         return {"status": "crashed", "exit": process.returncode, "wall_ms": {"total": wall_ms},
-                "cpu_ms": cpu_ms, "error_messages": tail}
+                "cpu_ms": cpu_ms, "error_messages": [repository_relative(line) for line in tail]}
     result = json.loads(out.read_text())
     result["cpu_ms"] = cpu_ms
+    result["error_messages"] = [repository_relative(message)
+                                for message in result.get("error_messages", [])]
     return result
 
 
