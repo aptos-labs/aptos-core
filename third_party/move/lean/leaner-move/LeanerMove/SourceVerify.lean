@@ -109,8 +109,8 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
       | none =>
           if ← source.isDir then
             if modules.isEmpty then
-              pure (LeanerMove.Frontend.Cli.filterTargets
-                (← LeanerMove.Frontend.Cli.exportPackage source) filter)
+              LeanerMove.Frontend.Cli.filterTargets
+                (← LeanerMove.Frontend.Cli.exportPackage source) filter
             else LeanerMove.Frontend.Cli.exportModules source modules
           else LeanerMove.Frontend.Cli.exportMoveFiles [source]
     let package ← withProofFiles package

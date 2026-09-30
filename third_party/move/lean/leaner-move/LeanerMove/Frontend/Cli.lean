@@ -105,10 +105,14 @@ def selectedBy (filter : Option String) (module : Module) : Bool :=
       (System.FilePath.fileName source).any fun name => (name.splitOn part).length > 1
   | none => true
 
-/-- The package with the modules `filter` selects as its targets. -/
-def filterTargets (package : Package) (filter : Option String) : Package :=
-  { package with modules := package.modules.map fun module =>
-      { module with isTarget := selectedBy filter module } }
+/-- The package with the modules `filter` selects as its targets. A filter
+selecting no module is an error, not a run that verifies nothing. -/
+def filterTargets (package : Package) (filter : Option String) : IO Package := do
+  if let some part := filter then
+    unless package.modules.any (selectedBy filter) do
+      throw <| IO.userError s!"no module matches the filter `{part}`"
+  return { package with modules := package.modules.map fun module =>
+    { module with isTarget := selectedBy filter module } }
 
 /-- Reads an existing export of a package, made by `move exchange --format
 ast`, for verification: with `packageDir`, the modules outside the package's
@@ -127,7 +131,7 @@ def readExportDir (dir : System.FilePath) (packageDir : Option System.FilePath)
       if targets.isEmpty then
         throw <| IO.userError s!"no module of the package {packageDir} matches the filter"
       pure { modules := targets ++ (linked ++ split.dependencies).map ({ · with isTarget := false }) }
-  | none => pure (filterTargets package filter)
+  | none => filterTargets package filter
 
 /-- Exports a Move package (`--package-dir`) and decodes its modules;
 `includeDeps` also exports the dependency modules with source. -/
@@ -168,6 +172,9 @@ def exportModules (dir : System.FilePath) (selectors : Array String) : IO Packag
     run exe (commandArgs ++ #["--format", "ast", "--package-dir", dir.toString,
       "--export-dir", tmp.toString, "--modules", ",".intercalate selectors.toList])
     let package ← readXastDir tmp
+    for selector in selectors do
+      unless package.modules.any (matchesSelector · selector) do
+        throw <| IO.userError s!"the export of {dir} holds no module `{selector}`"
     let selected (module : Module) := selectors.any (matchesSelector module)
     let (targets, linked) := package.modules.partition selected
     pure { modules := targets ++ linked.map ({ · with isTarget := false }) }
