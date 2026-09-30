@@ -9,7 +9,7 @@ input with a 32-byte result, and does not abort. A native with neither a
 specification nor a model is rejected, as the Prover rejects it. -/
 
 leaner module std::hash where
-  native fun sha3_256(data : Vector<u8>) -> Vector<u8>
+  public native fun sha3_256(data : Vector<u8>) -> Vector<u8>
 
 leaner module 0x49::digests where
   use std::hash::sha3_256

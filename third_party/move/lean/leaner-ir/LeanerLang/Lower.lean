@@ -1760,6 +1760,21 @@ private def resolveLocalRef (segments : Array String) (span : Span) :
       "cross-profile calls require a validated boundary adapter" (some span)
   let some declaration := sourceFunction? sourceNs localName
     | failAt "LEANER-CALL-NAME" s!"unknown function `{localName}`" (some span)
+  -- Another Move module's function is callable as Move allows: a public one,
+  -- a friend one from a module it names a friend, and a package one from a
+  -- module at its address, as Move compiles package visibility to friends
+  -- among the package's modules, which share their address.
+  if sourceNs.profile == .move && owner != state.sourceNamespace.path then
+    let caller := state.sourceNamespace.path
+    let visible := match declaration.modifiers.visibility with
+      | .public_ => true
+      | .friend => sourceNs.friends.any (·.path == caller)
+      | .package => owner[0]? == caller[0]?
+      | .private_ => false
+    unless visible do
+      failAt "LEANER-CALL-VISIBILITY"
+        s!"`{"::".intercalate (owner.push localName).toList}` is not visible from \
+          `{"::".intercalate caller.toList}`" (some span)
   let some namespaceId := namespaceId? state.tables owner
     | failAt "LEANER-CALL-NAME" s!"function namespace `{"::".intercalate owner.toList}` was not interned"
         (some span)
