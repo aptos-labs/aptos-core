@@ -348,11 +348,15 @@ removed problem stops.
 
 The workflow `.github/workflows/leaner-bench.yaml`:
 
-- **Triggers.** `workflow_dispatch` only. Repository policy prohibits
-  GitHub cron: PIES dispatches the nightly on `main`, registered in
-  `internal-ops` as the nightly full suite is
+- **Triggers.** `workflow_dispatch` for the nightly. Repository policy
+  prohibits GitHub cron: PIES dispatches the nightly on `main`, registered
+  in `internal-ops` as the nightly full suite is
   (`devtools/aptos-cargo-cli/README.md`). Manual dispatch takes
-  `problems` (a subset) and `window`.
+  `problems` (a subset) and `window`; GitHub dispatches only a workflow
+  that is on the default branch. A pull request of this repository (not a
+  fork) runs the benchmark on its head when it carries the
+  `CICD:run-leaner-bench` label, again on every push while it does, and
+  its report compares it with `main`'s nightlies.
 - **Job `bench`.** The dedicated benchmark runner of the execution
   performance test (`benchmark-c3d-60`), in its concurrency group
   (`execution-benchmark-benchmark-c3d-60`, queued, never cancelled), so that
@@ -420,9 +424,10 @@ after, on the same idle machine.
 5. **History and Slack** (written, not yet run). The `report` job, the HTML
    and step summary, and the Slack post; the PIES registration in
    `internal-ops` remains.
-6. **Optional: pull requests.** A label runs the benchmark on a pull request
-   and posts a sticky comment comparing it with `main`'s history, as the
-   mono-move benchmark does.
+6. **Pull requests** (label written, not yet run). The `CICD:run-leaner-bench`
+   label runs the benchmark on a pull request, with the comparison in the
+   job summary. A sticky comment, as the mono-move benchmark posts, remains
+   open.
 
 ## Open decisions
 

@@ -19,6 +19,10 @@ on:
         type: choice
         options: ["10", "30", "60", "90"]
         default: "30"
+  # A pull request of this repository runs it on request, with the
+  # `CICD:run-leaner-bench` label, and is compared with main's nightlies.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -30,6 +34,14 @@ concurrency:
 
 jobs:
   bench:
+    # Untrusted pull request code runs on a self-hosted runner: forks are
+    # excluded.
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-leaner-bench') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
     # The dedicated runner of the execution performance test, in its queue,
     # so no other benchmark shares the machine.
     runs-on: benchmark-c3d-60
@@ -41,6 +53,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # The pull request's head, not its merge with the base.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - uses: ./.github/actions/rust-setup
@@ -114,7 +128,7 @@ jobs:
         run: |
           python3 third_party/move/lean/scripts/leaner-bench.py report \
             --current "$RUNNER_TEMP/current/results.json" --window "$WINDOW" \
-            --branch "$GITHUB_REF_NAME" \
+            --branch main \
             --html "$RUNNER_TEMP/leaner-bench-report.html" \
             --markdown "$RUNNER_TEMP/summary.md" --slack "$RUNNER_TEMP/slack.json"
           cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
