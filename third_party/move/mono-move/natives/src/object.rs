@@ -7,7 +7,7 @@ use crate::{monomorphic_natives, polymorphic_natives, NativeEntry};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus},
-    types::{view_type, Type},
+    types::is_resource_type,
     VMResult,
 };
 use move_core_types::account_address::AccountAddress;
@@ -86,7 +86,7 @@ pub fn native_exists_at<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // and trip an invariant violation instead of aborting. The framework's
     // `key` bound rules it out in source, but the native cannot rely on that.
     let ty = ctx.ty_arg(0)?;
-    if !matches!(view_type(ty), Type::Nominal { .. }) {
+    if !is_resource_type(ty) {
         return Ok(NativeStatus::Abort {
             code: NOT_A_RESOURCE_TYPE,
             message: Some("Object type argument must be a resource (struct) type".to_string()),
