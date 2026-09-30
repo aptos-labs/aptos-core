@@ -3,6 +3,14 @@
 # Owners for the `.github` directory and all its subdirectories.
 /.github/ @aptos-labs/prod-eng
 
+# Replay-verify workflows: co-owned by the move team, which maintains replay-verify infra too.
+/.github/workflows/provision-replay-verify-archive-disks.yaml @aptos-labs/prod-eng @aptos-labs/move
+/.github/workflows/replay-verify-mainnet.yaml @aptos-labs/prod-eng @aptos-labs/move
+/.github/workflows/replay-verify-testnet.yaml @aptos-labs/prod-eng @aptos-labs/move
+/.github/workflows/workflow-run-replay-verify-archive-storage-provision.yaml @aptos-labs/prod-eng @aptos-labs/move
+/.github/workflows/workflow-run-replay-verify-on-archive.yaml @aptos-labs/prod-eng @aptos-labs/move
+/.github/workflows/workflow-run-replay-verify.yaml @aptos-labs/prod-eng @aptos-labs/move
+
 # Owners for the `/api` directory and all its subdirectories.
 /api/ @aptos-labs/developer-platform
 
@@ -126,6 +134,9 @@
 
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng
+
+# Owners for the replay-verify test infra: co-owned by the move team and prod-eng.
+/testsuite/replay-verify/ @aptos-labs/move @aptos-labs/prod-eng
 
 # Owners for third_party/move
 /third_party/move/ @aptos-labs/move
