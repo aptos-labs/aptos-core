@@ -301,14 +301,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         Ok(())
     }
 
-    /// Resolves `module_id::func_name` at the function type `expected_ty` into
-    /// the symbolic identity of the instantiation to call, inferring the type
-    /// arguments from `expected_ty`. The defining module is loaded, so the
-    /// read-set records it and gas pays for it; the function itself is neither
-    /// loaded nor lowered.
-    ///
-    /// The checks and their order mirror the legacy VM: the error codes are
-    /// part of the Move-visible reflection API.
+    /// Resolves `module_id::func_name` and checks its type matches the
+    /// expected type. If the type turns out to be different, resolution fails.
     pub fn resolve_function(
         &self,
         read_set: &mut ModuleReadSet<'guard>,
@@ -319,6 +313,15 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
         use FunctionResolutionError::*;
 
+        // Every load that succeeds leaves the entry loaded, so a pending entry
+        // means an earlier load of this module failed and left it behind.
+        // Resolution is the one caller that survives a failed load, so it has
+        // to fail the same way again instead of tripping over the leftover.
+        let id = self.guard.arena_ref_for_module_id(module_id);
+        if matches!(read_set.get(id), Some(ModuleRead::Pending)) {
+            return Ok(Err(FunctionNotFound));
+        }
+
         let module = match self.get_or_load_module(read_set, gas_meter, module_id) {
             Ok(module) => module,
             Err(err) if err.kind() == ExecutionErrorKind::LinkingError => {
@@ -326,13 +329,13 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             },
             Err(err) => return Err(err),
         };
-        // Preparing the module interned every identifier it declares, so a name
-        // absent from the interner names nothing in it. Probing keeps a
-        // caller-supplied name out of the interner.
-        let Some(func_name) = self.guard.lookup_identifier(func_name) else {
-            return Ok(Err(FunctionNotFound));
-        };
-        let func_name = func_name.into_global_arena_ptr();
+        // TODO(security): a caller-supplied name that names nothing still ends
+        // up in the process-global interner. Same class as the `TODO(metering)`
+        // on `ExecutionGuard::intern_identifier_internal`.
+        let func_name = self
+            .guard
+            .intern_identifier(func_name)
+            .into_global_arena_ptr();
         let Some(def_idx) = module.function_def_idx(func_name) else {
             return Ok(Err(FunctionNotFound));
         };
