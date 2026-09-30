@@ -23,8 +23,8 @@ pub struct FrameSlot {
 /// interpreter consults on every dispatch.
 ///
 /// Invariants (validated by [`Self::new`]): `args` and `returns` are each
-/// sorted by offset and non-overlapping, and `heap_ptr_offsets` is sorted
-/// ascending.
+/// sorted by offset and non-overlapping, `heap_ptr_offsets` is sorted
+/// ascending, and `return_types` is parallel to `returns`.
 #[derive(Debug, Clone)]
 pub struct NativeABI {
     args: Vec<FrameSlot>,
@@ -47,20 +47,25 @@ pub enum NativeABIError {
     Unsorted { kind: &'static str, idx: usize },
     #[error("{kind} slot {idx} overlaps with previous slot")]
     Overlap { kind: &'static str, idx: usize },
+    #[error("{returns} return slots but {return_types} return types")]
+    ReturnTypeCountMismatch { returns: usize, return_types: usize },
 }
 
 impl IntoExecutionError for NativeABIError {
     fn kind(&self) -> ExecutionErrorKind {
         use NativeABIError::*;
         match self {
-            Unsorted { .. } | Overlap { .. } => ExecutionErrorKind::InvariantViolation,
+            Unsorted { .. } | Overlap { .. } | ReturnTypeCountMismatch { .. } => {
+                ExecutionErrorKind::InvariantViolation
+            },
         }
     }
 }
 
 impl NativeABI {
     /// Safe constructor for a NativeABI that also validates the ABI is well-formed.
-    /// `args` and `returns` must be sorted by offset and must not overlap.
+    /// `args` and `returns` must be sorted by offset and must not overlap, and
+    /// `return_types` must have one entry per return slot.
     pub fn new(
         args: Vec<FrameSlot>,
         returns: Vec<FrameSlot>,
@@ -71,6 +76,12 @@ impl NativeABI {
         check_well_formed(&args, "arg")?;
         check_well_formed(&returns, "return")?;
         check_sorted(&heap_ptr_offsets)?;
+        if returns.len() != return_types.len() {
+            return Err(NativeABIError::ReturnTypeCountMismatch {
+                returns: returns.len(),
+                return_types: return_types.len(),
+            });
+        }
         let args_end = args.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
         let returns_end = returns.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
         Ok(Self {

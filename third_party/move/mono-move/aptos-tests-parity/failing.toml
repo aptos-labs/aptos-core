@@ -876,7 +876,7 @@ name = "e2e-move-tests::e2e_move_tests$tests::object_code_deployment::freeze_cod
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_rotation_capability_rejected_in_multisig_payload"
-note = "TODO"
+note = "MonoMove does not execute multisig payloads."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::per_category_gas_limits::io_limit_reached_by_load_resource"

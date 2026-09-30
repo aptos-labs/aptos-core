@@ -293,7 +293,7 @@ pub trait NativeContext {
     fn required_descriptor(&self, i: usize) -> Option<DescriptorId>;
 
     /// Type of the native's `i`-th return value.
-    fn return_type(&self, i: usize) -> Option<InternedType>;
+    fn return_type(&self, i: usize) -> VMResult<InternedType>;
 
     /// Boxes the by-value argument `value_arg` into a fresh heap object built
     /// from `descriptor`, returning an owned handle that stays live for the
