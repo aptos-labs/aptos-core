@@ -10,7 +10,7 @@ class PrivilegedPrWorkflowTests < Minitest::Test
 
   WORKFLOWS = {
     "workflow-run-docker-rust-publish-pr.yaml" => "publish-images",
-    "workflow-run-pr-e2e-tests.yaml" => "e2e-tests",
+    "workflow-run-pr-e2e-tests.yaml" => "prepare-images",
     "workflow-run-forge-pr.yaml" => "forge",
   }.freeze
 

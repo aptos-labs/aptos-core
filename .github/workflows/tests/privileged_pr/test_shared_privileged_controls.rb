@@ -21,7 +21,6 @@ class SharedPrivilegedControlTests < Minitest::Test
   REGISTRIES = ["us-docker.pkg.dev", "us-west1-docker.pkg.dev"].freeze
   # file => [job, first step that runs PR code]
   PRIVILEGED_WORKFLOWS = {
-    "workflow-run-pr-e2e-tests.yaml" => ["e2e-tests", "Verify checked-in API specifications"],
     "workflow-run-forge-pr.yaml" => ["forge", "Run pre-Forge checks with explicit image tags"],
   }.freeze
 
@@ -127,14 +126,12 @@ class SharedPrivilegedControlTests < Minitest::Test
     assert_required_source_inputs(runtime)
     assert_equal "composite", runtime.dig("runs", "using")
     action_steps = runtime.dig("runs", "steps")
-    assert_equal 4, action_steps.length
-    prerequisites, source, auth, tags = action_steps
+    assert_equal 3, action_steps.length
+    prerequisites, auth, tags = action_steps
     %w[GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT_EMAIL GCP_DOCKER_ARTIFACT_REPO].each do |name|
       assert_includes prerequisites.fetch("run"), "test -n \"$#{name}\"", name
     end
-    assert_equal EXACT_SOURCE_ACTION, source.fetch("uses")
-    assert_equal({"source_repository" => "${{ inputs.source_repository }}", "source_sha" => "${{ inputs.source_sha }}"},
-                 source.fetch("with"))
+    refute action_steps.any? { |step| step.fetch("uses", "") == EXACT_SOURCE_ACTION }
     assert_equal GCP_REGISTRY_ACTION, auth.fetch("uses")
     assert_equal(
       {
@@ -252,6 +249,17 @@ class SharedPrivilegedControlTests < Minitest::Test
     refute steps(publisher).any? { |step| step.to_s.include?("pr-source") }
     assert_equal "build-images", publisher.fetch("needs")
 
+    e2e_jobs = jobs(load_workflow("workflow-run-pr-e2e-tests.yaml"))
+    prepare = e2e_jobs.fetch("prepare-images")
+    e2e = e2e_jobs.fetch("e2e-tests")
+    assert_equal "privileged-pr-ci", prepare.fetch("environment")
+    assert_nil exact_source_step(prepare)
+    refute steps(prepare).any? { |step| step.to_s.include?("pr-source") }
+    assert_equal({"contents" => "read"}, e2e.fetch("permissions"))
+    refute e2e.key?("environment")
+    assert_equal "prepare-images", e2e.fetch("needs")
+    assert_operator assert_trusted_checkout(e2e), :<, steps(e2e).index(exact_source_step(e2e))
+
     PRIVILEGED_WORKFLOWS.each do |file, (job_name, first_source_step)|
       job = jobs(load_workflow(file)).fetch(job_name)
       job_steps = steps(job)
@@ -265,24 +273,19 @@ class SharedPrivilegedControlTests < Minitest::Test
       end
       assert_nil exact_source_step(job), file
       registry_refreshes = job_steps.select { |step| step["uses"] == REFRESHED_GCP_REGISTRY_ACTION }
-      assert_equal(file == "workflow-run-pr-e2e-tests.yaml" ? 0 : 1, registry_refreshes.length, file)
+      assert_equal 1, registry_refreshes.length, file
 
       execution = job_steps.find { |step| step["name"] == first_source_step }
       assert_operator trusted_index, :<, job_steps.index(setup), file
       assert_operator job_steps.index(setup), :<, job_steps.index(execution), file
-      if file == "workflow-run-forge-pr.yaml"
-        assert_equal "trusted-base", execution.fetch("working-directory"), file
-        refute job_steps.any? { |step| step.to_s.include?("pr-source") }, file
-      else
-        assert_equal "pr-source", execution.fetch("working-directory"), file
-      end
+      assert_equal "trusted-base", execution.fetch("working-directory"), file
       refute job_steps.any? { |step| step["run"].to_s.include?("docker-bake-rust-all.sh") }, file
       registry_refreshes.each { |step| assert_operator job_steps.index(step), :<, job_steps.index(execution), file }
       refute execution.fetch("env", {}).key?("CUSTOM_IMAGE_TAG_PREFIX"), file
-      # No step may load PR-owned action code: the job mints registry credentials
-      # before PR code runs, so a "./pr-source/..." step would hand it those credentials.
+      # The credentialed job runs only trusted-base code and uses PR identity as data.
       refute job_steps.any? { |step| step["uses"].to_s.start_with?("./pr-source/") }, file
-      # Before PR code runs, local actions must come from an exact trusted checkout.
+      refute job_steps.any? { |step| step.to_s.include?("pr-source") }, file
+      # Local actions must come from an exact trusted checkout.
       before_execution = job_steps.take(job_steps.index(execution))
       before_execution.select { |step| step["uses"].to_s.start_with?("./") }.each do |step|
         assert_match %r{\A\./trusted-(?:base|refresh)/}, step.fetch("uses"), "#{file}: #{step["name"]}"

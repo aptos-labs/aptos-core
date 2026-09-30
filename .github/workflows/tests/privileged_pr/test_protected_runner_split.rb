@@ -9,7 +9,7 @@ class ProtectedRunnerSplitTests < Minitest::Test
   def test_protected_jobs_require_rollout_gate_and_distinct_fleets
     {"workflow-run-docker-rust-publish-pr.yaml" => ["publish-images", "build"],
      "workflow-run-forge-pr.yaml" => ["forge", "forge"],
-     "workflow-run-pr-e2e-tests.yaml" => ["e2e-tests", "e2e"]}.each do |file, (id, fleet)|
+     "workflow-run-pr-e2e-tests.yaml" => ["prepare-images", "e2e"]}.each do |file, (id, fleet)|
       job = jobs(load_workflow(file)).fetch(id)
       assert_equal "vars.PROTECTED_RUNNERS_ENABLED == 'true'", job.fetch("if")
       assert_equal "runs-on/fleet=aptos-protected-#{fleet}/env=protected", job.fetch("runs-on")
@@ -23,6 +23,12 @@ class ProtectedRunnerSplitTests < Minitest::Test
     refute steps(build).any? { |step| step["uses"].to_s.include?("gcp-registry-auth") }
     assert_equal "build-images", jobs(load_workflow("workflow-run-docker-rust-publish-pr.yaml"))
       .fetch("publish-images").fetch("needs")
+    e2e = jobs(load_workflow("workflow-run-pr-e2e-tests.yaml")).fetch("e2e-tests")
+    assert_equal "vars.PROTECTED_RUNNERS_ENABLED == 'true'", e2e.fetch("if")
+    assert_equal "runs-on/fleet=aptos-protected-e2e/env=protected", e2e.fetch("runs-on")
+    assert_equal({"contents" => "read"}, e2e.fetch("permissions"))
+    refute e2e.key?("environment")
+    assert_equal "prepare-images", e2e.fetch("needs")
   end
 
   def test_consumers_require_protected_build_and_select_its_artifact_id

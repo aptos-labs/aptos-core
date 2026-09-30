@@ -30,15 +30,15 @@ permissions:
   contents: read
 
 jobs:
-  e2e-tests:
+  prepare-images:
     if: vars.PROTECTED_RUNNERS_ENABLED == 'true'
     environment: privileged-pr-ci
     runs-on: runs-on/fleet=aptos-protected-e2e/env=protected
     permissions:
       contents: read
       id-token: write
-    env:
-      GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+    outputs:
+      archive_id: ${{ steps.upload-e2e-images.outputs.artifact-id }}
     steps:
       - name: Record the protected deployment approval scope
         env:
@@ -62,16 +62,13 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Prepare the protected runtime from trusted base code
-        id: setup
-        uses: ./trusted-base/.github/actions/privileged-pr-runtime-setup
+      - name: Authenticate to protected image registries
+        uses: ./trusted-base/.github/actions/gcp-registry-auth
         with:
-          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
-          source_sha: ${{ inputs.SOURCE_SHA }}
-          pr_number: ${{ inputs.PR_NUMBER }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+          create_credentials_file: false
+          access_token_lifetime: 5400
 
       - name: Require one artifact ID from the protected producer
         env:
@@ -100,44 +97,93 @@ jobs:
           variant: ${{ inputs.VARIANT }}
           artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
 
+      - name: Prepare the offline E2E image archive
+        uses: ./trusted-base/.github/actions/image-archive
+        with:
+          mode: prepare-e2e
+          directory: ${{ runner.temp }}/e2e-image-output
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          base_sha: ${{ inputs.BASE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          variant: ${{ inputs.VARIANT }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
+      - name: Upload the immutable offline E2E image archive
+        id: upload-e2e-images
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: protected-e2e-images-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.VARIANT }}
+          path: ${{ runner.temp }}/e2e-image-output
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 1
+
+  e2e-tests:
+    needs: prepare-images
+    if: vars.PROTECTED_RUNNERS_ENABLED == 'true'
+    runs-on: runs-on/fleet=aptos-protected-e2e/env=protected
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the exact trusted event base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.BASE_SHA }}
+          path: trusted-base
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out the exact PR source without credentials
+        uses: ./trusted-base/.github/actions/checkout-exact-pr-source
+        with:
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          path: pr-source
+
+      - name: Require one prepared archive artifact ID
+        env:
+          ARCHIVE_ID: ${{ needs.prepare-images.outputs.archive_id }}
+        run: |
+          [[ "$ARCHIVE_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Missing prepared E2E archive ID"; exit 1; }
+
+      - name: Download the prepared E2E image archive by ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.prepare-images.outputs.archive_id }}
+          path: ${{ runner.temp }}/e2e-image-input
+          merge-multiple: true
+
+      - name: Load and validate the offline E2E images
+        uses: ./trusted-base/.github/actions/image-archive
+        with:
+          mode: load-e2e
+          directory: ${{ runner.temp }}/e2e-image-input
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+          base_sha: ${{ inputs.BASE_SHA }}
+          pr_number: ${{ inputs.PR_NUMBER }}
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          variant: ${{ inputs.VARIANT }}
+          artifact_repo: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
+
       - name: Record protected test inputs
         env:
           SOURCE_REPOSITORY: ${{ inputs.SOURCE_REPOSITORY }}
           SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
           PR_NUMBER: ${{ inputs.PR_NUMBER }}
-          IMAGE_TAG: ${{ env.PR_IMAGE_TAG }}
         run: |
           {
             echo "## Protected PR image tests"
             echo "Repository: \`$SOURCE_REPOSITORY\`"
             echo "PR: \`$PR_NUMBER\`"
             echo "Exact source SHA: \`$SOURCE_SHA\`"
-            echo "Immutable image tag: \`$IMAGE_TAG\`"
+            echo "Offline image tag: \`$PR_IMAGE_TAG\`"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Refresh Google Cloud authentication for protected tests
-        id: gcp-test-auth
-        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
-        with:
-          create_credentials_file: false
-          token_format: access_token
-          access_token_lifetime: 5400
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: Refresh the US multi-region registry login for protected tests
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
-        with:
-          registry: us-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.gcp-test-auth.outputs.access_token }}
-
-      - name: Refresh the us-west1 registry login for protected tests
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
-        with:
-          registry: us-west1-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.gcp-test-auth.outputs.access_token }}
 
       - name: Create API specification output directory
         run: mkdir -p "$RUNNER_TEMP/specs"
@@ -148,9 +194,9 @@ jobs:
           max_attempts: 3
           timeout_minutes: 20
           command: >-
-            docker run --rm
+            docker run --rm --pull=never
             --mount=type=bind,source=$RUNNER_TEMP/specs,target=/specs
-            ${PROTECTED_TOOLS_IMAGE}
+            ${GCP_DOCKER_ARTIFACT_REPO}/tools:${PR_IMAGE_TAG}
             aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
 
       - name: Generate JSON API specification
@@ -159,9 +205,9 @@ jobs:
           max_attempts: 3
           timeout_minutes: 20
           command: >-
-            docker run --rm
+            docker run --rm --pull=never
             --mount=type=bind,source=$RUNNER_TEMP/specs,target=/specs
-            ${PROTECTED_TOOLS_IMAGE}
+            ${GCP_DOCKER_ARTIFACT_REPO}/tools:${PR_IMAGE_TAG}
             aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       - name: Verify checked-in API specifications

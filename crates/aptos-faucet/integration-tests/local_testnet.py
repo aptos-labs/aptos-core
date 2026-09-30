@@ -4,6 +4,7 @@
 # This file contains functions for running the localnet.
 
 import logging
+import os
 import subprocess
 import time
 
@@ -46,7 +47,7 @@ def run_node(network: Network, image_repo_with_project: str, external_test_dir: 
             "docker",
             "run",
             "--pull",
-            "always",
+            "never" if os.environ.get("APTOS_E2E_OFFLINE_IMAGES") == "true" else "always",
             "--name",
             container_name,
             "--detach",

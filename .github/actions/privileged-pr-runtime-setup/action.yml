@@ -1,5 +1,5 @@
 name: Prepare a privileged PR runtime
-description: Run the trusted-base setup that must finish before PR-controlled code runs
+description: Authenticate trusted orchestration without checking out or executing PR code
 
 inputs:
   source_repository:
@@ -52,12 +52,6 @@ runs:
         test -n "$GCP_SERVICE_ACCOUNT_EMAIL" || { echo "::error::privileged-pr-ci lacks GCP_SERVICE_ACCOUNT_EMAIL"; exit 1; }
         test -n "$GCP_DOCKER_ARTIFACT_REPO" || { echo "::error::privileged-pr-ci lacks GCP_DOCKER_ARTIFACT_REPO"; exit 1; }
 
-    - name: Check out and verify the exact approved PR revision
-      uses: ./trusted-base/.github/actions/checkout-exact-pr-source
-      with:
-        source_repository: ${{ inputs.source_repository }}
-        source_sha: ${{ inputs.source_sha }}
-
     - name: Authenticate to Google Cloud from the protected environment
       uses: ./trusted-base/.github/actions/gcp-registry-auth
       with:
@@ -66,8 +60,6 @@ runs:
         workload_identity_provider: ${{ inputs.workload_identity_provider }}
         service_account: ${{ inputs.service_account }}
 
-    # docker-bake-rust-all.sh runs from the PR checkout, so trusted code derives
-    # the expected tag and passes its prefix to the build.
     - name: Derive the protected image tag
       id: tags
       shell: bash
