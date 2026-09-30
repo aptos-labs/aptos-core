@@ -12,7 +12,10 @@ use move_core_types::{
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use parking_lot::RwLock;
-use std::hash::{Hash, Hasher};
+use std::{
+    hash::{Hash, Hasher},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 struct PseudoGasContext {
     // Parameters for metering type tag construction:
@@ -215,6 +218,14 @@ pub(crate) struct PricedStructTag {
 /// fixed type parameters used by thread 3.
 pub struct TypeTagCache {
     cache: RwLock<HashMap<StructKey, PricedStructTag>>,
+    /// Sum of pseudo-gas costs of all cached entries, used to bound the size of the cache at block
+    /// boundaries. The pseudo-gas cost of a tag is proportional to the memory it occupies, so this
+    /// is a better proxy for the size of the cache than the number of entries: entries range from
+    /// a few hundred bytes to several kilobytes each.
+    ///
+    /// Only ever modified while holding the write lock on `cache` above, which keeps the two in
+    /// sync without any additional synchronization.
+    total_pseudo_gas_cost: AtomicU64,
 }
 
 impl TypeTagCache {
@@ -222,17 +233,26 @@ impl TypeTagCache {
     pub(crate) fn empty() -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),
+            total_pseudo_gas_cost: AtomicU64::new(0),
         }
     }
 
     /// Removes all entries from the cache.
     pub(crate) fn flush(&self) {
-        self.cache.write().clear();
+        let mut cache = self.cache.write();
+        cache.clear();
+        self.total_pseudo_gas_cost.store(0, Ordering::Relaxed);
     }
 
     /// Returns the number of entries in the cache.
     pub fn len(&self) -> usize {
         self.cache.read().len()
+    }
+
+    /// Returns the sum of pseudo-gas costs of all cached entries. Can be used to bound the size of
+    /// the cache at block boundaries.
+    pub fn total_pseudo_gas_cost(&self) -> u64 {
+        self.total_pseudo_gas_cost.load(Ordering::Relaxed)
     }
 
     /// Returns cached struct tag and its pseudo-gas cost if it exists, and [None] otherwise.
@@ -269,12 +289,17 @@ impl TypeTagCache {
             ty_args: ty_args.to_vec(),
         };
         let priced_struct_tag = priced_struct_tag.clone();
+        let pseudo_gas_cost = priced_struct_tag.pseudo_gas_cost;
 
         // Otherwise, we need to insert. We did the clones outside the lock, and also avoid the
         // double insertion.
         let mut cache = self.cache.write();
         if let Entry::Vacant(entry) = cache.entry(key) {
             entry.insert(priced_struct_tag);
+            // The cost must be accounted here, and not next to the early return above: that check
+            // runs without the write lock, so multiple threads can observe the entry as missing.
+            self.total_pseudo_gas_cost
+                .fetch_add(pseudo_gas_cost, Ordering::Relaxed);
             true
         } else {
             false
@@ -543,6 +568,34 @@ mod tests {
     }
 
     #[test]
+    fn test_type_tag_cache_total_pseudo_gas_cost() {
+        let cache = TypeTagCache::empty();
+        assert_eq!(cache.total_pseudo_gas_cost(), 0);
+
+        let foo_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
+            pseudo_gas_cost: 10,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(0), &[], &foo_tag));
+        assert_eq!(cache.total_pseudo_gas_cost(), 10);
+
+        let bar_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Bar").unwrap(),
+            pseudo_gas_cost: 32,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(1), &[], &bar_tag));
+        assert_eq!(cache.total_pseudo_gas_cost(), 42);
+
+        // Inserting an entry that is already cached does not change the total.
+        assert!(!cache.insert_struct_tag(&StructNameIndex::new(1), &[], &bar_tag));
+        assert_eq!(cache.total_pseudo_gas_cost(), 42);
+
+        cache.flush();
+        assert_eq!(cache.len(), 0);
+        assert_eq!(cache.total_pseudo_gas_cost(), 0);
+    }
+
+    #[test]
     fn test_ty_to_ty_tag() {
         let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
 
@@ -721,6 +774,71 @@ mod tests {
         ));
         assert_eq!(err.major_status(), StatusCode::TYPE_TAG_LIMIT_EXCEEDED);
         assert_none!(runtime_environment.ty_tag_cache().get_struct_tag(&idx, &[]));
+    }
+
+    #[test]
+    fn test_ty_tag_cost_is_the_same_on_cache_hit_and_miss() {
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
+
+        let vm_config = VMConfig {
+            type_base_cost: 3,
+            type_byte_cost: 2,
+            type_max_cost: u64::MAX,
+            ..VMConfig::default_for_test()
+        };
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
+
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let idx = runtime_environment
+            .struct_name_index_map()
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Foo").unwrap(),
+            ))
+            .unwrap();
+
+        let u8_ty = ty_builder.create_u8_ty();
+        let ty_args = [ty_builder.create_vec_ty(&u8_ty).unwrap()];
+
+        // Cache miss: the cost is charged incrementally while the tag is constructed.
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+        let tag_on_miss = assert_ok!(ty_tag_converter.struct_name_idx_to_struct_tag_impl(
+            &idx,
+            &ty_args,
+            &mut gas_context
+        ));
+        let cost_on_miss = gas_context.current_cost();
+        assert!(cost_on_miss > 0);
+
+        // Cache hit: the full cost is charged at once, and has to be the same as above. Flushing
+        // the cache is only safe as long as this holds.
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+        let tag_on_hit = assert_ok!(ty_tag_converter.struct_name_idx_to_struct_tag_impl(
+            &idx,
+            &ty_args,
+            &mut gas_context
+        ));
+        assert_eq!(gas_context.current_cost(), cost_on_miss);
+        assert_eq!(tag_on_hit, tag_on_miss);
+
+        // The same holds after the cache has actually been flushed.
+        runtime_environment.flush_ty_tag_cache();
+        assert_eq!(runtime_environment.ty_tag_cache().len(), 0);
+        assert_eq!(
+            runtime_environment.ty_tag_cache().total_pseudo_gas_cost(),
+            0
+        );
+
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+        let tag_after_flush = assert_ok!(ty_tag_converter.struct_name_idx_to_struct_tag_impl(
+            &idx,
+            &ty_args,
+            &mut gas_context
+        ));
+        assert_eq!(gas_context.current_cost(), cost_on_miss);
+        assert_eq!(tag_after_flush, tag_on_miss);
     }
 
     #[test]
