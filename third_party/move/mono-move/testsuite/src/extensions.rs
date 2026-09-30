@@ -52,6 +52,10 @@ pub(crate) fn seed_extensions(user_transaction_context: bool) -> NativeExtension
 }
 
 /// The user transaction context both VMs use.
+//
+// TODO(completeness): both payloads are seeded `Some`, so the `None` path (a
+// script transaction, or a non-multisig one) goes uncovered here. Check whether
+// the parity tests reach it, and add FakeExecutor coverage if they do not.
 pub(crate) fn test_user_transaction_context() -> UserTransactionContext {
     UserTransactionContext::new(
         AccountAddress::ZERO,

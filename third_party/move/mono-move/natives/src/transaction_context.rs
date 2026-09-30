@@ -362,6 +362,8 @@ pub fn native_secondary_signers<C: NativeContext>(ctx: &C) -> VMResult<NativeSta
 //
 // TODO(metering): charge gas.
 pub fn native_entry_function_payload<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // The extension borrow must end here: `return_optional_payload` can trigger
+    // a garbage collection, which borrows the extensions again.
     let payload = {
         let ext = ctx.get_extension::<TransactionContextExtension>()?;
         let Some(user_transaction_context) = &ext.user_transaction_context else {
@@ -381,6 +383,8 @@ pub fn native_entry_function_payload<C: NativeContext>(ctx: &C) -> VMResult<Nati
 //
 // TODO(metering): charge gas.
 pub fn native_multisig_payload<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // The extension borrow must end here: `return_optional_payload` can trigger
+    // a garbage collection, which borrows the extensions again.
     let payload = {
         let ext = ctx.get_extension::<TransactionContextExtension>()?;
         let Some(user_transaction_context) = &ext.user_transaction_context else {
@@ -398,13 +402,13 @@ pub fn native_multisig_payload<C: NativeContext>(ctx: &C) -> VMResult<NativeStat
 
 /// Serializes `payload` and rebuilds it on the VM heap as the native's return
 /// value. `payload` must mirror the declared return type's Move struct.
+//
+// TODO(perf): build the value on the heap directly, without the BCS round trip.
 fn return_optional_payload<C: NativeContext, T: Serialize>(
     ctx: &C,
     payload: &Option<T>,
 ) -> VMResult<NativeStatus> {
-    let ty = ctx
-        .return_type(0)
-        .ok_or_else(|| native_invariant_violation("payload native has no return type".into()))?;
+    let ty = ctx.return_type(0)?;
     let bytes = bcs::to_bytes(payload)
         .map_err(|e| native_invariant_violation(format!("failed to serialize payload: {e}")))?;
     let value = ctx.bcs_deserialize_value(ty, &bytes)?.ok_or_else(|| {
