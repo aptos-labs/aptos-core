@@ -276,29 +276,34 @@ id, CPU time, and repeats:
 The driver, written in Python like the other performance jobs, uses only
 the standard library and the `gh` CLI:
 
-- `run [--only <names>] --out results.json [--package <dir>] [--threads N]`
+- `run [--only <names>] [--out results.json] [--package <dir>] [--threads N]`
   reads the manifest, runs the warm-up, then every problem under a timeout
   (20 minutes by default, killing its process group, also when the driver
   itself is stopped) as often as its `repeat` asks, and writes the run: a
   schema version, the commit and whether the tree was dirty, the date, the
   Lean toolchain, the runner, the CPU model, the thread count (8 by
-  default), and per problem the median result and its repeats. A problem
+  default), the branch, whether it measured a subset (`--only`), and per
+  problem the median result and its repeats. A problem
   that times out or crashes is recorded with that status, and the run
   continues. Messages name files relative to the repository root, as the
-  manifest does, so runs on different checkouts read alike. The executable runs directly, in the environment `lake env`
-  gives it; the Move CLI is `APTOS_MOVE_CLI` or the checkout's
-  `target/ci/move`.
+  manifest does, so runs on different checkouts read alike. The executable
+  runs directly, in the environment `lake env` gives it; the Move CLI is
+  `APTOS_MOVE_CLI` or the checkout's `target/ci/move`. A local run is
+  recorded in the local history (below); in CI, `--out` names the results.
 - `history [--window N] [--branch main]` fetches the results of the last
   `N` CI runs that produced results (below) into a local cache keyed by run
-  id; a run's results never change.
-- `report [--current results.json] [--local results.json] [--window N]
-  [--html <file>] [--markdown <file>] [--slack <file>]` renders the
-  history, with the running CI run's results (`--current`) or a local run
-  appended, as the outputs described below; without an output it prints
-  the markdown.
-- `compare <before.json> <after.json>` compares two runs of one machine,
-  such as a local run before and after a change, by wall time and
-  heartbeats alike.
+  id; a run's results never change. `history --local` lists the recorded
+  local runs of the current branch instead.
+- `report [--current results.json] [--local results.json] [--local-runs]
+  [--window N] [--html <file>] [--markdown <file>] [--slack <file>]`
+  renders the history, with the running CI run's results (`--current`), a
+  local run, or the branch's recorded local runs appended, as the outputs
+  described below; without an output it prints the markdown.
+- `compare [before] [after]` compares two runs of one machine by wall time
+  and heartbeats alike, per problem and over the problems both verified.
+  A run is a results file or `@N`, the N-th recorded local run of the
+  current branch counting back from `@-1`, the latest; by default the last
+  two, `@-2` and `@-1`.
 
 ## History
 
@@ -400,22 +405,34 @@ stay well within the hour the set is trimmed to.
 ```bash
 cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
 (cd third_party/move/lean/leaner-e2e-tests && lake build leaner-bench)
-python3 third_party/move/lean/scripts/leaner-bench.py run --out /tmp/local.json
+python3 third_party/move/lean/scripts/leaner-bench.py run [--only math128,ordered_map]
+python3 third_party/move/lean/scripts/leaner-bench.py compare
 ```
 
-A local `run` writes its page, the run appended to the CI history, to
-`third_party/move/lean/local_benchmark.html`, which git ignores;
-`report --local /tmp/local.json` renders it there again, or to `--html`.
+A local run is recorded in the local history, and the files of local runs
+stay in `third_party/move/lean`, ignored by git:
+
+- `local_benchmark_history.jsonl`: the latest 100 local runs, each with its
+  branch;
+- `local_benchmark.html`: the page of the current branch's local runs after
+  the CI history, rewritten by every local run (`report --local-runs`);
+- `local_benchmark_logs/`: the problems' logs of the latest local run.
+
+So a series of changes on a branch is measured by a run after each, and
+`compare` gives the last change's effect; `history --local` lists the
+runs to compare further back (`compare @-4 @-1`). This is the loop an
+agent uses to follow its own optimizations: heartbeats tell whether the
+elaborator's work changed, wall time whether the change shows. The suite
+total compares full runs only; the page and `compare` show a subset run's
+problems.
 
 `run --package <dir>` takes the executable from another build of
 `leaner-e2e-tests`, such as a copy on a native disk.
 
-`run --only ordered_map,math128` measures a subset. `report --local`
-fetches the CI history with the user's `gh` login and appends the local run
-as a separate point. Its comparison table measures the local run against the
-latest CI run at or before the merge base of the local branch with
-`main`, so that changes that landed on `main` since do not show up as the
-local change. Against CI, the table leads with heartbeats, which compare
+The page fetches the CI history with the user's `gh` login. Its comparison
+table measures the latest local run against the latest CI run at or before
+the merge base of the local branch with `main`, so that changes that
+landed on `main` since do not show up as the local change. Against CI, the table leads with heartbeats, which compare
 directly when the toolchain matches (the report warns when it does not);
 wall time differs with the machine, so it is shown as each problem's share
 of the suite's time, which a change to one problem moves on any machine.

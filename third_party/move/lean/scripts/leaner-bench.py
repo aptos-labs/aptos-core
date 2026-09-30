@@ -847,6 +847,9 @@ def suite_section(points):
                 for value in (suite_value(point, measure) for point in points)]
     wall = scaled("wall_ms", 1000)
     beats = scaled("heartbeats", 1e6)
+    if all(value is None for value in wall):
+        return ('<section><h2>Suite</h2><p class="meta">No full run in this window: the '
+                "suite total compares full runs only.</p></section>")
     return (
         '<section><h2>Suite<span class="status">problems verified completely, '
         'full runs</span></h2>'
