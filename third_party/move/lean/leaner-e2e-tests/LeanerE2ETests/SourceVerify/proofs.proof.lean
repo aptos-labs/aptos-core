@@ -1,3 +1,6 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
 -- The obligations the closer leaves: the abort condition needs the square's
 -- sign, the result its expansion.
 verify square_of_sum by
