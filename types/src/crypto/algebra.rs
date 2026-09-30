@@ -1,11 +1,182 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Curve constants for the `aptos_std::crypto_algebra` natives.
+//! Curve constants, marker types and abort codes shared by the
+//! `aptos_std::crypto_algebra` natives of both VMs.
 
+use crate::error;
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::CanonicalDeserialize;
+use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 use once_cell::sync::Lazy;
+
+pub const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = error::invalid_argument(2);
+pub const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = error::not_implemented(1);
+pub const E_TOO_MUCH_MEMORY_USED: u64 = error::resource_exhausted(3);
+
+pub const E_CONSTANTS_BLS12381GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(1);
+pub const E_CONSTANTS_BN254GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(2);
+pub const E_CONSTANTS_BLS12381_R_ORDER_LOADING_FAILED: u64 = error::cancelled(3);
+pub const E_CONSTANTS_BLS12381FQ12_Q12_ORDER_LOADING_FAILED: u64 = error::cancelled(4);
+pub const E_CONSTANTS_BN254FQ12_Q12_ORDER_LOADING_FAILED: u64 = error::cancelled(5);
+pub const E_CASTING_BLS12381_R_SCALAR_LOADING_FAILED: u64 = error::cancelled(6);
+pub const E_SERIALIZATION_BLS12381GT_CONST_LOADING_FAILED: u64 = error::cancelled(7);
+pub const E_RAND_BLS12381GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(8);
+pub const E_RAND_BN254GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(9);
+pub const E_SCALAR_MUL_MSM_WINDOW_SIZE_FAILED: u64 = error::cancelled(10);
+pub const E_SCALAR_MUL_MSM_COMPUTATION_FAILED: u64 = error::cancelled(11);
+pub const E_HASH_TO_STRUCTURE_BLS12381G1_MAPPER_FAILED: u64 = error::cancelled(12);
+pub const E_HASH_TO_STRUCTURE_BLS12381G1_HASH_FAILED: u64 = error::cancelled(13);
+pub const E_HASH_TO_STRUCTURE_BLS12381G2_MAPPER_FAILED: u64 = error::cancelled(14);
+pub const E_HASH_TO_STRUCTURE_BLS12381G2_HASH_FAILED: u64 = error::cancelled(15);
+pub const E_RAND_INSECURE_NOT_IMPLEMENTED: u64 = error::cancelled(16);
+
+/// Splits `ty` into its module and struct name, or returns [`None`] if it is
+/// not a marker struct declared at `0x1`.
+fn marker_of(ty: &TypeTag) -> Option<(&str, &str)> {
+    let TypeTag::Struct(tag) = ty else {
+        return None;
+    };
+    if tag.address != AccountAddress::ONE || !tag.type_args.is_empty() {
+        return None;
+    }
+    Some((tag.module.as_str(), tag.name.as_str()))
+}
+
+/// An algebraic structure defined in `*_algebra.move`.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum Structure {
+    BLS12381Fq12,
+    BLS12381G1,
+    BLS12381G2,
+    BLS12381Gt,
+    BLS12381Fr,
+
+    BN254Fr,
+    BN254Fq,
+    BN254Fq12,
+    BN254G1,
+    BN254G2,
+    BN254Gt,
+}
+
+impl Structure {
+    /// Resolves the marker struct `0x1::<module>::<name>`.
+    pub fn from_marker(module: &str, name: &str) -> Option<Self> {
+        match (module, name) {
+            ("bls12381_algebra", "Fr") => Some(Self::BLS12381Fr),
+            ("bls12381_algebra", "Fq12") => Some(Self::BLS12381Fq12),
+            ("bls12381_algebra", "G1") => Some(Self::BLS12381G1),
+            ("bls12381_algebra", "G2") => Some(Self::BLS12381G2),
+            ("bls12381_algebra", "Gt") => Some(Self::BLS12381Gt),
+
+            ("bn254_algebra", "Fr") => Some(Self::BN254Fr),
+            ("bn254_algebra", "Fq") => Some(Self::BN254Fq),
+            ("bn254_algebra", "Fq12") => Some(Self::BN254Fq12),
+            ("bn254_algebra", "G1") => Some(Self::BN254G1),
+            ("bn254_algebra", "G2") => Some(Self::BN254G2),
+            ("bn254_algebra", "Gt") => Some(Self::BN254Gt),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<TypeTag> for Structure {
+    type Error = ();
+
+    fn try_from(value: TypeTag) -> Result<Self, ()> {
+        let (module, name) = marker_of(&value).ok_or(())?;
+        Self::from_marker(module, name).ok_or(())
+    }
+}
+
+/// A serialization format defined in `*_algebra.move`.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum SerializationFormat {
+    BLS12381Fq12LscLsb,
+    BLS12381G1Compressed,
+    BLS12381G1Uncompressed,
+    BLS12381G2Compressed,
+    BLS12381G2Uncompressed,
+    BLS12381Gt,
+    BLS12381FrLsb,
+    BLS12381FrMsb,
+
+    BN254G1Compressed,
+    BN254G1Uncompressed,
+    BN254G2Compressed,
+    BN254G2Uncompressed,
+    BN254Gt,
+    BN254FrLsb,
+    BN254FrMsb,
+    BN254FqLsb,
+    BN254FqMsb,
+    BN254Fq12LscLsb,
+}
+
+impl SerializationFormat {
+    /// Resolves the marker struct `0x1::<module>::<name>`.
+    pub fn from_marker(module: &str, name: &str) -> Option<Self> {
+        match (module, name) {
+            ("bls12381_algebra", "FormatFq12LscLsb") => Some(Self::BLS12381Fq12LscLsb),
+            ("bls12381_algebra", "FormatG1Uncompr") => Some(Self::BLS12381G1Uncompressed),
+            ("bls12381_algebra", "FormatG1Compr") => Some(Self::BLS12381G1Compressed),
+            ("bls12381_algebra", "FormatG2Uncompr") => Some(Self::BLS12381G2Uncompressed),
+            ("bls12381_algebra", "FormatG2Compr") => Some(Self::BLS12381G2Compressed),
+            ("bls12381_algebra", "FormatGt") => Some(Self::BLS12381Gt),
+            ("bls12381_algebra", "FormatFrLsb") => Some(Self::BLS12381FrLsb),
+            ("bls12381_algebra", "FormatFrMsb") => Some(Self::BLS12381FrMsb),
+
+            ("bn254_algebra", "FormatG1Uncompr") => Some(Self::BN254G1Uncompressed),
+            ("bn254_algebra", "FormatG1Compr") => Some(Self::BN254G1Compressed),
+            ("bn254_algebra", "FormatG2Uncompr") => Some(Self::BN254G2Uncompressed),
+            ("bn254_algebra", "FormatG2Compr") => Some(Self::BN254G2Compressed),
+            ("bn254_algebra", "FormatGt") => Some(Self::BN254Gt),
+            ("bn254_algebra", "FormatFrLsb") => Some(Self::BN254FrLsb),
+            ("bn254_algebra", "FormatFrMsb") => Some(Self::BN254FrMsb),
+            ("bn254_algebra", "FormatFqLsb") => Some(Self::BN254FqLsb),
+            ("bn254_algebra", "FormatFqMsb") => Some(Self::BN254FqMsb),
+            ("bn254_algebra", "FormatFq12LscLsb") => Some(Self::BN254Fq12LscLsb),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<TypeTag> for SerializationFormat {
+    type Error = ();
+
+    fn try_from(value: TypeTag) -> Result<Self, ()> {
+        let (module, name) = marker_of(&value).ok_or(())?;
+        Self::from_marker(module, name).ok_or(())
+    }
+}
+
+/// A hash-to-structure suite defined in `*_algebra.move`.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum HashToStructureSuite {
+    Bls12381g1XmdSha256SswuRo,
+    Bls12381g2XmdSha256SswuRo,
+}
+
+impl HashToStructureSuite {
+    /// Resolves the marker struct `0x1::<module>::<name>`.
+    pub fn from_marker(module: &str, name: &str) -> Option<Self> {
+        match (module, name) {
+            ("bls12381_algebra", "HashG1XmdSha256SswuRo") => Some(Self::Bls12381g1XmdSha256SswuRo),
+            ("bls12381_algebra", "HashG2XmdSha256SswuRo") => Some(Self::Bls12381g2XmdSha256SswuRo),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<TypeTag> for HashToStructureSuite {
+    type Error = ();
+
+    fn try_from(value: TypeTag) -> Result<Self, ()> {
+        let (module, name) = marker_of(&value).ok_or(())?;
+        Self::from_marker(module, name).ok_or(())
+    }
+}
 
 pub static BLS12381_GT_GENERATOR: Lazy<Option<ark_bls12_381::Fq12>> = Lazy::new(|| {
     let buf = hex::decode("b68917caaa0543a808c53908f694d1b6e7b38de90ce9d83d505ca1ef1b442d2727d7d06831d8b2a7920afc71d8eb50120f17a0ea982a88591d9f43503e94a8f1abaf2e4589f65aafb7923c484540a868883432a5c60e75860b11e5465b1c9a08873ec29e844c1c888cb396933057ffdd541b03a5220eda16b2b3a6728ea678034ce39c6839f20397202d7c5c44bb68134f93193cec215031b17399577a1de5ff1f5b0666bdd8907c61a7651e4e79e0372951505a07fa73c25788db6eb8023519a5aa97b51f1cad1d43d8aabbff4dc319c79a58cafc035218747c2f75daf8f2fb7c00c44da85b129113173d4722f5b201b6b4454062e9ea8ba78c5ca3cadaf7238b47bace5ce561804ae16b8f4b63da4645b8457a93793cbd64a7254f150781019de87ee42682940f3e70a88683d512bb2c3fb7b2434da5dedbb2d0b3fb8487c84da0d5c315bdd69c46fb05d23763f2191aabd5d5c2e12a10b8f002ff681bfd1b2ee0bf619d80d2a795eb22f2aa7b85d5ffb671a70c94809f0dafc5b73ea2fb0657bae23373b4931bc9fa321e8848ef78894e987bff150d7d671aee30b3931ac8c50e0b3b0868effc38bf48cd24b4b811a2995ac2a09122bed9fd9fa0c510a87b10290836ad06c8203397b56a78e9a0c61c77e56ccb4f1bc3d3fcaea7550f3503efe30f2d24f00891cb45620605fcfaa4292687b3a7db7c1c0554a93579e889a121fd8f72649b2402996a084d2381c5043166673b3849e4fd1e7ee4af24aa8ed443f56dfd6b68ffde4435a92cd7a4ac3bc77e1ad0cb728606cf08bf6386e5410f").ok()?;

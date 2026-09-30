@@ -14,18 +14,11 @@
 //! body through [`structure_of`], [`format_of`] and [`suite_of`].
 //
 // TODO(perf, cleanup): arkworks is built with `parallel`, so `pairing`,
-// `multi_pairing` and MSM fan out over rayon. The legacy VM confines that work
-// to a private one-thread pool per calling thread, through
-// `aptos_native_interface::with_native_rayon`; MonoMove lets it reach rayon's
-// global pool, which the rest of the node shares. Results are identical either
-// way, so parity holds.
-//
-// That wrapper guarded a deadlock back when Block-STM workers were rayon
-// threads and a native's nested `par_iter` could work-steal a block-executor
-// job. `aptos-move/block-executor/src/worker_pool.rs` runs them on plain `std`
-// threads, so what remains is a budgeting question: how much of the machine one
-// transaction's crypto may claim while Block-STM already saturates it. Settle
-// it before MonoMove executes on a real node.
+// `multi_pairing` and MSM fan out over rayon's global pool. Block-STM already
+// saturates the machine, so a native should run sequentially rather than claim
+// more of it; the better fix is to build the imported crypto libraries without
+// `parallel` at all, which is still TBD. Results are identical either way, so
+// parity holds.
 
 mod arithmetic;
 mod casting;
@@ -39,93 +32,33 @@ mod serialization;
 
 use crate::{polymorphic_natives, NativeEntry};
 pub(crate) use aptos_types::crypto::algebra::{
-    BLS12381_GT_GENERATOR, BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN, BLS12381_R_SCALAR,
-    BN254_GT_GENERATOR, BN254_Q12_LENDIAN, BN254_Q_LENDIAN, BN254_R_LENDIAN, BN254_R_SCALAR,
+    HashToStructureSuite, SerializationFormat, Structure, BLS12381_GT_GENERATOR,
+    BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN, BLS12381_R_SCALAR, BN254_GT_GENERATOR,
+    BN254_Q12_LENDIAN, BN254_Q_LENDIAN, BN254_R_LENDIAN, BN254_R_SCALAR,
+    E_CASTING_BLS12381_R_SCALAR_LOADING_FAILED, E_CONSTANTS_BLS12381FQ12_Q12_ORDER_LOADING_FAILED,
+    E_CONSTANTS_BLS12381GT_GT_GENERATOR_LOADING_FAILED,
+    E_CONSTANTS_BLS12381_R_ORDER_LOADING_FAILED, E_CONSTANTS_BN254FQ12_Q12_ORDER_LOADING_FAILED,
+    E_CONSTANTS_BN254GT_GT_GENERATOR_LOADING_FAILED, E_HASH_TO_STRUCTURE_BLS12381G1_HASH_FAILED,
+    E_HASH_TO_STRUCTURE_BLS12381G1_MAPPER_FAILED, E_HASH_TO_STRUCTURE_BLS12381G2_HASH_FAILED,
+    E_HASH_TO_STRUCTURE_BLS12381G2_MAPPER_FAILED, E_SCALAR_MUL_MSM_COMPUTATION_FAILED,
+    E_SERIALIZATION_BLS12381GT_CONST_LOADING_FAILED, E_TOO_MUCH_MEMORY_USED,
+    MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
 };
-use aptos_types::error;
+#[cfg(feature = "testing")]
+pub(crate) use aptos_types::crypto::algebra::{
+    E_RAND_BLS12381GT_GT_GENERATOR_LOADING_FAILED, E_RAND_BN254GT_GT_GENERATOR_LOADING_FAILED,
+    E_RAND_INSECURE_NOT_IMPLEMENTED,
+};
 use mono_move_core::{
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
         NativeStatus,
     },
     types::{view_name, view_type, view_type_list, InternedType, Type},
-    VMResult,
+    view_module_id, VMResult,
 };
 use move_core_types::account_address::AccountAddress;
 use std::{any::Any, cell::RefMut};
-
-const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = error::invalid_argument(2);
-const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = error::not_implemented(1);
-const E_TOO_MUCH_MEMORY_USED: u64 = error::resource_exhausted(3);
-
-const E_CONSTANTS_BLS12381GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(1);
-const E_CONSTANTS_BN254GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(2);
-const E_CONSTANTS_BLS12381_R_ORDER_LOADING_FAILED: u64 = error::cancelled(3);
-const E_CONSTANTS_BLS12381FQ12_Q12_ORDER_LOADING_FAILED: u64 = error::cancelled(4);
-const E_CONSTANTS_BN254FQ12_Q12_ORDER_LOADING_FAILED: u64 = error::cancelled(5);
-const E_CASTING_BLS12381_R_SCALAR_LOADING_FAILED: u64 = error::cancelled(6);
-const E_SERIALIZATION_BLS12381GT_CONST_LOADING_FAILED: u64 = error::cancelled(7);
-#[cfg(feature = "testing")]
-const E_RAND_BLS12381GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(8);
-#[cfg(feature = "testing")]
-const E_RAND_BN254GT_GT_GENERATOR_LOADING_FAILED: u64 = error::cancelled(9);
-// The legacy VM also has `cancelled(10)` for an unsupported MSM window size.
-// `ark_msm_window_size` never returns `None` here, so the code is unreachable.
-const E_SCALAR_MUL_MSM_COMPUTATION_FAILED: u64 = error::cancelled(11);
-const E_HASH_TO_STRUCTURE_BLS12381G1_MAPPER_FAILED: u64 = error::cancelled(12);
-const E_HASH_TO_STRUCTURE_BLS12381G1_HASH_FAILED: u64 = error::cancelled(13);
-const E_HASH_TO_STRUCTURE_BLS12381G2_MAPPER_FAILED: u64 = error::cancelled(14);
-const E_HASH_TO_STRUCTURE_BLS12381G2_HASH_FAILED: u64 = error::cancelled(15);
-#[cfg(feature = "testing")]
-const E_RAND_INSECURE_NOT_IMPLEMENTED: u64 = error::cancelled(16);
-
-/// An algebraic structure defined in `*_algebra.move`.
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum Structure {
-    BLS12381Fq12,
-    BLS12381G1,
-    BLS12381G2,
-    BLS12381Gt,
-    BLS12381Fr,
-
-    BN254Fr,
-    BN254Fq,
-    BN254Fq12,
-    BN254G1,
-    BN254G2,
-    BN254Gt,
-}
-
-/// A serialization format defined in `*_algebra.move`.
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum SerializationFormat {
-    BLS12381Fq12LscLsb,
-    BLS12381G1Compressed,
-    BLS12381G1Uncompressed,
-    BLS12381G2Compressed,
-    BLS12381G2Uncompressed,
-    BLS12381Gt,
-    BLS12381FrLsb,
-    BLS12381FrMsb,
-
-    BN254G1Compressed,
-    BN254G1Uncompressed,
-    BN254G2Compressed,
-    BN254G2Uncompressed,
-    BN254Gt,
-    BN254FrLsb,
-    BN254FrMsb,
-    BN254FqLsb,
-    BN254FqMsb,
-    BN254Fq12LscLsb,
-}
-
-/// A hash-to-structure suite defined in `*_algebra.move`.
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum HashToStructureSuite {
-    Bls12381g1XmdSha256SswuRo,
-    Bls12381g2XmdSha256SswuRo,
-}
 
 /// Matches any [`Structure`], and the unrecognized marker.
 ///
@@ -210,8 +143,7 @@ fn marker_of(ty: InternedType) -> Option<(&'static str, &'static str)> {
     if !view_type_list(*ty_args).is_empty() {
         return None;
     }
-    // SAFETY: interned ids are valid for the executable's lifetime.
-    let module_id = unsafe { module_id.as_ref_unchecked() };
+    let module_id = view_module_id(*module_id);
     if module_id.address() != &AccountAddress::ONE {
         return None;
     }
@@ -219,62 +151,18 @@ fn marker_of(ty: InternedType) -> Option<(&'static str, &'static str)> {
 }
 
 fn structure_of(ty: InternedType) -> Option<Structure> {
-    match marker_of(ty)? {
-        ("bls12381_algebra", "Fr") => Some(Structure::BLS12381Fr),
-        ("bls12381_algebra", "Fq12") => Some(Structure::BLS12381Fq12),
-        ("bls12381_algebra", "G1") => Some(Structure::BLS12381G1),
-        ("bls12381_algebra", "G2") => Some(Structure::BLS12381G2),
-        ("bls12381_algebra", "Gt") => Some(Structure::BLS12381Gt),
-
-        ("bn254_algebra", "Fr") => Some(Structure::BN254Fr),
-        ("bn254_algebra", "Fq") => Some(Structure::BN254Fq),
-        ("bn254_algebra", "Fq12") => Some(Structure::BN254Fq12),
-        ("bn254_algebra", "G1") => Some(Structure::BN254G1),
-        ("bn254_algebra", "G2") => Some(Structure::BN254G2),
-        ("bn254_algebra", "Gt") => Some(Structure::BN254Gt),
-        _ => None,
-    }
+    let (module, name) = marker_of(ty)?;
+    Structure::from_marker(module, name)
 }
 
 fn format_of(ty: InternedType) -> Option<SerializationFormat> {
-    match marker_of(ty)? {
-        ("bls12381_algebra", "FormatFq12LscLsb") => Some(SerializationFormat::BLS12381Fq12LscLsb),
-        ("bls12381_algebra", "FormatG1Uncompr") => {
-            Some(SerializationFormat::BLS12381G1Uncompressed)
-        },
-        ("bls12381_algebra", "FormatG1Compr") => Some(SerializationFormat::BLS12381G1Compressed),
-        ("bls12381_algebra", "FormatG2Uncompr") => {
-            Some(SerializationFormat::BLS12381G2Uncompressed)
-        },
-        ("bls12381_algebra", "FormatG2Compr") => Some(SerializationFormat::BLS12381G2Compressed),
-        ("bls12381_algebra", "FormatGt") => Some(SerializationFormat::BLS12381Gt),
-        ("bls12381_algebra", "FormatFrLsb") => Some(SerializationFormat::BLS12381FrLsb),
-        ("bls12381_algebra", "FormatFrMsb") => Some(SerializationFormat::BLS12381FrMsb),
-
-        ("bn254_algebra", "FormatG1Uncompr") => Some(SerializationFormat::BN254G1Uncompressed),
-        ("bn254_algebra", "FormatG1Compr") => Some(SerializationFormat::BN254G1Compressed),
-        ("bn254_algebra", "FormatG2Uncompr") => Some(SerializationFormat::BN254G2Uncompressed),
-        ("bn254_algebra", "FormatG2Compr") => Some(SerializationFormat::BN254G2Compressed),
-        ("bn254_algebra", "FormatGt") => Some(SerializationFormat::BN254Gt),
-        ("bn254_algebra", "FormatFrLsb") => Some(SerializationFormat::BN254FrLsb),
-        ("bn254_algebra", "FormatFrMsb") => Some(SerializationFormat::BN254FrMsb),
-        ("bn254_algebra", "FormatFqLsb") => Some(SerializationFormat::BN254FqLsb),
-        ("bn254_algebra", "FormatFqMsb") => Some(SerializationFormat::BN254FqMsb),
-        ("bn254_algebra", "FormatFq12LscLsb") => Some(SerializationFormat::BN254Fq12LscLsb),
-        _ => None,
-    }
+    let (module, name) = marker_of(ty)?;
+    SerializationFormat::from_marker(module, name)
 }
 
 fn suite_of(ty: InternedType) -> Option<HashToStructureSuite> {
-    match marker_of(ty)? {
-        ("bls12381_algebra", "HashG1XmdSha256SswuRo") => {
-            Some(HashToStructureSuite::Bls12381g1XmdSha256SswuRo)
-        },
-        ("bls12381_algebra", "HashG2XmdSha256SswuRo") => {
-            Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)
-        },
-        _ => None,
-    }
+    let (module, name) = marker_of(ty)?;
+    HashToStructureSuite::from_marker(module, name)
 }
 
 /// The abort every structure a native does not support falls to. Carries no
@@ -353,9 +241,14 @@ struct Entry {
 /// caller's own handle back, so the same slot must be readable as `Gt` and as
 /// `Fq12`. `Box<dyn Any>` also keeps the memory charge equal to the legacy VM's:
 /// it charges the concrete element's size, not the widest one.
+///
+/// [`MEMORY_LIMIT_IN_BYTES`] covers the whole transaction, where the legacy VM
+/// applies it per session.
 //
 // TODO(perf, security): elements are held in a Rust `Vec` here; they should
-// eventually live on the VM's own heap as a single rooted vector.
+// eventually live on the VM's own heap as a single rooted vector. That makes
+// them ordinary VM values under the heap limit and the collector, retiring both
+// this separate byte accounting and the per-element `Box`.
 #[derive(Default)]
 pub struct AlgebraStore {
     objs: Vec<Entry>,
@@ -431,6 +324,10 @@ impl NativeExtension for AlgebraStore {
         // Elements are referenced by handle and hold no VM heap pointers.
     }
 
+    /// Records a watermark rather than clearing the store as the legacy VM does
+    /// on session start. A handle never crosses the Move boundary, so an
+    /// element left behind by an earlier phase is unreachable; the only
+    /// difference is that phases share one byte budget.
     fn on_checkpoint(&mut self) {
         self.checkpoints.push(self.objs.len());
     }
