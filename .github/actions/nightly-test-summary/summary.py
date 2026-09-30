@@ -56,27 +56,41 @@ def build_history(previous, run_url, failed, attempt=1, cancelled=False):
     return f"Last {len(cells)} nights: " + "".join(cells)
 
 
-def job_rows(jobs, first_attempt_jobs, previous, cancelled=False):
-    """One row per failed job: its square on each night of the bar, then its failed steps."""
+def job_row(job, tonight, nights):
+    """A job's square on each night of the bar, tonight's linked to its log, then its failed steps."""
+    cells = []
+    for run in nights:
+        past = {past["name"]: past.get("conclusion") for past in run.get("jobs") or []}
+        retried = job["name"] in failed_names(run.get("first_attempt_jobs"))
+        run_cancelled = run.get("conclusion") == "cancelled"
+        cells.append(square(past.get(job["name"]), retried, run_cancelled))
+    cells.append(f"<{job['html_url']}|{tonight}>" if job.get("html_url") else tonight)
+    steps = [step["name"] for step in job.get("steps", []) if step.get("conclusion") in FAILED]
+    text = job["name"] + (" \u2014 " + ", ".join(steps) if steps else "")
+    return "".join(cells) + "  " + html.escape(text, quote=False)
+
+
+def job_rows(jobs, previous, cancelled=False):
+    """One row per job that failed tonight; jobs a cancellation interrupted are left out."""
     nights = recent_nights(previous)
-    rows = []
-    for job in jobs or []:
-        if job.get("conclusion") not in FAILED:
-            continue
-        cells = []
-        for run in nights:
-            past = {past["name"]: past.get("conclusion") for past in run.get("jobs") or []}
-            retried = job["name"] in failed_names(run.get("first_attempt_jobs"))
-            run_cancelled = run.get("conclusion") == "cancelled"
-            cells.append(square(past.get(job["name"]), retried, run_cancelled))
-        tonight = square(job["conclusion"], run_cancelled=cancelled)
-        cells.append(f"<{job['html_url']}|{tonight}>" if job.get("html_url") else tonight)
-        steps = [
-            step["name"] for step in job.get("steps", []) if step.get("conclusion") in FAILED
-        ]
-        text = job["name"] + (" \u2014 " + ", ".join(steps) if steps else "")
-        rows.append("".join(cells) + "  " + html.escape(text, quote=False))
-    return rows
+    return [
+        job_row(job, RED, nights)
+        for job in jobs or []
+        if job.get("conclusion") in FAILED
+        and not (cancelled and job["conclusion"] == "cancelled")
+    ]
+
+
+def retry_rows(jobs, first_attempt_jobs, previous):
+    """One row per job that passed only on the retry, linked to its failed first attempt."""
+    nights = recent_nights(previous)
+    # Jobs still running, such as this one, are neither failed nor passed.
+    passed = {job["name"] for job in jobs or [] if job.get("conclusion") == "success"}
+    return [
+        job_row(job, YELLOW, nights)
+        for job in first_attempt_jobs or []
+        if job.get("conclusion") in FAILED and job["name"] in passed
+    ]
 
 
 def build_summary(
@@ -114,20 +128,19 @@ def build_summary(
         f"<{run_url}|Run, logs, and artifacts>",
     ]
     if incomplete:
-        rows = job_rows(jobs, first_attempt_jobs, previous_runs, cancelled)
-        skipped = sorted(name for name, job in needs.items() if job["result"] == "skipped")
-        if rows:
-            lines.extend(rows)
-            if skipped:
-                lines.append("Skipped suites: " + ", ".join(skipped))
-        else:
+        if jobs is None:
             # Without job details, name the incomplete suites themselves.
             lines.append("Required suites: " + "; ".join(incomplete))
-    # Jobs still running, such as this one, are neither failed nor passed.
-    passed = {job["name"] for job in jobs or [] if job.get("conclusion") == "success"}
-    recovered = sorted(failed_names(first_attempt_jobs) & passed)
-    if recovered:
-        lines.append(html.escape("Passed on retry: " + ", ".join(recovered), quote=False))
+        else:
+            lines.extend(job_rows(jobs, previous_runs, cancelled))
+            skipped = sorted(name for name, job in needs.items() if job["result"] == "skipped")
+            # After a cancellation, skipped suites only restate it.
+            if skipped and not cancelled:
+                lines.append("Skipped suites: " + ", ".join(skipped))
+    retried = retry_rows(jobs, first_attempt_jobs, previous_runs)
+    if retried:
+        lines.append("Passed on retry:")
+        lines.extend(retried)
     if previous_sha:
         repo_url = run_url.split("/actions/runs/")[0]
         lines.append(

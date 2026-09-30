@@ -189,10 +189,12 @@ posts its result to
 one linked square per night for the last seven completed runs on the branch
 (green, yellow for passing only after the retry, red, a cross for a cancelled run
 that is not retried, or grey for skipped),
-oldest first, ending with the current run. A retried pass names the jobs that
-passed on retry. Failed attempts add one row per failed job, including failures
-outside Move: its square on each night of the bar, tonight's linked to the job
-log, then the failed steps. Skipped suites follow on one line. Add a notification
+oldest first, ending with the current run. Failed attempts add one row per failed
+job, including failures outside Move: its square on each night of the bar,
+tonight's linked to the job log, then the failed steps. Skipped suites follow on
+one line. A cancelled run lists only jobs that failed before the cancellation.
+Jobs that passed only on the retry get the same row under "Passed on retry",
+tonight's yellow square linked to the failed first attempt. Add a notification
 step for any further channel. Missing dispatches or runs cancelled before
 notification need external scheduler monitoring.
 
