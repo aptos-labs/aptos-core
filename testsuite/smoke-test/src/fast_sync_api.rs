@@ -3,7 +3,7 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
-use aptos_forge::{NodeExt, Swarm};
+use aptos_forge::Swarm;
 use std::time::Duration;
 
 /// Verifies what a node still fast syncing serves from its API.
