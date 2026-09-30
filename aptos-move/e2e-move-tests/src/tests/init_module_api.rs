@@ -69,8 +69,7 @@ fn publish(h: &mut MoveHarness, acc: &aptos_language_e2e_tests::account::Account
     builder.add_source("test.move", source);
     let path = builder.write_to_temp().unwrap();
     let txn = h.create_publish_package(acc, path.path(), Some(BuildOptions::move_2()), |_| {});
-    // MonoVM does not support publishing yet; use the same fallback as MoveHarness.
-    assert_success!(h.without_mono_move(|h| h.run(txn)));
+    assert_success!(h.run(txn));
 }
 
 fn run(h: &mut MoveHarness, acc: &aptos_language_e2e_tests::account::Account) {
@@ -197,24 +196,19 @@ fn init_module_remains_supported_with_lazy_initialization() {
     assert_eq!(counter(&h, *acc.address()), 1);
 }
 
-#[test_case::test_case(false, false; "legacy_eager_allowed")]
-#[test_case::test_case(false, true; "legacy_eager_disabled")]
-#[test_case::test_case(true, false; "mono_eager_allowed")]
-#[test_case::test_case(true, true; "mono_eager_disabled")]
-fn init_module_not_run_at_publish_with_lazy_initialization(mono_vm: bool, disable_eager: bool) {
+#[test_case::test_case(false; "eager_allowed")]
+#[test_case::test_case(true; "eager_disabled")]
+fn init_module_not_run_at_publish_with_lazy_initialization(disable_eager: bool) {
     let mut h = new_harness();
-    for (flag, enabled) in [
-        (FeatureFlag::ENABLE_MONO_MOVE, mono_vm),
-        (
+    if disable_eager {
+        h.enable_features(
+            vec![FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION],
+            vec![],
+        );
+    } else {
+        h.enable_features(vec![], vec![
             FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION,
-            disable_eager,
-        ),
-    ] {
-        if enabled {
-            h.enable_features(vec![flag], vec![]);
-        } else {
-            h.enable_features(vec![], vec![flag]);
-        }
+        ]);
     }
     let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
     publish(
@@ -255,7 +249,7 @@ fn init_module_eager_initialization_disabled(lazy_enabled: bool) {
     let mut h = new_harness();
     h.enable_features(
         vec![FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION],
-        vec![FeatureFlag::ENABLE_MONO_MOVE],
+        vec![],
     );
     if !lazy_enabled {
         h.enable_features(vec![], vec![FeatureFlag::LAZY_MODULE_INITIALIZATION]);
@@ -317,19 +311,13 @@ fn init_module_eager_initialization_disabled(lazy_enabled: bool) {
     assert_eq!(counter(&h, *acc.address()), 1);
 }
 
-#[test_case::test_case(false; "legacy")]
-#[test_case::test_case(true; "mono")]
-fn init_module_eager_disabled_allows_module_without_initializer(mono_vm: bool) {
+#[test]
+fn init_module_eager_disabled_allows_module_without_initializer() {
     let mut h = new_harness();
     h.enable_features(
         vec![FeatureFlag::DISABLE_EAGER_MODULE_INITIALIZATION],
         vec![],
     );
-    if mono_vm {
-        h.enable_features(vec![FeatureFlag::ENABLE_MONO_MOVE], vec![]);
-    } else {
-        h.enable_features(vec![], vec![FeatureFlag::ENABLE_MONO_MOVE]);
-    }
     let acc = h.new_account_at(AccountAddress::from_hex_literal(ADDR).unwrap());
     publish(
         &mut h,
