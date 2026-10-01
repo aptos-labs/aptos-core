@@ -1,3 +1,0 @@
-name: malformed
-on: [pull_request_target
-jobs: {}

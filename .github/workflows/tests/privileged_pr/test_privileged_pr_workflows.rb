@@ -1,12 +1,15 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
+require "digest"
 require "open3"
 require "tempfile"
 require_relative "../workflow_test_helper"
+require_relative "../pr_ci_policy/property_support"
 
 class PrivilegedPrWorkflowTests < Minitest::Test
   include WorkflowTestHelper
+  include PolicyPropertySupport
 
   WORKFLOWS = {
     "workflow-run-docker-rust-publish-pr.yaml" => "publish-images",
@@ -89,16 +92,36 @@ class PrivilegedPrWorkflowTests < Minitest::Test
 
   def test_forge_namespace_derivation_is_deterministic_sha_scoped_and_bounded
     step = forge_step("Derive a bounded PR-and-SHA-scoped namespace")
-    derive = lambda do |sha|
-      lines = run_step_env(step, "PR_NUMBER" => "9999999999", "NAMESPACE_KIND" => "abcdefghijklmno", "SOURCE_SHA" => sha)
+    derive = lambda do |input|
+      lines = run_step_env(step, input)
       lines.grep(/\AFORGE_NAMESPACE=/).first.delete_prefix("FORGE_NAMESPACE=")
     end
+    original = [9_999_999_998, 14, *(0...15), *Array.new(40, 10)]
+    check_property("forge_namespace", corpus: [original, original.take(17) + Array.new(40, 11)],
+      generate: ->(rng) {
+        [rng.rand(0...9_999_999_999), rng.rand(0...15),
+         *Array.new(15) { rng.rand(0...37) }, *Array.new(40) { rng.rand(0...16) }]
+      },
+      describe: ->(sample) { namespace_input(sample).inspect }) do |sample|
+      input = namespace_input(sample)
+      pr, kind, sha = input.values_at("PR_NUMBER", "NAMESPACE_KIND", "SOURCE_SHA")
+      digest = Digest::SHA256.hexdigest("pr:#{pr}:kind:#{kind}:sha:#{sha}")[0, 16]
+      namespace = derive.call(input)
+      assert_equal "pr#{pr}-#{kind}-#{digest}", namespace
+      assert_equal namespace, derive.call(input)
+      assert_operator namespace.length, :<=, 63
+      assert_match(/\A[a-z0-9-]+\z/, namespace)
+    end
+    first = namespace_input(original)
+    refute_equal derive.call(first), derive.call(first.merge("SOURCE_SHA" => "b" * 40))
+  end
 
-    first = derive.call("a" * 40)
-    assert_equal first, derive.call("a" * 40)
-    refute_equal first, derive.call("b" * 40)
-    assert_operator first.length, :<=, 63
-    assert_match(/\A[a-z0-9-]+\z/, first)
+  def namespace_input(sample)
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    alphabet = "#{letters}0123456789-"
+    kind = letters[sample[2] % letters.length] + sample[3, sample[1] % 15].map { |i| alphabet[i % alphabet.length] }.join
+    {"PR_NUMBER" => (1 + sample[0] % 9_999_999_999).to_s, "NAMESPACE_KIND" => kind,
+     "SOURCE_SHA" => sample[17, 40].map { |i| "0123456789abcdef"[i % 16] }.join}
   end
 
   def test_forge_pins_every_image_role_to_an_explicit_tag

@@ -5,8 +5,10 @@ require "minitest/autorun"
 require "open3"
 require "rbconfig"
 require_relative "../../../actions/pr-ci-policy/lib/pr_ci_policy"
+require_relative "property_support"
 
 class PolicyRunnerTest < Minitest::Test
+  include PolicyPropertySupport
   ACTION_DIR = File.expand_path("../../../actions/pr-ci-policy", __dir__)
   FIXTURES = File.join(__dir__, "fixtures")
   BASE_REPO = "aptos-labs/aptos-core"
@@ -103,47 +105,93 @@ class PolicyRunnerTest < Minitest::Test
     assert_includes api.requests.map(&:first), head_content_path(callee_path)
   end
 
-  def test_paginates_pr_file_listing
-    first = Array.new(100) { |i| { "filename" => "docs/#{i}.md", "status" => "modified" } }
-    second = [{ "filename" => "README.md", "status" => "modified" }]
-    api = FakeApi.new(files_path(1) => first, files_path(2) => second)
+  FILE_COUNTS = [0, 1, 2, 99, 100, 101, 199, 200, 999, 1_000].freeze
 
-    assert_empty PrCiPolicy::Runner.new(api).check(event(changed_files: 101))
-    assert_equal [files_path(1), files_path(2)], api.requests.map(&:first)
+  def listed_files(count)
+    Array.new(count) do |i|
+      # Keep the original one-file and 101-file examples in the corpus.
+      path = (count == 1 || (count == 101 && i == 100)) ? "README.md" : "docs/#{i}.md"
+      { "filename" => path, "status" => "modified" }
+    end
+  end
+
+  def paginated_api(files)
+    pages = files.each_slice(100).to_a
+    pages << [] if files.length % 100 == 0
+    FakeApi.new(pages.each_with_index.to_h { |page, i| [files_path(i + 1), page] })
+  end
+
+  def test_file_listing_pagination_counts_and_duplicates
+    # Kinds: complete, truncated, surplus, duplicate.
+    corpus = FILE_COUNTS.product((0...4).to_a, [0])
+    corpus += [101, 199, 200, 999, 1_000].map { |count| [count, 3, 1] }
+    check_property("file_listing_pagination_counts_and_duplicates", corpus: corpus,
+                   generate: ->(r) { [r.rand(0..1_000), r.rand(4), r.rand(2)] }) do |count, kind, cross_page|
+      count %= 1_001
+      kind %= 4
+      count = [count, 1].max if kind == 1
+      count = [count, 999].min if kind == 2
+      count = [count, cross_page.odd? ? 101 : 2].max if kind == 3
+      files = listed_files(count + (kind == 1 ? -1 : kind == 2 ? 1 : 0))
+      if kind == 3
+        files[0] = { "filename" => "README.md", "status" => "modified" }
+        files[cross_page.odd? ? 100 : 1] = files[0].dup
+      end
+      api = paginated_api(files)
+      runner = PrCiPolicy::Runner.new(api)
+      if kind.zero?
+        assert_empty runner.check(event(changed_files: count))
+      else
+        error = assert_raises(PrCiPolicy::PolicyError) { runner.check(event(changed_files: count)) }
+        assert_match(kind == 3 ? /duplicate paths/ : /truncated or changed/, error.message)
+      end
+      assert_equal (1..(files.length / 100 + 1)).map { |page| files_path(page) }, api.requests.map(&:first)
+    rescue PrCiPolicy::PolicyError => error
+      flunk("listing #{[count, kind, cross_page].inspect} failed: #{error.message}")
+    end
   end
 
   def test_fails_closed_on_api_error
     api = FakeApi.new(files_path => { error: "rate limited" })
-
     assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event) }
   end
 
-  def test_fails_closed_on_truncated_file_listing
-    api = FakeApi.new(files_path => [{ "filename" => "README.md", "status" => "modified" }])
-
-    assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event(changed_files: 2)) }
-  end
-
-  def test_fails_closed_on_duplicate_file_entries
-    duplicate = { "filename" => "README.md", "status" => "modified" }
-    api = FakeApi.new(files_path => [duplicate, duplicate.dup])
-
-    assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event(changed_files: 2)) }
-  end
-
   def test_fails_closed_on_file_count_limit
-    assert_raises(PrCiPolicy::PolicyError) do
-      PrCiPolicy::Runner.new(FakeApi.new({})).check(event(changed_files: PrCiPolicy::Runner::MAX_CHANGED_FILES + 1))
+    [-1, 1_001].each do |count|
+      api = FakeApi.new({})
+      error = assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event(changed_files: count)) }
+      assert_match(/invalid changed_files count/, error.message)
+      assert_empty api.requests
     end
+    api = paginated_api(listed_files(1_001))
+    error = assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event(changed_files: 1_000)) }
+    assert_match(/listing exceeds count limit/, error.message)
+    api = FakeApi.new(files_path => listed_files(101))
+    error = assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event(changed_files: 101)) }
+    assert_match(/page exceeds page size/, error.message)
   end
 
   def test_fails_closed_on_workflow_count_limit
-    files = Array.new(PrCiPolicy::Runner::MAX_WORKFLOW_FILES + 1) do |i|
-      { "filename" => ".github/workflows/#{i}.yaml", "status" => "added" }
+    [49, 50, 51].each do |count|
+      files = Array.new(count) { |i| { "filename" => ".github/workflows/#{i}.yaml", "status" => "added" } }
+      responses = { files_path => files }
+      if count <= 50
+        files.each do |file|
+          path = file.fetch("filename")
+          responses[base_content_path(path)] = :not_found
+          responses[head_content_path(path)] = content_payload(fixture("new-safe-secretless.yaml"))
+        end
+      end
+      api = FakeApi.new(responses)
+      runner = PrCiPolicy::Runner.new(api)
+      if count <= 50
+        assert_empty runner.check(event(changed_files: count))
+      else
+        error = assert_raises(PrCiPolicy::PolicyError) { runner.check(event(changed_files: count)) }
+        assert_match(/too many workflow files/, error.message)
+        assert_equal [files_path], api.requests.map(&:first)
+      end
     end
-    api = FakeApi.new(files_path => files)
-
-    assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event(changed_files: files.length)) }
   end
 
   def test_fails_closed_on_oversized_workflow
@@ -160,24 +208,38 @@ class PolicyRunnerTest < Minitest::Test
   end
 
   def test_fails_closed_on_renamed_workflow
-    file = { "filename" => ".github/workflows/new.yaml", "previous_filename" => ".github/workflows/old.yaml", "status" => "renamed" }
-    api = FakeApi.new(files_path => [file])
-
-    assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(api).check(event) }
+    [[".github/workflows/new.yaml", ".github/workflows/old.yaml"],
+     [".github/workflows/new.yaml", "docs/old.md"],
+     ["docs/new.md", ".github/workflows/old.yaml"]].each do |path, previous|
+      file = { "filename" => path, "previous_filename" => previous, "status" => "renamed" }
+      error = assert_raises(PrCiPolicy::PolicyError) { PrCiPolicy::Runner.new(FakeApi.new(files_path => [file])).check(event) }
+      assert_match(/workflow renames are ambiguous/, error.message)
+    end
   end
 
-  def test_fails_closed_when_workflow_presence_contradicts_its_status
+  def test_workflow_status_and_presence_table
     path = ".github/workflows/new.yaml"
     text = fixture("new-safe-secretless.yaml")
-    cases = {
-      "added" => [/added workflow already exists at base SHA/, { base_content_path(path) => content_payload(text), head_content_path(path) => content_payload(text) }],
-      "removed" => [/removed workflow still exists at head SHA/, { base_content_path(path) => content_payload(text), head_content_path(path) => content_payload(text) }],
+    # Rows are [base absent/head absent, absent/present, present/absent, present/present].
+    outcomes = {
+      "added" => [/added workflow is absent at head SHA/, nil, /added workflow already exists at base SHA/, /added workflow already exists at base SHA/],
+      "modified" => Array.new(3, /modified workflow is absent at base or head SHA/) + [nil],
+      "removed" => [/removed workflow is absent at base SHA/, /removed workflow is absent at base SHA/, nil, /removed workflow still exists at head SHA/],
     }
-    cases.each do |status, (message, contents)|
-      api = FakeApi.new({ files_path => [{ "filename" => path, "status" => status }] }.merge(contents))
-
-      error = assert_raises(PrCiPolicy::PolicyError, status) { PrCiPolicy::Runner.new(api).check(event) }
-      assert_match message, error.message, status
+    outcomes.keys.product((0...4).to_a).each do |status, presence|
+      base, head = [presence >= 2, presence.odd?].map { |present| present ? content_payload(text) : nil }
+      api = FakeApi.new(files_path => [{ "filename" => path, "status" => status }],
+                        base_content_path(path) => base, head_content_path(path) => head)
+      runner = PrCiPolicy::Runner.new(api)
+      if (message = outcomes.fetch(status)[presence])
+        error = assert_raises(PrCiPolicy::PolicyError) { runner.check(event) }
+        assert_match message, error.message
+      else
+        assert_empty runner.check(event)
+      end
+      assert_equal [[files_path, false, 2 * 1024 * 1024],
+                    [base_content_path(path), status == "added", PrCiPolicy::Runner::MAX_FILE_BYTES * 2],
+                    [head_content_path(path), status == "removed", PrCiPolicy::Runner::MAX_FILE_BYTES * 2]], api.requests
     end
   end
 
@@ -208,34 +270,47 @@ class PolicyRunnerTest < Minitest::Test
     end
   end
 
-  def test_rejects_new_files_under_every_manifest_prefix
-    PrCiPolicy::Manifest.read.protected_runtime_prefixes.select { |prefix| prefix.end_with?("/") }.each do |prefix|
-      file = { "filename" => "#{prefix}added-by-pr.txt", "status" => "added" }
-      result = PrCiPolicy::Runner.new(FakeApi.new(files_path => [file])).check(event)
-
-      assert_equal [:protected_runtime], result.map(&:category), prefix
+  def test_real_manifest_protected_paths_contract
+    paths = PrCiPolicy::Manifest.read.protected_runtime_prefixes.select { |prefix| prefix.end_with?("/") }
+                                .map { |prefix| "#{prefix}added-by-pr.txt" }
+    paths += ["docker/builder/image-tag-prefix.sh"]
+    paths += %w[docker-forge-pr-report indexer-processor-dispatch pr-ci-report].map { |name| ".github/actions/#{name}/action.yml" }
+    paths.each do |path|
+      status = path.end_with?("added-by-pr.txt") ? "added" : "modified"
+      result = PrCiPolicy::Runner.new(FakeApi.new(files_path => [{ "filename" => path, "status" => status }])).check(event)
+      assert_equal [:protected_runtime], result.map(&:category), path
     end
-  end
-
-  def test_rejects_change_to_exact_protected_image_tag_helper
-    file = { "filename" => "docker/builder/image-tag-prefix.sh", "status" => "modified" }
-    result = PrCiPolicy::Runner.new(FakeApi.new(files_path => [file])).check(event)
-
-    assert_equal [:protected_runtime], result.map(&:category)
   end
 
   def test_protected_prefixes_match_whole_directory_names
     file = { "filename" => ".github/actions/compute-authorized-v2/action.yml", "status" => "added" }
-
     assert_empty PrCiPolicy::Runner.new(FakeApi.new(files_path => [file])).check(event)
-  end
-
-  def test_rejects_changes_to_privileged_wrapper_actions
-    %w[docker-forge-pr-report indexer-processor-dispatch pr-ci-report].each do |name|
-      file = { "filename" => ".github/actions/#{name}/action.yml", "status" => "modified" }
-      result = PrCiPolicy::Runner.new(FakeApi.new(files_path => [file])).check(event)
-
-      assert_equal [:protected_runtime], result.map(&:category), name
+    prefixes = [".github/actions/compute-authorized/", ".github/actions/pr-ci-policy/", ".github/ci/"]
+    paths = prefixes.flat_map do |prefix|
+      [["#{prefix}action.yml", true], ["#{prefix.delete_suffix('/')}-v2/action.yml", false], [prefix.delete_suffix('/'), false]]
+    end
+    paths += [["docker/builder/image-tag-prefix.sh", true], ["docker/builder/image-tag-prefix.sh.bak", false],
+              ["docker/builder/image-tag-prefix.sh/nested", false]]
+    manifest = PrCiPolicy::Manifest.new(hardened_workflows: Set[], approved_protected_reusables: Set[],
+                                      protected_runtime_prefixes: (prefixes + ["docker/builder/image-tag-prefix.sh"]).to_set)
+    corpus = paths.each_index.flat_map do |current|
+      (0...3).map { |status| [current, status, 0, 0, 0] } + paths.each_index.map { |previous| [current, 3, previous, 0, 0] }
+    end
+    check_property("protected_path_lookalikes_and_rename_directions", corpus: corpus,
+                   generate: ->(r) { [r.rand(paths.length), r.rand(4), r.rand(paths.length), r.rand(32), r.rand(5)] }) do |current, status_choice, previous, suffix, depth|
+      path, protected = paths[current % paths.length]
+      old_path, old_protected = paths[previous % paths.length]
+      filename = suffix.zero? ? "action.yml" : "file-#{suffix}.rb"
+      nested = "nested/" * (depth % 5) + filename
+      path, old_path = [path, old_path].map { |value| value.sub("action.yml", nested) }
+      status = %w[added modified removed renamed][status_choice % 4]
+      file = { "filename" => path, "status" => status }
+      file["previous_filename"] = old_path if status == "renamed"
+      expected = protected || (status == "renamed" && old_protected) ? [:protected_runtime] : []
+      api = FakeApi.new(files_path => [file])
+      result = PrCiPolicy::Runner.new(api, manifest: manifest).check(event)
+      assert_equal expected, result.map(&:category), file.inspect
+      assert_equal [files_path], api.requests.map(&:first)
     end
   end
 

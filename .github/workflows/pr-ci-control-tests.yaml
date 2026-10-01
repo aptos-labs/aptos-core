@@ -45,16 +45,32 @@ jobs:
   ruby_contracts:
     name: Ruby policy and workflow contract tests
     runs-on: ubuntu-latest
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/.github/workflows/tests/Gemfile
+      BUNDLE_FROZEN: "true"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8
+        with:
+          ruby-version: "4.0.6"
+          bundler: "4.0.16"
+          bundler-cache: false
+      - name: Install locked Ruby test dependencies
+        env:
+          BUNDLE_PATH: ${{ runner.temp }}/ci-contract-tests-gems
+        run: bundle _4.0.16_ install --jobs 4 --retry 3
       - name: Run Ruby contract tests
+        env:
+          BUNDLE_PATH: ${{ runner.temp }}/ci-contract-tests-gems
+          RUBY_PROPERTY_PROFILE: ci
+          RUBY_PROPERTY_SEED: "20260930"
         run: |
           mapfile -d '' tests < <(find .github/workflows/tests -type f -name 'test_*.rb' -print0 | sort -z)
           test "${#tests[@]}" -gt 0
           status=0
-          for test_file in "${tests[@]}"; do ruby "$test_file" || status=1; done
+          for test_file in "${tests[@]}"; do bundle _4.0.16_ exec ruby "$test_file" || status=1; done
           exit "$status"
 
   actionlint:

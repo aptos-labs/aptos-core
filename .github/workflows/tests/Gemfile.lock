@@ -1,0 +1,27 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    base64 (0.3.0)
+    minitest (6.0.0)
+      prism (~> 1.5)
+    prism (1.9.0)
+    rantly (3.0.0)
+
+PLATFORMS
+  arm64-darwin-25
+  ruby
+  x86_64-linux
+
+DEPENDENCIES
+  base64 (= 0.3.0)
+  minitest (= 6.0.0)
+  rantly (= 3.0.0)
+
+CHECKSUMS
+  base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
+  minitest (6.0.0) sha256=4ca597fc1d735ea18d2b4b98c5fb1d5a6da4a6f35ddf32bd5fa3eded33a453be
+  prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
+  rantly (3.0.0) sha256=1db4a470eb4cfebdfa450746cb8ce9fa684139c907285df75cce47f5b7852973
+
+BUNDLED WITH
+  4.0.16

@@ -2,23 +2,22 @@
 
 require "minitest/autorun"
 require_relative "policy_test_helper"
+require_relative "property_support"
 
 class PolicyHardenedTest < Minitest::Test
   include PolicyTestHelper
+  include PolicyPropertySupport
 
-  def test_strict_hardened_workflow_rejects_changes_to_an_existing_risky_job
-    base = fixture("legacy-unsafe.yaml")
-    head = base.sub("./legacy.sh", "./legacy-v2.sh")
-    path = ".github/workflows/mono-move-e2e-perf.yaml"
-    assert_includes PrCiPolicy::PolicyChecker.new.check_pair(path, base, head).join("\n"), "hardened workflow"
-  end
-
-  def test_strict_hardened_workflow_rejects_changes_to_a_fixed_environment_risky_job
-    base = fixture("fixed-environment-privileged.yaml")
-    head = base.sub("google-github-actions/auth@v2", "google-github-actions/auth@v3")
-    path = ".github/workflows/mono-move-e2e-perf.yaml"
-
-    assert_includes PrCiPolicy::PolicyChecker.new.check_pair(path, base, head).join("\n"), "hardened workflow"
+  def test_hardened_and_ratchet_existing_risky_job_changes
+    {
+      "legacy-unsafe.yaml" => ["./legacy.sh", "./legacy-v2.sh"],
+      "fixed-environment-privileged.yaml" => ["google-github-actions/auth@v2", "google-github-actions/auth@v3"],
+    }.each do |name, (before, after)|
+      base = fixture(name)
+      head = base.sub(before, after)
+      assert_includes PrCiPolicy::PolicyChecker.new.check_pair(".github/workflows/mono-move-e2e-perf.yaml", base, head).join("\n"), "hardened workflow", name
+      assert_empty PrCiPolicy::PolicyChecker.new.check_pair(PATH, base, head), name
+    end
   end
 
   def test_hardened_workflow_reports_each_job_privilege_once
@@ -50,19 +49,6 @@ class PolicyHardenedTest < Minitest::Test
       [["publish", :privilege_increase, :id_token_write], ["publish", :privilege_increase, :secret]],
       findings(result),
     )
-  end
-
-  def test_non_hardened_workflow_allows_non_privilege_changes_to_existing_debt
-    base = fixture("legacy-unsafe.yaml")
-    head = base.sub("./legacy.sh", "./legacy-v2.sh")
-    assert_empty PrCiPolicy::PolicyChecker.new.check_pair(PATH, base, head)
-  end
-
-  def test_non_hardened_workflow_allows_changes_to_a_fixed_environment_risky_job
-    base = fixture("fixed-environment-privileged.yaml")
-    head = base.sub("google-github-actions/auth@v2", "google-github-actions/auth@v3")
-
-    assert_empty PrCiPolicy::PolicyChecker.new.check_pair(PATH, base, head)
   end
 
   def test_hardened_workflow_allows_changes_that_remove_all_risky_privileges
@@ -135,41 +121,18 @@ class PolicyHardenedTest < Minitest::Test
     end
   end
 
-  def test_rejects_policy_workflow_trigger_changes
+  def test_rejects_policy_workflow_execution_changes
     base = policy_workflow_text
-    head = base.sub(
-      "types: [opened, synchronize, reopened]",
-      "types: [opened, synchronize, reopened, closed]",
-    )
-
-    refute_empty policy_workflow_violations(base, head)
-  end
-
-  def test_rejects_policy_workflow_permission_changes
-    base = policy_workflow_text
-    head = base.sub("  pull-requests: read", "  actions: read")
-
-    refute_empty policy_workflow_violations(base, head)
-  end
-
-  def test_rejects_policy_workflow_checkout_changes
-    base = policy_workflow_text
-    head = base.sub(
-      "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
-      "actions/checkout@22bd71901bbe5b1630ceea73d27597364c9af683",
-    )
-
-    refute_empty policy_workflow_violations(base, head)
-  end
-
-  def test_rejects_policy_workflow_job_changes
-    base = policy_workflow_text
-    head = base.sub(
-      "name: Validate workflow privilege changes",
-      "name: Validate modified workflow privilege changes",
-    )
-
-    refute_empty policy_workflow_violations(base, head)
+    {
+      "trigger" => ["types: [opened, synchronize, reopened]", "types: [opened, synchronize, reopened, closed]"],
+      "permission" => ["  pull-requests: read", "  actions: read"],
+      "checkout" => ["actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683", "actions/checkout@22bd71901bbe5b1630ceea73d27597364c9af683"],
+      "job" => ["name: Validate workflow privilege changes", "name: Validate modified workflow privilege changes"],
+    }.each do |name, (before, after)|
+      head = base.sub(before, after)
+      refute_equal base, head, name
+      refute_empty policy_workflow_violations(base, head), name
+    end
   end
 
   def test_accepts_identical_and_comment_only_policy_workflow_changes
@@ -266,5 +229,55 @@ class PolicyHardenedTest < Minitest::Test
 
       assert_empty PrCiPolicy::PolicyChecker.new.check_pair(path, text, text), path
     end
+  end
+
+  # Test-owned transition categories and reported privilege sets.
+  TRANSITIONS = [
+    [:unchanged, nil, nil, [:write_permission]],
+    [:job_changed, :hardened_job_changed, nil, [:write_permission]],
+    [:state_changed, :hardened_state_changed, nil, [:write_permission]],
+    [:removed_privilege, nil, nil, []],
+    [:gained_privilege, :hardened_state_changed, :privilege_increase, [:id_token_write, :write_permission]],
+    [:renamed, :hardened_job_changed, :new_job, [:write_permission]],
+    [:source_added, :hardened_job_changed, :new_source, [:write_permission]],
+    [:new_job, :hardened_job_changed, :new_job, [:write_permission]],
+  ].freeze
+
+  def test_generated_base_head_hardened_and_ratchet_transitions
+    corpus = (0...TRANSITIONS.length).to_a.product([0, 1], [0, 1]).map { |row| row + [0, 0] }
+    check_property("hardened_ratchet_transitions", corpus: corpus,
+      generate: ->(random) { [random.rand(8), random.rand(2), random.rand(2), random.rand(4), random.rand(2)] },
+      describe: ->(choices) { transition_case(choices).inspect }) do |choices|
+      base, head, path, expected = transition_case(choices)
+      assert_equal expected, findings(PrCiPolicy::PolicyChecker.new.check_pair(path, base, head)).sort
+    end
+  end
+
+  private
+
+  def transition_case(choices)
+    transition, hardened, protected, count, syntax = choices.zip([8, 2, 2, 4, 2]).map { |value, limit| value % limit }
+    operation, strict_category, ratchet_category, kinds = TRANSITIONS.fetch(transition)
+    base = JSON.parse(pr_target_workflow(permissions: { "contents" => "write" }, steps: [{ "run" => "./legacy.sh" }]))
+    job = base.fetch("jobs").fetch("test")
+    job["environment"] = "privileged-pr-ci" if protected == 1
+    names = Array.new(count + 1) { |index| "test_#{index}" }
+    base["jobs"] = names.to_h { |name| [name, job] }
+    head = Marshal.load(Marshal.dump(base))
+    case operation
+    when :job_changed then head["jobs"].each_value { |value| value["steps"].last["run"] = "./legacy-v2.sh" }
+    when :state_changed then head["env"] = { "MODE" => "head" }
+    when :removed_privilege then head["permissions"] = { "contents" => "read" }
+    when :gained_privilege then head["permissions"]["id-token"] = "write"
+    when :renamed then head["jobs"] = head["jobs"].transform_keys { |name| "#{name}_renamed" }
+    when :source_added then head["jobs"].each_value { |value| value["steps"] << { "run" => "gh pr checkout 42" } }
+    when :new_job then base["jobs"] = {}
+    end
+    category = hardened == 1 ? strict_category : (protected.zero? ? ratchet_category : nil)
+    reported = hardened.zero? && operation == :gained_privilege ? [:id_token_write] : kinds
+    expected = category ? head["jobs"].keys.flat_map { |name| reported.map { |kind| [name, category, kind] } }.sort : []
+    path = hardened == 1 ? ".github/workflows/mono-move-e2e-perf.yaml" : PATH
+    texts = [base, head].map { |document| syntax.zero? ? JSON.generate(document) : JSON.pretty_generate(document) }
+    [*texts, path, expected]
   end
 end

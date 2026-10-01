@@ -1,9 +1,0 @@
-name: alias
-on: pull_request_target
-permissions: &permissions
-  contents: read
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    permissions: *permissions
-    steps: []

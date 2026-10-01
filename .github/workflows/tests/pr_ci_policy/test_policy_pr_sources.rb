@@ -2,36 +2,28 @@
 
 require "minitest/autorun"
 require_relative "policy_test_helper"
+require_relative "property_support"
 
 class PolicyPrSourcesTest < Minitest::Test
   include PolicyTestHelper
+  include PolicyPropertySupport
 
-  def test_rejects_pull_request_title_in_shell_with_write_authority
-    result = violations(nil, "pr-title-run.yaml").join("\n")
-
-    assert_includes result, "PR-controlled execution value"
-    assert_includes result, "write permission"
-  end
-
-  def test_rejects_github_event_number_in_privileged_execution
-    result = violations(nil, "shell-pr-expression.yaml").join("\n")
-
-    assert_includes result, "PR-controlled execution value"
-    assert_includes result, "write permission"
-  end
-
-  def test_rejects_event_file_as_a_pr_source_with_privilege
-    result = violations(nil, "shell-pr-event-file.yaml").join("\n")
-
-    assert_includes result, "shell-derived PR source"
-    assert_includes result, "write permission"
-  end
-
-  def test_rejects_raw_shell_pr_checkout_sources_with_privilege
-    result = violations(nil, "shell-pr-raw-sources.yaml").join("\n")
-
-    %w[head-ref pull-ref gh-checkout git-fetch api-fetch api-list].each do |job|
-      assert_match(/job "#{job}":.*shell-derived PR source/, result)
+  def test_privileged_source_fixture_classifications
+    {
+      "pr-title-run.yaml" => { "comment" => "PR-controlled execution value" },
+      "shell-pr-expression.yaml" => { "execute" => "PR-controlled execution value" },
+      "shell-pr-event-file.yaml" => { "execute" => "shell-derived PR source" },
+      "shell-pr-raw-sources.yaml" => %w[head-ref pull-ref gh-checkout git-fetch api-fetch api-list].to_h { |job| [job, "shell-derived PR source"] },
+      "script-pr-sources.yaml" => {
+        "event-path-expression" => "PR-controlled execution value",
+        **%w[context-issue context-payload github-graphql-pull-request github-request-pulls github-rest-get-ref github-rest-pulls octokit-rest-pulls process-env-event-path].to_h { |job| [job, "script/API-derived PR source"] },
+      },
+      "trusted-base-only.yaml" => { "trusted" => "pull_request_target workflow" },
+      "issue-api-pr-discovery.yaml" => { "execute" => "pull_request_target workflow" },
+    }.each do |name, jobs|
+      result = violations(nil, name).join("\n")
+      jobs.each { |job, label| assert_match(/job "#{job}":.*#{Regexp.escape(label)}/, result, name) }
+      assert_includes result, "write permission", name
     end
   end
 
@@ -49,19 +41,35 @@ class PolicyPrSourcesTest < Minitest::Test
               env:
                 VALUE: EXPRESSION
     YAML
-    {
-      "${{ github['event']['pull_request']['title'] }}" => [:execution_value],
-      "${{ github.event['pull_request'].title }}" => [:execution_value],
-      "${{ github [ 'event' ] . number }}" => [:execution_value],
-      "${{ github['head_ref'] }}" => [:execution_value],
-      "${{ inputs['head_sha'] }}" => [:execution_value],
-      "context['payload']['pull_request'].number" => [:script_api_source],
-      "github.rest['pulls'].get(context.repo)" => [:script_api_source],
-      "${{ github['event']['pull_request']['base']['sha'] }}" => [],
-    }.each do |expression, kinds|
+    # GH Actions templates and JavaScript source strings have separate renderers.
+    cases = [
+      ["${{ github['event']['pull_request']['title'] }}", [:execution_value], %w[github event pull_request title], :actions],
+      ["${{ github.event['pull_request'].title }}", [:execution_value], %w[github event pull_request title], :actions],
+      ["${{ github [ 'event' ] . number }}", [:execution_value], %w[github event number], :actions],
+      ["${{ github['head_ref'] }}", [:execution_value], %w[github head_ref], :actions],
+      ["${{ inputs['head_sha'] }}", [:execution_value], %w[inputs head_sha], :actions],
+      ["context['payload']['pull_request'].number", [:script_api_source], %w[context payload pull_request number], :script],
+      ["github.rest['pulls'].get(context.repo)", [:script_api_source], %w[github rest pulls], :script],
+      ["${{ github['event']['pull_request']['base']['sha'] }}", [], %w[github event pull_request base sha], :actions],
+    ]
+    render = lambda do |choice|
+      original, _kinds, members, language = cases.fetch(choice[0] % cases.size)
+      next original if choice[1].zero?
+      space = " " * (choice[2] % 3)
+      root, *tail = choice[3].odd? ? members.map(&:upcase) : members
+      quote = language == :actions ? "'" : '"'
+      chain = root + tail.each_with_index.map do |member, index|
+        forms = ["#{space}.#{space}#{member}", "#{space}[#{space}'#{member}'#{space}]", index.even? ? "[#{quote}#{member}#{quote}]" : ".#{member}"]
+        forms.fetch((choice[1] - 1) % forms.size)
+      end.join
+      language == :actions ? "${{ #{chain} }}" : "const value = #{chain};"
+    end
+    corpus = cases.each_index.to_a.product((0...4).to_a, (0...3).to_a, [0, 1])
+    check_property("member syntax", corpus: corpus,
+                   generate: ->(random) { [random.rand(cases.size), random.rand(4), random.rand(3), random.rand(2)] }, describe: render) do |choice|
+      expression = render.call(choice)
       result = PrCiPolicy::PolicyChecker.new.check_pair(PATH, nil, workflow.sub("EXPRESSION", expression))
-
-      assert_equal kinds, result.flat_map { |violation| violation.sources.map(&:kind) }.uniq, expression
+      assert_equal cases.fetch(choice[0] % cases.size)[1], result.flat_map { |violation| violation.sources.map(&:kind) }.uniq, expression
     end
   end
 
@@ -87,10 +95,7 @@ class PolicyPrSourcesTest < Minitest::Test
   end
 
   def test_member_access_dot_form_still_matches_before_a_trailing_dash
-    # `-` is not part of a GitHub Actions expression identifier, but it is a
-    # JavaScript subtraction operator, and this builder also feeds the
-    # actions/github-script rules. `(?![\w-])` rejected a trailing dash;
-    # `(?!\w)` is a `\b`-like boundary that still allows one.
+    # JavaScript subtraction must not hide a source member before the dash.
     assert_match PrCiPolicy::WorkflowAnalysis.member_access("context", "issue", "number"), "context.issue.number-1"
     assert_match PrCiPolicy::WorkflowAnalysis.member_access("context", "issue", "number"), "context.issue.number- 1"
     assert_match PrCiPolicy::WorkflowAnalysis.member_access("context", "payload", "pull_request"), "context.payload.pull_request-0"
@@ -108,32 +113,6 @@ class PolicyPrSourcesTest < Minitest::Test
     assert_includes result.join("\n"), "script/API-derived PR source"
   end
 
-  def test_rejects_event_path_and_script_api_pr_sources_with_privilege
-    result = violations(nil, "script-pr-sources.yaml").join("\n")
-
-    assert_match(/job "event-path-expression":.*PR-controlled execution value/, result)
-    %w[
-      context-issue context-payload github-graphql-pull-request github-request-pulls
-      github-rest-get-ref github-rest-pulls octokit-rest-pulls process-env-event-path
-    ].each do |job|
-      assert_match(/job "#{job}":.*script\/API-derived PR source/, result)
-    end
-  end
-
-  def test_rejects_privileged_job_that_only_appears_to_execute_trusted_base_code
-    result = violations(nil, "trusted-base-only.yaml").join("\n")
-
-    assert_includes result, "pull_request_target workflow"
-    assert_includes result, "write permission"
-  end
-
-  def test_rejects_indirect_issue_api_discovery_of_pr_code
-    result = violations(nil, "issue-api-pr-discovery.yaml").join("\n")
-
-    assert_includes result, "pull_request_target workflow"
-    assert_includes result, "write permission"
-  end
-
   def test_only_accepts_required_event_exclusion_conjuncts
     result = violations(nil, "pr-target-event-exclusions.yaml").join("\n")
 
@@ -146,61 +125,71 @@ class PolicyPrSourcesTest < Minitest::Test
     %w[safe-not-target safe-nested-other-or safe-workflow-dispatch].each do |job|
       refute_match(/job "#{job}"/, result)
     end
+    # Only a required, syntactically valid AND conjunct excludes the event.
+    render = lambda do |choice|
+      member = ["github.event_name", "github['event_name']", "github [ 'event_name' ]"][choice[2] % 3]
+      exclusion = "#{member} != 'pull_request_target'"
+      condition, excludes = [
+        ["#{exclusion} && (true || false)", true],
+        ["always() && #{member} == 'workflow_dispatch' && !cancelled()", true],
+        ["#{exclusion} || github.actor == 'octocat'", false],
+        ["always() && (#{exclusion} || true)", false],
+        ["#{exclusion} && !!!", false],
+        ["#{exclusion} && ${{ true }}", false],
+        ["#{member} != \"pull_request_target\"", false],
+        ["${{ #{exclusion} }}", true],
+        [" ${{ #{exclusion} }}", false],
+        ["${{ #{exclusion} }} ", false],
+        ["text ${{ #{exclusion} }}", false],
+        ["${{ #{exclusion} }", false],
+      ].fetch(choice[0] % 12)
+      # Templates stay whole; outer parentheses would turn them into rendered text.
+      depth = choice[0] % 12 < 7 ? choice[1] % 4 : 0
+      ["(" * depth + condition + ")" * depth, excludes]
+    end
+    corpus = (0...12).to_a.product((0...4).to_a, (0...3).to_a)
+    check_property("event exclusions", corpus: corpus,
+                   generate: ->(random) { [random.rand(12), random.rand(4), random.rand(3)] }, describe: render) do |choice|
+      condition, excludes = render.call(choice)
+      assert_event_source(condition, !excludes, steps: [{ "run" => "./trusted.sh" }])
+    end
   end
 
   def test_event_exclusion_fails_closed_on_non_ascii_event_name_literals
-    write = { "contents" => "write" }
-    {
-      "!= with a Unicode-casefold lookalike" => "github.event_name != 'pull_requeſt_target'",
-      "== with a non-ASCII literal" => "github.event_name == 'ｐush'",
-    }.each do |description, condition|
-      head = pr_target_workflow(job: { "if" => condition }, permissions: write)
-      result = PrCiPolicy::PolicyChecker.new.check_pair(PATH, nil, head).join("\n")
-
-      assert_includes result, "pull_request_target workflow", description
+    { "!= with a Unicode-casefold lookalike" => "github.event_name != 'pull_requeſt_target'",
+      "== with a non-ASCII literal" => "github.event_name == 'ｐush'" }.each do |description, condition|
+      assert_event_source(condition, true, description: description)
     end
   end
 
   def test_event_exclusion_rejects_template_with_surrounding_whitespace
-    # GitHub evaluates a job `if:` as a whole expression only when the string
-    # is exactly one ${{ }} template. With any surrounding text, even a space,
-    # it renders a non-empty format() string, which is always true.
-    write = { "contents" => "write" }
+    # A template with surrounding text renders a nonempty, truthy string.
     template = "${{ github.event_name != 'pull_request_target' }}"
-    {
-      "leading space" => " #{template}",
-      "trailing space" => "#{template} ",
-    }.each do |description, condition|
-      head = pr_target_workflow(job: { "if" => condition }, permissions: write)
-      result = PrCiPolicy::PolicyChecker.new.check_pair(PATH, nil, head).join("\n")
-
-      assert_includes result, "pull_request_target workflow", description
+    { "leading space" => " #{template}", "trailing space" => "#{template} " }.each do |description, condition|
+      assert_event_source(condition, true, description: description)
     end
-
-    head = pr_target_workflow(job: { "if" => template }, permissions: write)
-    refute_includes PrCiPolicy::PolicyChecker.new.check_pair(PATH, nil, head).join("\n"), "pull_request_target workflow"
+    assert_event_source(template, false)
   end
 
   def test_member_chain_length_fails_closed_on_non_ascii_bracket_member_names
-    # 'ſ' (U+017F LATIN SMALL LETTER LONG S) is Unicode-casefold equal to 's',
-    # so a naive casecmp? on the bracket string would treat this as a match
-    # for the member "s" even though GitHub's own lookup is ordinal.
+    # Long s (U+017F) casefolds to ASCII s, but member lookup is ordinal.
     tokens = PrCiPolicy::Expression.tokenize("root['ſ']")
 
     assert_nil PrCiPolicy::Expression.member_chain_length(tokens, %w[root s])
   end
 
-  # Regression test for homoglyphs: the 'а' in 'event_nаme' is U+0430
-  # CYRILLIC SMALL LETTER A. It does not test the case-folding fix, because
-  # this member name is not casefold-equal to 'event_name' and fails to
-  # match with or without that fix.
   def test_event_exclusion_ignores_homoglyph_bracket_event_name_member
-    write = { "contents" => "write" }
-    condition = "github['event_nаme'] != 'pull_request_target'"
+    # The Cyrillic a (U+0430) is not casefold-equal to the ASCII member.
+    assert_event_source("github['event_nаme'] != 'pull_request_target'", true)
+  end
 
-    head = pr_target_workflow(job: { "if" => condition }, permissions: write)
+  private
+
+  def assert_event_source(condition, expected, description: condition, steps: nil)
+    job = { "if" => condition }
+    job["steps"] = steps if steps
+    head = pr_target_workflow(job: job, permissions: { "contents" => "write" })
     result = PrCiPolicy::PolicyChecker.new.check_pair(PATH, nil, head).join("\n")
-
-    assert_includes result, "pull_request_target workflow"
+    assert_equal expected, result.include?("pull_request_target workflow"), description
   end
 end

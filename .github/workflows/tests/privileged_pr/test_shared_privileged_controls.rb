@@ -5,9 +5,11 @@ require "fileutils"
 require "open3"
 require "tmpdir"
 require_relative "../workflow_test_helper"
+require_relative "../pr_ci_policy/property_support"
 
 class SharedPrivilegedControlTests < Minitest::Test
   include WorkflowTestHelper
+  include PolicyPropertySupport
 
   EXACT_SOURCE_ACTION = "./trusted-base/.github/actions/checkout-exact-pr-source"
   GCP_REGISTRY_ACTION = "./trusted-base/.github/actions/gcp-registry-auth"
@@ -109,6 +111,28 @@ class SharedPrivilegedControlTests < Minitest::Test
     end
   end
 
+  def test_exact_source_validator_accepts_generated_lowercase_full_shas
+    check_property("valid-source-shas", corpus: [[0] * 5, [0xaaaaaaaa] * 5, [0xffffffff] * 5],
+                   generate: ->(random) { Array.new(5) { random.rand(2**32) } },
+                   describe: ->(words) { source_sha(words).inspect }) do |words|
+      sha = source_sha(words)
+      stdout, stderr, status = validate_source_sha(sha)
+      assert status.success?, "#{sha}: #{stdout}\n#{stderr}"
+    end
+  end
+
+  def test_exact_source_validator_rejects_invalid_sha_categories
+    # Every category stays invalid when the integer tuple shrinks.
+    check_property("invalid-source-shas", corpus: (0..7).map { |category| [category, 0, 0] },
+                   generate: ->(random) { [random.rand(8), random.rand(64), random.rand(40)] },
+                   describe: ->(sample) { invalid_source_sha(sample).inspect }) do |sample|
+      sha = invalid_source_sha(sample)
+      _stdout, stderr, status = validate_source_sha(sha)
+      refute status.success?, sha.inspect
+      assert_includes stderr, "full lowercase commit SHA", sha.inspect
+    end
+  end
+
   def test_gcp_registry_action_has_fixed_auth_and_registry_boundary
     action = load_action("gcp-registry-auth")
     assert_equal %w[access_token_lifetime create_credentials_file service_account workload_identity_provider],
@@ -164,21 +188,16 @@ class SharedPrivilegedControlTests < Minitest::Test
   # that exact prefix for every configured build variant.
   def test_privileged_setup_tag_matches_the_published_tag
     sha = "0123456789abcdef0123456789abcdef01234567"
-    variants = docker_manifest.fetch("variants").map { |variant| [variant.fetch("profile"), variant.fetch("features")] }
-    (variants + [["ci", "a,b"]]).each do |profile, features|
-      Dir.mktmpdir("image-tag") do |dir|
-        env = {"PR_NUMBER" => "42", "SOURCE_SHA" => sha, "PROFILE" => profile, "FEATURES" => features,
-               "GITHUB_RUN_ID" => "24680", "GITHUB_RUN_ATTEMPT" => "2"}
-        outputs, github_env = run_tag_step(dir, env)
-        expected_prefix = "pr-42_"
-        expected_prefix += "#{profile}_" unless profile == "release"
-        expected_prefix += "#{features.gsub(/[^a-zA-Z0-9]/, "_")}_" unless features.empty?
-        expected_prefix += "r24680-a2_"
-        assert_equal expected_prefix, outputs.fetch("image_tag_prefix"), "#{profile}:#{features}"
-        assert_equal "#{expected_prefix}#{sha}", outputs.fetch("image_tag"), "#{profile}:#{features}"
-        assert_equal ["PR_IMAGE_TAG=#{outputs.fetch("image_tag")}"], github_env
-        assert_equal expected_prefix, run_stubbed_bake(dir, sha, profile, features, expected_prefix)
-      end
+    tag_variants.each do |profile, features|
+      assert_published_tag(tag_env.merge("SOURCE_SHA" => sha, "PROFILE" => profile, "FEATURES" => features), bake: true)
+    end
+    corpus = tag_variants.each_index.map { |index| [index, 41, 0, 0, 0, 0, *[0xaaaaaaaa] * 5, 24679, 1] }
+    check_property("published-image-tags", corpus: corpus, generate: lambda { |random|
+      [tag_variants.length, random.rand(9_999_999_999), random.rand(65), random.rand(2**384),
+       random.rand(65), random.rand(2**384), *Array.new(5) { random.rand(2**32) },
+       random.rand(10**18), random.rand(10**6)]
+    }, describe: ->(sample) { generated_tag_env(sample).inspect }) do |sample|
+      assert_published_tag(generated_tag_env(sample))
     end
   end
 
@@ -199,21 +218,25 @@ class SharedPrivilegedControlTests < Minitest::Test
 
   def test_privileged_setup_rejects_values_that_could_inject_environment_lines
     [{"PR_NUMBER" => "1\nX=1"}, {"PROFILE" => "release\nX=1"}, {"FEATURES" => "failpoints\nX=1"}].each do |override|
-      Dir.mktmpdir("image-tag") do |dir|
-        env = {"PR_NUMBER" => "42", "SOURCE_SHA" => "a" * 40, "PROFILE" => "release", "FEATURES" => "",
-               "GITHUB_RUN_ID" => "24680", "GITHUB_RUN_ATTEMPT" => "2"}.merge(override)
-        assert_nil run_tag_step(dir, env, expect_success: false), override.keys.first
-      end
+      assert_tag_rejected(override)
+    end
+    corpus = (0..4).to_a.product((0..2).to_a, [0])
+    check_property("environment-line-injection", corpus: corpus,
+                   generate: ->(random) { [random.rand(5), random.rand(3), random.rand(64)] },
+                   describe: ->(sample) { tag_env.merge(injected_tag_input(sample)).inspect }) do |sample|
+      assert_tag_rejected(injected_tag_input(sample))
     end
   end
 
-  def test_privileged_setup_accepts_every_manifest_feature_set
-    docker_manifest.fetch("variants").each do |variant|
-      Dir.mktmpdir("image-tag") do |dir|
-        env = {"PR_NUMBER" => "42", "SOURCE_SHA" => "a" * 40, "PROFILE" => variant.fetch("profile"),
-               "FEATURES" => variant.fetch("features"), "GITHUB_RUN_ID" => "24680", "GITHUB_RUN_ATTEMPT" => "2"}
-        run_tag_step(dir, env)
-      end
+  def test_privileged_setup_rejects_invalid_tag_field_categories
+    corpus = tag_input_fields.each_index.flat_map do |field|
+      invalid_tag_values(tag_input_fields.fetch(field), 0).each_index.map { |category| [field, category, 0] }
+    end
+    check_property("invalid-tag-fields", corpus: corpus, generate: lambda { |random|
+      field = random.rand(tag_input_fields.length)
+      [field, random.rand(invalid_tag_values(tag_input_fields.fetch(field), 0).length), random.rand(64)]
+    }, describe: ->(sample) { tag_env.merge(invalid_tag_input(sample)).inspect }) do |sample|
+      assert_tag_rejected(invalid_tag_input(sample))
     end
   end
 
@@ -339,6 +362,107 @@ class SharedPrivilegedControlTests < Minitest::Test
 
   private
 
+  def source_sha(words)
+    words.map { |word| word.to_s(16).rjust(8, "0") }.join
+  end
+
+  def validate_source_sha(sha)
+    Open3.capture3("bash", File.join(ROOT, ".github/actions/checkout-exact-pr-source/verify-source.sh"), "validate", sha)
+  end
+
+  def invalid_source_sha(sample)
+    category, length, position = sample
+    sha = "a" * 40
+    case category
+    when 0 then "a" * (length % 40)
+    when 1 then "a" * (41 + length % 24)
+    when 2 then sha.dup.tap { |value| value[position] = "A" }
+    when 3 then sha.dup.tap { |value| value[position] = "g" }
+    when 4 then sha + "\r"
+    when 5 then sha + "\n"
+    when 6 then sha + "\r\nX=1"
+    when 7 then sha.dup.tap { |value| value[position] = "é" }
+    end
+  end
+
+  def tag_env
+    {"PR_NUMBER" => "42", "SOURCE_SHA" => "a" * 40, "PROFILE" => "release", "FEATURES" => "",
+     "GITHUB_RUN_ID" => "24680", "GITHUB_RUN_ATTEMPT" => "2"}
+  end
+
+  def tag_variants
+    @tag_variants ||= docker_manifest.fetch("variants").map { |variant| [variant.fetch("profile"), variant.fetch("features")] } + [["ci", "a,b"]]
+  end
+
+  def generated_tag_env(sample)
+    variant, pr, profile_length, profile_code, features_length, features_code, *rest = sample
+    profile, features = tag_variants.fetch(variant) do
+      [profile_length.zero? ? "release" : choice_string(profile_code, profile_length, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"),
+       choice_string(features_code, features_length, "abcdefghijklmnopqrstuvwxyz0123456789,-")]
+    end
+    tag_env.merge("PR_NUMBER" => (pr + 1).to_s, "PROFILE" => profile, "FEATURES" => features,
+                  "SOURCE_SHA" => source_sha(rest.take(5)), "GITHUB_RUN_ID" => (rest.fetch(5) + 1).to_s,
+                  "GITHUB_RUN_ATTEMPT" => (rest.fetch(6) + 1).to_s)
+  end
+
+  def choice_string(code, length, alphabet)
+    Array.new(length) do
+      code, character = code.divmod(alphabet.length)
+      alphabet[character]
+    end.join
+  end
+
+  def assert_published_tag(env, bake: false)
+    # Test-owned rules: omit release, normalize each feature separator, retain full SHA.
+    prefix = "pr-#{env.fetch('PR_NUMBER')}_"
+    prefix += "#{env.fetch('PROFILE')}_" unless env.fetch("PROFILE") == "release"
+    prefix += "#{env.fetch('FEATURES').tr(',-', '__')}_" unless env.fetch("FEATURES").empty?
+    prefix += "r#{env.fetch('GITHUB_RUN_ID')}-a#{env.fetch('GITHUB_RUN_ATTEMPT')}_"
+    Dir.mktmpdir("image-tag") do |dir|
+      outputs, github_env = run_tag_step(dir, env)
+      assert_equal prefix, outputs.fetch("image_tag_prefix"), env.inspect
+      assert_equal "#{prefix}#{env.fetch('SOURCE_SHA')}", outputs.fetch("image_tag"), env.inspect
+      assert_equal ["PR_IMAGE_TAG=#{outputs.fetch('image_tag')}"], github_env
+      if bake
+        assert_equal prefix, run_stubbed_bake(dir, env.fetch("SOURCE_SHA"), env.fetch("PROFILE"), env.fetch("FEATURES"), prefix)
+      end
+    end
+  end
+
+  def tag_input_fields
+    %w[PR_NUMBER PROFILE FEATURES GITHUB_RUN_ID GITHUB_RUN_ATTEMPT]
+  end
+
+  def invalid_tag_values(name, length)
+    numeric = ["", "0", "01", "-1", "+1", "a" * (length + 1), "1_2", " 1", "1 ", "１"]
+    case name
+    when "PR_NUMBER" then numeric + ["1" * 11]
+    when "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT" then numeric
+    when "PROFILE" then ["", "a.b", "a/b", "a,b", "a b", "a=b", "é" * (length + 1)]
+    when "FEATURES" then ["A" * (length + 1), "a_b", "a.b", "a/b", "a b", "a=b", "é" * (length + 1)]
+    end
+  end
+
+  def assert_tag_rejected(override)
+    Dir.mktmpdir("image-tag") do |dir|
+      assert_nil run_tag_step(dir, tag_env.merge(override), expect_success: false), override.inspect
+    end
+  end
+
+  def injected_tag_input(sample)
+    field, separator, length = sample
+    name = tag_input_fields.fetch(field)
+    newline = ["\r", "\n", "\r\n"].fetch(separator)
+    {name => "#{tag_env.fetch(name)}#{newline}X=#{'1' * (length + 1)}"}
+  end
+
+  def invalid_tag_input(sample)
+    field, category, length = sample
+    name = tag_input_fields.fetch(field)
+    values = invalid_tag_values(name, length)
+    {name => values.fetch(category % values.length)}
+  end
+
   def run_stubbed_bake(dir, sha, profile, features, prefix, bake = File.join(ROOT, "docker", "builder", "docker-bake-rust-all.sh"))
     bin = File.join(dir, "bin")
     Dir.mkdir(bin)
@@ -379,6 +503,7 @@ class SharedPrivilegedControlTests < Minitest::Test
     unless expect_success
       refute status.success?
       refute File.exist?(github_env)
+      refute File.exist?(output)
       return nil
     end
     assert status.success?, stderr

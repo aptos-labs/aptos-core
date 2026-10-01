@@ -104,7 +104,33 @@ class PrCiControlTestsWorkflowTest < Minitest::Test
 
     assert_includes script, "find .github/workflows/tests -type f -name 'test_*.rb'"
     assert_includes script, 'test "${#tests[@]}" -gt 0'
-    assert_includes script, 'for test_file in "${tests[@]}"; do ruby "$test_file" || status=1; done'
+    assert_includes script, 'for test_file in "${tests[@]}"; do bundle _4.0.16_ exec ruby "$test_file" || status=1; done'
     assert_includes script, 'exit "$status"'
+  end
+
+  def test_ruby_contracts_use_locked_dependencies_and_reproducible_properties
+    job = @jobs.fetch("ruby_contracts")
+    assert_equal({
+      "BUNDLE_GEMFILE" => "${{ github.workspace }}/.github/workflows/tests/Gemfile",
+      "BUNDLE_FROZEN" => "true",
+    }, job.fetch("env"))
+    steps = job.fetch("steps")
+    setup = steps.find { |step| step["uses"].to_s.start_with?("ruby/setup-ruby@") }
+    assert_equal "ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8", setup.fetch("uses")
+    assert_equal({"ruby-version" => "4.0.6", "bundler" => "4.0.16", "bundler-cache" => false}, setup.fetch("with"))
+    install = steps.find { |step| step["name"] == "Install locked Ruby test dependencies" }
+    run = steps.find { |step| step["name"] == "Run Ruby contract tests" }
+    assert_operator steps.index(setup), :<, steps.index(install)
+    assert_operator steps.index(install), :<, steps.index(run)
+    assert_equal "bundle _4.0.16_ install --jobs 4 --retry 3", install.fetch("run")
+    assert_equal({"BUNDLE_PATH" => "${{ runner.temp }}/ci-contract-tests-gems"}, install.fetch("env"))
+    assert_equal({"BUNDLE_PATH" => "${{ runner.temp }}/ci-contract-tests-gems", "RUBY_PROPERTY_PROFILE" => "ci", "RUBY_PROPERTY_SEED" => "20260930"}, run.fetch("env"))
+    gemfile = File.read(File.join(ROOT, ".github/workflows/tests/Gemfile"))
+    %w[base64 minitest rantly].zip(%w[0.3.0 6.0.0 3.0.0]).each do |name, version|
+      assert_includes gemfile, %Q{gem "#{name}", "#{version}"}
+    end
+    lockfile = File.read(File.join(ROOT, ".github/workflows/tests/Gemfile.lock"))
+    assert_includes lockfile, "CHECKSUMS\n"
+    assert_match(/BUNDLED WITH\n  4\.0\.16\n/, lockfile)
   end
 end
