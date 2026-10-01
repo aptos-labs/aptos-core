@@ -266,10 +266,25 @@ pub trait NativeContext {
     ) -> VMResult<Boxed<'a, Opaque>>;
 
     /// Whether a resource of type `ty` exists at `address` in global storage.
+    ///
+    /// `ty` must satisfy [`is_resource_type`](crate::types::is_resource_type):
+    /// resolving the resource group of anything else is an invariant violation.
     //
     // TODO(cleanup): see if the specializer can lower the caller (object::exists_at) to
     // the `Exists` micro-op directly, dropping this native path.
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool>;
+
+    /// Borrows the resource of type `ty` at `address`, returning a reference to
+    /// it. Returns `None` if the resource does not exist.
+    ///
+    /// `ty` must satisfy [`is_resource_type`](crate::types::is_resource_type):
+    /// resolving the resource group of anything else is an invariant violation.
+    fn resource_borrow(
+        &self,
+        address: AccountAddress,
+        ty: InternedType,
+        mutable: bool,
+    ) -> VMResult<Option<Ref<'_, Opaque>>>;
 
     /// BCS-serializes the by-value argument `i` of type `ty` (e.g. a table key).
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>>;
@@ -292,7 +307,7 @@ pub trait NativeContext {
     /// Whether a table entry exists at `(handle, key)`.
     fn table_contains(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value_ty: InternedType,
     ) -> VMResult<bool>;
@@ -301,7 +316,7 @@ pub trait NativeContext {
     /// Returns `None` if the entry does not exist.
     fn table_borrow(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         mutable: bool,
         value_ty: InternedType,
@@ -311,7 +326,7 @@ pub trait NativeContext {
     /// `key`. Returns false if an entry already exists at `key`.
     fn table_add(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value: Boxed<'_, Opaque>,
         value_ty: InternedType,
@@ -321,7 +336,7 @@ pub trait NativeContext {
     /// boxed object. Returns `None` if the entry does not exist.
     fn table_remove(
         &self,
-        handle: &TableHandle,
+        handle: TableHandle,
         key: &[u8],
         value_ty: InternedType,
     ) -> VMResult<Option<Boxed<'_, Opaque>>>;
