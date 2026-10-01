@@ -42,9 +42,17 @@ const TXN_COST_ENTRIES: &[&str] = &[
     "txn.encrypted_txn_decryption.base",
 ];
 
+/// Scales internal gas down to external gas, replacing the production value of
+/// 1,000,000. A safety net for any cost this module failed to zero: external gas
+/// is rounded up, so a missed charge is reported as a single unit instead of a
+/// number large enough to change balances or to run the transaction out of gas.
+const GAS_UNIT_SCALING_FACTOR: u64 = 1_000_000_000;
+
 /// Whether a gas schedule entry is a cost (which should be zeroed).
 fn is_cost(name: &str) -> bool {
-    if name.starts_with("misc.") {
+    // Abstract value sizes are used by cost formulas but are not costs; zeroing
+    // them would hide the charges the formulas are supposed to produce.
+    if name.starts_with("misc.abs_val.") {
         return false;
     }
     if name.starts_with("txn.") {
@@ -66,8 +74,34 @@ pub fn make_gas_free(state: &InMemoryStateStore) -> Result<()> {
         for (name, value) in &mut schedule.entries {
             if is_cost(name) {
                 *value = 0;
+            } else if name == "txn.gas_unit_scaling_factor" {
+                *value = GAS_UNIT_SCALING_FACTOR;
             }
         }
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_abstract_value_sizes_are_not_costs() {
+        assert!(!is_cost("misc.abs_val.u8"));
+        assert!(!is_cost("misc.abs_val.per_address_packed"));
+    }
+
+    #[test]
+    fn test_value_traversal_is_a_cost() {
+        assert!(is_cost("misc.value_traversal.base"));
+        assert!(is_cost("misc.value_traversal.per_abs_val_unit"));
+    }
+
+    #[test]
+    fn test_txn_structure_is_not_a_cost() {
+        assert!(!is_cost("txn.gas_unit_scaling_factor"));
+        assert!(!is_cost("txn.maximum_number_of_gas_units"));
+        assert!(is_cost("txn.intrinsic_gas_per_byte"));
+    }
 }
