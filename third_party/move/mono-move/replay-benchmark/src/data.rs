@@ -134,7 +134,7 @@ pub fn load_inputs(
     let mut inputs = vec![];
     for (block, read_set) in blocks.into_iter().zip(read_sets) {
         let state = InMemoryStateStore::new_with_state_values(read_set);
-        crate::gas::make_gas_free(&state)?;
+        vm_comparison::prepare_state(&state)?;
         let state = Arc::new(state);
         for (i, txn) in block.transactions.iter().enumerate() {
             if let Some(txn) = as_benchmark_transaction(txn) {

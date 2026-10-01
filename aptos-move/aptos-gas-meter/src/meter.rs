@@ -6,7 +6,7 @@ use crate::{
     CacheValueSizes,
 };
 use aptos_gas_algebra::{
-    AbstractValueSize, Fee, FeePerGasUnit, InternalGasPerAbstractValueUnit, NumTypeNodes,
+    AbstractValueSize, Fee, FeePerGasUnit, NumTypeNodes,
 };
 use aptos_gas_schedule::{
     gas_feature_versions::*,
@@ -30,14 +30,6 @@ use move_vm_types::{
     gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
-
-// Charges for traversing the value graph produced when a resource is loaded and
-// deserialized by the interpreter. Mirrors the serialize-side `bcs` traversal
-// pricing (3x `cmp::compare`'s base and per-abstract-value-unit costs).
-// TODO: add these to 1.50 schedule.
-const LOAD_RESOURCE_PER_VALUE_TRAVERSAL_BASE: InternalGas = InternalGas::new(11010);
-const LOAD_RESOURCE_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT: InternalGasPerAbstractValueUnit =
-    InternalGasPerAbstractValueUnit::new(420);
 
 /// The official gas meter used inside the Aptos VM.
 /// It maintains an internal gas counter, measured in internal gas units, and carries an environment
@@ -260,15 +252,11 @@ where
         if self.meter_value_nodes_on_deserialize
             && let Some(val) = &val
         {
-            let size = self
-                .vm_gas_params()
-                .misc
-                .abs_val
-                .abstract_value_size(val, self.feature_version())?;
-            self.algebra.charge_execution(
-                LOAD_RESOURCE_PER_VALUE_TRAVERSAL_BASE
-                    + LOAD_RESOURCE_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * size,
-            )?;
+            let feature_version = self.feature_version();
+            let misc = &self.vm_gas_params().misc;
+            let size = misc.abs_val.abstract_value_size(val, feature_version)?;
+            let cost = misc.value_traversal.cost(feature_version, size);
+            self.algebra.charge_execution(cost)?;
         }
 
         let cost = self
