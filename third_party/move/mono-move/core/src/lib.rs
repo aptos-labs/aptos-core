@@ -16,6 +16,7 @@ pub mod root_pool;
 pub mod storage;
 pub mod types;
 pub mod value_layout;
+mod verifier;
 pub mod vm_error;
 
 pub use align::{
@@ -64,4 +65,5 @@ pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
+pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};
 pub use vm_error::{CallFrame, ErrorLocation, VMInternalError, VMResult};

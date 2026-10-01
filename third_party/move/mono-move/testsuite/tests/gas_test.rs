@@ -51,7 +51,6 @@ module 0x1::test {
     let fib = interpreter
         .unmetered(|interp| interp.load_function(id, fib_name, EMPTY_TYPE_LIST))
         .expect("load should succeed");
-    mono_move_runtime::assert_verified(fib, &guard);
     let mut call = interpreter
         .build_call(fib)
         .expect("the root frame fits on the stack");

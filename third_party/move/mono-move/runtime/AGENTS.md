@@ -23,7 +23,8 @@ Any change that could break one needs a matching verifier check or a proof:
    `obj_ptr - 8` and `obj_ptr - 4`, written by the allocator. User micro-ops
    address only offsets `>= 0`, so they cannot reach the header.
 
-`verify_program` checks frame-access bounds, metadata overlap, jump targets, and
+`mono_move_core::verify_function` (run by the loader on every lowered function
+before it is cached) checks frame-access bounds, metadata overlap, jump targets, and
 descriptor validity before execution. Everything else is the compiler's
 responsibility.
 
