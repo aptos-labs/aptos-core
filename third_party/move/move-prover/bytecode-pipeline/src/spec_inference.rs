@@ -6540,9 +6540,18 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             self.mk_temporary(src)
         };
         let struct_env = self.get_struct(*module_id, *struct_id);
-        let field_env = struct_env
-            .get_field_by_offset_optional_variant(variants.first().copied(), field_offset);
-        let select_exp = self.mk_field_select(&field_env, type_args, src_exp.clone());
+        let select_exp = if variants.is_empty() {
+            let field_env = struct_env.get_field_by_offset(field_offset);
+            self.mk_field_select(&field_env, type_args, src_exp.clone())
+        } else {
+            self.mk_variant_field_select(
+                &struct_env,
+                variants,
+                field_offset,
+                type_args,
+                src_exp.clone(),
+            )
+        };
         *state = self.substitute_exp_state(state, dest, &select_exp);
         if !variants.is_empty() {
             let not_variant = self.mk_not(self.mk_variant_tests(&struct_env, variants, src_exp));
@@ -8086,10 +8095,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 // Direct: just return the new value
                 Some(new_exp)
             },
-            BorrowEdge::Field(qid, _variants, offset) => {
-                // Field update: UpdateField(old, new)
+            BorrowEdge::Field(qid, variants, offset) => {
+                // Field update: UpdateField(old, new). The variants of a field borrow share
+                // the field's name, which selects the update for all of them.
                 let struct_env = self.global_env().get_struct(qid.to_qualified_id());
-                let field_env = struct_env.get_field_by_offset(*offset);
+                let variant = variants.as_ref().and_then(|v| v.first().copied());
+                let field_env = struct_env.get_field_by_offset_optional_variant(variant, *offset);
                 let type_args = qid.inst.as_slice();
                 Some(self.mk_field_update(&field_env, type_args, old_exp, new_exp))
             },
