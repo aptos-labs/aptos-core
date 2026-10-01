@@ -1791,11 +1791,14 @@ private def namespaceOfRef? (reference : QualifiedRef) : LowerM (Option Namespac
     | return none
   return state.source.namespaces.find? (·.path == path)
 
+/-- Whether a call names a function of a namespace this unit does not hold.
+Only such a call states its result type: a held namespace declares the
+callee, whose signature and visibility apply to the call. -/
 private def isExternalPath (segments : Array String) : LowerM Bool := do
-  let sourceNs := (← get).sourceNamespace
-  let segments := (expandedUsePath? sourceNs segments).getD segments
+  let state ← get
+  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
   if segments.size <= 1 then return false
-  return segments.extract 0 (segments.size - 1) != sourceNs.path
+  return !state.source.namespaces.any (·.path == segments.pop)
 
 private def resolveExternalRef (segments : Array String) : LowerM QualifiedRef := do
   let sourceNs := (← get).sourceNamespace

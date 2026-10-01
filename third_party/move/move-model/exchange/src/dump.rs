@@ -99,7 +99,10 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
         structs.push(ctx.struct_decl(&struct_env)?);
     }
     // Unsupported function-value construction is left out, by name and
-    // reason, instead of failing the module.
+    // reason, instead of failing the module. An inline function, and the
+    // specification function derived from it, is left out unrecorded:
+    // compiler-v2 has expanded it at its call sites, so the module loses no
+    // declaration.
     let is_function_value_error =
         |e: &anyhow::Error| format!("{:#}", e).contains("function values are out of scope");
     let mut functions = vec![];
@@ -110,10 +113,14 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
         }
         match ctx.function(&fun_env) {
             Ok(function) => functions.push(function),
-            Err(e) if is_function_value_error(&e) => skipped.push(xast::Skipped {
-                name: fun_env.get_name_str().to_string(),
-                reason: format!("{:#}", e),
-            }),
+            Err(e) if is_function_value_error(&e) => {
+                if !fun_env.is_inline() {
+                    skipped.push(xast::Skipped {
+                        name: fun_env.get_name_str().to_string(),
+                        reason: format!("{:#}", e),
+                    })
+                }
+            },
             Err(e) => return Err(e),
         }
     }
@@ -121,10 +128,18 @@ pub fn dump_ast_module(env: &GlobalEnv, module_id: ModuleId) -> Result<xast::Xas
     for (_, decl) in module_env.get_spec_funs() {
         match ctx.spec_fun(decl) {
             Ok(spec_fun) => spec_funs.push(spec_fun),
-            Err(e) if is_function_value_error(&e) => skipped.push(xast::Skipped {
-                name: ctx.pool().string(decl.name).to_string(),
-                reason: format!("{:#}", e),
-            }),
+            Err(e) if is_function_value_error(&e) => {
+                let expanded = decl.is_move_fun
+                    && module_env
+                        .find_function(decl.name)
+                        .is_some_and(|fun_env| fun_env.is_inline());
+                if !expanded {
+                    skipped.push(xast::Skipped {
+                        name: ctx.pool().string(decl.name).to_string(),
+                        reason: format!("{:#}", e),
+                    })
+                }
+            },
             Err(e) => return Err(e),
         }
     }

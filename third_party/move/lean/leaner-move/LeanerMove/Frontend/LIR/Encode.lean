@@ -1535,12 +1535,6 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
       profileMetadata := profileMetadata.push
         (LeanerIR.Move.propertyValue "metadata.friend" (Codec.encodeModuleRef friend))
     for skipped in module.skipped do
-      -- Compiler-v2 has already expanded retained inline functions at their
-      -- call sites. Their retained declarations and companion diagnostics are
-      -- producer bookkeeping, not unsupported declarations in target LIR.
-      let expandedInlineDiagnostic :=
-        skipped.reason.startsWith s!"in function `{module.name}::{skipped.name}`:"
-      if inlineFunctions.contains skipped.name || expandedInlineDiagnostic then continue
       profileMetadata := profileMetadata.push
         (LeanerIR.Move.propertyValue "metadata.skipped" (Codec.pack #[skipped.name, skipped.reason]))
     let comments : Array LeanerIR.Comment ←

@@ -70,6 +70,24 @@ def companions (package : Package) (unit : LeanerIR.Validation.ValidatedUnit) :
     found := found.push { path, namespaceId, text }
   return found
 
+/-- The declarations the export of a target module left out, as errors at
+the module: what the export does not carry is not verified. -/
+def omissions (package : Package) : IO (Array Report) := do
+  let mut reports := #[]
+  for module in package.modules do
+    unless module.isTarget do continue
+    let file := (module.sources[module.loc.file]?).getD "?"
+    let position ← try
+        pure <| some <| (Lean.FileMap.ofString (← IO.FS.readFile file)).toPosition
+          ⟨module.loc.start⟩
+      catch _ => pure none
+    for skipped in module.skipped do
+      reports := reports.push {
+        file, line := position.map (·.line) |>.getD 1
+        column := position.map (·.column + 1) |>.getD 1, severity := .error
+        text := s!"unsupported Move declaration `{skipped.name}`: {skipped.reason}" }
+  return reports
+
 /-- Verify a Move file, or the modules of a Move package directory, writing
 the LeanerLang rendering to `output`. With `exported`, the package is read
 from that existing `move exchange --format ast` export instead of being
@@ -80,7 +98,7 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
     (exported : Option System.FilePath := none) (filter : Option String := none)
     (renderOnly : Bool := false) (heartbeats : Option Nat := none) :
     IO (Array Report) := do
-  let (unit, companions) ← LeanerLang.Perf.withPhase .frontend do
+  let (unit, companions, omitted) ← LeanerLang.Perf.withPhase .frontend do
     let package ← match exported with
       | some exported =>
           LeanerMove.Frontend.Cli.readExportDir exported
@@ -90,8 +108,9 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
           else LeanerMove.Frontend.Cli.exportMoveFiles [source]
     let package ← withProofFiles package
     match LeanerMove.Frontend.LIR.Backend.fromXast package with
-    | .ok unit => pure (unit, ← companions package unit)
+    | .ok unit => pure (unit, ← companions package unit, ← omissions package)
     | .error message => throw <| IO.userError s!"{source}: {message}"
-  run environment { unit, companions, output, renderOnly, heartbeats }
+  let reports ← run environment { unit, companions, output, renderOnly, heartbeats }
+  return (if renderOnly then #[] else omitted) ++ reports
 
 end LeanerMove.SourceVerify

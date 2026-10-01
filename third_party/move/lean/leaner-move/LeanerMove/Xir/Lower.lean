@@ -697,11 +697,33 @@ mutual
     | .tuple elements | .constructor _ _ none elements => elements.allM irrefutable
     | _ => pure false
 
-  /-- A match selects its arm by the scrutinee's variant or literal. The
-  last arm is taken unconditionally: validation proves the match
-  exhaustive. -/
+  /-- Whether the arms of a match cover every value of its scrutinee: an
+  irrefutable arm does, and so do arms naming every variant of the enum, or
+  both Booleans. -/
+  partial def covers (arms : Array MatchArm) : BodyM Bool := do
+    let mut owner : Option NameId := none
+    let mut variants : Array String := #[]
+    let mut booleans : Array Bool := #[]
+    for arm in arms do
+      if arm.guard.isSome then continue
+      match (← pattern arm.pattern).kind with
+      | .constructor name _ (some variant) fields =>
+          if ← fields.allM irrefutable then
+            owner := some name
+            variants := variants.push variant
+      | .literal (.bool value) => booleans := booleans.push value
+      | _ => if ← irrefutable arm.pattern then return true
+    if booleans.contains true && booleans.contains false then return true
+    let some name := owner | return false
+    let some declaration ← nominalDecl? name | return false
+    declaration.variants.allM fun variant => return variants.contains (← nameOf variant.name)
+
+  /-- A match selects its arm by the scrutinee's variant or literal. Move
+  requires the arms to cover the scrutinee, which validation does not
+  establish; once they do, the last arm is taken unconditionally. -/
   partial def lowerMatch (expression : Expr) (scrutinee : ExprId) (arms : Array MatchArm) :
       BodyM (Array Nat) := do
+    unless ← covers arms do failHere "a match must cover every value of its scrutinee"
     let results ← freshFor expression.typeId
     let value ← single (← lowerExpr scrutinee)
     let join ← newBlock

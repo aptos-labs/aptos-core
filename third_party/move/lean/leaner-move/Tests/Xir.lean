@@ -129,4 +129,40 @@ leaner module 0x42::xir_publish where
 #guard_msgs in
 #leaner_xir «0x42».xir_publish
 
+-- A match on a move-only enum covers it by naming every variant or by a
+-- wildcard; one that misses a variant has no Move bytecode form.
+leaner module 0x42::xir_match_cover where
+  enum Token has Drop where
+    | First (value : u64)
+    | Second
+
+  fun every(token : Token) -> u64 :=
+    match token with
+      | Token::First { value := value } => value
+      | Token::Second {} => 0
+
+  fun otherwise(token : Token) -> u64 :=
+    match token with
+      | Token::Second {} => 0
+      | _ => 1
+
+open Lean Elab Command in
+run_cmd do
+  let some unit := LeanerLang.registeredUnit? (← getEnv) `«0x42».xir_match_cover
+    | throwError "the module was not registered"
+  if let .error failure := lowerModule unit ⟨0⟩ then throwError failure.message
+
+leaner module 0x42::xir_match_partial where
+  enum Token has Drop where
+    | First (value : u64)
+    | Second
+
+  fun first(token : Token) -> u64 :=
+    match token with
+      | Token::First { value := value } => value
+
+/-- error: a match must cover every value of its scrutinee -/
+#guard_msgs in
+#leaner_xir «0x42».xir_match_partial
+
 end LeanerMove.Tests.Xir

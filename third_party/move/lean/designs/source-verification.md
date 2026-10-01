@@ -47,6 +47,10 @@ semantics, compiled bodies, contracts), and `verification` runs the proofs.
 Each moment counts toward the innermost phase running; the rest of the total
 is parsing and mapping the messages.
 
+A Move declaration the export leaves out, such as a function constructing a
+function value, is an error at its module: the rendering keeps it only as an
+`-- unsupported Move declaration` comment, so nothing verifies it.
+
 ### From the Move CLI
 
 A Move package is verified in place, with the usual package tooling, by the

@@ -84,6 +84,9 @@ leaner module aptos_framework::big_ordered_map where
 
   pragma verify = false
 
+  -- unsupported Move declaration `test_verify_iter_modify`: in function `big_ordered_map::test_verify_iter_modify`: closures are not supported by XAST (function values are out of scope)
+  -- unsupported Move declaration `test_verify_iter_modify_ranks_symbolic`: in function `big_ordered_map::test_verify_iter_modify_ranks_symbolic`: closures are not supported by XAST (function values are out of scope)
+  -- unsupported Move declaration `test_verify_modify`: in function `big_ordered_map::test_verify_modify`: closures are not supported by XAST (function values are out of scope)
   -- Error constants shared with ordered_map (so try using same values)
   /--
   Map key already exists
