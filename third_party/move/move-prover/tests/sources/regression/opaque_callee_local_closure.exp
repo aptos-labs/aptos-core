@@ -1,0 +1,52 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/opaque_callee_local_closure.move:30:9
+   │
+30 │         ensures R[a].value == old(R[a].value);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/opaque_callee_local_closure.move:25: caller
+   =     at tests/sources/regression/opaque_callee_local_closure.move:29: caller (spec)
+   =     at tests/sources/regression/opaque_callee_local_closure.move:25: caller
+   =         a = <redacted>
+   =     at tests/sources/regression/opaque_callee_local_closure.move:26: caller
+   =     at tests/sources/regression/opaque_callee_local_closure.move:30: caller (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/opaque_callee_local_closure.move:50:9
+   │
+50 │         ensures R[a].value == old(R[a].value);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/opaque_callee_local_closure.move:45: passed_caller
+   =     at tests/sources/regression/opaque_callee_local_closure.move:49: passed_caller (spec)
+   =     at tests/sources/regression/opaque_callee_local_closure.move:45: passed_caller
+   =         a = <redacted>
+   =     at tests/sources/regression/opaque_callee_local_closure.move:46: passed_caller
+   =     at tests/sources/regression/opaque_callee_local_closure.move:50: passed_caller (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/opaque_callee_local_closure.move:68:9
+   │
+68 │         ensures R[a].value == old(R[a].value);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/opaque_callee_local_closure.move:63: captured_caller
+   =     at tests/sources/regression/opaque_callee_local_closure.move:67: captured_caller (spec)
+   =     at tests/sources/regression/opaque_callee_local_closure.move:63: captured_caller
+   =         a = <redacted>
+   =     at tests/sources/regression/opaque_callee_local_closure.move:64: captured_caller
+   =     at tests/sources/regression/opaque_callee_local_closure.move:68: captured_caller (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/opaque_callee_local_closure.move:107:9
+    │
+107 │         ensures R[a].value == old(R[a].value);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/opaque_callee_local_closure.move:102: forwarded_caller
+    =     at tests/sources/regression/opaque_callee_local_closure.move:106: forwarded_caller (spec)
+    =     at tests/sources/regression/opaque_callee_local_closure.move:102: forwarded_caller
+    =         a = <redacted>
+    =     at tests/sources/regression/opaque_callee_local_closure.move:103: forwarded_caller
+    =     at tests/sources/regression/opaque_callee_local_closure.move:107: forwarded_caller (spec)

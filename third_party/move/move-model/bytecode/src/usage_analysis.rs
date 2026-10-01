@@ -15,12 +15,16 @@ use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{ConditionKind, Spec},
-    model::{FunctionEnv, GlobalEnv, QualifiedId, QualifiedInstId, StructId},
+    ast::{ConditionKind, Spec, TempIndex},
+    model::{FunId, FunctionEnv, GlobalEnv, QualifiedId, QualifiedInstId, StructId},
     ty::Type,
 };
 use paste::paste;
-use std::{collections::BTreeSet, fmt, fmt::Formatter};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    fmt::Formatter,
+};
 
 pub fn get_memory_usage<'env>(target: &FunctionTarget<'env>) -> &'env UsageState {
     target
@@ -69,6 +73,9 @@ pub struct UsageState {
     /// The memory read or written by the code of this function or its callees, excluding
     /// memory only mentioned by specifications.
     pub code_accessed: SetDomain<QualifiedInstId<StructId>>,
+    /// Function-typed parameters this function may invoke, directly or through the functions it
+    /// passes them to.
+    pub invoked_params: SetDomain<usize>,
     /// The memory mentioned by the assume expressions in this function.
     pub assumed: MemoryUsage,
     /// The memory mentioned by the assert expressions in this function.
@@ -427,6 +434,123 @@ impl MemoryUsageAnalysis<'_> {
             state.invoke_frame_wildcard = true;
         }
     }
+
+    /// Add the effects of closures created in this function that may run while it executes:
+    /// those invoked, or passed to a function that may invoke them, directly or through a copy,
+    /// a borrow, or a closure that captures them. A closure that is only returned, stored or
+    /// dropped runs later, if at all, and its effects belong to whoever invokes it. Also records
+    /// which function-typed parameters this function may invoke.
+    fn compute_closure_usage(&self, target: &FunctionTarget, state: &mut UsageState) {
+        use Bytecode::*;
+        use Operation::*;
+        let code = target.get_bytecode();
+        let mut values: BTreeMap<TempIndex, BTreeSet<FunValueOrigin>> = BTreeMap::new();
+        for param in 0..target.get_parameter_count() {
+            if target.get_local_type(param).skip_reference().is_function() {
+                values.insert(param, BTreeSet::from([FunValueOrigin::Param(param)]));
+            }
+        }
+        loop {
+            let mut changed = false;
+            for bc in code {
+                let (dest, origins) = match bc {
+                    Call(_, dests, Closure(mid, fid, inst, _), srcs, _) if dests.len() == 1 => {
+                        let mut origins = BTreeSet::from([FunValueOrigin::Closure(
+                            mid.qualified(*fid),
+                            inst.clone(),
+                        )]);
+                        for src in srcs {
+                            origins.extend(values.get(src).into_iter().flatten().cloned());
+                        }
+                        (dests[0], origins)
+                    },
+                    Assign(_, dest, src, _) => match values.get(src) {
+                        Some(origins) => (*dest, origins.clone()),
+                        None => continue,
+                    },
+                    Call(_, dests, BorrowLoc | ReadRef, srcs, _)
+                        if dests.len() == 1 && srcs.len() == 1 =>
+                    {
+                        match values.get(&srcs[0]) {
+                            Some(origins) => (dests[0], origins.clone()),
+                            None => continue,
+                        }
+                    },
+                    _ => continue,
+                };
+                let entry = values.entry(dest).or_default();
+                for origin in origins {
+                    changed |= entry.insert(origin);
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        let mut run = BTreeSet::new();
+        for bc in code {
+            match bc {
+                // An invoked value may also invoke the function values passed to it.
+                Call(_, _, Invoke, srcs, _) => {
+                    run.extend(
+                        srcs.iter()
+                            .filter_map(|src| values.get(src))
+                            .flatten()
+                            .cloned(),
+                    );
+                },
+                Call(_, _, Function(mid, fid, _), srcs, _) => {
+                    let callee_id = mid.qualified(*fid);
+                    // A native cannot call back into a closure. Any other callee without a
+                    // summary yet, such as a recursive one, may run its arguments.
+                    if self.cache.global_env().get_function(callee_id).is_native() {
+                        continue;
+                    }
+                    let callee = self
+                        .cache
+                        .get::<UsageState>(callee_id, &FunctionVariant::Baseline);
+                    for (pos, src) in srcs.iter().enumerate() {
+                        if callee.is_none_or(|summary| summary.invoked_params.contains(&pos)) {
+                            run.extend(values.get(src).into_iter().flatten().cloned());
+                        }
+                    }
+                },
+                _ => {},
+            }
+        }
+        for origin in run {
+            match origin {
+                FunValueOrigin::Param(param) => {
+                    state.invoked_params.insert(param);
+                },
+                FunValueOrigin::Closure(fun_id, inst) => {
+                    let Some(summary) = self
+                        .cache
+                        .get::<UsageState>(fun_id, &FunctionVariant::Baseline)
+                    else {
+                        continue;
+                    };
+                    let effects = summary
+                        .modified
+                        .get_all_inst(&inst)
+                        .into_iter()
+                        .chain(summary.invoke_frame.get_all_inst(&inst))
+                        .collect::<BTreeSet<_>>();
+                    state.invoke_frame_other.extend(effects.iter().cloned());
+                    state.add_transitive_invoke_frame_iter(effects.into_iter());
+                },
+            }
+        }
+    }
+}
+
+/// Where a function value held by a temporary comes from.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum FunValueOrigin {
+    /// A closure of the given function, created in this function.
+    Closure(QualifiedId<FunId>, Vec<Type>),
+    /// The function-typed parameter at the given position.
+    Param(usize),
 }
 
 pub struct UsageProcessor();
@@ -447,6 +571,7 @@ impl UsageProcessor {
         let mut summary = analysis.summarize(&func_target, UsageState::default());
         analysis.compute_spec_usage(&func_env.get_spec(), &mut summary);
         analysis.compute_invoke_usage(&func_target, &mut summary);
+        analysis.compute_closure_usage(&func_target, &mut summary);
         summary
     }
 }

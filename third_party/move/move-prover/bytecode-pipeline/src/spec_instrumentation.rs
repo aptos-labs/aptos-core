@@ -677,10 +677,9 @@ impl<'a> Instrumenter<'a> {
                 }
                 let callee = fun_env.module_env.env.get_function(qid);
                 let target = targets.get_target(&callee, &FunctionVariant::Baseline);
-                (usage_analysis::get_memory_usage(&target)
-                    .accessed
-                    .all
-                    .is_empty()
+                let callee_usage = usage_analysis::get_memory_usage(&target);
+                (callee_usage.accessed.all.is_empty()
+                    && callee_usage.invoke_frame.all.is_empty()
                     && callee.get_spec_used_memory().is_empty()
                     && callee.get_spec_generic_used_memory().is_empty()
                     && callee.get_parameters().iter().all(|p| {
