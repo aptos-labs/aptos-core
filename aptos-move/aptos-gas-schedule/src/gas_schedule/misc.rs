@@ -5,7 +5,7 @@
 //! ones related to definition of abstract value size.
 
 use crate::{
-    gas_schedule::VMGasParameters,
+    gas_schedule::{value_traversal::ValueTraversalGasParameters, VMGasParameters},
     traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
     ver::gas_feature_versions::{RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_50},
 };
@@ -1051,6 +1051,7 @@ impl AbstractValueSizeGasParameters {
 #[derive(Debug, Clone)]
 pub struct MiscGasParameters {
     pub abs_val: AbstractValueSizeGasParameters,
+    pub value_traversal: ValueTraversalGasParameters,
 }
 
 impl FromOnChainGasSchedule for MiscGasParameters {
@@ -1063,13 +1064,19 @@ impl FromOnChainGasSchedule for MiscGasParameters {
                 gas_schedule,
                 feature_version,
             )?,
+            value_traversal: FromOnChainGasSchedule::from_on_chain_gas_schedule(
+                gas_schedule,
+                feature_version,
+            )?,
         })
     }
 }
 
 impl ToOnChainGasSchedule for MiscGasParameters {
     fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)> {
-        self.abs_val.to_on_chain_gas_schedule(feature_version)
+        let mut entries = self.abs_val.to_on_chain_gas_schedule(feature_version);
+        entries.extend(self.value_traversal.to_on_chain_gas_schedule(feature_version));
+        entries
     }
 }
 
@@ -1077,6 +1084,7 @@ impl MiscGasParameters {
     pub fn zeros() -> Self {
         Self {
             abs_val: AbstractValueSizeGasParameters::zeros(),
+            value_traversal: ValueTraversalGasParameters::zeros(),
         }
     }
 }
@@ -1085,6 +1093,7 @@ impl InitialGasSchedule for MiscGasParameters {
     fn initial() -> Self {
         Self {
             abs_val: InitialGasSchedule::initial(),
+            value_traversal: InitialGasSchedule::initial(),
         }
     }
 }

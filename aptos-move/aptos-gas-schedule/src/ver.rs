@@ -11,6 +11,7 @@
 /// - V50:
 ///   - Raise the abstract value size of a closure from 40 to 200
 ///   - Include the cost of a closure's type arguments in its abstract value size
+///   - Gas parameters for value graph traversal
 /// - V49:
 ///   - Count the closure function-type node towards type size and depth limits
 /// - V48:
