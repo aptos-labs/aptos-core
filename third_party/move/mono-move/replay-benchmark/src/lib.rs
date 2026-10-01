@@ -11,7 +11,6 @@
 pub mod capture;
 pub mod compare;
 pub mod data;
-pub mod gas;
 pub mod report;
 pub mod timing;
 pub mod v1;
