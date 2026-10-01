@@ -51,7 +51,8 @@ MVC_LOG="move_compiler_v2=info,debug@prover.log" \
 - In order to regenerate baseline files, use `UPBL=1 cargo test <optional test filter>`
 - In order to narrow tests to a particular feature, use `MVP_TEST_FEATURE=<feature> cargo test`. If not set, all
   features will be tested for each test they are enabled for. (See discussion below about feature enabling).
-- In order to run tests with consistency checking enabled, use `MVP_TEST_INCONSISTENCY=1 cargo test`.
+- In order to run tests with consistency checking enabled, add `// flag: --check-inconsistency` to
+  the test file or use `MVP_TEST_FLAGS=--check-inconsistency cargo test`.
 - In order to run tests with a specific flag combination, use `MVP_TEST_FLAGS=<flags> cargo test`.
 - In order to run the tests in the `tests/xsources` tree instead of the default locations, use
   `MVP_TEST_X=1 cargo test`.
