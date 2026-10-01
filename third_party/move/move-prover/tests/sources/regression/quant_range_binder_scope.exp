@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/quant_range_binder_scope.move:15:9
+   │
+15 │         ensures result == (exists i in 1u64..2u64, j in 0u64..i: true);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/quant_range_binder_scope.move:14: shadowed (spec)
+   =     at tests/sources/regression/quant_range_binder_scope.move:11: shadowed
+   =         result = <redacted>
+   =     at tests/sources/regression/quant_range_binder_scope.move:15: shadowed (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/quant_range_binder_scope.move:24:9
+   │
+24 │         ensures result == (exists i in 1u64..2u64, j in 0u64..i: true);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/quant_range_binder_scope.move:23: unshadowed (spec)
+   =     at tests/sources/regression/quant_range_binder_scope.move:20: unshadowed
+   =         result = <redacted>
+   =     at tests/sources/regression/quant_range_binder_scope.move:24: unshadowed (spec)

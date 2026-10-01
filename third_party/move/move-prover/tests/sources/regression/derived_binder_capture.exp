@@ -1,0 +1,30 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/derived_binder_capture.move:27:9
+   │
+27 │         ensures same_as_old(c);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/derived_binder_capture.move:22: increment
+   =         c = <redacted>
+   =     at tests/sources/regression/derived_binder_capture.move:23: increment
+   =         c = <redacted>
+   =     at tests/sources/regression/derived_binder_capture.move:22: increment
+   =         c = <redacted>
+   =     at tests/sources/regression/derived_binder_capture.move:26: increment (spec)
+   =     at tests/sources/regression/derived_binder_capture.move:27: increment (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/derived_binder_capture.move:36:9
+   │
+36 │         ensures same_as_old_renamed(c);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/derived_binder_capture.move:31: increment_renamed
+   =         c = <redacted>
+   =     at tests/sources/regression/derived_binder_capture.move:32: increment_renamed
+   =         c = <redacted>
+   =     at tests/sources/regression/derived_binder_capture.move:31: increment_renamed
+   =         c = <redacted>
+   =     at tests/sources/regression/derived_binder_capture.move:35: increment_renamed (spec)
+   =     at tests/sources/regression/derived_binder_capture.move:36: increment_renamed (spec)
