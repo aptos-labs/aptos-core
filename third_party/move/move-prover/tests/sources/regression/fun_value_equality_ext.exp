@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/fun_value_equality_ext.move:19:9
+   │
+19 │         ensures result == false;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/fun_value_equality_ext.move:15: boxed_params
+   =         p = <redacted>
+   =         q = <redacted>
+   =     at tests/sources/regression/fun_value_equality_ext.move:16: boxed_params
+   =         result = <redacted>
+   =     at tests/sources/regression/fun_value_equality_ext.move:19: boxed_params (spec)
