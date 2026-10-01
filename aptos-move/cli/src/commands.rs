@@ -783,6 +783,12 @@ pub struct ExchangePackage {
     #[clap(long, conflicts_with = "single_file")]
     include_deps: bool,
 
+    /// In package mode, export only these modules (`module`,
+    /// `address::module`, or `alias::module`, comma-separated) and the
+    /// modules verifying them reads, dependencies included
+    #[clap(long, value_delimiter = ',', conflicts_with = "single_file")]
+    modules: Vec<String>,
+
     /// A single masm file to export (instead of a package)
     #[clap(long, value_parser)]
     masm_file: Option<PathBuf>,
@@ -838,12 +844,14 @@ mod exchange_flag_tests {
 }
 
 /// Exports the modules of a package in the given exchange format into
-/// `out_dir`, one JSON file per module; the number exported.
+/// `out_dir`, one JSON file per module; the number exported. With `modules`,
+/// exports those and the modules verifying them reads instead.
 fn export_package(
     move_options: &MovePackageOptions,
     out_dir: &Path,
     format: ExchangeFormat,
     include_deps: bool,
+    modules: &[String],
 ) -> CliTypedResult<usize> {
     let package_path = move_options.get_package_path()?;
     let compiler_version = move_options
@@ -878,12 +886,19 @@ fn export_package(
         // A dependency exported with its source goes through the full
         // pipeline a target gets, so its inlined and rewritten form is what
         // the export carries.
-        include_deps,
+        include_deps || !modules.is_empty(),
     )
     .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
     model
         .check_errors("in compilation")
         .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+    let selection = if modules.is_empty() {
+        None
+    } else {
+        let selected = exchange::select_modules(&model, modules)
+            .map_err(|e| CliError::CommandArgumentError(format!("{:#}", e)))?;
+        Some(exchange::module_closure(&model, &selected))
+    };
     std::fs::create_dir_all(out_dir).map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
     let suffix = match format {
         ExchangeFormat::Xir => ".exchange.json",
@@ -905,8 +920,13 @@ fn export_package(
     for module in model.get_modules() {
         // Dependencies are exported on request, and only when their
         // source is available (a bytecode-only dependency has no AST).
-        let exported_dependency = include_deps && !module.get_source_path().is_empty();
-        if !module.is_target() && !exported_dependency {
+        let wanted = match &selection {
+            Some(selection) => {
+                selection.contains(&module.get_id()) && !module.get_source_path().is_empty()
+            },
+            None => module.is_target() || include_deps && !module.get_source_path().is_empty(),
+        };
+        if !wanted {
             continue;
         }
         let name = module.get_full_name_str().replace("::", "_");
@@ -950,6 +970,7 @@ impl CliCommand<&'static str> for ExchangePackage {
             export_dir,
             format,
             include_deps,
+            modules,
             masm_file,
             move_file,
             out_file,
@@ -996,7 +1017,7 @@ impl CliCommand<&'static str> for ExchangePackage {
         task::spawn_blocking(move || {
             let package_path = move_options.get_package_path()?;
             let out_dir = export_dir.unwrap_or_else(|| package_path.join("exchange-json"));
-            let exported = export_package(&move_options, &out_dir, format, include_deps)?;
+            let exported = export_package(&move_options, &out_dir, format, include_deps, &modules)?;
             println!("Exported {} module(s) to {}", exported, out_dir.display());
             Ok("Success")
         })

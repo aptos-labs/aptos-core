@@ -30,6 +30,12 @@ lake env .lake/build/bin/leaner-rust verify foo.rs [--spec foo.spec.lean] \
 
 `lake exe` works as well but replays the build log first. The Move command
 needs the exchange frontend (`APTOS_MOVE_CLI`, see the tree's `CLAUDE.md`).
+For a package directory, `--filter <part>` verifies the modules whose
+source file name contains the part, and `--modules <a::m>,…` verifies the
+named modules with only what verifying them reads exported
+(`verification-benchmarks.md`, "Module selection"). A filter or a module
+name that selects nothing is an error rather than a run that verifies
+nothing.
 Each command writes the rendering beside the source (`foo.move.lean`,
 `foo.rs.lean`) for inspection, prints one `file:line:column: severity:
 message` line per message, and exits non-zero when any is an error. Its
@@ -80,7 +86,8 @@ resource and its existence a `spec module where axiom` of the module. The
 verifier's messages are the command's diagnostics, and a verification error
 fails the command as a Prover error does. The Prover's timing line becomes
 `build, export, leaner-move, total`, beside the verifier's own. `--filter` narrows the targets as
-usual; the Boogie backend's options have no effect. The verifier is found
+usual, and the export then carries only the filtered modules and what
+verifying them reads; the Boogie backend's options have no effect. The verifier is found
 through `LEANER_MOVE_EXE` (its executable, run as is, so the caller supplies
 `LEAN_PATH`), `LEANER_MOVE_HOME` (its Lean package), or the enclosing Aptos
 Core checkout, where `leaner-move/.lake/build/bin/leaner-move` runs through
