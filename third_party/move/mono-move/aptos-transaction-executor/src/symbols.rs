@@ -1,14 +1,20 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::on_chain_config::{ApprovedExecutionHashes, OnChainConfig};
+use aptos_types::{
+    jwks::{FederatedJWKs, PatchedJWKs},
+    on_chain_config::{ApprovedExecutionHashes, CurrentTimeMicroseconds, OnChainConfig},
+};
 use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedType,
     Interner,
 };
-use move_core_types::{account_address::AccountAddress, ident_str};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, language_storage::StructTag,
+    move_resource::MoveStructType,
+};
 
 /// The framework symbols the executor refers to, interned once per global
 /// context.
@@ -26,8 +32,12 @@ pub(crate) struct FrameworkSymbols {
     pub versioned_prologue: InternedIdentifier,
     pub versioned_epilogue: InternedIdentifier,
 
-    /// The on-chain configs the executor reads (see `providers::read_config`).
+    /// The on-chain configs and resources the executor reads (see
+    /// `providers::read_config` and `providers::read_resource`).
     pub approved_execution_hashes: InternedType,
+    pub current_time_microseconds: InternedType,
+    pub patched_jwks: InternedType,
+    pub federated_jwks: InternedType,
 }
 
 impl FrameworkSymbols {
@@ -48,12 +58,23 @@ impl FrameworkSymbols {
             versioned_epilogue: function(ident_str!("versioned_epilogue")),
 
             approved_execution_hashes: config_type::<ApprovedExecutionHashes>(interner),
+            current_time_microseconds: config_type::<CurrentTimeMicroseconds>(interner),
+            patched_jwks: config_type::<PatchedJWKs>(interner),
+            federated_jwks: resource_type::<FederatedJWKs>(interner),
         }
     }
 }
 
 /// Interns the type of the on-chain config `T`.
 fn config_type<T: OnChainConfig>(interner: &impl Interner) -> InternedType {
-    intern_struct_tag(&T::struct_tag(), interner)
-        .expect("a config's struct tag is a valid, non-generic framework type")
+    framework_type(&T::struct_tag(), interner)
+}
+
+/// Interns the type of the framework resource `T`.
+fn resource_type<T: MoveStructType>(interner: &impl Interner) -> InternedType {
+    framework_type(&T::struct_tag(), interner)
+}
+
+fn framework_type(tag: &StructTag, interner: &impl Interner) -> InternedType {
+    intern_struct_tag(tag, interner).expect("a framework struct tag is a valid, non-generic type")
 }
