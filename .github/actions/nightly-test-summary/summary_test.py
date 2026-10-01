@@ -80,6 +80,8 @@ class NightlySummaryTest(unittest.TestCase):
                 "conclusion": "success",
                 "attempt": 2,
                 "url": "https://github.com/org/repo/actions/runs/1",
+                "jobs": [{"name": "flaky", "conclusion": "success"}],
+                "first_attempt_jobs": [{"name": "flaky", "conclusion": "failure"}],
             }
         ]
         failed, payload = self.summary(
@@ -91,7 +93,12 @@ class NightlySummaryTest(unittest.TestCase):
                 {"name": "Nightly full-suite result", "conclusion": None},
             ],
             first_attempt_jobs=[
-                {"name": "flaky", "conclusion": "failure"},
+                {
+                    "name": "flaky",
+                    "conclusion": "failure",
+                    "html_url": "https://github.com/org/repo/actions/runs/2/job/7",
+                    "steps": [{"name": "Run smoke tests", "conclusion": "failure"}],
+                },
                 {"name": "steady", "conclusion": "success"},
                 {"name": "Nightly full-suite result", "conclusion": "failure"},
             ],
@@ -103,7 +110,15 @@ class NightlySummaryTest(unittest.TestCase):
             f"<https://github.com/org/repo/actions/runs/1|{YELLOW}>",
             payload["text"],
         )
-        self.assertIn("Passed on retry: flaky\n", payload["text"] + "\n")
+        # Retried jobs get a history row like failures; tonight's links to the failed attempt.
+        # The result job, still running while the summary is built, is not listed.
+        self.assertTrue(
+            payload["text"].endswith(
+                "Passed on retry:\n"
+                f"{YELLOW}<https://github.com/org/repo/actions/runs/2/job/7|{YELLOW}>"
+                "  flaky \u2014 Run smoke tests"
+            )
+        )
         # Failing again after the retry stays red.
         failed, payload = self.summary(
             {"workspace": {"result": "failure"}},
@@ -171,7 +186,24 @@ class NightlySummaryTest(unittest.TestCase):
         )
         self.assertIn("Nightly full-suite CANCELLED", payload["text"])
         self.assertIn(f"|{CANCELLED}>\nBranch:", payload["text"])
-        self.assertIn(f"{CANCELLED}{RED}{CANCELLED}  forge", payload["text"])
+        # A cancellation lists only jobs that failed before it, not those it interrupted.
+        _, payload = self.summary(
+            {
+                "forge": {"result": "cancelled"},
+                "smoke": {"result": "failure"},
+                "cli": {"result": "skipped"},
+                CANCELLATION_JOB: {"result": "success"},
+            },
+            previous_runs=previous,
+            jobs=[
+                {"name": "forge", "conclusion": "cancelled", "steps": []},
+                {"name": "smoke", "conclusion": "failure", "steps": []},
+            ],
+        )
+        self.assertIn(f"{GREY}{GREY}{RED}  smoke", payload["text"])
+        self.assertNotIn("  forge", payload["text"])
+        self.assertNotIn("Skipped suites", payload["text"])
+        self.assertNotIn("Required suites", payload["text"])
 
     def test_green_run_is_not_failed(self):
         failed, _ = self.summary({"workspace": {"result": "success"}})
@@ -201,6 +233,19 @@ class NightlySummaryTest(unittest.TestCase):
         # Without job details the incomplete suites are named instead.
         _, payload = self.summary({"storage": {"result": "failure"}})
         self.assertIn("Required suites: storage: failure", payload["text"])
+        # So they are when no job row accounts for the failure.
+        _, payload = self.summary(
+            {"storage": {"result": "failure"}},
+            jobs=[{"name": "storage", "conclusion": "action_required", "steps": []}],
+        )
+        self.assertIn("Required suites: storage: failure", payload["text"])
+        # A job that could not start is a failure like any other.
+        _, payload = self.summary(
+            {"storage": {"result": "failure"}},
+            jobs=[{"name": "storage", "conclusion": "startup_failure", "steps": []}],
+        )
+        self.assertIn(f"{RED}  storage", payload["text"])
+        self.assertNotIn("Required suites", payload["text"])
 
     def test_failed_jobs_show_their_seven_night_history(self):
         def night(day, jobs, first_attempt_jobs=None):
